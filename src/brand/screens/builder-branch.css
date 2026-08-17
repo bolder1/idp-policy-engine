@@ -1,0 +1,162 @@
+/* ---------------------------------------------------------------------------
+   Branch view — the same rule drawn as the fork it is.
+
+   Conditions become cards on the node and are edited there; a decision diamond
+   splits below them, match exits right to the outcome, no-match carries on down
+   the spine into the next rule. Population rides the outcome, the way Intercom
+   and Customer.io label theirs, because "how many people take this path" is the
+   question the diagram exists to answer.
+   --------------------------------------------------------------------------- */
+
+.bbn { position: relative; width: 520px; }
+
+.bbn__card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  box-shadow: var(--el-low);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.bbn__card:hover { border-color: var(--border-strong); box-shadow: var(--el-mid); }
+.bbn.is-selected .bbn__card { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg), var(--el-mid); }
+.bbn.is-off .bbn__card { border-style: dashed; opacity: 0.62; }
+.bbn.is-off .bbn__fork,
+.bbn.is-off .bbn__then { opacity: 0.4; }
+
+.bbn__head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bbn__idx {
+  flex: none; width: 21px; height: 21px; border-radius: var(--radius-pill);
+  display: grid; place-items: center;
+  background: var(--surface-inset);
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
+}
+.bbn.is-selected .bbn__idx { background: var(--brand); color: #fff; }
+.bbn__tile { flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; }
+.bbn__tile.is-deny { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bbn__tile.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bbn__tile.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bbn__headbody { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bbn__headbody strong { font-size: var(--fs-md); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bbn__headbody span { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.bbn__acts { display: flex; align-items: center; gap: 3px; flex: none; opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard); }
+.bbn:hover .bbn__acts,
+.bbn.is-selected .bbn__acts,
+.bbn:focus-within .bbn__acts { opacity: 1; }
+.bbn__acts button { width: 24px; height: 24px; border-radius: var(--radius-sm); display: grid; place-items: center; color: var(--text-tertiary); }
+.bbn__acts button:hover:not(:disabled) { background: var(--surface-sunken); color: var(--text-primary); }
+.bbn__acts button:disabled { opacity: 0.35; cursor: default; }
+.bbn__acts .bbn__del:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+
+/* IF — chips you can edit without leaving the canvas. */
+.bbn__if { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 11px 12px; background: var(--surface-sunken); }
+.bbn__kw {
+  flex: none; padding: 2px 8px; border-radius: var(--radius-sm);
+  background: var(--brand-subtle-bg); border: 1px solid var(--brand-subtle-border);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: var(--brand-active);
+}
+.bbn__any { font-size: var(--fs-xs); color: var(--text-muted); font-style: italic; }
+.bbn__conds { display: contents; }
+.bbn__condwrap { display: inline-flex; align-items: center; gap: 6px; }
+.bbn__joiner {
+  padding: 1px 6px; border-radius: var(--radius-pill);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
+  border: 1px solid var(--border-default); background: var(--surface-raised); color: var(--text-tertiary);
+}
+.bbn__joiner.is-and { color: var(--text-secondary); }
+.bbn__joiner.is-or { color: var(--fb-notice-fg); border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.bbn__joiner:hover { border-color: var(--brand); color: var(--brand-active); }
+.bbn__cond {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 4px 4px 9px; border-radius: var(--radius-pill);
+  background: var(--surface-raised); border: 1px solid var(--border-default);
+  font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap;
+}
+.bbn__cond b { font-weight: 600; color: var(--text-primary); }
+.bbn__cond i { font-style: normal; color: var(--text-muted); }
+.bbn__condx { width: 17px; height: 17px; border-radius: 999px; display: grid; place-items: center; color: var(--text-muted); font-size: 13px; line-height: 1; }
+.bbn__condx:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bbn__addcond {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: var(--radius-pill);
+  border: 1px dashed var(--border-default);
+  font-size: var(--fs-xs); font-weight: 500; color: var(--text-secondary);
+}
+.bbn__addcond:hover { border-color: var(--brand); border-style: solid; color: var(--brand-active); background: var(--brand-subtle-bg); }
+
+/* The fork: stem down to the diamond, arm out to the right. */
+.bbn__fork { position: relative; height: 46px; }
+.bbn__forkstem { position: absolute; left: 50%; top: 0; height: 20px; width: 0; border-left: 2px solid var(--border-strong); transform: translateX(-1px); }
+.bbn__diamond {
+  position: absolute; left: 50%; top: 14px;
+  width: 16px; height: 16px; margin-left: -8px;
+  transform: rotate(45deg);
+  border: 2px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-raised);
+}
+.bbn__forkarm {
+  position: absolute; left: calc(50% + 8px); top: 22px;
+  width: calc(50% + 26px); height: 0;
+  border-top: 2px solid var(--border-strong);
+}
+
+/* THEN — the outcome, switchable from the canvas, sitting on the arm and
+   tinted by the decision it carries. */
+.bbn__then {
+  position: absolute; left: calc(100% + 34px); top: calc(100% - 38px);
+  width: 260px;
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+.bbn__then.is-deny { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.bbn__then.is-mfa { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.bbn__then.is-allow { border-color: var(--fb-positive-border); background: var(--fb-positive-bg); }
+.bbn__thenlabel { font-size: 9px; font-weight: 700; letter-spacing: 0.07em; color: var(--text-muted); }
+.bbn__dec { display: flex; gap: 4px; }
+.bbn__decopt {
+  flex: 1; padding: 5px 6px; border-radius: var(--radius-sm);
+  border: 1px solid transparent; background: var(--surface-raised);
+  font-size: var(--fs-xs); font-weight: 500; color: var(--text-tertiary);
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.bbn__decopt:hover { border-color: var(--border-strong); }
+.bbn__decopt.is-on.is-deny { background: var(--fb-negative-dot); border-color: var(--fb-negative-dot); color: #fff; }
+.bbn__decopt.is-on.is-mfa { background: var(--fb-notice-dot); border-color: var(--fb-notice-dot); color: #fff; }
+.bbn__decopt.is-on.is-allow { background: var(--fb-positive-dot); border-color: var(--fb-positive-dot); color: #fff; }
+.bbn__reach { font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* Trace states carry the same meaning they do in the spine view. */
+.bbn.is-eval .bbn__card { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg), var(--el-mid); animation: bnode-pulse 0.6s var(--ease-standard) infinite alternate; }
+.bbn.is-passed .bbn__card { opacity: 0.55; }
+.bbn.is-hit--allow .bbn__card { border-color: var(--fb-positive-dot); box-shadow: 0 0 0 3px var(--fb-positive-bg), var(--el-mid); }
+.bbn.is-hit--mfa .bbn__card { border-color: var(--fb-notice-dot); box-shadow: 0 0 0 3px var(--fb-notice-bg), var(--el-mid); }
+.bbn.is-hit--deny .bbn__card { border-color: var(--fb-negative-dot); box-shadow: 0 0 0 3px var(--fb-negative-bg), var(--el-mid); }
+.bbn.is-hit--allow .bbn__forkarm, .bbn.is-hit--allow .bbn__diamond { border-color: var(--fb-positive-dot); }
+.bbn.is-hit--mfa .bbn__forkarm, .bbn.is-hit--mfa .bbn__diamond { border-color: var(--fb-notice-dot); }
+.bbn.is-hit--deny .bbn__forkarm, .bbn.is-hit--deny .bbn__diamond { border-color: var(--fb-negative-dot); }
+.bbn .bnode__verdict { bottom: auto; top: -9px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bbn.is-eval .bbn__card { animation: none; }
+}
+
+/* Branch nodes need a wider right gutter than the spine's, for the outcomes. */
+.bcanvas__stage:has(.bbn) { padding: 36px 330px 72px 90px; }
+
+@container (max-width: 720px) {
+  .bbn { width: 400px; }
+  .bbn__then { width: 200px; }
+  .bcanvas__stage:has(.bbn) { padding: 32px 250px 72px 40px; }
+}

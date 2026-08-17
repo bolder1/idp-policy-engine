@@ -1,0 +1,225 @@
+/* ---------------------------------------------------------------------------
+   Live console theme.
+
+   Measured directly from test.miniorange.in/moas/admin/customer/home rather
+   than taken from the design system, because the brief is to match the console
+   admins use today. Loaded after tokens.css and overrides it.
+
+   Where the live console and IDP · 2 Core disagree, the live console wins here
+   and the difference is noted:
+
+     - Primary button is navy #263746 in production; the design system makes it
+       brand orange. Orange in production appears only as the active-nav accent.
+     - Type is DM Sans at a 16px base, not Inter at 13px.
+     - The page is white and cards are #f8f9fa; the design system inverts that
+       (grey page, white cards).
+   --------------------------------------------------------------------------- */
+
+:root {
+  /* Type ------------------------------------------------------------------ */
+  --font-ui: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-base: 15px;
+  --fs-lg: 16px;
+  --fs-xl: 18px;
+  --fs-2xl: 20px;
+  --fs-3xl: 24px;
+  --fs-4xl: 28px;
+
+  /* Surfaces — the console is white-on-white with grey tiles ---------------- */
+  --surface-page: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f8f9fa;
+  --surface-inset: #eef1f4;
+  --surface-overlay: #ffffff;
+  --surface-inverse: #1e2c38;
+
+  --border-subtle: #e6e9ec;
+  --border-default: #dde1e6;
+  --border-strong: #adb5bd;
+
+  --text-primary: #212529;
+  --text-body: #212529;
+  --text-secondary: #495057;
+  --text-tertiary: #6c757d;
+  --text-muted: #868e96;
+  --text-inverse: #ffffff;
+  --text-link: #0f6ba4;
+
+  /* Brand stays #EB5424, but in production it is an accent, not a fill ------ */
+  --brand: #eb5424;
+  --brand-hover: #d64c21;
+  --brand-active: #a73c1a;
+  --brand-subtle-bg: #fdeee9;
+  --brand-subtle-border: #f9cabb;
+
+  /* Primary action = the console's navy ------------------------------------ */
+  --int-brand-bg: #263746;
+  --int-brand-bg-hover: #1e2c38;
+  --int-brand-bg-active: #16212b;
+  --int-brand-text: #ffffff;
+
+  --int-neutral-bg: #ffffff;
+  --int-neutral-bg-hover: #f8f9fa;
+  --int-neutral-bg-active: #eef1f4;
+  --int-neutral-border: #dde1e6;
+  --int-neutral-border-hover: #adb5bd;
+  --int-neutral-text: #212529;
+
+  --int-ghost-text: #495057;
+  --int-ghost-bg-hover: #f8f9fa;
+  --int-ghost-bg-active: #eef1f4;
+
+  --int-danger-bg: #c00f3a;
+  --int-danger-bg-hover: #a10c31;
+  --int-danger-text: #ffffff;
+
+  /* Feedback ---------------------------------------------------------------
+     This block used to carry Bootstrap's tones, and because this file loads
+     last it — not tokens.css — was the palette the product actually used in
+     light mode. Dark mode fell through to tokens.css, so the two themes were
+     running different colour systems.
+
+     Bootstrap's warning is #fd7e14: hue 27, thirteen degrees off brand orange
+     (#eb5424, hue 14). MFA chips sit next to orange primary buttons on every
+     card and every rule row, so the two most repeated colours in the product
+     were nearly the same colour.
+
+     Both themes now use the one designed set. See tokens.css for the rules
+     each family is verified against. */
+  --fb-positive-bg: #e8f7ee;
+  --fb-positive-border: #b6e3c6;
+  --fb-positive-fg: #14663a;
+  --fb-positive-dot: #128f43;
+  --fb-negative-bg: #fdf0f2;
+  --fb-negative-border: #f5c6ce;
+  --fb-negative-fg: #a5142b;
+  --fb-negative-dot: #d01243;
+  --fb-notice-bg: #fdf6e0;
+  --fb-notice-border: #f0dfa4;
+  --fb-notice-fg: #7d5800;
+  --fb-notice-dot: #b07a00;
+  --fb-info-bg: #e9f2fd;
+  --fb-info-border: #b9d6f5;
+  --fb-info-fg: #155e91;
+  --fb-info-dot: #1189d4;
+  --fb-neutral-bg: #f8f9fa;
+  --fb-neutral-border: #e6e9ec;
+  --fb-neutral-fg: #495057;
+  --fb-neutral-dot: #7e8b9a;
+  --fb-accent-bg: #f1eefc;
+  --fb-accent-border: #cec3f2;
+  --fb-accent-fg: #4c31a5;
+  --fb-accent-dot: #6d4ae0;
+  --fb-lime-bg: #f2f8e3;
+  --fb-lime-border: #d5e8ab;
+  --fb-lime-fg: #496b0c;
+  --fb-lime-dot: #6b9c14;
+  --fb-magenta-bg: #fbeefa;
+  --fb-magenta-border: #f0c6ec;
+  --fb-magenta-fg: #8b1f81;
+  --fb-magenta-dot: #b52aa8;
+
+  --focus-ring: #263746;
+  --focus-ring-danger: #dc3545;
+
+  /* Shell — measured off the live sidebar ---------------------------------- */
+  --shell-bg: #1e2c38;
+  --shell-bg-deep: #16212b;
+  --shell-raised: #263746;
+  --shell-border: rgba(255, 255, 255, 0.08);
+  --shell-border-strong: rgba(255, 255, 255, 0.14);
+  --shell-text: #ffffff;
+  --shell-text-secondary: rgba(255, 255, 255, 0.88);
+  --shell-text-muted: #cbcbcb;
+  --shell-item-hover: rgba(0, 0, 0, 0.22);
+  --shell-item-active: rgba(0, 0, 0, 0.4);
+
+  /* Geometry -------------------------------------------------------------- */
+  --nav-sidebar-w: 235px;
+  --nav-topbar-h: 52px;
+  --ctl-height-sm: 31px;
+  --ctl-height-md: 35px;
+  --ctl-height-lg: 42px;
+  --table-row-h: 46px;
+  --table-header-h: 40px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+
+  --el-low: 0 1px 2px rgba(33, 37, 41, 0.05);
+  --el-mid: 0 2px 8px rgba(33, 37, 41, 0.07);
+  --el-high: 0 8px 24px rgba(33, 37, 41, 0.12);
+  --el-overlay: 0 16px 48px rgba(33, 37, 41, 0.22);
+}
+
+/* The rail and topbar are measured in shell.css, which is the single place they
+   are defined. This file used to re-state them and, loading last, quietly won —
+   so the values here and there disagreed with no way to tell which applied. */
+
+.brand-root { font-size: var(--fs-md); }
+
+/* Content density follows the console: white page, grey tiles, 6px radii. */
+.bpage { padding: 20px 24px 56px; }
+.bpage__headrow h1 { font-size: var(--fs-3xl); font-weight: 500; letter-spacing: -0.01em; }
+.bpage__headrow p { font-size: var(--fs-md); }
+.btable-wrap, .bx-card, .bedit, .bmaster__list {
+  border-color: var(--border-subtle);
+  box-shadow: none;
+}
+.btable thead th { background: var(--surface-sunken); }
+
+/* --- Corrections after reading the live Adaptive Access Policies screen -----
+   The navy buttons on the dashboard are the "Setup / Customize" tiles, which
+   are secondary. The real primary call to action in the console is the brand
+   orange one — measured on "+ Create Policy": #eb5424, 14px/400, radius 6,
+   padding 6px 16px, height 35. */
+
+:root {
+  --int-brand-bg: #eb5424;
+  --int-brand-bg-hover: #d64c21;
+  --int-brand-bg-active: #a73c1a;
+  --int-brand-text: #ffffff;
+  /* The navy is still used, as a secondary "set this up" affordance. */
+  --int-setup-bg: #263746;
+  --int-setup-bg-hover: #1e2c38;
+}
+
+.bx-btn--brand { font-weight: 400; padding: 0 16px; }
+.bx-btn--setup { background: var(--int-setup-bg); color: #fff; border-color: var(--int-setup-bg); }
+.bx-btn--setup:not(:disabled):hover { background: var(--int-setup-bg-hover); border-color: var(--int-setup-bg-hover); }
+
+/* Page titles in the console are H5 at 20px/700, not a 24px display size. */
+.bpage__headrow h1, .bwiz__title h1 { font-size: 20px; font-weight: 700; letter-spacing: 0; }
+.bpage__headrow p, .bwiz__title p { font-size: var(--fs-md); color: var(--text-secondary); }
+
+/* Table chrome to match: checkbox column, selection bar, rows-per-page footer. */
+.btable thead th { font-size: var(--fs-md); font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text-primary); background: var(--surface-raised); border-bottom: 1px solid var(--border-default); }
+.btable tbody td { font-size: var(--fs-md); }
+.btable__foot { background: var(--surface-raised); color: var(--text-secondary); }
+
+/* Page head on one line -------------------------------------------------------
+   The title and its caption sit on the same baseline, divided by a hairline,
+   and the caption truncates rather than wrapping. Stacked it cost two lines and
+   ~40px of vertical space on every page to restate the nav item you just
+   clicked. */
+.bpage__head { margin-bottom: 16px; }
+.bpage__headrow { align-items: center; }
+.bpage__title { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.bpage__title h1 { flex: none; }
+.bpage__title p {
+  min-width: 0;
+  padding-left: 12px;
+  border-left: 1px solid var(--border-subtle);
+  font-size: var(--fs-md);
+  color: var(--text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@media (max-width: 1000px) {
+  /* Below this the caption cannot survive a truncate and stay useful. */
+  .bpage__title p { display: none; }
+}

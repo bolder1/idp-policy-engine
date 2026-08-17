@@ -1,0 +1,80 @@
+.obj {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.obj__list {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+}
+.obj__group {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+.obj__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  font-size: 13px;
+  text-align: left;
+  transition: all var(--dur-fast) var(--ease);
+}
+.obj__item:not(.obj__item--static):hover { background: var(--bg-hover); }
+.obj__item.is-on { background: var(--bg-selected); border-color: var(--orange-100); color: var(--orange-600); font-weight: 500; }
+.obj__item--static { cursor: default; color: var(--text-2); }
+.obj__item em { font-style: normal; font-size: 10px; color: var(--text-4); white-space: nowrap; }
+
+.obj__detail {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.obj__head { display: flex; align-items: center; gap: 10px; }
+.obj__head h2 { font-size: 16px; }
+.obj__uses { margin-left: auto; font-size: 11px; color: var(--text-3); }
+
+.obj__detail textarea { font-family: var(--font-mono); font-size: 12px; line-height: 1.7; }
+
+.obj__impact { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+.obj__dependents { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.obj__dependents li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  background: var(--bg-rail);
+  font-size: 12px;
+}
+.obj__dep-group { color: var(--text-2); }
+.obj__dep-mode { color: var(--text-3); font-size: 11px; }
+.obj__dependents .linkbtn { margin-top: 0; margin-left: auto; color: var(--text-link); }
+
+.obj__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+}
+
+@media (max-width: 900px) {
+  .obj { grid-template-columns: minmax(0, 1fr); }
+}

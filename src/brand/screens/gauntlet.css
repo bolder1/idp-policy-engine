@@ -1,0 +1,273 @@
+/* ---------------------------------------------------------------------------
+   Policy gauntlet. Prefix `bgt`.
+
+   The one place in this console where a surface is allowed to feel like a
+   scoreboard — and even here the restraint is deliberate: no gradients on the
+   cards, no trophy colours, no green that means "well done" rather than "this
+   held". The tokens are the same feedback triads every other screen uses, and
+   the only thing the game contributes is pacing.
+   --------------------------------------------------------------------------- */
+
+.bgt { display: flex; flex-direction: column; min-height: 0; }
+
+/* --- HUD --------------------------------------------------------------------- */
+
+.bgt__hud {
+  display: flex; align-items: center; gap: var(--space-7);
+  padding: var(--space-7) var(--space-8) var(--space-6);
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.bgt__dial { position: relative; flex: none; width: 96px; height: 96px; }
+.bgt__dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.bgt__dialtrack { fill: none; stroke: var(--border-default); stroke-width: 9; }
+.bgt__dialfill {
+  fill: none; stroke: var(--fb-neutral-dot); stroke-width: 9; stroke-linecap: round;
+}
+.bgt__dial.is-good .bgt__dialfill { stroke: var(--fb-positive-dot); }
+.bgt__dial.is-warn .bgt__dialfill { stroke: var(--fb-notice-dot); }
+.bgt__dial.is-bad .bgt__dialfill { stroke: var(--fb-negative-dot); }
+
+.bgt__dialtext {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px;
+}
+.bgt__dialtext strong { font-size: var(--fs-4xl); font-weight: var(--fw-bold); color: var(--text-primary); line-height: 1; }
+.bgt__dialtext .bgt__dialidle { font-size: var(--fs-2xl); color: var(--text-secondary); }
+.bgt__dialtext em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+.bgt__hudtext { flex: 1; min-width: 0; }
+.bgt__hudtext h3 {
+  display: flex; align-items: center; gap: var(--space-4);
+  margin: 0 0 2px; font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bgt__hudtext p { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); max-width: 62ch; }
+
+.bgt__streak {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: var(--radius-full);
+  background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border);
+  color: var(--fb-notice-fg); font-size: var(--fs-xs); font-weight: var(--fw-medium);
+}
+
+.bgt__counters { display: flex; gap: var(--space-4); margin-top: var(--space-5); }
+.bgt__counter {
+  display: flex; flex-direction: column; gap: 1px;
+  min-width: 92px; padding: var(--space-4) var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.bgt__counter:disabled { opacity: 0.75; cursor: default; }
+.bgt__counter:not(:disabled):hover { border-color: var(--border-strong); }
+.bgt__counter.is-on { border-color: var(--focus-ring); box-shadow: inset 0 0 0 1px var(--focus-ring); }
+.bgt__counter strong { font-size: var(--fs-2xl); font-weight: var(--fw-semibold); line-height: 1.1; }
+.bgt__counter em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bgt__counter.is-held strong { color: var(--fb-positive-fg); }
+.bgt__counter.is-breach strong { color: var(--fb-negative-fg); }
+.bgt__counter.is-lockout strong { color: var(--fb-notice-fg); }
+.bgt__counter.is-friction strong { color: var(--text-secondary); }
+
+/* --- Body -------------------------------------------------------------------- */
+
+.bgt__body {
+  flex: 1; min-height: 0; max-height: 52vh; overflow-y: auto;
+  padding: var(--space-6) var(--space-8);
+}
+
+/* --- The board ------------------------------------------------------------------
+   One surface for the whole run. The deck used to be one screen, the dealing
+   card a second and the results list a third — the same thirteen cards, three
+   times. A tile settles where it already sat, so the card you watched land is
+   the card you read. */
+
+.bgt__board {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+  gap: var(--space-4);
+}
+.bgt__tile {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  width: 100%; height: 100%; padding: var(--space-4) var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  text-align: left; cursor: pointer;
+  transition: opacity var(--dur-normal) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
+}
+.bgt__tile:hover { border-color: var(--border-strong); }
+.bgt__tile:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bgt__tile.is-dim { opacity: 0.32; }
+.bgt__tile.is-sel { border-color: var(--focus-ring); box-shadow: inset 0 0 0 1px var(--focus-ring); }
+.bgt__tile.is-breach { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.bgt__tile.is-lockout { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.bgt__tile.is-held { border-color: var(--fb-positive-border); }
+
+.bgt__tilehead { display: flex; align-items: center; gap: var(--space-3); }
+.bgt__tilehead .bgt__kind { margin-bottom: 0; }
+.bgt__tile.is-threat .bgt__kind {
+  background: var(--fb-negative-bg); border: 1px solid var(--fb-negative-border); color: var(--fb-negative-fg);
+}
+.bgt__tile.is-legit .bgt__kind {
+  background: var(--fb-info-bg); border: 1px solid var(--fb-info-border); color: var(--fb-info-fg);
+}
+.bgt__tilehead .bgt__mark { margin-left: auto; width: 18px; height: 18px; }
+
+.bgt__tilename { flex: 1; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bgt__tilefoot { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; color: var(--text-muted); }
+/* An undealt tile keeps the height its verdict will take, so the board does not
+   reflow card by card while it deals. */
+.bgt__tilewait {
+  width: 44px; height: 18px; border-radius: var(--radius-pill);
+  background: var(--surface-inset);
+}
+
+.bgt__hint { margin: var(--space-6) 0 0; font-size: var(--fs-xs); color: var(--text-muted); text-align: center; }
+
+/* --- The card you clicked --------------------------------------------------------- */
+
+.bgt__detail {
+  position: relative; margin-top: var(--space-5); padding: var(--space-5) var(--space-6) var(--space-6);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-xl);
+  box-shadow: var(--el-mid);
+}
+.bgt__detail.is-breach { border-color: var(--fb-negative-border); }
+.bgt__detail.is-lockout { border-color: var(--fb-notice-border); }
+.bgt__detailhead { display: flex; align-items: flex-start; }
+.bgt__detailhead .bgt__face { flex: 1; padding: 0; }
+.bgt__detailx {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: var(--radius-sm); color: var(--text-muted);
+}
+.bgt__detailx:hover { background: var(--surface-sunken); color: var(--text-primary); }
+
+/* --- Card face ---------------------------------------------------------------- */
+
+.bgt__face { padding: var(--space-5); }
+.bgt__face--sm { padding: var(--space-4) var(--space-5); }
+.bgt__kind {
+  display: inline-block; margin-bottom: var(--space-3);
+  padding: 1px 7px; border-radius: var(--radius-full);
+  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.04em; text-transform: uppercase;
+}
+.bgt__face.is-threat .bgt__kind {
+  background: var(--fb-negative-bg); border: 1px solid var(--fb-negative-border); color: var(--fb-negative-fg);
+}
+.bgt__face.is-legit .bgt__kind {
+  background: var(--fb-info-bg); border: 1px solid var(--fb-info-border); color: var(--fb-info-fg);
+}
+.bgt__cardname { display: block; font-size: var(--fs-base); color: var(--text-primary); }
+.bgt__face--sm .bgt__cardname { font-size: var(--fs-md); }
+.bgt__story { margin: var(--space-3) 0 0; font-size: var(--fs-md); color: var(--text-secondary); }
+
+.bgt__facts {
+  display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5);
+  margin: var(--space-4) 0 0; padding: 0; list-style: none;
+}
+.bgt__facts li {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--fs-xs); color: var(--text-tertiary);
+}
+
+.bgt__mark {
+  flex: none; display: grid; place-items: center;
+  width: 20px; height: 20px; border-radius: var(--radius-full);
+}
+.bgt__mark.is-held { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bgt__mark.is-breach { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bgt__mark.is-lockout { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bgt__mark.is-friction { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); }
+
+.bgt__want { font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+.bgt__why { margin: var(--space-5) 0; font-size: var(--fs-md); color: var(--text-secondary); max-width: 78ch; }
+.bgt__why strong { color: var(--text-body); }
+
+.bgt__trace { margin: 0 0 var(--space-4); padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.bgt__trace li {
+  display: grid; grid-template-columns: 16px minmax(0, auto) 1fr; align-items: baseline; gap: var(--space-3);
+  padding: 3px 0; font-size: var(--fs-xs);
+}
+.bgt__trace li b { color: var(--text-body); font-weight: var(--fw-medium); }
+.bgt__trace li em { font-style: normal; color: var(--text-tertiary); }
+.bgt__trace li.is-hit b { color: var(--fb-positive-fg); }
+.bgt__trace li.is-hit span { color: var(--fb-positive-dot); }
+.bgt__trace li.is-miss span { color: var(--text-muted); }
+.bgt__trace li.is-off,
+.bgt__trace li.is-unreached { opacity: 0.55; }
+
+.bgt__roundacts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-5); }
+.bgt__accept { font-size: var(--fs-xs); color: var(--text-link); }
+.bgt__accept:hover { text-decoration: underline; }
+
+.bgt__foot { flex: 1; font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* --- Toolbar pip -------------------------------------------------------------- */
+
+.bgt__pip {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: var(--ctl-height-sm); padding: 0 10px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
+}
+.bgt__pip:hover { border-color: var(--border-strong); }
+.bgt__pip b { font-weight: var(--fw-bold); }
+.bgt__pip em { font-style: normal; font-size: var(--fs-xs); }
+.bgt__pip.is-good b { color: var(--fb-positive-fg); }
+.bgt__pip.is-warn b { color: var(--fb-notice-fg); }
+.bgt__pip.is-bad b { color: var(--fb-negative-fg); }
+.bgt__pip.is-bad em { color: var(--fb-negative-fg); }
+
+/* --- Proposed fix ---------------------------------------------------------- */
+
+.bgt__fix {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--fb-info-dot);
+  border-radius: var(--radius-md);
+}
+.bgt__fixhead {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-3); color: var(--fb-info-fg);
+}
+.bgt__fixhead strong { font-size: var(--fs-md); }
+.bgt__fixrule {
+  margin: 0 0 var(--space-3); padding: var(--space-3) var(--space-4);
+  background: var(--surface-raised); border-radius: var(--radius-sm);
+  font-size: var(--fs-md); color: var(--text-body);
+}
+.bgt__fixrule b { font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bgt__fixrule em { font-style: normal; font-weight: var(--fw-medium); color: var(--fb-notice-fg); }
+.bgt__fixwhy { margin: 0 0 var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); max-width: 80ch; }
+/* Position is as much of the fix as the rule is, so it is stated rather than
+   left for the administrator to infer from the button label. */
+.bgt__fixwhere {
+  margin: 0 0 var(--space-4); padding-left: var(--space-4);
+  border-left: 2px solid var(--fb-notice-border);
+  font-size: var(--fs-xs); color: var(--fb-notice-fg); max-width: 80ch;
+}
+
+/* --- Replay ----------------------------------------------------------------- */
+
+.bgt__replay {
+  margin-bottom: var(--space-5); padding: var(--space-5);
+  border-radius: var(--radius-lg); border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+.bgt__replay.is-mixed { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.bgt__replayhead { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.bgt__replayhead strong { font-size: var(--fs-md); color: var(--text-primary); }
+.bgt__replayhead span { margin-left: auto; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bgt__replay ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.bgt__replay li { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-md); }
+.bgt__replay li b { font-weight: var(--fw-medium); color: var(--text-body); }
+.bgt__replay li em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bgt__replay li.is-better { color: var(--fb-positive-fg); }
+.bgt__replay li.is-worse { color: var(--fb-negative-fg); }
+.bgt__replay li.is-worse b { color: var(--fb-negative-fg); }

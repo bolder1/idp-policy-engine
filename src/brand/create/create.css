@@ -1,0 +1,958 @@
+/* ---------------------------------------------------------------------------
+   Create a policy — gallery, then name and app.
+   Console-native: white page, #f8f9fa tiles, 6px radii, orange primary.
+   --------------------------------------------------------------------------- */
+
+.bcp { max-width: 1500px; }
+.bcp__head { margin-bottom: 22px; }
+.bcp__crumb { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bcp__crumb button { color: var(--text-tertiary); }
+.bcp__crumb button:hover { color: var(--text-primary); text-decoration: underline; }
+.bcp__headrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.bcp__step { font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--brand-active); margin-bottom: 5px; }
+.bcp__headrow h1 { font-size: 20px; font-weight: 700; }
+.bcp__sub { margin-top: 6px; font-size: var(--fs-md); color: var(--text-secondary); max-width: 76ch; line-height: 1.55; }
+.bcp__headacts { display: flex; gap: 8px; flex: none; }
+
+/* --- Start banner -----------------------------------------------------------
+   The ways to begin used to be spread across three places: two buttons in the
+   page's action trail, a blank card inside the template grid, and a promo tile
+   for the marketplace. Three locations for one decision. They are one banner
+   now, and the fourth route — a template — is a section of its own below, so
+   the banner links down to it instead of pretending to contain it.
+
+   Guided setup is deliberately NOT here. It is the route you take once you have
+   decided to write a policy yourself and met the form, so it sits on that
+   form's action bar beside Create policy — offered at the moment the work
+   actually starts rather than as a fifth thing to choose between. */
+.bhero {
+  position: relative;
+  display: flex; align-items: center; gap: 24px;
+  margin-bottom: 28px;
+  padding: 26px 28px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  /* The dotted canvas the rule thumbnails use, warmed by the brand tint. It
+     reads as this product rather than as a marketing header. */
+  background:
+    radial-gradient(circle at 1px 1px, var(--card-dot) 1px, transparent 0) 0 0 / 12px 12px,
+    linear-gradient(105deg, var(--brand-subtle-bg) 0%, var(--surface-sunken) 58%, var(--surface-sunken) 100%);
+}
+.bhero__body { flex: 1; min-width: 0; }
+.bhero h2 {
+  font-size: var(--fs-2xl); font-weight: var(--fw-semibold);
+  letter-spacing: -0.015em; color: var(--text-primary);
+}
+.bhero p {
+  margin-top: 6px; max-width: 58ch;
+  font-size: var(--fs-base); color: var(--text-secondary); line-height: 1.55;
+}
+.bhero__acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.bhero__acts .bx-btn { display: inline-flex; align-items: center; gap: 7px; }
+/* A link, not a third button — it moves you down the page rather than starting
+   anything, and giving it a button's weight would misreport what it does. */
+.bhero__jump {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-left: 4px;
+  font-size: var(--fs-md); color: var(--text-link);
+}
+.bhero__jump:hover { text-decoration: underline; }
+
+/* Three chips on a spine — the same drawing as a rule stack, at a glance. */
+.bhero__art {
+  position: relative; flex: none;
+  width: 188px; height: 116px;
+  display: none;
+}
+@media (min-width: 900px) { .bhero__art { display: block; } }
+.bhero__art::before {
+  content: ''; position: absolute;
+  left: 14px; top: 12px; bottom: 12px;
+  width: 1px; background: var(--border-default);
+}
+.bhero__chip {
+  position: absolute; left: 0;
+  display: inline-flex; align-items: center;
+  height: 26px; padding: 0 11px 0 30px;
+  border-radius: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 2px rgba(33, 37, 41, 0.05);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium);
+}
+.bhero__chip::before {
+  content: ''; position: absolute; left: 9px;
+  width: 11px; height: 11px; border-radius: 3px;
+}
+.bhero__chip.is-1 { top: 6px; width: 132px; color: var(--fb-negative-fg); }
+.bhero__chip.is-1::before { background: var(--fb-negative-dot); }
+.bhero__chip.is-2 { top: 45px; width: 152px; color: var(--fb-notice-fg); }
+.bhero__chip.is-2::before { background: var(--fb-notice-dot); }
+.bhero__chip.is-3 { top: 84px; width: 116px; color: var(--fb-positive-fg); }
+.bhero__chip.is-3::before { background: var(--fb-positive-dot); }
+
+@media (max-width: 720px) {
+  .bhero { padding: 20px; }
+  .bhero__acts .bx-btn { flex: 1; justify-content: center; }
+}
+
+/* --- Gallery --------------------------------------------------------------- */
+
+.bgal__bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.bgal__bar .bgal__section { margin: 0; flex: 1; }
+.bcp__count {
+  font-style: normal; margin-left: 7px; padding: 0 6px;
+  border-radius: var(--radius-pill); background: var(--surface-inset);
+  font-size: var(--fs-xs); font-weight: 500; color: var(--text-tertiary);
+}
+.bgal__tabs { display: inline-flex; gap: 2px; padding: 3px; background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+.bgal__tab { position: relative; padding: 7px 13px; border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--text-secondary); }
+.bgal__tab span { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; }
+.bgal__tab em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+.bgal__tab.is-on { color: var(--text-primary); font-weight: 500; }
+.bgal__tabbg { position: absolute; inset: 0; background: var(--surface-raised); border-radius: var(--radius-sm); box-shadow: var(--el-low); }
+.bgal__search { width: 240px; margin-left: auto; }
+/* In the templates bar the search no longer claims the whole gap — the gallery
+   button sits after it, and both stay right-aligned as a pair. */
+.bgal__bar .bgal__search { flex: none; }
+.bgal__bar > .bx-btn { flex: none; }
+
+/* Spacing is asymmetric on purpose: a heading needs more air above it when it
+   follows a block of cards than when it follows the toolbar, or the group it
+   introduces reads as belonging to the group above it. 40 above, 16 below, and
+   the toolbar's own 28 covers the first one. */
+.bgal__section {
+  display: flex; align-items: center; gap: 10px;
+  font-size: var(--fs-md); font-weight: 600; color: var(--text-primary);
+  margin: 40px 0 16px;
+}
+.bgal__section:first-of-type { margin-top: 0; }
+
+/* The count, then who the group belongs to — the two things that make the
+   segregation readable without opening a card. Centred rather than
+   baseline-aligned: a bordered pill sits visibly high off a text baseline. */
+.bgal__section em {
+  font-style: normal; font-weight: 500; font-size: var(--fs-xs); line-height: 18px;
+  padding: 0 8px; border-radius: var(--radius-pill);
+  background: var(--surface-sunken); border: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+}
+/* A hairline, so the attribution reads as a separate fact from the count
+   rather than as more of the same label. */
+.bgal__section span {
+  padding-left: 12px;
+  border-left: 1px solid var(--border-subtle);
+  font-weight: 400; font-size: var(--fs-sm); color: var(--text-muted);
+}
+.bgal__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(296px, 1fr)); gap: 18px; align-items: start; }
+.bgal__none { padding: 48px; text-align: center; display: grid; gap: 14px; justify-items: center; color: var(--text-tertiary); }
+
+/* --- Template card ---------------------------------------------------------
+   A thumbnail of the rule stack, then the heading, then the description, then a
+   trailing action row.
+
+   The face was a tinted panel with a category icon in the middle. Both said the
+   same thing the heading said, and they cost 150px to say it. It now carries a
+   miniature of the policy itself — the rules, numbered, in evaluation order,
+   each with the outcome it lands on — drawn the way the builder's canvas draws
+   them, so the thumbnail and the editor are recognisably the same object.
+
+   Only one thing on this card is coloured now, and it is the decision. Green,
+   amber and red mean Allow, MFA and Deny here exactly as they do everywhere
+   else, and with the six decorative tints gone nothing competes with them. */
+:root {
+  --card-dot: rgba(33, 37, 41, 0.13);
+  --peek-bg: rgba(255, 255, 255, 0.72);
+}
+:root[data-theme='dark'] {
+  --card-dot: rgba(255, 255, 255, 0.1);
+  --peek-bg: rgba(255, 255, 255, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --card-dot: rgba(255, 255, 255, 0.1);
+    --peek-bg: rgba(255, 255, 255, 0.12);
+  }
+}
+
+.bgcard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* Sized to a four-row thumbnail plus a one-line heading and a two-line
+     description. Everything inside is fixed height, so a row of cards stays
+     level however long the names run. */
+  height: 362px;
+  overflow: hidden;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(33, 37, 41, 0.04);
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.bgcard:hover,
+.bgcard:focus-within { border-color: var(--border-default); box-shadow: 0 8px 22px rgba(33, 37, 41, 0.1); }
+
+/* The canvas. Sunken and dotted, because that is what the builder's canvas is —
+   the thumbnail reads as a scaled-down artboard rather than a decorative panel. */
+.bgcard__canvas {
+  position: relative;
+  flex: none;
+  height: 212px;
+  /* Centred, with the top inset reserving room for the badge and the bottom
+     inset for the readout, so a one-rule template and a five-rule one both sit
+     on the same optical line instead of one hugging the ceiling. */
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 32px 13px 43px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--card-dot) 1px, transparent 0) 0 0 / 12px 12px,
+    var(--surface-sunken);
+  border-bottom: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.bgcard__stack {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* The spine linking the numbers — the same connector the builder canvas draws
+   between rules, which is what makes the order read as order. */
+.bgcard__stack::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 11px;
+  bottom: 11px;
+  width: 1px;
+  background: var(--border-default);
+}
+
+.bgcard__mrow {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 7px 0 5px;
+  text-align: left;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 1px 1px rgba(33, 37, 41, 0.03);
+}
+
+.bgcard__mn {
+  display: grid;
+  place-items: center;
+  width: 18px; height: 18px;
+  border-radius: 5px;
+  background: var(--surface-inset);
+  border: 1px solid var(--border-subtle);
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  color: var(--text-tertiary);
+}
+.bgcard__mname {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bgcard__mdec {
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.02em;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+.bgcard__mdec.is-deny { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bgcard__mdec.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bgcard__mdec.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+
+/* Not part of the template: what the engine does when nothing above matched. */
+.bgcard__mrow--default {
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+}
+.bgcard__mrow--default .bgcard__mname { color: var(--text-tertiary); font-weight: var(--fw-regular); }
+.bgcard__mrow--default .bgcard__mdec { opacity: 0.7; }
+
+.bgcard__mrow--rest {
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+}
+.bgcard__mrow--rest .bgcard__mname { color: var(--text-secondary); }
+
+.bgcard__mrow--ghost {
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+}
+.bgcard__mrow--ghost .bgcard__mname { color: var(--text-tertiary); font-weight: var(--fw-regular); }
+.bgcard__mrow--ghost .bgcard__mn { color: var(--text-tertiary); }
+
+/* Fixed height and pinned to the canvas floor. Idle it states the posture;
+   pointing at a row swaps in that rule's condition. Nothing reflows either
+   way, which is what lets the strip carry real text. */
+.bgcard__readout {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 30px;
+  display: flex; align-items: center; gap: 7px;
+  padding: 0 13px;
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--fs-xs);
+}
+.bgcard__rlabel {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.bgcard__rtext {
+  min-width: 0;
+  color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.bgcard__badge {
+  position: absolute; top: 10px; left: 10px; z-index: 3;
+  max-width: calc(100% - 56px);
+  padding: 2px 9px; border-radius: var(--radius-pill); white-space: nowrap;
+  /* Violet, not brand orange. "Recommended" is a label, not an action, and in
+     brand orange it competed with the primary button on the same screen. */
+  background: var(--fb-accent-bg); color: var(--fb-accent-fg);
+  border: 1px solid var(--fb-accent-border);
+  font-size: var(--fs-xs); font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+.bgcard__peek {
+  position: absolute; top: 9px; right: 9px; z-index: 3;
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--peek-bg);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  /* Always painted. It is the only control on the thumbnail, so hiding it until
+     hover would make the one way into the preview the one thing you cannot see. */
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bgcard__peek:hover { background: var(--surface-raised); color: var(--text-primary); border-color: var(--border-strong); }
+.bgcard__peek:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+.bgcard__body {
+  flex: 1;
+  min-height: 0;
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 13px 16px 0;
+}
+.bgcard__h {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bgcard__sub {
+  font-size: var(--fs-md);
+  color: var(--text-secondary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bgcard__foot {
+  flex: none;
+  height: 54px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 0 12px 0 16px;
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border-subtle);
+}
+.bgcard__meta {
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bgcard__meta i { font-style: normal; margin: 0 5px; color: var(--border-strong); }
+
+.bgcard__cta {
+  flex: none;
+  height: 30px;
+  padding: 0 13px;
+  border-radius: var(--radius-md);
+  background: var(--int-neutral-bg);
+  border: 1px solid var(--int-neutral-border);
+  color: var(--int-neutral-text);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+}
+.bgcard__cta:hover { background: var(--int-neutral-bg-hover); border-color: var(--int-neutral-border-hover); }
+.bgcard:hover .bgcard__cta,
+.bgcard:focus-within .bgcard__cta { background: var(--brand); border-color: var(--brand); color: var(--text-on-brand); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bgcard, .bgcard__peek { transition: none; }
+}
+
+/* --- Preview dialog --------------------------------------------------------
+   The same drawing as the card face, at a size that fits the conditions. */
+.bprev__sub { font-size: var(--fs-base); color: var(--text-secondary); line-height: 1.55; }
+
+.bprev__facts {
+  display: grid; grid-template-columns: auto auto 1fr; gap: 0 22px;
+  margin: 14px 0 0; padding: 11px 14px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.bprev__facts dt {
+  font-size: 10px; font-weight: var(--fw-semibold);
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
+}
+.bprev__facts dd { margin: 3px 0 0; font-size: var(--fs-md); color: var(--text-primary); }
+.bprev__facts > div:last-child { min-width: 0; }
+
+.bprev__note { margin-top: 14px; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.5; }
+
+/* Dotted canvas and a spine, matching the thumbnail. */
+.bprev__stack {
+  position: relative;
+  list-style: none; margin: 10px 0 0;
+  padding: 13px;
+  display: flex; flex-direction: column; gap: 6px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--card-dot) 1px, transparent 0) 0 0 / 12px 12px,
+    var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.bprev__stack::before {
+  content: ''; position: absolute;
+  left: 27px; top: 26px; bottom: 26px;
+  width: 1px; background: var(--border-default);
+}
+
+.bprev__node {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 11px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 1px 1px rgba(33, 37, 41, 0.03);
+}
+.bprev__node--default {
+  background: transparent; border-style: dashed; box-shadow: none;
+}
+.bprev__node--default .bprev__body strong { color: var(--text-secondary); font-weight: var(--fw-medium); }
+
+.bprev__n {
+  flex: none; width: 20px; height: 20px; border-radius: 6px;
+  display: grid; place-items: center;
+  background: var(--surface-inset); border: 1px solid var(--border-subtle);
+  font-size: 10px; font-weight: var(--fw-semibold); color: var(--text-tertiary);
+}
+.bprev__body { flex: 1; min-width: 0; }
+.bprev__body strong { display: block; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bprev__body > span {
+  display: block; margin-top: 2px;
+  font-size: var(--fs-sm); color: var(--text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bprev__body i {
+  font-style: normal; font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.04em; color: var(--text-muted);
+}
+.bprev__right { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.bprev__right em { font-style: normal; font-size: 10px; color: var(--text-tertiary); }
+
+.bprev__foot {
+  margin-top: 12px;
+  font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.5;
+}
+
+/* --- Step 2 ---------------------------------------------------------------- */
+
+.bname2__main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.bcard { background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px 20px; }
+/* The whole form is one card of two fields. It was two cards because each one
+   carried a heading and a paragraph and needed the separation; with the prose
+   gone they are just fields, and fields belong in the same box. */
+.bname2__form { display: flex; flex-direction: column; gap: 18px; }
+.bname2__field { display: flex; flex-direction: column; gap: 6px; }
+.bname2__label {
+  display: block;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary);
+}
+.bname2__label i { font-style: normal; color: var(--fb-negative-dot); }
+.bname2__hint { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bname2__count { align-self: flex-end; font-size: var(--fs-xs); color: var(--text-muted); }
+
+
+
+.bname2__rules li { display: flex; align-items: center; gap: 9px; padding: 9px 11px; background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); }
+.bname2__none { margin-top: 6px; font-size: var(--fs-sm); color: var(--fb-notice-fg); line-height: 1.5; }
+.bname2__acts { display: flex; gap: 8px; margin-top: 18px; }
+.bname2__acts .bx-btn { flex: 1; }
+.bname2__foot { margin-top: 10px; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
+
+@media (max-width: 1100px) {
+  .bname2 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --- Bottom bar ------------------------------------------------------------ */
+
+.bbar {
+  grid-column: 1 / -1;
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 4px;
+  padding: 13px 18px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: 0 -2px 12px rgba(33, 37, 41, 0.06);
+  z-index: 20;
+}
+.bbar__note { font-size: var(--fs-sm); color: var(--text-tertiary); min-width: 0; }
+.bbar__acts { display: flex; align-items: center; gap: 8px; flex: none; }
+
+/* --- Guided setup ------------------------------------------------------------
+   The only animated control in the product. A slow sheen crosses it every few
+   seconds and the wand lifts on hover; everything else on this bar is still, so
+   the one moving thing reads as an invitation rather than as noise.
+
+   It is not the primary — Create policy is, and there is still exactly one
+   brand button here. This one is a bordered brand-tinted button: visibly
+   different from the neutral Back, visibly lighter than the thing that commits.
+   Under prefers-reduced-motion the sheen does not run at all. */
+.bguided {
+  position: relative; overflow: hidden;
+  display: inline-flex; align-items: center; gap: 7px;
+  height: var(--ctl-height-md); padding: 0 var(--space-5);
+  border: 1px solid var(--brand); border-radius: var(--radius-md);
+  background: var(--brand-subtle-bg); color: var(--brand-active);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); white-space: nowrap; cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.bguided:hover { box-shadow: var(--el-low); }
+.bguided svg { transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.bguided:hover svg { transform: translateY(-2px) rotate(-12deg); }
+.bguided:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.bguided__sheen {
+  position: absolute; inset: 0 auto 0 -60%;
+  width: 55%;
+  /* A sheen is a highlight, so it stays lighter than the button in both themes
+     — it cannot be derived from a token that flips. It is dialled back on the
+     dark surface, where the same alpha reads as a flash. */
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.72), transparent);
+  animation: bguided-sheen 4.2s var(--ease-standard) infinite;
+  pointer-events: none;
+}
+html[data-theme='dark'] .bguided__sheen {
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.14), transparent);
+}
+@keyframes bguided-sheen {
+  0%, 55% { transform: translateX(0); }
+  100% { transform: translateX(320%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bguided__sheen { display: none; }
+  .bguided svg { transition: none; }
+  .bguided:hover svg { transform: none; }
+}
+
+/* --- Empty state ----------------------------------------------------------- */
+
+.bempty {
+  margin-top: 8px;
+  padding: 0 0 14px;
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  text-align: center;
+}
+.bempty .glscene { border-bottom: none; border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.bempty strong { display: block; margin-top: 10px; font-size: var(--fs-md); font-weight: 600; }
+.bempty span { display: block; margin: 4px 14px 0; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.55; }
+
+/* --- App transfer ---------------------------------------------------------- */
+
+.bname2__applogo { display: inline-flex; flex: none; }
+
+/* Protects — one row, because there is one app. */
+
+/* Protects — the one place an app can be taken off the policy.
+   Box and scrolling live in the block near the bottom of this file. */
+.bname2__chipx {
+  width: 22px; height: 22px; border-radius: var(--radius-sm); flex: none;
+  color: var(--text-muted); font-size: var(--fs-base); line-height: 1;
+}
+.bname2__chipx:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+
+
+
+
+@media (max-width: 1120px) {
+  /* The rail's width lives in one variable, so this needs no override — a
+     hard-coded 200px here broke the moment the rail could collapse. */
+}
+
+/* --- The summary panel is a plain block ------------------------------------
+   It used to be a sticky flex column handing its height down to appsum and on
+   to the lists, so every child's height depended on the whole chain and a
+   single stray override anywhere in this file broke it silently. The panel and
+   the rule list now just grow; the commit bar is fixed, so nothing they push
+   down ends up out of reach. */
+
+
+
+/* --- Mobile ---------------------------------------------------------------
+   The console rail collapses below this, so the gallery gets the full width and
+   the summary stops being a sidebar. */
+@media (max-width: 720px) {
+  .bcp { padding-bottom: 92px; }
+  .bcp__headrow { flex-direction: column; gap: 14px; }
+  .bcp__headacts { width: 100%; }
+  .bcp__headacts .bx-btn { flex: 1; }
+
+  .bgal__bar { gap: 10px; }
+  .bgal__tabs { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .bgal__tab { white-space: nowrap; }
+  .bgal__search { width: 100%; margin-left: 0; }
+  .bgal__grid { grid-template-columns: minmax(0, 1fr); }
+
+
+  .bbar { left: 0; padding: 11px 16px; flex-wrap: wrap; gap: 10px; }
+  .bbar__note { flex: 1 1 100%; order: 2; }
+  .bbar__acts { flex: 1 1 100%; }
+  .bbar__acts .bx-btn { flex: 1; }
+}
+
+/* --- Template gallery (marketplace) ----------------------------------------
+   A sheet over the create flow, not a third step — "Step 1 of 2" stays true,
+   and you come back to exactly where you were if you close it.
+   -------------------------------------------------------------------------- */
+
+.bmarket {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(20, 25, 30, 0.42);
+  backdrop-filter: blur(2px);
+}
+.bmarket__sheet {
+  display: flex; flex-direction: column;
+  width: min(1180px, 100%); height: min(92vh, 100%);
+  background: var(--surface-page);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -12px 44px rgba(20, 25, 30, 0.28);
+  overflow: hidden;
+}
+
+.bmarket__head {
+  flex: none;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 18px 24px 16px;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bmarket__brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.bmarket__mark {
+  flex: none; width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center;
+  background: var(--brand-subtle-bg); color: var(--brand-active);
+  border: 1px solid var(--brand-subtle-border);
+}
+.bmarket__head h2 { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.01em; }
+.bmarket__head p { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bmarket__x {
+  flex: none; width: 34px; height: 34px; border-radius: var(--radius-md);
+  display: grid; place-items: center; color: var(--text-tertiary);
+}
+.bmarket__x:hover { background: var(--surface-sunken); color: var(--text-primary); }
+
+.bmarket__bar {
+  flex: none;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px 24px;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Only the catalogue scrolls — the header and filters stay put, which is the
+   difference between browsing a gallery and scrolling a page. */
+.bmarket__body { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px 40px; }
+.bmarket__body .bgal__section:first-of-type { margin-top: 0; }
+
+/* --- The entry point in the grid ------------------------------------------- */
+
+.bmarket__promo {
+  display: flex; flex-direction: column; align-items: flex-start;
+  height: 284px; padding: 22px 20px;
+  border: 1px dashed var(--border-default);
+  border-radius: 20px;
+  background: var(--surface-sunken);
+  text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+}
+.bmarket__promo:hover { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bmarket__promoicon {
+  width: 46px; height: 46px; border-radius: 13px; margin-bottom: 16px;
+  display: grid; place-items: center;
+  background: var(--surface-raised); color: var(--brand-active);
+  border: 1px solid var(--border-subtle);
+}
+.bmarket__promo strong { font-size: var(--fs-lg); font-weight: 600; }
+.bmarket__promosub {
+  margin-top: 6px; font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.5;
+}
+.bmarket__promocta {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: auto;
+  font-size: var(--fs-sm); font-weight: 500; color: var(--brand-active);
+}
+
+@media (max-width: 720px) {
+  .bmarket__sheet { height: 100%; border-radius: 0; }
+  .bmarket__head, .bmarket__bar, .bmarket__body { padding-left: 16px; padding-right: 16px; }
+  .bmarket__bar .bgal__tabs { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .bmarket__bar .bgal__search { width: 100%; margin-left: 0; }
+}
+
+/* The review line. Deliberately quiet — it is provenance, not a boast, and it
+   must not out-shout the action beside it. */
+.bgcard__reviewed { display: inline-flex; align-items: center; gap: 5px; color: var(--text-tertiary); }
+.bgcard__reviewed svg { color: var(--fb-positive-fg); flex: none; }
+
+/* --- Step 2 · a page that fits ----------------------------------------------
+   The step is now sized to the viewport instead of flowing past it. The page
+   itself never scrolls; the one thing whose length is unbounded — the rule
+   list, which a template can fill with any number of rules — scrolls inside
+   its own panel.
+
+   That also removes the fixed action bar and the 84px of padding the page had
+   to reserve underneath it. With the page a fixed-height column, the bar is
+   simply the last row of that column, which is both simpler and honest about
+   where the bottom of the page is. */
+.bcp--fit {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+.bcp--fit .bcp__head { margin-bottom: 16px; }
+.bcp--fit > div:has(.bname2) { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+.bcp__stepcrumb { color: var(--brand-active); font-weight: 500; }
+
+/* Two columns of equal height, so their bottoms line up instead of ending
+   wherever their content happens to stop. */
+.bname2 {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(340px, 36%) minmax(0, 1fr);
+  gap: 16px;
+}
+.bname2__form,
+.bname2__side {
+  min-height: 0;
+  height: 100%;
+}
+.bname2__form { overflow-y: auto; }
+
+.bname2__side {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.bname2__sidehead {
+  flex: none;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+.bname2__sidehead h2 { font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
+.bname2__sidehead p { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bname2__off {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--fb-neutral-bg);
+  border: 1px solid var(--fb-neutral-border);
+  color: var(--fb-neutral-fg);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); white-space: nowrap;
+}
+/* The only scroller on the page. */
+.bname2__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
+.bname2__rules { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bname2__rules--default { border-style: dashed !important; background: transparent !important; }
+.bname2__blank {
+  height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  text-align: center; padding: 24px;
+}
+.bname2__blank strong { font-size: var(--fs-base); color: var(--text-secondary); }
+.bname2__blank span { font-size: var(--fs-sm); color: var(--text-tertiary); max-width: 34ch; line-height: 1.5; }
+
+
+/* Last row of the column, not a fixed overlay. */
+.bcp--fit .bbar {
+  position: static;
+  flex: none;
+  left: auto; right: auto; bottom: auto;
+  margin-top: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  box-shadow: none;
+  padding: 11px 16px;
+}
+
+@media (max-width: 1120px) {
+  /* Below this the two columns cannot both be useful at half width, so the page
+     goes back to being a normal scrolling page. */
+  .bcp--fit { height: auto; overflow: visible; }
+  .bname2 { grid-template-columns: minmax(0, 1fr); }
+  .bname2__form, .bname2__side { height: auto; }
+  .bname2__scroll { max-height: 420px; }
+}
+
+/* --- Application list -------------------------------------------------------
+   Open, not collapsed. It is the only choice on this page, so nothing is
+   competing for the room, and the column had nothing else to put in it. Search
+   is what makes this scale to a real tenant's catalogue — collapsing never was
+   the part doing that work. */
+.bname2__field--fill { flex: 1; min-height: 0; }
+.bname2__label em {
+  font-style: normal; font-weight: var(--fw-regular);
+  margin-left: 6px; letter-spacing: 0; text-transform: none;
+  color: var(--text-muted);
+}
+
+.bapps {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.bapps__search {
+  position: relative; flex: none;
+  display: flex; align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+.bapps__search > svg { position: absolute; left: 18px; color: var(--text-tertiary); pointer-events: none; }
+.bname2 .bapps__search input {
+  width: 100%; height: 32px;
+  padding: 0 28px 0 29px;
+  font-size: var(--fs-md);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+.bapps__clearq {
+  position: absolute; right: 15px;
+  display: grid; place-items: center;
+  width: 20px; height: 20px;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+}
+.bapps__clearq:hover { background: var(--surface-inset); color: var(--text-primary); }
+
+/* The scroller. The list takes whatever height the column has left, so the
+   page itself never grows. */
+.bapps__list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px; }
+.bapps__row {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+.bapps__row:hover { background: var(--surface-sunken); }
+.bapps__row.is-on { background: var(--brand-subtle-bg); border-color: var(--brand-subtle-border); }
+.bapps__row:focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--focus-ring); }
+.bapps__name {
+  flex: 1; min-width: 0;
+  font-size: var(--fs-base); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bapps__row.is-on .bapps__name { font-weight: var(--fw-medium); }
+.bapps__proto { flex: none; font-size: var(--fs-xs); color: var(--text-tertiary); }
+/* Reserved whether or not it is filled, so ticking a row does not shift the
+   name and protocol sideways. */
+.bapps__mark { flex: none; width: 16px; display: grid; place-items: center; color: var(--brand); }
+.bapps__none { padding: 24px 12px; text-align: center; font-size: var(--fs-md); color: var(--text-tertiary); }
+
+/* The form column is now a flex column whose last field grows, so it stops
+   being a scroller itself — the list inside it is. */
+.bname2__form { overflow: visible; display: flex; flex-direction: column; }
+
+/* The name field, stated explicitly.
+
+   It was rendering with `border: 0px none` on a transparent background — an
+   input you cannot see the edges of. Same failure as the zone name field: the
+   kit's control defaults sit at `.brand-root :where(input[type=…])`, i.e.
+   (0,1,0), and anything that beats them has to say so. `.bname2 .bname2__field
+   input` is (0,2,1) and wins outright, so the field does not depend on which
+   other rule happens to load last. */
+.bname2 .bname2__field input[type='text'] {
+  width: 100%;
+  height: var(--ctl-height-md);
+  padding: 0 10px;
+  font-size: var(--fs-base);
+  color: var(--text-primary);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  transition: border-color var(--dur-fast) var(--ease-standard),
+              box-shadow var(--dur-fast) var(--ease-standard);
+}
+.bname2 .bname2__field input[type='text']::placeholder { color: var(--text-muted); }
+.bname2 .bname2__field input[type='text']:hover { border-color: var(--brand); }
+.bname2 .bname2__field input[type='text']:focus-visible {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: var(--focus-ring);
+}

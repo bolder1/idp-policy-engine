@@ -1,0 +1,376 @@
+/* ---------------------------------------------------------------------------
+   Builder dialogs — Assign apps, Review & Save, Save as template.
+
+   Prefix `bdlg`. Everything sits inside the kit Modal, so this file styles the
+   body content only; the shell, header and footer chrome come from kit.css.
+
+   Two rules held throughout:
+
+   · Every colour is a token. No hex reaches this file.
+   · Anything that has to beat a kit control default is written at real
+     specificity — class + element, or class + class + element — never inside
+     :where(). kit.css sets its control defaults at (0,1,0) with :where(), and a
+     zero-specificity override loses to it silently. Import order cannot be
+     relied on either: main.tsx imports App before its stylesheets, so this file
+     is injected ahead of kit.css and ties go the wrong way.
+   --------------------------------------------------------------------------- */
+
+.bdlg { display: flex; flex-direction: column; }
+
+/* Sits in the modal footer, left of the buttons, and carries the count or the
+   reason the primary action is disabled. Disabled-with-no-reason is the failure
+   this exists to prevent. */
+.bdlg-foot__note {
+  margin-right: auto;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.bdlg-foot__note em {
+  font-style: normal;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+.bdlg-foot__note.is-blocked { color: var(--fb-negative-fg); font-weight: var(--fw-medium); }
+
+.bdlg-empty {
+  margin: 0;
+  padding: var(--space-7) var(--space-5);
+  font-size: var(--fs-md);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+/* --- Assign apps ----------------------------------------------------------- */
+
+.bdlg-apps { gap: var(--space-2); }
+
+/* Pinned to the top of the scrolling modal body: the tab you filtered by has to
+   stay on screen, or an empty list reads as "no apps" rather than "no apps of
+   this type". The negative margins cancel the body's own padding so the bar
+   spans the full width when it sticks. */
+.bdlg-apps__bar {
+  position: sticky;
+  top: calc(-1 * var(--space-7));
+  z-index: 1;
+  margin: calc(-1 * var(--space-7)) calc(-1 * var(--space-7)) 0;
+  padding: var(--space-7) var(--space-7) var(--space-5);
+  background: var(--surface-overlay);
+}
+
+.bdlg-apps__list { display: flex; flex-direction: column; }
+
+.bdlg-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-4);
+  border: var(--bw-thin) solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.bdlg-row:hover { background: var(--surface-sunken); }
+
+/* Selection is a state, so it is drawn as one: a filled box, a tinted row and a
+   border. Hover-only selection means the answer to "what is selected" is
+   wherever the pointer happens to be. */
+.bdlg-row.is-on {
+  background: var(--brand-subtle-bg);
+  border-color: var(--brand-subtle-border);
+}
+.bdlg-row.is-on .bdlg-row__text { color: var(--text-primary); font-weight: var(--fw-medium); }
+
+/* Individually unselected while "All apps" is on: still clickable — clicking
+   one is how you narrow from all to some — but dimmed so the row does not claim
+   to be excluded. */
+.bdlg-row.is-covered:not(.is-on) { opacity: 0.72; }
+
+.bdlg-row input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.bdlg-row__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--fs-md);
+  color: var(--text-body);
+}
+.bdlg-row__text em {
+  font-style: normal;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-regular);
+  color: var(--text-tertiary);
+}
+.bdlg-row__text em.is-warn { color: var(--fb-notice-fg); }
+
+.bdlg-row__meta { flex: none; font-size: var(--fs-xs); color: var(--text-muted); }
+
+.bdlg-row--all {
+  margin-bottom: var(--space-4);
+  padding: var(--space-5) var(--space-4);
+  background: var(--surface-sunken);
+  border-color: var(--border-subtle);
+}
+.bdlg-row--all.is-on { background: var(--brand-subtle-bg); border-color: var(--brand-subtle-border); }
+
+/* --- Review & Save ---------------------------------------------------------- */
+
+.bdlg-rev { gap: var(--space-6); }
+
+.bdlg-rev__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.bdlg-rev__head h3 {
+  margin: 0;
+  margin-right: var(--space-2);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+}
+
+.bdlg-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  overflow: hidden;
+  padding: var(--space-5);
+  background: var(--fb-notice-bg);
+  border: var(--bw-thin) solid var(--fb-notice-border);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
+  color: var(--fb-notice-fg);
+}
+.bdlg-warn svg { flex: none; margin-top: 1px; }
+.bdlg-warn__go {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  color: var(--fb-notice-fg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.bdlg-rev__rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.bdlg-rev__rules > li {
+  padding: var(--space-5);
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--el-low);
+}
+.bdlg-rev__rules > li.is-off { opacity: 0.6; }
+/* The default rule is not editable and never was — drawn flat so it reads as
+   the floor of the list rather than another card you could have written. */
+.bdlg-rev__rules > li.is-default {
+  background: var(--surface-sunken);
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.bdlg-rev__line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-4);
+}
+.bdlg-rev__line strong {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+}
+.bdlg-rev__n {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-tertiary);
+}
+.bdlg-rev__arrow { color: var(--text-muted); }
+
+.bdlg-rev__prose {
+  margin: 0 0 var(--space-2);
+  padding-left: calc(20px + var(--space-4));
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.bdlg-rev__key {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.bdlg-diag {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  margin-left: calc(20px + var(--space-4));
+  padding: var(--space-4);
+  border: var(--bw-thin) solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.bdlg-diag svg { flex: none; margin-top: 2px; }
+.bdlg-diag strong { display: block; font-weight: var(--fw-semibold); }
+.bdlg-diag--error {
+  background: var(--fb-negative-bg);
+  border-color: var(--fb-negative-border);
+  color: var(--fb-negative-fg);
+}
+.bdlg-diag--warning {
+  background: var(--fb-notice-bg);
+  border-color: var(--fb-notice-border);
+  color: var(--fb-notice-fg);
+}
+.bdlg-diag--info {
+  background: var(--fb-neutral-bg);
+  border-color: var(--fb-neutral-border);
+  color: var(--fb-neutral-fg);
+}
+
+/* --- Save as template -------------------------------------------------------- */
+
+.bdlg-tpl { gap: var(--space-6); }
+
+/* (0,2,1) — class, class, element. kit.css sets the control defaults at (0,1,0)
+   via :where(), and textarea height at (0,1,1); both are beaten here on
+   specificity alone, independent of which stylesheet the bundler emits first. */
+.bdlg-tpl input.bdlg-input {
+  width: 100%;
+  height: var(--ctl-height-md);
+}
+.bdlg-tpl textarea.bdlg-input {
+  width: 100%;
+  height: auto;
+  min-height: 76px;
+  padding: var(--space-4) var(--space-5);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.bdlg-tpl__cats {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+/* width so the legend holds its own line in engines that let it participate in
+   the flex row; harmless in the ones that lay it out specially. */
+.bdlg-tpl__cats legend { width: 100%; padding: 0; margin-bottom: var(--space-4); }
+
+.bdlg-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
+  color: var(--text-body);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.bdlg-radio:hover { background: var(--surface-sunken); }
+.bdlg-radio.is-on {
+  background: var(--brand-subtle-bg);
+  border-color: var(--brand-subtle-border);
+  color: var(--brand-active);
+  font-weight: var(--fw-medium);
+}
+.bdlg-radio input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.bdlg-tpl__includes {
+  padding: var(--space-5);
+  background: var(--surface-sunken);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.bdlg-tpl__includes ul {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.bdlg-tpl__includes li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--fs-md);
+  color: var(--text-body);
+}
+.bdlg-tpl__n {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-tertiary);
+}
+.bdlg-tpl__rule { flex: 1; min-width: 0; }
+.bdlg-tpl__includes .bdlg-empty { padding: var(--space-5) 0 0; text-align: left; }
+
+/* --- Reduced motion ----------------------------------------------------------
+   The springs and fades are gated in the components with useReducedMotion, and
+   the CSS transitions are gated here. Both halves are needed: removing the
+   movement while leaving the duration in place still delays every state change,
+   which is the bug this project already shipped once. 1ms rather than 0 so
+   transitionend still fires for anything listening. */
+@media (prefers-reduced-motion: reduce) {
+  .bdlg,
+  .bdlg *,
+  .bdlg *::before,
+  .bdlg *::after {
+    transition-duration: 1ms !important;
+    animation: none !important;
+  }
+}

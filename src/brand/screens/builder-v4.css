@@ -1,0 +1,1070 @@
+/* ---------------------------------------------------------------------------
+   Policy builder v4 — the trail. Prefix `bf`.
+
+   The flow on the left, brought over from v1: a dot-grid stage where the
+   sequence is drawn rather than listed, resizable from the corridor beside it.
+   The trail in the middle: one step at a time, or the whole rule at once. And a
+   panel that arrives from the right only when it is asked for, taking width
+   from the trail rather than sitting on top of it.
+
+   The page cap is opted out of here. `.bpage` caps every screen at 1560px,
+   which is right for a table and wrong for a workspace — at 1920 it left 296px
+   of window empty.
+
+   Every colour is a token.
+   --------------------------------------------------------------------------- */
+
+.bf {
+  display: flex; flex-direction: column;
+  height: 100%; min-height: 0; padding: 0; overflow: hidden;
+  max-width: none;
+  background: var(--surface-page);
+}
+
+/* --- Top bar ----------------------------------------------------------------- */
+
+.bf__bar {
+  flex: none; display: flex; align-items: center; gap: var(--space-4);
+  height: 54px; padding: 0 var(--space-5) 0 var(--space-4);
+  background: var(--surface-raised); border-bottom: 1px solid var(--border-subtle);
+}
+.bf__pips { display: flex; align-items: center; gap: var(--space-3); }
+.bf .bf__name {
+  min-width: 160px; max-width: 380px; height: 32px; padding: 0 var(--space-4);
+  font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary);
+  background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
+}
+.bf .bf__name:hover { border-color: var(--border-default); }
+.bf .bf__name:focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--focus-ring); }
+
+.bf__baracts { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); }
+.bf__sep { width: 1px; height: 20px; margin: 0 var(--space-2); background: var(--border-subtle); }
+
+/* --- Work area ----------------------------------------------------------------
+   The flow takes a share of the window rather than a fixed slice, and the trail
+   takes the rest. Nothing is centred inside space it refuses to use. */
+
+.bf__work {
+  --slide-w: 360px;
+  flex: 1; min-height: 0; display: grid;
+  grid-template-columns: var(--flow-w, 380px) 14px minmax(0, 1fr) 0px;
+  transition: grid-template-columns 240ms var(--ease-standard);
+}
+.bf__work:has(.bf__slide.is-open) { grid-template-columns: var(--flow-w, 380px) 14px minmax(0, 1fr) var(--slide-w); }
+@media (prefers-reduced-motion: reduce) { .bf__work { transition: none; } }
+
+/* Placed explicitly rather than by source order. Hiding the split handle takes
+   it out of flow, and with auto-placement that slid the trail into the 0px
+   column meant for the flow — a whole workspace one property wide. */
+.bf__work > .bf__flow { grid-column: 1; }
+.bf__work > .bf__split { grid-column: 2; }
+.bf__work > .bf__main { grid-column: 3; }
+.bf__work > .bf__slide { grid-column: 4; }
+/* Between 1120 and 1180 the columns still fit until the panel opens, at which
+   point the flow yields rather than the step it is describing. */
+@media (max-width: 1180px) {
+  .bf__work:has(.bf__slide.is-open) { grid-template-columns: 0px 0px minmax(0, 1fr) var(--slide-w); }
+}
+
+/* --- Narrow: the flow becomes a drawer ------------------------------------------
+   At 1024 the flow was taking a third of the window to be a rail. The sequence
+   is something you consult and pick from, not something you need in view while
+   filling in a field — so below 1120 it slides over on request and closes as
+   soon as it has been used. */
+.bf__work.is-narrow { position: relative; grid-template-columns: 0 0 minmax(0, 1fr) 0px; }
+.bf__work.is-narrow:has(.bf__slide.is-open) { grid-template-columns: 0 0 minmax(0, 1fr) var(--slide-w); }
+.bf__work.is-narrow .bf__split[hidden] { display: none; }
+
+.bf__work.is-narrow .bf__flow {
+  position: absolute; z-index: var(--z-popover);
+  left: 0; top: 0; bottom: 0;
+  width: min(340px, 86vw);
+  border-right: 1px solid var(--border-default);
+  box-shadow: var(--el-high);
+  transform: translateX(-102%);
+  transition: transform 220ms var(--ease-standard);
+}
+.bf__work.is-narrow.is-flowopen .bf__flow { transform: translateX(0); }
+@media (prefers-reduced-motion: reduce) { .bf__work.is-narrow .bf__flow { transition: none; } }
+
+.bf__flowscrim {
+  position: absolute; inset: 0; z-index: calc(var(--z-popover) - 1);
+  background: rgb(12 17 23 / 0.32);
+  border: none; cursor: pointer;
+}
+
+.bf__flowbtn {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  height: 32px; padding: 0 var(--space-4);
+  margin-right: var(--space-3);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  color: var(--text-secondary); cursor: pointer;
+}
+.bf__flowbtn:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.bf__flowbtn[aria-expanded='true'] { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-inverse); }
+.bf__flowbtn span { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+
+/* Below a small laptop the step labels are the first thing to go — the numbers
+   and their state colour carry the trail on their own. */
+@media (max-width: 880px) {
+  .bf__steplabel { display: none; }
+  .bf__step { padding: 0 var(--space-3); }
+  /* The pips keep their grade and drop their detail rather than wrapping out of
+     their own pill. The number is the glance; the sentence is in the dialog. */
+  .bf__pips .bgt__pip em, .bf__pips .bia__pip b { display: none; }
+  .bf__pips .bgt__pip, .bf__pips .bia__pip { white-space: nowrap; }
+  .bf__stage { padding: var(--space-5) var(--space-5) var(--space-7); }
+  .bf__stepnav { padding: var(--space-4) var(--space-5); }
+  .bf__bar { padding: 0 var(--space-4); }
+  .bf__work.is-narrow:has(.bf__slide.is-open) { grid-template-columns: 0 0 0 minmax(0, 1fr); }
+}
+
+/* The corridor between them. Invisible until the pointer is near, which is the
+   only way a resize affordance can sit between two columns without becoming a
+   third one. Ported from v1's `.bsplit`. */
+.bf__split { position: relative; display: grid; place-items: center; cursor: col-resize; touch-action: none; background: var(--surface-page); }
+.bf__splitpill {
+  width: 4px; height: 44px; border-radius: var(--radius-lg);
+  background: var(--border-strong); opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard),
+    height var(--dur-fast) var(--ease-standard);
+}
+.bf__split:hover .bf__splitpill,
+.bf__split:focus-visible .bf__splitpill { opacity: 1; }
+.bf__split:active .bf__splitpill { opacity: 1; background: var(--brand); height: 64px; }
+.bf__split:focus-visible { outline: none; }
+.bf__split:focus-visible .bf__splitpill { background: var(--brand); }
+
+/* --- The flow (v1's left side) -------------------------------------------------- */
+
+.bf__flow {
+  display: flex; flex-direction: column; min-height: 0;
+  background:
+    radial-gradient(circle at 1px 1px, var(--border-default) 1px, transparent 0) 0 0 / 16px 16px,
+    var(--surface-sunken);
+  border-right: 1px solid var(--border-subtle);
+}
+.bf__flowhead {
+  flex: none; display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-5) var(--space-5) var(--space-3);
+}
+.bf__flowhead .u-label { flex: 1; }
+.bf__flowcount {
+  padding: 0 7px; border-radius: var(--radius-full);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle);
+  font-size: var(--fs-xs); color: var(--text-tertiary); font-variant-numeric: tabular-nums;
+}
+.bf__flowscroll { flex: 1; min-height: 0; overflow-y: auto; }
+.bf__flowstage { display: flex; flex-direction: column; align-items: stretch; padding: 0 var(--space-5) var(--space-7); }
+
+.bf__flowstart {
+  display: flex; align-items: center; gap: var(--space-4);
+  margin: 0; padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle);
+  font-size: var(--fs-xs); color: var(--text-tertiary);
+}
+.bf__flowstart span { width: 7px; height: 7px; border-radius: var(--radius-full); background: var(--brand); flex: none; }
+
+/* The connector, and v1's insert-here diamond on it.
+
+   A line, not a chevron — the relationship is "and then this one". The `+` is a
+   diamond because that is the flowchart glyph for "a decision happens here",
+   which is exactly what inserting a rule at this point creates, and it surfaces
+   on approach rather than sitting there sixteen times over. The icon
+   counter-rotates so the + stays upright inside the rotated box. Ported from
+   v1's `.bspine__add`. */
+.bf__link {
+  position: relative; flex: none;
+  display: flex; flex-direction: column; align-items: center;
+  height: 44px;
+}
+.bf__linkline {
+  position: absolute; inset: 0 auto 0 50%;
+  width: 0; border-left: 2px dashed var(--border-strong);
+  transform: translateX(-1px);
+}
+.bf__linklabel {
+  position: relative; z-index: 1;
+  margin-top: 12px; padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle);
+  font-size: 10px; font-weight: var(--fw-medium); letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-muted);
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bf__linkadd {
+  position: absolute; top: 50%; left: 50%; z-index: 2;
+  transform: translate(-50%, -50%) rotate(45deg) scale(0.6);
+  display: grid; place-items: center; width: 20px; height: 20px;
+  border-radius: 5px;
+  background: var(--brand); color: var(--text-on-brand);
+  box-shadow: var(--el-mid);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard), transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.bf__linkadd svg { transform: rotate(-45deg); }
+.bf__link:hover .bf__linkadd,
+.bf__linkadd:focus-visible { opacity: 1; transform: translate(-50%, -50%) rotate(45deg) scale(1); }
+/* Must out-specify `.bf__link:hover .bf__linkadd` (0,3,0), which also matches
+   whenever the button itself is hovered — at (0,2,0) the grow never fires. */
+.bf__link:hover .bf__linkadd:hover,
+.bf__link.is-always .bf__linkadd:hover { transform: translate(-50%, -50%) rotate(45deg) scale(1.18); }
+.bf__linkadd:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.bf__link:hover .bf__linklabel { opacity: 0; }
+
+/* The tail diamond is always there — it is also the "add a rule" affordance —
+   and it breathes, quietly, so the rail has one living point of invitation. */
+.bf__link.is-always { height: 56px; }
+.bf__link.is-always .bf__linklabel { display: none; }
+.bf__link.is-always .bf__linkadd {
+  opacity: 1;
+  transform: translate(-50%, -50%) rotate(45deg) scale(1);
+  animation: bf-diamond-breathe 2.6s var(--ease-standard) infinite;
+}
+@keyframes bf-diamond-breathe {
+  0%, 100% { box-shadow: var(--el-mid), 0 0 0 0 rgba(235, 84, 36, 0.35); }
+  55% { box-shadow: var(--el-mid), 0 0 0 7px rgba(235, 84, 36, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bf__link.is-always .bf__linkadd { animation: none; }
+  .bf__linkadd { transition: opacity var(--dur-fast) var(--ease-standard); }
+}
+
+.bf__node {
+  position: relative; display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  box-shadow: var(--el-low);
+  transition: opacity var(--dur-normal) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bf__node.is-on { border-color: var(--brand); box-shadow: var(--el-mid); }
+.bf__node.is-off { opacity: 0.55; border-style: dashed; }
+.bf__node.is-shadowed { opacity: 0.32; }
+.bf__node.is-lifted { opacity: 0.4; }
+.bf__node.is-over { box-shadow: inset 0 2px 0 var(--brand); }
+.bf__node.is-under { box-shadow: inset 0 -2px 0 var(--brand); }
+.bf__node.is-default { background: var(--surface-sunken); border-style: dashed; box-shadow: none; }
+
+.bf__nodeidx {
+  flex: none; display: inline-flex; align-items: center; gap: 1px;
+  padding: 2px 5px 2px 2px; border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary);
+  cursor: grab;
+}
+.bf__nodeidx:active { cursor: grabbing; }
+.bf__nodeidx svg { color: var(--text-disabled); }
+.bf__nodeidx.is-lock { padding: 3px; cursor: default; }
+
+.bf__nodetile {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px;
+  border-radius: var(--radius-md); border: 1px solid transparent;
+}
+.bf__nodetile.is-allow { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
+.bf__nodetile.is-mfa { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bf__nodetile.is-deny { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
+
+.bf__nodeselect {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px;
+  text-align: left; cursor: pointer;
+}
+.bf__nodeselect.as-static { cursor: default; }
+.bf__nodeselect strong {
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bf__nodeselect em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+.bf__nodeselect:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+
+.bf__nodepip { flex: none; width: 7px; height: 7px; border-radius: var(--radius-full); }
+.bf__nodepip.is-ready { background: var(--fb-positive-dot); }
+.bf__nodepip.is-warn { background: var(--fb-notice-dot); }
+.bf__nodepip.is-setup { background: var(--fb-negative-dot); }
+
+/* Drag alone is not an option in an admin console, and rule order IS the
+   policy — so the same move is reachable from the keyboard. */
+.bf__nodemove { position: absolute; right: var(--space-3); top: var(--space-3); display: none; gap: 2px; }
+.bf__node:hover .bf__nodemove, .bf__node:focus-within .bf__nodemove { display: flex; }
+.bf__nodemove button {
+  width: 18px; height: 18px; border-radius: var(--radius-sm);
+  background: var(--surface-raised); border: 1px solid var(--border-default);
+  font-size: 10px; line-height: 1; color: var(--text-secondary);
+}
+.bf__nodemove button:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
+.bf__nodemove button:disabled { opacity: 0.3; }
+
+/* --- The trail ------------------------------------------------------------------ */
+
+.bf__main { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--surface-page); }
+
+/* Wraps rather than scrolls. Opening the side panel takes width off this bar,
+   and a control that scrolls out of sight is a control nobody finds again. */
+.bf__trail {
+  flex: none; display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--space-3) var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  background: var(--surface-raised); border-bottom: 1px solid var(--border-subtle);
+}
+.bf__step {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  height: 32px; padding: 0 var(--space-4) 0 var(--space-3);
+  border: 1px solid transparent; border-radius: var(--radius-pill);
+  font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bf__step:hover:not(:disabled) { background: var(--surface-sunken); }
+.bf__step.is-on { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-inverse); }
+.bf__step:disabled { opacity: 0.4; cursor: not-allowed; }
+.bf__stepn {
+  display: grid; place-items: center; width: 19px; height: 19px; flex: none;
+  border-radius: var(--radius-full); background: var(--surface-inset);
+  font-size: 10px; font-weight: var(--fw-semibold); color: var(--text-muted);
+}
+/* Derived, never awarded. Idle is the default and it is neutral: colour on this
+   chip means "this step wants something from you", so a trail of green ticks on
+   arrival would spend the only signal it has before anything has happened.
+
+   The selected step keeps its state. It used to be overpainted white-on-ink by
+   `.is-on`, which meant the one step you were actually looking at was the one
+   whose state you could not see — scoped to `.is-idle` so that stops. */
+.bf__step.is-idle.is-on .bf__stepn { background: color-mix(in srgb, var(--text-inverse) 16%, transparent); color: var(--text-inverse); }
+.bf__step.is-ok .bf__stepn { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bf__step.is-warn .bf__stepn { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bf__step.is-error .bf__stepn { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+/* On ink, a tinted background is not enough separation — the ring is what keeps
+   a red chip legible against a dark pill. */
+.bf__step.is-on .bf__stepn { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--text-inverse) 34%, transparent); }
+
+.bf__step em {
+  font-style: normal; font-size: 10px; padding: 0 5px;
+  border-radius: var(--radius-full); background: var(--surface-inset); color: var(--text-tertiary);
+}
+.bf__step.is-on em { background: color-mix(in srgb, var(--text-inverse) 16%, transparent); color: var(--text-inverse); }
+/* Severity out-ranks the selected state for the same reason as the number. */
+.bf__step em.is-warn, .bf__step.is-on em.is-warn { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bf__step em.is-bad, .bf__step.is-on em.is-bad { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+
+.bf__trailend { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); }
+.bf__together {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  height: 30px; padding: 0 var(--space-4);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; cursor: pointer;
+}
+.bf__together:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text-primary); }
+.bf__together.is-on { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-inverse); }
+.bf__together:disabled { opacity: 0.4; }
+
+/* --- The stage -------------------------------------------------------------------- */
+
+.bf__stage { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-7) var(--space-8); }
+.bf__panel { max-width: 1080px; }
+
+.bf__rulehead[hidden] { display: none; }
+.bf__rulehead {
+  display: flex; align-items: center; gap: var(--space-4);
+  max-width: 1080px; margin-bottom: var(--space-5);
+  padding-bottom: var(--space-5); border-bottom: 1px solid var(--border-subtle);
+}
+.bf__ruleno {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold);
+}
+.bf__ruleno.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bf__ruleno.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bf__ruleno.is-deny { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bf .bf__ruleName {
+  flex: 1; min-width: 0; height: 34px; padding: 0 var(--space-4);
+  background: none; border: 1px solid transparent; border-radius: var(--radius-md);
+  font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bf .bf__ruleName:hover { border-color: var(--border-default); }
+.bf .bf__ruleName:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bf__ruleon { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* --- Step navigation ---------------------------------------------------------------- */
+
+.bf__stepnav {
+  flex: none; display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-4) var(--space-7);
+  background: var(--surface-raised); border-top: 1px solid var(--border-subtle);
+  transition: background var(--dur-normal) var(--ease-standard), border-color var(--dur-normal) var(--ease-standard);
+}
+/* Unsaved is a state of the bar, not a second bar on top of it. */
+.bf__stepnav.is-dirty { background: var(--fb-notice-bg); border-top-color: var(--fb-notice-border); }
+.bf__stepwhere {
+  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--space-3); justify-content: center;
+  font-size: var(--fs-xs); color: var(--text-muted);
+}
+.bf__stepwhere b { font-weight: var(--fw-medium); color: var(--fb-notice-fg); font-size: var(--fs-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bf__stepwhere i { font-style: normal; color: var(--fb-notice-fg); opacity: 0.8; }
+
+/* --- The slider --------------------------------------------------------------------
+   Three panels behind one column that arrives from the right when you ask for
+   it: what this rule would do, whether it is safe to ship, and shipping it.
+
+   It is a real grid column, not an overlay. A panel that describes the thing
+   you are editing must not be sitting on top of it — so the trail gives up the
+   width and takes it back when the panel closes. */
+
+.bf__slidetabs {
+  display: inline-flex; gap: 2px; padding: 2px;
+  background: var(--surface-inset); border-radius: var(--radius-md);
+}
+.bf__slidetabs button {
+  display: grid; place-items: center;
+  width: 28px; height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary); cursor: pointer;
+}
+.bf__slidetabs button:hover { color: var(--text-primary); }
+.bf__slidetabs button.is-on { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
+
+.bf__slide {
+  min-height: 0; overflow: hidden;
+  background: var(--surface-raised);
+  border-left: 1px solid var(--border-subtle);
+}
+.bf__slide[aria-hidden='true'] { border-left-color: transparent; }
+.bf__slideinner {
+  width: var(--slide-w); height: 100%;
+  display: flex; flex-direction: column; min-height: 0;
+}
+.bf__slidehead {
+  flex: none; display: flex; align-items: center; gap: var(--space-4);
+  height: 44px; padding: 0 var(--space-4) 0 var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bf__slidehead strong { flex: 1; min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bf__slidebody { flex: 1; min-height: 0; overflow-y: auto; }
+.bf__slidebody .bf__preview { padding: var(--space-5); }
+
+.bf__launch { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-5); }
+.bf__launch > .u-label { display: block; }
+.bf__launchclean {
+  margin: 0; padding: var(--space-5);
+  background: var(--surface-sunken); border-radius: var(--radius-md);
+  font-size: var(--fs-md); color: var(--text-tertiary);
+}
+.bf__launchacts { display: flex; flex-direction: column; gap: var(--space-3); margin-top: auto; }
+
+/* --- The form sheet, still hosted by v5 ----------------------------------------------- */
+
+.bf__form { min-height: 0; overflow-y: auto; background: var(--surface-page); }
+.bf__sheet { max-width: 720px; margin: 0 auto; padding: 0 var(--space-8) 140px; }
+
+.bf__sticky {
+  position: sticky; top: 0; z-index: var(--z-sticky);
+  display: flex; align-items: center; gap: var(--space-4);
+  margin: 0 calc(var(--space-8) * -1); padding: var(--space-4) var(--space-8);
+  background: var(--surface-page);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bf__stickyn {
+  display: grid; place-items: center; width: 22px; height: 22px;
+  border-radius: var(--radius-sm); font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+}
+.bf__stickyn.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bf__stickyn.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bf__stickyn.is-deny { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bf__sticky > strong {
+  flex: 1; min-width: 0; font-size: var(--fs-base); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bf__stickyswitch { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+.bf__blank {
+  max-width: 460px; margin: 12vh auto 0; text-align: center; color: var(--text-secondary);
+}
+.bf__blank h2 { margin: var(--space-5) 0 var(--space-3); font-size: var(--fs-xl); color: var(--text-primary); }
+.bf__blank p { margin: 0 0 var(--space-6); font-size: var(--fs-md); }
+.bf__blankacts { display: flex; justify-content: center; gap: var(--space-4); }
+
+/* --- Sections ------------------------------------------------------------------ */
+
+.bf__sec { padding: var(--space-8) 0; border-bottom: 1px solid var(--border-subtle); }
+.bf__sec > header { display: flex; align-items: flex-start; gap: var(--space-5); margin-bottom: var(--space-6); }
+.bf__sec > header > div { flex: 1; min-width: 0; }
+.bf__sec h2 { margin: 0; display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bf__sec > header p { margin: var(--space-2) 0 0; font-size: var(--fs-md); color: var(--text-tertiary); max-width: 70ch; }
+
+/* Hosted by the trail, which names the step it is on. A second copy of the
+   title inside the panel is furniture. */
+.bf__sec.is-bare { padding: 0; border-bottom: none; }
+.bf__secbar { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-5); }
+.bf__secbar h2 { flex: 1; min-width: 0; margin: 0; display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bf__secbar .bf__ifviews { flex: none; }
+.bf__secn {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px;
+  border-radius: var(--radius-full); background: var(--surface-inset);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary);
+}
+
+.bf__input {
+  width: 100%; height: var(--ctl-height-md); padding: 0 var(--space-5);
+  background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  font-size: var(--fs-base); color: var(--text-primary);
+}
+.bf__input--big { height: var(--ctl-height-lg); font-size: var(--fs-lg); font-weight: var(--fw-medium); }
+.bf__input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+
+/* --- Audience ------------------------------------------------------------------ */
+
+.bf__groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(228px, 1fr)); gap: var(--space-3); }
+.bf__group {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  text-align: left; cursor: pointer;
+}
+.bf__group:hover { border-color: var(--border-strong); }
+.bf__group.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bf__groupcheck {
+  flex: none; display: grid; place-items: center; width: 16px; height: 16px;
+  border: 1.5px solid var(--border-strong); border-radius: var(--radius-xs);
+  background: var(--surface-raised); color: var(--text-on-brand);
+}
+.bf__group.is-on .bf__groupcheck { background: var(--brand); border-color: var(--brand); }
+.bf__groupname { flex: 1; font-size: var(--fs-md); color: var(--text-body); }
+.bf__groupn { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* --- IF: the composer ----------------------------------------------------------- */
+
+.bf__ifviews { flex: none; display: flex; gap: 2px; padding: 2px; background: var(--surface-inset); border-radius: var(--radius-md); }
+.bf__ifviews button { padding: 4px 11px; border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer; }
+.bf__ifviews button.is-on { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
+
+.bf__match { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); margin-bottom: var(--space-5); }
+.bf__matchseg { display: flex; gap: 2px; padding: 2px; background: var(--surface-inset); border-radius: var(--radius-md); }
+.bf__matchseg button { padding: 4px 12px; border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer; }
+.bf__matchseg button.is-on { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
+.bf__matchcustom { padding: 4px 10px; font-size: var(--fs-sm); color: var(--fb-notice-fg); }
+.bf__matchnote {
+  flex-basis: 100%; display: flex; align-items: flex-start; gap: 6px;
+  margin: 0; font-size: var(--fs-xs); color: var(--fb-notice-fg); max-width: 76ch;
+}
+
+.bf__conds { margin: 0; padding: 0; list-style: none; }
+.bf__cond { position: relative; }
+
+/* The junction rail. Figma puts the relationship between two rows in the gutter
+   rather than inside either row; the same move here keeps the condition rows
+   scannable as a column of fields. */
+.bf__joiner {
+  position: relative; z-index: 1;
+  display: block; margin: var(--space-3) 0 var(--space-3) var(--space-6);
+  padding: 1px 9px; border-radius: var(--radius-full);
+  border: 1px solid var(--border-default); background: var(--surface-raised);
+  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.05em;
+  color: var(--text-tertiary); cursor: pointer;
+}
+.bf__joiner:hover { border-color: var(--brand); color: var(--brand); }
+.bf__joiner.is-or { color: var(--fb-accent-fg); border-color: var(--fb-accent-border); background: var(--fb-accent-bg); }
+/* The line the pill sits on, so the rail reads as continuous. */
+.bf__cond + .bf__cond .bf__joiner::before {
+  content: ''; position: absolute; left: 50%; top: -8px; height: 8px; width: 1px;
+  background: var(--border-default);
+}
+.bf__cond + .bf__cond .bf__joiner::after {
+  content: ''; position: absolute; left: 50%; bottom: -8px; height: 8px; width: 1px;
+  background: var(--border-default);
+}
+
+.bf__condrow {
+  position: relative; overflow: hidden;
+  display: grid; grid-template-columns: 150px 122px minmax(0, 1fr) 26px;
+  align-items: center; gap: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+/* The category edge. Three pixels, on the side the eye scans down. */
+.bf__condrow::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--cond-dot, var(--border-default));
+}
+.bf__condrow.is-info { --cond-dot: var(--fb-info-dot); --cond-bg: var(--fb-info-bg); --cond-fg: var(--fb-info-fg); }
+.bf__condrow.is-lime { --cond-dot: var(--fb-lime-dot); --cond-bg: var(--fb-lime-bg); --cond-fg: var(--fb-lime-fg); }
+.bf__condrow.is-accent { --cond-dot: var(--fb-accent-dot); --cond-bg: var(--fb-accent-bg); --cond-fg: var(--fb-accent-fg); }
+.bf__condrow.is-magenta { --cond-dot: var(--fb-magenta-dot); --cond-bg: var(--fb-magenta-bg); --cond-fg: var(--fb-magenta-fg); }
+.bf__condrow.is-positive { --cond-dot: var(--fb-positive-dot); --cond-bg: var(--fb-positive-bg); --cond-fg: var(--fb-positive-fg); }
+.bf__condrow.is-notice { --cond-dot: var(--fb-notice-dot); --cond-bg: var(--fb-notice-bg); --cond-fg: var(--fb-notice-fg); }
+.bf__condrow.is-neutral { --cond-dot: var(--fb-neutral-dot); --cond-bg: var(--fb-neutral-bg); --cond-fg: var(--fb-neutral-fg); }
+
+.bf__cond.is-blank .bf__condrow { border-color: var(--fb-negative-border); }
+.bf__condfield {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-body);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bf__condicon {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px;
+  border-radius: var(--radius-sm);
+  background: var(--cond-bg, var(--surface-inset)); color: var(--cond-fg, var(--text-muted));
+}
+.bf__condwarn { margin: var(--space-2) 0 0 var(--space-4); font-size: var(--fs-xs); color: var(--fb-negative-fg); }
+
+.bf .bf__op,
+.bf__val select,
+.bf__val input,
+.bf__propctl select,
+.bf__propctl input {
+  height: var(--ctl-height-sm); padding: 0 var(--space-4);
+  background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  font-size: var(--fs-md); color: var(--text-body); font-family: inherit;
+}
+.bf .bf__op:focus-visible,
+.bf__val select:focus-visible,
+.bf__val input:focus-visible,
+.bf__propctl select:focus-visible,
+.bf__propctl input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+
+.bf__val { min-width: 0; display: flex; align-items: center; gap: var(--space-3); }
+.bf__val--select select, .bf__val > input { width: 100%; }
+.bf__val--chips { flex-wrap: wrap; gap: var(--space-2); }
+.bf__val--time em, .bf__val--range em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+.bf__val--range input { width: 82px; }
+
+/* Multi-value as toggles. The model has always held an array here; a single
+   select was the control lying about it. */
+.bf__vchip {
+  padding: 4px 10px; border-radius: var(--radius-full);
+  border: 1px solid var(--border-default); background: var(--surface-raised);
+  font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
+}
+.bf__vchip:hover { border-color: var(--border-strong); }
+.bf__vchip.is-on { background: var(--brand); border-color: var(--brand); color: var(--text-on-brand); }
+
+.bf__condx {
+  display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: var(--radius-sm); color: var(--text-muted);
+}
+.bf__condx:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+
+.bf__empty {
+  margin: 0; padding: var(--space-6);
+  background: var(--surface-sunken); border: 1px dashed var(--border-default); border-radius: var(--radius-md);
+  font-size: var(--fs-md); color: var(--text-tertiary);
+}
+
+.bf__addwrap { margin-top: var(--space-5); }
+.bf__add {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  height: var(--ctl-height-sm); padding: 0 var(--space-5);
+  border: 1px dashed var(--border-default); border-radius: var(--radius-md);
+  font-size: var(--fs-md); color: var(--text-secondary); cursor: pointer;
+}
+.bf__add:hover { border-color: var(--brand); color: var(--brand); }
+
+/* --- Picker --------------------------------------------------------------------- */
+
+.bf__picker {
+  overflow: hidden; margin-top: var(--space-4);
+  background: var(--surface-raised); border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg); box-shadow: var(--el-mid);
+}
+.bf__pickbar {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+.bf__pickbar input { flex: 1; height: 26px; background: none; border: none; font-size: var(--fs-md); color: var(--text-primary); }
+/* The ring moves to the bar rather than disappearing. Suppressing it outright
+   — which this did — leaves a keyboard user with no way to tell the field has
+   focus, and "focus is never suppressed" is a rule this repo enforces. */
+.bf__pickbar:focus-within { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+.bf__pickbar input:focus-visible { outline: none; }
+.bf__pickbar button { display: grid; place-items: center; width: 22px; height: 22px; border-radius: var(--radius-sm); color: var(--text-muted); }
+.bf__pickbar button:hover { background: var(--surface-sunken); color: var(--text-primary); }
+
+.bf__pickbody { max-height: 320px; overflow-y: auto; padding: var(--space-3); }
+.bf__pickgroup + .bf__pickgroup { margin-top: var(--space-4); }
+.bf__pickgroup h4 {
+  margin: 0 0 var(--space-2); padding: 0 var(--space-4);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.bf__pickgroup button {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  width: 100%; padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md); text-align: left; cursor: pointer; color: var(--text-muted);
+}
+.bf__pickgroup button:hover { background: var(--surface-sunken); }
+.bf__pickgroup button svg { margin-top: 2px; flex: none; }
+.bf__pickgroup button span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.bf__pickgroup button strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bf__pickgroup button em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bf__pickempty { padding: var(--space-6); text-align: center; font-size: var(--fs-md); color: var(--text-muted); }
+
+/* --- Checklist ------------------------------------------------------------------- */
+
+.bf__checklist {
+  padding: var(--space-5);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+}
+.bf__cl_head {
+  display: flex; align-items: baseline; gap: var(--space-4);
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+}
+.bf__cl_head span { font-weight: var(--fw-regular); font-size: var(--fs-xs); color: var(--text-muted); }
+.bf__checklist ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.bf__checklist li { display: flex; align-items: flex-start; gap: var(--space-4); }
+.bf__clbox {
+  flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin-top: 1px;
+  border-radius: var(--radius-xs); border: 1.5px solid var(--border-strong); color: var(--text-muted);
+}
+.bf__checklist li.is-pass .bf__clbox { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
+.bf__checklist li.is-fail .bf__clbox { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
+.bf__checklist li.is-unknown .bf__clbox { border-style: dashed; }
+.bf__cltext { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.bf__cltext strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-body); }
+.bf__cltext em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bf__cljoin {
+  display: inline-block; margin-right: var(--space-3);
+  padding: 0 6px; border-radius: var(--radius-full); background: var(--surface-inset);
+  font-size: 10px; letter-spacing: 0.05em; color: var(--text-tertiary);
+}
+.bf__cljoin.is-or { background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
+
+.bf__verdict {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  margin: var(--space-5) 0 0; padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md); font-size: var(--fs-md);
+}
+.bf__verdict span { display: flex; flex-direction: column; gap: 1px; }
+.bf__verdict strong { font-weight: var(--fw-semibold); }
+.bf__verdict.is-hit { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bf__verdict.is-miss { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); }
+
+/* --- THEN ------------------------------------------------------------------------ */
+
+.bf__outs { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+.bf__out {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-5);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  text-align: left; cursor: pointer; color: var(--text-muted);
+}
+.bf__out:hover { border-color: var(--border-strong); }
+.bf__out strong { font-size: var(--fs-base); color: var(--text-primary); }
+.bf__out em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bf__out.is-on.is-allow { border-color: var(--fb-positive-dot); background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bf__out.is-on.is-mfa { border-color: var(--fb-notice-dot); background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bf__out.is-on.is-deny { border-color: var(--fb-negative-dot); background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bf__out.is-on strong { color: inherit; }
+
+.bf__denynote {
+  margin: var(--space-5) 0 0; padding: var(--space-5);
+  background: var(--fb-negative-bg); border-radius: var(--radius-md);
+  font-size: var(--fs-md); color: var(--fb-negative-fg);
+}
+
+.bf__factors { overflow: hidden; margin-top: var(--space-5); }
+.bf__prop {
+  display: grid; grid-template-columns: 116px minmax(0, 1fr); align-items: center; gap: var(--space-5);
+  padding: var(--space-3) 0;
+}
+.bf__prop.is-sub { padding-left: var(--space-6); }
+.bf__prop.is-sub .bf__proplabel { color: var(--text-muted); }
+.bf__proplabel { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bf__propctl { min-width: 0; display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+
+.bf__seg { display: flex; gap: 2px; padding: 2px; background: var(--surface-inset); border-radius: var(--radius-md); }
+.bf__seg button { padding: 4px 12px; border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer; }
+.bf__seg button.is-on { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
+
+.bf__switchrow { display: inline-flex; align-items: center; gap: var(--space-4); font-size: var(--fs-md); color: var(--text-secondary); }
+
+.bf__chain { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.bf__chainstep { display: inline-flex; align-items: center; gap: var(--space-3); }
+.bf__chainstep b {
+  display: grid; place-items: center; width: 18px; height: 18px;
+  border-radius: var(--radius-full); background: var(--surface-inset);
+  font-size: 10px; color: var(--text-tertiary);
+}
+.bf__chainstep button { display: grid; place-items: center; width: 20px; height: 20px; border-radius: var(--radius-sm); color: var(--text-muted); }
+.bf__chainstep button:hover:not(:disabled) { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bf__chainstep button:disabled { opacity: 0.3; }
+.bf__chainadd {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: var(--ctl-height-sm); padding: 0 var(--space-4);
+  border: 1px dashed var(--border-default); border-radius: var(--radius-sm);
+  font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
+}
+.bf__chainsum { flex-basis: 100%; margin: var(--space-2) 0 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+.bf__factorwarn {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  margin: var(--space-4) 0 0; padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--fb-negative-bg); color: var(--fb-negative-fg); font-size: var(--fs-md);
+}
+.bf__factorwarn.is-warn { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+
+/* --- Checks ---------------------------------------------------------------------- */
+
+.bf__prose {
+  padding: var(--space-5); margin-bottom: var(--space-5);
+  background: var(--surface-raised); border-left: 3px solid var(--border-default); border-radius: var(--radius-md);
+}
+.bf__prose p { margin: 0; font-size: var(--fs-md); color: var(--text-body); line-height: 1.55; }
+.bf__prose p + p { margin-top: var(--space-3); }
+.bf__prose span {
+  display: inline-block; min-width: 38px;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-muted); letter-spacing: 0.05em;
+}
+
+.bf__impact {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5);
+  padding: var(--space-5); margin-bottom: var(--space-5);
+  background: var(--surface-sunken); border-radius: var(--radius-lg);
+}
+.bf__impact div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bf__impact strong { font-size: var(--fs-2xl); font-weight: var(--fw-semibold); color: var(--text-primary); line-height: 1.1; }
+.bf__impact em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bf__impact .bf__falls { font-size: var(--fs-md); }
+.bf__impact .bf__falls button { font-size: var(--fs-md); color: var(--text-link); text-align: left; }
+.bf__impact .bf__falls button:hover { text-decoration: underline; }
+.bf__basis { padding: 0 5px; border-radius: var(--radius-pill); font-weight: var(--fw-medium); }
+.bf__basis.is-exact { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bf__basis.is-estimate { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); }
+.bf__basis.is-stale { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+
+.bf__clean {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin: 0; padding: var(--space-4) var(--space-5);
+  background: var(--fb-positive-bg); border-radius: var(--radius-md);
+  font-size: var(--fs-md); color: var(--fb-positive-fg);
+}
+
+.bf__diags { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.bf__diags li {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  padding: var(--space-4) var(--space-5); border-radius: var(--radius-md);
+  font-size: var(--fs-md);
+}
+.bf__diags li span { display: flex; flex-direction: column; gap: 2px; }
+.bf__diags strong { font-weight: var(--fw-semibold); }
+.bf__diags li.is-error { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bf__diags li.is-warning { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bf__diags li.is-info { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); }
+.bf__diaggo { align-self: flex-start; margin-top: var(--space-2); font-size: var(--fs-xs); color: inherit; text-decoration: underline; }
+
+.bf__rowacts { display: flex; gap: var(--space-6); padding: var(--space-6) 0; }
+.bf__rowacts button {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  font-size: var(--fs-md); color: var(--text-secondary); cursor: pointer;
+}
+.bf__rowacts button:hover { color: var(--text-primary); }
+.bf__rowacts button.is-danger:hover { color: var(--fb-negative-fg); }
+
+/* --- Review, the last stop on the trail ------------------------------------------------
+
+   Not a modal. A dialog behind Publish puts the summary of a policy on the far
+   side of the decision to ship it; on the trail it is a place you can stand. */
+
+.bf__review { max-width: 880px; }
+
+.bf__gate { display: flex; align-items: center; gap: var(--space-5); margin-bottom: var(--space-5); }
+.bf__gatetrack { flex: 1; height: 6px; border-radius: var(--radius-full); background: var(--surface-inset); overflow: hidden; }
+.bf__gatetrack span { display: block; height: 100%; border-radius: var(--radius-full); background: var(--fb-notice-dot); }
+.bf__gatetrack span.is-clear { background: var(--fb-positive-dot); }
+.bf__gatecount { margin: 0; flex: none; font-size: var(--fs-md); color: var(--text-tertiary); }
+.bf__gatecount strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+.bf__gates { margin: 0 0 var(--space-7); padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.bf__gates li {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.bf__gates li.is-block { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.bf__gates li.is-open { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.bf__gatemark { flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin-top: 1px; border-radius: var(--radius-full); }
+.bf__gates li.is-ok .bf__gatemark { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bf__gates li.is-open .bf__gatemark { color: var(--fb-notice-fg); }
+.bf__gates li.is-block .bf__gatemark { color: var(--fb-negative-fg); }
+.bf__gatetext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.bf__gatetext strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bf__gatetext em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bf__gatego {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; align-self: center;
+  font-size: var(--fs-xs); color: var(--text-link); cursor: pointer;
+}
+.bf__gatego:hover { text-decoration: underline; }
+
+.bf__revblock { margin-bottom: var(--space-7); }
+.bf__revblock > .u-label { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+
+.bf__revchanges { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.bf__revchanges li {
+  padding: var(--space-3) var(--space-5);
+  border-left: 2px solid var(--brand); background: var(--surface-sunken);
+  font-size: var(--fs-md); color: var(--text-body);
+}
+
+.bf__revrules { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.bf__revrules li { display: flex; }
+.bf__revrules li.is-off { opacity: 0.55; }
+.bf__revrules li.is-fallback {
+  gap: var(--space-4); padding: var(--space-4) var(--space-5);
+  border: 1px dashed var(--border-default); border-radius: var(--radius-md); background: var(--surface-sunken);
+}
+.bf__revrules li > button {
+  flex: 1; display: flex; align-items: flex-start; gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  text-align: left; cursor: pointer;
+}
+.bf__revrules li > button:hover { border-color: var(--border-strong); }
+.bf__revn {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px;
+  border-radius: var(--radius-sm); background: var(--surface-inset);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary);
+}
+.bf__revbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bf__revbody strong { display: flex; align-items: center; gap: var(--space-4); font-size: var(--fs-md); color: var(--text-primary); }
+.bf__revbody em { font-style: normal; font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.5; }
+.bf__revbody em b { font-weight: var(--fw-semibold); color: var(--text-muted); margin-right: var(--space-3); }
+
+.bf__revfoot {
+  display: flex; align-items: center; gap: var(--space-5);
+  padding-top: var(--space-6); border-top: 1px solid var(--border-subtle);
+}
+.bf__revfootacts { flex: 1; display: flex; gap: var(--space-3); }
+
+/* --- Live preview -------------------------------------------------------------------- */
+
+.bf__preview { padding: var(--space-5); }
+.bf__preview > .u-label { display: block; margin-bottom: var(--space-4); }
+
+.bf__pvusers { display: flex; gap: var(--space-3); }
+.bf__pvusers button {
+  width: 30px; height: 30px; border-radius: var(--radius-full);
+  border: 1px solid var(--border-default); background: var(--surface-sunken);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary); cursor: pointer;
+}
+.bf__pvusers button.is-on { background: var(--text-primary); border-color: var(--text-primary); color: var(--surface-raised); }
+
+.bf__pvwho { margin: var(--space-4) 0 var(--space-5); display: flex; flex-direction: column; gap: 1px; }
+.bf__pvwho strong { font-size: var(--fs-md); color: var(--text-primary); }
+.bf__pvwho em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+
+.bf__pvaxis { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: var(--space-4); margin-bottom: var(--space-3); }
+.bf__pvaxis > span:first-child { font-size: var(--fs-xs); color: var(--text-muted); }
+.bf__pvselect { position: relative; display: block; }
+.bf__pvselect select {
+  width: 100%; height: 28px; padding: 0 24px 0 var(--space-4);
+  background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  font-size: var(--fs-sm); color: var(--text-body); font-family: inherit; appearance: none;
+}
+.bf__pvselect svg { position: absolute; right: 7px; top: 8px; color: var(--text-muted); pointer-events: none; }
+
+.bf__pvverdict {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  margin: var(--space-5) 0; padding: var(--space-5);
+  border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); background: var(--surface-sunken);
+}
+.bf__pvverdict.is-allow { border-color: var(--fb-positive-border); background: var(--fb-positive-bg); }
+.bf__pvverdict.is-mfa { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.bf__pvverdict.is-deny { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.bf__pvverdict p { margin: 0; font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.5; }
+.bf__pvverdict button { font-size: var(--fs-xs); color: var(--text-link); text-decoration: underline; }
+
+.bf__pvtrace { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.bf__pvtrace li { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bf__pvtrace li button { font-size: var(--fs-xs); color: inherit; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bf__pvtrace li button:hover { color: var(--text-primary); }
+.bf__pvtrace li span { flex: none; display: grid; place-items: center; width: 14px; color: var(--text-muted); }
+.bf__pvtrace li.is-hit { color: var(--fb-positive-fg); font-weight: var(--fw-medium); }
+.bf__pvtrace li.is-hit span { color: var(--fb-positive-dot); }
+.bf__pvtrace li.is-unreached, .bf__pvtrace li.is-off { opacity: 0.5; }
+.bf__pvtrace li.is-current button { text-decoration: underline; }
+
+.bf__pvnote { margin: var(--space-5) 0 0; font-size: 10px; line-height: 1.5; color: var(--text-muted); }
+
+/* --- Policy overview -----------------------------------------------------------
+
+   The read-only reading surface. Prefix `bov`. Deliberately plainer than the
+   builder around it: no controls, no affordances competing with the sequence,
+   and the only colour is the decision chip and whatever the shadow state is
+   saying.
+   --------------------------------------------------------------------------- */
+
+.bov { padding: var(--space-6) var(--space-7) var(--space-7); max-height: 62vh; overflow-y: auto; }
+.bov__list { margin: 0; padding: 0; list-style: none; }
+
+.bov__step {
+  display: flex; align-items: flex-start; gap: var(--space-5);
+  width: 100%; padding: var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  text-align: left;
+  transition: opacity var(--dur-normal) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+button.bov__step { cursor: pointer; }
+button.bov__step:hover { border-color: var(--border-strong); }
+button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bov__step.is-off { opacity: 0.55; border-style: dashed; }
+.bov__step.is-dimmed { opacity: 0.3; }
+.bov__step.is-dead { border-color: var(--fb-negative-border); }
+.bov__step.is-trigger { background: var(--surface-inverse); border-color: transparent; }
+.bov__step.is-trigger h3 { color: var(--text-inverse); }
+.bov__step.is-trigger .bov__eyebrow { color: color-mix(in srgb, var(--text-inverse) 62%, transparent); }
+.bov__step.is-fallback { background: var(--surface-sunken); border-style: dashed; }
+
+.bov__step > div { flex: 1; min-width: 0; }
+.bov__step h3 { margin: 2px 0 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bov__step p { margin: 3px 0 0; font-size: var(--fs-md); color: var(--text-secondary); }
+.bov__step p em { font-style: normal; color: var(--text-body); }
+
+.bov__eyebrow { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); color: var(--text-muted); }
+.bov__tag {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 6px; border-radius: var(--radius-full);
+  background: var(--fb-neutral-bg); color: var(--fb-neutral-fg);
+  font-size: 10px; font-weight: var(--fw-medium);
+}
+.bov__tag.is-dead { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bov__tag.is-error { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+
+.bov__n {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px;
+  border-radius: var(--radius-md); border: 1px solid var(--border-subtle);
+  background: var(--surface-inset);
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary);
+}
+.bov__n.is-allow { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
+.bov__n.is-mfa { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bov__n.is-deny { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
+.bov__n.is-trigger { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+/* The connector, drawn between rows rather than on them. */
+.bov__list li + li,
+.bov > .bov__list,
+.bov__step.is-fallback { position: relative; }
+.bov__list li { position: relative; padding-top: var(--space-5); }
+.bov__list li::before,
+.bov__step.is-fallback::before {
+  content: ''; position: absolute; left: 33px; top: 0; height: var(--space-5); width: 1px;
+  background: var(--border-default);
+}
+.bov__step.is-fallback { margin-top: var(--space-5); }
+
+.bov__empty {
+  margin: var(--space-5) 0; padding: var(--space-6);
+  background: var(--surface-sunken); border: 1px dashed var(--border-default); border-radius: var(--radius-md);
+  font-size: var(--fs-md); color: var(--text-tertiary);
+}
+.bov__foot { flex: 1; font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* The rail's tabs, borrowed from v5 so both hosts present the same two panels
+   the same way. */
+.bf__rail .bm__railtabs { border-top: 1px solid var(--border-subtle); }
+
+/* A rule that wins nothing in the whole sweep is a finding, not a statistic —
+   it is either unreachable or written against a signal nobody produces. */
+.bf__impact div.is-empty strong { color: var(--fb-negative-fg); }

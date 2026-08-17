@@ -1,0 +1,131 @@
+/* ---------------------------------------------------------------------------
+   Coverage — apps across, groups down, one cell per pair.
+   Console-native: white surface, #f8f9fa heads, 6px radii, orange accents.
+   --------------------------------------------------------------------------- */
+
+.bcov__stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.bcov__stat {
+  padding: 12px 14px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.bcov__stat.is-warn { background: var(--fb-notice-bg); border-color: var(--fb-notice-border, var(--border-subtle)); }
+.bcov__statlabel { display: block; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bcov__statvalue { display: block; margin-top: 3px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.bcov__statvalue em { font-style: normal; font-size: var(--fs-md); font-weight: 400; color: var(--text-muted); }
+.bcov__statvalue.is-mfa { color: var(--fb-notice-fg); }
+.bcov__statvalue.is-deny { color: var(--fb-negative-fg); }
+
+/* The head column and head row both stick, so a wide tenant can be scrolled in
+   either direction without losing which pair you are looking at. */
+.bcov__wrap {
+  overflow: auto;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.bcov { border-collapse: separate; border-spacing: 0; width: 100%; }
+
+.bcov th, .bcov td { border-bottom: 1px solid var(--border-subtle); }
+.bcov tbody tr:last-child th, .bcov tbody tr:last-child td { border-bottom: none; }
+
+.bcov__corner, .bcov__colhead {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface-sunken);
+  padding: 10px 12px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+.bcov__corner { left: 0; z-index: 3; min-width: 168px; color: var(--text-tertiary); }
+.bcov__corner span { text-transform: uppercase; letter-spacing: 0.06em; }
+.bcov__corner em { font-style: normal; margin-left: 6px; opacity: 0.7; }
+.bcov__corner::after { content: '↘'; margin-left: 4px; opacity: 0.5; }
+
+.bcov__colhead { color: var(--text-secondary); }
+.bcov__colhead span { display: inline-flex; align-items: center; gap: 6px; }
+.bcov__colhead.is-hot { background: var(--brand-subtle-bg); color: var(--brand-active); }
+
+.bcov__rowhead {
+  position: sticky; left: 0; z-index: 1;
+  background: var(--surface-raised);
+  padding: 9px 12px;
+  text-align: left;
+  border-right: 1px solid var(--border-subtle);
+  min-width: 168px;
+}
+.bcov__rowhead span { display: block; font-size: var(--fs-sm); font-weight: 500; }
+.bcov__rowhead em { display: block; font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+.bcov__rowhead.is-hot { background: var(--brand-subtle-bg); }
+
+.bcov__cell {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; min-width: 92px; height: 44px;
+  font-size: var(--fs-sm); font-weight: 500;
+  color: var(--text-secondary);
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+.bcov__cell:hover { background: var(--surface-sunken); }
+.bcov__cell i { width: 7px; height: 7px; border-radius: 999px; flex: none; }
+.bcov__cell.is-allow i { background: var(--fb-positive-dot); }
+.bcov__cell.is-mfa i { background: var(--fb-notice-dot); }
+.bcov__cell.is-deny i { background: var(--fb-negative-dot); }
+
+/* Reached only by the always-on global policy. Not a gap, but not cover
+   either — drawn quietly so the real policies read first. */
+.bcov__cell.is-fallback { color: var(--text-muted); font-weight: 400; }
+.bcov__cell.is-fallback i { background: none; box-shadow: inset 0 0 0 1px var(--border-strong); }
+
+/* An empty cell is the finding, so it reads as a slot to fill rather than as
+   nothing at all. */
+.bcov__cell.is-empty { color: var(--text-muted); }
+.bcov__plus {
+  display: grid; place-items: center;
+  width: 20px; height: 20px; border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-default);
+  font-size: 13px; line-height: 1;
+}
+.bcov__cell.is-empty:hover { background: var(--brand-subtle-bg); color: var(--brand-active); }
+.bcov__cell.is-empty:hover .bcov__plus { border-color: var(--brand); border-style: solid; }
+
+.bcov__foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-top: 12px; flex-wrap: wrap; }
+.bcov__legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: var(--fs-sm); color: var(--text-secondary); }
+.bcov__legend span { display: inline-flex; align-items: center; gap: 6px; }
+.bcov__legend i { width: 7px; height: 7px; border-radius: 999px; }
+.bcov__legend .is-allow i { background: var(--fb-positive-dot); }
+.bcov__legend .is-mfa i { background: var(--fb-notice-dot); }
+.bcov__legend .is-deny i { background: var(--fb-negative-dot); }
+.bcov__legend .is-fallback i { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.bcov__legend .is-empty i { border: 1px dashed var(--border-strong); background: none; }
+.bcov__note { flex: 1; min-width: 260px; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; text-align: right; }
+
+.bcov__flip { margin-top: 14px; font-size: var(--fs-sm); color: var(--text-link); }
+.bcov__flip:hover { text-decoration: underline; }
+
+/* --- View switch ---------------------------------------------------------- */
+
+.bviewswitch {
+  display: inline-flex; gap: 2px; padding: 3px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.bviewswitch button {
+  padding: 5px 13px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.bviewswitch button.is-on {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-weight: 500;
+  box-shadow: var(--el-low);
+}
+
+@media (max-width: 720px) {
+  .bcov__note { text-align: left; }
+  .bcov__corner, .bcov__rowhead { min-width: 130px; }
+}

@@ -1,0 +1,211 @@
+/* ---------------------------------------------------------------------------
+   The builder tour. Prefix `btr`.
+
+   The scrim dims and does not block: `pointer-events: none` everywhere except
+   the card. The lit element stays clickable, which is deliberate — somebody who
+   ignores the card and clicks the thing it is pointing at is a person learning
+   the product.
+   --------------------------------------------------------------------------- */
+
+.btr { position: fixed; inset: 0; z-index: var(--z-modal); pointer-events: none; }
+
+/* A bare positioning context for the card, so the keyed swap has a stable
+   parent and the card keeps its absolute placement. */
+.btr__cardslot { position: absolute; inset: 0; pointer-events: none; }
+
+.btr__scrim { position: absolute; inset: 0; width: 100%; height: 100%; }
+.btr__scrim rect[mask] { fill: rgb(12 17 23 / 0.55); }
+.btr__scrim > rect { fill: rgb(12 17 23 / 0.55); }
+
+/* A hairline around the hole, so the lit element reads as chosen rather than as
+   the only thing that happens to be bright. */
+.btr__ring {
+  position: absolute; border-radius: 12px;
+  box-shadow: 0 0 0 2px var(--brand), 0 0 0 7px rgb(235 84 36 / 0.18);
+  pointer-events: none;
+}
+
+/* --- The card --------------------------------------------------------------- */
+
+.btr__card {
+  position: absolute; width: 372px; pointer-events: auto;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-xl);
+  box-shadow: var(--el-high);
+  overflow: hidden;
+}
+.btr__card.is-centred { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.btr__card:focus-visible { outline: none; box-shadow: var(--el-high), 0 0 0 2px var(--focus-ring); }
+
+.btr__x {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 78%, transparent); color: var(--text-secondary);
+}
+.btr__x:hover { background: var(--surface-raised); color: var(--text-primary); }
+
+/* --- The hero band ---------------------------------------------------------- */
+
+.btr__hero {
+  height: 168px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--card-dot, var(--border-subtle)) 1px, transparent 0) 0 0 / 12px 12px,
+    linear-gradient(140deg, var(--brand-subtle-bg) 0%, var(--surface-sunken) 70%);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.btr__hero svg { display: block; width: 100%; height: 100%; }
+.btr__hero text { font-family: inherit; }
+
+/* The beak. A rotated square rather than a border triangle, so it inherits the
+   card's own background and border and stays right when either changes. */
+.btr__beak {
+  position: absolute; width: 12px; height: 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  transform: rotate(45deg);
+}
+.btr__card.is-left .btr__beak { left: -7px; border-right: none; border-top: none; }
+.btr__card.is-right .btr__beak { right: -7px; border-left: none; border-bottom: none; }
+
+/* --- Copy ------------------------------------------------------------------- */
+
+.btr__body { padding: var(--space-6) var(--space-6) var(--space-5); }
+.btr__count {
+  font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted);
+}
+.btr__body h2 {
+  margin: var(--space-3) 0 var(--space-3);
+  font-size: var(--fs-xl); font-weight: var(--fw-semibold); letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.btr__body p { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55; }
+
+/* --- Controls --------------------------------------------------------------- */
+
+.btr__foot {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border-subtle); background: var(--surface-sunken);
+}
+.btr__dots { flex: 1; display: flex; gap: 5px; }
+.btr__dots i {
+  width: 6px; height: 6px; border-radius: var(--radius-full);
+  background: var(--border-strong);
+  transition: background var(--dur-fast) var(--ease-standard), width var(--dur-fast) var(--ease-standard);
+}
+.btr__dots i.is-done { background: var(--brand); }
+.btr__dots i.is-on { width: 16px; border-radius: var(--radius-pill); background: var(--brand); }
+
+.btr__skip { font-size: var(--fs-xs); color: var(--text-muted); padding: 0 var(--space-3); }
+.btr__skip:hover { color: var(--text-primary); text-decoration: underline; }
+
+@media (max-width: 560px) {
+  .btr__card { width: calc(100vw - 24px); left: 12px !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   Learn the builder — the panel behind the bar's Learn button.
+
+   Two levels in one drawer: a countable list, and a guide it pushes to. The
+   list carries a meter because a list with a denominator gets finished and a
+   list without one gets closed.
+   --------------------------------------------------------------------------- */
+
+.btr__tourcard {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-4) var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--brand-subtle-border); border-radius: var(--radius-lg);
+  background: var(--brand-subtle-bg);
+}
+.btr__tourico {
+  display: grid; place-items: center; width: 38px; height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--surface-raised); border: 1px solid var(--brand-subtle-border);
+  color: var(--brand-active);
+}
+.btr__tourcard h3 { margin: 0 0 3px; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.btr__tourcard p { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.5; }
+/* The button sits under the copy, in the copy's column — beside it, the three
+   words of the label squeeze the paragraph into five lines. */
+.btr__tourcard > :last-child { grid-column: 2; justify-self: start; }
+
+.btr__listhead {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);
+  margin: var(--space-7) 0 var(--space-4);
+}
+.btr__listhead h3 { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.btr__listhead span { font-size: var(--fs-sm); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+
+.btr__meter { height: 4px; margin-bottom: var(--space-5); border-radius: var(--radius-full); background: var(--surface-inset); overflow: hidden; }
+.btr__meter span { display: block; height: 100%; background: var(--brand); border-radius: var(--radius-full); }
+
+.btr__guides { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.btr__guides button {
+  display: flex; align-items: center; gap: var(--space-5); width: 100%;
+  padding: var(--space-5); text-align: left; cursor: pointer;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.btr__guides button:hover { border-color: var(--border-strong); box-shadow: var(--el-low); }
+.btr__guides button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.btr__guidemark {
+  flex: none; display: grid; place-items: center; width: 20px; height: 20px;
+  border-radius: var(--radius-full); box-shadow: inset 0 0 0 1px var(--border-strong);
+  color: var(--text-on-brand);
+}
+.btr__guidemark.is-done { background: var(--brand); box-shadow: none; }
+.btr__guidetext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.btr__guidetext strong { font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-primary); }
+.btr__guidetext em { font-style: normal; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.45; }
+.btr__guidemins {
+  flex: none; display: inline-flex; align-items: center; gap: var(--space-3);
+  font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap;
+}
+
+/* --- A guide ---------------------------------------------------------------- */
+
+.btr__crumb {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-5); padding: 0;
+  background: none; font-size: var(--fs-sm); color: var(--text-tertiary); cursor: pointer;
+}
+.btr__crumb:hover { color: var(--text-primary); }
+
+.btr__figure {
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-sunken); overflow: hidden;
+}
+.btr__figure svg { display: block; width: 100%; height: auto; }
+.btr__figure text { font-family: inherit; }
+
+.btr__lead { margin: var(--space-5) 0 0; font-size: var(--fs-base); color: var(--text-secondary); line-height: 1.55; }
+
+.btr__steps { list-style: none; margin: var(--space-6) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-6); }
+.btr__steps li { display: flex; align-items: flex-start; gap: var(--space-5); }
+.btr__stepn {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin-top: 1px;
+  border-radius: var(--radius-full); background: var(--surface-inset);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-secondary);
+}
+.btr__steps h4 { margin: 0 0 var(--space-3); font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); line-height: 1.35; }
+.btr__steps p { margin: 0; font-size: var(--fs-md); color: var(--text-body); line-height: 1.6; }
+
+.btr__tip {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  margin-top: var(--space-4) !important; padding: var(--space-4) var(--space-5);
+  border-left: 2px solid var(--brand); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface-sunken);
+  color: var(--text-primary) !important; font-weight: var(--fw-medium);
+}
+.btr__tip svg { flex: none; margin-top: 2px; color: var(--brand-active); }
+
+.btr__nextguide {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); flex-wrap: wrap;
+  margin-top: var(--space-7); padding-top: var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--fs-md); color: var(--text-tertiary);
+}
+.btr__nextguide strong { font-weight: var(--fw-medium); color: var(--text-primary); }

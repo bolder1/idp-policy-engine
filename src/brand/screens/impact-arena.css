@@ -1,0 +1,202 @@
+/* ---------------------------------------------------------------------------
+   Blast radius. Prefix `bia`.
+
+   The dot field is the load-bearing element: 1,440 cells in a stable order,
+   coloured by outcome, with a per-dot transition delay so a change sweeps
+   across the field rather than blinking. Everything else on this screen is
+   there to caption it.
+   --------------------------------------------------------------------------- */
+
+.bia { display: flex; flex-direction: column; min-height: 0; }
+
+/* --- Head -------------------------------------------------------------------- */
+
+.bia__head {
+  display: flex; align-items: flex-start; gap: var(--space-7);
+  padding: var(--space-7) var(--space-8) var(--space-6);
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bia__headline { flex: 1; min-width: 0; }
+.bia__headline h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-2xl); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bia__headline p {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-5);
+  margin: 0; font-size: var(--fs-md); color: var(--text-secondary);
+}
+.bia__headline p b { font-weight: var(--fw-medium); color: var(--fb-notice-fg); }
+.bia__up, .bia__down { display: inline-flex; align-items: center; gap: 5px; }
+.bia__up { color: var(--fb-info-fg); }
+.bia__down { color: var(--text-tertiary); }
+.bia__down.is-alarm { color: var(--fb-negative-fg); font-weight: var(--fw-medium); }
+
+.bia__time { flex: none; display: flex; gap: 2px; padding: 2px; background: var(--surface-inset); border-radius: var(--radius-md); }
+.bia__time button {
+  padding: 5px 11px; border-radius: var(--radius-sm);
+  font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
+}
+.bia__time button.is-on { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
+
+/* --- Body -------------------------------------------------------------------- */
+
+.bia__body {
+  flex: 1; min-height: 0; max-height: 58vh; overflow-y: auto;
+  padding: var(--space-6) var(--space-8) var(--space-8);
+  display: flex; flex-direction: column; gap: var(--space-7);
+}
+
+/* --- Meters ------------------------------------------------------------------ */
+
+.bia__meters { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
+.bia__meter {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-2) var(--space-5);
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+}
+.bia__meter .u-label { display: inline-flex; align-items: center; gap: 5px; grid-column: 1 / -1; }
+.bia__bar { height: 8px; border-radius: var(--radius-full); background: var(--surface-inset); overflow: hidden; }
+.bia__bar i { display: block; height: 100%; border-radius: var(--radius-full); }
+.bia__bar .is-guarded { background: var(--fb-info-dot); }
+.bia__bar .is-open { background: var(--fb-neutral-dot); }
+.bia__meter strong {
+  display: inline-flex; align-items: baseline; gap: var(--space-3);
+  font-size: var(--fs-2xl); font-weight: var(--fw-semibold); color: var(--text-primary); line-height: 1;
+}
+.bia__meter strong em { font-style: normal; font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+.bia__meter strong em.is-up { color: var(--fb-info-fg); }
+.bia__meter strong em.is-down { color: var(--fb-negative-fg); }
+.bia__meter p { grid-column: 1 / -1; margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* --- Field ------------------------------------------------------------------- */
+
+.bia__fieldbar { display: flex; align-items: center; gap: var(--space-6); margin-bottom: var(--space-5); }
+.bia__views { display: flex; gap: 2px; padding: 2px; background: var(--surface-inset); border-radius: var(--radius-md); }
+.bia__views button {
+  padding: 5px 12px; border-radius: var(--radius-sm);
+  font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
+}
+.bia__views button.is-on { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
+.bia__views button:disabled { opacity: 0.4; cursor: default; }
+
+.bia__legend { display: flex; gap: var(--space-6); margin: 0 0 0 auto; padding: 0; list-style: none; }
+.bia__legend li { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bia__legend i { width: 9px; height: 9px; border-radius: 2px; }
+.bia__legend b { color: var(--text-body); font-variant-numeric: tabular-nums; }
+.bia__legend .is-allow, .bia__dot.is-allow { background: var(--fb-positive-dot); }
+.bia__legend .is-mfa, .bia__dot.is-mfa { background: var(--fb-notice-dot); }
+.bia__legend .is-deny, .bia__dot.is-deny { background: var(--fb-negative-dot); }
+
+/* 72 columns × 20 rows = the 1,440 situations exactly, at a pitch that reads as
+   a field rather than a chequerboard. The column count is duplicated in the
+   delay calculation in impact-arena-dialog.tsx — they have to agree or the
+   sweep animation runs diagonally. */
+.bia__dots {
+  display: grid;
+  grid-template-columns: repeat(72, 1fr);
+  gap: 2px;
+  padding: var(--space-5);
+  background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+}
+.bia__dot {
+  aspect-ratio: 1; border-radius: 1px;
+  transition: background-color 260ms var(--ease-standard), opacity 260ms var(--ease-standard),
+              transform 260ms var(--ease-standard);
+}
+/* "What moved" dims the settled world so the movement is the only thing with
+   any weight left on screen — the alternative, highlighting the movers, still
+   leaves 1,200 dots competing for the eye. */
+.bia__dots.is-moved .bia__dot { opacity: 0.14; }
+.bia__dots.is-moved .bia__dot.is-stricter,
+.bia__dots.is-moved .bia__dot.is-looser { opacity: 1; transform: scale(1.35); border-radius: var(--radius-full); }
+.bia__dots.is-moved .bia__dot.is-looser { box-shadow: 0 0 0 1.5px var(--fb-negative-fg); }
+
+.bia__fieldnote { margin: var(--space-4) 0 0; font-size: var(--fs-xs); color: var(--text-tertiary); max-width: 96ch; }
+.bia__fieldnote b { color: var(--text-body); }
+
+/* --- Flows and cohorts -------------------------------------------------------- */
+
+.bia__flows { overflow: hidden; }
+.bia__flows h4 { margin: 0 0 var(--space-4); }
+.bia__flows h4 + ul { margin-bottom: var(--space-6); }
+.bia__flows ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.bia__flows li {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  background: var(--surface-sunken); border-radius: var(--radius-md);
+  font-size: var(--fs-md); color: var(--text-tertiary);
+}
+.bia__flows li b { margin-left: auto; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.bia__lane { padding: 2px 8px; border-radius: var(--radius-pill); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+.bia__lane.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bia__lane.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bia__lane.is-deny { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+
+.bia__cohorts li { color: var(--text-body); }
+.bia__cohorts b.is-stricter { color: var(--fb-info-fg); }
+.bia__cohorts b.is-looser { color: var(--fb-negative-fg); }
+
+/* --- Rule reach ---------------------------------------------------------------- */
+
+.bia__reach h4 { margin: 0 0 var(--space-4); }
+.bia__reach ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.bia__reach li {
+  display: grid; grid-template-columns: minmax(140px, 260px) 1fr 116px; align-items: center; gap: var(--space-5);
+  padding: var(--space-2) 0;
+}
+.bia__reachname {
+  display: inline-flex; align-items: center; gap: var(--space-4);
+  font-size: var(--fs-md); color: var(--text-body); text-align: left; cursor: pointer;
+}
+.bia__reachname:disabled, .bia__reachname.is-static { cursor: default; }
+.bia__reachname:not(:disabled):hover { color: var(--text-link); text-decoration: underline; }
+.bia__reachname em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+.bia__reachn {
+  flex: none; display: grid; place-items: center;
+  width: 20px; height: 20px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); font-size: var(--fs-xs); color: var(--text-tertiary);
+}
+.bia__reachbar { height: 10px; border-radius: var(--radius-full); background: var(--surface-inset); overflow: hidden; }
+.bia__reachbar i { display: block; height: 100%; }
+.bia__reachbar .is-allow { background: var(--fb-positive-dot); }
+.bia__reachbar .is-mfa { background: var(--fb-notice-dot); }
+.bia__reachbar .is-deny { background: var(--fb-negative-dot); }
+.bia__reach li b { font-size: var(--fs-xs); color: var(--text-tertiary); font-variant-numeric: tabular-nums; text-align: right; }
+.bia__reach li.is-dead b { color: var(--fb-negative-fg); }
+.bia__reach li.is-dead .bia__reachname { color: var(--fb-negative-fg); }
+.bia__reach li.is-default { opacity: 0.75; }
+
+/* --- Badges --------------------------------------------------------------------- */
+
+.bia__badges h4 { display: inline-flex; align-items: center; gap: 5px; margin: 0 0 var(--space-4); }
+.bia__badgegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); gap: var(--space-4); }
+.bia__badge {
+  padding: var(--space-5);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  border-left: 3px solid var(--border-default);
+}
+.bia__badge.is-earned { border-left-color: var(--fb-positive-dot); background: var(--surface-raised); }
+.bia__badgemark { display: block; margin-bottom: var(--space-3); color: var(--text-muted); }
+.bia__badge.is-earned .bia__badgemark { color: var(--fb-positive-fg); }
+.bia__badge strong { display: block; font-size: var(--fs-md); color: var(--text-primary); }
+.bia__badge p { margin: var(--space-2) 0 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bia__badge:not(.is-earned) p { color: var(--fb-negative-fg); }
+
+.bia__foot { flex: 1; font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* --- Toolbar pip ---------------------------------------------------------------- */
+
+.bia__pip {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: var(--ctl-height-sm); padding: 0 10px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
+}
+.bia__pip:hover { border-color: var(--border-strong); }
+.bia__pip b { color: var(--text-primary); font-weight: var(--fw-medium); }
+.bia__pip em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+.bia__pip.is-alarm { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.bia__pip.is-alarm b { color: var(--fb-negative-fg); }

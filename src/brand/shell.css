@@ -1,0 +1,221 @@
+/* The topbar runs the full width and the rail starts under it — the console's
+   arrangement, and the reason its logo sits on white rather than on the rail. */
+.bshell {
+  display: grid;
+  grid-template-columns: var(--nav-sidebar-w) minmax(0, 1fr);
+  grid-template-rows: var(--nav-topbar-h) minmax(0, 1fr);
+  grid-template-areas:
+    'top  top'
+    'rail main';
+  height: 100%;
+  background: var(--surface-page);
+  transition: grid-template-columns var(--dur-normal) var(--ease-standard);
+}
+.bshell.is-collapsed { --nav-sidebar-w: 64px; }
+
+/* --- Topbar --------------------------------------------------------------- */
+
+.bshell__top {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--nav-topbar-h);
+  padding: 0 12px 0 8px;
+  background: #fff;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  z-index: 60;
+}
+.bshell__burger {
+  width: 37px; height: 37px; flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--radius-md);
+  color: #495057;
+}
+.bshell__burger:hover { background: #f1f3f5; }
+.bshell__logo { display: flex; align-items: center; padding: 0 8px; }
+.bshell__logo img { height: 40px; width: auto; display: block; }
+
+.bshell__topright { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.bshell__icon {
+  width: 37px; height: 37px;
+  display: grid; place-items: center;
+  border-radius: var(--radius-md);
+  color: #495057;
+}
+.bshell__icon:hover { background: #f1f3f5; color: #212529; }
+.bshell__avatar {
+  width: 30px; height: 30px; margin-left: 4px;
+  border-radius: var(--radius-full);
+  background: var(--brand);
+  color: #fff;
+  display: grid; place-items: center;
+  font-size: 11px; font-weight: var(--fw-semibold);
+}
+
+/* --- Rail ----------------------------------------------------------------- */
+
+.bshell__rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  background: var(--shell-bg);
+  overflow: hidden;
+}
+
+/* A thin overlay-style bar, so the rows keep the console's full 231px rather
+   than losing 15px to a platform scrollbar. */
+.bshell__nav { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 0 24px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
+.bshell__nav::-webkit-scrollbar { width: 4px; }
+.bshell__nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); border-radius: 999px; }
+.bshell__nav::-webkit-scrollbar-track { background: transparent; }
+.bshell__group { margin-bottom: 4px; }
+
+/* Sentence case at body size, not the small uppercase label used elsewhere in
+   the product — this is what the console ships. */
+.bshell__section {
+  margin: 8px;
+  font-size: 14px;
+  font-weight: 300;
+  color: #cbcbcb;
+  white-space: nowrap;
+}
+
+.bshell__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 10px 10px 12px;
+  border-left: 4.8px solid transparent;
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.35;
+  color: var(--shell-text);
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+.bshell__item:hover { background: rgba(0, 0, 0, 0.22); }
+/* Measured: rgba(0,0,0,.4) behind a 4.8px brand edge, square corners. */
+.bshell__item.is-active {
+  background: rgba(0, 0, 0, 0.4);
+  border-left-color: var(--brand);
+  font-weight: 500;
+}
+.bshell__item.is-inert { color: var(--shell-text); }
+
+.bshell__ico { flex: none; }
+.bshell__item-label { flex: 1; min-width: 0; }
+.bshell__badge {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: #fff;
+  font-size: 9px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 15px;
+}
+.bshell__chev {
+  flex: none;
+  color: #9aa5ad;
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.bshell__chev.is-open { transform: rotate(90deg); }
+
+.bshell__sub { display: flex; flex-direction: column; padding-left: 24px; }
+.bshell__subitem {
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 300;
+  line-height: 1.35;
+  color: var(--shell-text);
+  text-align: left;
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bshell__subitem:hover { background: rgba(0, 0, 0, 0.22); }
+.bshell__subitem.is-active { color: var(--brand); }
+
+.bshell__foot { flex: none; padding: 10px; border-top: var(--bw-thin) solid rgba(255, 255, 255, 0.08); }
+.bshell__version {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: var(--fs-xs);
+  font-weight: 300;
+  color: var(--shell-text-muted);
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+.bshell__version:hover { background: rgba(255, 255, 255, 0.12); }
+.bshell__version strong { color: var(--shell-text); font-weight: 500; }
+.bshell__version-go { margin-left: auto; color: var(--brand); }
+
+/* --- Collapsed ------------------------------------------------------------ */
+
+.bshell.is-collapsed .bshell__item { justify-content: center; padding: 10px 6px 10px 2px; gap: 0; }
+.bshell.is-collapsed .bshell__item-label,
+.bshell.is-collapsed .bshell__badge,
+.bshell.is-collapsed .bshell__chev,
+.bshell.is-collapsed .bshell__version-txt { display: none; }
+.bshell.is-collapsed .bshell__section { height: 1px; margin: 10px 12px; overflow: hidden; color: transparent; background: rgba(255, 255, 255, 0.1); }
+.bshell.is-collapsed .bshell__version { justify-content: center; padding: 8px 0; }
+.bshell.is-collapsed .bshell__version-go { margin-left: 0; }
+
+.bshell__main { grid-area: main; overflow-y: auto; min-width: 0; }
+
+.bshell__toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-8);
+  transform: translateX(-50%);
+  padding: var(--space-4) var(--space-7);
+  background: var(--surface-inverse);
+  color: var(--text-inverse);
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-sm);
+  box-shadow: var(--el-overlay);
+  z-index: var(--z-toast);
+}
+
+/* --- Page chrome ---------------------------------------------------------- */
+
+.bpage { padding: var(--space-8) var(--space-8) var(--space-14); max-width: 1560px; }
+.bpage__head { margin-bottom: var(--space-7); }
+.bpage__crumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+}
+.bpage__crumb button { color: var(--text-tertiary); }
+.bpage__crumb button:hover { color: var(--text-primary); }
+.bpage__headrow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+.bpage__headrow h1 { font-size: var(--fs-3xl); letter-spacing: -0.02em; }
+.bpage__headrow p { margin-top: var(--space-2); font-size: var(--fs-base); color: var(--text-secondary); max-width: 64ch; }
+.bpage__actions { display: flex; align-items: center; gap: var(--space-4); flex: none; }
+
+/* --- Narrow --------------------------------------------------------------- */
+
+/* Narrow the rail by changing the variable, not the grid — the fixed commit bar
+   and anything else positioned against the rail reads the same value. */
+@media (max-width: 1120px) {
+  .bshell { --nav-sidebar-w: 200px; }
+  .bshell.is-collapsed { --nav-sidebar-w: 64px; }
+  .bpage { padding: var(--space-7) var(--space-6) var(--space-12); }
+}

@@ -1,0 +1,281 @@
+/* ---------------------------------------------------------------------------
+   Network zones — one zone, two optional sections, ANDed.
+
+   The layout's whole job is to make three things unmissable: that there are two
+   sections, that they are joined by AND, and that an empty one means "any".
+   The first two are structural (numbered cards, a drawn connector); the third
+   is textual, because it is a claim about semantics and only words can make it.
+   --------------------------------------------------------------------------- */
+
+.bzone { display: flex; flex-direction: column; min-width: 0; }
+.bzone__name { margin-bottom: 4px; }
+.bzone__sub {
+  display: block; margin-top: 2px;
+  font-style: normal; font-size: var(--fs-xs); color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* --- Section shell ---------------------------------------------------------- */
+
+.bzone__sec {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+/* An unconstrained section is drawn as permissive, not as unfinished — dashed
+   reads "open", solid reads "narrowed". */
+.bzone__sec.is-any { border-style: dashed; }
+
+.bzone__sechead {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 14px 16px;
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bzone__secn {
+  flex: none; width: 22px; height: 22px; border-radius: var(--radius-pill);
+  display: grid; place-items: center;
+  background: var(--surface-inverse); color: var(--text-inverse);
+  font-size: 11px; font-weight: 600;
+}
+.bzone__secbody { flex: 1; min-width: 0; }
+.bzone__secbody h3 {
+  display: flex; align-items: center; gap: 7px;
+  font-size: var(--fs-md); font-weight: 600;
+}
+.bzone__secbody p { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bzone__anytag {
+  flex: none; padding: 2px 9px; border-radius: var(--radius-pill);
+  background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border);
+  color: var(--fb-notice-fg); font-size: var(--fs-xs); font-weight: 500;
+  white-space: nowrap;
+}
+
+.bzone__subs { display: grid; gap: 2px; }
+.bzone__geo { display: grid; gap: 14px; padding: 16px; }
+
+/* --- The AND, drawn --------------------------------------------------------- */
+
+.bzone__and { display: flex; align-items: center; gap: 10px; padding: 0 60px; height: 34px; }
+.bzone__andline { flex: 1; height: 0; border-top: 2px dashed var(--border-strong); }
+.bzone__andpill {
+  flex: none; padding: 3px 13px; border-radius: var(--radius-pill);
+  background: var(--surface-inverse); color: var(--text-inverse);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+}
+.bzone__andnote {
+  margin: 0 0 14px; text-align: center;
+  font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5;
+}
+.bzone__andnote strong { color: var(--text-secondary); font-weight: 600; }
+
+/* --- Token fields (IP, ASN) ------------------------------------------------- */
+
+.btok { padding: 14px 16px; }
+.btok + .btok { border-top: 1px solid var(--border-subtle); }
+.btok__head { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; margin-bottom: 8px; }
+.btok__label {
+  font-size: var(--fs-xs); font-weight: 600;
+  letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-secondary);
+}
+.btok__hint { font-size: var(--fs-xs); color: var(--text-muted); }
+
+.btok__box {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+/* "Any address" in place of a blank. A blank field reads as not-yet-set, and
+   not-yet-set reads as restrictive — the opposite of what empty means here. */
+.btok__empty {
+  display: block; padding: 9px 12px;
+  font-size: var(--fs-sm); font-style: italic; color: var(--fb-notice-fg);
+  background: var(--fb-notice-bg);
+}
+
+.btok__chips { list-style: none; margin: 0; padding: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.btok__chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 4px 4px 10px; border-radius: var(--radius-sm);
+  background: var(--surface-sunken); border: 1px solid var(--border-subtle);
+  font-size: var(--fs-sm);
+}
+/* IP values are compared character by character, so they get a mono face. */
+.btok--mono .btok__val { font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-xs); }
+.btok__chip em {
+  font-style: normal; font-size: 10px; color: var(--text-muted);
+  padding-left: 7px; border-left: 1px solid var(--border-subtle);
+}
+.btok__chip button {
+  width: 19px; height: 19px; border-radius: var(--radius-sm);
+  display: grid; place-items: center;
+  color: var(--text-muted); font-size: 14px; line-height: 1;
+}
+.btok__chip button:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.btok__chip.is-bad { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.btok__chip.is-bad em { color: var(--fb-negative-fg); border-left-color: var(--fb-negative-border); }
+
+.btok__entry { display: flex; gap: 0; border-top: 1px solid var(--border-subtle); }
+.btok__entry input {
+  flex: 1; height: 36px; border: none; border-radius: 0; background: transparent;
+  font-size: var(--fs-sm);
+}
+.btok--mono .btok__entry input { font-family: var(--font-mono, ui-monospace, monospace); }
+.btok__entry input:focus { outline: none; box-shadow: none; }
+.btok__entry button {
+  flex: none; padding: 0 14px;
+  font-size: var(--fs-sm); font-weight: 500; color: var(--text-link);
+  border-left: 1px solid var(--border-subtle);
+}
+.btok__entry button:disabled { color: var(--text-muted); cursor: default; }
+
+/* Real values from the spec, one click away — faster than typing and it teaches
+   the accepted formats by example. */
+.btok__eg { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.btok__eg button {
+  padding: 2px 8px; border-radius: var(--radius-pill);
+  border: 1px dashed var(--border-default);
+  font-size: 10px; color: var(--text-tertiary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.btok__eg button:hover:not(:disabled) { border-style: solid; border-color: var(--brand); color: var(--brand-active); }
+.btok__eg button:disabled { opacity: 0.4; cursor: default; }
+
+/* --- Location pickers ------------------------------------------------------- */
+
+.bpick { display: flex; flex-direction: column; gap: 6px; }
+.bpick__box {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  min-height: 38px; padding: 6px 8px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+}
+.bpick__box .btok__empty { background: none; padding: 0 4px; }
+.bpick__chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 4px 3px 10px; border-radius: var(--radius-pill);
+  background: var(--brand-subtle-bg); border: 1px solid var(--brand-subtle-border);
+  color: var(--brand-active); font-size: var(--fs-sm);
+}
+.bpick__chip button { width: 17px; height: 17px; border-radius: 999px; display: grid; place-items: center; font-size: 13px; line-height: 1; }
+.bpick__chip button:hover { background: rgba(0, 0, 0, 0.08); }
+.bpick__box select { width: auto; min-width: 84px; height: 26px; padding: 0 6px; font-size: var(--fs-xs); }
+
+.bzone__radius { display: flex; flex-direction: column; gap: 6px; }
+.bzone__radius .u-label { display: inline-flex; align-items: center; gap: 6px; }
+.bzone__radiusrow { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--text-secondary); }
+.bzone__radiusrow input[type='number'] { width: 76px; }
+.bzone__radiusrow input[type='text'] { width: 190px; font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-xs); }
+.bzone__radiusrow button {
+  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  display: grid; place-items: center; color: var(--text-muted); font-size: 15px;
+}
+.bzone__radiusrow button:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bzone__add {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: var(--radius-md);
+  border: 1px dashed var(--border-default);
+  font-size: var(--fs-sm); color: var(--text-secondary);
+}
+.bzone__add:hover { border-style: solid; border-color: var(--brand); color: var(--brand-active); }
+
+/* --- Resolution + issues ---------------------------------------------------- */
+
+.bzone__resolve {
+  margin-top: 16px; padding: 12px 14px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.bzone__sentence {
+  margin-top: 4px;
+  font-size: var(--fs-md); font-weight: 500;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--text-primary);
+  white-space: pre-wrap; word-break: break-word;
+}
+
+.bzone__issues { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.bzone__issue {
+  display: flex; gap: 9px;
+  padding: 10px 12px; border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle); background: var(--surface-raised);
+}
+.bzone__issue.is-error { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.bzone__issue.is-warning { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.bzone__issuemark { flex: none; margin-top: 1px; }
+.bzone__issue.is-error .bzone__issuemark { color: var(--fb-negative-fg); }
+.bzone__issue.is-warning .bzone__issuemark { color: var(--fb-notice-fg); }
+.bzone__issue.is-info .bzone__issuemark { color: var(--text-tertiary); }
+.bzone__issue > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bzone__issue strong { font-size: var(--fs-sm); font-weight: 600; }
+.bzone__issue span span { font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.5; }
+
+.bobj__and { font-size: var(--fs-xs); color: var(--text-tertiary); margin-bottom: 6px; }
+
+@media (max-width: 720px) {
+  .bzone__and { padding: 0 12px; }
+  .bzone__geo { padding: 12px; }
+}
+
+/* ---------------------------------------------------------------------------
+   Method sets — a named subset of the tenant's authentication catalogue.
+   --------------------------------------------------------------------------- */
+
+.bmset__facts {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+  margin-bottom: 16px;
+  background: var(--border-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.bmset__fact { padding: 11px 14px; background: var(--surface-raised); }
+.bmset__fact span { display: block; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bmset__fact strong { display: block; margin-top: 2px; font-size: var(--fs-lg); font-weight: 600; }
+.bmset__fact strong.is-good { color: var(--fb-positive-fg); }
+
+.bmset__group { margin-top: 22px; }
+.bmset__grouphead {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding-bottom: 8px; margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bmset__blurb { margin-top: 3px; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; max-width: 62ch; }
+.bmset__count { flex: none; font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; }
+
+.bmset__row {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bmset__row:last-child { border-bottom: none; }
+/* In the set — a left edge rather than a fill, so the rows stay scannable. */
+.bmset__row.is-in { box-shadow: inset 3px 0 0 var(--brand); padding-left: 11px; }
+/* Off tenant-wide. Dimmed but never hidden: a set can still reference it, and
+   that is exactly the case the admin needs to see. */
+.bmset__row.is-off .bmset__body { opacity: 0.55; }
+
+.bmset__body { flex: 1; min-width: 0; }
+.bmset__name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-md); font-weight: 500; }
+.bmset__desc { margin-top: 3px; font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.5; max-width: 68ch; }
+
+.bmset__tag {
+  padding: 1px 7px; border-radius: var(--radius-pill);
+  font-size: 10px; font-weight: 500;
+  background: var(--surface-inset); color: var(--text-tertiary);
+}
+.bmset__tag.is-good { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bmset__tag.is-off { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+
+/* The delivery options a method covers — shown because "Email" alone does not
+   say whether that means a code or a link. */
+.bmset__variants { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.bmset__variants span {
+  padding: 1px 7px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  font-size: 10px; color: var(--text-muted);
+}
+.bmset__enrolled { margin-top: 6px; font-size: var(--fs-xs); color: var(--text-muted); }

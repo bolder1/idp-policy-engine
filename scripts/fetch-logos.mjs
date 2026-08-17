@@ -1,0 +1,174 @@
+#!/usr/bin/env node
+/* ---------------------------------------------------------------------------
+   Logo fetcher.
+
+   Reads the registry in src/brand/logos/sources.ts, tries each provider in
+   order for every app, writes the first usable image to public/logos/, and
+   emits a generated manifest the UI imports.
+
+   Design decisions worth keeping:
+     - Images are written to disk, not embedded as data URIs. A logo set grows
+       with the app catalogue, and inlining it would put every byte in the JS
+       bundle whether the screen shows logos or not.
+     - The manifest records which provider answered and when. A logo that
+       silently changed source is a thing you want to be able to see.
+     - Failure is recorded, not thrown. One unreachable vendor should not fail
+       the build; the UI falls back to a monogram for that app alone.
+
+   Usage:  npm run logos          (add --force to refetch existing files)
+   --------------------------------------------------------------------------- */
+
+import { mkdir, readFile, writeFile, access } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const root = join(here, '..')
+const outDir = join(root, 'public', 'logos')
+const manifestPath = join(root, 'src', 'brand', 'logos', 'manifest.generated.ts')
+const force = process.argv.includes('--force')
+
+const TIMEOUT_MS = 8000
+const MIN_BYTES = 100
+
+/** Parse the registry without needing a TS toolchain in the script. */
+async function readRegistry() {
+  const src = await readFile(join(root, 'src', 'brand', 'logos', 'sources.ts'), 'utf8')
+
+  const apps = []
+  const appBlock = src.slice(src.indexOf('LOGO_SOURCES'), src.indexOf('PROVIDERS'))
+  for (const m of appBlock.matchAll(/\{\s*id:\s*'([^']+)',\s*name:\s*'([^']+)',\s*domain:\s*'([^']+)'/g)) {
+    apps.push({ id: m[1], name: m[2], domain: m[3] })
+  }
+
+  const providers = []
+  const provBlock = src.slice(src.indexOf('PROVIDERS'))
+  for (const m of provBlock.matchAll(/name:\s*'([^']+)',\s*url:\s*\(d\)\s*=>\s*`([^`]+)`/g)) {
+    providers.push({ name: m[1], template: m[2] })
+  }
+
+  return { apps, providers }
+}
+
+function extFor(contentType, url) {
+  if (/svg/i.test(contentType)) return 'svg'
+  if (/png/i.test(contentType)) return 'png'
+  if (/jpe?g/i.test(contentType)) return 'jpg'
+  if (/icon|ico/i.test(contentType)) return 'ico'
+  const guess = url.split('?')[0].split('.').pop()
+  return ['svg', 'png', 'jpg', 'ico'].includes(guess) ? guess : 'png'
+}
+
+async function tryFetch(url) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS)
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      redirect: 'follow',
+      headers: { 'user-agent': 'xecurify-idp-logo-fetcher/1.0' },
+    })
+    if (!res.ok) return null
+    const type = res.headers.get('content-type') ?? ''
+    if (!/image|octet-stream/i.test(type)) return null
+    const buf = Buffer.from(await res.arrayBuffer())
+    // Some providers answer 200 with a 1x1 or an empty body.
+    if (buf.byteLength < MIN_BYTES) return null
+    return { buf, ext: extFor(type, url), type }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function exists(p) {
+  try {
+    await access(p)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function main() {
+  const { apps, providers } = await readRegistry()
+  if (apps.length === 0) {
+    console.error('No apps found in sources.ts — has the registry format changed?')
+    process.exit(1)
+  }
+
+  await mkdir(outDir, { recursive: true })
+  console.log(`Resolving ${apps.length} logos across ${providers.length} providers…\n`)
+
+  const results = []
+  for (const app of apps) {
+    let record = { id: app.id, name: app.name, domain: app.domain, file: null, provider: null, bytes: 0 }
+
+    // Reuse what is already on disk unless --force.
+    if (!force) {
+      for (const ext of ['svg', 'png', 'jpg', 'ico']) {
+        if (await exists(join(outDir, `${app.id}.${ext}`))) {
+          record = { ...record, file: `/logos/${app.id}.${ext}`, provider: 'cached' }
+          break
+        }
+      }
+    }
+
+    if (!record.file) {
+      for (const p of providers) {
+        const url = p.template.replace(/\$\{d\}/g, app.domain)
+        const hit = await tryFetch(url)
+        if (hit) {
+          const file = `${app.id}.${hit.ext}`
+          await writeFile(join(outDir, file), hit.buf)
+          record = { ...record, file: `/logos/${file}`, provider: p.name, bytes: hit.buf.byteLength }
+          break
+        }
+      }
+    }
+
+    results.push(record)
+    const status = record.file ? `${record.provider}${record.bytes ? ` · ${(record.bytes / 1024).toFixed(1)}kB` : ''}` : 'no source — monogram fallback'
+    console.log(`  ${record.file ? '✓' : '·'} ${app.name.padEnd(22)} ${status}`)
+  }
+
+  const ok = results.filter((r) => r.file).length
+  const stamp = new Date().toISOString()
+
+  const body = `/* GENERATED by scripts/fetch-logos.mjs — do not edit by hand.
+   Run \`npm run logos\` to refresh, \`npm run logos -- --force\` to refetch.
+   Resolved ${ok} of ${results.length} at ${stamp}. */
+
+export interface ResolvedLogo {
+  id: string
+  name: string
+  domain: string
+  /** Public path, or null when every provider failed. */
+  file: string | null
+  /** Which provider answered, for provenance. */
+  provider: string | null
+}
+
+export const GENERATED_AT = '${stamp}'
+
+export const RESOLVED_LOGOS: Record<string, ResolvedLogo> = {
+${results
+  .map(
+    (r) =>
+      `  '${r.id}': { id: '${r.id}', name: ${JSON.stringify(r.name)}, domain: '${r.domain}', file: ${
+        r.file ? `'${r.file}'` : 'null'
+      }, provider: ${r.provider ? `'${r.provider}'` : 'null'} },`,
+  )
+  .join('\n')}
+}
+`
+
+  await writeFile(manifestPath, body)
+  console.log(`\nResolved ${ok}/${results.length}. Manifest → src/brand/logos/manifest.generated.ts`)
+}
+
+main().catch((err) => {
+  console.error('Logo fetch failed:', err)
+  process.exit(1)
+})

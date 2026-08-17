@@ -1,0 +1,384 @@
+/* ---------------------------------------------------------------------------
+   builder-test.css — the test simulator (`bts`) and the decision log (`bdl`).
+
+   Prefixes are new on purpose. `btest__` and `blog__` already belong to v0's
+   drawers in screens.css, and reusing them would have restyled those screens
+   from a file they do not import.
+
+   Every colour is a token. The trace leans on the feedback families rather
+   than on brand orange: brand marks the thing you are steering, and in a trace
+   the thing you are steering is the input, not the outcome.
+   --------------------------------------------------------------------------- */
+
+/* === Test simulator ======================================================== */
+
+.bts { display: flex; flex-direction: column; gap: var(--space-6); }
+
+.bts__live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.bts__policy {
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+}
+
+.bts__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .bts__grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.bts__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  background: var(--surface-sunken);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+/* --- Who --------------------------------------------------------------------- */
+
+.bts__search { position: relative; display: flex; align-items: center; }
+.bts__search svg {
+  position: absolute;
+  left: var(--space-5);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+/* (0,2,1) — kit.css sets control defaults at `.brand-root :where(input…)`,
+   which is (0,1,0). A :where() wrapper here would be (0,0,0) and lose. */
+.bts__search input {
+  height: var(--ctl-height-sm);
+  padding-left: var(--space-9);
+  background: var(--surface-raised);
+  border-radius: var(--radius-md);
+}
+
+.bts__users { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+
+.bts__user {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border: var(--bw-thin) solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  transition: border-color var(--dur-fast) var(--ease-standard),
+              background var(--dur-fast) var(--ease-standard);
+}
+.bts__user:hover { border-color: var(--border-default); }
+.bts__user.is-on { background: var(--brand-subtle-bg); border-color: var(--brand); }
+
+.bts__avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: var(--surface-inset);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+.bts__user.is-on .bts__avatar { background: var(--brand); color: var(--text-on-brand); }
+
+.bts__usertext { min-width: 0; display: flex; flex-direction: column; }
+.bts__usertext strong {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+}
+.bts__usertext em {
+  font-style: normal;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bts__group {
+  margin-left: auto;
+  flex: none;
+  padding: 1px var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--fb-neutral-bg);
+  border: var(--bw-thin) solid var(--fb-neutral-border);
+  color: var(--fb-neutral-fg);
+  font-size: var(--fs-xs);
+}
+
+.bts__empty { list-style: none; font-size: var(--fs-sm); color: var(--text-muted); padding: var(--space-4); }
+
+/* --- Context axes ------------------------------------------------------------ */
+
+.bts__axis { display: flex; flex-direction: column; gap: var(--space-3); }
+.bts__axislabel { font-size: var(--fs-sm); color: var(--text-secondary); }
+
+.bts__opts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.bts__opt {
+  padding: var(--space-2) var(--space-4);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  transition: border-color var(--dur-fast) var(--ease-standard),
+              background var(--dur-fast) var(--ease-standard),
+              color var(--dur-fast) var(--ease-standard);
+}
+.bts__opt:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.bts__opt.is-on {
+  background: var(--brand-subtle-bg);
+  border-color: var(--brand);
+  color: var(--brand-active);
+  font-weight: var(--fw-medium);
+}
+
+/* The claim the screen is allowed to make, written where the claim is made. */
+.bts__caveat {
+  padding: var(--space-4) var(--space-5);
+  border-left: var(--bw-thick) solid var(--fb-info-border);
+  background: var(--fb-info-bg);
+  border-radius: var(--radius-sm);
+  color: var(--fb-info-fg);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+/* --- Trace ------------------------------------------------------------------- */
+
+.bts__trace { display: flex; flex-direction: column; gap: var(--space-4); }
+.bts__norules { font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+.bts__steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+
+.bts__step {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+.bts__step.is-hit { border-color: var(--fb-positive-border); background: var(--fb-positive-bg); }
+.bts__step.is-off { border-style: dashed; background: var(--surface-sunken); }
+.bts__step.is-unreached { opacity: 0.5; }
+
+.bts__mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: var(--radius-full);
+  background: var(--fb-neutral-bg);
+  border: var(--bw-thin) solid var(--fb-neutral-border);
+  color: var(--fb-neutral-fg);
+}
+.bts__step.is-hit .bts__mark {
+  background: var(--fb-positive-dot);
+  border-color: var(--fb-positive-dot);
+  color: var(--text-inverse);
+}
+
+.bts__steptext { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bts__steptext strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+}
+.bts__steptext em {
+  font-style: normal;
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+  line-height: 1.45;
+}
+
+.bts__verdict {
+  font-weight: var(--fw-medium);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.bts__verdict.is-hit { color: var(--fb-positive-fg); }
+.bts__verdict.is-miss { color: var(--text-tertiary); }
+
+/* --- Verdict card ------------------------------------------------------------ */
+
+.bts__verdictcard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  box-shadow: var(--el-low);
+}
+.bts__decision { display: flex; align-items: center; gap: var(--space-5); }
+.bts__decision p { font-size: var(--fs-md); color: var(--text-body); }
+.bts__decision strong { color: var(--text-primary); font-weight: var(--fw-semibold); }
+
+.bts__sees { display: flex; flex-direction: column; gap: var(--space-3); }
+.bts__sees ol {
+  margin: 0;
+  padding-left: var(--space-7);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+/* === Decision log ========================================================== */
+
+.bdl { display: flex; flex-direction: column; gap: var(--space-5); }
+
+.bdl__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+}
+.bdl__export { margin-left: auto; }
+.bdl__export .bx-btn { display: inline-flex; align-items: center; gap: var(--space-3); }
+
+.bdl__range { display: flex; gap: var(--space-3); }
+
+.bdl__seg {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--surface-inset);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+.bdl__segbtn {
+  position: relative;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.bdl__segbtn.is-on { color: var(--text-primary); font-weight: var(--fw-medium); }
+.bdl__segbg {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+.bdl__seglabel { position: relative; display: inline-flex; align-items: center; gap: var(--space-3); }
+.bdl__seglabel em {
+  font-style: normal;
+  font-size: var(--fs-xs);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--fb-neutral-bg);
+  color: var(--text-tertiary);
+}
+
+.bdl__summary { font-size: var(--fs-sm); color: var(--text-secondary); }
+
+.bdl__scroll {
+  max-height: 46vh;
+  overflow: auto;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.bdl__table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
+.bdl__table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: var(--table-header-h);
+  padding: 0 var(--space-5);
+  text-align: left;
+  background: var(--surface-sunken);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.bdl__table td {
+  height: var(--table-row-h);
+  padding: 0 var(--space-5);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  color: var(--text-body);
+  vertical-align: middle;
+}
+.bdl__table tr:last-child td { border-bottom: none; }
+.bdl__table tbody tr { transition: background var(--dur-fast) var(--ease-standard); }
+.bdl__table tbody tr:hover { background: var(--surface-sunken); }
+
+.bdl__time { color: var(--text-tertiary); white-space: nowrap; }
+.bdl__user { color: var(--text-primary); }
+.bdl__app { display: inline-flex; align-items: center; gap: var(--space-4); white-space: nowrap; }
+.bdl__rule { color: var(--text-secondary); }
+
+/* DecisionChip's own tones, re-expressed for the log's three words. Same three
+   feedback families, so a Deny here and a Deny on a rule card are one colour. */
+.bdl__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 2px var(--space-4);
+  border-radius: var(--radius-pill);
+  border: var(--bw-thin) solid;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
+.bdl__chip i { width: 6px; height: 6px; border-radius: var(--radius-full); flex: none; }
+.bdl__chip.is-allow { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
+.bdl__chip.is-allow i { background: var(--fb-positive-dot); }
+.bdl__chip.is-deny { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
+.bdl__chip.is-deny i { background: var(--fb-negative-dot); }
+.bdl__chip.is-challenge { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bdl__chip.is-challenge i { background: var(--fb-notice-dot); }
+
+.bdl__empty { padding: var(--space-8); text-align: center; font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* === Reduced motion ========================================================
+   The JS springs are gated by useReducedMotion(); these are the CSS-side
+   transitions, which that hook cannot reach. Duration goes to 1ms rather than
+   0 so transitionend still fires — and it is set here rather than left to the
+   token override, because a transition that no longer moves but still takes
+   200ms is a control that feels broken. */
+@media (prefers-reduced-motion: reduce) {
+  .bts *,
+  .bts,
+  .bdl *,
+  .bdl {
+    transition-duration: 1ms !important;
+    animation: none !important;
+  }
+}

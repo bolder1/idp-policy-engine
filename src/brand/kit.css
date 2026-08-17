@@ -1,0 +1,689 @@
+/* ---------------------------------------------------------------------------
+   Brand kit styles.
+
+   Every value here resolves to a token from tokens.css (generated from the
+   design-system repo, brand #EB5424 locked). No raw colour values — that is
+   rule 1 of COMPONENTS.md and it is enforced by reading, so it is worth
+   keeping literally true.
+   --------------------------------------------------------------------------- */
+
+/* The token file is generated and carries no reset, so the document surface is
+   established here. color-scheme keeps native controls and scrollbars in step
+   with the chosen theme. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+/* The type stack lives on body, not only on .brand-root.
+   Anything portalled to document.body — the rules popover in the policy table
+   is one — sits outside .brand-root and so inherited the UA default. It was
+   rendering in Times New Roman, which is invisible in a screenshot review
+   because nobody expects to check the font of a tooltip. */
+body {
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  color: var(--text-body);
+}
+html {
+  background: var(--surface-page);
+  color-scheme: light;
+}
+html[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+.brand-root {
+  height: 100%;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  color: var(--text-body);
+  background: var(--surface-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-variant-numeric: tabular-nums;
+}
+
+.brand-root *,
+.brand-root *::before,
+.brand-root *::after {
+  box-sizing: border-box;
+}
+
+/* :where() for the same reason as the resets below. Written as
+   `.brand-root h2` this is (0,1,1) and beats every single-class component rule,
+   so a heading that asked for its own margin silently got 0 — which is what was
+   collapsing the gallery's section spacing. Zero specificity still overrides
+   the UA default, because author styles always outrank it. */
+.brand-root :where(h1, h2, h3, h4) {
+  margin: 0;
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.014em;
+  color: var(--text-primary);
+}
+
+.brand-root :where(p) { margin: 0; }
+
+/* :where() so these resets carry zero specificity of their own. Written as
+   `.brand-root button` they beat every single-class component rule — which is
+   how the dark nav's sub-items ended up rendering in ink on a near-black
+   surface. */
+.brand-root :where(button) {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.brand-root :where(input, select, textarea) { font: inherit; color: inherit; }
+
+.brand-root a { color: var(--text-link); text-decoration: none; }
+
+/* Focus is never suppressed, and the ring is ink — not brand. A brand-coloured
+   ring disappears against brand-coloured controls, which is where focus matters
+   most. */
+.brand-root :focus-visible {
+  outline: var(--bw-thick) solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.brand-root .u-label {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.brand-root .u-mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+
+.brand-root .u-muted { color: var(--text-tertiary); }
+
+/* Screen-reader-only. Two names for one thing, because both are in use across
+   screens that were written years apart; they are defined together so they
+   cannot drift.
+
+   They belong here rather than in whichever builder stylesheet happened to need
+   them first — an accident that stopped being harmless the moment those
+   stylesheets were split into their own chunks. `.u-sr` was defined in v1's and
+   used by the Zones screen, which is not v1: splitting would have rendered its
+   severity prefixes as visible text. */
+.u-sr,
+.u-sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* --- Button ---------------------------------------------------------------
+   Four roles = the four interactive/* semantic roles. Destructive triggers use
+   `neutral`; `danger` appears only as the confirming control inside a
+   destructive dialog. */
+
+.bx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: var(--ctl-height-md);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-md);
+  border: var(--bw-thin) solid transparent;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  transition:
+    background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+.bx-btn--sm { height: var(--ctl-height-sm); padding: 0 var(--space-4); font-size: var(--fs-xs); }
+.bx-btn.is-block { width: 100%; }
+.bx-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.bx-btn--brand { background: var(--int-brand-bg); color: var(--int-brand-text); border-color: var(--int-brand-bg); }
+.bx-btn--brand:not(:disabled):hover { background: var(--int-brand-bg-hover); border-color: var(--int-brand-bg-hover); }
+.bx-btn--brand:not(:disabled):active { background: var(--int-brand-bg-active); border-color: var(--int-brand-bg-active); }
+
+.bx-btn--neutral { background: var(--int-neutral-bg); color: var(--int-neutral-text); border-color: var(--int-neutral-border); }
+.bx-btn--neutral:not(:disabled):hover { background: var(--int-neutral-bg-hover); border-color: var(--int-neutral-border-hover); }
+.bx-btn--neutral:not(:disabled):active { background: var(--int-neutral-bg-active); }
+
+.bx-btn--ghost { background: transparent; color: var(--int-ghost-text); }
+.bx-btn--ghost:not(:disabled):hover { background: var(--int-ghost-bg-hover); }
+.bx-btn--ghost:not(:disabled):active { background: var(--int-ghost-bg-active); }
+
+.bx-btn--danger { background: var(--int-danger-bg); color: var(--int-danger-text); border-color: var(--int-danger-bg); }
+.bx-btn--danger:not(:disabled):hover { background: var(--int-danger-bg-hover); border-color: var(--int-danger-bg-hover); }
+.bx-btn--danger:focus-visible { outline-color: var(--focus-ring-danger); }
+
+/* --- Icon button -----------------------------------------------------------
+   Square, icon only, and never without a label — the label is both the
+   accessible name and the tooltip, so an icon that cannot be guessed still
+   names itself on hover and on focus. */
+
+.bx-iconbtn {
+  display: inline-grid; place-items: center; flex: none;
+  width: var(--ctl-height-md); height: var(--ctl-height-md);
+  border-radius: var(--radius-md);
+  border: var(--bw-thin) solid transparent;
+  color: var(--text-secondary);
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+.bx-iconbtn--sm { width: var(--ctl-height-sm); height: var(--ctl-height-sm); border-radius: var(--radius-sm); }
+.bx-iconbtn--neutral { border-color: var(--int-neutral-border); background: var(--int-neutral-bg); }
+.bx-iconbtn--neutral:not(:disabled):hover { background: var(--int-neutral-bg-hover); border-color: var(--int-neutral-border-hover); color: var(--text-primary); }
+.bx-iconbtn--ghost:not(:disabled):hover { background: var(--int-ghost-bg-hover); color: var(--text-primary); }
+.bx-iconbtn.is-on { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-inverse); }
+.bx-iconbtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* --- Menu button -------------------------------------------------------------
+   One trigger carrying a group of related actions. The toolbar it replaced had
+   eleven flat controls; grouping costs a click and returns the bar to the two
+   decisions that matter. */
+
+.bx-menu { position: relative; display: inline-flex; }
+.bx-menu__trigger.is-open { background: var(--int-neutral-bg-active); }
+.bx-menu__pop {
+  position: absolute; top: calc(100% + 6px); z-index: var(--z-popover);
+  min-width: 232px; padding: var(--space-3);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-lg);
+  box-shadow: var(--el-high);
+}
+.bx-menu__pop.is-end { right: 0; }
+.bx-menu__pop.is-start { left: 0; }
+.bx-menu__item {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  width: 100%; padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md); text-align: left; cursor: pointer;
+  color: var(--text-muted);
+}
+.bx-menu__item.is-divided { margin-top: var(--space-3); border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); }
+.bx-menu__item svg { margin-top: 2px; flex: none; }
+.bx-menu__item > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.bx-menu__item strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bx-menu__item em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bx-menu__item kbd {
+  flex: none; margin-top: 1px; padding: 1px 5px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-xs);
+  background: var(--surface-sunken);
+  font-family: inherit; font-size: 10px; color: var(--text-muted);
+}
+.bx-menu__item.is-cursor:not(:disabled) { background: var(--surface-sunken); }
+.bx-menu__item.is-danger.is-cursor strong,
+.bx-menu__item.is-danger:hover strong { color: var(--fb-negative-fg); }
+.bx-menu__item:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* --- Tip -------------------------------------------------------------------
+   Where a demoted sentence goes. Hover, focus and touch all open it; Escape
+   closes it; aria-describedby carries it without a pointer. */
+
+.bx-tip { position: relative; display: inline-flex; align-items: center; }
+.bx-tip__pop {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  width: 262px; padding: var(--space-4) var(--space-5);
+  background: var(--surface-inverse); color: var(--text-inverse);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-xs); font-weight: var(--fw-regular); line-height: 1.5;
+  text-align: left; letter-spacing: 0; text-transform: none;
+  box-shadow: var(--el-high); z-index: var(--z-tooltip);
+  pointer-events: none;
+}
+.bx-tip__pop.is-bottom { top: calc(100% + 7px); }
+.bx-tip__pop.is-top { bottom: calc(100% + 7px); }
+
+.bx-tipdot {
+  display: grid; place-items: center; flex: none;
+  width: 15px; height: 15px; border-radius: var(--radius-full);
+  border: 1px solid var(--border-default); background: var(--surface-raised);
+  font-size: 9px; font-weight: var(--fw-semibold); line-height: 1;
+  color: var(--text-muted); cursor: help;
+}
+.bx-tipdot:hover { border-color: var(--border-strong); color: var(--text-secondary); }
+
+/* --- Badge ---------------------------------------------------------------- */
+
+.bx-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 1px var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 18px;
+  border: var(--bw-thin) solid transparent;
+}
+.bx-badge--neutral { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); border-color: var(--fb-neutral-border); }
+.bx-badge--brand { background: var(--brand-subtle-bg); color: var(--brand-active); border-color: var(--brand-subtle-border); }
+.bx-badge--positive { background: var(--fb-positive-bg); color: var(--fb-positive-fg); border-color: var(--fb-positive-border); }
+.bx-badge--negative { background: var(--fb-negative-bg); color: var(--fb-negative-fg); border-color: var(--fb-negative-border); }
+.bx-badge--notice { background: var(--fb-notice-bg); color: var(--fb-notice-fg); border-color: var(--fb-notice-border); }
+.bx-badge--info { background: var(--fb-info-bg); color: var(--fb-info-fg); border-color: var(--fb-info-border); }
+/* Violet. For "New", "Beta", "Recommended" — labels that want attention but are
+   not a state and are not an action. They used to borrow brand orange, which
+   put them in direct competition with the primary button on the same screen. */
+.bx-badge--accent { background: var(--fb-accent-bg); color: var(--fb-accent-fg); border-color: var(--fb-accent-border); }
+.bx-badge--system { background: var(--surface-inset); color: var(--text-tertiary); border-color: var(--border-subtle); }
+
+/* --- Decision chip / status ----------------------------------------------
+   Dot AND label, always. There is no dot-only variant anywhere in this kit. */
+
+.bx-decision,
+.bx-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
+.bx-decision i,
+.bx-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  flex: none;
+}
+.bx-decision {
+  padding: 2px var(--space-4) 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  border: var(--bw-thin) solid transparent;
+}
+.bx-decision--sm { font-size: var(--fs-xs); padding: 1px var(--space-3) 1px var(--space-2); }
+.bx-decision--positive { background: var(--fb-positive-bg); color: var(--fb-positive-fg); border-color: var(--fb-positive-border); }
+.bx-decision--positive i { background: var(--fb-positive-dot); }
+.bx-decision--negative { background: var(--fb-negative-bg); color: var(--fb-negative-fg); border-color: var(--fb-negative-border); }
+.bx-decision--negative i { background: var(--fb-negative-dot); }
+.bx-decision--notice { background: var(--fb-notice-bg); color: var(--fb-notice-fg); border-color: var(--fb-notice-border); }
+.bx-decision--notice i { background: var(--fb-notice-dot); }
+
+.bx-status--active { color: var(--text-body); }
+.bx-status--active i { background: var(--fb-positive-dot); }
+/* Inactive is a lifecycle state, not a failure — neutral, never red. */
+.bx-status--inactive { color: var(--text-tertiary); }
+.bx-status--inactive i { background: var(--fb-neutral-dot); }
+.bx-status--always {
+  padding: 2px var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--fb-positive-bg);
+  color: var(--fb-positive-fg);
+  border: var(--bw-thin) solid var(--fb-positive-border);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+}
+
+/* --- App glyphs ----------------------------------------------------------- */
+
+.bx-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: var(--fw-semibold);
+  flex: none;
+}
+.bx-appstack { display: inline-flex; align-items: center; gap: var(--space-4); }
+.bx-appstack__row { display: inline-flex; }
+.bx-appstack__row .bx-glyph { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface-raised); }
+.bx-appstack__row .bx-glyph:first-child { margin-left: 0; }
+.bx-appstack__count { font-size: var(--fs-sm); color: var(--text-secondary); }
+.bx-appstack__none { font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* --- Toggle --------------------------------------------------------------- */
+
+/* --- Switch --------------------------------------------------------------------
+   The knob is absolutely placed and translated a known distance, rather than
+   parked by  and chased by a layout animation. Two things
+   follow from that: the travel cannot disagree with the track, and the inset is
+   free to be large enough that the knob is visibly inside the track at both
+   ends — at 2px the knob shadow spilled over the edge and the control read as
+   broken.
+
+   Sizes are the ones the references land on: md is the default at 44×24, up
+   from 34×20, because a switch is a hit target as well as a picture. */
+
+.bx-toggle {
+  position: relative; flex: none;
+  width: 44px; height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--surface-inset);
+  border: 1px solid var(--border-default);
+  transition: background var(--dur-normal) var(--ease-standard), border-color var(--dur-normal) var(--ease-standard);
+}
+.bx-toggle--sm { width: 32px; height: 18px; }
+.bx-toggle--lg { width: 52px; height: 30px; }
+
+.bx-toggle.is-on { background: var(--int-brand-bg); border-color: var(--int-brand-bg); }
+.bx-toggle:not(:disabled):hover { border-color: var(--border-strong); }
+.bx-toggle.is-on:not(:disabled):hover { border-color: var(--int-brand-bg-hover); background: var(--int-brand-bg-hover); }
+.bx-toggle:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.bx-toggle__knob {
+  position: absolute; left: 2px; top: 50%;
+  width: 18px; height: 18px; margin-top: -9px;
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+.bx-toggle--sm .bx-toggle__knob { width: 14px; height: 14px; margin-top: -7px; }
+.bx-toggle--lg .bx-toggle__knob { width: 24px; height: 24px; margin-top: -12px; left: 2px; }
+
+/* --- Chip ----------------------------------------------------------------- */
+
+.bx-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  border: var(--bw-thin) solid var(--border-default);
+  background: var(--surface-raised);
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+}
+.bx-chip__main {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.bx-chip__main:disabled { cursor: default; }
+.bx-chip.is-clickable:hover { border-color: var(--border-strong); }
+.bx-chip.is-on { background: var(--brand-subtle-bg); border-color: var(--brand); }
+.bx-chip.is-on .bx-chip__main { color: var(--brand-active); font-weight: var(--fw-medium); }
+.bx-chip__main em {
+  font-style: normal;
+  font-size: var(--fs-xs);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-inset);
+  color: var(--text-tertiary);
+}
+.bx-chip.is-on .bx-chip__main em { background: var(--brand-subtle-border); color: var(--brand-active); }
+.bx-chip__x {
+  padding: 0 var(--space-4) 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+  line-height: 1;
+}
+.bx-chip__x:hover { color: var(--text-primary); }
+
+/* --- Tabs ----------------------------------------------------------------- */
+
+.bx-tabs {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--surface-inset);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+.bx-tabs__tab {
+  position: relative;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.bx-tabs__tab.is-on { color: var(--text-primary); }
+.bx-tabs__bg {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-raised);
+  border-radius: var(--radius-md);
+  box-shadow: var(--el-low);
+}
+.bx-tabs__label { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: var(--space-3); }
+.bx-tabs__label em {
+  font-style: normal;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+/* --- Fields --------------------------------------------------------------- */
+
+.bx-field { display: flex; flex-direction: column; gap: var(--space-3); }
+.bx-field.is-inline { flex-direction: row; align-items: center; gap: var(--space-5); }
+.bx-field.is-inline .bx-field__label { min-width: 128px; }
+.bx-field__control { display: flex; flex-direction: column; gap: var(--space-3); }
+.bx-field__hint { font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* :where() throughout — at (0,2,1) these defaults beat every component that
+   asked for a smaller control, so a condition row rendered its selects at 31px
+   and its text inputs at 35px on the same line. Zero specificity keeps the
+   defaults while letting a component set its own size. */
+.brand-root :where(input[type='text'], input[type='search'], input[type='number'], select, textarea) {
+  height: var(--ctl-height-md);
+  padding: 0 var(--space-5);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font-size: var(--fs-md);
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+/* Width is the one thing a control's own context decides, so it is set at zero
+   specificity. In the rule above it was (0,2,1) and beat every component that
+   asked for a narrower field — which is why a 240px search box rendered full
+   width. Everything still defaults to 100%; only an explicit width now wins. */
+.brand-root :where(input[type='text'], input[type='search'], input[type='number'], select, textarea) {
+  width: 100%;
+}
+.brand-root textarea { height: auto; padding: var(--space-4) var(--space-5); resize: vertical; }
+/* :where() again — at (0,2,1) this painted a visible border on the toolbar's
+   deliberately borderless name field the moment the pointer touched it. */
+.brand-root :where(input, select):hover { border-color: var(--int-neutral-border-hover); }
+
+/* --- Callout -------------------------------------------------------------- */
+
+.bx-callout {
+  display: flex;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-6);
+  border-radius: var(--radius-lg);
+  border: var(--bw-thin) solid;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+.bx-callout__mark { width: 6px; height: 6px; border-radius: var(--radius-full); flex: none; margin-top: 6px; }
+.bx-callout strong { display: block; margin-bottom: 2px; }
+.bx-callout--info { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
+.bx-callout--info .bx-callout__mark { background: var(--fb-info-dot); }
+.bx-callout--notice { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bx-callout--notice .bx-callout__mark { background: var(--fb-notice-dot); }
+.bx-callout--negative { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
+.bx-callout--negative .bx-callout__mark { background: var(--fb-negative-dot); }
+.bx-callout--positive { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
+.bx-callout--positive .bx-callout__mark { background: var(--fb-positive-dot); }
+
+/* --- Card ----------------------------------------------------------------- */
+
+.bx-card {
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--el-low);
+}
+.bx-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-7);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+}
+.bx-card__head h2 { font-size: var(--fs-base); }
+.bx-card__head p { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bx-card__actions { display: flex; gap: var(--space-4); flex: none; }
+.bx-card__body { padding: var(--space-7); }
+.bx-card__body.is-flush { padding: 0; }
+
+/* --- Info dot ------------------------------------------------------------- */
+
+.bx-infodot-wrap { position: relative; display: inline-flex; }
+.bx-infodot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  flex: none;
+}
+.bx-infodot--notice { background: var(--fb-notice-dot); }
+.bx-infodot--negative { background: var(--fb-negative-dot); }
+.bx-infodot__pop {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: 248px;
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-inverse);
+  color: var(--text-inverse);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  box-shadow: var(--el-high);
+  z-index: var(--z-tooltip);
+}
+
+/* --- Overlays ------------------------------------------------------------- */
+
+.bx-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 23, 30, 0.42);
+  z-index: var(--z-overlay);
+}
+.bx-scrim--center { display: grid; place-items: center; padding: var(--space-8); }
+
+.bx-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-overlay);
+  border-left: var(--bw-thin) solid var(--border-subtle);
+  box-shadow: var(--el-overlay);
+  z-index: var(--z-modal);
+}
+/* The leading edge, draggable. Same grammar as the builder's column split: an
+   invisible corridor that surfaces a pill when the pointer is near, so a resize
+   affordance can sit on a boundary without becoming a third thing on screen.
+   Double-click returns it to the width the caller opened it at. */
+.bx-drawer__grip {
+  position: absolute; left: -3px; top: 0; bottom: 0; width: 10px; z-index: 1;
+  display: grid; place-items: center;
+  cursor: col-resize; touch-action: none;
+}
+.bx-drawer__grip span {
+  width: 4px; height: 46px; border-radius: var(--radius-lg);
+  background: var(--border-strong); opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard),
+    height var(--dur-fast) var(--ease-standard);
+}
+.bx-drawer__grip:hover span,
+.bx-drawer__grip:focus-visible span { opacity: 1; }
+.bx-drawer__grip:active span { opacity: 1; background: var(--brand); height: 68px; }
+.bx-drawer__grip:focus-visible { outline: none; }
+.bx-drawer__grip:focus-visible span { background: var(--brand); }
+
+.bx-drawer__head,
+.bx-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-6) var(--space-7);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+}
+.bx-drawer__head h2,
+.bx-modal__head h2 { font-size: var(--fs-lg); }
+.bx-drawer__head p { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bx-drawer__x { font-size: var(--fs-2xl); line-height: 1; color: var(--text-muted); }
+.bx-drawer__x:hover { color: var(--text-primary); }
+.bx-drawer__body { flex: 1; overflow-y: auto; padding: var(--space-7); }
+.bx-drawer__foot,
+.bx-modal__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-7);
+  border-top: var(--bw-thin) solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+
+.bx-modal {
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-overlay);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--el-overlay);
+  overflow: hidden;
+  z-index: var(--z-modal);
+}
+.bx-modal__body { overflow-y: auto; padding: var(--space-7); }
+.bx-modal__body.is-flush { padding: 0; }
+
+/* --- Save bar ------------------------------------------------------------- */
+
+.bx-savebar {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-8);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-7);
+  background: var(--surface-inverse);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--el-overlay);
+  z-index: var(--z-toast);
+}
+.bx-savebar__text { display: flex; flex-direction: column; color: var(--text-inverse); }
+.bx-savebar__text strong { font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+.bx-savebar__text span { font-size: var(--fs-xs); opacity: 0.7; }
+.bx-savebar .bx-btn--ghost { color: color-mix(in srgb, var(--text-inverse) 78%, transparent); }
+.bx-savebar .bx-btn--ghost:hover { background: color-mix(in srgb, var(--text-inverse) 10%, transparent); color: var(--text-inverse); }
+
+/* --- App logos ------------------------------------------------------------ */
+
+.applogo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  overflow: hidden;
+}
+.applogo--img { background: var(--surface-raised); border: var(--bw-thin) solid var(--border-subtle); }
+.applogo--img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.applogo--mono { color: #fff; font-weight: var(--fw-semibold); letter-spacing: -0.02em; }
+
+.applogo__stack { display: inline-flex; align-items: center; gap: var(--space-4); }
+.applogo__row { display: inline-flex; }
+.applogo__row .applogo { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface-raised); }
+.applogo__row .applogo:first-child { margin-left: 0; }
+.applogo__count { font-size: var(--fs-sm); color: var(--text-secondary); }
+.applogo__none { font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* Two more pill families, for labels that are categories rather than states —
+   severity bands, environments, owners. They exist so a categorical tag never
+   has to borrow a semantic colour and imply an outcome it does not have. */
+.bx-badge--lime { background: var(--fb-lime-bg); color: var(--fb-lime-fg); border-color: var(--fb-lime-border); }
+.bx-badge--magenta { background: var(--fb-magenta-bg); color: var(--fb-magenta-fg); border-color: var(--fb-magenta-border); }

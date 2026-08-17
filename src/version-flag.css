@@ -1,0 +1,23 @@
+/* Floating switcher shown on the model-concept version. The brand revamp has
+   its own switcher in the nav rail footer, where it belongs. */
+.version-flag {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: #12171e;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 22px 55px -18px rgba(20, 30, 40, 0.5);
+  z-index: 900;
+}
+.version-flag strong { color: #fff; font-weight: 500; }
+.version-flag span { color: #eb5424; }
+.version-flag:hover { background: #1a222b; }

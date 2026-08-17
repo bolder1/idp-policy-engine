@@ -1,0 +1,146 @@
+/* ---------------------------------------------------------------------------
+   Authentication methods — the consolidated 2FA page.
+   --------------------------------------------------------------------------- */
+
+.bam__facts { grid-template-columns: repeat(3, 1fr); margin-bottom: 14px; }
+.bam__facts .bmset__fact strong em {
+  font-style: normal; font-size: var(--fs-sm); font-weight: 400; color: var(--text-muted);
+}
+.bam__facts .bmset__fact strong.is-bad { color: var(--fb-negative-fg); }
+
+.bam__tabs { margin-bottom: 20px; }
+.bam__tabs button { display: inline-flex; align-items: center; gap: 6px; }
+
+/* --- Tiers ------------------------------------------------------------------ */
+
+.bam__tier { margin-top: 26px; }
+.bam__tier:first-of-type { margin-top: 18px; }
+.bam__tierhead {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;
+  padding-bottom: 9px; margin-bottom: 2px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bam__tierhead h2 {
+  display: flex; align-items: center; gap: 7px;
+  font-size: var(--fs-md); font-weight: 600;
+}
+.bam__tierhead h2 svg { color: var(--fb-positive-fg); }
+.bam__tierhead p { margin-top: 3px; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.55; max-width: 74ch; }
+
+/* --- A method --------------------------------------------------------------- */
+
+.bam__row { border-bottom: 1px solid var(--border-subtle); }
+.bam__row:last-child { border-bottom: none; }
+.bam__main { display: flex; align-items: flex-start; gap: 16px; padding: 13px 0; }
+/* Dimmed, never hidden: a blocked method is exactly what the admin came to
+   find, and hiding it is how the console loses people. */
+.bam__row.is-blocked .bam__body { opacity: 0.62; }
+
+.bam__body { flex: 1; min-width: 0; }
+.bam__name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-md); font-weight: 500; }
+.bam__chan {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 7px; border-radius: var(--radius-pill);
+  background: var(--surface-inset);
+  font-size: 10px; font-weight: 400; color: var(--text-tertiary);
+}
+
+/* The four states, in the order they must be fixed. */
+.bam__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 7px; }
+.bam__state {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-xs);
+}
+.bam__state::before {
+  content: ''; width: 6px; height: 6px; border-radius: 999px; flex: none;
+}
+.bam__state.is-yes { color: var(--text-secondary); }
+.bam__state.is-yes::before { background: var(--fb-positive-dot); }
+.bam__state.is-no { color: var(--text-muted); }
+.bam__state.is-no::before { box-shadow: inset 0 0 0 1px var(--border-strong); }
+.bam__enrol { font-size: var(--fs-xs); color: var(--text-muted); margin-left: 2px; }
+
+/* The first thing standing between this method and a user being able to pick
+   it — one line, rather than three states to cross-reference. */
+.bam__blocker {
+  margin-top: 6px; font-size: var(--fs-xs); font-weight: 500;
+  color: var(--fb-notice-fg);
+}
+
+.bam__acts { display: flex; align-items: center; gap: 6px; flex: none; }
+.bam__more {
+  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  display: grid; place-items: center; color: var(--text-tertiary);
+}
+.bam__more:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bam__more svg { transition: transform var(--dur-fast) var(--ease-standard); }
+.bam__more svg.is-open { transform: rotate(180deg); }
+
+/* --- Per-method detail ------------------------------------------------------ */
+
+.bam__detail {
+  padding: 4px 0 16px 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.bam__balance {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 11px; margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs); color: var(--text-secondary);
+}
+.bam__balance.is-empty {
+  background: var(--fb-negative-bg); color: var(--fb-negative-fg);
+}
+
+.bam__setting {
+  display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.bam__setting + .bam__setting { margin-top: 2px; }
+.bam__setting > div { min-width: 0; }
+.bam__setting p { font-size: var(--fs-sm); font-weight: 500; }
+.bam__setting span { display: block; margin-top: 2px; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; max-width: 70ch; }
+.bam__setting select { width: auto; min-width: 96px; }
+
+.bam__detailfoot {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+.bam__check { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+.bam__check input:disabled + * { opacity: 0.5; }
+.bam__link { font-size: var(--fs-sm); font-weight: 500; color: var(--text-link); }
+.bam__link:hover { text-decoration: underline; }
+
+/* --- Other panes ------------------------------------------------------------ */
+
+.bam__pane { display: flex; flex-direction: column; gap: 2px; max-width: 900px; }
+.bam__pane > .bx-callout { margin-bottom: 12px; }
+.bam__sub { margin-top: 20px; margin-bottom: 4px; }
+.bam__note { font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; margin-bottom: 10px; max-width: 72ch; }
+.bam__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.bam__radio {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+}
+.bam__radio + .bam__radio { margin-top: 4px; }
+.bam__radio.is-blocked { opacity: 0.6; }
+/* The dependency the console states in prose, drawn from the same catalogue so
+   it cannot fall out of step with it. */
+.bam__radio em {
+  display: block; margin-top: 2px;
+  font-style: normal; font-size: var(--fs-xs); color: var(--fb-notice-fg);
+}
+
+.bam__sets { margin-top: 4px; }
+
+@media (max-width: 720px) {
+  .bam__facts { grid-template-columns: 1fr; }
+  .bam__setting { flex-direction: column; align-items: flex-start; gap: 8px; }
+}

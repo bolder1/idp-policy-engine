@@ -183,6 +183,11 @@ html[data-theme='dark'] {
 .bx-iconbtn--neutral { border-color: var(--int-neutral-border); background: var(--int-neutral-bg); }
 .bx-iconbtn--neutral:not(:disabled):hover { background: var(--int-neutral-bg-hover); border-color: var(--int-neutral-border-hover); color: var(--text-primary); }
 .bx-iconbtn--ghost:not(:disabled):hover { background: var(--int-ghost-bg-hover); color: var(--text-primary); }
+/* Quiet until reached for, then unmistakable. A destructive icon button that
+   is red at rest turns every list into an alarm; one that is never red is a
+   delete you press by accident. */
+.bx-iconbtn--danger { color: var(--fb-negative-fg); }
+.bx-iconbtn--danger:not(:disabled):hover { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
 .bx-iconbtn.is-on { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-inverse); }
 .bx-iconbtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -190,6 +195,10 @@ html[data-theme='dark'] {
    One trigger carrying a group of related actions. The toolbar it replaced had
    eleven flat controls; grouping costs a click and returns the bar to the two
    decisions that matter. */
+
+/* A kebab trigger: square, no text, no chevron. */
+.bx-btn.bx-menu__trigger--icon { width: var(--ctl-height-sm); padding: 0; }
+.bx-btn.bx-menu__trigger--icon.bx-btn--md { width: var(--ctl-height-md); }
 
 .bx-menu { position: relative; display: inline-flex; }
 .bx-menu__trigger.is-open { background: var(--int-neutral-bg-active); }
@@ -229,18 +238,26 @@ html[data-theme='dark'] {
    closes it; aria-describedby carries it without a pointer. */
 
 .bx-tip { position: relative; display: inline-flex; align-items: center; }
+/* `fixed`, in a portal on document.body — see the note on Tip in kit.tsx. It
+   used to be absolute and centred on its trigger, which put it half off-screen
+   near an edge and let any `overflow: hidden` ancestor clip it away entirely.
+   Both coordinates now come from JS, measured against the viewport. */
 .bx-tip__pop {
-  position: absolute; left: 50%; transform: translateX(-50%);
-  width: 262px; padding: var(--space-4) var(--space-5);
+  position: fixed; top: 0; left: 0;
+  /* A width, not a fixed size: 262 is the intent, but on a narrow phone the
+     viewport wins — a tooltip wider than the screen cannot be clamped into it. */
+  width: 262px; max-width: calc(100vw - 16px);
+  padding: var(--space-4) var(--space-5);
   background: var(--surface-inverse); color: var(--text-inverse);
   border-radius: var(--radius-md);
   font-size: var(--fs-xs); font-weight: var(--fw-regular); line-height: 1.5;
   text-align: left; letter-spacing: 0; text-transform: none;
   box-shadow: var(--el-high); z-index: var(--z-tooltip);
+  /* Never intercepts the pointer: a tooltip under the cursor that eats the
+     mouseleave is a tooltip that will not close. */
   pointer-events: none;
 }
-.bx-tip__pop.is-bottom { top: calc(100% + 7px); }
-.bx-tip__pop.is-top { bottom: calc(100% + 7px); }
+.bx-tip__pop strong { color: inherit; font-weight: var(--fw-semibold); }
 
 .bx-tipdot {
   display: grid; place-items: center; flex: none;
@@ -566,7 +583,16 @@ html[data-theme='dark'] {
   background: rgba(18, 23, 30, 0.42);
   z-index: var(--z-overlay);
 }
-.bx-scrim--center { display: grid; place-items: center; padding: var(--space-8); }
+/* The track is pinned to the scrim rather than left `auto`. An auto track sizes
+   to the dialog's own max-content, so a dialog wider than the viewport grew the
+   track to match and `max-width: 100%` on the panel had nothing to clamp
+   against — the right-hand edge, and the buttons on it, ended up off-screen. */
+.bx-scrim--center {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  padding: var(--space-8);
+}
 
 .bx-drawer {
   position: fixed;
@@ -629,6 +655,9 @@ html[data-theme='dark'] {
 
 .bx-modal {
   max-height: 88vh;
+  /* The width comes in as an inline pixel value, so without this a wide dialog
+     overflows the scrim on a narrow viewport instead of shrinking into it. */
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   background: var(--surface-overlay);
@@ -687,3 +716,16 @@ html[data-theme='dark'] {
    has to borrow a semantic colour and imply an outcome it does not have. */
 .bx-badge--lime { background: var(--fb-lime-bg); color: var(--fb-lime-fg); border-color: var(--fb-lime-border); }
 .bx-badge--magenta { background: var(--fb-magenta-bg); color: var(--fb-magenta-fg); border-color: var(--fb-magenta-border); }
+
+/* Monitor — the report-only state.
+
+   Notice, never positive. A pill that reads as "live" on a policy which has
+   never refused anything is how a tenant spends a fortnight believing they are
+   protected, and the whole value of the state is that it is visibly not
+   enforcing. */
+.bx-status--monitor {
+  background: var(--fb-notice-bg);
+  border-color: var(--fb-notice-border);
+  color: var(--fb-notice-fg);
+}
+.bx-status--monitor i { background: var(--fb-notice-dot); }

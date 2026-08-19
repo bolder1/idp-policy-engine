@@ -77,7 +77,7 @@ export interface Challenge {
 /* The deck.
 
    Chosen to cover the axes the condition catalogue actually models — network
-   zone, device posture, MDM, registration, trust age, risk signal, auth state,
+   zone, device fingerprint, MDM, registration, trust age, risk signal, auth state,
    user type, time of day — with at least one hostile and one ordinary card on
    most of them. A deck that was all attacks would score a policy that denies
    everything as perfect, which is why half of these are people trying to do
@@ -101,10 +101,10 @@ export const DECK: Challenge[] = [
     id: 'proxy-finance',
     kind: 'threat',
     name: 'Finance account behind a known proxy',
-    story: 'A finance user appears from a commercial proxy on a device that fails posture.',
-    userId: 'priya', place: 'Known proxy', device: 'Non-compliant', authState: 'Normal returning user', risk: 'Medium', at: '11:20',
+    story: 'A finance user appears from a commercial proxy on a device whose fingerprint has changed.',
+    userId: 'priya', place: 'Known proxy', device: 'Changed fingerprint', authState: 'Normal returning user', risk: 'Medium', at: '11:20',
     want: 'deny',
-    why: 'Regulated data on a non-compliant device is the case device posture exists for.',
+    why: 'Regulated data on a device whose fingerprint changed is the case this exists for.',
     fix: {
       name: 'Block anonymised sources',
       conditions: [{ typeId: 'zone', operator: 'in zone', values: ['anon'] }],

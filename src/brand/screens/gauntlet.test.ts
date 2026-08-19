@@ -212,20 +212,20 @@ describe('badges', () => {
   })
 
   it('is earned only when the claim it states is true of the grid', () => {
-    /* Deny anonymised sources and everything non-compliant; both gate badges
+    /* Deny anonymised sources and every unrecognised device; both gate badges
        should then hold, and they should not hold for an empty policy. */
     const guarded = policy([
       rule({ conditions: [cond('zone', 'in zone', ['anon'])], decision: 'deny' }),
-      rule({ conditions: [cond('posture', 'not compliant with', ['corp'])], decision: 'deny' }),
+      rule({ conditions: [cond('fingerprint', 'not recognised by', ['fp-corp'])], decision: 'deny' }),
     ])
     const got = badges(guarded, sweep(guarded, env, noon), null, 0)
     expect(got.find((b) => b.id === 'anon-gated')?.earned).toBe(true)
-    expect(got.find((b) => b.id === 'posture-enforced')?.earned).toBe(true)
+    expect(got.find((b) => b.id === 'device-recognised')?.earned).toBe(true)
 
     const open = policy([])
     const none = badges(open, sweep(open, env, noon), null, 0)
     expect(none.find((b) => b.id === 'anon-gated')?.earned).toBe(false)
-    expect(none.find((b) => b.id === 'posture-enforced')?.earned).toBe(false)
+    expect(none.find((b) => b.id === 'device-recognised')?.earned).toBe(false)
   })
 })
 

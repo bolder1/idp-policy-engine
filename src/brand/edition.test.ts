@@ -1,0 +1,104 @@
+/// <reference types="vite/client" />
+import { describe, expect, it } from 'vitest'
+
+import policiesSrc from './screens/Policies.tsx?raw'
+import createSrc from './create/CreatePolicy.tsx?raw'
+import builderSrc from './screens/PolicyBuilderV4.tsx?raw'
+import { GAPS, featuresOf, gapsFor, type Features } from './edition'
+
+/* The lite edition is a promise about what is *absent*, and absence is the one
+   thing nobody notices regressing. A feature that quietly comes back makes the
+   comparison this whole exercise is for meaningless, so the gates are asserted
+   at their call sites rather than trusted. */
+
+const LITE = featuresOf('lite')
+const FULL = featuresOf('full')
+
+describe('the two editions', () => {
+  it('withholds exactly what was asked for, and nothing else', () => {
+    const off = (Object.keys(LITE) as (keyof Features)[]).filter((k) => !LITE[k]).sort()
+    expect(off).toEqual(
+      [
+        'blastRadius',
+        'checkStep',
+        'commands',
+        'coverage',
+        'designSwitcher',
+        'exposure',
+        'gauntlet',
+        'guidedSetup',
+        'publish',
+        'reviewStep',
+        'templateHero',
+      ].sort(),
+    )
+  })
+
+  it('grants everything in full', () => {
+    expect(Object.values(FULL).every(Boolean)).toBe(true)
+  })
+
+  it('gates every withheld capability at its call site', () => {
+    // Grep the source rather than render: the point is that no path reaches the
+    // feature, and a render test only proves the paths it happens to walk.
+    expect(policiesSrc).toContain('store.features.coverage')
+    expect(policiesSrc).toContain('store.features.exposure')
+    expect(createSrc).toContain('store.features.templateHero')
+    expect(createSrc).toContain('store.features.guidedSetup')
+    for (const flag of ['gauntlet', 'blastRadius', 'commands', 'guidedSetup', 'publish']) {
+      expect(`${flag}: ${builderSrc.includes(`features.${flag}`)}`).toBe(`${flag}: true`)
+    }
+  })
+
+  it('binds the command shortcut to the same flag as the menu entry', () => {
+    // A palette still reachable by ⌘K in an edition whose menu denies it exists
+    // is worse than one that is simply present.
+    expect(builderSrc).toMatch(/features\.commands &&\s*\(e\.metaKey/)
+  })
+
+  it('builds the trail from the edition instead of filtering at each use', () => {
+    // Half the builder walks STEPS by index. Holes would need every one of
+    // those sites to learn about holes.
+    expect(builderSrc).toContain('stepsFor(features)')
+    expect(builderSrc).not.toMatch(/const STEPS: \{/)
+  })
+})
+
+describe('the gap catalogue', () => {
+  it('names a gap for every capability lite withholds', () => {
+    /* Two flags are deliberately unargued, and both need a reason on record or
+       this assertion becomes a place to hide omissions:
+
+       · `designSwitcher` is prototype furniture. Removing it costs the product
+         nothing, because it was never part of the product.
+       · `publish` gates the bar button and the launch slide, which is the same
+         argument the `reviewStep` gap already makes under the title "The
+         publish gate". A second entry saying it again would pad the panel and
+         weaken it. */
+    const UNARGUED: (keyof Features)[] = ['designSwitcher', 'publish']
+    const withheld = (Object.keys(LITE) as (keyof Features)[]).filter((k) => !LITE[k])
+    const named = new Set(GAPS.map((g) => g.id))
+    const missing = withheld.filter((k) => !UNARGUED.includes(k) && !named.has(k))
+    expect(missing).toEqual([])
+    // And the fold has to be real: the review gap must actually mention it.
+    expect(GAPS.find((g) => g.id === 'reviewStep')?.title).toBe('The publish gate')
+  })
+
+  it('shows nothing in the full edition', () => {
+    expect(gapsFor(FULL)).toEqual([])
+  })
+
+  it('orders worst-first, so the panel opens on the argument that carries weight', () => {
+    const rank = { high: 0, medium: 1, low: 2 }
+    const got = gapsFor(LITE).map((g) => rank[g.weight])
+    expect(got).toEqual([...got].sort((a, b) => a - b))
+  })
+
+  it('states every gap as a question with a cost and an answer', () => {
+    for (const g of GAPS) {
+      expect(`${g.id}: ${g.question.trim().endsWith('?')}`).toBe(`${g.id}: true`)
+      expect(g.cost.length).toBeGreaterThan(40)
+      expect(g.covered.length).toBeGreaterThan(40)
+    }
+  })
+})

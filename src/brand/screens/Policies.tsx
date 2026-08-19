@@ -6,7 +6,7 @@ import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
 import { AppLogoStack } from '../logos/AppLogo'
 import { Badge, Button, DecisionChip, InfoDot, StatusPill } from '../kit'
-import type { Policy, PolicyType } from '../data'
+import { enforces, type Policy, type PolicyType } from '../data'
 import { useBrand } from '../store'
 import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
@@ -189,7 +189,7 @@ export function Policies() {
   const store = useBrand()
   const [view, setView] = useState<'list' | 'coverage'>('list')
   const [type, setType] = useState<PolicyType | 'All'>('All')
-  const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all')
+  const [status, setStatus] = useState<'all' | 'active' | 'monitor' | 'inactive'>('all')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'modified', dir: 1 })
   const [menuFor, setMenuFor] = useState<string | null>(null)
@@ -197,7 +197,7 @@ export function Policies() {
   const env = useMemo<SimEnv>(
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
-      postureName: (id) => store.postureById(id)?.name ?? id,
+      fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
       groupName: (id) => store.groupById(id).name,
     }),
     [store],
@@ -228,7 +228,11 @@ export function Policies() {
   const rows = useMemo(() => {
     let list = store.policies.filter((p) => {
       if (type !== 'All' && p.type !== type) return false
-      if (status === 'active' && p.status === 'inactive') return false
+      /* "Active" filters to what actually decides sign-ins, so a monitor
+         policy is excluded from it — the filter has to mean the same thing the
+         pill does or the two teach different models of one state. */
+      if (status === 'active' && !enforces(p)) return false
+      if (status === 'monitor' && p.status !== 'monitor') return false
       if (status === 'inactive' && p.status !== 'inactive') return false
       if (query && !p.name.toLowerCase().includes(query.toLowerCase())) return false
       return true
@@ -259,9 +263,10 @@ export function Policies() {
   }, [store.policies, type, status, query, sort, grades])
 
   const counts = useMemo(() => {
-    const active = store.policies.filter((p) => p.status !== 'inactive').length
+    const active = store.policies.filter(enforces).length
+    const monitoring = store.policies.filter((p) => p.status === 'monitor').length
     const issues = store.policies.filter((p) => p.configIssue).length
-    return { total: store.policies.length, active, issues }
+    return { total: store.policies.length, active, monitoring, issues }
   }, [store.policies])
 
   /* Counted across everything graded, not just the filtered rows — a filter
@@ -301,14 +306,18 @@ export function Policies() {
               >
                 List
               </button>
-              <button
-                role="tab"
-                aria-selected={view === 'coverage'}
-                className={view === 'coverage' ? 'is-on' : ''}
-                onClick={() => setView('coverage')}
-              >
-                Coverage
-              </button>
+              {/* Two tabs or none. A tablist with one tab is a label with a
+                  border round it. */}
+              {store.features.coverage && (
+                <button
+                  role="tab"
+                  aria-selected={view === 'coverage'}
+                  className={view === 'coverage' ? 'is-on' : ''}
+                  onClick={() => setView('coverage')}
+                >
+                  Coverage
+                </button>
+              )}
             </div>
             <Button variant="ghost" onClick={() => store.go({ name: 'templates' })}>
               Manage templates
@@ -320,9 +329,9 @@ export function Policies() {
         }
       />
 
-      {view === 'coverage' && <Coverage />}
+      {store.features.coverage && view === 'coverage' && <Coverage />}
 
-      {view === 'list' && (
+      {(view === 'list' || !store.features.coverage) && (
         <>
       {counts.issues > 0 && (
         <div className="bpolicies__banner">
@@ -369,6 +378,7 @@ export function Policies() {
           >
             <option value="all">All statuses</option>
             <option value="active">Active</option>
+            <option value="monitor">Monitor</option>
             <option value="inactive">Inactive</option>
           </select>
           {/* Only appears once something is filtered — a permanent Clear that
@@ -407,7 +417,7 @@ export function Policies() {
               {head('type', 'Type')}
               <th>Apps assigned</th>
               {head('rules', 'Rules')}
-              {head('exposure', 'Exposure')}
+              {store.features.exposure && head('exposure', 'Exposure')}
               <th>Status</th>
               <th>Last modified</th>
               <th className="btable__right">Actions</th>
@@ -447,7 +457,8 @@ export function Policies() {
 
         <footer className="btable__foot">
           <span>
-            Showing {rows.length} of {counts.total} policies · {counts.active} evaluating
+            Showing {rows.length} of {counts.total} policies · {counts.active} enforcing
+            {counts.monitoring > 0 && ` · ${counts.monitoring} in monitor`}
             {leaking > 0 && (
               <>
                 {' · '}
@@ -507,6 +518,9 @@ function PolicyRow({
           <RulePeek policy={policy} />
         )}
       </td>
+      {/* The Exposure column is the grade in the list. Withheld in lite, so
+          the cell goes with the header rather than leaving an empty column. */}
+      {store.features.exposure && (
       <td>
         {gauntlet ? (
           (() => {
@@ -537,6 +551,7 @@ function PolicyRow({
           </span>
         )}
       </td>
+      )}
       <td>
         <StatusPill status={policy.status} />
       </td>

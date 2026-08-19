@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, type LucideIcon } from 'lucide-react'
 
-import type { AccessDecision } from './data'
+import type { AccessDecision, PolicyStatus } from './data'
 
 /* -----------------------------------------------------------------------------
    Brand kit — the primitives from IDP · 2 Core.
@@ -84,7 +85,10 @@ export function IconButton({
   onClick?: () => void
   disabled?: boolean
   size?: 'sm' | 'md'
-  tone?: 'neutral' | 'ghost'
+  /* `danger` exists because an icon-only delete with no colour on it is a
+     control that gets pressed by accident. The kit already had a danger
+     Button; the icon variant was the gap. */
+  tone?: 'neutral' | 'ghost' | 'danger'
   pressed?: boolean
 }) {
   return (
@@ -128,6 +132,7 @@ export function MenuButton({
   variant = 'secondary',
   size = 'md',
   align = 'end',
+  iconOnly = false,
 }: {
   label: string
   icon?: LucideIcon
@@ -136,6 +141,11 @@ export function MenuButton({
   variant?: ButtonVariant
   size?: 'sm' | 'md'
   align?: 'start' | 'end'
+  /* A kebab: the icon alone, no text and no chevron, with `label` carrying the
+     accessible name. Needed wherever a row offers an overflow rather than a
+     named menu — a labelled trigger in a hover cluster is three words competing
+     with the three icons beside it. */
+  iconOnly?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [cursor, setCursor] = useState(0)
@@ -177,7 +187,8 @@ export function MenuButton({
     <span className="bx-menu" ref={wrap}>
       <button
         type="button"
-        className={`bx-btn bx-btn--${ROLE[variant]} bx-btn--${size} bx-menu__trigger ${open ? 'is-open' : ''}`}
+        className={`bx-btn bx-btn--${ROLE[variant]} bx-btn--${size} bx-menu__trigger ${iconOnly ? 'bx-menu__trigger--icon' : ''} ${open ? 'is-open' : ''}`}
+        aria-label={iconOnly ? label : undefined}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
@@ -193,8 +204,8 @@ export function MenuButton({
         }}
       >
         {icon && <MenuIcon icon={icon} size={size} />}
-        {label}
-        <ChevronDown size={size === 'sm' ? 12 : 13} strokeWidth={2.2} aria-hidden />
+        {!iconOnly && label}
+        {!iconOnly && <ChevronDown size={size === 'sm' ? 12 : 13} strokeWidth={2.2} aria-hidden />}
       </button>
 
       <AnimatePresence>
@@ -283,8 +294,19 @@ export function DecisionChip({
   )
 }
 
-export function StatusPill({ status }: { status: 'active' | 'inactive' | 'always-on' }) {
+export function StatusPill({ status }: { status: PolicyStatus }) {
   if (status === 'always-on') return <span className="bx-status bx-status--always">Always on</span>
+  /* Monitor gets its own pill rather than a variant of Active, because the two
+     differ in the only way that matters — one refuses sign-ins and one does
+     not. Notice tone, never positive: a monitor policy looking like a live one
+     is how a tenant believes they are protected for a fortnight. */
+  if (status === 'monitor')
+    return (
+      <span className="bx-status bx-status--monitor" title="Evaluates every sign-in and records what it would have done. Enforces nothing.">
+        <i />
+        Monitor
+      </span>
+    )
   return (
     <span className={`bx-status bx-status--${status}`}>
       <i />
@@ -547,6 +569,27 @@ export function Counter({ value, className }: { value: number; className?: strin
    Hover and focus both open it, Escape closes it, and a tap opens it on touch
    where there is no hover at all. `aria-describedby` means a screen reader gets
    the text without the pointer ever being involved. */
+/* -----------------------------------------------------------------------------
+   Tooltip.
+
+   Two bugs made this worth rewriting rather than patching.
+
+   It was `position: absolute; left: 50%; translateX(-50%)` on a fixed 262px
+   box — centred on its trigger, so a trigger anywhere near an edge put half the
+   tooltip off-screen. And absolute positioning is clipped by any ancestor with
+   `overflow: hidden`, which by now includes the zones table, the fingerprint
+   category panels, the attribute accordion and the entry lists. A tooltip that
+   disappears inside a scroll container is worse than no tooltip.
+
+   So it renders in a PORTAL with FIXED coordinates measured from the trigger:
+   no ancestor can clip it, and it decides its own placement from the room it
+   actually has. Prefer the requested side, flip when that side cannot hold it,
+   and clamp horizontally to the viewport so it is always fully visible.
+   -------------------------------------------------------------------------- */
+
+const TIP_GAP = 7
+const TIP_MARGIN = 8
+
 export function Tip({
   text,
   children,
@@ -559,19 +602,62 @@ export function Tip({
   width?: number
 }) {
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number; side: 'top' | 'bottom' } | null>(null)
+  const anchor = useRef<HTMLSpanElement | null>(null)
+  const pop = useRef<HTMLSpanElement | null>(null)
   const id = useId()
 
+  const place = useCallback(() => {
+    const a = anchor.current?.getBoundingClientRect()
+    if (!a) return
+    const p = pop.current?.getBoundingClientRect()
+    const w = p?.width ?? width ?? 262
+    const h = p?.height ?? 0
+
+    /* Flip only when the preferred side genuinely cannot hold it AND the other
+       side has more room. Flipping toward an equally cramped side just moves the
+       problem. */
+    const below = window.innerHeight - a.bottom
+    const above = a.top
+    let side = placement
+    if (placement === 'bottom' && below < h + TIP_GAP + TIP_MARGIN && above > below) side = 'top'
+    if (placement === 'top' && above < h + TIP_GAP + TIP_MARGIN && below > above) side = 'bottom'
+
+    const top = side === 'bottom' ? a.bottom + TIP_GAP : a.top - h - TIP_GAP
+    /* Centre on the trigger, then clamp — the clamp is the whole fix for the
+       edge case, and it is why the tooltip is no longer allowed to know where
+       its trigger is horizontally. */
+    const centred = a.left + a.width / 2 - w / 2
+    const left = Math.max(TIP_MARGIN, Math.min(centred, window.innerWidth - w - TIP_MARGIN))
+    setPos({ top, left, side })
+  }, [placement, width])
+
+  /* Measured after the pop is in the DOM, so `h` is real rather than guessed —
+     the first pass renders it invisible at 0,0 and the second puts it right. */
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setPos(null)
+      return
+    }
+    place()
+    /* `capture: true` so a scroll inside any container moves it, not just the
+       window — this is the half of the fix that keeps it attached. */
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
     document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open])
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open, place])
 
   return (
     <span
+      ref={anchor}
       className="bx-tip"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
@@ -581,22 +667,30 @@ export function Tip({
       aria-describedby={open ? id : undefined}
     >
       {children}
-      <AnimatePresence>
-        {open && (
-          <motion.span
-            id={id}
-            role="tooltip"
-            className={`bx-tip__pop is-${placement}`}
-            style={width ? { width } : undefined}
-            initial={{ opacity: 0, y: placement === 'bottom' ? -3 : 3 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: placement === 'bottom' ? -3 : 3 }}
-            transition={{ duration: 0.13 }}
-          >
-            {text}
-          </motion.span>
+      {open &&
+        createPortal(
+          <AnimatePresence>
+            <motion.span
+              ref={pop}
+              id={id}
+              role="tooltip"
+              className={`bx-tip__pop is-${pos?.side ?? placement}`}
+              style={{
+                top: pos?.top ?? 0,
+                left: pos?.left ?? 0,
+                width,
+                /* Hidden until measured, so nothing is ever seen at 0,0. */
+                visibility: pos ? 'visible' : 'hidden',
+              }}
+              initial={{ opacity: 0, y: (pos?.side ?? placement) === 'bottom' ? -3 : 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.13 }}
+            >
+              {text}
+            </motion.span>
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </span>
   )
 }
@@ -649,6 +743,7 @@ export function Drawer({
   onClose,
   title,
   caption,
+  head,
   actions,
   children,
   width = 460,
@@ -660,6 +755,11 @@ export function Drawer({
   onClose: () => void
   title: string
   caption?: string
+  /** Replaces the default title block. For a panel whose header needs to carry
+      more than two lines of text — an icon, a count, a state — composed by the
+      caller rather than by adding a prop per thing. `title` is still required
+      and still names the panel for assistive tech. */
+  head?: ReactNode
   actions?: ReactNode
   children: ReactNode
   /** Opening width. A caller that knows what it is about to render should pick
@@ -755,10 +855,12 @@ export function Drawer({
             )}
 
             <header className="bx-drawer__head">
-              <div>
-                <h2>{title}</h2>
-                {caption && <p>{caption}</p>}
-              </div>
+              {head ?? (
+                <div>
+                  <h2>{title}</h2>
+                  {caption && <p>{caption}</p>}
+                </div>
+              )}
               <button className="bx-drawer__x" onClick={onClose} aria-label="Close">
                 ×
               </button>

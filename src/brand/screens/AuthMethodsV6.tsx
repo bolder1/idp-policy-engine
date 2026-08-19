@@ -18,7 +18,6 @@ import {
 
 import { Button, Callout, Toggle, TipDot } from '../kit'
 import {
-  AUTH_METHODS,
   DEFAULT_METHOD_ID,
   METHOD_TIERS,
   methodBlocker,
@@ -96,7 +95,10 @@ export function AuthMethodsV6() {
   const store = useBrand()
   const reduce = useReducedMotion()
 
-  const [methods, setMethods] = useState<AuthMethod[]>(AUTH_METHODS)
+  /* From the store, not the module: enrolment counts move with the tenant,
+     and a screen holding its own copy would keep the old tenant's numbers the
+     moment the persona changes underneath it. */
+  const { methods, setMethods } = useBrand()
   const [defaultId, setDefaultId] = useState(DEFAULT_METHOD_ID)
   const [sel, setSel] = useState<Selection>({ kind: 'method', id: 'fido2' })
   const [q, setQ] = useState('')

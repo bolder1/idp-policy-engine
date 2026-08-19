@@ -63,6 +63,7 @@ export function Zones() {
     const z: Zone = {
       id: `z${Date.now()}`,
       name: 'New zone',
+      kind: 'custom',
       ip: [],
       asn: [],
       location: emptyLocation(),

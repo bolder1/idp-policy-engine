@@ -133,7 +133,7 @@ export function PolicyBuilderV3({ policyId }: { policyId: string }) {
 
   const rules = draft.rules
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft)
-  const diagnostics = diagnose(draft, store.groups)
+  const diagnostics = diagnose(draft, store.groups, store.hooks)
 
   const patch = (p: Partial<Policy>) => setDraft({ ...draft, ...p })
   const patchRule = (i: number, p: Partial<Rule>) =>
@@ -161,8 +161,8 @@ export function PolicyBuilderV3({ policyId }: { policyId: string }) {
           :
           t.valueKind === 'zone'
             ? store.zones[0] ? [store.zones[0].id] : []
-            : t.valueKind === 'posture'
-              ? store.postures[0] ? [store.postures[0].id] : []
+            : t.valueKind === 'fingerprint'
+              ? store.fingerprints[0] ? [store.fingerprints[0].id] : []
               : t.valueKind === 'time'
                 ? ['09:00', '17:00']
                 : t.options?.length
@@ -173,7 +173,7 @@ export function PolicyBuilderV3({ policyId }: { policyId: string }) {
            type — "Office Network" says more than "Network Zone". */
         seed.name = preset
           ? store.zones.find((z) => z.id === preset)?.name ??
-            store.postures.find((pp) => pp.id === preset)?.name ??
+            store.fingerprints.find((pp) => pp.id === preset)?.name ??
             t.label
           : t.label
       }
@@ -464,7 +464,7 @@ function Picker({
         {(() => {
           const hit = (t: string) => !q || t.toLowerCase().includes(q.toLowerCase())
           const zones = store.zones.filter((z) => hit(z.name) || hit('zone'))
-          const postures = store.postures.filter((p) => hit(p.name) || hit('device'))
+          const postures = store.fingerprints.filter((p) => hit(p.name) || hit('device'))
           if (zones.length === 0 && postures.length === 0) return null
           return (
             <div className="bz__pickgroup">
@@ -481,7 +481,7 @@ function Picker({
                 </button>
               ))}
               {postures.map((pp) => (
-                <button key={pp.id} type="button" className="bz__pick" onClick={() => onPick('posture', pp.id)}>
+                <button key={pp.id} type="button" className="bz__pick" onClick={() => onPick('fingerprint', pp.id)}>
                   <span className="bz__pickico" aria-hidden>
                     <MonitorSmartphone size={15} strokeWidth={1.8} />
                   </span>
@@ -888,11 +888,11 @@ function ValueField({
       </select>
     )
   }
-  if (type.valueKind === 'posture') {
+  if (type.valueKind === 'fingerprint') {
     return (
       <select aria-label="Device posture" value={v} onChange={(e) => onChange([e.target.value])}>
         <option value="">Choose a posture…</option>
-        {store.postures.map((p) => (
+        {store.fingerprints.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
           </option>

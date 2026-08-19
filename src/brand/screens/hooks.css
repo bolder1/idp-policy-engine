@@ -1,0 +1,216 @@
+/* ---------------------------------------------------------------------------
+   External hooks. Shaped like the zones library, because a hook is the same
+   kind of object — named once, referenced everywhere, dangerous to edit.
+   --------------------------------------------------------------------------- */
+
+.bhk__empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-5);
+  max-width: 520px;
+  margin: var(--space-12) auto;
+  text-align: center;
+}
+.bhk__empty > span {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-inset);
+  color: var(--text-tertiary);
+}
+.bhk__empty h2 { margin: 0; font-size: var(--fs-xl); }
+.bhk__empty p { margin: 0; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.55; }
+
+.bhk__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-6); }
+
+.bhk__card {
+  padding: var(--space-6);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.bhk__cardhead { display: flex; align-items: center; gap: var(--space-5); }
+.bhk__tile {
+  flex: none;
+  display: grid; place-items: center;
+  width: 34px; height: 34px;
+  border-radius: var(--radius-md);
+}
+.bhk__tile.is-sync { background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.bhk__tile.is-attribute-sync { background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
+
+.bhk__cardname { flex: 1; min-width: 0; }
+.bhk__cardname h3 { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-medium); }
+.bhk__cardname p {
+  margin: 1px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.bhk__why {
+  margin: var(--space-5) 0 0;
+  padding-left: var(--space-5);
+  border-left: 2px solid var(--border-default);
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+  line-height: 1.55;
+}
+
+/* --- The facts row --------------------------------------------------------- */
+
+.bhk__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+.bhk__fact {
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  color: var(--text-body);
+}
+.bhk__fact strong {
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+/* Neither failure mode is coloured as danger. They are two defensible answers
+   to one question, and tinting one red would make the form read as though the
+   product has an opinion it is declining to state. Notice and info, not
+   negative and positive. */
+.bhk__fact.is-fail-closed { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bhk__fact.is-fail-closed strong { color: var(--fb-notice-fg); opacity: 0.75; }
+.bhk__fact.is-fail-open { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
+.bhk__fact.is-fail-open strong { color: var(--fb-info-fg); opacity: 0.75; }
+.bhk__fact.is-slow { border-color: var(--fb-notice-border); }
+
+.bhk__issue {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.bhk__issue svg { flex: none; margin-top: 2px; }
+.bhk__issue.is-error { background: var(--fb-negative-bg); border: 1px solid var(--fb-negative-border); color: var(--fb-negative-fg); }
+.bhk__issue.is-warning { background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border); color: var(--fb-notice-fg); }
+
+/* --- Used by --------------------------------------------------------------- */
+
+.bhk__uses { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--border-subtle); }
+.bhk__useshead {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.bhk__usesnone { margin: var(--space-3) 0 0; font-size: var(--fs-sm); color: var(--text-muted); }
+.bhk__uses ul { margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.bhk__uses ul li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: var(--space-3) 0;
+  font-size: var(--fs-sm);
+}
+.bhk__uses ul li + li { border-top: 1px solid var(--border-subtle); }
+.bhk__uses ul strong { font-weight: var(--fw-medium); color: var(--text-primary); }
+.bhk__uses ul span { color: var(--text-tertiary); text-align: right; }
+
+.bhk__confirm { margin: 0; font-size: var(--fs-md); line-height: 1.55; color: var(--text-body); }
+
+/* --- The form -------------------------------------------------------------- */
+
+.bhk__form { display: flex; flex-direction: column; gap: var(--space-6); }
+.bhk__row { display: flex; gap: var(--space-5); align-items: flex-start; }
+.bhk__row .bhk__field { flex: 1; }
+.bhk__field--method { flex: 0 0 110px !important; }
+.bhk__field--num { flex: 0 0 140px !important; }
+
+.bhk__field { display: flex; flex-direction: column; gap: var(--space-3); }
+.bhk__field > span { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bhk__field > span em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-weight: 400;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.bhk__field input,
+.bhk__field textarea,
+.bhk__field select {
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  color: var(--text-body);
+  background: var(--surface-raised);
+  border: 1px solid var(--int-neutral-border);
+  border-radius: var(--radius-sm);
+}
+.bhk__field textarea { line-height: 1.5; resize: vertical; }
+.bhk__field input:focus-visible,
+.bhk__field textarea:focus-visible,
+.bhk__field select:focus-visible {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-subtle-bg);
+}
+
+.bhk__modes { display: flex; flex-direction: column; gap: var(--space-4); margin: 0; padding: 0; border: none; }
+.bhk__modes legend {
+  padding: 0 0 var(--space-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+}
+.bhk__modes label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.bhk__modes label:hover { border-color: var(--int-neutral-border-hover); }
+.bhk__modes label.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bhk__modes input { margin-top: 3px; accent-color: var(--brand); }
+.bhk__modes svg { flex: none; margin-top: 2px; color: var(--text-tertiary); }
+.bhk__modes strong { display: block; font-size: var(--fs-md); font-weight: var(--fw-medium); }
+.bhk__modes em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+.bhk__formissues { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.bhk__formissues li {
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.bhk__formissues li.is-error { background: var(--fb-negative-bg); border: 1px solid var(--fb-negative-border); color: var(--fb-negative-fg); }
+.bhk__formissues li.is-warning { background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border); color: var(--fb-notice-fg); }

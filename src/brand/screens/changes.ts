@@ -75,6 +75,19 @@ export function describeChanges(saved: Policy, draft: Policy): string[] {
 
     if (before.enabled !== r.enabled) out.push(`“${r.name}” switched ${r.enabled ? 'on' : 'off'}`)
 
+    /* Reported, even though it changes no decision. The save bar's job is to
+       name what changed, not to rank it — and a rationale quietly rewritten is
+       exactly the edit an auditor needs to see, precisely because the engine
+       behaves identically afterwards. */
+    if ((before.description ?? '') !== (r.description ?? ''))
+      out.push(
+        !before.description
+          ? `Rationale added to “${r.name}”`
+          : !r.description
+            ? `Rationale removed from “${r.name}”`
+            : `Rationale reworded on “${r.name}”`,
+      )
+
     if (factorKey(before) !== factorKey(r)) out.push(`Authentication settings changed on “${r.name}”`)
   })
 

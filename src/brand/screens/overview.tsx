@@ -35,8 +35,8 @@ function predicate(policy: Policy, index: number, env: SimEnv): string {
       const shown =
         t.valueKind === 'zone'
           ? c.values.map(env.zoneName).join(', ')
-          : t.valueKind === 'posture'
-            ? c.values.map(env.postureName).join(', ')
+          : t.valueKind === 'fingerprint'
+            ? c.values.map(env.fingerprintName).join(', ')
             : t.valueKind === 'time'
               ? c.values.filter(Boolean).join('–')
               : c.values.filter(Boolean).join(', ')
@@ -139,6 +139,7 @@ export function PolicyOverview({
                     <p>
                       When <em>{predicate(policy, i, env)}</em>
                     </p>
+                    {r.description && <p className="bov__why">{r.description}</p>}
                   </div>
                   <DecisionChip decision={r.decision} size="sm" />
                 </button>

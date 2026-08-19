@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { PageHead } from '../Shell'
 import { TemplateCard, TemplatePreview, type CardModel } from '../create/TemplateCard'
-import { Badge, Button, Callout, Card, Chip } from '../kit'
+import { Button, Chip } from '../kit'
 import { useBrand } from '../store'
 import type { Template } from '../data'
 
@@ -101,56 +101,8 @@ export function Templates() {
   )
 }
 
-/* --- Device posture -------------------------------------------------------- */
-
-export function DevicePosturePage() {
-  const store = useBrand()
-  const [sel, setSel] = useState(store.postures[0].id)
-  const p = store.postures.find((x) => x.id === sel)!
-
-  return (
-    <div className="bpage">
-      <PageHead
-        title="Device posture"
-        caption="Named device health requirements. Define once, reference across policies."
-        actions={<Button variant="brand">New posture policy</Button>}
-      />
-      <div className="bmaster">
-        <aside className="bmaster__list">
-          {store.postures.map((x) => (
-            <button key={x.id} type="button" className={`bmaster__item ${sel === x.id ? 'is-on' : ''}`} onClick={() => setSel(x.id)}>
-              <span>{x.name}</span>
-              <Badge tone="neutral">{x.strictness}</Badge>
-            </button>
-          ))}
-        </aside>
-
-        <Card title={p.name} caption={`Referenced by ${p.usedIn} policies`} actions={<Badge tone="neutral">{p.strictness}</Badge>}>
-          <Callout tone="notice" title="Editing this affects every policy that references it">
-            {p.usedIn} polic{p.usedIn === 1 ? 'y' : 'ies'} evaluate this posture on every sign-in.
-          </Callout>
-
-          <div className="bposture">
-            <div className="bposture__row">
-              <span className="u-label">Platforms</span>
-              <div className="bposture__chips">
-                {['iOS', 'Android', 'Windows', 'macOS', 'ChromeOS', 'Linux'].map((pl) => (
-                  <Chip key={pl} active={p.platforms.includes(pl)}>
-                    {pl}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-            {p.requirements.map((r) => (
-              <div key={r.label} className="bposture__row">
-                <span className="u-label">{r.label}</span>
-                <span className="bposture__val">{r.value}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-    </div>
-  )
-}
+/* The Device posture page lived here. It was replaced by Device Fingerprint:
+   posture asked whether a device was healthy, which is a different question
+   from whether it is the same device, and only the second one is what the
+   condition in the rule model now means. */
 

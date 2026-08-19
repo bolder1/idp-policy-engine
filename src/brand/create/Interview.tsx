@@ -120,7 +120,7 @@ export function Interview({
   const env = useMemo<SimEnv>(
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
-      postureName: (id) => store.postureById(id)?.name ?? id,
+      fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
       groupName: (id) => store.groupById(id).name,
     }),
     [store],

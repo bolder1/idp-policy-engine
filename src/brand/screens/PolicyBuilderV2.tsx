@@ -181,7 +181,7 @@ export function PolicyBuilderV2({ policyId }: { policyId: string }) {
 
   const rules = draft.rules
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft)
-  const diagnostics = diagnose(draft, store.groups)
+  const diagnostics = diagnose(draft, store.groups, store.hooks)
   const selRule = sel !== null ? rules[sel] : undefined
 
   const patch = (p: Partial<Policy>) => setDraft({ ...draft, ...p })
@@ -213,7 +213,7 @@ export function PolicyBuilderV2({ policyId }: { policyId: string }) {
       let values: string[] = ['']
       if (preset) values = [preset]
       else if (t.valueKind === 'zone') values = store.zones[0] ? [store.zones[0].id] : []
-      else if (t.valueKind === 'posture') values = store.postures[0] ? [store.postures[0].id] : []
+      else if (t.valueKind === 'fingerprint') values = store.fingerprints[0] ? [store.fingerprints[0].id] : []
       else if (t.valueKind === 'time') values = ['09:00', '17:00']
       else if (t.options?.length) values = [t.options[0]]
 
@@ -252,8 +252,8 @@ export function PolicyBuilderV2({ policyId }: { policyId: string }) {
       const values =
         t.valueKind === 'zone'
           ? store.zones[0] ? [store.zones[0].id] : []
-          : t.valueKind === 'posture'
-            ? store.postures[0] ? [store.postures[0].id] : []
+          : t.valueKind === 'fingerprint'
+            ? store.fingerprints[0] ? [store.fingerprints[0].id] : []
             : t.valueKind === 'time'
               ? ['09:00', '17:00']
               : t.options?.length
@@ -494,9 +494,9 @@ function Palette({
     const hit = (s: string) => !q || s.toLowerCase().includes(q.toLowerCase())
     return {
       zones: store.zones.filter((z) => hit(z.name)),
-      postures: store.postures.filter((p) => hit(p.name)),
+      postures: store.fingerprints.filter((p) => hit(p.name)),
     }
-  }, [q, store.zones, store.postures])
+  }, [q, store.zones, store.fingerprints])
 
   return (
     <aside className="bwb__palette" aria-label="Add to policy">
@@ -570,7 +570,7 @@ function Palette({
                 icon={MonitorSmartphone}
                 name={p.name}
                 title={`Adds a Device Posture condition set to ${p.name}`}
-                item={{ kind: 'condition', typeId: 'posture' }}
+                item={{ kind: 'condition', typeId: 'fingerprint' }}
                 {...{ onActivate, onDragItem, onDragEnd, dragging }}
               />
             ))}

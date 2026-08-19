@@ -374,3 +374,57 @@
     animation: none !important;
   }
 }
+
+/* --- Copy rule to another policy ------------------------------------------- */
+
+.bdlg-copy__none { margin: 0; padding: var(--space-8) 0; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.55; }
+
+.bdlg-copy__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-4); }
+.bdlg-copy__list label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.bdlg-copy__list label:hover { border-color: var(--int-neutral-border-hover); }
+.bdlg-copy__list label.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bdlg-copy__list input { margin-top: 3px; accent-color: var(--brand); }
+
+.bdlg-copy__main { min-width: 0; }
+.bdlg-copy__name { display: flex; align-items: center; gap: var(--space-4); font-size: var(--fs-md); color: var(--text-primary); }
+.bdlg-copy__meta { display: block; margin-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* The two outcomes a copy can have that the policy name does not reveal. Warn
+   is not danger — copying into a position where the rule cannot fire is a
+   recoverable mistake with an obvious fix, and colouring it red would put it on
+   a level with deleting something. */
+.bdlg-copy__warn,
+.bdlg-copy__note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.bdlg-copy__warn { background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bdlg-copy__note { background: var(--fb-info-bg); border: 1px solid var(--fb-info-border); color: var(--fb-info-fg); }
+.bdlg-copy__warn svg, .bdlg-copy__note svg { flex: none; margin-top: 1px; }
+
+/* The rationale, in the review. Above IF/THEN rather than below, because a
+   reviewer checks the logic *against* the stated reason — reading them in the
+   other order means reading the logic twice. */
+.bdlg-rev__why {
+  margin: var(--space-3) 0 var(--space-4) 30px;
+  padding-left: var(--space-5);
+  border-left: 2px solid var(--border-default);
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}

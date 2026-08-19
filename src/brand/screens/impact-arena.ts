@@ -214,8 +214,8 @@ export interface Badge {
 
 /** Situations whose origin is an anonymising network, by index. */
 const ANON_SITUATIONS = SITUATIONS.filter((s) => (PLACE_FACTS[s.place]?.zonesIn ?? []).includes('anon')).map((s) => s.index)
-/** Situations on a device that fails posture. */
-const BROKEN_DEVICE_SITUATIONS = SITUATIONS.filter((s) => DEVICE_FACTS[s.device]?.compliant === false).map((s) => s.index)
+/** Situations on a device the fingerprint does not recognise. */
+const UNRECOGNISED_SITUATIONS = SITUATIONS.filter((s) => DEVICE_FACTS[s.device]?.recognised === false).map((s) => s.index)
 
 export function badges(
   policy: Policy,
@@ -251,15 +251,15 @@ export function badges(
         : undefined,
   })
 
-  const postureLeak = BROKEN_DEVICE_SITUATIONS.filter((i) => after.decisions[i] === '1fa')
+  const deviceLeak = UNRECOGNISED_SITUATIONS.filter((i) => after.decisions[i] === '1fa')
   out.push({
-    id: 'posture-enforced',
-    label: 'Failing devices are stopped',
-    claim: 'No device that fails posture gets in on one factor.',
-    earned: postureLeak.length === 0,
+    id: 'device-recognised',
+    label: 'Unrecognised devices are stopped',
+    claim: 'No device the fingerprint does not recognise gets in on one factor.',
+    earned: deviceLeak.length === 0,
     detail:
-      postureLeak.length > 0
-        ? `${postureLeak.length} of ${BROKEN_DEVICE_SITUATIONS.length} situations on a non-compliant device sign in on a single factor.`
+      deviceLeak.length > 0
+        ? `${deviceLeak.length} of ${UNRECOGNISED_SITUATIONS.length} situations on an unrecognised device sign in on a single factor.`
         : undefined,
   })
 

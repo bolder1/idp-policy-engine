@@ -1,22 +1,31 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from 'react'
 
 import {
-  apps as seedApps,
-  devicePostures as seedPostures,
-  groups as seedGroups,
-  methodSets as seedMethodSets,
-  policies as seedPolicies,
   templates as seedTemplates,
-  zones as seedZones,
   type AccessDecision,
   type App,
-  type DevicePosture,
   type Group,
   type MethodSet,
   type Policy,
+  type Rule,
   type Template,
   type Zone,
 } from './data'
+import { type FingerprintProfile } from './fingerprint'
+import { type Hook } from './hooks'
+import { appsAt, fingerprintsAt, groupsAt, hooksAt, methodSetsAt, methodsAt, policiesAt, zonesAt } from './fixtures'
+import type { AuthMethod } from './methods'
+import { TAB_SCREEN, personaById, type PersonaId } from './personas'
+import { featuresOf, type Edition, type Features } from './edition'
 
 export type BrandScreen =
   | { name: 'policies' }
@@ -27,7 +36,8 @@ export type BrandScreen =
   | { name: 'builder'; policyId: string; open?: 'gauntlet' | 'impact' }
   | { name: 'templates' }
   | { name: 'zones' }
-  | { name: 'posture' }
+  | { name: 'fingerprint' }
+  | { name: 'hooks' }
   | { name: 'methods' }
   | { name: 'create' }
 
@@ -35,8 +45,34 @@ interface BrandStore {
   apps: App[]
   groups: Group[]
   zones: Zone[]
-  postures: DevicePosture[]
+  fingerprints: FingerprintProfile[]
+  /* External hooks. A library object like zones, for the reason set out in
+     hooks.ts: the endpoint is shared, the rules that consult it are not. */
+  hooks: Hook[]
+  /* Which edition is on screen, and the capabilities it grants. Read the
+     flags, never the name: a screen that asks `edition === 'lite'` has to be
+     revisited every time a third edition is imagined. */
+  edition: Edition
+  features: Features
+  setEdition: (e: Edition) => void
+  /* Which persona's tenant is loaded.
+
+     Not a view filter. Changing it replaces the contents of every tab —
+     policies, zones, fingerprint profiles, method sets, hooks, and the group
+     directory the rule previews count against — because the doc's archetypes
+     differ by company size and a 200-person tenant is a different product
+     experience from a 20,000-person one rather than the same one scaled.
+
+     Editing state is dropped on the swap, deliberately: carrying a draft
+     written against three policies into an estate of twenty-three would leave
+     rules pointing at zones that tenant does not have. */
+  persona: PersonaId
+  setPersona: (p: PersonaId) => void
   methodSets: MethodSet[]
+  /* The catalogue is the same eleven methods for every tenant; only how many
+     people have enrolled in each moves with the persona. */
+  methods: AuthMethod[]
+  setMethods: Dispatch<SetStateAction<AuthMethod[]>>
   templates: Template[]
   policies: Policy[]
 
@@ -46,7 +82,14 @@ interface BrandStore {
   appById: (id: string) => App
   groupById: (id: string) => Group
   zoneById: (id: string) => Zone | undefined
-  postureById: (id: string) => DevicePosture | undefined
+  fingerprintById: (id: string) => FingerprintProfile | undefined
+  hookById: (id: string) => Hook | undefined
+  addHook: (h: Hook) => void
+  updateHook: (h: Hook) => void
+  removeHook: (id: string) => void
+  addFingerprint: (p: FingerprintProfile) => void
+  updateFingerprint: (p: FingerprintProfile) => void
+  removeFingerprint: (id: string) => void
   policyById: (id: string) => Policy | undefined
 
   /* Gauntlet expectations the tenant has overruled, per policy.
@@ -72,6 +115,18 @@ interface BrandStore {
 
   savePolicy: (p: Policy) => void
   addPolicy: (p: Policy) => void
+  /* Copy a rule into another policy as an independent rule.
+
+     Copied, never linked, and the distinction is the whole design. Zones and
+     method sets are *referenced* — editing one reaches every rule that names
+     it, which is what makes "Corporate Network" mean one thing across twenty
+     policies. A rule is not that. Two policies can want the same conditions
+     today and diverge next quarter, and a rule that propagated its edits would
+     make the second policy change without anybody touching it.
+
+     So: fresh id, fresh identity, no back-reference. Whoever copies it owns
+     the copy. */
+  copyRuleInto: (targetPolicyId: string, rule: Rule) => void
   addZone: (z: Zone) => void
   updateZone: (z: Zone) => void
   removeZone: (id: string) => void
@@ -85,14 +140,42 @@ interface BrandStore {
 const Ctx = createContext<BrandStore | null>(null)
 
 export function BrandProvider({ children }: { children: ReactNode }) {
-  const [policies, setPolicies] = useState<Policy[]>(seedPolicies)
+  const [policies, setPolicies] = useState<Policy[]>(() => policiesAt('medium'))
   /* Zones are edited in place now that they carry two sections, so they need
      the same draft/commit treatment policies already had. */
-  const [zones, setZones] = useState<Zone[]>(seedZones)
+  const [zones, setZones] = useState<Zone[]>(() => zonesAt('medium'))
   const [screen, setScreen] = useState<BrandScreen>({ name: 'policies' })
   const [toast, setToast] = useState<string | null>(null)
   const [gauntletOverrides, setOverrides] = useState<Record<string, Record<string, AccessDecision>>>({})
-  const [methodSets, setMethodSets] = useState<MethodSet[]>(seedMethodSets)
+  const [methodSets, setMethodSets] = useState<MethodSet[]>(() => methodSetsAt('medium'))
+  /* Fingerprint profiles live here rather than on the screen: policy rules
+     name them, so the linter and the simulator have to be able to resolve
+     one without the Device Fingerprint page being mounted. */
+  const [fingerprints, setFingerprints] = useState<FingerprintProfile[]>(() => fingerprintsAt('medium'))
+  const [hooks, setHooks] = useState<Hook[]>(() => hooksAt('medium'))
+  const [methods, setMethods] = useState<AuthMethod[]>(() => methodsAt('medium'))
+  const [apps, setApps] = useState<App[]>(() => appsAt('medium'))
+  const [groups, setGroups] = useState<Group[]>(() => groupsAt('medium'))
+  const [edition, setEdition] = useState<Edition>('full')
+  const [persona, setPersonaId] = useState<PersonaId>('manager')
+
+  /* One swap, every tab. Held here rather than in the switcher so that a screen
+     mounted at the time reads the new tenant on its next render instead of
+     holding the old one until it is revisited. */
+  const setPersona = useCallback((id: PersonaId) => {
+    const { depth, landing } = personaById(id)
+    setPersonaId(id)
+    setPolicies(policiesAt(depth))
+    setZones(zonesAt(depth))
+    setMethodSets(methodSetsAt(depth))
+    setMethods(methodsAt(depth))
+    setFingerprints(fingerprintsAt(depth))
+    setHooks(hooksAt(depth))
+    setApps(appsAt(depth))
+    setGroups(groupsAt(depth))
+    setOverrides({})
+    setScreen(TAB_SCREEN[landing])
+  }, [])
 
   const showToast = useCallback((m: string) => {
     setToast(m)
@@ -101,23 +184,44 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<BrandStore>(
     () => ({
-      apps: seedApps,
-      groups: seedGroups,
+      apps,
+      groups,
       zones,
-      postures: seedPostures,
+      fingerprints,
+      hooks,
+      edition,
+      features: featuresOf(edition),
+      setEdition,
+      persona,
+      setPersona,
       methodSets,
+      methods,
+      setMethods,
       templates: seedTemplates,
       policies,
 
       screen,
       go: setScreen,
 
-      appById: (id) => seedApps.find((a) => a.id === id) ?? seedApps[0],
-      groupById: (id) => seedGroups.find((g) => g.id === id) ?? seedGroups[0],
+      appById: (id) => apps.find((a) => a.id === id) ?? apps[0],
+      groupById: (id) => groups.find((g) => g.id === id) ?? groups[0],
       // Reads live state, not the seed — otherwise a deleted or renamed zone
       // keeps resolving everywhere it is referenced.
       zoneById: (id) => zones.find((z) => z.id === id),
-      postureById: (id) => seedPostures.find((p) => p.id === id),
+      fingerprintById: (id) => fingerprints.find((p) => p.id === id),
+      hookById: (id) => hooks.find((h) => h.id === id),
+      addHook: (h) => setHooks((all) => [...all, h]),
+      updateHook: (h) => setHooks((all) => all.map((x) => (x.id === h.id ? h : x))),
+      /* Same contract as zones and fingerprints: deleting does not unlink the
+         rules naming it. The linter reports a condition pointing at nothing,
+         which is a louder and more accurate signal than a rule that silently
+         rewrote itself while nobody was looking. */
+      removeHook: (id) => setHooks((all) => all.filter((h) => h.id !== id)),
+      addFingerprint: (p) => setFingerprints((all) => [...all, p]),
+      updateFingerprint: (p) => setFingerprints((all) => all.map((x) => (x.id === p.id ? p : x))),
+      /* Deleting a profile does not unlink the rules naming it — the linter
+         reports a condition pointing at nothing, same as it does for zones. */
+      removeFingerprint: (id) => setFingerprints((all) => all.filter((p) => p.id !== id)),
       policyById: (id) => policies.find((p) => p.id === id),
 
       gauntletOverrides,
@@ -144,6 +248,26 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         setPolicies((all) => all.map((x) => (x.id === p.id ? { ...p, lastModified: 'Just now', modifiedBy: 'You' } : x))),
 
       addPolicy: (p) => setPolicies((all) => [p, ...all]),
+
+      /* Appended, not inserted. Under first-match-wins any other position is a
+         guess about intent the copier has not expressed — dropping a rule into
+         the middle of somebody else's ordered list silently changes what every
+         rule below it decides. The end is the only position that changes
+         nothing that already worked, and the dialog says so, and says whether
+         the rule can still fire from there. */
+      copyRuleInto: (targetPolicyId, r) =>
+        setPolicies((all) =>
+          all.map((p) =>
+            p.id === targetPolicyId
+              ? {
+                  ...p,
+                  rules: [...p.rules, { ...r, id: `r${Date.now()}-${p.rules.length}` }],
+                  lastModified: 'Just now',
+                  modifiedBy: 'You',
+                }
+              : p,
+          ),
+        ),
       addZone: (z) => setZones((all) => [...all, z]),
       updateZone: (z) => setZones((all) => all.map((x) => (x.id === z.id ? z : x))),
       /* A deleted zone is not unlinked from the rules that name it — the
@@ -171,7 +295,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       toast,
       showToast,
     }),
-    [policies, zones, methodSets, screen, toast, showToast, gauntletOverrides],
+    [policies, zones, fingerprints, hooks, apps, groups, edition, persona, setPersona, methodSets, methods, screen, toast, showToast, gauntletOverrides],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

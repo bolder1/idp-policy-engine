@@ -4,8 +4,10 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  ClipboardCheck,
   Command,
   Copy,
+  CopyPlus,
   Eye,
   FileDown,
   Grid3x3,
@@ -30,7 +32,7 @@ import {
 import { Button, IconButton, MenuButton, Tip, TipDot, Toggle, type MenuItem } from '../kit'
 import { blankRule, type Policy, type Rule } from '../data'
 import { useBrand } from '../store'
-import { AssignAppsDialog, SaveTemplateDialog } from './builder-dialogs'
+import { AssignAppsDialog, CopyRuleDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
 import { DecisionLogDialog, TestPolicyDialog } from './builder-test'
 import { describeChanges } from './changes'
 import { CommandBar, baseCommands } from './command-bar'
@@ -110,13 +112,22 @@ const SLIDES: { id: SlideId; label: string; title: string; icon: LucideIcon }[] 
   { id: 'launch', label: 'Launch', title: 'Launch', icon: Rocket },
 ]
 
-const STEPS: { id: StepId; label: string; title: string; hint?: string }[] = [
+type Step = { id: StepId; label: string; title: string; hint?: string }
+
+const ALL_STEPS: Step[] = [
   { id: 'who', label: 'Who', title: 'Who it applies to' },
   { id: 'when', label: 'When', title: 'When it applies' },
   { id: 'then', label: 'Then', title: 'What happens' },
   { id: 'check', label: 'Check', title: 'Checks & impact' },
   { id: 'review', label: 'Review', title: 'Review & publish' },
 ]
+
+/* The trail is built from the edition rather than filtered at every use site.
+   Half the file walks STEPS by index — next, back, "step 3 of 5" — and an array
+   with holes in it would need every one of those to learn about the holes. */
+function stepsFor(f: { checkStep: boolean; reviewStep: boolean }): Step[] {
+  return ALL_STEPS.filter((s) => (s.id === 'check' ? f.checkStep : s.id === 'review' ? f.reviewStep : true))
+}
 
 /* The flow is wider than a list rail needs to be, because it is a diagram: v1's
    canvas earned that width and this is the same drawing. Draggable from there,
@@ -145,6 +156,18 @@ const STEP_OF: Record<string, StepId> = {
   optout: 'then',
   nomethods: 'then',
   disabled: 'check',
+  /* A condition naming a hook that no longer exists is fixed where conditions
+     are edited. */
+  hookgone: 'when',
+  /* The other two hook findings are a mismatch between the rule's OUTCOME and
+     the hook's failure behaviour, so Then is where one half of the fix lives —
+     the other half is on the hook itself, which is why the message names it.
+
+     `hookslow` is deliberately absent: nothing on this rule fixes a slow
+     endpoint, so it belongs to Check alone rather than being routed to a step
+     that cannot act on it. Check sees every finding regardless of mapping. */
+  hookopen: 'then',
+  hookclosed: 'then',
 }
 
 export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: 'gauntlet' | 'impact' }) {
@@ -163,10 +186,15 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
   const [hoverShadow, setHoverShadow] = useState<number | null>(null)
   const [cmd, setCmd] = useState(false)
   const [overview, setOverview] = useState(false)
+  const features = store.features
+  /* One array, derived once. Everything downstream indexes into it. */
+  const STEPS = useMemo(() => stepsFor(features), [features])
   const [interview, setInterview] = useState(false)
   const [tour, setTour] = useState(false)
   const [learn, setLearn] = useState(false)
-  const [dialog, setDialog] = useState<null | 'log' | 'test' | 'apps' | 'template' | 'gauntlet' | 'impact'>(open ?? null)
+  const [dialog, setDialog] = useState<null | 'log' | 'test' | 'apps' | 'template' | 'gauntlet' | 'impact' | 'review' | 'copy'>(
+    open ?? null,
+  )
 
   const stage = useRef<HTMLDivElement | null>(null)
   const work = useRef<HTMLDivElement | null>(null)
@@ -260,7 +288,9 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
      whether the policy still exists. */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      /* The shortcut goes with the feature. Leaving it bound would make the
+         palette reachable in an edition whose menu says it does not exist. */
+      if (features.commands && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setCmd((v) => !v)
         return
@@ -273,12 +303,14 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+    // Rebound when the edition changes, or the shortcut keeps working in an
+    // edition that has taken the palette away.
+  }, [features.commands])
 
   const env = useMemo<SimEnv>(
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
-      postureName: (id) => store.postureById(id)?.name ?? id,
+      fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
       groupName: (id) => store.groupById(id).name,
     }),
     [store],
@@ -298,7 +330,7 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
   const rules = draft.rules
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft)
   const changes = dirty ? describeChanges(saved, draft) : []
-  const diagnostics = diagnose(draft, store.groups)
+  const diagnostics = diagnose(draft, store.groups, store.hooks)
   const index = Math.min(selected, Math.max(0, rules.length - 1))
   const rule: Rule | undefined = rules[index]
   const mine = diagnostics.filter((d) => d.ruleIndex === index)
@@ -368,7 +400,7 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
     setDialog(null)
     setCmd(false)
     setOverview(false)
-    if (step === 'review') setStep('check')
+    if (step === 'review') setStep(features.checkStep ? 'check' : 'then')
     stage.current?.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
   }
 
@@ -397,29 +429,43 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
      "this rule" in their label to be unambiguous. */
   const policyItems: MenuItem[] = [
     { id: 'test', label: 'Test a sign-in', icon: Sparkles, hint: 'One person, end to end' },
-    { id: 'gauntlet', label: 'Policy gauntlet', icon: Swords, hint: '13 attempts against these rules' },
-    { id: 'impact', label: 'Blast radius', icon: Target, hint: 'What publishing moves' },
+    ...(features.gauntlet
+      ? [{ id: 'gauntlet', label: 'Policy gauntlet', icon: Swords, hint: '13 attempts against these rules' }]
+      : []),
+    ...(features.blastRadius ? [{ id: 'impact', label: 'Blast radius', icon: Target, hint: 'What publishing moves' }] : []),
     { id: 'log', label: 'Decision log', icon: ScrollText, hint: 'What the engine actually did' },
     { id: 'overview', label: 'Read it end to end', icon: BookOpen },
     { id: 'apps', label: `Assign apps (${draft.allApps ? 'all' : draft.appIds.length})`, icon: Grid3x3, divide: true },
     { id: 'template', label: 'Save as template', icon: FileDown },
-    { id: 'cmd', label: 'All commands', icon: Command, kbd: '⌘K' },
+    /* v0 §8. Restored whenever the Review step is withheld: taking the publish
+       gate away must not also take away the only way to read a policy back and
+       commit it, which is a v0 requirement rather than one of ours. */
+    ...(features.reviewStep
+      ? []
+      : [{ id: 'review', label: 'Review & Save', icon: ClipboardCheck, hint: 'Read it back, then commit' }]),
+    ...(features.commands ? [{ id: 'cmd', label: 'All commands', icon: Command, kbd: '⌘K' }] : []),
     { id: 'learn', label: 'Learn the builder', icon: GraduationCap, hint: 'The tour, and five guides', divide: true },
   ]
 
   const ruleItems: MenuItem[] = [
     { id: 'add', label: 'Add a rule below', icon: Plus },
-    { id: 'duplicate', label: 'Duplicate', icon: Copy },
+    { id: 'duplicate', label: 'Duplicate', icon: Copy, hint: 'Below this one, in this policy' },
+    /* Gap 3 in the framework doc. Sits beside Duplicate because they are the
+       same gesture aimed at two places, and separating them would make the
+       admin who wants the second one go looking for a different menu. */
+    { id: 'copy', label: 'Copy to another policy…', icon: CopyPlus, hint: 'An independent copy' },
     { id: 'delete', label: 'Delete', icon: Trash2, danger: true, divide: true },
   ]
 
   const onAction = (id: string) => {
     if (id === 'add') return addRule(index + 1)
     if (id === 'duplicate') return duplicate()
+    if (id === 'copy') return setDialog('copy')
     if (id === 'delete') return remove()
     if (id === 'cmd') return setCmd(true)
     if (id === 'overview') return setOverview(true)
     if (id === 'learn') return setLearn(true)
+    if (id === 'review') return setDialog('review')
     setDialog(id as typeof dialog)
   }
 
@@ -441,8 +487,8 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
               case that matters, a draft that moves people, look like more of
               the same furniture. */}
           <span className="bf__pips" data-tour="gauntlet">
-            <GauntletPip policy={draft} onOpen={() => setDialog('gauntlet')} />
-            {dirty && <ImpactPip draft={draft} saved={saved} onOpen={() => setDialog('impact')} />}
+            {features.gauntlet && <GauntletPip policy={draft} onOpen={() => setDialog('gauntlet')} />}
+            {features.blastRadius && dirty && <ImpactPip draft={draft} saved={saved} onOpen={() => setDialog('impact')} />}
           </span>
           <span className="bf__sep" aria-hidden />
           {/* On the bar, not in a menu. The tour used to be reachable only from
@@ -455,7 +501,9 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
           {/* One primary per view. On the Review step the primary is the
               Publish button at the end of the checks, so this one stands down
               rather than competing with it. */}
-          {step !== 'review' && (
+          {/* The publish gate. In lite there is no Review step to send anyone
+              to, and v0 commits from Review & Save in the Policy menu. */}
+          {features.publish && step !== 'review' && (
             <Button variant="secondary" disabled={!rule && rules.length === 0} onClick={() => goStep('review')}>
               {blockers > 0 ? `${blockers} to fix` : 'Review & publish'}
             </Button>
@@ -600,9 +648,11 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
                 <div className="bf__blankacts">
                   {/* Offered first, because an empty builder is exactly where
                       somebody who has not met an ordered rule list is stuck. */}
-                  <Button variant="primary" icon={Wand2} onClick={() => setInterview(true)}>
-                    Guided setup
-                  </Button>
+                  {features.guidedSetup && (
+                    <Button variant="primary" icon={Wand2} onClick={() => setInterview(true)}>
+                      Guided setup
+                    </Button>
+                  )}
                   <Button icon={Plus} onClick={() => addRule()}>
                     Add the first rule
                   </Button>
@@ -632,6 +682,24 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
                       gesture. */}
                   <MenuButton label="⋯" items={ruleItems} onSelect={onAction} size="sm" align="end" />
                 </div>
+
+                {/* The rationale, under the name rather than beside it.
+
+                    Borderless until focused, so an empty one is an invitation
+                    and a filled one reads as a caption rather than as a form
+                    control. That matters more here than anywhere else the field
+                    appears: the head above it is one line by design, and giving
+                    "why" a boxed input would put it on a level with the rule's
+                    own name and cost the row the compactness it was built for. */}
+                <textarea
+                  className="bf__rulewhy"
+                  hidden={step === 'review' && !together}
+                  aria-label="Why this rule exists"
+                  rows={1}
+                  placeholder="Why does this rule exist? The next person will read this before changing it."
+                  value={rule.description ?? ''}
+                  onChange={(e) => patchRule({ description: e.target.value })}
+                />
 
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
@@ -667,9 +735,19 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
                         env={env}
                         onJump={jump}
                         onOpen={(d) => setDialog(d)}
-                        onPublish={() => {
-                          store.savePolicy(draft)
-                          store.showToast(`${draft.name} published`)
+                        onPublish={(status) => {
+                          /* The status is patched into the draft rather than
+                             saved alongside it, so the builder's own dirty
+                             check and the undo stack see the same policy the
+                             store does. */
+                          const shipped = { ...draft, status }
+                          patch({ status })
+                          store.savePolicy(shipped)
+                          store.showToast(
+                            status === 'monitor'
+                              ? `${draft.name} is monitoring — evaluating every sign-in, enforcing nothing`
+                              : `${draft.name} published and enforcing`,
+                          )
                         }}
                       />
                     )}
@@ -791,7 +869,7 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
       </div>
 
       <AnimatePresence>
-        {cmd && (
+        {features.commands && cmd && (
           <CommandBar
             commands={baseCommands(rules, { canUndo: canUndo(hist), canRedo: canRedo(hist) })}
             onClose={() => setCmd(false)}
@@ -854,7 +932,7 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
       <DecisionLogDialog open={dialog === 'log'} policy={draft} onClose={() => setDialog(null)} />
       <TestPolicyDialog open={dialog === 'test'} policy={draft} onClose={() => setDialog(null)} />
       <GauntletDialog
-        open={dialog === 'gauntlet'}
+        open={features.gauntlet && dialog === 'gauntlet'}
         policy={draft}
         onClose={() => setDialog(null)}
         onJumpToRule={jump}
@@ -866,13 +944,26 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
           store.showToast(`${fix.rule.name} ${what} rule ${fix.at + 1}`)
         }}
       />
-      <ImpactArenaDialog open={dialog === 'impact'} draft={draft} saved={saved} onClose={() => setDialog(null)} onJumpToRule={jump} />
+      <ReviewDialog
+        open={dialog === 'review'}
+        policy={draft}
+        onClose={() => setDialog(null)}
+        onConfirm={() => {
+          store.savePolicy(draft)
+          setDialog(null)
+          store.showToast(`${draft.name} saved`)
+        }}
+        onAssignApps={() => setDialog('apps')}
+      />
+
+      <ImpactArenaDialog open={features.blastRadius && dialog === 'impact'} draft={draft} saved={saved} onClose={() => setDialog(null)} onJumpToRule={jump} />
       <AssignAppsDialog
         open={dialog === 'apps'}
         policy={draft}
         onClose={() => setDialog(null)}
         onChange={(appIds, allApps) => patch({ appIds, allApps })}
       />
+      <CopyRuleDialog open={dialog === 'copy'} rule={rule} from={draft} onClose={() => setDialog(null)} />
       <SaveTemplateDialog
         open={dialog === 'template'}
         policy={draft}

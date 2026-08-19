@@ -21,6 +21,7 @@ import {
   type Zone,
 } from '../data'
 import { useBrand } from '../store'
+import { modeLabel } from '../fingerprint'
 import { impactOf } from './diagnostics'
 import './builder-v0.css'
 
@@ -68,7 +69,7 @@ const sentence = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
 function valueText(c: Condition, store: Store): string {
   const t = conditionType(c.typeId)
   if (t.valueKind === 'zone') return c.values.map((v) => store.zoneById(v)?.name ?? v).join(', ')
-  if (t.valueKind === 'posture') return c.values.map((v) => store.postureById(v)?.name ?? v).join(', ')
+  if (t.valueKind === 'fingerprint') return c.values.map((v) => store.fingerprintById(v)?.name ?? v).join(', ')
   if (t.valueKind === 'time') return c.values.filter(Boolean).join('–')
   return c.values.filter(Boolean).join(', ')
 }
@@ -106,7 +107,7 @@ function zoneKind(z: Zone): string {
 function seedValues(typeId: string, store: Store): string[] {
   const t = conditionType(typeId)
   if (t.valueKind === 'zone') return store.zones[0] ? [store.zones[0].id] : []
-  if (t.valueKind === 'posture') return store.postures[0] ? [store.postures[0].id] : []
+  if (t.valueKind === 'fingerprint') return store.fingerprints[0] ? [store.fingerprints[0].id] : []
   if (t.valueKind === 'time') return ['09:00', '17:00']
   if (t.options?.length) return [t.options[0]]
   return ['']
@@ -611,16 +612,16 @@ export function PolicyBuilderV0({ policyId }: { policyId: string }) {
           <RailSection
             title="Device posture"
             icon={<MonitorSmartphone size={13} strokeWidth={1.9} aria-hidden />}
-            onNew={() => store.go({ name: 'posture' })}
+            onNew={() => store.go({ name: 'fingerprint' })}
           >
-            {store.postures.map((p) => (
+            {store.fingerprints.map((p) => (
               <ObjRow
                 key={p.id}
                 name={p.name}
-                kind={p.strictness}
+                kind={modeLabel(p)}
                 usedIn={p.usedIn}
                 disabled={!selected}
-                onAdd={() => attach(cond('posture', 'compliant with', [p.id]), p.name)}
+                onAdd={() => attach(cond('fingerprint', 'recognised by', [p.id]), p.name)}
               />
             ))}
           </RailSection>
@@ -826,7 +827,7 @@ function ValueControl({
     )
   }
 
-  if (type.valueKind === 'posture') {
+  if (type.valueKind === 'fingerprint') {
     return (
       <select
         className="bv0__val"
@@ -835,7 +836,7 @@ function ValueControl({
         onChange={(e) => onChange([e.target.value])}
       >
         <option value="">Choose a posture…</option>
-        {store.postures.map((p) => (
+        {store.fingerprints.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
           </option>

@@ -426,3 +426,92 @@
 @media (prefers-reduced-motion: reduce) {
   :root { --dur-fast: 0ms; --dur-normal: 0ms; }
 }
+
+/* --- Identity tints -------------------------------------------------------------
+   These were seven SATURATED fills with a white glyph — the pattern Webflow and
+   Sprig use for a marketing page, and wrong here. Twelve of them down a settings
+   list is a paint chart, and the brand orange sat among them as just another
+   hue, which cost it the one job it has.
+
+   Restrained instead: a pale surface with a saturated glyph. It is the treatment
+   Sketch, Intercom, Antimetal and Upwork all land on for exactly this row — the
+   tile identifies without competing, and the colour lives in the 15px glyph
+   rather than a 36px block.
+
+   ORANGE IS NOT IN THIS SET. The brand is reserved for state — active tab,
+   selected chip, primary button, the row you are about to open. A hue that means
+   "this one is live" cannot also mean "this one is SMS".
+   -------------------------------------------------------------------------- */
+:root {
+  --tint-slate-bg: #eef1f5;  --tint-slate-fg: #526175;
+  --tint-teal-bg: #e6f2f1;   --tint-teal-fg: #106d6c;
+  --tint-green-bg: #e8f2ec;  --tint-green-fg: #1d6b42;
+  --tint-blue-bg: #e9f0fa;   --tint-blue-fg: #23568f;
+  --tint-indigo-bg: #ecebf8; --tint-indigo-fg: #4a44a0;
+  --tint-amber-bg: #f6efe2;  --tint-amber-fg: #7d5a16;
+}
+
+:root[data-theme="dark"] {
+  /* Deep, desaturated grounds with a lifted glyph. The same ordering of
+     lightness as light mode — tile quieter than its icon — so the row reads the
+     same way in both. */
+  --tint-slate-bg: #232a33;  --tint-slate-fg: #93a1b3;
+  --tint-teal-bg: #16292b;   --tint-teal-fg: #4dada9;
+  --tint-green-bg: #172a20;  --tint-green-fg: #4fa877;
+  --tint-blue-bg: #1a2634;   --tint-blue-fg: #6d9fd8;
+  --tint-indigo-bg: #222235; --tint-indigo-fg: #8f89e0;
+  --tint-amber-bg: #2b2418;  --tint-amber-fg: #c39a4e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --tint-slate-bg: #232a33;  --tint-slate-fg: #93a1b3;
+    --tint-teal-bg: #16292b;   --tint-teal-fg: #4dada9;
+    --tint-green-bg: #172a20;  --tint-green-fg: #4fa877;
+    --tint-blue-bg: #1a2634;   --tint-blue-fg: #6d9fd8;
+    --tint-indigo-bg: #222235; --tint-indigo-fg: #8f89e0;
+    --tint-amber-bg: #2b2418;  --tint-amber-fg: #c39a4e;
+  }
+}
+
+/* --- Priority ramp -------------------------------------------------------------
+   Attribute priority is ORDINAL — Low, Medium, High is a magnitude, not a
+   verdict. It was drawn as a traffic light (green / blue / grey), which reads
+   as good / neutral / nothing — a judgement the data does not carry. A
+   high-priority signal is not "safe", it is strong. Green for High was the tell.
+
+   Sequential instead: one hue, three intensities, so the ordering is legible
+   without a key and nothing implies approval. Blue rather than red or green
+   because it is the one hue in this palette with no valence attached — it reads
+   as magnitude, which is exactly what priority is.
+   -------------------------------------------------------------------------- */
+:root {
+  --pri-1-bg: #eff2f6;
+  --pri-1-fg: #77828f;
+  --pri-2-bg: #dbe6f7;
+  --pri-2-fg: #3f6296;
+  --pri-3-bg: #c3d6f5;
+  --pri-3-fg: #1b4480;
+}
+
+:root[data-theme="dark"] {
+  /* Same ordering, inverted lightness: the fill deepens and the ink brightens,
+     so High is still unmistakably the heaviest of the three. */
+  --pri-1-bg: #1e242c;
+  --pri-1-fg: #7d8894;
+  --pri-2-bg: #1b2c44;
+  --pri-2-fg: #7fa6db;
+  --pri-3-bg: #1c3a5e;
+  --pri-3-fg: #a9caf7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --pri-1-bg: #1e242c;
+    --pri-1-fg: #7d8894;
+    --pri-2-bg: #1b2c44;
+    --pri-2-fg: #7fa6db;
+    --pri-3-bg: #1c3a5e;
+    --pri-3-fg: #a9caf7;
+  }
+}

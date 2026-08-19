@@ -33,7 +33,7 @@ export const SIM_USERS: SimUser[] = [
 ]
 
 export const PLACES = ['Any location', 'Office Network', 'Outside all zones', 'Tor exit node', 'Known proxy']
-export const DEVICE_OPTIONS = ['New / unknown', 'Known < 90 days', 'Known > 90 days', 'Expired trust', 'Managed (MDM)', 'Non-compliant']
+export const DEVICE_OPTIONS = ['New / unknown', 'Known < 90 days', 'Known > 90 days', 'Expired trust', 'Managed (MDM)', 'Changed fingerprint']
 export const AUTH_STATES = ['Normal returning user', 'First time login', 'MFA recently reset', 'No MFA configured']
 export const RISKS = ['Low', 'Medium', 'High']
 
@@ -58,19 +58,21 @@ export const PLACE_FACTS: Record<string, PlaceFacts> = {
 }
 
 export interface DeviceFacts {
-  compliant: boolean
+  /* Whether the fingerprint still matches — not whether the device is
+     healthy. A device can be perfectly recognisable and badly configured. */
+  recognised: boolean
   mdm: string
   registration: string
   trustDays: number
 }
 
 export const DEVICE_FACTS: Record<string, DeviceFacts> = {
-  'New / unknown': { compliant: false, mdm: 'Not enrolled', registration: 'Unregistered', trustDays: 0 },
-  'Known < 90 days': { compliant: true, mdm: 'Not enrolled', registration: 'Registered', trustDays: 34 },
-  'Known > 90 days': { compliant: true, mdm: 'Not enrolled', registration: 'Registered', trustDays: 214 },
-  'Expired trust': { compliant: false, mdm: 'Not enrolled', registration: 'Pending', trustDays: 402 },
-  'Managed (MDM)': { compliant: true, mdm: 'Enrolled', registration: 'Registered', trustDays: 120 },
-  'Non-compliant': { compliant: false, mdm: 'Not enrolled', registration: 'Registered', trustDays: 61 },
+  'New / unknown': { recognised: false, mdm: 'Not enrolled', registration: 'Unregistered', trustDays: 0 },
+  'Known < 90 days': { recognised: true, mdm: 'Not enrolled', registration: 'Registered', trustDays: 34 },
+  'Known > 90 days': { recognised: true, mdm: 'Not enrolled', registration: 'Registered', trustDays: 214 },
+  'Expired trust': { recognised: false, mdm: 'Not enrolled', registration: 'Pending', trustDays: 402 },
+  'Managed (MDM)': { recognised: true, mdm: 'Enrolled', registration: 'Registered', trustDays: 120 },
+  'Changed fingerprint': { recognised: false, mdm: 'Not enrolled', registration: 'Registered', trustDays: 61 },
 }
 
 export const RISK_SCORE: Record<string, number> = { Low: 12, Medium: 48, High: 86 }
@@ -87,7 +89,7 @@ export interface SimContext {
 
 export interface SimEnv {
   zoneName: (id: string) => string
-  postureName: (id: string) => string
+  fingerprintName: (id: string) => string
   groupName: (id: string) => string
 }
 
@@ -109,8 +111,8 @@ export function condPhrase(c: Condition, env: SimEnv): string {
   const shown =
     t.valueKind === 'zone'
       ? vals.map(env.zoneName).join(', ')
-      : t.valueKind === 'posture'
-        ? vals.map(env.postureName).join(', ')
+      : t.valueKind === 'fingerprint'
+        ? vals.map(env.fingerprintName).join(', ')
         : t.valueKind === 'time'
           ? `${vals[0] ?? '—'}–${vals[1] ?? '—'}`
           : vals.join(', ')
@@ -155,8 +157,11 @@ export function evalCond(c: Condition, ctx: SimContext): { state: CondState; det
         ? unknown(`“${ctx.place}” does not fix a city`)
         : decide(vals.includes(place.city), `the connection geolocates to ${place.city}`)
 
-    case 'posture':
-      return decide(device.compliant, `the device is ${device.compliant ? 'compliant' : 'not compliant'}`)
+    case 'fingerprint':
+      return decide(
+        device.recognised,
+        `the device fingerprint ${device.recognised ? 'matches the profile' : 'does not match the profile'}`,
+      )
     case 'mdm':
       return decide(vals.includes(device.mdm), `the device is ${device.mdm.toLowerCase()} in MDM`)
     case 'device-reg':
@@ -292,6 +297,6 @@ export function decide(policy: Policy, ctx: SimContext, env: SimEnv): { decision
 /** A stand-in environment for callers with no store — tests, mostly. */
 export const rawEnv: SimEnv = {
   zoneName: (id) => id,
-  postureName: (id) => id,
+  fingerprintName: (id) => id,
   groupName: (id) => id,
 }

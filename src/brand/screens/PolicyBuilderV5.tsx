@@ -30,7 +30,7 @@ import {
   type Rule,
 } from '../data'
 import { useBrand } from '../store'
-import { AssignAppsDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
+import { AssignAppsDialog, CopyRuleDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
 import { DecisionLogDialog, TestPolicyDialog } from './builder-test'
 import { describeChanges } from './changes'
 import { diagnose, shadowedBy } from './diagnostics'
@@ -111,7 +111,7 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
   const [cmd, setCmd] = useState(false)
   const [live, setLive] = useState('')
   const [dialog, setDialog] = useState<
-    null | 'log' | 'test' | 'apps' | 'template' | 'review' | 'gauntlet' | 'impact'
+    null | 'log' | 'test' | 'apps' | 'template' | 'review' | 'gauntlet' | 'impact' | 'copy'
   >(open ?? null)
 
   const stage = useRef<HTMLDivElement | null>(null)
@@ -130,7 +130,7 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
   const env = useMemo<SimEnv>(
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
-      postureName: (id) => store.postureById(id)?.name ?? id,
+      fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
       groupName: (id) => store.groupById(id).name,
     }),
     [store],
@@ -172,7 +172,7 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
   const rules = draft.rules
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft)
   const changes = dirty ? describeChanges(saved, draft) : []
-  const diagnostics = diagnose(draft, store.groups)
+  const diagnostics = diagnose(draft, store.groups, store.hooks)
   const index = Math.min(selected, Math.max(0, rules.length - 1))
   const rule: Rule | undefined = rules[index]
 
@@ -185,7 +185,7 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
     let r = blankRule(`Rule ${rules.length + 1}`)
     if (typeId) {
       const t = conditionType(typeId)
-      r = { ...r, name: t.label, conditions: [cond(typeId, t.operators[0], seedValues(t, store.zones[0]?.id, store.postures[0]?.id))] }
+      r = { ...r, name: t.label, conditions: [cond(typeId, t.operators[0], seedValues(t, store.zones[0]?.id, store.fingerprints[0]?.id, store.hooks.find((h) => h.mode === 'sync')?.id))] }
     }
     patch({ rules: [...rules.slice(0, at), r, ...rules.slice(at)] })
     setSelected(at)
@@ -216,7 +216,7 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
      append" has to mean when the canvas can be empty. */
   const paletteAdd = (typeId: string, preset?: string) => {
     const t = conditionType(typeId)
-    const values = preset ? [preset] : seedValues(t, store.zones[0]?.id, store.postures[0]?.id)
+    const values = preset ? [preset] : seedValues(t, store.zones[0]?.id, store.fingerprints[0]?.id, store.hooks.find((h) => h.mode === 'sync')?.id)
     if (!rule) return addRule(rules.length, typeId)
     patchRule({ conditions: [...rule.conditions, cond(typeId, t.operators[0], values)] })
     setLive(`${t.label} added to ${rule.name}`)
@@ -236,6 +236,7 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
       onPatch={patchRule}
       onJump={jump}
       sticky={mode === 'form'}
+      onCopyTo={() => setDialog('copy')}
       onDuplicate={() => {
         const copy = { ...rule, id: `r${Date.now()}`, name: `${rule.name} (copy)` }
         patch({ rules: [...rules.slice(0, index + 1), copy, ...rules.slice(index + 1)] })
@@ -544,6 +545,7 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
         }}
       />
       <ImpactArenaDialog open={dialog === 'impact'} draft={draft} saved={saved} onClose={() => setDialog(null)} onJumpToRule={jump} />
+      <CopyRuleDialog open={dialog === 'copy'} rule={rule} from={draft} onClose={() => setDialog(null)} />
       <AssignAppsDialog
         open={dialog === 'apps'}
         policy={draft}
@@ -584,8 +586,8 @@ function predicate(r: Rule, env: SimEnv): string {
       const shown =
         t.valueKind === 'zone'
           ? c.values.map(env.zoneName).join(', ')
-          : t.valueKind === 'posture'
-            ? c.values.map(env.postureName).join(', ')
+          : t.valueKind === 'fingerprint'
+            ? c.values.map(env.fingerprintName).join(', ')
             : c.values.filter(Boolean).join(', ')
       const body = `${t.label} ${c.operator} ${shown || '…'}`
       return i === 0 ? body : `${c.joiner} ${body}`
@@ -736,7 +738,7 @@ function Palette({ onPick, target }: { onPick: (typeId: string, preset?: string)
         <input aria-label="Search the catalogue" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       <div className="bm__palbody">
-        {(store.zones.some((z) => hit(z.name)) || store.postures.some((p) => hit(p.name))) && (
+        {(store.zones.some((z) => hit(z.name)) || store.fingerprints.some((p) => hit(p.name))) && (
           <div className="bm__palgroup">
             <h4>Library</h4>
             {store.zones.filter((z) => hit(z.name) || hit('zone')).map((z) => (
@@ -744,8 +746,8 @@ function Palette({ onPick, target }: { onPick: (typeId: string, preset?: string)
                 {z.name}
               </button>
             ))}
-            {store.postures.filter((p) => hit(p.name) || hit('device')).map((p) => (
-              <button key={p.id} type="button" onClick={() => onPick('posture', p.id)}>
+            {store.fingerprints.filter((p) => hit(p.name) || hit('device')).map((p) => (
+              <button key={p.id} type="button" onClick={() => onPick('fingerprint', p.id)}>
                 {p.name}
               </button>
             ))}

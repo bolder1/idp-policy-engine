@@ -2,8 +2,9 @@ import { useState } from 'react'
 
 import { AuthMethods } from './AuthMethods'
 import { AuthMethodsV5 } from './AuthMethodsV5'
+import { AuthMethodsV7 } from './AuthMethodsV7'
 import { AuthMethodsV6 } from './AuthMethodsV6'
-import './auth-methods-v6.css'
+import { AuthMethodsV8 } from './AuthMethodsV8'
 
 /* Three versions on the same data, behind a switch.
 
@@ -26,9 +27,11 @@ import './auth-methods-v6.css'
    surfaces in it as peers, and an inspector on the right that answers for
    whatever is selected. See the header of AuthMethodsV6.tsx. */
 export function AuthMethodsPage() {
-  const [v, setV] = useState<'v6' | 'sets' | 'v5'>('v6')
+  const [v, setV] = useState<'final' | 'v7' | 'v6' | 'sets' | 'v5'>('final')
 
   const VERSIONS: { id: typeof v; label: string; blurb: string }[] = [
+    { id: 'final', label: 'Final · categories', blurb: 'Two tabs, a list of eleven categories, and the methods on an inner page' },
+    { id: 'v7', label: 'V7 · families', blurb: 'Grouped the way the settings sheet groups them, with a default-method section' },
     { id: 'v6', label: 'V6 · one workspace', blurb: 'No tabs — one catalogue and an inspector' },
     { id: 'sets', label: 'Current · with method sets', blurb: 'Five tabs, full depth' },
     { id: 'v5', label: 'V5 · MFA experience', blurb: 'The deployed prototype, rebuilt as-is' },
@@ -54,7 +57,17 @@ export function AuthMethodsPage() {
         </div>
       </div>
 
-      {v === 'v6' ? <AuthMethodsV6 /> : v === 'sets' ? <AuthMethods initialTab="sets" /> : <AuthMethodsV5 />}
+      {v === 'final' ? (
+        <AuthMethodsV8 />
+      ) : v === 'v7' ? (
+        <AuthMethodsV7 />
+      ) : v === 'v6' ? (
+        <AuthMethodsV6 />
+      ) : v === 'sets' ? (
+        <AuthMethods initialTab="sets" />
+      ) : (
+        <AuthMethodsV5 />
+      )}
     </>
   )
 }

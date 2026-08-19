@@ -4,13 +4,15 @@ import { useEffect, useId, useMemo, useState } from 'react'
 
 import {
   conditionType,
-  devicePostures as seedPostures,
+  enforces,
   zones as seedZones,
   type Group,
   type Policy,
   type PolicyType,
   type Rule,
 } from '../data'
+import { seedProfiles } from '../fingerprint'
+import { seedHooks } from '../hooks'
 import { Badge, Button, Counter, DecisionChip, Field, Modal, StatusPill, Tabs } from '../kit'
 import { AppLogo } from '../logos/AppLogo'
 import { useBrand } from '../store'
@@ -28,7 +30,7 @@ import './builder-dialogs.css'
    particular is open while its count is read by the toolbar underneath.
 
    The store is still read for reference data — the app catalogue, the group
-   directory, live zone and posture names — because that data is the tenant's,
+   directory, live zone and fingerprint names — because that data is the tenant's,
    not the dialog's.
    -------------------------------------------------------------------------- */
 
@@ -41,25 +43,25 @@ export interface RuleProse {
   then: string
 }
 
-/* Zone and posture conditions store an id, and the object it points at can be
+/* Zone and fingerprint conditions store an id, and the object it points at can be
    renamed after the rule was written. The resolver is how a caller hands in the
    live directory; without one the seed is used, which is right for tests and
    for any caller that has no store. */
-type NameLookup = (kind: 'zone' | 'posture', id: string) => string | undefined
+type NameLookup = (kind: 'zone' | 'fingerprint' | 'hook', id: string) => string | undefined
 
 
-function seedName(kind: 'zone' | 'posture', id: string) {
-  return kind === 'zone'
-    ? seedZones.find((z) => z.id === id)?.name
-    : seedPostures.find((p) => p.id === id)?.name
+function seedName(kind: 'zone' | 'fingerprint' | 'hook', id: string) {
+  if (kind === 'zone') return seedZones.find((z) => z.id === id)?.name
+  if (kind === 'hook') return seedHooks.find((h) => h.id === id)?.name
+  return seedProfiles.find((p) => p.id === id)?.name
 }
 
 /* One condition as English.
 
-   The type label is dropped for zone and posture because the object's own name
-   already says which field it is — "Not compliant with Corporate Managed" reads
-   as a sentence where "Device Posture Policy not compliant with Corporate
-   Managed" reads as a form field. Every other kind keeps its label, because
+   The type label is dropped for zone and fingerprint because the object's own name
+   already says which field it is — "Not recognised by Corporate managed" reads
+   as a sentence where "Device Fingerprint not recognised by Corporate managed"
+   reads as a form field. Every other kind keeps its label, because
    "is not India" alone does not say what is not India. */
 function conditionSentence(
   c: { typeId: string; operator: string; values: string[] },
@@ -69,7 +71,7 @@ function conditionSentence(
   const raw = c.values.filter((v) => v.trim() !== '')
 
   let value: string
-  if (t.valueKind === 'zone' || t.valueKind === 'posture') {
+  if (t.valueKind === 'zone' || t.valueKind === 'fingerprint' || t.valueKind === 'hook') {
     const kind = t.valueKind
     value = raw.map((v) => resolve?.(kind, v) ?? seedName(kind, v) ?? v).join(', ')
   } else if (t.valueKind === 'time' || t.valueKind === 'range') {
@@ -82,14 +84,20 @@ function conditionSentence(
   // the prose has to agree with the panel next to it.
   if (!value) value = '(no value set)'
 
+  /* The type label is dropped wherever the object's own name already says which
+     field this is. "Fraud score lookup returns true" reads as a sentence;
+     "External hook Fraud score lookup returns true" reads as a form field with
+     its label left on. */
   const body =
-    t.valueKind === 'zone' || t.valueKind === 'posture'
+    t.valueKind === 'zone' || t.valueKind === 'fingerprint'
       ? `${c.operator} ${value}`
-      : `${t.label} ${c.operator} ${value}`
+      : t.valueKind === 'hook'
+        ? `${value} ${c.operator}`
+        : `${t.label} ${c.operator} ${value}`
 
   /* Not capitalised: this is only ever embedded mid-sentence, after "users in
-     X AND ". For zone/posture the label is dropped so `body` starts with the
-     operator, and capitalising gave "... AND Not compliant with Corporate
+     X AND ". For zone/fingerprint the label is dropped so `body` starts with the
+     operator, and capitalising gave "... AND Not recognised by Corporate
      Managed". Those two valueKinds were the only cases where it fired at all —
      everywhere else the label already carried a capital. */
   return body
@@ -198,7 +206,9 @@ export function AssignAppsDialog({
   const conflictsByApp = useMemo(() => {
     const m = new Map<string, number>()
     for (const p of store.policies) {
-      if (p.id === policy.id || p.status === 'inactive') continue
+      // Only enforcing policies can fight over a sign-in. A monitor policy
+      // sharing an app is not a conflict — it is how you trial one safely.
+      if (p.id === policy.id || !enforces(p)) continue
       for (const id of p.appIds) m.set(id, (m.get(id) ?? 0) + 1)
     }
     return m
@@ -346,9 +356,13 @@ export function ReviewDialog({
   const reduce = useReducedMotion()
 
   const resolve: NameLookup = (kind, id) =>
-    kind === 'zone' ? store.zoneById(id)?.name : store.postureById(id)?.name
+    kind === 'zone'
+      ? store.zoneById(id)?.name
+      : kind === 'hook'
+        ? store.hookById(id)?.name
+        : store.fingerprintById(id)?.name
 
-  const diagnostics = diagnose(policy, store.groups)
+  const diagnostics = diagnose(policy, store.groups, store.hooks)
   /* Only errors on rules that actually run can block the save. diagnose()
      leaves `blank`, `nomethods` and `unreachable` unguarded by rule.enabled
      (unlike the duplicate/subsumed checks), so without this filter a rule you
@@ -433,6 +447,7 @@ export function ReviewDialog({
                   </span>
                   <DecisionChip decision={rule.decision} size="sm" />
                 </p>
+                {rule.description && <p className="bdlg-rev__why">{rule.description}</p>}
                 <p className="bdlg-rev__prose">
                   <span className="bdlg-rev__key">IF:</span> {iff}
                 </p>
@@ -595,6 +610,172 @@ export function SaveTemplateDialog({
             </ul>
           )}
         </section>
+      </div>
+    </Modal>
+  )
+}
+
+/* --- Copy rule to another policy ---------------------------------------------
+
+   Gap 3 in the framework doc, and the last step of the Configurator's own
+   stated flow: build a rule, go to the second policy, copy it across, adjust
+   one condition. Until now that meant rebuilding it — re-picking the same
+   group, the same zone, the same THEN, with three chances to introduce a
+   difference nobody meant.
+
+   Three decisions this dialog makes, and why.
+
+   **Same type only.** An App Access rule dropped into a Session policy is a
+   category error the target has no way to reject: Session policies govern how
+   long a session lasts once access is decided, not whether it is granted. The
+   list is filtered rather than showing everything and warning, because a
+   disabled row still invites the question "why not".
+
+   **It says where the rule will land, and whether it can fire from there.**
+   Appending is the only position that changes nothing already working, but
+   under first-match-wins the end of a list is also where a rule goes to die.
+   A copy that lands unreachable and reports success is worse than a refusal —
+   so the row that would swallow it is named before the copy happens, not after.
+
+   **The rule is copied, not linked.** Said out loud in the footer, because the
+   objects immediately around it — zones, method sets — behave the opposite way,
+   and an admin who has learned that shared objects propagate will reasonably
+   assume this one does too. */
+export function CopyRuleDialog({
+  open,
+  rule,
+  from,
+  onClose,
+}: {
+  open: boolean
+  rule: Rule | undefined
+  from: Policy
+  onClose: () => void
+}) {
+  const store = useBrand()
+  const [picked, setPicked] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (open) setPicked(null)
+  }, [open])
+
+  /* Every candidate, with the one thing the admin cannot see from a policy
+     name: what happens to this rule once it is at the bottom of that list.
+
+     Computed by building the target as it *would* be and running the real
+     linter over it, rather than by re-deriving "is this shadowed" here. Two
+     implementations of reachability is two chances for this dialog to promise
+     something the builder then contradicts. */
+  const targets = useMemo(() => {
+    if (!rule) return []
+    const probe = { ...rule, id: 'copy-probe' }
+
+    /* What is wrong with the rule *itself*, independent of where it lands.
+
+       Without this subtraction the dialog reported the rule's own mixed-joiner
+       note against all five candidate policies, which reads as "copying here
+       causes a problem" five times over for a problem that travels with the
+       rule and is already visible in the builder behind the dialog. The only
+       findings worth a row here are the ones the move creates. */
+    const intrinsic = new Set(
+      diagnose({ ...from, isSystem: false, rules: [probe] }, store.groups, store.hooks).map((d) => d.title),
+    )
+
+    return store.policies
+      .filter((p) => p.id !== from.id && p.type === from.type && !p.isSystem)
+      .map((p) => {
+        const at = p.rules.length
+        const would: Policy = { ...p, rules: [...p.rules, probe] }
+        const found = diagnose(would, store.groups, store.hooks)
+          .filter((d) => d.ruleIndex === at)
+          .filter((d) => !intrinsic.has(d.title))
+        return {
+          policy: p,
+          at,
+          blocking: found.find((d) => d.severity === 'error'),
+          notes: found.filter((d) => d.severity !== 'error'),
+        }
+      })
+  }, [store.policies, store.groups, from, rule])
+
+  const chosen = targets.find((t) => t.policy.id === picked)
+
+  const copy = () => {
+    if (!rule || !chosen) return
+    store.copyRuleInto(chosen.policy.id, rule)
+    store.showToast(
+      `“${rule.name}” copied into ${chosen.policy.name} as rule ${chosen.at + 1}${
+        chosen.blocking ? ' — where it cannot fire. Reorder it there.' : ''
+      }`,
+    )
+    onClose()
+  }
+
+  return (
+    <Modal
+      open={open && !!rule}
+      onClose={onClose}
+      title={rule ? `Copy “${rule.name}” to…` : 'Copy rule'}
+      width={620}
+      footer={
+        <>
+          <span className="bdlg-foot__note">
+            An independent copy. Later edits to either one do not reach the other.
+          </span>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="brand" onClick={copy} disabled={!chosen}>
+            {chosen ? `Copy into ${chosen.policy.name}` : 'Copy'}
+          </Button>
+        </>
+      }
+    >
+      <div className="bdlg bdlg-copy">
+        {targets.length === 0 ? (
+          <p className="bdlg-copy__none">
+            There is no other <strong>{from.type}</strong> policy to copy into. A rule can only be copied to a
+            policy of the same type — the conditions and the outcome mean different things in the others.
+          </p>
+        ) : (
+          <ul className="bdlg-copy__list">
+            {targets.map((t) => (
+              <li key={t.policy.id}>
+                <label className={picked === t.policy.id ? 'is-on' : ''}>
+                  <input
+                    type="radio"
+                    name="copy-target"
+                    checked={picked === t.policy.id}
+                    onChange={() => setPicked(t.policy.id)}
+                  />
+                  <span className="bdlg-copy__main">
+                    <span className="bdlg-copy__name">
+                      {t.policy.name}
+                      <StatusPill status={t.policy.status} />
+                    </span>
+                    <span className="bdlg-copy__meta">
+                      {t.policy.rules.length === 0
+                        ? 'No rules yet — the copy becomes rule 1'
+                        : `${t.policy.rules.length} rule${t.policy.rules.length === 1 ? '' : 's'} — the copy lands last, as rule ${t.at + 1}`}
+                    </span>
+                    {t.blocking && (
+                      <span className="bdlg-copy__warn">
+                        <AlertTriangle size={13} strokeWidth={1.9} aria-hidden />
+                        {t.blocking.detail}
+                      </span>
+                    )}
+                    {!t.blocking && t.notes.length > 0 && (
+                      <span className="bdlg-copy__note">
+                        <Info size={13} strokeWidth={1.9} aria-hidden />
+                        {t.notes[0].detail}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </Modal>
   )

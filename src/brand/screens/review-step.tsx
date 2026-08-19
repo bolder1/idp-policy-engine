@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { AlertTriangle, ArrowRight, Check, Swords, Target } from 'lucide-react'
 
 import { Button, DecisionChip, TipDot } from '../kit'
-import type { Policy } from '../data'
+import type { Policy, PolicyStatus } from '../data'
 import { useBrand } from '../store'
 import { ruleSentence } from './builder-dialogs'
 import { describeChanges } from './changes'
@@ -38,7 +38,8 @@ export function ReviewStep({
   env: SimEnv
   onJump: (i: number) => void
   onOpen: (d: 'gauntlet' | 'impact' | 'apps' | 'test') => void
-  onPublish: () => void
+  /** The status to publish into. Monitor is offered wherever it is the safer first move. */
+  onPublish: (status: PolicyStatus) => void
 }) {
   const store = useBrand()
   const reduce = useReducedMotion()
@@ -53,14 +54,18 @@ export function ReviewStep({
     [rulesDirty, saved, env, after],
   )
 
-  const diagnostics = diagnose(draft, store.groups)
+  const diagnostics = diagnose(draft, store.groups, store.hooks)
   const errors = diagnostics.filter((d) => d.severity === 'error' && draft.rules[d.ruleIndex]?.enabled !== false)
   const dead = draft.rules.map((r, i) => ({ r, i })).filter(({ r, i }) => r.enabled && after.reach[i] === 0)
   const attached = draft.allApps === true || draft.appIds.length > 0
   const changes = dirty ? describeChanges(saved, draft) : []
 
-  const resolve = (kind: 'zone' | 'posture', id: string) =>
-    kind === 'zone' ? store.zoneById(id)?.name : store.postureById(id)?.name
+  const resolve = (kind: 'zone' | 'fingerprint' | 'hook', id: string) =>
+    kind === 'zone'
+      ? store.zoneById(id)?.name
+      : kind === 'hook'
+        ? store.hookById(id)?.name
+        : store.fingerprintById(id)?.name
 
   const gates: Gate[] = [
     {
@@ -216,9 +221,47 @@ export function ReviewStep({
             Blast radius
           </Button>
         </div>
-        <Button variant="primary" disabled={!dirty || errors.length > 0} onClick={onPublish}>
-          {errors.length > 0 ? `${errors.length} error${errors.length === 1 ? '' : 's'} to fix` : dirty ? 'Publish this policy' : 'Nothing to publish'}
-        </Button>
+        {/* Two doors, and which two depends on where the policy already is.
+
+            A policy that has never been live gets monitor offered first and
+            given the quieter button: it is the safer move, not the recommended
+            one, and making it primary would be the product overruling a tenant
+            who has read their own checks and decided.
+
+            A policy already in monitor gets the opposite pair — the useful next
+            question there is "has it been watched long enough", and the answer
+            that moves it forward is enforcement. */}
+        {errors.length > 0 ? (
+          <Button variant="primary" disabled>
+            {errors.length} error{errors.length === 1 ? '' : 's'} to fix
+          </Button>
+        ) : (
+          <div className="bf__revship">
+            {draft.status === 'inactive' && (
+              <Button variant="secondary" disabled={!dirty} onClick={() => onPublish('monitor')}>
+                Publish in monitor
+              </Button>
+            )}
+            {draft.status === 'monitor' && (
+              <Button variant="secondary" disabled={!dirty} onClick={() => onPublish('monitor')}>
+                Keep monitoring
+              </Button>
+            )}
+            <Button variant="primary" disabled={!dirty} onClick={() => onPublish('active')}>
+              {!dirty
+                ? 'Nothing to publish'
+                : draft.status === 'monitor'
+                  ? 'Start enforcing'
+                  : 'Publish and enforce'}
+            </Button>
+          </div>
+        )}
+        {draft.status === 'inactive' && errors.length === 0 && dirty && (
+          <p className="bf__revmonitor">
+            Monitor evaluates every sign-in and records what it would have done, without refusing anything. The
+            Decision log fills up; nobody is locked out by a rule you have not watched yet.
+          </p>
+        )}
       </footer>
     </div>
   )

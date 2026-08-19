@@ -24,6 +24,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { EditionBar } from './EditionBar'
+import { PersonaBar } from './PersonaBar'
 import { useBrand, type BrandScreen } from './store'
 
 /* -----------------------------------------------------------------------------
@@ -78,8 +80,9 @@ const NAV: { section?: string; items: NavItem[] }[] = [
           { label: 'All Policies', screen: { name: 'policies' } },
           { label: 'Templates', screen: { name: 'templates' } },
           { label: 'Zones', screen: { name: 'zones' } },
-          { label: 'Device Posture', screen: { name: 'posture' } },
+          { label: 'Device Fingerprint', screen: { name: 'fingerprint' } },
           { label: 'Method Sets', screen: { name: 'methods' } },
+          { label: 'External Hooks', screen: { name: 'hooks' } },
         ],
       },
       {
@@ -149,7 +152,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
   },
 ]
 
-const POLICY_SCREENS = ['policies', 'builder', 'templates', 'zones', 'posture', 'methods']
+const POLICY_SCREENS = ['policies', 'builder', 'templates', 'zones', 'fingerprint', 'methods']
 
 function isActive(current: BrandScreen, item: NavItem): boolean {
   if (item.label === 'Policies') return POLICY_SCREENS.includes(current.name)
@@ -241,6 +244,13 @@ export function Shell({ children, onSwitchVersion }: { children: ReactNode; onSw
         </a>
 
         <div className="bshell__topright">
+          {/* The edition switch belongs on the shell, not on a screen: the flag
+              it flips spans the list, the create flow and the builder. */}
+          {/* Two prototype controls, side by side and both labelled as such.
+              The edition switch changes what the product CAN do; the persona
+              switch changes who is looking and what is in their tenant. */}
+          <PersonaBar />
+          <EditionBar />
           <button
             className="bshell__icon"
             onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}

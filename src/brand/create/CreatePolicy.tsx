@@ -151,7 +151,7 @@ export function CreatePolicy() {
               setAppIds={setAppIds}
               onBack={() => setStep(1)}
               onCreate={create}
-              onGuided={() => setInterview(true)}
+              onGuided={store.features.guidedSetup ? () => setInterview(true) : undefined}
             />
         )}
       </motion.div>
@@ -159,7 +159,7 @@ export function CreatePolicy() {
       <Marketplace open={market} onClose={() => setMarket(false)} onChoose={choose} />
 
       <AnimatePresence>
-        {interview && (
+        {interview && store.features.guidedSetup && (
           <Suspense fallback={null}>
           <Interview
             open={interview}
@@ -198,6 +198,7 @@ const Gallery = forwardRef<HTMLDivElement, {
   onChoose: (s: Scenario | null) => void
   onOpenMarket: () => void
 }>(function Gallery({ onChoose, onOpenMarket }, ref) {
+  const store = useBrand()
   const [q, setQ] = useState('')
   const [preview, setPreview] = useState<Scenario | null>(null)
   const mine = useMemo(() => MINE.filter((s) => hit(s, q)), [q])
@@ -257,11 +258,16 @@ const Gallery = forwardRef<HTMLDivElement, {
         </div>
       )}
 
-      <TemplatePreview
-        m={preview ? scenarioCard(preview) : null}
-        onClose={() => setPreview(null)}
-        onUse={() => preview && onChoose(preview)}
-      />
+      {/* The live preview draws the rules a template will create before it is
+          chosen. Withheld in lite, so a card commits on its name and its
+          one-line description — which is the v0 behaviour. */}
+      {store.features.templateHero && (
+        <TemplatePreview
+          m={preview ? scenarioCard(preview) : null}
+          onClose={() => setPreview(null)}
+          onUse={() => preview && onChoose(preview)}
+        />
+      )}
     </section>
   )
 })
@@ -345,41 +351,59 @@ function Marketplace({
               </button>
             </header>
 
-            <div className="bmarket__bar">
-              <div className="bgal__tabs" role="tablist" aria-label="Template categories">
-                {CATEGORIES.map((c) => (
-                  <button
-                    key={c}
-                    role="tab"
-                    aria-selected={cat === c}
-                    className={`bgal__tab ${cat === c ? 'is-on' : ''}`}
-                    onClick={() => setCat(c)}
-                  >
-                    {cat === c && (
-                      <motion.span
-                        layoutId="markettab"
-                        className="bgal__tabbg"
-                        transition={{ type: 'spring', stiffness: 600, damping: 44 }}
-                      />
-                    )}
-                    <span>
-                      {c}
-                      {c !== 'All' && <em>{PROVIDED.filter((s) => s.category === c).length}</em>}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <input
-                type="search"
-                className="bgal__search"
-                placeholder="Search the gallery…"
-                aria-label="Search the gallery"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-              />
-            </div>
+            {/* Apollo's shape: the filter is a left rail rather than a tab
+                strip. Six categories in a horizontal row is a row that wraps on
+                a laptop and truncates its counts; the same six down the side
+                are a fixed index that the grid scrolls independently of, which
+                is why every gallery of any size ends up here. Search sits at
+                the top of the rail because it filters the same thing the rail
+                filters. */}
+            <div className="bmarket__work">
+              <aside className="bmarket__rail">
+                <input
+                  type="search"
+                  className="bmarket__search"
+                  placeholder="Search templates"
+                  aria-label="Search the gallery"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
 
-            <div className="bmarket__body">
+                <div className="bmarket__cats" role="tablist" aria-label="Template categories">
+                  {CATEGORIES.map((c) => {
+                    const n = c === 'All' ? PROVIDED.length : PROVIDED.filter((s2) => s2.category === c).length
+                    return (
+                      <button
+                        key={c}
+                        role="tab"
+                        aria-selected={cat === c}
+                        className={`bmarket__cat ${cat === c ? 'is-on' : ''}`}
+                        onClick={() => setCat(c)}
+                      >
+                        {cat === c && (
+                          <motion.span
+                            layoutId="marketcat"
+                            className="bmarket__catbg"
+                            transition={{ type: 'spring', stiffness: 600, damping: 44 }}
+                          />
+                        )}
+                        <span>{c === 'All' ? 'All templates' : c}</span>
+                        <em>{n}</em>
+                      </button>
+                    )
+                  })}
+                </div>
+              </aside>
+
+              <div className="bmarket__body">
+              <div className="bmarket__intro">
+                <h3>{cat === 'All' ? 'All templates' : cat}</h3>
+                <p>
+                  Ready-made policies you can take as they are or edit afterwards. Nothing goes live until you switch
+                  it on.
+                </p>
+              </div>
+
               {featured.length > 0 && (
                 <>
                   <h3 className="bgal__section">
@@ -419,7 +443,8 @@ function Marketplace({
                     Clear search
                   </Button>
                 </div>
-              )}
+                )}
+              </div>
             </div>
           </motion.div>
 
@@ -580,7 +605,9 @@ function NameStep({
   setAppIds: (v: string[]) => void
   onBack: () => void
   onCreate: () => void
-  onGuided: () => void
+  /* Absent in lite: the guided build is withheld, and a button that opens
+     nothing is worse than no button. */
+  onGuided?: () => void
 }) {
   const chosen = appIds[0] ?? null
 
@@ -704,11 +731,13 @@ function NameStep({
               wand that lifts on hover. Everything else here is still, so one
               moving thing reads as an invitation instead of as noise — and it
               stops entirely under prefers-reduced-motion. */}
+          {onGuided && (
           <button type="button" className="bguided" onClick={onGuided}>
             <span className="bguided__sheen" aria-hidden />
             <Wand2 size={14} strokeWidth={1.9} aria-hidden />
             Guided setup
           </button>
+          )}
 
           <Button variant="brand" onClick={onCreate} disabled={!name.trim()}>
             Create policy

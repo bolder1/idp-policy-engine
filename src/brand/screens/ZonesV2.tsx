@@ -114,6 +114,7 @@ export function ZonesV2() {
     const z: Zone = {
       id: `z${Date.now()}`,
       name: `${p.name} zone`,
+      kind: 'custom',
       ip: [],
       asn: [],
       location: emptyLocation(),

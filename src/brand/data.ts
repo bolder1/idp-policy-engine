@@ -9,7 +9,28 @@
    --------------------------------------------------------------------------- */
 
 export type PolicyType = 'App Access' | 'Session' | 'Account Management'
-export type PolicyStatus = 'active' | 'inactive' | 'always-on'
+
+/* `monitor` is the framework doc's report-only, and it is the reason the two
+   predicates below exist.
+
+   Entra ships it as a first-class policy state and the doc lists it as an open
+   question with its own answer already attached — "would meaningfully de-risk
+   rollout and should be cheap if we design the PDP to log decisions
+   regardless." It is also §6.4's migration mechanism: run the new engine
+   alongside the old one, log both, flip when they agree.
+
+   A monitor policy **evaluates and does not enforce.** That is one sentence and
+   two different questions, which every surface in this console was previously
+   answering with `status !== 'inactive'` — a test that silently counts a
+   monitor policy as protection the moment the state exists. Hence: */
+export type PolicyStatus = 'active' | 'inactive' | 'monitor' | 'always-on'
+
+/** Decides real sign-ins. The question Coverage, conflicts and cover-counts ask. */
+export const enforces = (p: { status: PolicyStatus }) =>
+  p.status === 'active' || p.status === 'always-on'
+
+/** Runs and records what it would have done. Enforcing implies evaluating. */
+export const evaluates = (p: { status: PolicyStatus }) => enforces(p) || p.status === 'monitor'
 
 export interface App {
   id: string
@@ -36,7 +57,7 @@ export interface ConditionType {
   hint: string
   operators: string[]
   /** Where the value comes from: a library object, a fixed list, or free text. */
-  valueKind: 'zone' | 'posture' | 'list' | 'text' | 'range' | 'time'
+  valueKind: 'zone' | 'fingerprint' | 'hook' | 'list' | 'text' | 'range' | 'time'
   options?: string[]
 }
 
@@ -56,11 +77,14 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
   { id: 'os', label: 'Operating System', group: 'Device', hint: 'Match OS name and version', operators: ['is', 'is not'], valueKind: 'list', options: ['Windows', 'macOS', 'iOS', 'Android', 'Linux', 'ChromeOS'] },
   { id: 'mdm', label: 'MDM Managed', group: 'Device', hint: 'Require MDM enrollment', operators: ['is', 'is not'], valueKind: 'list', options: ['Enrolled', 'Not enrolled'] },
   { id: 'browser', label: 'Browser', group: 'Device', hint: 'Match browser name and version', operators: ['is', 'is not'], valueKind: 'list', options: ['Chrome', 'Edge', 'Safari', 'Firefox'] },
-  { id: 'device-risk', label: 'Device Risk Score', group: 'Device', hint: 'Device posture management score', operators: ['above', 'below'], valueKind: 'range' },
+  { id: 'device-risk', label: 'Device Risk Score', group: 'Device', hint: 'Device risk management score', operators: ['above', 'below'], valueKind: 'range' },
   { id: 'ml-risk', label: 'ML Risk Score', group: 'Device', hint: 'AI-derived overall risk score', operators: ['is', 'is not'], valueKind: 'list', options: ['Low', 'Medium', 'High'] },
   { id: 'device-count', label: 'Number of Devices', group: 'Device', hint: 'Limit registered devices per user', operators: ['above', 'below'], valueKind: 'range' },
   { id: 'device-reg', label: 'Device Registration', group: 'Device', hint: 'Registered, pending, or unregistered', operators: ['is', 'is not'], valueKind: 'list', options: ['Registered', 'Pending', 'Unregistered'] },
-  { id: 'posture', label: 'Device Posture Policy', group: 'Device', hint: 'Match by saved DAPP from your library', operators: ['compliant with', 'not compliant with'], valueKind: 'posture' },
+  /* Replaced the old Device Posture Policy condition. Posture asked whether a
+     device was healthy; this asks whether it is the same device as last time,
+     which is what the fingerprint profiles actually decide. */
+  { id: 'fingerprint', label: 'Device Fingerprint', group: 'Device', hint: 'Match by saved fingerprint profile from your library', operators: ['recognised by', 'not recognised by'], valueKind: 'fingerprint' },
 
   { id: 'group', label: 'Group Membership', group: 'User', hint: "Match by user's group", operators: ['in', 'not in'], valueKind: 'list', options: ['All Employees', 'Finance', 'Engineering', 'Executives', 'Contractors', 'IT Admins'] },
   { id: 'user-type', label: 'User Type', group: 'User', hint: 'Employee, contractor, or partner', operators: ['is', 'is not'], valueKind: 'list', options: ['Employee', 'Contractor', 'Partner'] },
@@ -70,7 +94,12 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
 
   { id: 'group-attr', label: 'Group Attribute', group: 'Group', hint: "Match by group's custom attributes", operators: ['is', 'is not'], valueKind: 'text' },
   { id: 'user-attr', label: 'User Attribute', group: 'Custom attributes', hint: 'Match email, designation, age, and more', operators: ['is', 'is not', 'contains'], valueKind: 'text' },
-  { id: 'webhook', label: 'Webhook', group: 'Webhooks', hint: 'Call an external endpoint and evaluate the response', operators: ['returns'], valueKind: 'text' },
+  /* Was a free-text box. It is now a reference to a Hook, for the same reason
+     the network condition references a Zone rather than carrying a CIDR: every
+     rule that consults the fraud service consults the same fraud service, and
+     an endpoint written into each condition makes rotating a URL an audit of
+     every policy in the tenant. See hooks.ts. */
+  { id: 'webhook', label: 'External hook', group: 'Webhooks', hint: 'Ask an external endpoint, and use its answer as a condition', operators: ['returns true', 'returns false'], valueKind: 'hook' },
 ]
 
 export function conditionType(id: string): ConditionType {
@@ -105,6 +134,20 @@ export const DECISION_CAPTION: Record<AccessDecision, string> = {
 export interface Rule {
   id: string
   name: string
+  /* Why this rule exists, in the author's words.
+
+     A name says what a rule does; it cannot say what it is for. "Off-network
+     finance access" tells the next administrator the predicate and nothing
+     about the decision behind it — whether it exists because of a regulator,
+     because of an incident, or because somebody was experimenting in March.
+     Those three have completely different answers to "can I delete this".
+
+     The framework doc's third persona is defined by wanting exactly this:
+     "every rule needs a name, a description, a rationale". Two of the three
+     had nowhere to live. Optional rather than required, because forcing a
+     sentence out of somebody mid-edit produces "asdf" and teaches everyone
+     afterwards that the field is noise. */
+  description?: string
   enabled: boolean
   appliesTo: string[]
   conditions: Condition[]
@@ -164,15 +207,28 @@ export interface ZoneLocation {
   radius?: { km: number; lat: number; lon: number; label?: string }
 }
 
+/* What a zone is *for*. A zone is only a boundary — it says where a request
+   came from, not what to do about it — but in practice every one is written
+   with an intention, and leaving that intention unrecorded meant a list of
+   zones read as a list of undifferentiated address blocks. Naming it lets the
+   list group, and lets a rule-writer see whether a zone is somewhere you trust
+   or somewhere you do not before opening it. */
+export type ZoneKind = 'allowed' | 'blocked' | 'custom'
+
 export interface Zone {
   id: string
   name: string
+  kind: ZoneKind
   /** IPv4/IPv6 addresses, CIDR blocks, and ranges. */
   ip: string[]
   /** Autonomous System Numbers — a whole network operator at once. */
   asn: string[]
   location: ZoneLocation
   usedIn: number
+  /* The two defaults ship with the tenant and every rule can assume they
+     exist, so they are editable but not removable. Deleting them would break
+     that assumption for every policy written after them. */
+  locked?: boolean
 }
 
 export const emptyLocation = (): ZoneLocation => ({ countries: [], states: [], cities: [] })
@@ -181,15 +237,6 @@ export const emptyLocation = (): ZoneLocation => ({ countries: [], states: [], c
 export const ipSectionEmpty = (z: Zone) => z.ip.length === 0 && z.asn.length === 0
 export const locationEmpty = (l: ZoneLocation) =>
   l.countries.length === 0 && l.states.length === 0 && l.cities.length === 0 && !l.radius
-
-export interface DevicePosture {
-  id: string
-  name: string
-  strictness: 'Strict' | 'Standard' | 'Minimal'
-  platforms: string[]
-  requirements: { label: string; value: string }[]
-  usedIn: number
-}
 
 /* The authentication catalogue, read off the prototype's 2-Factor
    Authentication → Methods tab.
@@ -353,10 +400,40 @@ export const groups: Group[] = [
 ]
 
 export const zones: Zone[] = [
+  /* The two defaults. Every tenant gets them, every rule can name them, and
+     neither can be deleted — only emptied, which is the honest way to switch
+     one off. */
+  {
+    id: 'default-allowed',
+    name: 'Allowed locations',
+    kind: 'allowed',
+    ip: ['10.0.0.0/8', '192.168.0.0/16'],
+    asn: [],
+    location: { countries: ['India'], states: [], cities: [] },
+    usedIn: 0,
+    locked: true,
+  },
+  {
+    /* Seeded rather than empty, and the linter is the reason: an empty zone
+       matches everything, so a default Blocked zone shipped blank would deny
+       every sign-in the moment somebody wrote the obvious rule against it. It
+       ships with the one thing every tenant agrees is worth blocking — known
+       anonymising infrastructure — and can be emptied deliberately by somebody
+       who has read the warning. */
+    id: 'default-blocked',
+    name: 'Blocked locations',
+    kind: 'blocked',
+    ip: ['185.220.101.0/24'],
+    asn: ['AS9009'],
+    location: { countries: [], states: [], cities: [] },
+    usedIn: 0,
+    locked: true,
+  },
   /* Worked example 1 — address only. Inside the zone regardless of where it
      geolocates, which is what an office egress block should mean. */
   {
     id: 'office',
+    kind: 'allowed',
     name: 'Office Network',
     ip: ['10.0.0.0/8', '192.168.1.0/24', '203.0.113.5', '198.51.100.0/24', '172.16.0.0/12', '2001:db8::/32'],
     asn: [],
@@ -367,6 +444,7 @@ export const zones: Zone[] = [
      rotate, so they cannot be enumerated. */
   {
     id: 'eu',
+    kind: 'custom',
     name: 'EU Countries',
     ip: [],
     asn: [],
@@ -375,6 +453,7 @@ export const zones: Zone[] = [
   },
   {
     id: 'asn',
+    kind: 'allowed',
     name: 'Corporate ASN',
     ip: [],
     asn: ['AS64512'],
@@ -386,6 +465,7 @@ export const zones: Zone[] = [
      what this zone says. */
   {
     id: 'jio-in',
+    kind: 'custom',
     name: 'Reliance Jio · India',
     ip: [],
     asn: ['AS55836'],
@@ -395,6 +475,7 @@ export const zones: Zone[] = [
   {
     id: 'pune-hq',
     name: 'Pune HQ · 25km',
+    kind: 'custom',
     ip: [],
     asn: [],
     location: {
@@ -407,6 +488,7 @@ export const zones: Zone[] = [
   },
   {
     id: 'anon',
+    kind: 'blocked',
     name: 'Anonymizers',
     ip: ['185.220.101.0/24', '185.220.102.0/24'],
     asn: ['AS9009', 'AS16276'],
@@ -425,40 +507,6 @@ export const ASN_DIRECTORY: Record<string, string> = {
   AS9009: 'M247 — hosting',
   AS16276: 'OVH — hosting',
 }
-
-export const devicePostures: DevicePosture[] = [
-  {
-    id: 'corp', name: 'Corporate Managed', strictness: 'Strict',
-    platforms: ['Windows', 'macOS'],
-    requirements: [
-      { label: 'OS Version', value: 'Windows 11 22H2+, macOS 14+' },
-      { label: 'Disk Encryption', value: 'Required' },
-      { label: 'Screen Lock', value: 'Required, ≤ 5 min' },
-      { label: 'Jailbreak / Root', value: 'Blocked' },
-      { label: 'MDM Enrollment', value: 'Required' },
-      { label: 'Grace Period', value: '7 days' },
-    ],
-    usedIn: 3,
-  },
-  {
-    id: 'byod', name: 'BYOD Baseline', strictness: 'Standard',
-    platforms: ['iOS', 'Android', 'Windows', 'macOS', 'ChromeOS'],
-    requirements: [
-      { label: 'OS Version', value: 'Current major − 1' },
-      { label: 'Disk Encryption', value: 'Required' },
-      { label: 'Screen Lock', value: 'Required' },
-      { label: 'Jailbreak / Root', value: 'Blocked' },
-      { label: 'MDM Enrollment', value: 'Not required' },
-    ],
-    usedIn: 5,
-  },
-  {
-    id: 'kiosk', name: 'Kiosk Devices', strictness: 'Minimal',
-    platforms: ['Windows'],
-    requirements: [{ label: 'Screen Lock', value: 'Not required' }],
-    usedIn: 1,
-  },
-]
 
 export const methodSets: MethodSet[] = [
   /* Names must resolve against AUTH_METHODS in methods.ts — a set referencing a
@@ -538,12 +586,13 @@ export const policies: Policy[] = [
       rule({
         name: 'Block compromised devices',
         appliesTo: ['all'],
-        conditions: [cond('posture', 'not compliant with', ['corp'])],
+        conditions: [cond('fingerprint', 'not recognised by', ['fp-corp'])],
         decision: 'deny',
         matchEstimate: 108,
       }),
       rule({
         name: 'Off-network finance access',
+        description: 'Required by the FY26 audit finding on remote access to ledger systems. The 09:00–17:00 window is the auditor’s, not ours — check with Compliance before widening it.',
         appliesTo: ['finance'],
         conditions: [
           cond('zone', 'not in zone', ['office']),
@@ -597,6 +646,7 @@ export const policies: Policy[] = [
     rules: [
       rule({
         name: 'Block anonymised sources',
+        description: 'No legitimate sign-in to these apps has ever arrived from a Tor exit or a hosting ASN. Written after the March access review; delete only if a customer is genuinely behind one of these networks.',
         appliesTo: ['all'],
         conditions: [cond('zone', 'in zone', ['anon'])],
         decision: 'deny',
@@ -604,6 +654,7 @@ export const policies: Policy[] = [
       }),
       rule({
         name: 'Block accounts with no second factor',
+        description: 'A challenge nobody can complete is a lockout dressed as security. Refusing the sign-in outright sends the user to enrolment instead of to the help desk.',
         appliesTo: ['all'],
         conditions: [cond('auth-state', 'is', ['No MFA configured'])],
         decision: 'deny',
@@ -628,6 +679,7 @@ export const policies: Policy[] = [
          one moment an account is worth binding to a person. */
       rule({
         name: 'Verify first login and resets',
+        description: 'Redundant against the unmanaged-device rule above for most people, and kept deliberately: a first login from a managed device is still the one moment an account is worth binding to a person.',
         appliesTo: ['all'],
         conditions: [
           cond('auth-state', 'is', ['First time login']),
@@ -676,6 +728,19 @@ export const policies: Policy[] = [
     modifiedBy: 'Mehak Garg',
     rules: [
       rule({ name: 'Deny anonymized traffic', appliesTo: ['executives'], conditions: [cond('zone', 'in zone', ['anon'])], decision: 'deny', matchEstimate: 12 }),
+      /* The Lenskart/Oberoi shape, seeded so the capability is exercised rather
+         than merely available: a condition this engine cannot evaluate, asked
+         of a system that can. Paired with a fail-open hook on a deny rule
+         deliberately — the linter reports it, and a warning nobody can trigger
+         is a warning nobody trusts. */
+      rule({
+        name: 'External risk verdict',
+        description: 'The risk platform sees payment history this console never will. Owner is the risk team; changes to the threshold happen there, not here.',
+        appliesTo: ['executives'],
+        conditions: [cond('webhook', 'returns true', ['hk-fraud'])],
+        decision: 'deny',
+        matchEstimate: 3,
+      }),
       rule({ name: 'New country', appliesTo: ['executives'], conditions: [cond('country', 'is not', ['India'])], decision: '2fa', matchEstimate: 9 }),
       rule({ name: 'Unmanaged device', appliesTo: ['executives'], conditions: [cond('mdm', 'is', ['Not enrolled'])], decision: '2fa', matchEstimate: 7 }),
       rule({ name: 'High ML risk', appliesTo: ['executives'], conditions: [cond('ml-risk', 'is', ['High'])], decision: '2fa', matchEstimate: 4 }),
@@ -708,11 +773,15 @@ export const policies: Policy[] = [
     name: 'Engineering VPN Policy',
     type: 'App Access',
     appIds: ['github', 'aws', 'jira'],
-    status: 'inactive',
+    /* Seeded in monitor rather than inactive, so the state exists in the demo
+       estate and not only in the type. Its first rule denies everything off the
+       corporate ASN, which is precisely the kind of rule nobody should switch
+       on without watching it for a week first. */
+    status: 'monitor',
     lastModified: '2 weeks ago',
     modifiedBy: 'Mehak Garg',
     rules: [
-      rule({ name: 'Require corporate ASN', appliesTo: ['engineering'], conditions: [cond('zone', 'not in zone', ['asn'])], decision: 'deny', matchEstimate: 310 }),
+      rule({ name: 'Require corporate ASN', description: 'Written during the VPN migration and never revisited. Engineering now works from home two days a week, so this may be denying more than it was meant to.', appliesTo: ['engineering'], conditions: [cond('zone', 'not in zone', ['asn'])], decision: 'deny', matchEstimate: 310 }),
       rule({ name: 'Known device', appliesTo: ['engineering'], conditions: [cond('device-reg', 'is', ['Registered'])], decision: '1fa', matchEstimate: 280 }),
       rule({ name: 'Everything else', appliesTo: ['engineering'], decision: '2fa', matchEstimate: 30 }),
     ],
@@ -764,10 +833,10 @@ export const templates: Template[] = [
   },
   {
     id: 't-zerotrust', name: 'Zero-Trust starter', category: 'Device-based',
-    description: 'Device posture + network + risk gating for sensitive apps.', ruleCount: 2,
+    description: 'Device fingerprint + network + risk gating for sensitive apps.', ruleCount: 2,
     author: 'Xecurify', when: '—', provided: true, reviewed: { by: 'miniOrange Security', on: '2026-01' },
     rules: [
-      { name: 'Block non-compliant devices', ifText: 'Device not compliant with Corporate Managed', decision: 'deny' },
+      { name: 'Block unrecognised devices', ifText: 'Device not recognised by Corporate managed', decision: 'deny' },
       { name: 'Step up off-network', ifText: 'Outside Office Network', decision: '2fa' },
     ],
   },
@@ -847,10 +916,10 @@ export const scenarios: Scenario[] = [
   },
   {
     id: 's-compromised', provided: true, reviewed: { by: 'miniOrange Security', on: '2025-11' }, name: 'Block compromised devices', category: 'Device-based', tag: 'Device',
-    description: 'Deny access from jailbroken, rooted, or non-compliant devices.',
+    description: 'Deny access from jailbroken, rooted, or unrecognised devices.',
     rules: [{
-      name: 'Block compromised devices', ifText: 'Not compliant with Corporate Managed', decision: 'deny',
-      build: () => rule({ name: 'Block compromised devices', appliesTo: ['all'], conditions: [cond('posture', 'not compliant with', ['corp'])], decision: 'deny', matchEstimate: 108 }),
+      name: 'Block compromised devices', ifText: 'Not recognised by Corporate managed', decision: 'deny',
+      build: () => rule({ name: 'Block compromised devices', appliesTo: ['all'], conditions: [cond('fingerprint', 'not recognised by', ['fp-corp'])], decision: 'deny', matchEstimate: 108 }),
     }],
   },
   {
@@ -909,8 +978,8 @@ export const scenarios: Scenario[] = [
     id: 's-zerotrust', provided: true, reviewed: { by: 'miniOrange Security', on: '2026-01' }, name: 'Zero-Trust baseline', category: 'Device-based', tag: 'Device', badge: 'Recommended',
     description: 'Layered checks in order — block the broken, trust the known, verify everything in between.',
     rules: [
-      { name: 'Block non-compliant devices', ifText: 'Device fails Corporate Managed posture', decision: 'deny',
-        build: () => rule({ name: 'Block non-compliant devices', appliesTo: ['all'], conditions: [cond('posture', 'not compliant with', ['corp'])], decision: 'deny', matchEstimate: 108 }) },
+      { name: 'Block unrecognised devices', ifText: 'Device not recognised by Corporate managed', decision: 'deny',
+        build: () => rule({ name: 'Block unrecognised devices', appliesTo: ['all'], conditions: [cond('fingerprint', 'not recognised by', ['fp-corp'])], decision: 'deny', matchEstimate: 108 }) },
       { name: 'Block anonymised sources', ifText: 'Connection is Tor, VPN or a known proxy', decision: 'deny',
         build: () => rule({ name: 'Block anonymised sources', appliesTo: ['all'], conditions: [cond('zone', 'in zone', ['anon'])], decision: 'deny', matchEstimate: 31 }) },
       { name: 'Trusted office device', ifText: 'On Office Network and device registered', decision: '1fa',
@@ -1003,7 +1072,7 @@ export const decisionLog: LogEntry[] = [
   },
   {
     time: '11:47:30', user: 'contractor@ext.com', app: 'GitHub Enterprise', matchedRule: 'Block compromised devices', decision: 'Deny',
-    conditions: [{ label: 'Not compliant with Corporate Managed', matched: true }],
+    conditions: [{ label: 'Not recognised by Corporate managed', matched: true }],
     ip: '185.220.101.12', device: 'unknown', place: 'Unknown (Tor exit)', factor: '—', latency: '61ms', risk: 'High · ML Engine: escalated',
     chain: [{ rule: 'Rule 1 · Block compromised devices', outcome: 'matched — evaluation stopped' }],
   },

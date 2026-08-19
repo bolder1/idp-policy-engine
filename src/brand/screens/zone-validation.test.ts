@@ -13,6 +13,7 @@ function zone(over: Partial<Zone> = {}): Zone {
   return {
     id: 'z',
     name: 'Test zone',
+    kind: 'custom',
     ip: [],
     asn: [],
     location: emptyLocation(),

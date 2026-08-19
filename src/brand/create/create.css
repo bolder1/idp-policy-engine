@@ -145,7 +145,14 @@
   border-left: 1px solid var(--border-subtle);
   font-weight: 400; font-size: var(--fs-sm); color: var(--text-muted);
 }
-.bgal__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(296px, 1fr)); gap: 18px; align-items: start; }
+/* `1fr` rows and stretched items: every card in a row matches the tallest, and
+   the footer pins to the bottom of whatever that turns out to be. The old fixed
+   362px was sized for a card that always had a thumbnail — with the thumbnail
+   withheld in lite it became 362px of mostly nothing. */
+.bgal__grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(296px, 1fr));
+  gap: 18px; align-items: stretch; grid-auto-rows: 1fr;
+}
 .bgal__none { padding: 48px; text-align: center; display: grid; gap: 14px; justify-items: center; color: var(--text-tertiary); }
 
 /* --- Template card ---------------------------------------------------------
@@ -180,10 +187,11 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  /* Sized to a four-row thumbnail plus a one-line heading and a two-line
-     description. Everything inside is fixed height, so a row of cards stays
-     level however long the names run. */
-  height: 362px;
+  /* Fills its grid row rather than declaring a height. The row is `1fr`, so
+     cards stay level with each other without the card having to know whether it
+     is carrying a thumbnail. */
+  height: 100%;
+  min-height: 224px;
   overflow: hidden;
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle);
@@ -700,17 +708,55 @@ html[data-theme='dark'] .bguided__sheen {
 }
 .bmarket__x:hover { background: var(--surface-sunken); color: var(--text-primary); }
 
-.bmarket__bar {
-  flex: none;
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-  padding: 14px 24px;
+/* Rail and catalogue, side by side. Only the catalogue scrolls — the header and
+   the filters stay put, which is the difference between browsing a gallery and
+   scrolling a page. */
+.bmarket__work { flex: 1; min-height: 0; display: grid; grid-template-columns: 236px minmax(0, 1fr); }
+
+.bmarket__rail {
+  grid-column: 1;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 18px 14px;
   background: var(--surface-raised);
-  border-bottom: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+  overflow-y: auto;
+}
+.bmarket .bmarket__search {
+  width: 100%; height: var(--ctl-height-md); padding: 0 12px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--surface-page); color: var(--text-primary);
+  font: inherit; font-size: var(--fs-md);
+}
+.bmarket .bmarket__search:focus-visible {
+  outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg);
 }
 
-/* Only the catalogue scrolls — the header and filters stay put, which is the
-   difference between browsing a gallery and scrolling a page. */
-.bmarket__body { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px 40px; }
+.bmarket__cats { display: flex; flex-direction: column; gap: 2px; }
+.bmarket__cat {
+  position: relative;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 11px; border-radius: var(--radius-md);
+  background: none; text-align: left; cursor: pointer;
+  font-size: var(--fs-md); color: var(--text-secondary);
+}
+.bmarket__cat:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bmarket__cat > span, .bmarket__cat > em { position: relative; z-index: 1; }
+.bmarket__cat em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bmarket__cat.is-on { color: var(--brand-active); font-weight: var(--fw-medium); }
+.bmarket__cat.is-on em { color: var(--brand-active); }
+/* The moving pill, so switching category reads as one selection travelling
+   rather than two independent repaints. */
+.bmarket__catbg {
+  position: absolute; inset: 0; z-index: 0;
+  border-radius: var(--radius-md);
+  background: var(--brand-subtle-bg);
+  box-shadow: inset 0 0 0 1px var(--brand-subtle-border);
+}
+
+.bmarket__body { grid-column: 2; min-height: 0; overflow-y: auto; padding: 22px 24px 40px; }
+.bmarket__intro { margin-bottom: 20px; }
+.bmarket__intro h3 { font-size: var(--fs-2xl); font-weight: var(--fw-semibold); letter-spacing: -0.015em; color: var(--text-primary); }
+.bmarket__intro p { margin-top: 6px; max-width: 62ch; font-size: var(--fs-base); color: var(--text-secondary); line-height: 1.5; }
 .bmarket__body .bgal__section:first-of-type { margin-top: 0; }
 
 /* --- The entry point in the grid ------------------------------------------- */
@@ -742,9 +788,18 @@ html[data-theme='dark'] .bguided__sheen {
 
 @media (max-width: 720px) {
   .bmarket__sheet { height: 100%; border-radius: 0; }
-  .bmarket__head, .bmarket__bar, .bmarket__body { padding-left: 16px; padding-right: 16px; }
-  .bmarket__bar .bgal__tabs { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
-  .bmarket__bar .bgal__search { width: 100%; margin-left: 0; }
+  .bmarket__head, .bmarket__body { padding-left: 16px; padding-right: 16px; }
+  /* No room for a 236px rail beside a card grid, so it becomes a strip above
+     it — the categories still scroll, just along the other axis. */
+  .bmarket__work { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .bmarket__rail {
+    grid-column: 1; grid-row: 1;
+    border-right: none; border-bottom: 1px solid var(--border-subtle);
+    padding: 12px 16px;
+  }
+  .bmarket__cats { flex-direction: row; overflow-x: auto; }
+  .bmarket__cat { white-space: nowrap; }
+  .bmarket__body { grid-column: 1; grid-row: 2; }
 }
 
 /* The review line. Deliberately quiet — it is provenance, not a boast, and it
@@ -956,3 +1011,57 @@ html[data-theme='dark'] .bguided__sheen {
   border-color: var(--brand);
   box-shadow: var(--focus-ring);
 }
+
+/* --- Card without its illustration -------------------------------------------
+   The lite edition drops the rule-stack thumbnail, which is what the badge was
+   absolutely positioned against. With the canvas gone it needs a place in the
+   flow rather than a corner to hang in, and the card needs its own top padding
+   back — the canvas was providing it. */
+.bgcard.is-flat { padding-top: var(--space-5); }
+.bgcard__badge.is-flat {
+  position: static; display: inline-block; align-self: flex-start;
+  margin: 0 var(--space-5) var(--space-4);
+  max-width: calc(100% - var(--space-6) * 2);
+}
+
+
+/* --- Signals, tags, and the pinned footer -------------------------------------
+   Apollo's card grammar: a row of round glyphs for what the thing contains, a
+   row of tinted labels for what it is, then the words, then one action pinned
+   to the bottom edge so the button is on the same line across the whole grid.
+   --------------------------------------------------------------------------- */
+
+.bgcard__signals { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
+.bgcard__sig {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px 2px 6px; border-radius: var(--radius-pill);
+  font-size: 11px; line-height: 1.5; white-space: nowrap;
+}
+.bgcard__sig em { font-style: normal; }
+.bgcard__sig.is-info { background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.bgcard__sig.is-lime { background: var(--fb-lime-bg, var(--fb-positive-bg)); color: var(--fb-lime-fg, var(--fb-positive-fg)); }
+.bgcard__sig.is-accent { background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
+.bgcard__sig.is-magenta { background: var(--fb-magenta-bg, var(--fb-accent-bg)); color: var(--fb-magenta-fg, var(--fb-accent-fg)); }
+.bgcard__sig.is-notice { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bgcard__sig.is-neutral { background: var(--surface-inset); color: var(--text-tertiary); }
+
+.bgcard__tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.bgcard__tag {
+  padding: 2px 8px; border-radius: var(--radius-sm);
+  font-size: 10px; font-weight: var(--fw-medium);
+  letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap;
+}
+/* The category keeps the violet it had as a corner badge — it is a label, not
+   an action, and brand orange would compete with the button below it. */
+.bgcard__tag.is-cat { background: var(--fb-accent-bg); color: var(--fb-accent-fg); border: 1px solid var(--fb-accent-border); }
+.bgcard__tag.is-count { background: var(--surface-inset); color: var(--text-muted); }
+/* The strictest outcome, in the product's three reserved decision hues. */
+.bgcard__tag.is-deny { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bgcard__tag.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bgcard__tag.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bgcard__tag.is-none { background: var(--surface-inset); color: var(--text-muted); }
+
+/* The body takes the slack so the footer sits on the card's floor whatever the
+   description length — which is what keeps the Use buttons on one line. */
+.bgcard__body { flex: 1; min-height: 0; }
+.bgcard__foot { margin-top: auto; }

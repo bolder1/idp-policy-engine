@@ -1,0 +1,354 @@
+/* -----------------------------------------------------------------------------
+   Settings row.
+
+   The old row was label / grey help sentence / control-on-the-right, repeated.
+   At forty-two rows that reads as a wall, and the help was doing the damage —
+   longest text on the row, least often wanted. It moved to the label.
+
+   What is left has to carry the weight instead, so: an icon to find rows by, a
+   value stated large enough to read at a glance, and a slider wide enough to
+   aim at. Measured against Antimetal, Fruitful and Teak, which all solve the
+   same row and all give the range the full width rather than a right-hand
+   column.
+   -------------------------------------------------------------------------- */
+
+.bsf {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bsf:last-child { border-bottom: none; }
+/* A range row is two lines tall by nature, so it gets a little more air than a
+   toggle row rather than the same and looking cramped. */
+.bsf.is-range { padding-bottom: 16px; }
+
+.bsf__head { display: flex; align-items: center; gap: 11px; }
+
+.bsf__ico {
+  flex: none; display: grid; place-items: center;
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); color: var(--text-tertiary);
+}
+.bsf:hover .bsf__ico { color: var(--brand-active); }
+
+.bsf__label {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+}
+
+/* Provenance, inside the tip rather than on the row. It was a chip beside every
+   label and it made a column of six settings read as a column of twelve
+   things. */
+.bsf__tipsrc { display: inline-block; margin-top: 4px; font-style: normal; opacity: 0.8; }
+
+.bsf__ctl { flex: none; display: flex; align-items: center; gap: 8px; }
+
+/* --- The number, typed -------------------------------------------------------------
+   Still the big read-out it always was — the size is what makes a column of
+   rows scannable — but now with a caret in it, because a slider cannot answer
+   "exactly 45" and on a 1-to-300 range it should not be asked to. Deliberately
+   not drawn as a form field at rest: a border and a grey box here would turn
+   the one confident number on the row into another input to fill in. The
+   affordance arrives on hover. */
+.bsf__num {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  padding: 2px 6px; margin: -2px -6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition: border-color var(--dur-fast) var(--ease-standard),
+              background var(--dur-fast) var(--ease-standard);
+}
+.bsf__num:hover { border-color: var(--border-default); }
+.bsf__num:focus-within { border-color: var(--brand); background: var(--brand-subtle-bg); }
+
+.bsf .bsf__numin {
+  min-width: 1ch; padding: 0; height: auto;
+  background: none; border: 0; border-radius: 0;
+  font-size: var(--fs-2xl); font-weight: var(--fw-semibold);
+  color: var(--text-primary); letter-spacing: -0.02em;
+  /* Tabular so a column of them does not jitter as the slider moves, and
+     right-aligned so the digits grow leftwards into the label's space rather
+     than pushing the unit around. */
+  font-variant-numeric: tabular-nums; line-height: 1; text-align: right;
+}
+.bsf__numin:focus-visible { outline: none; }
+
+.bsf__num em {
+  font-style: normal; font-size: var(--fs-xs); font-weight: var(--fw-regular);
+  color: var(--text-muted); letter-spacing: 0;
+}
+.bsf__num.is-warn .bsf__numin { color: var(--fb-notice-fg); }
+
+/* Out of range, mid-type. The number is left exactly as typed — clamping per
+   keystroke eats the second digit of "45" — and the bounds are stated instead,
+   in place of the unit so the row keeps its width. */
+.bsf__num.is-bad { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.bsf__num.is-bad .bsf__numin { color: var(--fb-negative-fg); }
+.bsf__num.is-bad em { display: none; }
+.bsf__numhint {
+  font-style: normal; font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  color: var(--fb-negative-fg); font-variant-numeric: tabular-nums;
+}
+
+/* --- Slider ------------------------------------------------------------------------
+   The native input carries all the behaviour and none of the appearance: it
+   sits transparent on top, and track, fill, ceiling notch and thumb are each
+   painted as their own element underneath.
+
+   The reason they are separate elements rather than a gradient on the native
+   track: a gradient stop is not reliably interpolable across engines, and a
+   native thumb cannot be transitioned at all — it is wherever the input's value
+   says, the instant the value changes. Real elements can be eased, which is
+   what lets a typed value travel to its new position instead of teleporting.
+
+   Geometry: a native thumb is inset by half its own width at each end, so the
+   usable span is `100% - 20px` starting 10px in. Fill, notch and thumb are all
+   laid out in that same reduced span, so they agree with each other and with
+   the invisible input they are standing in for. */
+.bsf__slider { padding: 0 2px; }
+
+.bsf__rail { position: relative; height: 22px; }
+
+/* On top, invisible, and the only part that takes the pointer. */
+.bsf .bsf__rail input.bsf__range {
+  -webkit-appearance: none; appearance: none;
+  position: absolute; inset: 0; z-index: 1;
+  width: 100%; height: 100%;
+  padding: 0; margin: 0; background: none; border: 0;
+  opacity: 0; cursor: pointer;
+}
+/* Sized, not hidden: the thumb's width is what sets the input's pixel mapping,
+   so it has to match the one being painted or the two drift apart. */
+.bsf__range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; }
+.bsf__range::-moz-range-thumb { width: 20px; height: 20px; border: 0; }
+.bsf__range:focus-visible { outline: none; }
+
+/* Painted, and inert — every click falls through to the input above. */
+.bsf__trackbg, .bsf__fill, .bsf__mark, .bsf__thumb { position: absolute; pointer-events: none; }
+
+.bsf__trackbg {
+  left: 0; right: 0; top: 50%; transform: translateY(-50%);
+  height: 8px; border-radius: var(--radius-pill);
+  background: var(--surface-inset); border: 1px solid var(--border-subtle);
+}
+.bsf__fill {
+  left: 0; top: 50%; transform: translateY(-50%);
+  width: calc(10px + (100% - 20px) * var(--p));
+  height: 8px; border-radius: var(--radius-pill);
+  background: var(--brand);
+}
+.bsf__thumb {
+  top: 50%;
+  left: calc(10px + (100% - 20px) * var(--p));
+  transform: translate(-50%, -50%);
+  width: 20px; height: 20px; border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  border: 2px solid var(--brand);
+  box-shadow: var(--el-mid);
+}
+
+/* The ceiling, on the track. Drawn through the full height of the rail so it
+   reads as a limit rather than a decoration, and sitting under the thumb so
+   parking on it does not hide it. */
+.bsf__mark {
+  top: 50%; transform: translate(-50%, -50%);
+  left: calc(10px + (100% - 20px) * var(--m));
+  width: 2px; height: 14px; border-radius: 1px;
+  background: var(--fb-notice-fg); opacity: 0.55;
+  pointer-events: auto; cursor: help;
+}
+
+/* Only when the value jumped. A drag is 1:1 — easing a thumb that is under the
+   user's finger reads as lag. */
+.bsf__slider.is-tween .bsf__fill { transition: width var(--dur-normal) var(--ease-standard); }
+.bsf__slider.is-tween .bsf__thumb { transition: left var(--dur-normal) var(--ease-standard); }
+
+.bsf__range:hover ~ .bsf__thumb { transform: translate(-50%, -50%) scale(1.12); }
+.bsf__range:active ~ .bsf__thumb { transform: translate(-50%, -50%) scale(1.04); }
+.bsf__range:focus-visible ~ .bsf__thumb { box-shadow: 0 0 0 4px var(--brand-subtle-bg), var(--el-mid); }
+
+/* Past the RADIUS ceiling the fill stops being reassuring. */
+.bsf__slider.is-warn .bsf__fill { background: var(--fb-notice-fg); }
+.bsf__slider.is-warn .bsf__thumb { border-color: var(--fb-notice-fg); }
+.bsf__slider.is-warn .bsf__mark { opacity: 1; }
+
+.bsf__ticks, .bsf__ends {
+  display: flex; justify-content: space-between;
+  margin-top: 2px; padding: 0 2px;
+  font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums;
+}
+/* Ticks behind the fill are part of the chosen range, so they read as on. */
+.bsf__ticks span.is-past { color: var(--brand-active); font-weight: var(--fw-medium); }
+
+/* --- Presets -----------------------------------------------------------------------
+   The two or three values anyone actually picks, on the ranges wide enough that
+   most of the track is noise. Under the scale rather than above the track: a
+   shortcut to the control, not a replacement for it — which is also why they
+   are small and quiet next to the number they set. */
+.bsf__presets { display: flex; gap: 5px; margin-top: 7px; }
+.bsf__presets button {
+  display: inline-flex; align-items: baseline; gap: 2px;
+  padding: 3px 9px; border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--fs-xs); color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  transition: border-color var(--dur-fast) var(--ease-standard),
+              background var(--dur-fast) var(--ease-standard),
+              color var(--dur-fast) var(--ease-standard);
+}
+.bsf__presets button em { font-style: normal; font-size: 10px; color: var(--text-muted); }
+.bsf__presets button:hover { border-color: var(--border-strong); color: var(--text-primary); }
+/* On means "the value is currently this", so it is a state and not a selection
+   the user made here — same fill as a chosen chip anywhere else in the kit. */
+.bsf__presets button.is-on {
+  background: var(--brand-subtle-bg); border-color: var(--brand);
+  color: var(--brand-active); font-weight: var(--fw-medium);
+}
+.bsf__presets button.is-on em { color: inherit; }
+.bsf__presets button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+.bsf__warn {
+  display: flex; align-items: flex-start; gap: 6px; margin: 0;
+  padding: 7px 10px; border-radius: var(--radius-sm);
+  background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border);
+  font-size: var(--fs-xs); line-height: 1.45; color: var(--fb-notice-fg);
+}
+.bsf__warn svg { flex: none; margin-top: 2px; }
+
+/* --- Segmented ---------------------------------------------------------------------
+   Two or three options, all visible. A popover for a binary choice is a click
+   spent hiding one word. */
+.bsf__seg {
+  display: inline-flex; gap: 2px; padding: 3px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.bsf__seg button {
+  padding: 5px 12px; border-radius: var(--radius-sm);
+  background: none; cursor: pointer; white-space: nowrap;
+  font-size: var(--fs-sm); color: var(--text-secondary);
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bsf__seg button:hover { color: var(--text-primary); }
+/* Brand tint, never a surface step — inside a Drawer or Modal --surface-raised
+   is the panel's own colour and a "selected" segment would vanish. */
+.bsf__seg button.is-on {
+  background: var(--brand-subtle-bg); color: var(--brand-active); font-weight: var(--fw-medium);
+  box-shadow: inset 0 0 0 1px var(--brand-subtle-border);
+}
+.bsf__seg button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* --- Dropdown ----------------------------------------------------------------------- */
+
+.bsf__dd { position: relative; display: inline-flex; }
+.bsf__ddtrigger {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-width: 168px; height: var(--ctl-height-sm); padding: 0 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  cursor: pointer; font-size: var(--fs-md); color: var(--text-primary);
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.bsf__ddtrigger > span { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bsf__ddtrigger > svg { flex: none; color: var(--text-muted); transition: transform var(--dur-fast) var(--ease-standard); }
+.bsf__ddtrigger:hover { border-color: var(--border-strong); }
+.bsf__ddtrigger.is-open { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bsf__ddtrigger.is-open > svg { transform: rotate(180deg); }
+.bsf__ddtrigger:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+.bsf__ddlist {
+  position: absolute; z-index: 20; top: calc(100% + 5px); right: 0;
+  min-width: 100%; list-style: none; margin: 0; padding: 4px;
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  box-shadow: var(--el-high);
+}
+.bsf__ddlist button {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 7px 9px; border-radius: var(--radius-sm);
+  background: none; cursor: pointer; text-align: left; white-space: nowrap;
+  font-size: var(--fs-md); color: var(--text-secondary);
+}
+/* The tick holds its space so nothing shifts when the choice moves. */
+.bsf__ddlist button > svg { flex: none; opacity: 0; color: var(--brand-active); }
+.bsf__ddlist button.is-on { color: var(--brand-active); font-weight: var(--fw-medium); }
+.bsf__ddlist button.is-on > svg { opacity: 1; }
+.bsf__ddlist button:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bsf__ddlist button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* --- Text ---------------------------------------------------------------------------
+   The counter sits inside the field rather than under it, so a row that is
+   approaching its limit does not change height — a settings column that reflows
+   as you type is a column that moves the thing you were about to click. */
+
+.bsf__textwrap { position: relative; display: inline-flex; align-items: center; }
+
+.bsf .bsf__text {
+  width: 200px; height: var(--ctl-height-sm); padding: 0 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  font-size: var(--fs-md); color: var(--text-primary);
+}
+.bsf__text:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+
+.bsf__textwrap.is-bad .bsf__text { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.bsf__textwrap.is-bad .bsf__text:focus-visible { box-shadow: 0 0 0 3px var(--fb-negative-bg); }
+
+/* Appears within two characters of the limit, not from the moment the panel
+   opens: a counter reading 3/11 is decoration, one reading 10/11 is a warning.
+   The field reserves room for it so the text never runs underneath. */
+.bsf__count {
+  position: absolute; right: 9px;
+  font-style: normal; font-size: 10px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.bsf__textwrap:has(.bsf__count) .bsf__text { padding-right: 42px; }
+.bsf__textwrap.is-bad .bsf__count { color: var(--fb-negative-fg); font-weight: var(--fw-medium); }
+
+/* --- Revealed settings --------------------------------------------------------------
+   What a choice brought with it. Indented under the row that caused them and
+   held by a rule down the left, because their existence is conditional on that
+   row: flush with everything else they read as peers, and then vanish when the
+   choice changes, which is a list rearranging itself for no visible reason. */
+.bsf__reveal {
+  margin: 2px 0 0 39px;                 /* aligns with the label, past the icon */
+  padding-left: 14px;
+  border-left: 2px solid var(--border-default);
+}
+.bsf__reveal .bsf { padding: 10px 0; border-bottom: none; }
+.bsf__reveal .bsf + .bsf { border-top: 1px solid var(--border-subtle); }
+/* One step down in the hierarchy, so a revealed row does not compete with the
+   row that produced it. */
+.bsf__reveal .bsf__ico { width: 24px; height: 24px; }
+.bsf__reveal .bsf__label { font-weight: var(--fw-regular); color: var(--text-secondary); }
+
+@media (max-width: 620px) {
+  .bsf__head { flex-wrap: wrap; }
+  .bsf__ctl { width: 100%; justify-content: flex-end; }
+  .bsf .bsf__text { width: 100%; }
+  .bsf__textwrap { width: 100%; }
+  .bsf__reveal { margin-left: 0; }
+}
+
+/* Removable rows — the fingerprint profile's attributes can be taken out of the
+   set. Quiet until the row is under the pointer, always in the tab order. */
+.bsf__drop {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: var(--radius-sm); background: none; cursor: pointer; color: var(--text-muted);
+  opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bsf:hover .bsf__drop, .bsf:focus-within .bsf__drop { opacity: 1; }
+.bsf__drop:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bsf__drop:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); opacity: 1; }
+
+/* Badges the caller adds after the label. */
+.bsf__badge {
+  padding: 1px 6px; border-radius: var(--radius-sm);
+  font-style: normal; font-size: 10px; font-weight: var(--fw-medium); white-space: nowrap;
+}
+.bsf__badge.is-high { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.bsf__badge.is-medium { background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.bsf__badge.is-low { background: var(--surface-inset); color: var(--text-muted); }
+.bsf__badge.is-soon { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }

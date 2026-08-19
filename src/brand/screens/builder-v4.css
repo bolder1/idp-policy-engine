@@ -365,8 +365,39 @@
 .bf__rulehead[hidden] { display: none; }
 .bf__rulehead {
   display: flex; align-items: center; gap: var(--space-4);
-  max-width: 1080px; margin-bottom: var(--space-5);
-  padding-bottom: var(--space-5); border-bottom: 1px solid var(--border-subtle);
+  max-width: 1080px;
+  padding-bottom: var(--space-4);
+}
+
+/* The rationale, in v4's head. Borderless until focused: an empty one has to
+   read as an invitation rather than as an unfilled required field, and a filled
+   one has to read as a caption under the name rather than as a second input
+   competing with it. The border-bottom that used to close the head moved down
+   here, so the two fields read as one block. */
+.bf__rulewhy[hidden] { display: none; }
+.bf__rulewhy {
+  display: block;
+  width: 100%;
+  max-width: 1080px;
+  margin-bottom: var(--space-5);
+  padding: var(--space-3) 0 var(--space-5) 34px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text-tertiary);
+  resize: vertical;
+  field-sizing: content;
+}
+.bf__rulewhy::placeholder { color: var(--text-muted); }
+.bf__rulewhy:hover::placeholder { color: var(--text-tertiary); }
+.bf__rulewhy:focus-visible {
+  outline: none;
+  color: var(--text-body);
+  border-bottom-color: var(--brand);
 }
 .bf__ruleno {
   flex: none; display: grid; place-items: center; width: 26px; height: 26px;
@@ -1068,3 +1099,42 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
 /* A rule that wins nothing in the whole sweep is a finding, not a statistic —
    it is either unreachable or written against a signal nobody produces. */
 .bf__impact div.is-empty strong { color: var(--fb-negative-fg); }
+
+/* The rationale field. Sits under the rule name, sized so two lines are the
+   comfortable answer and more is possible — a rule whose reason takes a
+   paragraph is a rule worth splitting, and the box should say so by feeling
+   tight rather than by refusing the text. */
+.bf__why {
+  height: auto;
+  margin-top: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  color: var(--text-body);
+  resize: vertical;
+}
+.bf__why::placeholder { color: var(--text-muted); }
+
+/* The rationale in the read-end-to-end surface. Quieter than the predicate
+   above it — the predicate is what the engine does, this is what a person
+   meant, and the two should not compete for the same glance. */
+.bov__why {
+  margin: var(--space-3) 0 0;
+  font-size: var(--fs-sm);
+  font-style: italic;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Two ship buttons where there was one. Kept on one row: a monitor rollout is
+   one decision with two answers, and stacking them would read as two steps. */
+.bf__revship { display: flex; align-items: center; gap: var(--space-4); }
+.bf__revmonitor {
+  flex-basis: 100%;
+  margin: var(--space-4) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+  text-align: right;
+}

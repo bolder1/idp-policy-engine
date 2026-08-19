@@ -1,5 +1,7 @@
 import { Suspense, lazy, useState } from 'react'
 
+import { useBrand } from '../store'
+
 import { PolicyBuilderV4 } from './PolicyBuilderV4'
 
 /* v4 is the default and ships with the entry. The other five are comparison
@@ -43,10 +45,14 @@ const VERSIONS: { id: V; label: string; blurb: string }[] = [
    v3, v4 and v5 share the same dialogs, so a fix to Review or Test lands in all
    of them. */
 export function BuilderPage({ policyId, open }: { policyId: string; open?: 'gauntlet' | 'impact' }) {
+  const store = useBrand()
   const [v, setV] = useState<V>('v4')
 
   return (
     <>
+      {/* Prototype furniture. A watered-down product should not advertise
+          that it has six other versions of itself. */}
+      {store.features.designSwitcher && (
       <div className="bzver">
         <span>Builder design</span>
         <div className="bviewswitch" role="tablist" aria-label="Builder version">
@@ -65,6 +71,7 @@ export function BuilderPage({ policyId, open }: { policyId: string; open?: 'gaun
           ))}
         </div>
       </div>
+      )}
 
       {v === 'v4' ? (
         <PolicyBuilderV4 policyId={policyId} open={open} />

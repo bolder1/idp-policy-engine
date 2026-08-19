@@ -1,0 +1,155 @@
+/* ---------------------------------------------------------------------------
+   The persona switcher and its strip.
+
+   Reads as prototype furniture on purpose — it sits beside the edition switch,
+   which is the same kind of control, and neither pretends to be part of the
+   product being demonstrated.
+   --------------------------------------------------------------------------- */
+
+.bpb { position: relative; }
+
+.bpb__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 30px;
+  padding: 0 var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--int-neutral-border);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bpb__trigger:hover { border-color: var(--int-neutral-border-hover); color: var(--text-primary); }
+.bpb__trigger svg { color: var(--text-muted); }
+.bpb__label { text-transform: uppercase; letter-spacing: 0.06em; font-size: var(--fs-xs); color: var(--text-muted); }
+.bpb__trigger strong { font-weight: var(--fw-medium); color: var(--text-primary); }
+
+/* Wide, because every row carries four things a name alone cannot: the
+   archetype, the question, the tenant size, and which tabs they touch. A
+   narrow menu of six labels would read as a theme picker. */
+.bpb__panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 60;
+  width: 460px;
+  max-height: 70vh;
+  overflow: auto;
+  padding: var(--space-4);
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 14px 36px rgba(16, 21, 28, 0.18);
+}
+.bpb__intro {
+  margin: 0 0 var(--space-4);
+  padding: 0 var(--space-4) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.bpb__panel ul { margin: 0; padding: 0; list-style: none; }
+.bpb__panel li + li { margin-top: 2px; }
+.bpb__panel button {
+  display: block;
+  width: 100%;
+  padding: var(--space-5);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.bpb__panel button:hover { background: var(--surface-sunken); }
+.bpb__panel button.is-on { background: var(--brand-subtle-bg); }
+.bpb__panel button.is-on .bpb__name { color: var(--brand-active); }
+
+.bpb__name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+}
+.bpb__name em { font-style: normal; font-size: var(--fs-xs); font-weight: 400; color: var(--text-muted); }
+
+.bpb__q {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+  line-height: 1.45;
+}
+
+.bpb__meta { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-4); }
+.bpb__meta i {
+  font-style: normal;
+  padding: 1px var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+/* Notice, not danger. An unmet need is the next piece of work, not a fault. */
+.bpb__meta i.is-gap { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+
+.bpb__tabs { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-3); }
+.bpb__tabs em {
+  font-style: normal;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+.bpb__tabs em + em::before { content: '·'; margin-right: var(--space-3); }
+
+/* --- The strip ------------------------------------------------------------- */
+
+.bpb__strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--brand);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+}
+.bpb__stripwho {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.bpb__stripwho svg { color: var(--text-muted); }
+.bpb__stripwho em { font-style: normal; font-weight: 400; color: var(--text-muted); }
+.bpb__stripq {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bpb__stripdepth {
+  flex: none;
+  padding: 2px var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .bpb__stripq { display: none; }
+  .bpb__panel { width: min(460px, calc(100vw - 32px)); }
+}

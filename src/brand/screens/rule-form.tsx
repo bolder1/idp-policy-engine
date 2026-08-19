@@ -7,6 +7,7 @@ import {
   Circle,
   Clock,
   Copy,
+  CopyPlus,
   Fingerprint,
   Globe,
   Info,
@@ -38,6 +39,7 @@ import {
   type Rule,
 } from '../data'
 import { useBrand } from '../store'
+import { modeLabel } from '../fingerprint'
 import { ruleSentence } from './builder-dialogs'
 import { impactOf, type Diagnostic } from './diagnostics'
 import { SITUATIONS, sweep } from './impact-arena'
@@ -141,9 +143,10 @@ export function matchMode(r: Rule): MatchMode {
    value is a rule that can never fire, and diagnose() rightly calls that an
    error, so seeding is the difference between adding a condition and adding a
    defect. Same rule V0 follows. */
-export function seedValues(t: ConditionType, zoneId?: string, postureId?: string): string[] {
+export function seedValues(t: ConditionType, zoneId?: string, postureId?: string, hookId?: string): string[] {
   if (t.valueKind === 'zone') return zoneId ? [zoneId] : []
-  if (t.valueKind === 'posture') return postureId ? [postureId] : []
+  if (t.valueKind === 'fingerprint') return postureId ? [postureId] : []
+  if (t.valueKind === 'hook') return hookId ? [hookId] : []
   if (t.valueKind === 'time') return ['09:00', '17:00']
   if (t.options?.length) return [t.options[0]]
   return ['']
@@ -191,6 +194,7 @@ export function RuleForm({
   onPatch,
   onJump,
   onDuplicate,
+  onCopyTo,
   onDelete,
   sticky = true,
 }: {
@@ -204,6 +208,8 @@ export function RuleForm({
   onPatch: (p: Partial<Rule>) => void
   onJump: (i: number) => void
   onDuplicate?: () => void
+  /** Gap 3 — copy this rule into another policy of the same type. */
+  onCopyTo?: () => void
   onDelete?: () => void
   /** Hosts that already show the rule's identity above the form turn this off. */
   sticky?: boolean
@@ -236,6 +242,21 @@ export function RuleForm({
           value={rule.name}
           onChange={(e) => onPatch({ name: e.target.value })}
         />
+        {/* Second field, deliberately quieter than the first and never
+            required. The name is what every other surface renders; this is what
+            the person who inherits the policy reads before deciding whether
+            they are allowed to remove it. Placeholder asks for the reason
+            rather than a restatement, because "blocks off-network finance
+            access" under a rule called "Off-network finance access" is the
+            failure mode this field has in every product that ships it. */}
+        <textarea
+          className="bf__input bf__why"
+          aria-label="Why this rule exists"
+          rows={2}
+          placeholder="Why does this rule exist? A regulator, an incident, a request — whatever the next person needs to know before changing it."
+          value={rule.description ?? ''}
+          onChange={(e) => onPatch({ description: e.target.value })}
+        />
       </Section>
 
       <AudienceSection rule={rule} onPatch={onPatch} />
@@ -255,11 +276,16 @@ export function RuleForm({
 
       <ChecksSection policy={policy} index={index} env={env} diagnostics={diagnostics} onJump={onJump} />
 
-      {(onDuplicate || onDelete) && (
+      {(onDuplicate || onCopyTo || onDelete) && (
         <div className="bf__rowacts">
           {onDuplicate && (
             <button type="button" onClick={onDuplicate}>
               <Copy size={13} strokeWidth={1.9} aria-hidden /> Duplicate this rule
+            </button>
+          )}
+          {onCopyTo && (
+            <button type="button" onClick={onCopyTo}>
+              <CopyPlus size={13} strokeWidth={1.9} aria-hidden /> Copy to another policy
             </button>
           )}
           {onDelete && (
@@ -416,6 +442,10 @@ export function IfSection({
 }) {
   const store = useBrand()
   const mode = matchMode(rule)
+  /* Attribute-sync hooks are not choosable here: they do not answer a question
+     at sign-in, they populate user attributes that ordinary conditions then
+     read. Offering one would produce a condition that can never resolve. */
+  const syncHooks = store.hooks.filter((h) => h.mode === 'sync')
 
   const setConditions = (conditions: Condition[]) => onPatch({ conditions })
   const patchCondition = (i: number, p: Partial<Condition>) =>
@@ -423,7 +453,7 @@ export function IfSection({
 
   const add = (typeId: string, preset?: string) => {
     const t = conditionType(typeId)
-    const values = preset ? [preset] : seedValues(t, store.zones[0]?.id, store.postures[0]?.id)
+    const values = preset ? [preset] : seedValues(t, store.zones[0]?.id, store.fingerprints[0]?.id, syncHooks[0]?.id)
     setConditions([...rule.conditions, cond(typeId, t.operators[0], values, mode === 'any' ? 'OR' : 'AND')])
     onAdding(false)
   }
@@ -600,11 +630,15 @@ function ValueControl({
   const store = useBrand()
   const v = values[0] ?? ''
 
-  if (type.valueKind === 'zone' || type.valueKind === 'posture') {
+  if (type.valueKind === 'zone' || type.valueKind === 'fingerprint' || type.valueKind === 'hook') {
     const items =
       type.valueKind === 'zone'
         ? store.zones.map((z) => ({ id: z.id, name: z.name, meta: z.usedIn ? `${z.usedIn} uses` : '' }))
-        : store.postures.map((p) => ({ id: p.id, name: p.name, meta: p.strictness }))
+        : type.valueKind === 'fingerprint'
+          ? store.fingerprints.map((p) => ({ id: p.id, name: p.name, meta: modeLabel(p) }))
+          : store.hooks
+              .filter((h) => h.mode === 'sync')
+              .map((h) => ({ id: h.id, name: h.name, meta: `${h.timeoutMs}ms` }))
     return (
       <span className="bf__val bf__val--select">
         <select
@@ -695,8 +729,8 @@ function Checklist({ rule, ctx, env }: { rule: Rule; ctx: SimContext; env: SimEn
           const shown =
             t.valueKind === 'zone'
               ? c.values.map(env.zoneName).join(', ')
-              : t.valueKind === 'posture'
-                ? c.values.map(env.postureName).join(', ')
+              : t.valueKind === 'fingerprint'
+                ? c.values.map(env.fingerprintName).join(', ')
                 : t.valueKind === 'time'
                   ? c.values.filter(Boolean).join('–')
                   : c.values.filter(Boolean).join(', ')
@@ -743,7 +777,7 @@ function FieldPicker({ onPick, onClose }: { onPick: (typeId: string, preset?: st
 
   const hit = (t: string) => !q || t.toLowerCase().includes(q.toLowerCase())
   const zones = store.zones.filter((z) => hit(z.name) || hit('zone'))
-  const postures = store.postures.filter((p) => hit(p.name) || hit('device'))
+  const postures = store.fingerprints.filter((p) => hit(p.name) || hit('device'))
 
   return (
     <motion.div
@@ -775,11 +809,11 @@ function FieldPicker({ onPick, onClose }: { onPick: (typeId: string, preset?: st
               </button>
             ))}
             {postures.map((p) => (
-              <button key={p.id} type="button" onClick={() => onPick('posture', p.id)}>
+              <button key={p.id} type="button" onClick={() => onPick('fingerprint', p.id)}>
                 <MonitorSmartphone size={14} strokeWidth={1.8} aria-hidden />
                 <span>
                   <strong>{p.name}</strong>
-                  <em>Device posture · {p.strictness}</em>
+                  <em>Device fingerprint · {modeLabel(p)}</em>
                 </span>
               </button>
             ))}
@@ -1086,8 +1120,12 @@ export function ChecksSection({
   const reach = swept.reach[index] ?? 0
   const share = Math.round((reach / swept.total) * 100)
   const rule = policy.rules[index]
-  const resolve = (kind: 'zone' | 'posture', id: string) =>
-    kind === 'zone' ? store.zoneById(id)?.name : store.postureById(id)?.name
+  const resolve = (kind: 'zone' | 'fingerprint' | 'hook', id: string) =>
+    kind === 'zone'
+      ? store.zoneById(id)?.name
+      : kind === 'hook'
+        ? store.hookById(id)?.name
+        : store.fingerprintById(id)?.name
   const { iff, then } = ruleSentence(rule, store.groups, resolve)
 
   return (

@@ -49,6 +49,7 @@ import {
   conditionType,
   cond,
   decisionLog,
+  enforces,
   type AccessDecision,
   type Condition,
   type Policy,
@@ -130,7 +131,7 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
   /* Recomputed from the draft on every edit, so the panel can never disagree
      with the canvas — the same discipline as the plain-English summary. */
   const checks = useMemo(
-    () => (draft ? diagnose(draft, store.groups) : []),
+    () => (draft ? diagnose(draft, store.groups, store.hooks) : []),
     [draft, store.groups],
   )
   /* The split is the user's to shape. Three working modes fall out of the
@@ -327,11 +328,11 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
     if (kind === 'zones') {
       updateRule(selected, { conditions: [...rule.conditions, cond('zone', 'in zone', [id])] })
       store.showToast(`${store.zones.find((z) => z.id === id)?.name} attached as a condition`)
-    } else if (kind === 'posture') {
+    } else if (kind === 'fingerprint') {
       updateRule(selected, {
-        conditions: [...rule.conditions, cond('posture', 'compliant with', [id])],
+        conditions: [...rule.conditions, cond('fingerprint', 'recognised by', [id])],
       })
-      store.showToast(`${store.postures.find((p) => p.id === id)?.name} attached as a condition`)
+      store.showToast(`${store.fingerprints.find((p) => p.id === id)?.name} attached as a condition`)
     } else if (kind === 'methods') {
       // Carry the set's methods onto the rule. Without this, attaching set A
       // and set B produced byte-identical rules while the toast claimed
@@ -352,8 +353,8 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
     const value =
       t.valueKind === 'zone'
         ? [store.zones[0].id]
-        : t.valueKind === 'posture'
-          ? [store.postures[0].id]
+        : t.valueKind === 'fingerprint'
+          ? [store.fingerprints[0].id]
           : t.options
             ? [t.options[0]]
             : t.valueKind === 'time'
@@ -1232,7 +1233,7 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
           >
             <Boxes size={15} strokeWidth={1.8} aria-hidden />
             Reusable objects
-            <em>{store.zones.length + store.postures.length + store.methodSets.length}</em>
+            <em>{store.zones.length + store.fingerprints.length + store.methodSets.length}</em>
             <ChevronDown
               className={`bdock__chev ${dockOpen ? 'is-open' : ''}`}
               size={15}
@@ -1260,7 +1261,7 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
                     mode={mode}
                     canAttach={!!rule}
                     onAttachZone={(id) => attachObject('zones', id)}
-                    onAttachPosture={(id) => attachObject('posture', id)}
+                    onAttachFingerprint={(id) => attachObject('fingerprint', id)}
                     onUseMethods={(id) => attachObject('methods', id)}
                   />
                 </div>
@@ -1732,9 +1733,9 @@ function ConditionRow({
               ))}
             </select>
           )}
-          {t.valueKind === 'posture' && (
+          {t.valueKind === 'fingerprint' && (
             <select aria-label="Device posture" value={condition.values[0]} onChange={(e) => onChange({ values: [e.target.value] })}>
-              {store.postures.map((p) => (
+              {store.fingerprints.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
@@ -2007,13 +2008,13 @@ function ObjectsPanel({
   mode,
   canAttach,
   onAttachZone,
-  onAttachPosture,
+  onAttachFingerprint,
   onUseMethods,
 }: {
   mode: 'slim' | 'mid' | 'wide'
   canAttach: boolean
   onAttachZone?: (id: string) => void
-  onAttachPosture?: (id: string) => void
+  onAttachFingerprint?: (id: string) => void
   onUseMethods?: (id: string) => void
 }) {
   const store = useBrand()
@@ -2056,26 +2057,32 @@ function ObjectsPanel({
       })),
     },
     {
-      id: 'posture',
-      title: 'Device posture',
+      id: 'fingerprint',
+      title: 'Device fingerprint',
       icon: MonitorSmartphone,
-      manage: () => store.go({ name: 'posture' }),
-      rows: store.postures.map((p) => ({
+      manage: () => store.go({ name: 'fingerprint' }),
+      rows: store.fingerprints.map((p) => ({
         id: p.id,
         name: p.name,
-        tag: p.strictness,
+        tag: p.mode === 'match' ? 'Attribute match' : 'Risk score',
         used: p.usedIn,
         detail: (
           <dl className="bobj__reqs">
-            {p.requirements.map((r) => (
-              <div key={r.label}>
-                <dt>{r.label}</dt>
-                <dd>{r.value}</dd>
-              </div>
-            ))}
+            <div>
+              <dt>Attributes</dt>
+              <dd>{p.enabled.length} on</dd>
+            </div>
+            <div>
+              <dt>{p.mode === 'match' ? 'Tolerance' : 'Bands'}</dt>
+              <dd>
+                {p.mode === 'match'
+                  ? `${p.tolerance} may drift, then ${p.onMismatch}`
+                  : `allow ≤${p.bands.allow}, challenge ≤${p.bands.challenge}`}
+              </dd>
+            </div>
           </dl>
         ),
-        attach: onAttachPosture ? () => onAttachPosture(p.id) : undefined,
+        attach: onAttachFingerprint ? () => onAttachFingerprint(p.id) : undefined,
         attachLabel: 'Require compliance',
       })),
     },
@@ -2376,7 +2383,7 @@ function TestDrawer({
     const matches = (r: Rule) => {
       if (risk === 'High' && r.decision !== '1fa') return true
       if (place === 'Outside all zones' && r.conditions.some((c) => c.typeId === 'zone')) return true
-      if (device === 'Non-compliant' && r.conditions.some((c) => c.typeId === 'posture')) return true
+      if (device === 'Changed fingerprint' && r.conditions.some((c) => c.typeId === 'fingerprint')) return true
       if (authState === 'First time login' && r.conditions.some((c) => c.typeId === 'auth-state')) return true
       return false
     }
@@ -2460,7 +2467,7 @@ function TestDrawer({
             <option>Known &lt; 90 days</option>
             <option>New / unknown</option>
             <option>Expired trust</option>
-            <option>Non-compliant</option>
+            <option>Changed fingerprint</option>
           </select>
         </label>
         <label className="btest__field">
@@ -2643,7 +2650,7 @@ function AppsDrawer({
         {list.map((a) => {
           const on = draft.appIds.includes(a.id)
           const conflicts = store.policies.filter(
-            (p) => p.id !== draft.id && p.status !== 'inactive' && p.appIds.includes(a.id),
+            (p) => p.id !== draft.id && enforces(p) && p.appIds.includes(a.id),
           )
           return (
             <label key={a.id} className="bapps__row">
@@ -2680,7 +2687,7 @@ function conditionSentence(c: Condition, store: Store): string {
   const t = conditionType(c.typeId)
   let value = c.values.join(', ')
   if (t.valueKind === 'zone') value = store.zoneById(c.values[0])?.name ?? value
-  if (t.valueKind === 'posture') value = store.postureById(c.values[0])?.name ?? value
+  if (t.valueKind === 'fingerprint') value = store.fingerprintById(c.values[0])?.name ?? value
   if (t.valueKind === 'time') value = c.values.join('–')
   return `${t.label} ${c.operator} ${value}`.trim()
 }

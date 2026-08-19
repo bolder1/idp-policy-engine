@@ -65,7 +65,7 @@ export function ImpactArenaDialog({
   const env = useMemo<SimEnv>(
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
-      postureName: (id) => store.postureById(id)?.name ?? id,
+      fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
       groupName: (id) => store.groupById(id).name,
     }),
     [store],
@@ -79,7 +79,7 @@ export function ImpactArenaDialog({
   const movement = useMemo(() => (dirty ? compare(before, after) : null), [dirty, before, after])
 
   const errors = useMemo(
-    () => diagnose(draft, store.groups).filter((d) => d.severity === 'error' && draft.rules[d.ruleIndex]?.enabled !== false).length,
+    () => diagnose(draft, store.groups, store.hooks).filter((d) => d.severity === 'error' && draft.rules[d.ruleIndex]?.enabled !== false).length,
     [draft, store.groups],
   )
   const earned = useMemo(() => badges(draft, after, movement, errors), [draft, after, movement, errors])
@@ -375,7 +375,7 @@ export function ImpactPip({ draft, saved, onOpen }: { draft: Policy; saved: Poli
   const env = useMemo<SimEnv>(
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
-      postureName: (id) => store.postureById(id)?.name ?? id,
+      fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
       groupName: (id) => store.groupById(id).name,
     }),
     [store],

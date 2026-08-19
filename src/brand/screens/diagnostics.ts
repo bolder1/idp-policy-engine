@@ -1,4 +1,5 @@
 import { conditionType, type AccessDecision, type Group, type Policy, type Rule } from '../data'
+import { SLOW_TIMEOUT_MS, seedHooks, type Hook } from '../hooks'
 
 /* -----------------------------------------------------------------------------
    Rule diagnostics.
@@ -39,7 +40,7 @@ export interface Diagnostic {
 const NEGATIONS: Record<string, string> = {
   'is not': 'is',
   'not in zone': 'in zone',
-  'not compliant with': 'compliant with',
+  'not recognised by': 'recognised by',
   'not between': 'between',
   'not in': 'in',
 }
@@ -84,7 +85,11 @@ export function shadowedBy(policy: Policy, index: number): number[] {
   return out
 }
 
-export function diagnose(policy: Policy, groups: Group[]): Diagnostic[] {
+/* `hooks` is optional and falls back to the seed, the same way the prose
+   resolver in builder-dialogs does. Callers with a store pass the live list so
+   a hook deleted five seconds ago is reported; callers without one (the tests,
+   the interview composer) still get sound answers about the seeded catalogue. */
+export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHooks): Diagnostic[] {
   const out: Diagnostic[] = []
   const rules = policy.rules
   // The global default is a deliberate catch-all; warning about it is noise.
@@ -210,6 +215,64 @@ export function diagnose(policy: Policy, groups: Group[]): Diagnostic[] {
         title: 'No second factor chosen',
         detail: 'The rule asks for specific methods but none are selected, so there is nothing for a user to verify with.',
       })
+    }
+
+    /* --- External hooks ------------------------------------------------------
+
+       Three things a hook condition can be wrong about, and none of them are
+       visible from the rule: the endpoint may have been deleted, the failure
+       behaviour may contradict what the rule is for, and the timeout is charged
+       to every sign-in that reaches here.
+
+       The middle one is the reason this section exists. A rule whose whole
+       purpose is to deny, gated on a hook that fails open, stops denying the
+       moment somebody else's service has a bad afternoon — and it does so
+       silently, because from the engine's point of view nothing went wrong. */
+    for (const c of r.conditions.filter((x) => x.typeId === 'webhook')) {
+      const id = c.values[0]
+      if (!id) continue
+      const hook = hooks.find((h) => h.id === id)
+
+      if (!hook) {
+        out.push({
+          id: `hookgone-${r.id}-${c.id}`,
+          severity: 'error',
+          ruleIndex: i,
+          title: 'This rule calls a hook that no longer exists',
+          detail: `The condition names a hook that has been deleted, so it has nothing to ask. The rule cannot be evaluated as written.`,
+        })
+        continue
+      }
+
+      if (r.decision === 'deny' && hook.onFailure === 'fail-open') {
+        out.push({
+          id: `hookopen-${r.id}-${c.id}`,
+          severity: 'warning',
+          ruleIndex: i,
+          title: 'This rule stops denying when the hook is unavailable',
+          detail: `${hook.name} is set to treat a failure as “not matched”. Because this rule denies, an outage or a timeout at the endpoint lets the sign-in through to the rules below instead of refusing it.`,
+        })
+      }
+
+      if (r.decision !== 'deny' && hook.onFailure === 'fail-closed') {
+        out.push({
+          id: `hookclosed-${r.id}-${c.id}`,
+          severity: 'warning',
+          ruleIndex: i,
+          title: 'An outage at the hook locks these users out',
+          detail: `${hook.name} is set to deny when it cannot be reached. Everyone this rule applies to depends on that endpoint being up, whatever the rule itself decides.`,
+        })
+      }
+
+      if (hook.timeoutMs > SLOW_TIMEOUT_MS) {
+        out.push({
+          id: `hookslow-${r.id}-${c.id}`,
+          severity: 'warning',
+          ruleIndex: i,
+          title: 'This rule can add most of a second to a sign-in',
+          detail: `${hook.name} waits up to ${hook.timeoutMs}ms before giving up, and every sign-in that reaches this rule pays it. Worth checking against the endpoint's measured p99.`,
+        })
+      }
     }
 
     /* --- Unreachable ---------------------------------------------------------

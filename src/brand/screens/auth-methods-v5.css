@@ -326,38 +326,6 @@
   .bv5__card-right { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
 }
 
-/* --- Figures ----------------------------------------------------------------
-   Four numbers, stated flat. Stripe's Connect dashboard is the reference: the
-   figures earn the top of the page because they answer the questions the list
-   underneath cannot, and they are not dressed up as cards to look busier. */
-.bv5__figures {
-  /* The strip is divided, not a row of cards, so a ragged last row reads as a
-     mistake — auto-FILL left the fourth figure alone on its own line. auto-fit
-     fills the row edge to edge; the strip is capped instead, which is what stops
-     three figures becoming three 540px panels on a wide page. */
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  max-width: 1120px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-.bv5__fig { padding: 14px 18px; border-right: 1px solid var(--border-subtle); }
-.bv5__fig:last-child { border-right: 0; }
-.bv5__fig > span {
-  display: block; font-size: var(--fs-xs); font-weight: var(--fw-medium);
-  letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-tertiary);
-}
-.bv5__fig > strong {
-  display: block; margin-top: 5px;
-  font-size: 26px; font-weight: var(--fw-semibold); line-height: 1.1;
-  color: var(--text-primary); letter-spacing: -0.02em;
-}
-.bv5__fig > strong em {
-  font-style: normal; margin-left: 3px;
-  font-size: var(--fs-lg); font-weight: var(--fw-regular); color: var(--text-muted);
-}
-.bv5__fig.is-warn > strong { color: var(--fb-notice-fg); }
 
 /* One notice, and only when it has something to say. */
 .bv5__notice {
@@ -408,7 +376,23 @@
 
 /* --- Toolbar and filters ------------------------------------------------- */
 
-.bv5__toolbar--flat { background: none; border: 0; padding: 0; }
+/* The toolbar carries a fourth control now that category has moved onto it,
+   and it had no wrap: three controls fitted, four overflow at about 700px. The
+   chip row was hiding this by wrapping on its own account. */
+.bv5__toolbar--flat { background: none; border: 0; padding: 0; flex-wrap: wrap; row-gap: 8px; }
+
+/* Category filter. The shell is the global `.btoolbar__select`, brand-tinted by
+   `.is-set` when a family is chosen — the same treatment the chips used for
+   `.is-on`, which is safe in dark because it is a brand tint and not a surface
+   step. Only the width is local: family names run to "miniOrange Authenticator"
+   and the global 168px clips it. */
+.bv5__catf { display: inline-flex; }
+.bv5__catf-sel { width: 216px; height: var(--ctl-height-sm); }
+
+/* The one line under the table. Reads as a caption, not a figure. */
+.bv5__foot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; }
+.bv5__foot strong { color: var(--text-secondary); font-weight: var(--fw-semibold); }
+.bv5__foot-sep { color: var(--border-strong); }
 .bv5__filters {
   display: inline-flex; gap: 2px; padding: 3px;
   background: var(--surface-sunken);
@@ -445,7 +429,8 @@
 .bv5__rowhead,
 .bv5__row2 {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px 110px 64px;
+  /* Method · status · enrolments · enable · default */
+  grid-template-columns: minmax(0, 1fr) 150px 96px 74px 92px;
   align-items: center;
   gap: 16px;
   padding: 0 16px;
@@ -503,7 +488,7 @@
 
 @media (max-width: 860px) {
   .bv5__rowhead { display: none; }
-  .bv5__row2 { grid-template-columns: minmax(0, 1fr) auto; grid-auto-rows: min-content; row-gap: 8px; }
+  .bv5__row2 { grid-template-columns: minmax(0, 1fr) auto auto; grid-auto-rows: min-content; row-gap: 8px; }
   .bv5__cell-num { text-align: left; }
 }
 
@@ -910,3 +895,160 @@
 .bv5__type.is-info { background: var(--fb-info-bg); color: var(--fb-info-fg); }
 .bv5__type.is-accent { background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
 .bv5__type.is-neutral { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); }
+
+
+
+/* The family, restated on the row. The chip row filters; this one tells you
+   which family a row belongs to when no filter is applied. */
+.bv5__catchip {
+  display: inline-flex; align-items: center; gap: 3px;
+  margin-right: 7px; padding: 0 6px;
+  border-radius: var(--radius-sm); background: var(--surface-inset);
+  font-style: normal; font-size: 10px; color: var(--text-muted); white-space: nowrap;
+}
+
+.bv5__defbadge {
+  font-style: normal; padding: 1px 7px; border-radius: var(--radius-pill);
+  background: var(--brand-subtle-bg); border: 1px solid var(--brand-subtle-border);
+  color: var(--brand-active); font-size: 10px; font-weight: var(--fw-medium); white-space: nowrap;
+}
+
+.bv5__cell-more { display: flex; justify-content: flex-end; }
+/* Quiet until the row is under the pointer — it is an occasional action, and a
+   button on all twenty-one rows would out-shout the two toggles that matter. */
+.bv5__setdef {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: var(--radius-sm);
+  background: none; font-size: 10px; color: var(--text-link); cursor: pointer; white-space: nowrap;
+  opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bv5__row2:hover .bv5__setdef,
+.bv5__row2:focus-within .bv5__setdef { opacity: 1; }
+.bv5__setdef:hover { background: var(--surface-inset); }
+.bv5__isdef { display: inline-grid; place-items: center; color: var(--brand); }
+
+@media (max-width: 900px) {
+  .bv5__setdef { opacity: 1; }
+}
+
+
+/* --- One-line rows --------------------------------------------------------------
+   The description moved to a tip on the name, so the row is a single line and
+   the table stops reading as a feed. The chip comes up with it. */
+.bv5__cell-main { align-items: center; }
+.bv5__cell-open { min-width: 0; flex: 0 1 auto; text-align: left; }
+.bv5__cell-name { display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap; min-width: 0; }
+.bv5__cell-sub { display: none; }
+.bv5__row2 { min-height: 46px; }
+
+/* --- Drawer: the sheet's settings ---------------------------------------------
+   Wiring mfa-settings.ts in meant the drawer now shows three kinds of thing at
+   once — what this method alone controls, what its whole family shares, and how
+   we connect to the provider. Scope is the only one of those an admin can get
+   wrong silently, so scope is what the styling spends itself on. */
+
+/* Said once, at the top. The shipping console's equivalent page looks like a
+   configuration screen and configures the signed-in admin's own second factor;
+   this line is the difference, stated rather than implied. */
+.bv5__dwscope {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary);
+}
+.bv5__dwscope svg { flex: none; color: var(--text-muted); }
+
+/* The shared band, bled to the panel edges.
+
+   --space-7 is 20px and is exactly .bx-drawer__body's padding, so the negative
+   inline margin lands the fill flush with both edges — the band reads as a
+   different surface rather than an indented box. --surface-sunken and not
+   --surface-raised: raised is byte-identical to --surface-overlay in both
+   themes (#ffffff / #1a212a), which is the Drawer's own background, so a raised
+   band inside a drawer is invisible. Sunken is the only fill that steps. */
+.bv5__dwband {
+  margin-inline: calc(var(--space-7) * -1);
+  padding: var(--space-6) var(--space-7);
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bv5__dwband-head {
+  margin: 0 0 2px; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary);
+}
+.bv5__dwband-scope { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
+/* The siblings, named. A scope claim you can check beats one you must trust. */
+.bv5__dwband-kin { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 4px; }
+.bv5__dwband-kin i {
+  font-style: normal; padding: 1px 6px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); border: 1px solid var(--border-subtle);
+  font-size: var(--fs-xs); color: var(--text-secondary);
+}
+.bv5__dwband-note {
+  margin: 8px 0 0; padding-left: 8px;
+  border-left: 2px solid var(--border-strong);
+  font-size: var(--fs-xs); line-height: 1.5; color: var(--text-tertiary);
+}
+.bv5__dwband .bv5__dsetting { border-bottom-color: var(--border-default); }
+.bv5__dwband .bv5__dsetting:last-child { border-bottom: none; }
+.bv5__dwband .bv5__dselect { background: var(--surface-raised); }
+
+/* Where the setting is migrating from. Sized down hard because it is
+   provenance, not a label — it must not compete with the setting's name. */
+.bv5__dsetting .bv5__srctag {
+  margin-left: 6px; padding: 1px 5px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); border: 1px solid var(--border-subtle);
+  font-style: normal; font-size: 10px; font-weight: var(--fw-regular);
+  letter-spacing: 0.01em; color: var(--text-muted); white-space: nowrap;
+}
+
+/* The warning wraps onto its own line under the control, so --wide lets the
+   flex row break. Without it the row would stretch and every sibling row on the
+   panel would stop aligning with it. */
+.bv5__dsetting--wide { flex-wrap: wrap; }
+
+/* Two classes, because `.bv5__dsetting span` at (0,1,1) already claims every
+   span in the row and would render this number control as a block of 12px
+   tertiary text. (0,2,0) beats it. */
+.bv5__dsetting .bv5__dnum {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 0; font-size: var(--fs-md); color: var(--text-secondary);
+}
+.bv5 .bv5__dnum input {
+  width: 68px; height: var(--ctl-height-sm); padding: 0 8px;
+  background: var(--surface-raised); border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm); font-size: var(--fs-md); color: var(--text-body);
+}
+/* Same reason as the span above: `.bv5__dsetting p` would paint this at
+   --text-primary in medium weight, which is louder than the setting it warns
+   about. */
+.bv5__dsetting .bv5__dwarn {
+  flex: 1 0 100%;
+  display: flex; align-items: flex-start; gap: 6px;
+  margin: 6px 0 0;
+  font-size: var(--fs-xs); font-weight: var(--fw-regular); line-height: 1.5;
+  color: var(--fb-notice-fg);
+}
+.bv5__dsetting .bv5__dwarn svg { flex: none; margin-top: 2px; }
+
+/* The action, named on the row.
+
+   Quiet until the row is under the pointer, the same contract `.bv5__setdef`
+   already uses two columns over — a word on all twenty-one rows at full
+   strength would out-shout the toggle, which is the control most visits are
+   actually here for. Hidden with opacity and not `display: none`, so it stays
+   in the accessibility tree: the button's name reads "FIDO2 / Passkey …
+   Configure" whether or not a pointer is anywhere near it, which is the half of
+   this that had to be true all the time. */
+.bv5__cell-go {
+  display: inline-flex; align-items: center; gap: 2px;
+  margin-left: 2px; white-space: nowrap;
+  font-size: 10px; font-weight: var(--fw-medium); color: var(--text-link);
+  opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bv5__row2:hover .bv5__cell-go,
+.bv5__cell-open:focus-visible .bv5__cell-go { opacity: 1; }
+
+/* Touch has no hover, so the word is simply always there. */
+@media (max-width: 900px) {
+  .bv5__cell-go { opacity: 1; }
+}

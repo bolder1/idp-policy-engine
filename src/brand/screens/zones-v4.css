@@ -1,0 +1,279 @@
+/* ---------------------------------------------------------------------------
+   Zones v4 — the Drive layout. Prefix `bz5`.
+
+   A dense list on the left and a details panel docked to the right. The panel
+   is a grid column, not an overlay: it animates its own width and the list
+   reflows into what is left, so opening a zone never covers the row you clicked
+   or the next one you were about to.
+   --------------------------------------------------------------------------- */
+
+/* This screen owns its own scrolling: the list scrolls inside the list and the
+   panel's Save footer stays pinned to the bottom of the panel. That only works
+   if the page is exactly as tall as the space it is given rather than as tall
+   as its content, and the shell's main is a plain scrolling block — so the
+   model is switched, scoped by `:has()` to the one screen that needs it.
+   Without `:has()` support the page simply scrolls as before, which is the
+   behaviour every other screen has. */
+.bshell__main:has(.bz5) { display: flex; flex-direction: column; overflow: hidden; }
+.bshell__main:has(.bz5) > .bzver { flex: none; }
+
+.bpage.bz5 {
+  padding-left: 0; padding-right: 0; max-width: none;
+  display: flex; flex-direction: column; flex: 1; min-height: 0;
+}
+
+.bz5__head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-6);
+  padding: var(--space-7) var(--space-8) var(--space-6);
+}
+.bz5__head h1 { margin: 0; font-size: var(--fs-2xl); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bz5__head p { margin: var(--space-3) 0 0; font-size: var(--fs-base); color: var(--text-secondary); }
+
+/* The panel is a sibling column. Flex rather than grid because motion animates
+   its width, and a grid track cannot be animated by the element inside it. */
+.bz5__work { flex: 1; min-height: 0; display: flex; align-items: stretch; }
+.bz5__main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 0 var(--space-8) var(--space-7); }
+
+.bz5__bar { display: flex; align-items: center; gap: var(--space-5); padding-bottom: var(--space-5); }
+.bz5__search {
+  display: inline-flex; align-items: center; gap: var(--space-4);
+  width: 100%; max-width: 340px; height: var(--ctl-height-md); padding: 0 var(--space-5);
+  border: 1px solid var(--border-default); border-radius: var(--radius-pill);
+  background: var(--surface-sunken); color: var(--text-muted);
+}
+.bz5__search:focus-within { border-color: var(--brand); background: var(--surface-raised); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bz5__search input { flex: 1; min-width: 0; border: none; background: none; outline: none; font: inherit; font-size: var(--fs-md); color: var(--text-primary); }
+.bz5__count { font-size: var(--fs-sm); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+
+/* --- The selection strip ---------------------------------------------------- */
+
+.bz5__selbar {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-4); padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--brand-subtle-bg); border: 1px solid var(--brand-subtle-border);
+}
+.bz5__selbar strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bz5__selspace { flex: 1; }
+
+/* --- The list --------------------------------------------------------------- */
+
+/* One grid template, declared once and used by both the header and every row,
+   so a column cannot drift between them. */
+.bz5__cols,
+.bz5__rowmain {
+  display: grid;
+  grid-template-columns: 32px minmax(160px, 1.2fr) minmax(0, 1.6fr) 96px;
+  align-items: center; gap: var(--space-5);
+}
+.bz5__cols {
+  padding: 0 128px var(--space-3) var(--space-5);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bz5__cols > :first-child { grid-column: 1 / span 2; }
+
+.bz5__rows { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.bz5__row {
+  position: relative; display: flex; align-items: center;
+  border-radius: var(--radius-md);
+}
+.bz5__row:hover { background: var(--surface-sunken); }
+/* Drive fills the whole row when it is selected, which is the only treatment
+   that survives a list this dense — a left border alone disappears. */
+.bz5__row.is-on { background: var(--brand-subtle-bg); }
+.bz5__row.is-on .bz5__name { color: var(--text-primary); font-weight: var(--fw-medium); }
+
+.bz5__rowmain {
+  flex: 1; min-width: 0; padding: var(--space-4) var(--space-5);
+  background: none; text-align: left; cursor: pointer;
+}
+.bz5__rowmain:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); border-radius: var(--radius-md); }
+
+.bz5__ico {
+  display: grid; place-items: center; width: 30px; height: 30px;
+  border-radius: var(--radius-md);
+  background: var(--surface-inset); color: var(--text-tertiary);
+}
+/* The row's type, at a glance. Derived rather than stored — a zone that names
+   addresses is a different object from one that names a country, and the list
+   should not make you read the summary to find that out. */
+.bz5__ico.is-net { background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.bz5__ico.is-loc { background: var(--fb-lime-bg, var(--fb-positive-bg)); color: var(--fb-lime-fg, var(--fb-positive-fg)); }
+.bz5__ico.is-both { background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
+
+.bz5__name {
+  display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0;
+  font-size: var(--fs-base); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bz5__dot { flex: none; width: 6px; height: 6px; border-radius: var(--radius-full); }
+.bz5__dot.is-error { background: var(--fb-negative-dot); }
+.bz5__dot.is-warning { background: var(--fb-notice-dot); }
+.bz5__sum {
+  min-width: 0; font-size: var(--fs-md); color: var(--text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bz5__use { font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; }
+
+/* --- Hover actions -----------------------------------------------------------
+   Rendered always and hidden with opacity, never unmounted: a cluster that only
+   exists on :hover is a cluster a keyboard user does not have. `:focus-within`
+   brings it back, and the selected row keeps it. */
+
+.bz5__acts {
+  display: flex; align-items: center; gap: 2px;
+  padding-right: var(--space-4);
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bz5__row:hover .bz5__acts,
+.bz5__row:focus-within .bz5__acts,
+.bz5__row.is-on .bz5__acts { opacity: 1; pointer-events: auto; }
+/* Keep the column reserved at all times so the summary does not reflow the
+   moment a pointer crosses the row. */
+.bz5__row { padding-right: 0; }
+
+.bz5__empty { padding: var(--space-8) 0; font-size: var(--fs-base); color: var(--text-muted); text-align: center; }
+.bz5__confirm { margin: 0; font-size: var(--fs-base); color: var(--text-body); line-height: 1.6; }
+
+/* --- The docked panel -------------------------------------------------------- */
+
+.bz5__panel { flex: none; overflow: hidden; border-left: 1px solid var(--border-subtle); background: var(--surface-raised); }
+.bz5__panelinner { width: 380px; height: 100%; display: flex; flex-direction: column; min-height: 0; }
+
+.bz5__phead {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+}
+.bz5__phead strong {
+  flex: 1; min-width: 0;
+  font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.bz5__tabs { display: flex; gap: var(--space-6); padding: 0 var(--space-5); border-bottom: 1px solid var(--border-subtle); }
+.bz5__tabs button {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4) 2px; background: none; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-tertiary);
+}
+.bz5__tabs button:hover { color: var(--text-primary); }
+.bz5__tabs button.is-on { color: var(--brand-active); border-bottom-color: var(--brand); }
+.bz5__tabs em {
+  font-style: normal; padding: 0 6px; border-radius: var(--radius-pill);
+  background: var(--surface-inset); font-size: var(--fs-xs); color: var(--text-tertiary);
+}
+
+.bz5__pbody { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-6); }
+
+.bz5__field { display: flex; flex-direction: column; gap: var(--space-3); }
+.bz5__field > span,
+.bz5__matches > span {
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted);
+}
+.bz5 .bz5__field input {
+  height: var(--ctl-height-md); padding: 0 var(--space-4);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--surface-raised); color: var(--text-primary); font: inherit; font-size: var(--fs-base);
+}
+.bz5 .bz5__field input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+
+.bz5__sec { display: flex; flex-direction: column; gap: var(--space-3); }
+.bz5__sec h3 {
+  display: flex; align-items: center; gap: var(--space-3); margin: 0 0 2px;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bz5__sec h3 svg { color: var(--text-tertiary); }
+.bz5__sec h3 em {
+  font-style: normal; padding: 0 7px; border-radius: var(--radius-pill);
+  background: var(--surface-inset); font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-tertiary);
+}
+.bz5__any { margin: 0; padding: var(--space-3) var(--space-4); border: 1px dashed var(--border-default); border-radius: var(--radius-sm); font-size: var(--fs-md); color: var(--text-muted); }
+
+.bz5__entry {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 2px 2px 2px var(--space-4);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.bz5__entry:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bz5__entry.is-bad { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.bz5__entry.is-add { border-style: dashed; }
+.bz5 .bz5__entry input {
+  flex: 1; min-width: 0; height: 26px; padding: 0;
+  border: none; background: none; outline: none;
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-sm); color: var(--text-primary);
+}
+.bz5__entry > span { flex: none; font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+.bz5__static { flex: 1 !important; min-width: 0; display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-md) !important; color: var(--text-primary) !important; }
+.bz5 .bz5__km { width: 50px !important; height: 22px !important; padding: 0 var(--space-3) !important; border: 1px solid var(--border-default) !important; border-radius: var(--radius-sm); font-family: inherit !important; }
+
+.bz5__pool { display: flex; flex-wrap: wrap; gap: 5px; }
+.bz5__pool button {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 9px; border-radius: var(--radius-pill);
+  border: 1px dashed var(--border-default); background: none;
+  font-size: var(--fs-sm); color: var(--text-tertiary); cursor: pointer;
+}
+.bz5__pool button:hover { border-style: solid; border-color: var(--brand); color: var(--brand-active); }
+
+.bz5__matches { padding: var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken); }
+.bz5__matches p { margin: var(--space-3) 0 0; font-size: var(--fs-md); color: var(--text-body); line-height: 1.5; }
+
+.bz5__issue {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  margin: 0; padding: var(--space-4);
+  border-radius: var(--radius-md); font-size: var(--fs-sm); line-height: 1.5;
+}
+.bz5__issue svg { flex: none; margin-top: 2px; }
+.bz5__issue.is-error { background: var(--fb-negative-bg); border: 1px solid var(--fb-negative-border); color: var(--fb-negative-fg); }
+.bz5__issue.is-warning { background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border); color: var(--fb-notice-fg); }
+
+/* --- Used by ------------------------------------------------------------------
+   Drive's Activity tab, answering the question this product is actually asked:
+   not who touched it, but what breaks if it goes. */
+
+.bz5__used { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.bz5__used button {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%;
+  padding: var(--space-4); text-align: left; cursor: pointer;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-raised);
+}
+.bz5__used button:hover { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bz5__used strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bz5__used em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.45; }
+.bz5__usedfoot { margin-top: var(--space-3); font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.5; }
+.bz5__none { margin: 0; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.6; }
+
+.bz5__pfoot {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border-subtle); background: var(--surface-sunken);
+}
+.bz5__pfoot > span { flex: 1; font-size: var(--fs-xs); color: var(--text-muted); }
+
+/* --- Narrow -------------------------------------------------------------------
+   Below this the panel stops being a column and becomes an overlay, because a
+   380px panel beside a 300px list is two things that both fail. */
+
+@media (max-width: 1080px) {
+  .bz5__cols { padding-right: var(--space-5); }
+  .bz5__cols > :nth-child(3) { display: none; }
+  .bz5__rowmain { grid-template-columns: 32px minmax(0, 1fr) 96px; }
+  .bz5__sum { display: none; }
+  /* Nothing to reveal on a touch screen, so the actions stay put. */
+  .bz5__acts { opacity: 1; pointer-events: auto; }
+}
+
+@media (max-width: 900px) {
+  .bz5__head, .bz5__main { padding-left: var(--space-5); padding-right: var(--space-5); }
+  .bz5__panel {
+    position: fixed; inset: 0 0 0 auto; z-index: var(--z-modal);
+    box-shadow: var(--el-high);
+  }
+  .bz5__panelinner { width: min(380px, 100vw); }
+}

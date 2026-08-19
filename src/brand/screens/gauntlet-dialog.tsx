@@ -293,8 +293,8 @@ function TileDetail({
                 const shown =
                   t.valueKind === 'zone'
                     ? fc.values.map(env.zoneName).join(', ')
-                    : t.valueKind === 'posture'
-                      ? fc.values.map(env.postureName).join(', ')
+                    : t.valueKind === 'fingerprint'
+                      ? fc.values.map(env.fingerprintName).join(', ')
                       : fc.values.join(', ')
                 return `${t.label} ${fc.operator} ${shown}`
               })
@@ -373,7 +373,7 @@ export function GauntletDialog({
   const env = useMemo<SimEnv>(
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
-      postureName: (id) => store.postureById(id)?.name ?? id,
+      fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
       groupName: (id) => store.groupById(id).name,
     }),
     [store],
@@ -654,7 +654,7 @@ export function GauntletPip({ policy, onOpen }: { policy: Policy; onOpen: () => 
   const env = useMemo<SimEnv>(
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
-      postureName: (id) => store.postureById(id)?.name ?? id,
+      fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
       groupName: (id) => store.groupById(id).name,
     }),
     [store],

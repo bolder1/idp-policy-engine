@@ -1,0 +1,417 @@
+/* -----------------------------------------------------------------------------
+   Zones · final.
+
+   One rule governs most of what follows: an empty section matches ANY, so it is
+   drawn as the loudest thing on the card, not the quietest. Every earlier
+   version rendered it in muted grey — the visual language of "nothing here" —
+   which is precisely backwards. `.bz7__any` is the fix and it is filled,
+   bordered and tinted with the same `--fb-info-*` the linter grades that state
+   as, so the colour is the linter's verdict rather than a second opinion.
+   -------------------------------------------------------------------------- */
+
+.bz7 { display: flex; flex-direction: column; gap: 16px; }
+
+.bz7__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.bz7__head h1 { margin: 0; }
+.bz7__head p { margin: 5px 0 0; max-width: 72ch; font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55; }
+.bz7__pagehead { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.bz7__actions { flex: none; display: flex; gap: 8px; }
+
+.bz7__back {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 8px 4px 4px; border-radius: var(--radius-sm);
+  background: none; cursor: pointer; font-size: var(--fs-md); color: var(--text-link);
+}
+.bz7__back:hover { background: var(--surface-inset); }
+.bz7__back:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* --- Toolbar --------------------------------------------------------------------- */
+
+.bz7__toolbar { display: flex; align-items: center; gap: 10px; }
+.bz7__search {
+  flex: 1; max-width: 380px;
+  display: flex; align-items: center; gap: 8px;
+  height: var(--ctl-height-md); padding: 0 11px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  color: var(--text-muted);
+}
+.bz7 .bz7__search input {
+  flex: 1; min-width: 0; height: auto; padding: 0;
+  background: none; border: 0; font-size: var(--fs-md); color: var(--text-primary);
+}
+.bz7 .bz7__search input:focus-visible { outline: none; }
+.bz7__search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bz7__count { margin-left: auto; font-size: var(--fs-sm); color: var(--text-tertiary); white-space: nowrap; }
+
+/* .bviewswitch is padded 5px 13px for text labels. These are icons. */
+.bz7__viewswitch button { display: grid; place-items: center; width: 30px; height: 26px; padding: 0; }
+
+/* --- Cards ----------------------------------------------------------------------- */
+
+.bz7__grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px; list-style: none; padding: 0; margin: 0;
+}
+.bz7__card {
+  position: relative;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.bz7__card:hover { border-color: var(--border-strong); box-shadow: var(--el-low); }
+.bz7__card:focus-within { border-color: var(--brand); }
+
+.bz7__cardhead { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* The name is the button; ::after stretches its hit area over the tile so the
+   card is one target and one tab stop. */
+.bz7__open {
+  min-width: 0; background: none; cursor: pointer; text-align: left;
+  font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bz7__card .bz7__open::after { content: ''; position: absolute; inset: 0; border-radius: var(--radius-lg); }
+.bz7__open:hover { color: var(--brand-active); }
+.bz7__open:focus-visible { outline: none; text-decoration: underline; }
+
+.bz7__tile {
+  flex: none; display: grid; place-items: center;
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); color: var(--text-tertiary);
+}
+.bz7__tile--sm { width: 22px; height: 22px; }
+.bz7__tile--lg { width: 44px; height: 44px; border-radius: var(--radius-md); }
+.bz7__tile.is-blue { background: var(--tint-blue-bg); color: var(--tint-blue-fg); }
+.bz7__tile.is-green { background: var(--tint-green-bg); color: var(--tint-green-fg); }
+.bz7__tile.is-indigo { background: var(--tint-indigo-bg); color: var(--tint-indigo-fg); }
+/* A zone constraining neither half matches everything. That is not a category,
+   it is a defect, and the tile says so. */
+.bz7__tile.is-warn { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+
+/* The two ANDed operands, with the conjunction drawn between them. */
+.bz7__ops { display: flex; flex-direction: column; gap: 7px; }
+.bz7__op { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; min-height: 24px; }
+.bz7__op > svg { flex: none; color: var(--text-muted); }
+.bz7__and {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 9px; font-weight: var(--fw-semibold); letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.bz7__and::before, .bz7__and::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
+
+.bz7__chip {
+  font-style: normal; padding: 2px 8px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); border: 1px solid var(--border-subtle);
+  font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap;
+}
+.bz7__chip.is-more { background: none; border-style: dashed; color: var(--text-muted); }
+
+/* THE band. Inverted on purpose — see the file header. */
+/* `flex: none` by default. It used to be `flex: 1`, which is right inside the
+   card's operand ROW — the band should fill the width there — and wrong inside
+   the popup's section, which is a COLUMN: the same declaration grew it
+   vertically into a tall blue block. It fills the width only where width is the
+   axis. */
+.bz7__any {
+  flex: none; align-self: stretch;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: var(--ctl-height-sm);
+  padding: 3px 10px; border-radius: var(--radius-sm);
+  background: var(--fb-info-bg); border: 1px solid var(--fb-info-border);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--fb-info-fg);
+  white-space: nowrap;
+}
+.bz7__any svg { flex: none; }
+/* The row contexts, where filling the line is the point. */
+.bz7__op > .bz7__any, .bz7__tcell > .bz7__any { flex: 1; align-self: auto; min-height: 0; }
+
+.bz7__cardfoot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding-top: 10px; border-top: 1px solid var(--border-subtle);
+  font-size: var(--fs-xs); color: var(--text-secondary);
+}
+.bz7__cardfoot .is-quiet { color: var(--text-muted); }
+.bz7__flag { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.bz7__flag.is-error { color: var(--fb-negative-fg); }
+.bz7__flag.is-warning { color: var(--fb-notice-fg); }
+
+/* --- List ------------------------------------------------------------------------ */
+
+.bz7__table {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden;
+}
+/* One template, declared once, shared by the header and every row so the
+   columns cannot drift apart. */
+.bz7__trow {
+  display: grid;
+  grid-template-columns: 30px minmax(130px, 1.1fr) minmax(0, 1.3fr) 40px minmax(0, 1.3fr) 100px;
+  align-items: center; gap: 12px;
+  padding: 9px 16px; min-height: 46px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bz7__trow:last-child { border-bottom: none; }
+.bz7__trow:not(.bz7__thead):hover { background: var(--surface-sunken); }
+.bz7__thead {
+  min-height: var(--table-header-h); padding-top: 0; padding-bottom: 0;
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-tertiary);
+}
+.bz7__andhead { text-align: center; }
+/* The conjunction as a column: a rule down the middle of every row, so the AND
+   is structural rather than repeated into each row's prose. */
+.bz7__andcell { justify-self: center; width: 1px; height: 22px; background: var(--border-subtle); }
+.bz7__tcell { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: nowrap; overflow: hidden; }
+.bz7__tuses { font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; }
+.bz7__tuses.is-quiet { color: var(--text-muted); }
+
+/* --- Empty ------------------------------------------------------------------------ */
+
+.bz7__empty {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 56px 24px; text-align: center;
+  background: var(--surface-raised);
+  border: 1px dashed var(--border-default); border-radius: var(--radius-lg);
+}
+.bz7__empty-ico {
+  display: grid; place-items: center; width: 52px; height: 52px;
+  border-radius: var(--radius-full); background: var(--surface-inset); color: var(--text-tertiary);
+}
+.bz7__empty h2 { margin: 4px 0 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bz7__empty p { margin: 0; max-width: 56ch; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.55; }
+.bz7__empty-note {
+  margin: 4px 0 8px !important;
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  background: var(--fb-info-bg); border: 1px solid var(--fb-info-border);
+  color: var(--fb-info-fg) !important; font-size: var(--fs-sm) !important;
+}
+
+.bz7__none { padding: 28px; text-align: center; font-size: var(--fs-md); color: var(--text-tertiary); }
+.bz7__link { background: none; color: var(--text-link); cursor: pointer; }
+.bz7__link:hover { text-decoration: underline; }
+
+/* --- Inner page -------------------------------------------------------------------- */
+
+.bz7__issues { display: flex; flex-direction: column; gap: 8px; }
+.bz7__issue {
+  display: flex; align-items: flex-start; gap: 9px; margin: 0;
+  padding: 10px 13px; border-radius: var(--radius-sm);
+  font-size: var(--fs-sm); line-height: 1.5;
+}
+.bz7__issue svg { flex: none; margin-top: 1px; }
+.bz7__issue.is-error { background: var(--fb-negative-bg); border: 1px solid var(--fb-negative-border); color: var(--fb-negative-fg); }
+.bz7__issue.is-warning { background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bz7__issue.is-info { background: var(--fb-info-bg); border: 1px solid var(--fb-info-border); color: var(--fb-info-fg); }
+
+/* Both halves at one glance, which is the thing v5 got right and is kept. */
+.bz7__panes { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: stretch; }
+.bz7__paneand {
+  align-self: center; padding: 4px 7px; border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: 9px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; color: var(--text-muted);
+}
+.bz7__pane {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+.bz7__pane h3 {
+  display: flex; align-items: center; gap: 6px; margin: 0 0 10px;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
+}
+
+.bz7__values { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bz7__values li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid var(--border-subtle);
+}
+.bz7__values li:last-child { border-bottom: none; }
+.bz7__values code {
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis;
+}
+.bz7__values em { margin-left: auto; font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; }
+
+.bz7__uses { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.bz7__uses li { display: flex; flex-direction: column; gap: 2px; }
+.bz7__uses strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bz7__uses span { font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* --- The popup ---------------------------------------------------------------------- */
+
+.bz7__form { display: flex; flex-direction: column; gap: 14px; }
+.bz7__field { display: flex; flex-direction: column; gap: 6px; }
+.bz7__field > span { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bz7__form .bz7__field input {
+  height: var(--ctl-height-md); padding: 0 11px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  font-size: var(--fs-md); color: var(--text-primary);
+}
+.bz7__field input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+
+/* --surface-sunken and not --surface-raised: inside a Modal, raised IS the
+   modal's own background, so a raised section is invisible in both themes. */
+.bz7__sec {
+  display: flex; flex-direction: column; gap: 9px;
+  padding: 13px 14px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.bz7__sec > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bz7__sec h4 {
+  display: flex; align-items: center; gap: 6px; margin: 0;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
+}
+.bz7__sec > header > span { font-size: var(--fs-xs); color: var(--text-muted); }
+
+/* Left and right, with the conjunction between them. Read top-to-bottom, the
+   second condition looks like a consequence of the first; side by side it looks
+   like what it is. */
+.bz7__cols {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px; align-items: stretch;
+}
+.bz7__cols .bz7__sec { min-width: 0; }
+.bz7__formand {
+  align-self: center; padding: 4px 8px; border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: 9px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; color: var(--text-muted);
+}
+
+/* Quick add. Chips rather than buttons in a row: they are values, and a value
+   you can click once is the whole point of them being here. */
+.bz7__quick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bz7__quick > span {
+  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.bz7__quickbtn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  border: 1px dashed var(--border-default);
+  font-size: var(--fs-xs); color: var(--text-secondary); cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+}
+.bz7__quickbtn:hover:not(:disabled) { border-style: solid; border-color: var(--brand); background: var(--brand-subtle-bg); color: var(--brand-active); }
+.bz7__quickbtn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bz7__quickbtn code { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+/* Already in the zone. Solid and quiet — done, not offered. */
+.bz7__quickbtn.is-in { border-style: solid; border-color: var(--fb-positive-border); background: var(--fb-positive-bg); color: var(--fb-positive-fg); cursor: default; }
+.bz7__quickbtn.is-in code { color: inherit; opacity: 0.75; }
+
+.bz7__add { display: flex; align-items: center; gap: 8px; }
+.bz7__add > svg { flex: none; color: var(--text-muted); margin-left: 2px; }
+.bz7__form .bz7__add input {
+  flex: 1; min-width: 0;
+  height: var(--ctl-height-sm); padding: 0 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  font-size: var(--fs-md); color: var(--text-primary);
+}
+.bz7__add input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-subtle-bg); }
+
+.bz7__entries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; flex: 1; min-height: 96px; max-height: 210px; overflow-y: auto; }
+.bz7__entries li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 0; border-bottom: 1px solid var(--border-subtle);
+}
+.bz7__entries li:last-child { border-bottom: none; }
+.bz7__entries code { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-primary); }
+.bz7__entries em { margin-left: auto; font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+.bz7__entries button {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px;
+  border-radius: var(--radius-sm); background: none; cursor: pointer; color: var(--text-muted);
+}
+.bz7__entries button:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+
+/* --- The place search ----------------------------------------------------------------- */
+
+.bz7__combo { position: relative; }
+.bz7__hits {
+  position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px);
+  list-style: none; margin: 0; padding: 4px;
+  max-height: 232px; overflow-y: auto;
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  box-shadow: var(--el-high);
+}
+.bz7__hit {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 7px 9px; border-radius: var(--radius-sm);
+  background: none; cursor: pointer; text-align: left;
+}
+.bz7__hit > svg { flex: none; color: var(--text-muted); }
+/* Brand tint for the cursor, never a surface step — inside an overlay,
+   --surface-raised is the overlay's own colour in both themes. */
+.bz7__hit.is-cursor { background: var(--brand-subtle-bg); }
+.bz7__hit.is-cursor .bz7__hitname { color: var(--brand-active); }
+.bz7__hitname { font-size: var(--fs-md); color: var(--text-primary); white-space: nowrap; }
+.bz7__hitctx { font-size: var(--fs-xs); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bz7__hitnote {
+  margin-left: auto; flex: none;
+  display: inline-flex; align-items: center; gap: 3px;
+  font-style: normal; font-size: 10px; color: var(--fb-positive-fg); white-space: nowrap;
+}
+.bz7__hitnote.is-warn { color: var(--fb-notice-fg); }
+.bz7__nohit { padding: 14px; text-align: center; font-size: var(--fs-sm); color: var(--text-muted); }
+
+.bz7__footnote { flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+@media (max-width: 860px) {
+  .bz7__panes { grid-template-columns: minmax(0, 1fr); }
+  .bz7__paneand { justify-self: center; }
+  .bz7__trow { grid-template-columns: 26px minmax(0, 1fr) 90px; }
+  .bz7__trow > :nth-child(3), .bz7__trow > :nth-child(4), .bz7__trow > :nth-child(5) { display: none; }
+  .bz7__head { flex-direction: column; gap: 12px; }
+}
+
+/* --- Inner page: hero and stats -----------------------------------------------------
+   The detail view was a page title over two panels. It is a banner now, because
+   the name alone answers nothing — "Office Network" could be two addresses or
+   two hundred — and the sentence under it is what the zone actually matches,
+   which is the only line here an admin can check against what they meant. */
+.bz7__hero {
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 20px; border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  /* The shape's tint as a spine down the left edge, not a wash across the
+     whole banner — a saturated fill behind body text fails contrast in one
+     theme or the other, and this reads at a glance either way. */
+  border-left: 4px solid var(--border-strong);
+}
+.bz7__hero.is-blue { border-left-color: var(--tint-blue-fg); }
+.bz7__hero.is-green { border-left-color: var(--tint-green-fg); }
+.bz7__hero.is-indigo { border-left-color: var(--tint-indigo-fg); }
+.bz7__hero.is-warn { border-left-color: var(--fb-notice-fg); background: var(--fb-notice-bg); }
+
+.bz7__heroicon {
+  flex: none; display: grid; place-items: center;
+  width: 46px; height: 46px; border-radius: var(--radius-md);
+  background: var(--surface-inset); color: var(--text-secondary);
+}
+.bz7__hero.is-blue .bz7__heroicon { background: var(--tint-blue-bg); color: var(--tint-blue-fg); }
+.bz7__hero.is-green .bz7__heroicon { background: var(--tint-green-bg); color: var(--tint-green-fg); }
+.bz7__hero.is-indigo .bz7__heroicon { background: var(--tint-indigo-bg); color: var(--tint-indigo-fg); }
+.bz7__hero.is-warn .bz7__heroicon { background: transparent; color: var(--fb-notice-fg); }
+
+.bz7__herotext { flex: 1; min-width: 0; }
+.bz7__herotext h1 { margin: 0; font-size: var(--fs-3xl); }
+.bz7__herotext p {
+  margin: 3px 0 0; font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.5;
+}
+.bz7__hero.is-warn .bz7__herotext p { color: var(--fb-notice-fg); }
+
+@media (max-width: 720px) {
+  .bz7__hero { flex-wrap: wrap; }
+  .bz7__cols { grid-template-columns: minmax(0, 1fr); }
+  .bz7__formand { justify-self: center; }
+}

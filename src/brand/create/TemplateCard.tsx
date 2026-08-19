@@ -1,7 +1,20 @@
-import { BadgeCheck, Maximize2, Plus } from 'lucide-react'
+import {
+  BadgeCheck,
+  Clock,
+  Fingerprint,
+  Globe,
+  Maximize2,
+  Network,
+  Plus,
+  Sparkles,
+  Users,
+  Webhook,
+  type LucideIcon,
+} from 'lucide-react'
 
 import { Button, DecisionChip, Modal } from '../kit'
 import type { AccessDecision } from '../data'
+import { useBrand } from '../store'
 
 /* -----------------------------------------------------------------------------
    The template card, shared by the create gallery and the Templates library.
@@ -71,6 +84,59 @@ export function posture(rules: CardRule[]): 'deny' | 'mfa' | 'allow' | 'none' {
 
 const POSTURE_WORD = { deny: 'Deny', mfa: 'MFA', allow: 'Allow', none: '—' } as const
 
+/* --- The signal row ------------------------------------------------------------
+   Apollo puts a row of small round glyphs at the top of every workflow card, one
+   per kind of step the workflow contains. It works because it answers the
+   question you actually have while scanning a gallery — not "what is this
+   called" but "what does it need from me" — and it answers it in a shape the eye
+   reads without stopping.
+
+   Ours carries the condition groups the template's rules read, which is the same
+   question in this product: a template that needs a Network zone is one you
+   cannot use until you have made one. The labels are already derived from the
+   built rules, so the row cannot drift from what the template does. */
+
+const SIGNAL_ICON: Record<string, LucideIcon> = {
+  Network: Network,
+  Location: Globe,
+  Device: Fingerprint,
+  Identity: Users,
+  Time: Clock,
+  Attributes: Sparkles,
+  External: Webhook,
+  Everyone: Users,
+}
+
+/* One tone per signal so the row is scannable rather than seven grey circles.
+   Tokens only — these are the same feedback hues the conditions use in the
+   builder, so a Network glyph here is the colour a Network row is there. */
+const SIGNAL_TONE: Record<string, string> = {
+  Network: 'info',
+  Location: 'lime',
+  Device: 'accent',
+  Identity: 'magenta',
+  Time: 'notice',
+  Attributes: 'neutral',
+  External: 'neutral',
+  Everyone: 'neutral',
+}
+
+function SignalRow({ signals }: { signals: string[] }) {
+  return (
+    <span className="bgcard__signals">
+      {signals.map((sig) => {
+        const Ico = SIGNAL_ICON[sig] ?? Sparkles
+        return (
+          <span key={sig} className={`bgcard__sig is-${SIGNAL_TONE[sig] ?? 'neutral'}`} title={`Reads ${sig}`}>
+            <Ico size={13} strokeWidth={1.9} aria-hidden />
+            <em>{sig}</em>
+          </span>
+        )
+      })}
+    </span>
+  )
+}
+
 /* The thumbnail holds four rows at a size the grid can still scan, and the
    fall-through always takes the last one. So three rules fit exactly; beyond
    that the third row becomes the overflow count rather than a fourth rule
@@ -89,14 +155,20 @@ export function TemplateCard({
   onPreview: () => void
   useLabel?: string
 }) {
+  const art = useBrand().features.templateHero
   const shown = m.rules.slice(0, shownCount(m.rules.length))
   const rest = m.rules.length - shown.length
   const post = posture(m.rules)
 
   return (
-    <article className="bgcard">
+    <article className={`bgcard ${art ? '' : 'is-flat'}`}>
+      {/* The illustration is the live preview: the template's rules drawn as
+          the builder would order them, plus the control that expands them.
+          Withheld in lite, where a template is chosen from its name and its
+          description — which is v0's "Start from a scenario". The badge is
+          metadata rather than illustration, so it survives on its own. */}
+      {art && (
       <div className="bgcard__canvas">
-        {m.badge && <span className="bgcard__badge">{m.badge}</span>}
         <button
           type="button"
           className="bgcard__peek"
@@ -156,8 +228,22 @@ export function TemplateCard({
           <span className="bgcard__rtext">strictest outcome is {POSTURE_WORD[post]}</span>
         </p>
       </div>
+      )}
 
       <div className="bgcard__body">
+        {/* Signals first, then the labels, then the words — Apollo's order, and
+            it is the right one: the glyph row is read at a glance across the
+            grid, the heading only once the glyphs have narrowed the field. */}
+        <SignalRow signals={m.signals} />
+
+        <span className="bgcard__tags">
+          {m.badge && <span className="bgcard__tag is-cat">{m.badge}</span>}
+          <span className={`bgcard__tag is-${post}`}>{POSTURE_WORD[post]}</span>
+          <span className="bgcard__tag is-count">
+            {m.rules.length} rule{m.rules.length === 1 ? '' : 's'}
+          </span>
+        </span>
+
         {/* Truncated to one line, so the full name has to stay reachable. */}
         <h3 className="bgcard__h" title={m.name}>
           {m.name}

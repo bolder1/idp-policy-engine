@@ -4,43 +4,54 @@ import {
   AlertTriangle,
   ArrowRight,
   Check,
+  ChevronRight,
   CreditCard,
   Fingerprint,
+  Grid3x3,
   HelpCircle,
   Info,
   KeyRound,
-  Layers,
   LifeBuoy,
   Lock,
   Mail,
   MessageSquare,
   Phone,
-  Plus,
   Search,
   ShieldCheck,
   Smartphone,
+  Sparkles,
   Star,
   Upload,
-  UserPlus,
   X,
   type LucideIcon,
 } from 'lucide-react'
 
 import { Button, Drawer, TipDot, Toggle } from '../kit'
-import { AUTH_METHODS, methodBlocker, type AuthMethod, type MethodSetting, type MethodTier } from '../methods'
+import { AUTH_METHODS, methodBlocker, type AuthMethod, type MethodSetting } from '../methods'
 import { useBrand } from '../store'
-import { MethodSetsTab } from './method-sets'
 import { ConfigFields } from './method-forms'
 import { configFor, missingFields, setField, type ConfigField } from '../method-config'
 import { methodStatus } from '../method-status'
+import { SettingField } from '../setting-field'
+import {
+  configSuppressed,
+  familyForChannel,
+  familySettingsFor,
+  legacySuppressed,
+  methodSettingsFor,
+  settingKey,
+  siblingsOf,
+  type MfaValue,
+  type MfaValues,
+} from '../mfa-join'
 
 /* -----------------------------------------------------------------------------
    V5 · MFA experience.
 
    A faithful rebuild of the V5 variant on the deployed prototype, read off its
-   own DOM rather than from a screenshot: four tabs, three tiers on the Methods
-   tab, and lettered sections on Enrollment and Recovery. Spec and the capture it
-   came from are in docs/v5-mfa-experience.md.
+   own DOM rather than from a screenshot: three tiers on the Methods tab and
+   lettered sections on Recovery. Spec and the capture it came from are in
+   docs/v5-mfa-experience.md.
 
    Two things about the rebuild are worth stating plainly.
 
@@ -49,46 +60,57 @@ import { methodStatus } from '../method-status'
    and Fallback & Recovery is Knowledge & tokens — but it is a lossy one, so the
    original tier is still shown on each card rather than thrown away.
 
-   V5 has no Method Sets tab. Recreating it as-is therefore drops a surface we
-   already built, which is why this ships beside the existing screen behind a
-   switch instead of replacing it.
+   V5 has no Method Sets tab, and this rebuild no longer adds one — the other
+   version owns that editor, and two screens both claiming to be where sets are
+   edited is worse than one screen not having them.
    -------------------------------------------------------------------------- */
 
-type Tab = 'methods' | 'sets' | 'enrollment' | 'recovery' | 'tokens'
+type Tab = 'methods' | 'recovery' | 'tokens'
 
-/* Method Sets is the tab the deployed screen does not have — this rebuild was
-   faithful to it, which meant dropping a surface the product already owns and
-   which the nav item on the left is named after. It is added here rather than
-   reimplemented: `MethodSetsTab` is the same component the other version
-   renders, so set editing has one implementation and cannot drift between two
-   screens that both claim to own it. It brings its own look with it, which is
-   the honest trade — a second copy in V5's idiom would be two editors. */
+/* Three tabs. Method Sets and Enrollment were dropped: the first duplicated a
+   surface the other version already owns, and rendering the same editor twice
+   meant two screens both claiming to be where sets are edited. Enrollment went
+   with it — it configured how users join methods, which is a different job from
+   deciding which methods exist. */
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: 'methods', label: 'Methods', icon: KeyRound },
-  { id: 'sets', label: 'Method Sets', icon: Layers },
-  { id: 'enrollment', label: 'Enrollment', icon: UserPlus },
   { id: 'recovery', label: 'Recovery', icon: LifeBuoy },
   { id: 'tokens', label: 'Hardware Tokens', icon: CreditCard },
 ]
 
-/* V5's three bands over our four tiers. */
-const BANDS: { name: string; blurb: string; tiers: MethodTier[] }[] = [
-  {
-    name: 'Phishing-Resistant',
-    blurb: 'Cryptographically bound credentials. Cannot be replayed or intercepted.',
-    tiers: ['Phishing-resistant'],
-  },
-  {
-    name: 'Standard MFA',
-    blurb: 'One-time codes and push notifications. Effective but susceptible to phishing.',
-    tiers: ['App-based', 'Delivery-based'],
-  },
-  {
-    name: 'Fallback & Recovery',
-    blurb: 'Something remembered, or a code from a separate device. Useful as a fallback, weak alone.',
-    tiers: ['Knowledge & tokens'],
-  },
+/* The sheet's families, which are already on the model as `channel`. Eleven of
+   them, and seven hold exactly one method — which is the argument for chips
+   rather than sections: a section heading over a single row is a heading that
+   costs more vertical space than the thing it labels. As a chip row it is one
+   line, it filters, and each one carries the logo you would recognise the
+   family by anyway. */
+const CHANNELS = [
+  'SMS',
+  'Email',
+  'Authenticator App',
+  'miniOrange Authenticator',
+  'Call Verification',
+  'Hardware Token',
+  'Security Questions',
+  'Grid Pattern',
+  'Smart Cards',
+  'RSA Authenticator',
+  'Biometric',
 ]
+
+const FAMILY_ICON: Record<string, LucideIcon> = {
+  SMS: MessageSquare,
+  Email: Mail,
+  'Authenticator App': Smartphone,
+  'miniOrange Authenticator': Sparkles,
+  'Call Verification': Phone,
+  'Hardware Token': KeyRound,
+  'Security Questions': HelpCircle,
+  'Grid Pattern': Grid3x3,
+  'Smart Cards': CreditCard,
+  'RSA Authenticator': ShieldCheck,
+  Biometric: Fingerprint,
+}
 
 export function AuthMethodsV5() {
   const store = useBrand()
@@ -97,24 +119,53 @@ export function AuthMethodsV5() {
 
   /* One source of truth for every toggle on the page. The prototype's V5 keeps
      these in component state too — nothing here is persisted — but they are
-     lifted so Enrollment and Recovery can read what Methods did, which is the
+     lifted so Recovery can read what Methods did, which is the
      dependency the real console gets wrong. */
   const [methods, setMethods] = useState<AuthMethod[]>(AUTH_METHODS)
+  /* Exactly one method holds it, which is why it lives here and not on a row's
+     own state: setting a new default has to clear the old one. */
+  const [defaultId, setDefaultId] = useState<string | null>('otp-email')
+  /* One switch, and it writes both fields.
+
+     The row used to carry two: Enabled (the tenant's decision) and For users
+     (whether a user may pick it during enrolment). They are genuinely different
+     questions, but nothing in the catalogue ever answers them differently —
+     every one of the twenty-one methods ships with `active === allowed`, so the
+     second column spent a column of every row restating the first.
+
+     Both fields still exist, because `methodBlocker` reads both and v0 still
+     shows them separately. Writing them together is what keeps the single
+     toggle honest: turn it on and the method is on AND offered, so the blocker
+     clears. Writing only `active` would leave anything seeded `allowed: false`
+     reporting "Not offered to end users" with no control on the screen able to
+     fix it — a dead end this row had once before. */
   const setActive = (id: string, on: boolean) =>
-    setMethods((all) => all.map((m) => (m.id === id ? { ...m, active: on, allowed: on && m.allowed } : m)))
+    setMethods((all) => all.map((m) => (m.id === id ? { ...m, active: on, allowed: on } : m)))
   /* The drawer writes more than `active` — it saves a configuration and it
      edits the method's own settings — so it gets a general patch rather than a
      second single-purpose setter. */
   const patch = (id: string, p: Partial<AuthMethod>) =>
     setMethods((all) => all.map((m) => (m.id === id ? { ...m, ...p } : m)))
 
-  const enabledIds = useMemo(() => new Set(methods.filter((m) => !methodBlocker(m)).map((m) => m.id)), [methods])
+  /* The sheet's settings live here and not on a method, because half of them do
+     not belong to one. OTP length is a property of the SMS family: the three
+     SMS methods share it, and a copy per method would let them disagree about a
+     number the gateway only has one of.
+
+     Flat, keyed by `settingKey` — scope, owner, id — so a family value and a
+     method value cannot collide even when they share an id, which 'kba', 'grid'
+     and 'rsa' all do. Absent means "still the sheet's default"; the map only
+     holds what an admin actually changed. */
+  const [behaviour, setBehaviour] = useState<MfaValues>({})
+  const saveBehaviour = (p: MfaValues) => setBehaviour((v) => ({ ...v, ...p }))
 
   return (
     <div className="bpage bv5">
       <header className="bv5__head">
         <h1>Authentication methods</h1>
-        <p>Manage authentication factors, how users enroll, and recovery options — all in one place.</p>
+        <p>
+          Manage authentication factors, how users enroll, and recovery options — all in one place.
+        </p>
       </header>
 
       {/* The sections read down the side rather than across the top. Five of
@@ -139,33 +190,45 @@ export function AuthMethodsV5() {
         </nav>
 
         <div className="bv5__content">
+          {banner && (
+            <div className="bv5__banner">
+              <span className="bv5__banner-accent" aria-hidden />
+              <Info size={16} strokeWidth={1.6} aria-hidden />
+              <span className="bv5__banner-text">
+                Methods you enable here appear in your policy rules. Enrollee and policy-rule counts
+                are live data.
+              </span>
+              <button
+                type="button"
+                className="bv5__link"
+                onClick={() => store.go({ name: 'policies' })}
+              >
+                Go to Policy Builder <ArrowRight size={13} strokeWidth={2} aria-hidden />
+              </button>
+              <button
+                type="button"
+                className="bv5__banner-x"
+                aria-label="Dismiss"
+                onClick={() => setBanner(false)}
+              >
+                <X size={16} strokeWidth={1.6} />
+              </button>
+            </div>
+          )}
 
-      {banner && (
-        <div className="bv5__banner">
-          <span className="bv5__banner-accent" aria-hidden />
-          <Info size={16} strokeWidth={1.6} aria-hidden />
-          <span className="bv5__banner-text">
-            Methods you enable here appear in your policy rules. Enrollee and policy-rule counts are
-            live data.
-          </span>
-          <button type="button" className="bv5__link" onClick={() => store.go({ name: 'policies' })}>
-            Go to Policy Builder <ArrowRight size={13} strokeWidth={2} aria-hidden />
-          </button>
-          <button type="button" className="bv5__banner-x" aria-label="Dismiss" onClick={() => setBanner(false)}>
-            <X size={16} strokeWidth={1.6} />
-          </button>
-        </div>
-      )}
-
-        {tab === 'methods' && <MethodsTab methods={methods} onToggle={setActive} onPatch={patch} />}
-        {tab === 'sets' && (
-          <div className="bv5__pane bv5__pane--sets">
-            <MethodSetsTab />
-          </div>
-        )}
-        {tab === 'enrollment' && <EnrollmentTab methods={methods} enabled={enabledIds} />}
-        {tab === 'recovery' && <RecoveryTab methods={methods} />}
-        {tab === 'tokens' && <TokensTab />}
+          {tab === 'methods' && (
+            <MethodsTab
+              methods={methods}
+              onToggle={setActive}
+              onPatch={patch}
+              defaultId={defaultId}
+              onDefault={setDefaultId}
+              behaviour={behaviour}
+              onBehaviour={saveBehaviour}
+            />
+          )}
+          {tab === 'recovery' && <RecoveryTab methods={methods} />}
+          {tab === 'tokens' && <TokensTab />}
         </div>
       </div>
     </div>
@@ -204,12 +267,21 @@ function MethodsTab({
   methods,
   onToggle,
   onPatch,
+  defaultId,
+  onDefault,
+  behaviour,
+  onBehaviour,
 }: {
   methods: AuthMethod[]
   onToggle: (id: string, on: boolean) => void
   onPatch: (id: string, p: Partial<AuthMethod>) => void
+  defaultId: string | null
+  onDefault: (id: string) => void
+  behaviour: MfaValues
+  onBehaviour: (p: MfaValues) => void
 }) {
   const [filter, setFilter] = useState<Filter>('all')
+  const [channel, setChannel] = useState<string | null>(null)
   const [q, setQ] = useState('')
   /* Configuration is a page, not a dialog.
 
@@ -220,21 +292,23 @@ function MethodsTab({
      relying-party id is not something to fill in over the top of the list you
      were reading. So the row opens inward. */
   const [openId, setOpenId] = useState<string | null>(null)
-  const open = openId ? methods.find((m) => m.id === openId) ?? null : null
+  const open = openId ? (methods.find((m) => m.id === openId) ?? null) : null
 
   const stats = useMemo(() => {
     const live = methods.filter((m) => !methodBlocker(m))
     const enrolments = methods.reduce((n, m) => n + (m.enrolled ?? 0), 0)
-    const phishing = methods.filter((m) => m.tier === 'Phishing-resistant' && !methodBlocker(m))
-    const phishingEnrol = phishing.reduce((n, m) => n + (m.enrolled ?? 0), 0)
+    const phishingEnrol = methods
+      .filter((m) => m.tier === 'Phishing-resistant' && !methodBlocker(m))
+      .reduce((n, m) => n + (m.enrolled ?? 0), 0)
     return {
       live: live.length,
-      total: methods.length,
-      enrolments,
-      phishingEnrol,
+      /* Enrolment-weighted, not a count of methods: the share of everyone who
+         has enrolled in anything who sits on a factor that cannot be phished.
+         It was one of the three figure cards and is the only number they
+         carried that is stated nowhere else, so it moves to the table foot
+         rather than going with them. */
       phishingShare: enrolments ? Math.round((phishingEnrol / enrolments) * 100) : 0,
       unconfigured: methods.filter((m) => !m.configured).length,
-      inUse: methods.filter((m) => (m.enrolled ?? 0) > 0).length,
       /* Live, but nobody uses it. The most actionable row on the page and the
          one no console surfaces: it is a factor you are maintaining for zero
          users, and either it needs promoting or switching off. */
@@ -242,42 +316,53 @@ function MethodsTab({
     }
   }, [methods])
 
+  /* The families, counted in one pass and derived from the data rather than
+     read off CHANNELS. That is what stops the filter going stale: add a family
+     to methods.ts and it appears here on its own. CHANNELS survives as the
+     display order only, so a family the array has never heard of still lists —
+     at the end, alphabetically, instead of vanishing. */
+  const families = useMemo(() => {
+    const by = new Map<string, { id: string; n: number; live: number }>()
+    for (const m of methods) {
+      const e = by.get(m.channel) ?? { id: m.channel, n: 0, live: 0 }
+      e.n += 1
+      if (!methodBlocker(m)) e.live += 1
+      by.set(m.channel, e)
+    }
+    const order = new Map(CHANNELS.map((c, i) => [c, i]))
+    return [...by.values()].sort(
+      (a, b) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99) || a.id.localeCompare(b.id),
+    )
+  }, [methods])
+
+  /* The family list used to be eleven visible chips, so searching by family was
+     never necessary — you could see them all. Behind a select it is, and
+     matching the name alone meant typing "sms" or "biometric" found nothing.
+     Widened to name + family + strength, which is what V6 already does. */
   const shown = useMemo(
     () =>
       methods.filter((m) => {
-        if (q && !m.name.toLowerCase().includes(q.toLowerCase())) return false
+        const needle = q.trim().toLowerCase()
+        if (needle && !`${m.name} ${m.channel} ${m.tier}`.toLowerCase().includes(needle))
+          return false
+        if (channel && m.channel !== channel) return false
         const blocked = methodBlocker(m)
         if (filter === 'live') return !blocked
         if (filter === 'setup') return !m.configured
         if (filter === 'unused') return !blocked && (m.enrolled ?? 0) === 0
         return true
       }),
-    [methods, filter, q],
+    [methods, filter, channel, q],
   )
 
   return (
     <div className="bv5__pane">
-      {/* --- Figures ---------------------------------------------------- */}
-      <div className="bv5__figures">
-        <div className="bv5__fig">
-          <span>Methods live</span>
-          <strong>
-            {stats.live}
-            <em>/ {stats.total}</em>
-          </strong>
-        </div>
-        <div className="bv5__fig">
-          <span>Phishing-resistant share</span>
-          <strong>
-            {stats.phishingShare}
-            <em>%</em>
-          </strong>
-        </div>
-        <div className={`bv5__fig ${stats.unconfigured ? 'is-warn' : ''}`}>
-          <span>Never configured</span>
-          <strong>{stats.unconfigured}</strong>
-        </div>
-      </div>
+      {/* The three figure cards used to open this tab. Two of them —
+          "Methods live 7/21" and "Never configured 9" — restated numbers the
+          filter row underneath already prints on its own tabs, from the very
+          same `stats` fields, so they spent 107px repeating the control that
+          sits below them. The third carried the only fact they owned; it moved
+          to the table foot. */}
 
       {/* One notice, and only when it has something to say. */}
       {stats.idle > 0 && (
@@ -285,9 +370,11 @@ function MethodsTab({
           <AlertTriangle size={15} strokeWidth={1.9} aria-hidden />
           <span>
             <strong>
-              {stats.idle} method{stats.idle === 1 ? ' is' : 's are'} switched on with no enrolments.
+              {stats.idle} method{stats.idle === 1 ? ' is' : 's are'} switched on with no
+              enrolments.
             </strong>{' '}
-            A factor nobody has enrolled in cannot be used by a policy — promote it or switch it off.
+            A factor nobody has enrolled in cannot be used by a policy — promote it or switch it
+            off.
           </span>
           <button type="button" className="bv5__link" onClick={() => setFilter('unused')}>
             Review <ArrowRight size={12} strokeWidth={2} aria-hidden />
@@ -321,6 +408,38 @@ function MethodsTab({
             )
           })}
         </div>
+
+        {/* Category, as a select rather than a row of chips.
+
+            Eleven families wrapped to three lines at the width this tab is
+            usually read at, and to two at 1440px — with a twelfth family it
+            takes another. A select costs one control at any number of families,
+            which is the whole point: the list grows inside it, not down the
+            page. Policies.tsx reached the same conclusion about policy types
+            and this reuses the control it landed on, `.btoolbar__select`,
+            including its `is-set` brand tint so an active filter still looks
+            different from a default at a glance.
+
+            What a native select cannot carry is the family glyph. It does not
+            need to: every row already prints its own family as an icon + label
+            (`.bv5__catchip`), so the glyphs never left the screen — only the
+            filter did. The per-family counts follow into the option text. */}
+        <label className="bv5__catf">
+          <span className="u-sr-only">Filter by category</span>
+          <select
+            className={`btoolbar__select bv5__catf-sel ${channel ? 'is-set' : ''}`}
+            value={channel ?? ''}
+            onChange={(e) => setChannel(e.target.value || null)}
+          >
+            <option value="">All categories ({methods.length})</option>
+            {families.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.id} — {f.live} of {f.n} on
+              </option>
+            ))}
+          </select>
+        </label>
+
         <span className="bv5__spacer" />
         <span className="bv5__search">
           <Search size={14} strokeWidth={1.9} aria-hidden />
@@ -335,66 +454,105 @@ function MethodsTab({
       </div>
 
       {/* --- The rows ---------------------------------------------------- */}
-      {BANDS.map((band) => {
-        const list = shown.filter((m) => band.tiers.includes(m.tier))
-        if (list.length === 0) return null
-        const on = list.filter((m) => !methodBlocker(m)).length
-        return (
-          <section key={band.name} className="bv5__group">
-            <header className="bv5__group-head">
-              <h3>
-                {band.name}
-                {band.name === 'Phishing-Resistant' && (
-                  <span className="bv5__phish">
-                    <ShieldCheck size={11} strokeWidth={2} aria-hidden /> Strongest
-                  </span>
-                )}
-              </h3>
-              <span className="bv5__count">
-                {on} of {list.length} on
-              </span>
-            </header>
+      {/* The bordered panel and the table are two elements now. They were one,
+          and the foot below would then have been a stray div inside
+          `role="table"` — which is not row content, so it either vanishes from
+          the accessibility tree or corrupts the table's shape depending on the
+          reader. The panel keeps the border; the grid keeps the role. */}
+      <div className="bv5__rows">
+        <div role="table" aria-label="Authentication methods">
+          <div className="bv5__rowhead" role="row">
+            <span role="columnheader">Method</span>
+            <span role="columnheader">Status</span>
+            <span role="columnheader" className="bv5__ta-right">
+              Enrolments
+            </span>
+            <span role="columnheader" className="bv5__ta-right">
+              Enable
+            </span>
+            <span role="columnheader" />
+          </div>
+          {shown.map((m) => (
+            <MethodRow
+              key={m.id}
+              m={m}
+              isDefault={defaultId === m.id}
+              onToggle={onToggle}
+              onDefault={() => onDefault(m.id)}
+              onOpen={() => setOpenId(m.id)}
+            />
+          ))}
+        </div>
 
-            <div className="bv5__rows" role="table">
-              <div className="bv5__rowhead" role="row">
-                <span role="columnheader">Method</span>
-                <span role="columnheader">Status</span>
-                <span role="columnheader" className="bv5__ta-right">
-                  Enrolments
-                </span>
-                <span role="columnheader" className="bv5__ta-right">
-                  Enabled
-                </span>
-              </div>
-              {list.map((m) => (
-                <MethodRow key={m.id} m={m} onToggle={onToggle} onOpen={() => setOpenId(m.id)} />
-              ))}
-            </div>
-          </section>
-        )
-      })}
+        {/* Where the third figure card went. It is a derived, whole-tenant
+            number — it does not belong to any row, and stated once under the
+            table it is read after the list rather than instead of it. The
+            live region is the other thing the chips used to give away: they
+            carried `aria-pressed`, so a screen reader heard the filter change.
+            A select announces its own value but not what it did to the table,
+            so the count says it. */}
+        <div className="btable__foot bv5__foot">
+          <span aria-live="polite" role="status">
+            Showing {shown.length} of {methods.length} methods
+          </span>
+          <span className="bv5__foot-sep" aria-hidden>
+            ·
+          </span>
+          <span>
+            <strong>{stats.phishingShare}%</strong> of enrolments are on a phishing-resistant method
+          </span>
+        </div>
+      </div>
 
       {shown.length === 0 && (
         <p className="bv5__empty-state">
-          No method matches {q ? `“${q}”` : 'this filter'}.{' '}
-          <button type="button" className="bv5__link" onClick={() => { setQ(''); setFilter('all') }}>
+          {/* Names the filter that is actually hiding things. "this filter" was
+              ambiguous while three dimensions were on screen at once, and once
+              family moved behind a select it became a dead end: `Clear` reset
+              the search and the status tab but never the family, so the one
+              filter you could no longer see was the one it would not clear. */}
+          No method matches{' '}
+          {[q && `“${q}”`, channel, filter !== 'all' && FILTERS.find((f) => f.id === filter)?.label]
+            .filter(Boolean)
+            .join(' + ') || 'this filter'}
+          .{' '}
+          <button
+            type="button"
+            className="bv5__link"
+            onClick={() => {
+              setQ('')
+              setFilter('all')
+              setChannel(null)
+            }}
+          >
             Clear
           </button>
         </p>
       )}
 
-      <MethodDrawer m={open} onClose={() => setOpenId(null)} onToggle={onToggle} onPatch={onPatch} />
+      <MethodDrawer
+        m={open}
+        onClose={() => setOpenId(null)}
+        onToggle={onToggle}
+        onPatch={onPatch}
+        behaviour={behaviour}
+        onBehaviour={onBehaviour}
+      />
     </div>
   )
 }
 
 function MethodRow({
   m,
+  isDefault,
   onToggle,
+  onDefault,
   onOpen,
 }: {
   m: AuthMethod
+  isDefault: boolean
   onToggle: (id: string, on: boolean) => void
+  onDefault: () => void
   onOpen: () => void
 }) {
   const reduce = useReducedMotion()
@@ -406,20 +564,59 @@ function MethodRow({
     <div className={`bv5__row2 ${blocked ? 'is-off' : ''}`} role="row">
       <div className="bv5__cell-main" role="cell">
         <MethodIcon name={m.name} size={30} />
-        {/* The name is the way in. A separate "Configure" button in a fifth
-            column would be a fifth column on every row for the sake of the two
-            that need it today. */}
+        {/* The name is the way in, and it now says so.
+
+            It used to be a bare button: clicking the method name opened the
+            panel, but nothing on the row named the action, and its accessible
+            name was just the method's. That was survivable while the panel held
+            connection settings for the two methods that needed them — the old
+            argument here was that a Configure column would be a fifth column
+            for the sake of two rows.
+
+            Wiring the sheet in ended that. Every method now has settings behind
+            this row, so the action is relevant to all twenty-one, not two. And
+            there is a second reason to name it: in the shipping console the
+            word on a method card is "Edit", and it opens a QR code or a "change
+            your phone number" form — enrolment for the signed-in admin, not
+            tenant configuration. An unlabelled row invites exactly that reading.
+
+            "Configure" rides inside the existing button rather than becoming a
+            column of its own, so the accessible name reads "FIDO2 / Passkey …
+            Configure" — the visible words, in order, which keeps voice control
+            working. An aria-label would have replaced the name and broken it. */}
+        {/* One line. The description used to sit under every name — twenty-one
+            sentences competing with the twenty-one rows they describe, and it
+            was the reason the list read as a feed rather than a table. It is
+            not deleted, only demoted: one gesture away on the name, where
+            somebody who needs it will look and somebody who does not will not
+            read it. The category chip comes up onto the name line, which is
+            where it was going to have to live once the second line went. */}
         <button type="button" className="bv5__cell-open" onClick={onOpen}>
-          <span className="bv5__cell-text">
-            <span className="bv5__cell-name">
-              {m.name}
-              {m.tier === 'Phishing-resistant' && (
-                <ShieldCheck size={12} strokeWidth={2} className="bv5__phish-ico" aria-label="Phishing-resistant" />
-              )}
-            </span>
-            <span className="bv5__cell-sub">{m.description}</span>
+          <span className="bv5__cell-name">
+            {m.name}
+            {m.tier === 'Phishing-resistant' && (
+              <ShieldCheck
+                size={12}
+                strokeWidth={2}
+                className="bv5__phish-ico"
+                aria-label="Phishing-resistant"
+              />
+            )}
+            {isDefault && <i className="bv5__defbadge">Default</i>}
+            <i className="bv5__catchip">
+              {(() => {
+                const Ico = FAMILY_ICON[m.channel] ?? KeyRound
+                return <Ico size={10} strokeWidth={2} aria-hidden />
+              })()}
+              {m.channel}
+            </i>
+          </span>
+          <span className="bv5__cell-go">
+            Configure
+            <ChevronRight size={13} strokeWidth={2} aria-hidden />
           </span>
         </button>
+        <TipDot text={m.description} label={`What ${m.name} is`} />
       </div>
 
       <div className="bv5__cell-status" role="cell">
@@ -432,33 +629,68 @@ function MethodRow({
             sends over a paid channel it IS the status, so it takes the pill.
             Rox, Customer.io and Fresha all resolve it the same way: the problem
             goes in the badge, with an icon, and the row stays one line. */}
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.span
-            key={status.key}
-            className={`bv5__pill is-${status.tone}`}
-            title={status.detail}
-            initial={{ opacity: 0, y: reduce ? 0 : -4, scale: reduce ? 1 : 0.94 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: reduce ? 0 : 4, scale: reduce ? 1 : 0.94 }}
-            transition={{ duration: reduce ? 0 : 0.16, ease: [0.2, 0, 0, 1] }}
-          >
-            <status.icon size={12} strokeWidth={2.2} aria-hidden />
-            {status.label}
-          </motion.span>
-        </AnimatePresence>
+        {/* A keyed remount, not an AnimatePresence swap.
+
+            This was `AnimatePresence mode="wait"`, and it deadlocked: the
+            incoming pill is gated on the outgoing one finishing its exit, and
+            an exit driven by rAF never finishes in a tab that has stopped
+            compositing. Flip Enable in a backgrounded tab and the row un-dimmed
+            while the pill stayed on "Switched off" — the two halves of one
+            render disagreeing, which is the tell.
+
+            Changing `key` remounts the span and replays initial → animate, so
+            the state change still gets its motion. There is no exit to wait on,
+            and only ever one pill in the row, so nothing can jump. */}
+        <motion.span
+          key={status.key}
+          className={`bv5__pill is-${status.tone}`}
+          title={status.detail}
+          initial={{ opacity: 0, y: reduce ? 0 : -4, scale: reduce ? 1 : 0.94 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: reduce ? 0 : 0.16, ease: [0.2, 0, 0, 1] }}
+        >
+          <status.icon size={12} strokeWidth={2.2} aria-hidden />
+          {status.label}
+        </motion.span>
       </div>
 
       <div className="bv5__cell-num" role="cell">
-        {m.enrolled !== undefined ? m.enrolled.toLocaleString() : <span className="bv5__dash">—</span>}
+        {m.enrolled !== undefined ? (
+          m.enrolled.toLocaleString()
+        ) : (
+          <span className="bv5__dash">—</span>
+        )}
       </div>
 
+      {/* One switch. It turns the method on for the tenant and offers it to
+          users in the same stroke — see `setActive` for why both fields move
+          together. Still disabled until the method is configured, because
+          switching on something unconfigured is the console's oldest silent
+          no-op. */}
       <div className="bv5__cell-act" role="cell">
         <Toggle
-          checked={!blocked}
+          checked={m.active}
           onChange={(v) => onToggle(m.id, v)}
           label={`Enable ${m.name}`}
           disabled={!m.configured}
         />
+      </div>
+
+      {/* Set as default lives in the row, because the row is where you already
+          are when you decide. Only methods that work with no prior enrolment
+          qualify — the rest cannot be a default however much you want them. */}
+      <div className="bv5__cell-more" role="cell">
+        {m.canBeDefault && m.configured && m.active && !isDefault && (
+          <button type="button" className="bv5__setdef" onClick={onDefault}>
+            <Star size={12} strokeWidth={2} aria-hidden />
+            Set default
+          </button>
+        )}
+        {isDefault && (
+          <span className="bv5__isdef" title="Used before a user has enrolled in anything">
+            <Star size={12} strokeWidth={2.4} aria-hidden />
+          </span>
+        )}
       </div>
     </div>
   )
@@ -483,183 +715,58 @@ function MethodRow({
    other, which is the whole reason a transfer reads better than a checkbox: the
    thing you clicked moved somewhere, and you can see where. */
 
-function MethodTransfer({
-  methods,
-  enabled,
-  allowed,
-  onAllowed,
-}: {
-  methods: AuthMethod[]
-  enabled: Set<string>
-  allowed: Set<string>
-  onAllowed: (next: Set<string>) => void
-}) {
-  const reduce = useReducedMotion()
-  const [q, setQ] = useState('')
-
-  const offered = methods.filter((m) => allowed.has(m.id) && enabled.has(m.id))
-  const available = methods.filter((m) => !allowed.has(m.id) || !enabled.has(m.id))
-
-  const hit = (m: AuthMethod) => !q || `${m.name} ${m.channel} ${m.tier}`.toLowerCase().includes(q.toLowerCase())
-
-  const add = (id: string) => {
-    const n = new Set(allowed)
-    n.add(id)
-    onAllowed(n)
-  }
-  const remove = (id: string) => {
-    const n = new Set(allowed)
-    n.delete(id)
-    onAllowed(n)
-  }
-  const addGroup = (ids: string[]) => {
-    const n = new Set(allowed)
-    ids.forEach((id) => n.add(id))
-    onAllowed(n)
-  }
-
-  return (
-    <div className="bv5__xfer">
-      <div className="bv5__xfersearch">
-        <Search size={13} strokeWidth={1.9} aria-hidden />
-        <input
-          type="search"
-          value={q}
-          placeholder="Search methods…"
-          aria-label="Search methods"
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </div>
-
-      <div className="bv5__xferpanes">
-        {/* --- Everything ------------------------------------------------- */}
-        <section className="bv5__xferpane">
-          <header>
-            <h4>Available</h4>
-            <span>{available.length}</span>
-          </header>
-          <div className="bv5__xferbody">
-            {BANDS.map((band) => {
-              const rows = available.filter((m) => band.tiers.includes(m.tier) && hit(m))
-              if (rows.length === 0) return null
-              const addable = rows.filter((m) => enabled.has(m.id)).map((m) => m.id)
-              return (
-                <div className="bv5__xfergroup" key={band.name}>
-                  <h5>
-                    {band.name}
-                    {addable.length > 1 && (
-                      <button type="button" onClick={() => addGroup(addable)}>
-                        Offer all {addable.length}
-                      </button>
-                    )}
-                  </h5>
-                  {rows.map((m) => {
-                    const off = !enabled.has(m.id)
-                    return (
-                      <motion.button
-                        key={m.id}
-                        layout={!reduce}
-                        transition={{ type: 'spring', stiffness: 520, damping: 40 }}
-                        type="button"
-                        disabled={off}
-                        className={`bv5__xferrow ${off ? 'is-blocked' : ''}`}
-                        onClick={() => add(m.id)}
-                        title={off ? 'Switched off in the Methods tab' : `Offer ${m.name}`}
-                      >
-                        <MethodIcon name={m.name} size={22} />
-                        <span className="bv5__xfername">{m.name}</span>
-                        {off ? (
-                          <span className="bv5__xfernote">Off in Methods</span>
-                        ) : (
-                          <span className="bv5__xferadd" aria-hidden>
-                            <Plus size={13} strokeWidth={2.4} />
-                          </span>
-                        )}
-                      </motion.button>
-                    )
-                  })}
-                </div>
-              )
-            })}
-            {available.filter(hit).length === 0 && <p className="bv5__xferempty">Everything is offered.</p>}
-          </div>
-        </section>
-
-        {/* --- The answer -------------------------------------------------- */}
-        <section className="bv5__xferpane is-picked">
-          <header>
-            <h4>Offered to users</h4>
-            <span>{offered.length}</span>
-          </header>
-          <div className="bv5__xferbody">
-            {offered.filter(hit).map((m) => (
-              <motion.button
-                key={m.id}
-                layout={!reduce}
-                transition={{ type: 'spring', stiffness: 520, damping: 40 }}
-                type="button"
-                className="bv5__xferrow is-on"
-                onClick={() => remove(m.id)}
-                title={`Stop offering ${m.name}`}
-              >
-                <MethodIcon name={m.name} size={22} />
-                <span className="bv5__xfername">{m.name}</span>
-                <span className="bv5__xfernum">{m.enrolled ? m.enrolled.toLocaleString() : '—'}</span>
-                <span className="bv5__xferx" aria-hidden>
-                  <X size={13} strokeWidth={2.2} />
-                </span>
-              </motion.button>
-            ))}
-            {offered.length === 0 && (
-              <p className="bv5__xferempty">
-                Nothing is offered. Users get their default method and cannot change it themselves.
-              </p>
-            )}
-          </div>
-        </section>
-      </div>
-    </div>
-  )
-}
-
-/* --- Configuration, in a drawer ------------------------------------------------
-
-   One method's configuration and its own settings, over the list rather than
-   instead of it. The list stays visible behind, so closing the panel puts you
-   back where you were rather than at the top of a page you have to find your
-   row in again.
-
-   The form is `ConfigFields` over `configFor(id)` — the same schema and the same
-   renderer the other version puts in a dialog. All 21 methods have one; V5 had
-   no door to any of them, so "Needs setup" was a state the screen could name and
-   not change.
-
-   Saving an incomplete form is allowed and does not mark the method configured.
-   Blocking the save would lose work on a form whose credentials usually have to
-   be fetched from somewhere this panel cannot reach.
-
-   `Drawer` is the kit's, not a second one built here: it already owns the scrim,
-   the spring, Escape-to-close and the header, and a drawer that behaves
-   differently from every other drawer in the product is a bug with a nice
-   animation. */
-
 function MethodDrawer({
   m,
   onClose,
   onToggle,
   onPatch,
+  behaviour,
+  onBehaviour,
 }: {
   m: AuthMethod | null
   onClose: () => void
   onToggle: (id: string, on: boolean) => void
   onPatch: (id: string, p: Partial<AuthMethod>) => void
+  behaviour: MfaValues
+  onBehaviour: (p: MfaValues) => void
 }) {
   const store = useBrand()
-  const base = useMemo(() => (m ? configFor(m.id) : null), [m])
-  const [fields, setFields] = useState<ConfigField[]>(base?.fields ?? [])
+  /* Keyed on the id, not on `m`.
 
-  // Opening a different method must not carry the previous one's values.
-  useEffect(() => setFields(base?.fields ?? []), [base])
+     `m` is recomputed by `methods.find(...)` over an array that every toggle
+     replaces wholesale, so it is a new object on each patch even when it is the
+     same method. The reset effect below was keyed on `base`, which is memoised
+     on `m` — so flipping Enable from inside the drawer changed `m`, recomputed
+     `base`, fired the effect and threw away whatever had been typed into the
+     form. Keyed on the id it fires when the drawer actually changes method. */
+  const mid = m?.id ?? null
+  const base = useMemo(() => (mid ? configFor(mid) : null), [mid])
+
+  /* The sheet supersedes some of what the connection form asks for — Grid's
+     "Pattern length" is the sheet's grid-length, and the SMS and Email builders
+     both ask for a code expiry the sheet now owns as OTP validity. Filtered
+     here rather than deleted from method-config.ts, because the other versions
+     of this screen still render the full form. */
+  const [fields, setFields] = useState<ConfigField[]>(() =>
+    (base?.fields ?? []).filter((f) => !configSuppressed(mid ?? '').includes(f.id)),
+  )
+  useEffect(() => {
+    setFields((configFor(mid ?? '')?.fields ?? []).filter((f) => !configSuppressed(mid ?? '').includes(f.id)))
+  }, [mid])
+
+  /* Edits are staged in the drawer and committed on save, the same contract the
+     connection form already has. `??` and not `||`, so a setting switched off
+     is not read as absent and quietly reset to the sheet's default. */
+  const [draft, setDraft] = useState<MfaValues>({})
+  useEffect(() => setDraft({}), [mid])
+  const read = (key: string, fallback: MfaValue): MfaValue => draft[key] ?? behaviour[key] ?? fallback
+  const write = (key: string, v: MfaValue) => setDraft((d) => ({ ...d, [key]: v }))
+
+  const family = m ? familyForChannel(m.channel) : undefined
+  const famSettings = m ? familySettingsFor(m.channel) : []
+  const ownSettings = m ? methodSettingsFor(m.id) : []
+  const legacy = (m?.settings ?? []).filter((s) => !legacySuppressed(m?.id ?? '').includes(s.id))
+  const kin = m ? siblingsOf(m) : []
 
   const blocked = m ? methodBlocker(m) : null
   const missing = missingFields(fields)
@@ -673,7 +780,9 @@ function MethodDrawer({
      Counted from the schema, not hand-assigned: a kind that needs room asks for
      it, and a form that is simply long asks for a little. The drag handle is
      there for when the guess is wrong. */
-  const roomy = fields.filter((f) => f.kind === 'list' || f.kind === 'textarea' || f.kind === 'radio').length
+  const roomy = fields.filter(
+    (f) => f.kind === 'list' || f.kind === 'textarea' || f.kind === 'radio',
+  ).length
   const openWidth = Math.min(760, 480 + roomy * 90 + Math.max(0, fields.length - 3) * 20)
 
   return (
@@ -696,12 +805,14 @@ function MethodDrawer({
             <span className="bmc__foot">
               {ready ? (
                 <>
-                  <Check size={13} strokeWidth={2.6} aria-hidden /> Everything required is filled in.
+                  <Check size={13} strokeWidth={2.6} aria-hidden /> Everything required is filled
+                  in.
                 </>
               ) : (
                 <>
                   <AlertTriangle size={13} strokeWidth={2} aria-hidden />
-                  {missing.length} required field{missing.length === 1 ? '' : 's'} still blank —{' '}
+                  {missing.length} required field
+                  {missing.length === 1 ? '' : 's'} still blank —{' '}
                   {missing.map((f) => f.label).join(', ')}
                 </>
               )}
@@ -714,6 +825,11 @@ function MethodDrawer({
               onClick={() => {
                 if (!m) return
                 onPatch(m.id, { configured: ready })
+                /* Family values are committed to the page, not to the method,
+                   which is what makes the "also applies to" claim in the shared
+                   band true rather than decorative. */
+                onBehaviour(draft)
+                setDraft({})
                 store.showToast(ready ? `${m.name} configured` : `${m.name} draft saved`)
               }}
             >
@@ -747,21 +863,51 @@ function MethodDrawer({
             <p className="bv5__inline-warn">
               <AlertTriangle size={14} strokeWidth={1.9} aria-hidden />
               <span>
-                <strong>{blocked}.</strong> No policy rule can ask for this method until it is resolved.
+                <strong>{blocked}.</strong> No policy rule can ask for this method until it is
+                resolved.
               </span>
             </p>
           )}
 
-          <p className="bmc__blurb">
-            {base?.blurb ?? 'This method has nothing to connect — it is ready as soon as it is switched on.'}
+          {/* One line that the live console never says anywhere. Everything
+              below configures the method for the whole tenant — the shipping
+              "Configure Second Factor" page looks like this and configures the
+              signed-in admin's own second factor, so saying which one this is
+              is not padding. */}
+          <p className="bv5__dwscope">
+            <Lock size={12} strokeWidth={2} aria-hidden />
+            Tenant-wide. Applies to every user who signs in with this method.
           </p>
-          {base && <ConfigFields fields={fields} onChange={(id, v) => setFields((f) => setField(f, id, v))} />}
 
-          {m.settings && m.settings.length > 0 && (
+          {m.balance && (
+            <p className="bv5__dbalance">
+              {m.balance.remaining.toLocaleString()} {m.balance.label} remaining — this method draws
+              down a purchased balance every time it sends.
+            </p>
+          )}
+
+          {/* --- This method only ------------------------------------------ */}
+          {(ownSettings.length > 0 || legacy.length > 0) && (
             <>
-              <p className="bv5__sublabel">Settings</p>
+              <p className="bv5__sublabel">This method only</p>
               <div className="bv5__dsettings">
-                {m.settings.map((opt) => (
+                {ownSettings.map((opt) => (
+                  <SettingField
+                    key={opt.id}
+                    setting={opt}
+                    value={read(settingKey('method', m.id, opt.id), opt.field.value)}
+                    onChange={(v) => write(settingKey('method', m.id, opt.id), v)}
+                    child={{
+                      read: (id, fb) => read(settingKey('method', m.id, id), fb),
+                      write: (id, v) => write(settingKey('method', m.id, id), v),
+                    }}
+                  />
+                ))}
+                {/* What the sheet does not model yet. Two settings survive here
+                    — CAC's certificate chain and the grid's clickable mode —
+                    and dropping them to make the migration tidy would be losing
+                    working controls to make a diagram look better. */}
+                {legacy.map((opt) => (
                   <div className="bv5__dsetting" key={opt.id}>
                     <div>
                       <p>{opt.label}</p>
@@ -771,14 +917,18 @@ function MethodDrawer({
                       <Toggle
                         checked={opt.value}
                         label={opt.label}
-                        onChange={(v) => onPatch(m.id, { settings: setSetting(m.settings!, opt.id, v) })}
+                        onChange={(v) =>
+                          onPatch(m.id, { settings: setSetting(m.settings!, opt.id, v) })
+                        }
                       />
                     ) : (
                       <select
                         className="bv5__dselect"
                         aria-label={opt.label}
                         value={opt.value}
-                        onChange={(e) => onPatch(m.id, { settings: setSetting(m.settings!, opt.id, e.target.value) })}
+                        onChange={(e) =>
+                          onPatch(m.id, { settings: setSetting(m.settings!, opt.id, e.target.value) })
+                        }
                       >
                         {opt.options.map((o) => (
                           <option key={o}>{o}</option>
@@ -791,11 +941,69 @@ function MethodDrawer({
             </>
           )}
 
-          {m.balance && (
-            <p className="bv5__dbalance">
-              {m.balance.remaining.toLocaleString()} {m.balance.label} remaining — this method draws down a
-              purchased balance every time it sends.
-            </p>
+          {/* --- Shared across the family ----------------------------------
+              Outdented to the panel edges and filled, because the one thing an
+              admin must not misread here is scope: these controls change the
+              sibling methods too. It says so in words, and then names them —
+              a claim you can check beats a claim you have to trust. */}
+          {family && famSettings.length > 0 && (
+            <section className="bv5__dwband" aria-label={`Shared across ${family.name}`}>
+              <p className="bv5__dwband-head">Shared across {family.name}</p>
+              <p className="bv5__dwband-scope">
+                {kin.length === 0
+                  ? `${m.name} is the only method in this family, so these apply to it alone — for now.`
+                  : 'Changing these also changes:'}
+                {kin.length > 0 && (
+                  <span className="bv5__dwband-kin">
+                    {kin.map((k) => (
+                      <i key={k.id}>{k.name}</i>
+                    ))}
+                  </span>
+                )}
+              </p>
+
+              {/* The one method whose family is not where you would guess. It
+                  delivers by email as well as SMS but the sheet files it under
+                  SMS, so its email leg obeys the SMS code length — not the one
+                  set on the Email family. Worth a sentence, because getting it
+                  wrong is invisible until a code arrives the wrong length. */}
+              {m.id === 'otp-sms-email' && (
+                <p className="bv5__dwband-note">
+                  This method also sends by email, but it sits in the SMS family — so its email leg
+                  follows the SMS length and validity above, not the Email family's.
+                </p>
+              )}
+
+              <div className="bv5__dsettings">
+                {famSettings.map((opt) => (
+                  <SettingField
+                    key={opt.id}
+                    setting={opt}
+                    value={read(settingKey('family', family.id, opt.id), opt.field.value)}
+                    onChange={(v) => write(settingKey('family', family.id, opt.id), v)}
+                    child={{
+                      read: (id, fb) => read(settingKey('family', family.id, id), fb),
+                      write: (id, v) => write(settingKey('family', family.id, id), v),
+                    }}
+                  />
+                ))}
+              </div>
+
+              {family.note && <p className="bv5__dwband-note">{family.note}</p>}
+            </section>
+          )}
+
+          {/* --- Connection ------------------------------------------------ */}
+          <p className="bv5__sublabel">Connection</p>
+          <p className="bmc__blurb">
+            {base?.blurb ??
+              'This method has nothing to connect — it is ready as soon as it is switched on.'}
+          </p>
+          {base && (
+            <ConfigFields
+              fields={fields}
+              onChange={(id, v) => setFields((f) => setField(f, id, v))}
+            />
           )}
         </div>
       )}
@@ -803,6 +1011,18 @@ function MethodDrawer({
   )
 }
 
+/* One renderer for a sheet setting.
+
+   Deliberately built on the drawer's existing `.bv5__dsetting` row rather than
+   a new stylesheet: V7 has its own `.bm7__field` version of this and a third
+   look for the same three controls would make the two screens disagree about
+   what a setting is. The shape is label + help on the left, control on the
+   right, which is what the row already does.
+
+   V7's copy takes `(setting, values, setValues)` and keys internally on
+   `setting.id` — the reason SMS and Email share one OTP length there. This one
+   is handed a single value and a single setter, so the key is chosen by the
+   caller and the component cannot get it wrong. */
 /* Spreading over a discriminated union widens it, so each kind is narrowed
    before the value is written. */
 function setSetting(all: MethodSetting[], id: string, value: boolean | string): MethodSetting[] {
@@ -824,7 +1044,11 @@ function setSetting(all: MethodSetting[], id: string, value: boolean | string): 
 
    Shared by every tab, so a method looks the same wherever it appears. */
 const VENDOR_LOGO: { match: RegExp; src: string; name: string }[] = [
-  { match: /minioranges?|mo /i, src: '/logos/miniorange.png', name: 'miniOrange' },
+  {
+    match: /minioranges?|mo /i,
+    src: '/logos/miniorange.png',
+    name: 'miniOrange',
+  },
   { match: /google/i, src: '/logos/google.ico', name: 'Google' },
   { match: /microsoft/i, src: '/logos/m365.ico', name: 'Microsoft' },
 ]
@@ -870,247 +1094,12 @@ export function MethodIcon({ name, size = 24 }: { name: string; size?: number })
   )
 }
 
-/* --- Enrollment --------------------------------------------------------------
-   Settings on the left, the rollout they produce on the right.
-
-   V5 stacks four lettered cards — A, B, C, D — down the full width. The letters
-   are arbitrary (nothing references them), and a full-width card for a single
-   toggle wastes the half of the screen where the consequences of that toggle
-   could be shown instead. So the controls keep their order but lose the
-   lettering, and the space buys a panel that answers the question the settings
-   raise: how is the rollout actually going.
-
-   The panel refuses to state one number it cannot know. Enrolments are counted
-   per method, so summing them gives enrolments, not people — the directory size
-   is shown beside it as context and the ratio is labelled as a ratio, rather
-   than dressing the two up as a coverage percentage that would be wrong. */
-function EnrollmentTab({ methods, enabled }: { methods: AuthMethod[]; enabled: Set<string> }) {
-  const store = useBrand()
-  const [enforce, setEnforce] = useState(true)
-  const [grace, setGrace] = useState(7)
-  const [selfEnroll, setSelfEnroll] = useState(true)
-  const [allowed, setAllowed] = useState<Set<string>>(
-    new Set(methods.filter((m) => !methodBlocker(m) && m.tier !== 'Phishing-resistant').map((m) => m.id)),
-  )
-  const [fallback, setFallback] = useState('')
-
-  const selectable = methods.filter((m) => m.tier !== 'Phishing-resistant')
-  const defaults = methods.filter((m) => m.canBeDefault)
-  const directory = 1240
-
-  const ranked = useMemo(
-    () =>
-      methods
-        .filter((m) => (m.enrolled ?? 0) > 0)
-        .sort((a, b) => (b.enrolled ?? 0) - (a.enrolled ?? 0))
-        .slice(0, 6),
-    [methods],
-  )
-  const enrolments = methods.reduce((n, m) => n + (m.enrolled ?? 0), 0)
-  const peak = ranked[0]?.enrolled ?? 1
-  const openToSelf = [...allowed].filter((id) => enabled.has(id)).length
-
-  return (
-    <div className="bv5__pane">
-      {/* The rollout numbers, which used to be the first card in a right-hand
-          rail. They are the shape of the page's subject, so they read across the
-          top where the Methods tab puts its own — not in a column beside the
-          settings they describe. */}
-      <div className="bv5__figures">
-        <div className="bv5__fig">
-          <span>Enrolments</span>
-          <strong>{enrolments.toLocaleString()}</strong>
-        </div>
-        <div className="bv5__fig">
-          <span>People</span>
-          <strong>{directory.toLocaleString()}</strong>
-        </div>
-        <div className="bv5__fig">
-          <span>Per person</span>
-          <strong>{(enrolments / directory).toFixed(1)}</strong>
-        </div>
-        <div className="bv5__fig">
-          <span>Offered in the portal</span>
-          <strong>
-            {openToSelf}
-            <em>/ {selectable.length}</em>
-          </strong>
-        </div>
-      </div>
-      {/* The number this strip deliberately does not show, and why. */}
-      <p className="bv5__caveat">
-        Enrolments are counted per method, so this is not a headcount — someone with a passkey and an
-        authenticator app is two of them.
-      </p>
-
-      {/* One list, not a grid of cards. Every one of these is the same shape —
-          a named setting, a sentence about it, and one control — so they read as
-          rows of a list rather than as four boxes that happen to contain rows.
-          The section labels are the only structure that earns a line. */}
-      <div className="bv5__list">
-        <Group icon={ShieldCheck} title="Enforcement" note={enforce ? `${grace}-day grace` : 'Off'}>
-          <Row
-            name="Require 2FA at first sign-in"
-            desc="Users who have not enrolled must do so before they can finish signing in."
-            on={enforce}
-            onChange={setEnforce}
-          />
-          {enforce && (
-            <div className="bv5__inset">
-              <div className="bv5__inset-line">
-                <label htmlFor="v5-grace">Grace period</label>
-                <input
-                  id="v5-grace"
-                  type="number"
-                  min={0}
-                  max={90}
-                  value={grace}
-                  onChange={(e) => setGrace(Math.max(0, Math.min(90, Number(e.target.value))))}
-                />
-                <span>days</span>
-              </div>
-            </div>
-          )}
-          {/* Under the setting it is about. In the rail it was three columns
-              away from the toggle and the number it describes, which is how a
-              warning ends up read as decoration. */}
-          {enforce && (
-            <p className="bv5__inline-warn">
-              <AlertTriangle size={14} strokeWidth={1.9} aria-hidden />
-              <span>
-                Anyone who has not enrolled after{' '}
-                <strong>
-                  {grace} day{grace === 1 ? '' : 's'}
-                </strong>{' '}
-                is blocked at sign-in. Check the offered methods cover every group before the period ends.
-              </span>
-            </p>
-          )}
-        </Group>
-
-        <Group
-          icon={UserPlus}
-          title="Self-enrolment"
-          note={selfEnroll ? `${openToSelf} method${openToSelf === 1 ? '' : 's'} offered` : 'Off'}
-        >
-          <Row
-            name="Let users enrol themselves"
-            desc="Users can add, remove and switch methods from their self-service portal."
-            on={selfEnroll}
-            onChange={setSelfEnroll}
-          />
-          {selfEnroll && (
-            <>
-              <MethodTransfer
-                methods={selectable}
-                enabled={enabled}
-                allowed={allowed}
-                onAllowed={setAllowed}
-              />
-            </>
-          )}
-        </Group>
-
-        <Group icon={Star} title="Default method" note={fallback || defaults[0]?.name || 'None'}>
-          {/* The options are on the page, not behind a select.
-
-              Seven of twenty-one methods qualify, and which seven is the
-              interesting part — a closed select shows one and hides the fact
-              that the list is a shortlist at all. Laid out, the constraint is
-              visible: these are the methods that work before anybody has
-              enrolled in anything. */}
-          <p className="bv5__pickhelp">
-            Applied tenant-wide before a user has enrolled in anything
-            <TipDot text="Only methods that work with no prior enrolment can be a default, which is why this is a shortlist. A policy rule can still ask for something else." />
-            <em>
-              {defaults.length} of {methods.length} qualify
-            </em>
-          </p>
-          <div className="bv5__picks" role="radiogroup" aria-label="Default authentication method">
-            {defaults.map((m) => {
-              const on = (fallback || defaults[0]?.name) === m.name
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  className={`bv5__pick ${on ? 'is-on' : ''}`}
-                  onClick={() => setFallback(m.name)}
-                >
-                  <MethodIcon name={m.name} size={24} />
-                  <span>{m.name}</span>
-                </button>
-              )
-            })}
-          </div>
-        </Group>
-
-        <Group icon={Mail} title="Credential delivery" note="Email">
-          <Row
-            name="Email the enrolment QR code"
-            desc="Users receive their QR without having to open the self-service portal first."
-            on
-            onChange={() => store.showToast('Delivery is configured per email template')}
-          />
-        </Group>
-      </div>
-
-      {/* Where users actually are. Full width, so the bars are long enough to
-          compare at a glance — in the rail they were 60px of a 300px column and
-          every one of them looked the same length. */}
-      <section className="bv5__group2">
-        <header className="bv5__group2-head">
-          <span className="bv5__group2-ico" aria-hidden>
-            <UserPlus size={15} strokeWidth={1.8} />
-          </span>
-          <h2>Most enrolled</h2>
-          <span className="bv5__group2-note">Where users actually are today</span>
-        </header>
-        <div className="bv5__group2-body">
-          <ul className="bv5__rank bv5__rank--wide">
-            {ranked.map((m) => (
-              <li key={m.id}>
-                <MethodIcon name={m.name} size={22} />
-                <span className="bv5__rank-name">{m.name}</span>
-                <span className="bv5__rank-bar" aria-hidden>
-                  <i style={{ width: `${((m.enrolled ?? 0) / peak) * 100}%` }} />
-                </span>
-                <span className="bv5__rank-n">{(m.enrolled ?? 0).toLocaleString()}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-    </div>
-  )
+function initials(email: string): string {
+  const local = email.split('@')[0]
+  const parts = local.split(/[._-]+/).filter(Boolean)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return local.slice(0, 2).toUpperCase()
 }
-
-function Group({
-  icon: Ico,
-  title,
-  note,
-  children,
-}: {
-  icon: LucideIcon
-  title: string
-  note?: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="bv5__group2">
-      <header className="bv5__group2-head">
-        <span className="bv5__group2-ico" aria-hidden>
-          <Ico size={18} strokeWidth={1.8} />
-        </span>
-        <h2>{title}</h2>
-        {note && <span className="bv5__group2-note">{note}</span>}
-      </header>
-      <div className="bv5__group2-body">{children}</div>
-    </section>
-  )
-}
-
 
 /* Three options, and what actually separates them is how much proof each one
    asks for. That was buried in a sentence per row; it is a pill now, and the
@@ -1145,16 +1134,6 @@ const RECOVERY_OPTIONS: {
   },
 ]
 
-/* The local part of the address, initialled. Two letters where there is a
-   separator to split on, one where there is not — never a slice of a surname
-   that happens to start the same way. */
-function initials(email: string): string {
-  const local = email.split('@')[0]
-  const parts = local.split(/[._-]+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return local.slice(0, 2).toUpperCase()
-}
-
 /* One tone per vendor family, so a column of types is scannable rather than
    three near-identical grey pills. */
 function tokenTone(type: string): string {
@@ -1163,7 +1142,12 @@ function tokenTone(type: string): string {
   return 'neutral'
 }
 
-function RecoveryTab({ methods }: { methods: AuthMethod[] }) {
+/* Exported so the final version can render it rather than own a second copy.
+
+   Recovery is the one tab the brief left alone — "recovery is fine as we have
+   in v5" — so the honest way to keep it identical is to render the same
+   component, not to reimplement it and hope the two stay in step. */
+export function RecoveryTab({ methods }: { methods: AuthMethod[] }) {
   const [forgot, setForgot] = useState(true)
   const [choice, setChoice] = useState('kba')
   const [userPick, setUserPick] = useState(true)
@@ -1207,7 +1191,11 @@ function RecoveryTab({ methods }: { methods: AuthMethod[] }) {
                     disabled={blocked}
                     className={`bv5__radio ${on ? 'is-on' : ''} ${blocked ? 'is-blocked' : ''}`}
                     onClick={() => setChoice(o.id)}
-                    title={blocked ? `${o.sub} Needs Security Questions, which is switched off in Methods.` : o.sub}
+                    title={
+                      blocked
+                        ? `${o.sub} Needs Security Questions, which is switched off in Methods.`
+                        : o.sub
+                    }
                   >
                     <span className="bv5__radio-ico" aria-hidden>
                       <o.icon size={18} strokeWidth={1.8} />
@@ -1235,7 +1223,11 @@ function RecoveryTab({ methods }: { methods: AuthMethod[] }) {
                           initial={{ scale: 0.3, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
                           exit={{ scale: 0.3, opacity: 0 }}
-                          transition={{ type: 'spring', stiffness: 700, damping: 32 }}
+                          transition={{
+                            type: 'spring',
+                            stiffness: 700,
+                            damping: 32,
+                          }}
                         >
                           <Check size={11} strokeWidth={3.2} />
                         </motion.span>
@@ -1254,7 +1246,11 @@ function RecoveryTab({ methods }: { methods: AuthMethod[] }) {
                 because the dependency runs both ways and the console only ever
                 mentions one of them. The consequence is on the tip. */}
             <p className={`bv5__dep ${kbaOn ? 'is-ok' : 'is-warn'}`}>
-              {kbaOn ? <Check size={13} strokeWidth={2.4} aria-hidden /> : <Lock size={13} strokeWidth={2.2} aria-hidden />}
+              {kbaOn ? (
+                <Check size={13} strokeWidth={2.4} aria-hidden />
+              ) : (
+                <Lock size={13} strokeWidth={2.2} aria-hidden />
+              )}
               Security Questions is <strong>{kbaOn ? 'on' : 'off'}</strong> in Methods
               <TipDot
                 text={
@@ -1315,7 +1311,11 @@ interface TokenRow {
 const SEED_TOKENS: TokenRow[] = [
   { user: 'priya.anand@acme.com', serial: 'YK-5C-0A91F', type: 'Yubikey OTP' },
   { user: 'sam.rivera@acme.com', serial: 'YK-5C-0A93B', type: 'Yubikey OTP' },
-  { user: 'mehak.garg@acme.com', serial: 'DT-2200-4417', type: 'Display Token' },
+  {
+    user: 'mehak.garg@acme.com',
+    serial: 'DT-2200-4417',
+    type: 'Display Token',
+  },
   { user: 'jaspreet.t@acme.com', serial: 'VS-GO6-88201', type: 'Vasco' },
 ]
 
@@ -1326,7 +1326,10 @@ function TokensTab() {
   const [q, setQ] = useState('')
 
   const shown = rows.filter(
-    (r) => !q || r.user.toLowerCase().includes(q.toLowerCase()) || r.serial.toLowerCase().includes(q.toLowerCase()),
+    (r) =>
+      !q ||
+      r.user.toLowerCase().includes(q.toLowerCase()) ||
+      r.serial.toLowerCase().includes(q.toLowerCase()),
   )
 
   return (
@@ -1364,10 +1367,17 @@ function TokensTab() {
             />
           </span>
           <span className="bv5__spacer" />
-          <Button size="sm" onClick={() => store.showToast('CSV accepts user, serial and token type')}>
+          <Button
+            size="sm"
+            onClick={() => store.showToast('CSV accepts user, serial and token type')}
+          >
             <Upload size={13} strokeWidth={1.9} aria-hidden /> Upload CSV
           </Button>
-          <Button size="sm" variant="brand" onClick={() => store.showToast('Assign opens the user picker')}>
+          <Button
+            size="sm"
+            variant="brand"
+            onClick={() => store.showToast('Assign opens the user picker')}
+          >
             Assign token
           </Button>
         </div>

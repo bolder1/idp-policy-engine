@@ -269,10 +269,10 @@
    panel, and there the input came out with no border, transparent background
    and the wrong size: it read as a line of prose sitting in the section.
 
-   The rule that made the field invisible is gone at the root: a legacy global
-   in the concept version's ui.css matched every text input in the app with
-   tokens defined only on .concept-root, and it is scoped there now. What is
-   left here is this field's own sizing, which it needs on its own account. */
+   The rule that made the field invisible is gone at the root: a global in a
+   second application that used to live in this repo matched every text input
+   here, with tokens scoped to that app. What is left is this field's own
+   sizing, which it needs on its own account. */
 .bz7 .bz7__add input {
   flex: 1; min-width: 0;
   height: var(--ctl-height-md); padding: 0 11px;

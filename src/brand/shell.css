@@ -140,35 +140,13 @@
 .bshell__subitem:hover { background: rgba(0, 0, 0, 0.22); }
 .bshell__subitem.is-active { color: var(--brand); }
 
-.bshell__foot { flex: none; padding: 10px; border-top: var(--bw-thin) solid rgba(255, 255, 255, 0.08); }
-.bshell__version {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.06);
-  font-size: var(--fs-xs);
-  font-weight: 300;
-  color: var(--shell-text-muted);
-  white-space: nowrap;
-  transition: background var(--dur-fast) var(--ease-standard);
-}
-.bshell__version:hover { background: rgba(255, 255, 255, 0.12); }
-.bshell__version strong { color: var(--shell-text); font-weight: 500; }
-.bshell__version-go { margin-left: auto; color: var(--brand); }
-
 /* --- Collapsed ------------------------------------------------------------ */
 
 .bshell.is-collapsed .bshell__item { justify-content: center; padding: 10px 6px 10px 2px; gap: 0; }
 .bshell.is-collapsed .bshell__item-label,
 .bshell.is-collapsed .bshell__badge,
 .bshell.is-collapsed .bshell__chev,
-.bshell.is-collapsed .bshell__version-txt { display: none; }
 .bshell.is-collapsed .bshell__section { height: 1px; margin: 10px 12px; overflow: hidden; color: transparent; background: rgba(255, 255, 255, 0.1); }
-.bshell.is-collapsed .bshell__version { justify-content: center; padding: 8px 0; }
-.bshell.is-collapsed .bshell__version-go { margin-left: 0; }
 
 .bshell__main { grid-area: main; overflow-y: auto; min-width: 0; }
 

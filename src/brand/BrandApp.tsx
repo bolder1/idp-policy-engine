@@ -80,14 +80,14 @@ function Screen() {
   }
 }
 
-export function BrandApp({ onSwitchVersion }: { onSwitchVersion: () => void }) {
+export function BrandApp() {
   usePrefetchScreens()
 
   return (
     <MotionConfig reducedMotion="user">
       <div className="brand-root">
         <BrandProvider>
-          <Shell onSwitchVersion={onSwitchVersion}>
+          <Shell>
             {/* Inside the Shell, so the rail and header stay put if a fallback
                 ever does render — a navigation that blanks the chrome reads as
                 a page load rather than a tab change. In practice the prefetch

@@ -161,7 +161,7 @@ function isActive(current: BrandScreen, item: NavItem): boolean {
   return item.screen ? current.name === item.screen.name : false
 }
 
-export function Shell({ children, onSwitchVersion }: { children: ReactNode; onSwitchVersion: () => void }) {
+export function Shell({ children }: { children: ReactNode }) {
   const { screen, go } = useBrand()
   const main = useRef<HTMLElement>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
@@ -342,15 +342,6 @@ export function Shell({ children, onSwitchVersion }: { children: ReactNode; onSw
             </div>
           ))}
         </nav>
-
-        <div className="bshell__foot">
-          <button type="button" className="bshell__version" onClick={onSwitchVersion} title="Switch version">
-            <span className="bshell__version-txt">
-              Viewing <strong>Brand revamp</strong>
-            </span>
-            <span className="bshell__version-go">switch →</span>
-          </button>
-        </div>
       </aside>
 
       <main className="bshell__main" ref={main}>

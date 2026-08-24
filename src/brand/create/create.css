@@ -983,12 +983,11 @@ html[data-theme='dark'] .bguided__sheen {
    It was rendering with `border: 0px none` on a transparent background — an
    input you cannot see the edges of, the same failure as the zone name field.
 
-   The cause named here used to be the kit's own `:where()` defaults, and that
-   was wrong: they do paint a border. What erased it was a bare
-   `input[type='text']` in the concept version's ui.css, loaded globally, at
-   (0,1,1) against the kit's (0,1,0) and reading tokens that only exist under
-   .concept-root. That rule is scoped now, so a plain brand input is visible on
-   its own.
+   The cause was never the kit's `:where()` defaults, which do paint a border.
+   It was a bare `input[type='text']` in a second application that used to live
+   in this repo, loaded globally, at (0,1,1) against the kit's (0,1,0) and
+   reading tokens scoped to that app's root. That application is gone, so a
+   plain brand input is visible on its own.
 
    This block stays because the field wants more than the default — a stronger
    border, a brand hover, its own focus ring. It no longer needs to win a fight,

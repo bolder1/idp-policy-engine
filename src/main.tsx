@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
-import App from './App'
+import { BrandApp } from './brand/BrandApp'
 
 // Brand revamp (default) — tokens generated from the design-system repo.
 import './brand/tokens.css'
@@ -48,12 +48,8 @@ import './brand/tour/tour.css'
 // match the console in production. See above for what depends on that.
 import './brand/console-theme.css'
 
-// The model concept's stylesheets are NOT here. They live in ConceptApp.tsx and
-// travel with its chunk, so the ~1,400 lines of CSS for a version reachable only
-// from the switcher stop loading for everyone who never opens it.
-
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <BrandApp />
   </StrictMode>,
 )

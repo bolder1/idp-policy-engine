@@ -5,17 +5,19 @@ Two versions of the Policies section, switchable in-app.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 159 tests — engine, linter, simulator, gauntlet, sweep
+npm test         # 295 tests — linter, simulator, gauntlet, sweep, methods, zones
 npm run lint
 npm run build
 ```
 
-| Version | What it is |
-|---|---|
-| **Brand revamp** *(default)* | The console's **existing** policy functions, rebuilt on the published design system. Nothing about how the engine works was changed. |
-| **Model concept** | An earlier pass that reworked the engine model itself — coverage matrix, App × Group binding, weight-resolution explainer. Kept for comparison, not deleted; the question it asks is still open, it just isn't this pass's question. |
+One prototype, one view: the console's **existing** policy functions, rebuilt on
+the published design system. Nothing about how the engine works was changed.
 
-Switch with the control in the nav rail footer (brand) or the pill bottom-right (concept).
+> An earlier pass — the *model concept* — reworked the engine model itself:
+> coverage matrix, App × Group binding, weight-resolution explainer. It lived
+> here as a second application behind a switcher until it was removed, because
+> the question it asks is a different question from this one. It is in the git
+> history if that question comes back.
 
 ---
 
@@ -209,7 +211,6 @@ src/
       readiness.tsx      the publish gate, hosted by v4 and v5
       command-bar.tsx    ⌘K, with the command list supplied by the host
       overview.tsx       the read-only reading surface
-  engine/ data/ screens/ ← MODEL CONCEPT (second version)
 ```
 
 ---

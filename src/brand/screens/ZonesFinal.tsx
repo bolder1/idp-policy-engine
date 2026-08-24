@@ -390,6 +390,14 @@ function ZoneTable({
      the two tables behave identically. */
   const [menuFor, setMenuFor] = useState<string | null>(null)
 
+  /* Picking an item closes the menu — see the same helper in
+     DeviceFingerprintV2. Delete hid this by taking the row away with it;
+     Duplicate left the menu open over a table that had just grown a row. */
+  const choose = (run: () => void) => {
+    setMenuFor(null)
+    run()
+  }
+
   return (
     <div className="bz7__table" role="table" onClick={() => setMenuFor(null)}>
       <div className="bz7__trow bz7__thead" role="row">
@@ -454,16 +462,16 @@ function ZoneTable({
                     onClick={(e) => e.stopPropagation()}
                     role="menu"
                   >
-                    <button role="menuitem" onClick={() => onOpen(z.id)}>
+                    <button role="menuitem" onClick={() => choose(() => onOpen(z.id))}>
                       <Eye size={14} strokeWidth={1.9} aria-hidden />
                       View details
                     </button>
-                    <button role="menuitem" onClick={() => onDuplicate(z)}>
+                    <button role="menuitem" onClick={() => choose(() => onDuplicate(z))}>
                       <Copy size={14} strokeWidth={1.9} aria-hidden />
                       Duplicate
                     </button>
                     <span className="bmenu__rule" />
-                    <button role="menuitem" className="is-danger" onClick={() => onDelete(z)}>
+                    <button role="menuitem" className="is-danger" onClick={() => choose(() => onDelete(z))}>
                       <Trash2 size={14} strokeWidth={1.9} aria-hidden />
                       Delete zone
                     </button>

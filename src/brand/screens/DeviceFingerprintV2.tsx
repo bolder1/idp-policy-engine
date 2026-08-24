@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import {
   Activity,
   AlertTriangle,
@@ -14,8 +15,10 @@ import {
   Check,
   CircuitBoard,
   Clock,
+  Copy,
   Cpu,
   Database,
+  Eye,
   FileCode,
   Gauge,
   Globe,
@@ -106,6 +109,31 @@ export function DeviceFingerprintV2() {
 
   const open = openId ? store.fingerprints.find((p) => p.id === openId) ?? null : null
 
+  /* The list can delete now, which is what the detail page has been promising
+     all along: "No rule references this profile. It can be changed or deleted
+     without affecting any sign-in." There was no delete anywhere on this screen
+     when that sentence was written, so the store's `removeFingerprint` sat
+     unused and the copy described an affordance nobody could reach.
+
+     Deleting does not unlink the rules that name the profile — same contract as
+     zones and hooks. The usage count on the row is the warning, and a rule
+     pointing at a profile that no longer exists resolves to nothing, which the
+     policy linter already reports. */
+  const remove = (p: FingerprintProfile) => {
+    store.removeFingerprint(p.id)
+    store.showToast(`${p.name} deleted`)
+  }
+
+  const duplicate = (p: FingerprintProfile) => {
+    const copy: FingerprintProfile = {
+      ...p,
+      id: `fp-${p.id}-copy-${store.fingerprints.length}`,
+      name: `${p.name} (copy)`,
+    }
+    store.addFingerprint(copy)
+    store.showToast(`${copy.name} created`)
+  }
+
   const create = (p: FingerprintProfile) => {
     store.addFingerprint(p)
     setCreating(false)
@@ -130,6 +158,8 @@ export function DeviceFingerprintV2() {
           policies={store.policies}
           onOpen={setOpenId}
           onCreate={() => setCreating(true)}
+          onDuplicate={duplicate}
+          onDelete={remove}
         />
       )}
 
@@ -145,12 +175,28 @@ function ProfileList({
   policies,
   onOpen,
   onCreate,
+  onDuplicate,
+  onDelete,
 }: {
   profiles: FingerprintProfile[]
   policies: Policy[]
   onOpen: (id: string) => void
   onCreate: () => void
+  onDuplicate: (p: FingerprintProfile) => void
+  onDelete: (p: FingerprintProfile) => void
 }) {
+  const [menuFor, setMenuFor] = useState<string | null>(null)
+
+  /* Picking an item closes the menu. The menu stops its own clicks bubbling to
+     the table, which is what dismisses it, so without this a chosen menu stayed
+     open — invisible on Delete because the row went with it, but on Duplicate
+     it hung over the table and a second kebab could be opened beside it. Two
+     open menus over different rows is a mis-click waiting to happen. */
+  const choose = (run: () => void) => {
+    setMenuFor(null)
+    run()
+  }
+
   return (
     <>
       <header className="bfp2__head">
@@ -180,13 +226,14 @@ function ProfileList({
           }
         />
       ) : (
-        <div className="bfp2__table" role="table">
+        <div className="bfp2__table" role="table" onClick={() => setMenuFor(null)}>
             <div className="bfp2__trow bfp2__thead" role="row">
               <span role="columnheader" />
               <span role="columnheader">Profile</span>
               <span role="columnheader">Decides by</span>
               <span role="columnheader">Attributes</span>
               <span role="columnheader">Used by</span>
+              <span role="columnheader" />
             </div>
             {profiles.map((p) => {
               const uses = rulesUsing('fingerprint', p.id, policies)
@@ -210,6 +257,51 @@ function ProfileList({
                 <span role="cell" className="bfp2__tnum">{p.enabled.length}</span>
                 <span role="cell" className={`bfp2__tuses ${uses === 0 ? 'is-quiet' : ''}`}>
                   {uses === 0 ? '—' : `${uses} rule${uses === 1 ? '' : 's'}`}
+                </span>
+
+                {/* The same three actions the zones table carries, in the same
+                    order, because a profile and a zone are the same kind of
+                    thing to an admin: a library object a rule points at. */}
+                <span role="cell" className="bfp2__menuwrap">
+                  <button
+                    type="button"
+                    className="bfp2__kebab"
+                    aria-label={`Actions for ${p.name}`}
+                    aria-expanded={menuFor === p.id}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setMenuFor((m) => (m === p.id ? null : p.id))
+                    }}
+                  >
+                    ⋯
+                  </button>
+                  <AnimatePresence>
+                    {menuFor === p.id && (
+                      <motion.div
+                        className="bmenu"
+                        initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                        transition={{ duration: 0.13 }}
+                        onClick={(e) => e.stopPropagation()}
+                        role="menu"
+                      >
+                        <button role="menuitem" onClick={() => choose(() => onOpen(p.id))}>
+                          <Eye size={14} strokeWidth={1.9} aria-hidden />
+                          View details
+                        </button>
+                        <button role="menuitem" onClick={() => choose(() => onDuplicate(p))}>
+                          <Copy size={14} strokeWidth={1.9} aria-hidden />
+                          Duplicate
+                        </button>
+                        <span className="bmenu__rule" />
+                        <button role="menuitem" className="is-danger" onClick={() => choose(() => onDelete(p))}>
+                          <Trash2 size={14} strokeWidth={1.9} aria-hidden />
+                          Delete profile
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </span>
               </div>
             )

@@ -286,6 +286,20 @@
 .bz7 .bz7__add input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-subtle-bg); }
 
 .bz7__entries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; flex: 1; min-height: 96px; max-height: 210px; overflow-y: auto; }
+/* Not virtualised, and measured rather than assumed.
+
+   The paste box above deliberately accepts as many networks as an estate has,
+   so the worry was a zone with hundreds of rows. Pasting 500 CIDRs gives 506
+   rows in a 320px scroller, and content-visibility: auto does work there — the
+   browser reports skipping 231 of them at the top of the list. It is still not
+   worth having. The seeded zones hold six entries; at that size the containment
+   only buys a placeholder sized from a hint instead of a real row, and getting
+   the hint wrong (it is a content-box value, not the 33px border-box) inflates
+   every row by 11px until it has rendered once.
+
+   The fix that does earn its place is upstream, in AddressSection: the list and
+   its filter are memoised, so typing does not re-run the IP classifier over
+   every entry. That is where the cost actually was. */
 .bz7__entries li {
   display: flex; align-items: center; gap: 10px;
   padding: 5px 0; border-bottom: 1px solid var(--border-subtle);

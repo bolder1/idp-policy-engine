@@ -511,7 +511,7 @@
 }
 .bfp2__trow {
   display: grid;
-  grid-template-columns: 28px minmax(140px, 1.3fr) 150px 100px 110px;
+  grid-template-columns: 28px minmax(140px, 1.3fr) 150px 100px 110px 32px;
   align-items: center; gap: 12px;
   padding: 9px 16px; min-height: 46px;
   border-bottom: 1px solid var(--border-subtle);
@@ -540,8 +540,20 @@
 .bfp2__tuses { font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; }
 .bfp2__tuses.is-quiet { color: var(--text-muted); }
 
+/* Row actions, matching the zones table. */
+.bfp2__menuwrap { position: relative; display: flex; justify-content: flex-end; }
+.bfp2__kebab {
+  display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: var(--radius-sm); background: none; cursor: pointer;
+  color: var(--text-muted); line-height: 1;
+}
+.bfp2__kebab:hover { background: var(--surface-inset); color: var(--text-primary); }
+.bfp2__kebab:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
 @media (max-width: 860px) {
-  .bfp2__trow { grid-template-columns: 24px minmax(0, 1fr) 70px; }
+  /* The kebab keeps its column here — it is the only way to delete from the
+     list, so it is the last thing that should be dropped for width. */
+  .bfp2__trow { grid-template-columns: 24px minmax(0, 1fr) 70px 32px; }
   .bfp2__trow > :nth-child(3), .bfp2__trow > :nth-child(5) { display: none; }}
 
 /* --- Used by ---------------------------------------------------------------

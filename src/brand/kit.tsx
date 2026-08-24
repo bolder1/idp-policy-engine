@@ -323,42 +323,6 @@ export function StatusPill({ status }: { status: PolicyStatus }) {
   )
 }
 
-export function AppGlyph({ glyph, tint, size = 20 }: { glyph: string; tint: string; size?: number }) {
-  return (
-    <span
-      className="bx-glyph"
-      style={{ background: tint, width: size, height: size, fontSize: size * 0.5, borderRadius: size * 0.27 }}
-      aria-hidden
-    >
-      {glyph}
-    </span>
-  )
-}
-
-/** Overlapping app avatars with a count, as the policy table shows them. */
-export function AppStack({
-  items,
-  max = 3,
-}: {
-  items: { id: string; name: string; glyph: string; tint: string }[]
-  max?: number
-}) {
-  if (items.length === 0) return <span className="bx-appstack__none">No apps</span>
-  const shown = items.slice(0, max)
-  return (
-    <span className="bx-appstack" title={items.map((a) => a.name).join(', ')}>
-      <span className="bx-appstack__row">
-        {shown.map((a) => (
-          <AppGlyph key={a.id} glyph={a.glyph} tint={a.tint} size={18} />
-        ))}
-      </span>
-      <span className="bx-appstack__count">
-        {items.length} app{items.length === 1 ? '' : 's'}
-      </span>
-    </span>
-  )
-}
-
 /* How far the knob travels, per size: track − knob − (2 × inset). Kept here as
    a number rather than derived from layout, which is the whole point of the
    rewrite below. */

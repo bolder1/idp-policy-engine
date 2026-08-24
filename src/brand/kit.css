@@ -340,23 +340,6 @@ html[data-theme='dark'] {
   font-weight: var(--fw-medium);
 }
 
-/* --- App glyphs ----------------------------------------------------------- */
-
-.bx-glyph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-weight: var(--fw-semibold);
-  flex: none;
-}
-.bx-appstack { display: inline-flex; align-items: center; gap: var(--space-4); }
-.bx-appstack__row { display: inline-flex; }
-.bx-appstack__row .bx-glyph { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface-raised); }
-.bx-appstack__row .bx-glyph:first-child { margin-left: 0; }
-.bx-appstack__count { font-size: var(--fs-sm); color: var(--text-secondary); }
-.bx-appstack__none { font-size: var(--fs-sm); color: var(--text-muted); }
-
 /* --- Toggle --------------------------------------------------------------- */
 
 /* --- Switch --------------------------------------------------------------------
@@ -482,7 +465,7 @@ html[data-theme='dark'] {
    asked for a smaller control, so a condition row rendered its selects at 31px
    and its text inputs at 35px on the same line. Zero specificity keeps the
    defaults while letting a component set its own size. */
-.brand-root :where(input[type='text'], input[type='search'], input[type='number'], select, textarea) {
+.brand-root :where(input[type='text'], input[type='search'], input[type='number'], input[type='time'], select, textarea) {
   height: var(--ctl-height-md);
   padding: 0 var(--space-5);
   border: var(--bw-thin) solid var(--border-default);
@@ -496,7 +479,7 @@ html[data-theme='dark'] {
    specificity. In the rule above it was (0,2,1) and beat every component that
    asked for a narrower field — which is why a 240px search box rendered full
    width. Everything still defaults to 100%; only an explicit width now wins. */
-.brand-root :where(input[type='text'], input[type='search'], input[type='number'], select, textarea) {
+.brand-root :where(input[type='text'], input[type='search'], input[type='number'], input[type='time'], select, textarea) {
   width: 100%;
 }
 .brand-root textarea { height: auto; padding: var(--space-4) var(--space-5); resize: vertical; }
@@ -730,7 +713,6 @@ html[data-theme='dark'] {
 }
 .bx-status--monitor i { background: var(--fb-notice-dot); }
 
-
 /* --- Number stepper ---------------------------------------------------------------
    One bordered control holding the whole question: step down, the value, its
    unit, step up. The unit lives inside the border so it cannot wrap away from
@@ -790,5 +772,4 @@ html[data-theme='dark'] {
 .bx-step.is-corrected + .bx-step__hint { color: var(--fb-negative-fg); }
 
 @media (prefers-reduced-motion: reduce) {
-  .bx-step, .bx-step__hint { transition: none; }
-}
+  .bx-step, .bx-step__hint { transition: none; }}

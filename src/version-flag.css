@@ -1,6 +1,13 @@
 /* Floating switcher shown on the model-concept version. The brand revamp has
-   its own switcher in the nav rail footer, where it belongs. */
-.version-flag {
+   its own switcher in the nav rail footer, where it belongs.
+
+   Scoped rather than bare, and not for tidiness. concept-tokens.css resets
+   controls with `.concept-root button { background: none; border: none;
+   padding: 0 }` at (0,1,1), and a bare `.version-flag` is (0,1,0) — so the
+   reset won and this button rendered as inherited-colour text with no pill, no
+   padding and no background, floating bottom-right. Everything below was being
+   thrown away except the properties the reset does not name. */
+.concept-root .version-flag {
   position: fixed;
   right: 18px;
   bottom: 18px;
@@ -18,6 +25,6 @@
   box-shadow: 0 22px 55px -18px rgba(20, 30, 40, 0.5);
   z-index: 900;
 }
-.version-flag strong { color: #fff; font-weight: 500; }
-.version-flag span { color: #eb5424; }
-.version-flag:hover { background: #1a222b; }
+.concept-root .version-flag strong { color: #fff; font-weight: 500; }
+.concept-root .version-flag span { color: #eb5424; }
+.concept-root .version-flag:hover { background: #1a222b; }

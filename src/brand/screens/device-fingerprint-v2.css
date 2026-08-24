@@ -39,39 +39,8 @@
 .bfp2__tile--lg { width: 48px; height: 48px; border-radius: var(--radius-lg); }
 .bfp2__tile.is-match { background: var(--tint-blue-bg); color: var(--tint-blue-fg); }
 .bfp2__tile.is-risk { background: var(--tint-indigo-bg); color: var(--tint-indigo-fg); }
-
-.bfp2__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.bfp2__name {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-.bfp2__mode {
-  font-style: normal; padding: 1px 7px; border-radius: var(--radius-sm);
-  background: var(--surface-inset); font-size: 10px; font-weight: var(--fw-regular);
-  color: var(--text-muted); white-space: nowrap;
-}
-.bfp2__desc { font-size: var(--fs-md); color: var(--text-tertiary); }
-
-.bfp2__right { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
-.bfp2__count { font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; }
 .bfp2__uses { font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; }
 .bfp2__uses.is-quiet { color: var(--text-muted); }
-
-/* --- Empty ---------------------------------------------------------------------- */
-
-.bfp2__empty {
-  display: flex; flex-direction: column; align-items: center; gap: 10px;
-  padding: 56px 24px; text-align: center;
-  background: var(--surface-raised);
-  border: 1px dashed var(--border-default); border-radius: var(--radius-lg);
-}
-.bfp2__empty-ico {
-  display: grid; place-items: center; width: 52px; height: 52px;
-  border-radius: var(--radius-full);
-  background: var(--surface-inset); color: var(--text-tertiary);
-}
-.bfp2__empty h2 { margin: 4px 0 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bfp2__empty p { margin: 0 0 6px; max-width: 52ch; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.55; }
 
 /* --- Create form ----------------------------------------------------------------- */
 
@@ -350,21 +319,13 @@
    badge and priority is the one you compare across rows. */
 .bfp2__soonico { flex: none; display: grid; place-items: center; color: var(--fb-notice-fg); }
 
-/* The step marker in the footer, left of the hint. */
-.bfp2__stepcrumb {
-  flex: none;
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand-active);
-}
-
 /* Under about 820px the rail cannot be a column and stay legible, so it becomes
    a scrolling row of labels and gives its width back to the cards. */
 @media (max-width: 820px) {
   .bfp2__pickbody { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .bfp2__rail { flex-direction: row; overflow-x: auto; overflow-y: hidden; }
   .bfp2__railitem { white-space: nowrap; }
-  .bfp2__railitem > strong { flex: none; }
-}
+  .bfp2__railitem > strong { flex: none; }}
 
 /* Priority is ORDINAL, so it is a sequential ramp rather than a traffic light.
    It was green / blue / grey, and green for High reads as "safe" — a judgement
@@ -444,9 +405,7 @@
 
 @media (max-width: 720px) {
   .bfp2__head { flex-direction: column; gap: 12px; }
-  .bfp2__attrow { flex-wrap: wrap; gap: 10px; }
-  .bfp2__desc { display: none; }
-}
+  .bfp2__attrow { flex-wrap: wrap; gap: 10px; }}
 
 /* --- Score bands, as a strip ------------------------------------------------------
    Risk mode only. It used to be a panel above the attributes and it did not
@@ -529,8 +488,7 @@
 .bfp2__cat .bfp2__rows { padding: 4px 16px 8px; }
 
 @media (max-width: 720px) {
-  .bfp2__cathead > em { display: none; }
-}
+  .bfp2__cathead > em { display: none; }}
 
 /* --- Card and table views ----------------------------------------------------------
    Same arrangement Zones uses, for the same reason: a profile is COMPARED by
@@ -584,8 +542,7 @@
 
 @media (max-width: 860px) {
   .bfp2__trow { grid-template-columns: 24px minmax(0, 1fr) 70px; }
-  .bfp2__trow > :nth-child(3), .bfp2__trow > :nth-child(5) { display: none; }
-}
+  .bfp2__trow > :nth-child(3), .bfp2__trow > :nth-child(5) { display: none; }}
 
 /* --- Used by ---------------------------------------------------------------
 

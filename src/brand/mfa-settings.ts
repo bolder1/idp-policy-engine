@@ -376,36 +376,6 @@ export const FAMILIES: MfaFamily[] = [
   },
 ]
 
-/* --- The settings that are not about one method ------------------------------
-
-   The sheet's last block. These sit outside the families because they govern
-   the whole second factor rather than any one way of proving it — which is also
-   the answer to the sheet's open question about where the default method goes.
-   -------------------------------------------------------------------------- */
-
-export interface GeneralSetting {
-  id: string
-  label: string
-  help?: string
-  source?: SettingSource
-  value: boolean
-}
-
-export const ALTERNATE_SETTINGS: GeneralSetting[] = [
-  { id: 'forgot-phone', label: 'Enable Forgot Phone', help: 'Users who cannot reach their enrolled device get a recovery path.', value: true },
-  { id: 'user-select', label: 'Let users pick their own method at sign-in', help: 'Otherwise they get the default and nothing else.', value: true },
-  { id: 'security-codes', label: 'Let users sign in with security codes', value: true },
-]
-
-export const ADMIN_SETTINGS: GeneralSetting[] = [
-  { id: 'admin-mfa', label: 'Require MFA for additional admin accounts', help: 'Applies at login, on top of whatever the policy says.', source: 'prod', value: true },
-]
-
-/* Flattened views, for the places that still want one. */
-export const ALL_METHODS = FAMILIES.flatMap((f) => f.methods.map((m) => ({ ...m, familyId: f.id, familyName: f.name })))
-
-export const familyOf = (methodId: string) => FAMILIES.find((f) => f.methods.some((m) => m.id === methodId))
-
 /** Every setting on screen, with the level it belongs to. Used by the tests to
     assert nothing from the sheet was dropped in transcription. */
 export function allSettings(): { familyId: string; methodId?: string; setting: MfaSetting }[] {

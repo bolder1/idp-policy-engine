@@ -196,13 +196,21 @@ export function Policies() {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'modified', dir: 1 })
   const [menuFor, setMenuFor] = useState<string | null>(null)
 
+  /* Keyed on the three collections it reads, not on the store object.
+
+     `store` changes identity whenever anything in it changes, so this memo was
+     rebuilt by edits that had nothing to do with it — and because the gauntlet
+     memo below lists `env` as a dependency, every policy was re-scored each
+     time. Naming the real inputs means the deck recomputes when a zone,
+     fingerprint or group actually changes, and not otherwise. */
+  const { zones, fingerprints, groups } = store
   const env = useMemo<SimEnv>(
     () => ({
-      zoneName: (id) => store.zoneById(id)?.name ?? id,
-      fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
-      groupName: (id) => store.groupById(id).name,
+      zoneName: (id) => zones.find((z) => z.id === id)?.name ?? id,
+      fingerprintName: (id) => fingerprints.find((p) => p.id === id)?.name ?? id,
+      groupName: (id) => (groups.find((g) => g.id === id) ?? groups[0]).name,
     }),
-    [store],
+    [zones, fingerprints, groups],
   )
 
   /* Two exclusions, both to stop the column asserting things it cannot know.

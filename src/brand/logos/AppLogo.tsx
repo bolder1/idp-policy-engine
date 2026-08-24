@@ -89,13 +89,3 @@ export function AppLogoStack({
     </span>
   )
 }
-
-/** Provenance for the logo set — which provider answered, and when. */
-export function logoProvenance() {
-  const rows = Object.values(RESOLVED_LOGOS)
-  return {
-    total: rows.length,
-    resolved: rows.filter((r) => r.file).length,
-    providers: [...new Set(rows.map((r) => r.provider).filter(Boolean))] as string[],
-  }
-}

@@ -71,6 +71,7 @@ import {
 import { useBrand } from '../store'
 import { EmptyState, DeviceArt } from '../empty'
 import type { Policy } from '../data'
+import { policiesUsing, rulesUsing } from './usage'
 
 /* -----------------------------------------------------------------------------
    Device fingerprint · profiles.
@@ -188,7 +189,7 @@ function ProfileList({
               <span role="columnheader">Used by</span>
             </div>
             {profiles.map((p) => {
-              const uses = rulesUsing(p.id, policies)
+              const uses = rulesUsing('fingerprint', p.id, policies)
               return (
               <div className="bfp2__trow" role="row" key={p.id}>
                 <span role="cell" className={`bfp2__tile bfp2__tile--sm is-${p.mode}`} aria-hidden>
@@ -706,8 +707,8 @@ function ProfilePage({
 }) {
   const [adding, setAdding] = useState(false)
   const chosen = profile.enabled.map(byId).filter((a): a is Attribute => Boolean(a))
-  const uses = rulesUsing(profile.id, policies)
-  const users = policiesUsing(profile.id, policies)
+  const uses = rulesUsing('fingerprint', profile.id, policies)
+  const users = policiesUsing('fingerprint', profile.id, policies)
 
   const setConfig = (id: string, v: string | number) =>
     onChange({ ...profile, config: { ...profile.config, [id]: v } })
@@ -1319,27 +1320,5 @@ function AddModal({
    telling them where the danger is. Three is not actionable; three *named*
    policies are — you can go and read them before you save.
 
-   The same shape as `policiesUsing` in ZonesFinal, deliberately, because these
-   two pages answer the same question about two different shared objects and an
-   admin should not have to learn the answer twice. */
-function policiesUsing(profileId: string, policies: Policy[]) {
-  return policies
-    .map((policy) => ({
-      policy,
-      rules: policy.rules
-        .filter((r) => r.conditions.some((c) => c.typeId === 'fingerprint' && c.values.includes(profileId)))
-        .map((r) => r.name),
-    }))
-    .filter((x) => x.rules.length > 0)
-}
-
-function rulesUsing(profileId: string, policies: Policy[]): number {
-  return policies.reduce(
-    (n, p) =>
-      n +
-      p.rules.filter((r) =>
-        r.conditions.some((c) => c.typeId === 'fingerprint' && c.values.includes(profileId)),
-      ).length,
-    0,
-  )
-}
+   It used to say the same shape as `policiesUsing` in ZonesFinal, deliberately.
+   It is now literally the same function — see ./usage. */

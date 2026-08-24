@@ -238,112 +238,6 @@ export const ipSectionEmpty = (z: Zone) => z.ip.length === 0 && z.asn.length ===
 export const locationEmpty = (l: ZoneLocation) =>
   l.countries.length === 0 && l.states.length === 0 && l.cities.length === 0 && !l.radius
 
-/* The authentication catalogue, read off the prototype's 2-Factor
-   Authentication → Methods tab.
-
-   Two facts here are the reason a method set is not just a list of strings.
-
-   `enabled` is tenant-wide: the 2FA page decides which factors exist at all, and
-   a method that is off there cannot be satisfied by any user, whatever a policy
-   rule asks for. A set containing one is a set that cannot be met.
-
-   `variants` matter because the catalogue is two levels deep — "Email" is the
-   method, "OTP over Email" and "Email Link" are the ways it can be delivered.
-   Sets reference the method, not the delivery, or the same set would mean
-   different things as delivery options are toggled. */
-export interface AuthMethod {
-  id: string
-  name: string
-  group: 'Phishing-Resistant' | 'Standard MFA' | 'Fallback & Recovery'
-  description: string
-  variants?: string[]
-  phishingResistant?: boolean
-  /** Switched on tenant-wide. Off means no user can complete it. */
-  enabled: boolean
-  enrolled?: number
-  /** Shared with the Recovery configuration, so disabling it there matters. */
-  alsoRecovery?: boolean
-}
-
-export const AUTH_METHODS: AuthMethod[] = [
-  {
-    id: 'passkey', name: 'WebAuthn / FIDO2 + Passkeys', group: 'Phishing-Resistant',
-    description: "Built into the user's device — Face ID, Windows Hello, or platform passkey. No separate hardware required.",
-    variants: ['FIDO2 / Passkey'], phishingResistant: true, enabled: true, enrolled: 1203,
-  },
-  {
-    id: 'seckey', name: 'Security Keys (FIDO2 / WebAuthn)', group: 'Phishing-Resistant',
-    description: 'External USB or NFC device the user carries and taps or inserts. Required for platforms without built-in biometrics.',
-    phishingResistant: true, enabled: false,
-  },
-
-  {
-    id: 'mo-auth', name: 'miniOrange Authenticator', group: 'Standard MFA',
-    description: 'Push notifications, OTP, and QR-based verification via the miniOrange app.',
-    variants: ['miniOrange Push', 'miniOrange OTP', 'miniOrange QR Verify'], enabled: true, enrolled: 1203,
-  },
-  {
-    id: 'auth-apps', name: 'Authenticator Apps', group: 'Standard MFA',
-    description: 'Time-based one-time codes from third-party authenticator apps.',
-    variants: ['Google Authenticator', 'Microsoft Authenticator', 'Authy Authenticator', 'Microsoft Push'],
-    enabled: true, enrolled: 847,
-  },
-  {
-    id: 'sms', name: 'SMS', group: 'Standard MFA',
-    description: 'OTP over SMS, SMS Link, and OTP over SMS and Email.',
-    variants: ['OTP over SMS', 'SMS Link', 'OTP over SMS and Email'], enabled: true, enrolled: 512,
-  },
-  {
-    id: 'email', name: 'Email', group: 'Standard MFA',
-    description: 'OTP over Email, Email Link, and OTP over Alternate Email.',
-    variants: ['OTP over Email', 'Email Link'], enabled: true, enrolled: 612,
-  },
-  {
-    id: 'call', name: 'Call Verification', group: 'Standard MFA',
-    description: 'Automated voice call with a spoken one-time code.', enabled: false,
-  },
-  {
-    id: 'grid', name: 'Grid Pattern', group: 'Standard MFA',
-    description: 'User-defined grid coordinates entered as a second factor.', enabled: false,
-  },
-  {
-    id: 'hw-otp', name: 'Hardware OTP Tokens', group: 'Standard MFA',
-    description: 'Yubikey, Display Token, Vasco. Generates a one-time code; can be phished or replayed like any OTP.',
-    enabled: false,
-  },
-  {
-    id: 'smartcard', name: 'Smart Cards (CAC)', group: 'Standard MFA',
-    description: 'Certificate-based smart card / CAC login.', enabled: false,
-  },
-  {
-    id: 'rsa', name: 'RSA Authenticator (SecurID)', group: 'Standard MFA',
-    description: 'RSA SecurID token codes.', enabled: false,
-  },
-  {
-    id: 'biometric', name: 'Biometric', group: 'Standard MFA',
-    description: 'Device-based biometric verification — fingerprint reader or platform passkey.', enabled: false,
-  },
-  {
-    id: 'kba', name: 'Security Questions', group: 'Standard MFA',
-    description: 'Knowledge-based answers (KBA). Shared with your Recovery configuration.',
-    enabled: true, enrolled: 390, alsoRecovery: true,
-  },
-
-  {
-    id: 'password', name: 'Password', group: 'Fallback & Recovery',
-    description: 'Standard password-based sign in. Configure the password policy end users must follow.',
-    enabled: true,
-  },
-]
-
-export const METHOD_GROUPS: { name: AuthMethod['group']; blurb: string }[] = [
-  { name: 'Phishing-Resistant', blurb: 'Cryptographically bound credentials. Cannot be replayed or intercepted.' },
-  { name: 'Standard MFA', blurb: 'One-time codes and push notifications. Effective but susceptible to phishing.' },
-  { name: 'Fallback & Recovery', blurb: 'Break-glass options for when primary methods are unavailable. Not recommended as primary authentication.' },
-]
-
-export const methodByName = (n: string) => AUTH_METHODS.find((m) => m.name === n)
-
 export interface MethodSet {
   id: string
   name: string
@@ -587,9 +481,17 @@ export const policies: Policy[] = [
         conditions: [cond('ml-risk', 'is', ['High']), cond('zone', 'not in zone', ['office'], 'AND')],
         decision: '2fa',
         secondFactor: 'specific',
-        // "Specific" with nothing named is a rule that cannot be satisfied —
-        // the diagnostics checker found this gap in the seed.
-        secondFactorMethods: ['WebAuthn / FIDO2 + Passkeys', 'miniOrange Authenticator'],
+        /* "Specific" with nothing named is a rule that cannot be satisfied —
+           the diagnostics checker found this gap in the seed.
+
+           These are matched against the live catalogue BY NAME (see
+           `rulesUsing` in AuthMethods.tsx), so they have to be names that
+           actually exist in methods.ts. They were 'WebAuthn / FIDO2 + Passkeys'
+           and 'miniOrange Authenticator' — spellings from the older catalogue
+           in this file, which nothing reads any more. Neither resolved, so the
+           join found nothing and "Used in N policy rules" rendered on none of
+           the twenty-one method cards. */
+        secondFactorMethods: ['FIDO2 / Passkey', 'miniOrange Push'],
         matchEstimate: 12,
       }),
       rule({

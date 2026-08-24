@@ -224,7 +224,11 @@
 .biv__record button:hover { background: var(--surface-sunken); }
 .biv__record button > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .biv__record em { font-style: normal; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
-.biv__record strong { font-size: var(--fs-md); font-weight: var(--fw-normal); color: var(--text-primary); }
+/* --fw-regular, not --fw-normal. The latter is not a token, so this declaration
+   was invalid at computed-value time and the weight fell back to inherited —
+   which is bold, from the <strong>, i.e. the exact opposite of what it asks
+   for. */
+.biv__record strong { font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-primary); }
 .biv__record svg { flex: none; color: var(--text-muted); opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard); }
 .biv__record button:hover svg, .biv__record button:focus-visible svg { opacity: 1; }
 

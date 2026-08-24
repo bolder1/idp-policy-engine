@@ -128,11 +128,32 @@
 }
 .field__hint { margin: 0; font-size: 12px; color: var(--text-3); }
 
-input[type='text'],
-input[type='number'],
-input[type='time'],
-select,
-textarea {
+/* Scoped to .concept-root, like every other rule in this file and like the
+   tokens it reads.
+
+   These two blocks were the only bare element selectors in the concept's
+   stylesheets, and main.tsx loads that stylesheet globally — so they applied
+   to the brand app too. `input[type='text']` is (0,1,1); the brand kit's
+   default is `.brand-root :where(input[type='text'], …)`, and :where()
+   contributes nothing, so that is (0,1,0). The legacy rule won on every brand
+   text input, number input, select and textarea.
+
+   Winning would have been survivable if the values were harmless. They are
+   not: --border, --bg, --orange and --orange-50 are defined on .concept-root
+   and nowhere else, so in the brand app each declaration was invalid at
+   computed-value time and fell back to its initial — border-style: none and a
+   transparent background, with the focus ring resolving to no shadow and a
+   currentColor border. Any brand input that relied on the kit default rendered
+   as an invisible box. The zone-name field was one; it was patched there with
+   a more specific selector, which treated the symptom.
+
+   Nothing else needed: the concept app renders entirely inside
+   <div className="concept-root">. */
+.concept-root input[type='text'],
+.concept-root input[type='number'],
+.concept-root input[type='time'],
+.concept-root select,
+.concept-root textarea {
   border: 1px solid var(--border);
   background: var(--bg);
   border-radius: var(--radius);
@@ -141,9 +162,9 @@ textarea {
   width: 100%;
   transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-input:focus,
-select:focus,
-textarea:focus {
+.concept-root input:focus,
+.concept-root select:focus,
+.concept-root textarea:focus {
   outline: none;
   border-color: var(--orange);
   box-shadow: 0 0 0 3px var(--orange-50);

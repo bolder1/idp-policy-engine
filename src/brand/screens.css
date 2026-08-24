@@ -381,8 +381,6 @@
 
 /* --- Builder -------------------------------------------------------------- */
 
-
-
 /* --- Rule editor ---------------------------------------------------------- */
 
 .bedit {
@@ -686,26 +684,6 @@
 /* --- Master / detail pages ------------------------------------------------ */
 
 .bmaster { display: grid; grid-template-columns: 268px minmax(0, 1fr); gap: var(--space-6); align-items: start; }
-.bmaster__list {
-  background: var(--surface-raised);
-  border: var(--bw-thin) solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
-}
-.bmaster__item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  width: 100%;
-  padding: var(--space-4) var(--space-5);
-  border-radius: var(--radius-md);
-  font-size: var(--fs-md);
-  text-align: left;
-}
-.bmaster__item:hover { background: var(--surface-sunken); }
-.bmaster__item.is-on { background: var(--brand-subtle-bg); color: var(--brand-active); font-weight: var(--fw-medium); }
-.bmaster__foot { display: flex; justify-content: flex-end; gap: var(--space-4); margin-top: var(--space-6); padding-top: var(--space-5); border-top: var(--bw-thin) solid var(--border-subtle); }
 
 .bimpactbox { margin-top: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); }
 .bdeps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
@@ -738,38 +716,6 @@
 }
 .bmethods__row:last-child { border-bottom: none; }
 
-/* --- Templates ------------------------------------------------------------ */
-
-.btpl { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-5); }
-.btpl__card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-6);
-  background: var(--surface-raised);
-  border: var(--bw-thin) solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--el-low);
-}
-.btpl__card header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
-.btpl__card h3 { font-size: var(--fs-base); }
-.btpl__desc { font-size: var(--fs-sm); color: var(--text-secondary); }
-.btpl__meta { font-size: var(--fs-xs); color: var(--text-muted); }
-.btpl__toggle { align-self: flex-start; font-size: var(--fs-sm); color: var(--text-link); }
-.btpl__rules { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
-.btpl__rules li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  background: var(--surface-sunken);
-  border-radius: var(--radius-md);
-}
-.btpl__rules li > span { flex: 1; display: flex; flex-direction: column; }
-.btpl__rules strong { font-size: var(--fs-sm); font-weight: var(--fw-medium); }
-.btpl__rules em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
-.btpl__card footer { margin-top: auto; padding-top: var(--space-3); }
-
 /* --- Narrow --------------------------------------------------------------- */
 
 @media (max-width: 1400px) {
@@ -778,5 +724,4 @@
   .bmaster { grid-template-columns: minmax(0, 1fr); }
   .bnew { grid-template-columns: minmax(0, 1fr); }
   .bnew__other { border-left: none; border-top: var(--bw-thin) solid var(--border-subtle); }
-  .bdec { grid-template-columns: minmax(0, 1fr); }
-}
+  .bdec { grid-template-columns: minmax(0, 1fr); }}

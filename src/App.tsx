@@ -1,14 +1,6 @@
-import { useState } from 'react'
-import { MotionConfig } from 'motion/react'
+import { Suspense, lazy, useState } from 'react'
 
 import { BrandApp } from './brand/BrandApp'
-import { Shell } from './components/Shell'
-import { Builder } from './screens/Builder'
-import { Coverage } from './screens/Coverage'
-import { NamedObjects } from './screens/NamedObjects'
-import { Resolution } from './screens/Resolution'
-import { Simulate } from './screens/Simulate'
-import { StoreProvider, useStore } from './state/store'
 
 /* -----------------------------------------------------------------------------
    Two versions live side by side.
@@ -20,40 +12,13 @@ import { StoreProvider, useStore } from './state/store'
                (coverage matrix, App x Group binding). Kept for comparison
                rather than deleted, because the question it answers is still
                open — it just isn't this pass's question.
+
+   Only the brand app ships with the entry. The concept is a whole second
+   application behind a button almost nobody presses, so it loads when pressed
+   — see ConceptApp.tsx, which carries its own stylesheets for the same reason.
    -------------------------------------------------------------------------- */
 
-function ConceptRouter() {
-  const { screen } = useStore()
-  switch (screen.name) {
-    case 'coverage':
-      return <Coverage />
-    case 'builder':
-      return <Builder policyId={screen.policyId} />
-    case 'simulate':
-      return <Simulate policyId={screen.policyId} />
-    case 'resolution':
-      return <Resolution userId={screen.userId} appId={screen.appId} />
-    case 'objects':
-      return <NamedObjects />
-  }
-}
-
-function ConceptApp({ onSwitchVersion }: { onSwitchVersion: () => void }) {
-  return (
-    <MotionConfig reducedMotion="user">
-      <div className="concept-root">
-        <StoreProvider>
-          <Shell>
-            <ConceptRouter />
-          </Shell>
-          <button type="button" className="version-flag" onClick={onSwitchVersion}>
-            Viewing <strong>Model concept</strong> <span>back to brand revamp →</span>
-          </button>
-        </StoreProvider>
-      </div>
-    </MotionConfig>
-  )
-}
+const ConceptApp = lazy(() => import('./ConceptApp'))
 
 export default function App() {
   const [version, setVersion] = useState<'brand' | 'concept'>('brand')
@@ -61,6 +26,17 @@ export default function App() {
   return version === 'brand' ? (
     <BrandApp onSwitchVersion={() => setVersion('concept')} />
   ) : (
-    <ConceptApp onSwitchVersion={() => setVersion('brand')} />
+    /* Styled inline rather than through a class: this renders in the gap
+       before the concept's stylesheets have loaded, so any class it named
+       would be unstyled at exactly the moment it is on screen. */
+    <Suspense
+      fallback={
+        <p style={{ padding: '48px', font: '14px system-ui, sans-serif', color: '#7a818b' }}>
+          Loading the model concept…
+        </p>
+      }
+    >
+      <ConceptApp onSwitchVersion={() => setVersion('brand')} />
+    </Suspense>
   )
 }

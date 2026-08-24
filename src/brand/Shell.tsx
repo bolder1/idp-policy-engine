@@ -28,7 +28,7 @@ import {
 
 import { EditionBar } from './EditionBar'
 import { PersonaBar } from './PersonaBar'
-import { useBrand, type BrandScreen } from './store'
+import { useBrand, useToast, type BrandScreen } from './store'
 
 /* -----------------------------------------------------------------------------
    AdminShell — the live console's chrome, measured off
@@ -162,7 +162,7 @@ function isActive(current: BrandScreen, item: NavItem): boolean {
 }
 
 export function Shell({ children, onSwitchVersion }: { children: ReactNode; onSwitchVersion: () => void }) {
-  const { screen, go, toast } = useBrand()
+  const { screen, go } = useBrand()
   const main = useRef<HTMLElement>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [collapsed, setCollapsed] = useState(false)
@@ -377,21 +377,30 @@ export function Shell({ children, onSwitchVersion }: { children: ReactNode; onSw
         </button>
       </div>
 
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            className="bshell__toast"
-            initial={{ opacity: 0, y: 14, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.99 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 38 }}
-            role="status"
-          >
-            {toast}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Toast />
     </div>
+  )
+}
+
+/* Its own component, so subscribing to the toast re-renders this node rather
+   than the whole shell around it. */
+function Toast() {
+  const toast = useToast()
+  return (
+    <AnimatePresence>
+      {toast && (
+        <motion.div
+          className="bshell__toast"
+          initial={{ opacity: 0, y: 14, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.99 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+          role="status"
+        >
+          {toast}
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 

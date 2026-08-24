@@ -56,10 +56,6 @@
 }
 .bv5__row:last-child { border-bottom: 0; }
 .bv5__rn { display: block; font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bv5__sublabel {
-  margin: 14px 0 8px;
-  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary);
-}
 
 /* --- Radios ----------------------------------------------------------------- */
 
@@ -117,26 +113,6 @@
    it made the one case that matters look like more of the same. */
 .bv5__dep.is-warn { background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border); color: var(--fb-notice-fg); }
 
-/* --- Stats ------------------------------------------------------------------ */
-
-.bv5__stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
-.bv5__stat {
-  flex: 1; min-width: 120px;
-  padding: 12px 14px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-}
-.bv5__stat strong { display: block; font-size: var(--fs-2xl); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bv5__stat span {
-  display: block; margin-top: 2px;
-  font-size: var(--fs-xs); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
-}
-.bv5__stat.is-green strong { color: var(--fb-positive-fg); }
-.bv5__stat.is-amber strong { color: var(--fb-notice-fg); }
-
-
-
 /* --- Method identity ---------------------------------------------------------
    A vendor logo where a vendor exists, a channel icon where one does not.
    Both render at the same box so rows stay aligned whichever a method gets. */
@@ -151,20 +127,6 @@
 }
 .bv5__mico--logo { object-fit: contain; padding: 3px; background: var(--surface-raised); }
 
-/* Rows carry the rules, so every row gets one and the last in a section does
-   not — the section boundary is already a line. */
-.bv5__list .bv5__group2-body .bv5__row { padding: 13px 0; border-bottom: 1px solid var(--border-subtle); }
-.bv5__list .bv5__group2-body .bv5__row:first-child { border-bottom: 1px solid var(--border-subtle); }
-.bv5__list .bv5__group2-body .bv5__row:last-child { border-bottom: 0; }
-
-.bv5__list .bv5__scroller .bv5__mico { flex: none; }
-
-.bv5__group2-body .bv5__row { padding: 12px 0; }
-.bv5__group2-body .bv5__row:first-child { border-bottom: 0; }
-
-.bv5__rank .bv5__mico { flex: none; }
-.bv5__xferrow .bv5__mico { flex: none; }
-
 /* --- After the text cut ----------------------------------------------------------
    Rows are a name and a control. The sentence that used to sit under every name
    is on a TipDot beside it: one gesture away for anyone who needs it, and off
@@ -173,8 +135,6 @@
 
 .bv5__row { align-items: center; }
 .bv5__rn { display: flex; align-items: center; gap: 7px; }
-
-.bv5__pick .bv5__mico { flex: none; box-sizing: border-box; }
 
 /* --- Recovery options ------------------------------------------------------------
    What separates these three is how much proof each asks for, and that was
@@ -194,16 +154,3 @@
    as a hole punched in the selected one. Transparent has no theme to get
    wrong. */
 .bv5__radio.is-on .bv5__radio-ico { background: transparent; border-color: var(--brand-subtle-border); color: var(--brand-active); }
-
-/* Two classes, because `.bv5__dsetting span` at (0,1,1) already claims every
-   span in the row and would render this number control as a block of 12px
-   tertiary text. (0,2,0) beats it. */
-.bv5__dsetting .bv5__dnum {
-  display: inline-flex; align-items: center; gap: 6px;
-  margin-top: 0; font-size: var(--fs-md); color: var(--text-secondary);
-}
-.bv5 .bv5__dnum input {
-  width: 68px; height: var(--ctl-height-sm); padding: 0 8px;
-  background: var(--surface-raised); border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm); font-size: var(--fs-md); color: var(--text-body);
-}

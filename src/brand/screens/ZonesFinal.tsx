@@ -34,8 +34,9 @@ import {
 import { coveredBy, placeContext, searchPlaces, type Place } from '../places'
 import { useBrand } from '../store'
 import { EmptyState, UnusedArt, ZoneArt } from '../empty'
-import { canSaveZone, classifyIp, describeZone, validateZone } from './zone-validation'
+import { classifyIp, describeZone, validateZone } from './zone-validation'
 import { parseEntries } from './zone-entries'
+import { policiesUsing, rulesUsing } from './usage'
 
 /* -----------------------------------------------------------------------------
    Zones · final.
@@ -96,12 +97,7 @@ export function ZonesFinal() {
   const [view, setView] = useState<View>('list')
   const [q, setQ] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
-  /* The edit panel. `null` closed, otherwise the id being edited — creation
-     no longer comes through here. */
-  const [editing, setEditing] = useState<string | null>(null)
-
   const open = openId ? store.zones.find((z) => z.id === openId) ?? null : null
-  const draftOf = editing ? store.zones.find((z) => z.id === editing) ?? null : null
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -127,14 +123,6 @@ export function ZonesFinal() {
     /* Straight to the inner page. The zone exists and matches nothing yet,
        which is exactly the state the page is being asked to make workable. */
     setOpenId(id)
-  }
-
-  /* Only ever an edit now — creation goes through the naming dialog and the
-     inner page, so the panel never opens on a zone that does not exist yet. */
-  const save = (z: Zone) => {
-    store.updateZone(z)
-    setEditing(null)
-    store.showToast(`${z.name} saved`)
   }
 
   return (
@@ -256,13 +244,6 @@ export function ZonesFinal() {
       )}
 
       <NameOnlyModal open={naming} onClose={() => setNaming(false)} onCreate={createByName} />
-
-      <ZoneFormPanel
-        open={editing !== null}
-        zone={draftOf}
-        onClose={() => setEditing(null)}
-        onSave={save}
-      />
     </div>
   )
 }
@@ -337,8 +318,13 @@ function Chips({ items, max = 3 }: { items: string[]; max?: number }) {
 function ZoneCard({ zone, policies, onOpen }: { zone: Zone; policies: Policy[]; onOpen: () => void }) {
   const shape = shapeOf(zone)
   const meta = SHAPE[shape]
-  const uses = rulesUsing(zone.id, policies)
-  const worst = validateZone(zone).find((i) => i.level === 'error') ?? validateZone(zone).find((i) => i.level === 'warning')
+  const uses = rulesUsing('zone', zone.id, policies)
+  /* One pass, two questions. This read `validateZone(zone).find(error) ??
+     validateZone(zone).find(warning)`, which ran the whole validation — every
+     entry through the IP classifier — a second time for every card without an
+     error, which is most of them. */
+  const issues = validateZone(zone)
+  const worst = issues.find((i) => i.level === 'error') ?? issues.find((i) => i.level === 'warning')
 
   return (
     <li className="bz7__card">
@@ -416,7 +402,7 @@ function ZoneTable({
       </div>
       {zones.map((z) => {
         const meta = SHAPE[shapeOf(z)]
-        const uses = rulesUsing(z.id, policies)
+        const uses = rulesUsing('zone', z.id, policies)
         return (
           <div className="bz7__trow" role="row" key={z.id}>
             <span role="cell" className={`bz7__tile bz7__tile--sm is-${meta.tint}`} aria-hidden>
@@ -518,7 +504,7 @@ function ZoneDetail({
      none of the page's vertical space the rest of the time. */
   const [showUses, setShowUses] = useState(false)
   const issues = validateZone(zone)
-  const users = policiesUsing(zone.id, policies)
+  const users = policiesUsing('zone', zone.id, policies)
 
   const netCount = zone.ip.length + zone.asn.length
   const placeCount =
@@ -814,242 +800,6 @@ function NameOnlyModal({
   )
 }
 
-/* --- The form, as a side panel ------------------------------------------------------
-   It was a 980px centred modal holding two columns joined by an AND. Three
-   things were wrong with that, and all three came from the layout being drawn
-   before the question was asked.
-
-   - It opened showing BOTH halves, so a zone that only ever constrains a
-     country still made you look at an address field and decide to ignore it.
-     Every new zone started life as two empty forms.
-   - The AND between the columns described the engine, not the task. It is true
-     that the halves are ANDed, but that is a fact about evaluation, and the
-     person filling this in is naming a place, not writing a boolean.
-   - Side by side caps each half at about 460px. Survivable for four addresses,
-     wrong for five hundred, which is what this field actually accepts.
-
-   So: a panel, and a sequence. Name it, say what it matches on, then fill in
-   only what you said. The two kinds are a multi-select rather than a switch,
-   because "our ranges, but only from India" is a real zone and forcing a choice
-   between them would make it unbuildable. */
-function ZoneFormPanel({
-  open,
-  zone,
-  onClose,
-  onSave,
-}: {
-  open: boolean
-  zone: Zone | null
-  onClose: () => void
-  onSave: (z: Zone) => void
-}) {
-  const [draft, setDraft] = useState<Zone>(zone ?? blank())
-  const [seeded, setSeeded] = useState<string | null>(null)
-  const [confirming, setConfirming] = useState(false)
-  /* Which halves the zone constrains. Not stored on the Zone: an empty list
-     already means "any", so this is disclosure state for the form, seeded from
-     whatever the zone already holds. */
-  const [use, setUse] = useState({ net: false, place: false })
-
-  /* Re-seed when the panel opens on a different subject. Keyed on the id rather
-     than the object, because the store replaces the array on every write and
-     the object identity changes without the subject changing. */
-  const subject = zone?.id ?? 'new'
-  if (open && seeded !== subject) {
-    setSeeded(subject)
-    const next = zone ? { ...zone, location: { ...zone.location } } : blank()
-    setDraft(next)
-    /* An existing zone opens with the halves it already uses ticked. A new one
-       opens with neither, because which halves it needs is the first thing
-       being asked. */
-    setUse({ net: !ipSectionEmpty(next), place: !locationEmpty(next.location) })
-    setConfirming(false)
-  }
-  if (!open && seeded !== null) setSeeded(null)
-
-  const dirty = JSON.stringify(draft) !== JSON.stringify(zone ?? blank())
-  const named = draft.name.trim().length > 0
-  const ok = named && canSaveZone(draft)
-
-  const close = () => {
-    if (dirty && !confirming) {
-      setConfirming(true)
-      return
-    }
-    setConfirming(false)
-    onClose()
-  }
-
-  const netCount = draft.ip.length + draft.asn.length
-  const placeCount =
-    draft.location.countries.length + draft.location.states.length + draft.location.cities.length
-
-  /* Unticking a half clears it, because leaving the values behind would save a
-     zone narrower than the form says it is. The count sits on the card so the
-     cost of unticking is visible before it is paid. */
-  const toggleNet = () => {
-    if (use.net) setDraft({ ...draft, ip: [], asn: [] })
-    setUse({ ...use, net: !use.net })
-  }
-  const togglePlace = () => {
-    if (use.place)
-      setDraft({ ...draft, location: { ...draft.location, countries: [], states: [], cities: [] } })
-    setUse({ ...use, place: !use.place })
-  }
-
-  return (
-    <Drawer
-      open={open}
-      onClose={close}
-      title={zone ? 'Edit ' + zone.name : 'New zone'}
-      caption={zone ? undefined : 'Name it, then choose what it matches on.'}
-      /* Wide for a drawer, because five hundred entries need a list that is not
-         a column of wrapped text, and resizable because how wide is enough
-         depends on whether this zone holds four addresses or four hundred. */
-      width={620}
-      resizable
-      maxWidth={900}
-      actions={
-        confirming ? (
-          <>
-            <span className="bz7__footnote">Discard your changes?</span>
-            <Button variant="ghost" onClick={() => setConfirming(false)}>
-              Keep editing
-            </Button>
-            <Button variant="danger" onClick={onClose}>
-              Discard
-            </Button>
-          </>
-        ) : (
-          <>
-            <span className="bz7__footnote">{describeDraft(draft)}</span>
-            <Button variant="ghost" onClick={close}>
-              Cancel
-            </Button>
-            <Button
-              variant="brand"
-              disabled={!ok}
-              onClick={() =>
-                onSave({
-                  ...draft,
-                  id: draft.id || 'z-' + draft.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-                  name: draft.name.trim(),
-                })
-              }
-            >
-              {zone ? 'Save changes' : 'Create zone'}
-            </Button>
-          </>
-        )
-      }
-    >
-      <div className="bz7__form">
-        <label className="bz7__field">
-          <span>Zone name</span>
-          <input
-            type="text"
-            value={draft.name}
-            autoFocus
-            placeholder="Pune office egress"
-            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-          />
-        </label>
-
-        {/* The second question, and the one the old layout answered for you.
-
-            Both can be on: that is the whole reason this is a pair of
-            checkboxes and not a two-way switch. The zone the AND existed to
-            serve is still reachable, it is just no longer the default shape of
-            an empty form. */}
-        <fieldset className="bz7__pick" disabled={!named}>
-          <legend>What does this zone match on?</legend>
-          <PickCard
-            on={use.net}
-            icon={Network}
-            title="Addresses and networks"
-            blurb="IPs, CIDR blocks, ranges, or a whole operator by ASN."
-            count={netCount}
-            onToggle={toggleNet}
-          />
-          <PickCard
-            on={use.place}
-            icon={Globe}
-            title="Locations"
-            blurb="Countries, states and cities the request comes from."
-            count={placeCount}
-            onToggle={togglePlace}
-          />
-        </fieldset>
-
-        {!named && <p className="bz7__gate">Give the zone a name to carry on.</p>}
-
-        {/* Stacked, not columned, and with nothing between them. The AND was
-            describing how the engine joins these; the footer sentence says the
-            same thing in words that match the task. */}
-        {named && use.net && <AddressSection draft={draft} onChange={setDraft} />}
-        {named && use.place && <PlaceSection draft={draft} onChange={setDraft} />}
-
-        {named && !use.net && !use.place && (
-          <p className="bz7__gate">
-            Pick at least one. A zone that matches on neither matches everything.
-          </p>
-        )}
-      </div>
-    </Drawer>
-  )
-}
-
-/* One of the two kinds, as a card you tick.
-
-   A card rather than a checkbox row because the choice needs its sentence:
-   "Locations" alone does not tell you a city counts, and an admin who does not
-   know that goes looking for a second form. */
-function PickCard({
-  on,
-  icon: Icon,
-  title,
-  blurb,
-  count,
-  onToggle,
-}: {
-  on: boolean
-  icon: typeof Network
-  title: string
-  blurb: string
-  count: number
-  onToggle: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={on}
-      className={'bz7__pickcard ' + (on ? 'is-on' : '')}
-      onClick={onToggle}
-    >
-      <span className="bz7__pickbox" aria-hidden>
-        <Check size={11} strokeWidth={3.2} />
-      </span>
-      <Icon size={15} strokeWidth={1.9} aria-hidden className="bz7__pickico" />
-      <span className="bz7__pickbody">
-        <strong>{title}</strong>
-        <em>{blurb}</em>
-      </span>
-      {/* Says what unticking would throw away. */}
-      {on && count > 0 && <i className="bz7__pickcount">{count}</i>}
-    </button>
-  )
-}
-
-function describeDraft(z: Zone): string {
-  const net = ipSectionEmpty(z)
-  const loc = locationEmpty(z.location)
-  if (net && loc) return 'This zone would match every request. Add an address or a place.'
-  if (net) return 'Any address, in the places below.'
-  if (loc) return 'The addresses below, anywhere in the world.'
-  return 'The addresses below, and only in the places below.'
-}
-
 /* --- Addresses ---------------------------------------------------------------------
    One field for both. An admin pasting a block of network identifiers does not
    sort them into IPs and ASNs first, and asking them to is asking them to do
@@ -1103,15 +853,26 @@ function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) 
     setText(bad.join(' '))
   }
 
-  const all = [
-    ...draft.ip.map((v) => ({ v, kind: classifyIp(v) as string, asn: false })),
-    ...draft.asn.map((v) => ({ v, kind: ASN_DIRECTORY[v] ?? 'network operator', asn: true })),
-  ]
+  /* Memoized because this list has no ceiling — the paste box deliberately
+     accepts as many networks as an estate has, and classifyIp is a run of
+     regexes per entry. Unmemoized it re-classified the whole list on every
+     keystroke into the paste box and the filter, which are exactly the two
+     fields receiving keystrokes while the list is long. */
+  const all = useMemo(
+    () => [
+      ...draft.ip.map((v) => ({ v, kind: classifyIp(v) as string, asn: false })),
+      ...draft.asn.map((v) => ({ v, kind: ASN_DIRECTORY[v] ?? 'network operator', asn: true })),
+    ],
+    [draft.ip, draft.asn],
+  )
   /* A filter, not a search: it hides rows rather than ranking them, because the
      question at four hundred entries is "is 10.2.x in here" and the answer is
      the row or nothing. Only offered once scrolling starts. */
   const needle = filter.trim().toLowerCase()
-  const rows = needle ? all.filter((r) => r.v.toLowerCase().includes(needle) || r.kind.toLowerCase().includes(needle)) : all
+  const rows = useMemo(
+    () => (needle ? all.filter((r) => r.v.toLowerCase().includes(needle) || r.kind.toLowerCase().includes(needle)) : all),
+    [all, needle],
+  )
 
   return (
     <section className="bz7__sec">
@@ -1413,26 +1174,4 @@ function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) =>
    rather than guessed from the string. */
 function inCountry(name: string, country: string, kind: 'state' | 'city'): boolean {
   return searchPlaces(name, 40).some((p) => p.kind === kind && p.name === name && p.country === country)
-}
-
-function rulesUsing(zoneId: string, policies: Policy[]): number {
-  return policies.reduce(
-    (n, p) =>
-      n +
-      p.rules.filter((r) =>
-        r.conditions.some((c) => c.typeId === 'zone' && c.values.includes(zoneId)),
-      ).length,
-    0,
-  )
-}
-
-function policiesUsing(zoneId: string, policies: Policy[]) {
-  return policies
-    .map((policy) => ({
-      policy,
-      rules: policy.rules
-        .filter((r) => r.conditions.some((c) => c.typeId === 'zone' && c.values.includes(zoneId)))
-        .map((r) => r.name),
-    }))
-    .filter((x) => x.rules.length > 0)
 }

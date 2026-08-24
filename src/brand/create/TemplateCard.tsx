@@ -5,7 +5,6 @@ import {
   Globe,
   Maximize2,
   Network,
-  Plus,
   Sparkles,
   Users,
   Webhook,
@@ -267,56 +266,6 @@ export function TemplateCard({
         </span>
         <button type="button" className="bgcard__cta" onClick={onUse}>
           {useLabel}
-        </button>
-      </footer>
-    </article>
-  )
-}
-
-/** The blank card keeps the same skeleton so it sits in the grid, not beside it. */
-export function BlankTemplateCard({ onUse }: { onUse: () => void }) {
-  return (
-    <article className="bgcard bgcard--blank">
-      <div className="bgcard__canvas">
-        <ol className="bgcard__stack">
-          <li>
-            <span className="bgcard__mrow bgcard__mrow--ghost">
-              <span className="bgcard__mn" aria-hidden>
-                <Plus size={12} strokeWidth={2.2} />
-              </span>
-              <span className="bgcard__mname">Your first rule</span>
-            </span>
-          </li>
-          <li>
-            <span className="bgcard__mrow bgcard__mrow--ghost" />
-          </li>
-          <li>
-            <span className="bgcard__mrow bgcard__mrow--default">
-              <span className="bgcard__mn" aria-hidden>
-                ⌄
-              </span>
-              <span className="bgcard__mname">Everyone else</span>
-              <span className="bgcard__mdec is-allow">Allow</span>
-            </span>
-          </li>
-        </ol>
-        <p className="bgcard__readout">
-          <span className="bgcard__rlabel">Empty</span>
-          <span className="bgcard__rtext">every sign-in is allowed until you add a rule</span>
-        </p>
-      </div>
-
-      <div className="bgcard__body">
-        <h3 className="bgcard__h">Start from scratch</h3>
-        <p className="bgcard__sub">
-          An empty policy. Pick this when none of the templates match what you are protecting.
-        </p>
-      </div>
-
-      <footer className="bgcard__foot">
-        <span className="bgcard__meta">No rules yet</span>
-        <button type="button" className="bgcard__cta" onClick={onUse}>
-          Start blank
         </button>
       </footer>
     </article>

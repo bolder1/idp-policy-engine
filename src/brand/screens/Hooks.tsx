@@ -5,7 +5,7 @@ import { PageHead } from '../Shell'
 import { Badge, Button, Modal } from '../kit'
 import { useBrand } from '../store'
 import { EmptyState, HookArt } from '../empty'
-import type { Policy } from '../data'
+import { policiesUsing } from './usage'
 import {
   FAILURE_BLURB,
   FAILURE_LABEL,
@@ -65,6 +65,18 @@ export function Hooks() {
     store.showToast(`${h.name} saved`)
   }
 
+  /* Walked once. This read `policiesUsing(...).length > 0 ? policiesUsing(...).length`
+     — the same scan of every rule of every policy, run twice to ask a question
+     and then answer it. */
+  const deleteImpact = !confirmDelete
+    ? ''
+    : (() => {
+        const n = policiesUsing('webhook', confirmDelete.id, store.policies).length
+        return n > 0
+          ? `${n} policy rule set references this hook. Those conditions will point at nothing, and the checks will report each one as an error until they are fixed.`
+          : 'No rule references this hook, so nothing else changes.'
+      })()
+
   return (
     <div className="bpage bhk">
       <PageHead
@@ -93,7 +105,7 @@ export function Hooks() {
       ) : (
         <ul className="bhk__list">
           {store.hooks.map((h) => {
-            const users = policiesUsing(h.id, store.policies)
+            const users = policiesUsing('webhook', h.id, store.policies)
             const issues = validateHook(h)
             const Icon = MODE[h.mode].icon
             return (
@@ -211,11 +223,7 @@ export function Hooks() {
           </>
         }
       >
-        <p className="bhk__confirm">
-          {confirmDelete && policiesUsing(confirmDelete.id, store.policies).length > 0
-            ? `${policiesUsing(confirmDelete.id, store.policies).length} policy rule set references this hook. Those conditions will point at nothing, and the checks will report each one as an error until they are fixed.`
-            : 'No rule references this hook, so nothing else changes.'}
-        </p>
+        <p className="bhk__confirm">{deleteImpact}</p>
       </Modal>
     </div>
   )
@@ -404,18 +412,3 @@ function HookForm({
   )
 }
 
-/* --- Helpers -------------------------------------------------------------------- */
-
-/* The same shape as the zone and fingerprint versions, deliberately. Three
-   library objects answering "what depends on me" in three different ways is
-   three things for an admin to learn instead of one. */
-function policiesUsing(hookId: string, policies: Policy[]) {
-  return policies
-    .map((policy) => ({
-      policy,
-      rules: policy.rules
-        .filter((r) => r.conditions.some((c) => c.typeId === 'webhook' && c.values.includes(hookId)))
-        .map((r) => r.name),
-    }))
-    .filter((x) => x.rules.length > 0)
-}

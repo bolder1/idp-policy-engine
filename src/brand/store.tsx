@@ -105,14 +105,6 @@ interface BrandStore {
   gauntletOverrides: Record<string, Record<string, AccessDecision>>
   setGauntletOverride: (policyId: string, cardId: string, want: AccessDecision | null) => void
 
-  /* Method sets are edited in place like zones, so they need the same
-     add/update/remove the store already gives those. Until now they were read
-     from the seed and never written, which is why the Sets tab could edit a
-     set's contents and had nowhere to put the result. */
-  addMethodSet: (s: MethodSet) => void
-  updateMethodSet: (s: MethodSet) => void
-  removeMethodSet: (id: string) => void
-
   savePolicy: (p: Policy) => void
   addPolicy: (p: Policy) => void
   /* Copy a rule into another policy as an independent rule.
@@ -133,11 +125,24 @@ interface BrandStore {
   deletePolicy: (id: string) => void
   duplicatePolicy: (id: string) => void
 
-  toast: string | null
   showToast: (m: string) => void
 }
 
 const Ctx = createContext<BrandStore | null>(null)
+
+/* The toast sits in its own context, and the reason is measurable.
+
+   It used to be a field on the one store object. That object is memoized on a
+   dependency list holding every collection in the app, so putting `toast` on it
+   meant every toast changed the store's identity — twice, once to show and once
+   to clear 2.8 seconds later. Every consumer of `useBrand()` re-rendered both
+   times, and any downstream memo keyed on the store was invalidated with it:
+   the policies screen re-ran its whole gauntlet over every policy because a
+   zone had been renamed and said so.
+
+   `showToast` stays on the main store — it is a stable useCallback, so it costs
+   its callers nothing. Only the string moved, and only one node reads it. */
+const ToastCtx = createContext<string | null>(null)
 
 export function BrandProvider({ children }: { children: ReactNode }) {
   const [policies, setPolicies] = useState<Policy[]>(() => policiesAt('medium'))
@@ -237,13 +242,6 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           return { ...all, [policyId]: forPolicy }
         }),
 
-      addMethodSet: (m) => setMethodSets((all) => [...all, m]),
-      updateMethodSet: (m) => setMethodSets((all) => all.map((x) => (x.id === m.id ? m : x))),
-      /* Removing a set does not unlink the rules naming it — the usage count in
-         the editor is the warning, and a rule pointing at a set that no longer
-         exists resolves to nothing, which the policy linter already reports. */
-      removeMethodSet: (id) => setMethodSets((all) => all.filter((x) => x.id !== id)),
-
       savePolicy: (p) =>
         setPolicies((all) => all.map((x) => (x.id === p.id ? { ...p, lastModified: 'Just now', modifiedBy: 'You' } : x))),
 
@@ -292,13 +290,22 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           return [copy, ...all]
         }),
 
-      toast,
       showToast,
     }),
-    [policies, zones, fingerprints, hooks, apps, groups, edition, persona, setPersona, methodSets, methods, screen, toast, showToast, gauntletOverrides],
+    [policies, zones, fingerprints, hooks, apps, groups, edition, persona, setPersona, methodSets, methods, screen, showToast, gauntletOverrides],
   )
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+  return (
+    <Ctx.Provider value={value}>
+      <ToastCtx.Provider value={toast}>{children}</ToastCtx.Provider>
+    </Ctx.Provider>
+  )
+}
+
+/** The current toast, or null. Separate from useBrand so a toast re-renders
+    the toast and nothing else. */
+export function useToast(): string | null {
+  return useContext(ToastCtx)
 }
 
 export function useBrand(): BrandStore {

@@ -515,3 +515,17 @@
     --pri-3-fg: #a9caf7;
   }
 }
+
+/* --- Canvas dot ------------------------------------------------------------
+   The dotted ground the builder canvas, the template thumbnails and the tour
+   hero all draw on. It lived in create.css, which was eager, so the three
+   stylesheets that read it and ship in their own chunks resolved it by luck of
+   load order. Only tour.css passed a fallback, so the moment create.css moved
+   into the create flow's chunk the v2 and v3 builder canvases would have drawn
+   a gradient with an invalid stop. A token four sheets share belongs with the
+   tokens. */
+:root { --card-dot: rgba(33, 37, 41, 0.13); }
+:root[data-theme="dark"] { --card-dot: rgba(255, 255, 255, 0.1); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --card-dot: rgba(255, 255, 255, 0.1); }
+}

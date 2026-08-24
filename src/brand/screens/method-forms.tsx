@@ -1,9 +1,8 @@
-import { useEffect, useId, useMemo, useState } from 'react'
-import { AlertTriangle, Check, Eye, EyeOff, Plus, X } from 'lucide-react'
+import { useId, useState } from 'react'
+import { Eye, EyeOff, Plus, X } from 'lucide-react'
 
-import { Button, Modal, NumberStepper, TipDot } from '../kit'
-import { configFor, missingFields, setField, type ConfigField } from '../method-config'
-import type { AuthMethod } from '../methods'
+import { NumberStepper, TipDot } from '../kit'
+import type { ConfigField } from '../method-config'
 
 /* -----------------------------------------------------------------------------
    The configuration form.
@@ -247,69 +246,3 @@ function ListField({ f, onChange }: { f: Extract<ConfigField, { kind: 'list' }>;
   )
 }
 
-/* --- The dialog ------------------------------------------------------------- */
-
-export function ConfigureMethodDialog({
-  open,
-  method,
-  onClose,
-  onSave,
-}: {
-  open: boolean
-  method: AuthMethod | null
-  onClose: () => void
-  onSave: (id: string, configured: boolean) => void
-}) {
-  const base = useMemo(() => (method ? configFor(method.id) : null), [method])
-  const [fields, setFields] = useState<ConfigField[]>(base?.fields ?? [])
-
-  // Reopening on a different method must not carry the previous one's values.
-  useEffect(() => {
-    setFields(base?.fields ?? [])
-  }, [base, open])
-
-  if (!method) return null
-  const missing = missingFields(fields)
-  const ready = missing.length === 0
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={`Configure ${method.name}`}
-      width={720}
-      footer={
-        <>
-          <span className="bmc__foot">
-            {ready ? (
-              <>
-                <Check size={13} strokeWidth={2.6} aria-hidden /> Everything required is filled in.
-              </>
-            ) : (
-              <>
-                <AlertTriangle size={13} strokeWidth={2} aria-hidden />
-                {missing.length} required field{missing.length === 1 ? '' : 's'} still blank —{' '}
-                {missing.map((f) => f.label).join(', ')}
-              </>
-            )}
-          </span>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          {/* Saving an incomplete configuration is allowed and does NOT mark the
-              method configured. Blocking the save would lose work on a form
-              whose credentials often have to be fetched from somewhere else. */}
-          <Button variant="brand" onClick={() => onSave(method.id, ready)}>
-            {ready ? 'Save and mark configured' : 'Save draft'}
-          </Button>
-        </>
-      }
-    >
-      <div className="bmc">
-        <p className="bmc__blurb">{base?.blurb}</p>
-        {!base && <p className="bmc__blurb">This method has nothing to connect — it is ready as soon as it is switched on.</p>}
-        <ConfigFields fields={fields} onChange={(id, v) => setFields((f) => setField(f, id, v))} />
-      </div>
-    </Modal>
-  )
-}

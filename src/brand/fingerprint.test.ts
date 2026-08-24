@@ -27,6 +27,12 @@ const profile = (over: Partial<FingerprintProfile> = {}): FingerprintProfile => 
   tolerance: 0,
   onMismatch: 'challenge',
   bands: { ...DEFAULT_BANDS },
+  reach: 'agent',
+  registration: 'self',
+  maxDevices: 3,
+  roster: null,
+  mobileRestriction: true,
+  autoRegister: false,
   usedIn: 0,
   ...over,
 })

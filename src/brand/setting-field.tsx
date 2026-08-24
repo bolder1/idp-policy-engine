@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
+  ArrowUpRight,
   Bell,
   Check,
   ChevronDown,
@@ -21,8 +22,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { Toggle, TipDot } from './kit'
-import { SOURCE_LABEL, type MfaSetting } from './mfa-settings'
+import { Button, Toggle, TipDot } from './kit'
+import { SOURCE_LABEL, fieldValue, type MfaSetting } from './mfa-settings'
 import type { MfaValue } from './mfa-join'
 
 /* -----------------------------------------------------------------------------
@@ -107,13 +108,6 @@ export function SettingField({
   const num = f.kind === 'number' ? Number(value) : 0
   const warn = f.kind === 'number' && f.warnAbove && num > f.warnAbove.value ? f.warnAbove.why : null
 
-  /* Who moved the value decides whether it animates. A drag has to be 1:1 —
-     easing a thumb that is under the user's finger reads as lag — but a typed
-     value is a jump, and a jump with no travel between the old position and the
-     new one is a control that appears to teleport. The box sets this when it
-     commits, the slider clears it when it drags, and the class is on for
-     exactly the render that needs it. */
-  const [tween, setTween] = useState(false)
 
   /* A toggle keys its disclosure on 'on'; a choice keys on the option's own
      label. Both come out of the same map, so the row does not need to know
@@ -131,7 +125,7 @@ export function SettingField({
       : null
 
   return (
-    <div className={`bsf ${f.kind === 'number' ? 'is-range' : ''}`}>
+    <div className="bsf">
       <div className="bsf__head">
         <span className="bsf__ico" aria-hidden>
           <Icon size={15} strokeWidth={1.9} />
@@ -172,15 +166,13 @@ export function SettingField({
             <Toggle checked={Boolean(value)} onChange={onChange} label={setting.label} size="sm" />
           )}
           {f.kind === 'number' && (
-            <NumberBox
+            <NumberChoice
               value={num}
-              min={f.min}
-              max={f.max}
+              options={f.options}
               unit={f.unit}
               label={setting.label}
               warn={Boolean(warn)}
               onChange={(v) => onChange(v)}
-              onTween={setTween}
             />
           )}
           {f.kind === 'choice' &&
@@ -199,6 +191,15 @@ export function SettingField({
                 onChange={onChange}
               />
             ))}
+          {/* A door, not a dial. The row exists so the option is findable from
+              the family it belongs to; the surface it opens is a table of users
+              and serials, which is not a settings row. */}
+          {f.kind === 'link' && (
+            <Button variant="secondary" size="sm" onClick={() => onChange(String(Date.now()))}>
+              {f.cta}
+              <ArrowUpRight size={14} strokeWidth={2} aria-hidden />
+            </Button>
+          )}
           {f.kind === 'text' && (
             <TextBox
               value={String(value)}
@@ -217,29 +218,6 @@ export function SettingField({
           </button>
         )}
       </div>
-
-      {/* Full width, under the label — a slider squeezed into a right-hand
-          column is a slider you cannot aim at. */}
-      {f.kind === 'number' && (
-        <Slider
-          min={f.min}
-          max={f.max}
-          value={num}
-          label={setting.label}
-          unit={f.unit}
-          warnAbove={f.warnAbove?.value}
-          presets={f.presets}
-          tween={tween}
-          onChange={(v) => {
-            setTween(false)
-            onChange(v)
-          }}
-          onJump={(v) => {
-            setTween(true)
-            onChange(v)
-          }}
-        />
-      )}
 
       {/* The carrier's rule, or the endpoint's. Shown only once the value
           actually breaks it — a constraint stated permanently under a field is
@@ -272,7 +250,7 @@ export function SettingField({
             <SettingField
               key={s.id}
               setting={s}
-              value={child.read(s.id, s.field.value)}
+              value={child.read(s.id, fieldValue(s.field))}
               onChange={(v) => child.write(s.id, v)}
               child={child}
             />
@@ -283,258 +261,56 @@ export function SettingField({
   )
 }
 
-/* --- The number, typed -------------------------------------------------------------
-   The second way in. A slider alone answers "roughly where in the range" and
-   refuses to answer "exactly 45" — on OTP validity, 1 to 30 in a 300px track,
-   every step is ten pixels and picking one is a test of aim. So the readout is
-   the input: the same large number it always was, now with a caret in it.
+/* --- A bounded number, as a choice between named values ----------------------------
+   This was a slider with a typed box beside it. Both are gone.
 
-   The smart part is all in when it commits.
+   A slider is the right control for a continuous quantity and the wrong one for
+   these: every setting here has a handful of defensible answers and a long tail
+   of numbers nobody should pick. A push timeout of 287 seconds is not a
+   considered decision, it is a slider that slipped — and the typed box that
+   made 287 reachable made it reachable by accident too. Offering the set
+   instead removes the tail, and removes the question "is 45 meaningfully
+   different from 44" along with it.
 
-   · **Digits only, from anything.** A pasted "60 seconds" or "6 digits" — which
-     is exactly what you get copying the value out of the row above — becomes 60
-     and 6. Stripping is kinder than rejecting.
-   · **Live while it is valid, patient while it is not.** Type "4" on the way to
-     "45" in a 15-to-120 range and a control that clamps per keystroke snaps you
-     to 15 and eats the 5. So an out-of-range draft is left alone and marked;
-     only a valid one moves the slider as you type.
-   · **Clamped on the way out.** Enter or blur settles whatever is in the box
-     into the range. Escape puts back what was there before.
-   · **Arrows step**, ten at a time with Shift — because the fine end of a
-     1-to-300 range is where typing is least pleasant.
-   -------------------------------------------------------------------------- */
-function NumberBox({
+   Always a dropdown, never a segmented row.
+
+   The split used to be by shape — `4 5 6 7 8` inline, `30 60 120 180 300` in a
+   dropdown — and it was defensible in isolation and wrong in a column. A panel
+   of five settings drew two different controls for one kind of question, so
+   the eye had to identify the control before it could read the value, and the
+   right-hand edge of the form zig-zagged between a 200px row of buttons and a
+   140px trigger.
+
+   One control for one kind. The unit rides on each option — "6 digits", "3
+   minutes" — because a dropdown's options are read one at a time with nothing
+   beside them to borrow it from, and because the closed trigger then states
+   the whole value rather than a bare number. */
+function NumberChoice({
   value,
-  min,
-  max,
+  options,
   unit,
   label,
   warn,
   onChange,
-  onTween,
 }: {
   value: number
-  min: number
-  max: number
+  options: number[]
   unit?: string
   label: string
   warn: boolean
   onChange: (v: number) => void
-  onTween: (on: boolean) => void
 }) {
-  /* Null means "not being edited", and the box shows the real value. A string
-     means the user is mid-thought and it is theirs until they leave. */
-  const [draft, setDraft] = useState<string | null>(null)
-
-  /* A draft only outranks the real value while the box is the thing changing
-     it. Drag the slider with a half-typed number still in the box and the box
-     would otherwise keep showing the number it was holding — a row reading 5
-     next to a slider sitting on 7. So: remember what this box last committed,
-     and the moment the value arrives as something else, the draft is stale and
-     goes. (A pointer drag normally blurs the box first and settles it that way;
-     this is for the paths that do not, like the arrow keys on the range.) */
-  const mine = useRef<number | null>(null)
-  useEffect(() => {
-    if (mine.current !== value) setDraft(null)
-    mine.current = value
-  }, [value])
-
-  const shown = draft ?? String(value)
-  const parsed = draft === null ? value : Number(draft)
-  const outOfRange =
-    draft !== null && draft !== '' && Number.isFinite(parsed) && (parsed < min || parsed > max)
-
-  const commit = (n: number) => {
-    const v = Math.min(max, Math.max(min, Math.round(n)))
-    mine.current = v
-    onTween(true)
-    onChange(v)
-    return v
-  }
-
-  const type = (raw: string) => {
-    const clean = raw.replace(/[^\d]/g, '')
-    setDraft(clean)
-    const n = Number(clean)
-    if (clean !== '' && Number.isFinite(n) && n >= min && n <= max) commit(n)
-  }
-
-  const settle = () => {
-    if (draft === null) return
-    const n = Number(draft)
-    if (draft !== '' && Number.isFinite(n)) commit(n)
-    setDraft(null)
-  }
-
-  const key = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') return e.currentTarget.blur()
-    if (e.key === 'Escape') {
-      setDraft(null)
-      return e.currentTarget.blur()
-    }
-    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
-    e.preventDefault()
-    const base = draft === null || draft === '' ? value : Number(draft)
-    const by = (e.shiftKey ? 10 : 1) * (e.key === 'ArrowUp' ? 1 : -1)
-    setDraft(String(commit((Number.isFinite(base) ? base : value) + by)))
-  }
-
   return (
-    <span className={`bsf__num ${warn ? 'is-warn' : ''} ${outOfRange ? 'is-bad' : ''}`}>
-      <input
-        type="text"
-        inputMode="numeric"
-        className="bsf__numin"
-        value={shown}
-        /* Sized to the widest value it can hold, so the row does not reflow as
-           the digits change and a column of rows keeps its right edge. */
-        style={{ width: `${String(max).length}ch` }}
-        aria-label={`${label}, ${min} to ${max}${unit ? ` ${unit}` : ''}`}
-        onFocus={(e) => {
-          setDraft(String(value))
-          e.currentTarget.select()
-        }}
-        onChange={(e) => type(e.target.value)}
-        onBlur={settle}
-        onKeyDown={key}
+    <span className={warn ? 'is-warn' : undefined}>
+      <Dropdown
+        options={options.map((n) => (unit ? `${n} ${unit}` : String(n)))}
+        value={unit ? `${value} ${unit}` : String(value)}
+        label={label}
+        onChange={(v) => onChange(Number(String(v).split(' ')[0]))}
       />
-      {unit && <em>{unit}</em>}
-      {/* Says what the box will do to the number rather than doing it mid-word.
-          It replaces the unit, so the row does not grow a fourth thing. */}
-      {outOfRange && (
-        <i className="bsf__numhint">
-          {min}–{max}
-        </i>
-      )}
     </span>
   )
 }
-
-/* --- Slider ----------------------------------------------------------------------
-   A real input[type=range] carries the behaviour — keyboard, screen reader,
-   touch — and none of the appearance. It sits transparent on top and every
-   visible part is painted underneath as its own element.
-
-   That is the change from the gradient version: a fill painted into the track's
-   background cannot be animated (a gradient stop is not reliably interpolable
-   across engines) and the native thumb cannot be animated at all, since it
-   follows the input's value the instant it changes. Separate elements can both
-   be transitioned, which is what makes a typed value travel to its new position
-   instead of appearing there.
-
-   The geometry is the one fiddly part: a native thumb is inset by half its own
-   width at each end, so a fill of `50%` and a thumb at `left: 50%` do not line
-   up with where the browser actually puts it. Both are laid out in the same
-   reduced span — `10px + (100% - 20px) * ratio` — so they track each other and
-   the invisible input exactly. */
-function Slider({
-  min,
-  max,
-  value,
-  label,
-  unit,
-  warnAbove,
-  presets,
-  tween,
-  onChange,
-  onJump,
-}: {
-  min: number
-  max: number
-  value: number
-  label: string
-  unit?: string
-  warnAbove?: number
-  presets?: number[]
-  tween: boolean
-  /** From the track — instant, because a drag must be 1:1. */
-  onChange: (v: number) => void
-  /** From a preset — eased, because it is a jump. */
-  onJump: (v: number) => void
-}) {
-  const ratio = (n: number) => (max === min ? 0 : (n - min) / (max - min))
-  /* One tick per step while the range is small enough to count. Past a dozen
-     they stop being landmarks and become texture. */
-  const steps = max - min
-  const ticks = steps > 0 && steps <= 12 ? Array.from({ length: steps + 1 }, (_, i) => min + i) : null
-  const over = warnAbove !== undefined && value > warnAbove
-  /* The ceiling, marked on the track. It was only ever stated after you crossed
-     it — a warning under a row you have already changed. A notch says where the
-     edge is while you are still deciding, which is the difference between a
-     guard rail and a complaint. */
-  const markAt = warnAbove !== undefined && warnAbove > min && warnAbove < max ? warnAbove : null
-
-  return (
-    <div className={`bsf__slider ${tween ? 'is-tween' : ''} ${over ? 'is-warn' : ''}`}>
-      <div className="bsf__rail" style={{ '--p': ratio(value) } as React.CSSProperties}>
-        <input
-          type="range"
-          className="bsf__range"
-          min={min}
-          max={max}
-          value={value}
-          aria-label={label}
-          onChange={(e) => onChange(Number(e.target.value))}
-        />
-        <span className="bsf__trackbg" aria-hidden />
-        <span className="bsf__fill" aria-hidden />
-        {markAt !== null && (
-          <span
-            className="bsf__mark"
-            style={{ '--m': ratio(markAt) } as React.CSSProperties}
-            title={`Recommended maximum: ${markAt}${unit ? ` ${unit}` : ''}`}
-          />
-        )}
-        <span className="bsf__thumb" aria-hidden />
-      </div>
-
-      {ticks ? (
-        <div className="bsf__ticks" aria-hidden>
-          {ticks.map((t) => (
-            <span key={t} className={t <= value ? 'is-past' : ''}>
-              {t}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <div className="bsf__ends" aria-hidden>
-          <span>{min}</span>
-          <span>{max}</span>
-        </div>
-      )}
-
-      {/* The three values anyone actually picks.
-
-          The slider and the box between them answer "roughly where" and
-          "exactly what". Neither answers "what is normal", and on a range of
-          286 seconds that is the only question most people have. Sits under the
-          scale rather than above the track, so it reads as a shortcut to the
-          control rather than a replacement for it. */}
-      {presets && presets.length > 0 && (
-        <div className="bsf__presets">
-          {presets.map((p) => (
-            <button
-              key={p}
-              type="button"
-              aria-pressed={value === p}
-              className={value === p ? 'is-on' : ''}
-              onClick={() => onJump(p)}
-            >
-              {p}
-              {unit ? <em>{shortUnit(unit)}</em> : null}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-/* Chips are narrow, and "seconds" spelled out on three of them is a row of text
-   rather than a row of choices. Only the units that actually appear on a preset
-   are abbreviated; anything else is left alone rather than guessed at. */
-const SHORT: Record<string, string> = { seconds: 's', minutes: 'min', sends: 'sends' }
-const shortUnit = (u: string) => SHORT[u] ?? u
 
 /* --- Text, with the rule it has to keep -------------------------------------------
    Free text was the one kind that accepted anything, which is fine for an email
@@ -627,7 +403,7 @@ function Segmented({
    current value and give each option room. A native select cannot do either,
    and on Windows it renders the OS list, which is the one element on the page
    that never matches the product. */
-function Dropdown({
+export function Dropdown({
   options,
   value,
   label,

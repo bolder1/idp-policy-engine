@@ -1,13 +1,17 @@
+import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
   Check,
+  ChevronRight,
   Copy,
+  Eye,
   Globe,
   Infinity as InfinityIcon,
   LayoutGrid,
   Layers,
+  Link2,
   List,
   MapPin,
   Network,
@@ -17,7 +21,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { Button, Modal, TipDot } from '../kit'
+import { Button, Drawer, Modal, StatusPill, TipDot } from '../kit'
 import {
   ASN_DIRECTORY,
   emptyLocation,
@@ -29,6 +33,7 @@ import {
 } from '../data'
 import { coveredBy, placeContext, searchPlaces, type Place } from '../places'
 import { useBrand } from '../store'
+import { EmptyState, UnusedArt, ZoneArt } from '../empty'
 import { canSaveZone, classifyIp, describeZone, validateZone } from './zone-validation'
 import { parseEntries } from './zone-entries'
 
@@ -91,11 +96,12 @@ export function ZonesFinal() {
   const [view, setView] = useState<View>('list')
   const [q, setQ] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
-  /* One editor. `null` closed, `'new'` creating, an id editing. */
+  /* The edit panel. `null` closed, otherwise the id being edited — creation
+     no longer comes through here. */
   const [editing, setEditing] = useState<string | null>(null)
 
   const open = openId ? store.zones.find((z) => z.id === openId) ?? null : null
-  const draftOf = editing && editing !== 'new' ? store.zones.find((z) => z.id === editing) ?? null : null
+  const draftOf = editing ? store.zones.find((z) => z.id === editing) ?? null : null
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -111,11 +117,24 @@ export function ZonesFinal() {
     )
   }, [store.zones, q])
 
+  /* The only way in. See NameOnlyModal. */
+  const [naming, setNaming] = useState(false)
+
+  const createByName = (name: string) => {
+    const id = `z-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${store.zones.length}`
+    store.addZone({ ...blank(), id, name: name.trim() })
+    setNaming(false)
+    /* Straight to the inner page. The zone exists and matches nothing yet,
+       which is exactly the state the page is being asked to make workable. */
+    setOpenId(id)
+  }
+
+  /* Only ever an edit now — creation goes through the naming dialog and the
+     inner page, so the panel never opens on a zone that does not exist yet. */
   const save = (z: Zone) => {
-    if (editing === 'new') store.addZone(z)
-    else store.updateZone(z)
+    store.updateZone(z)
     setEditing(null)
-    store.showToast(editing === 'new' ? `${z.name} created` : `${z.name} saved`)
+    store.showToast(`${z.name} saved`)
   }
 
   return (
@@ -125,12 +144,7 @@ export function ZonesFinal() {
           zone={open}
           policies={store.policies}
           onBack={() => setOpenId(null)}
-          onEdit={() => setEditing(open.id)}
-          onDuplicate={() => {
-            const copy: Zone = { ...open, id: `z-${open.id}-copy`, name: `${open.name} (copy)`, usedIn: 0 }
-            store.addZone(copy)
-            store.showToast(`${copy.name} created`)
-          }}
+          onChange={store.updateZone}
           onDelete={() => {
             store.removeZone(open.id)
             setOpenId(null)
@@ -144,14 +158,26 @@ export function ZonesFinal() {
               <h1>Zones</h1>
               <p>Named boundaries — addresses, networks and places — that your policy rules reference.</p>
             </div>
-            <Button variant="brand" onClick={() => setEditing('new')}>
-              <Plus size={15} strokeWidth={2.2} aria-hidden />
-              New zone
-            </Button>
+            <div className="bz7__headactions">
+              {/* One way in now.
+
+                 Two sat here while the question was open: a panel that asked
+                 everything before it would commit, and a dialog that commits a
+                 name and lets the inner page carry the rest. The second one
+                 won, so the first is gone and the winner takes the plain name.
+
+                 The panel itself survives — it is still what "Edit zone" opens,
+                 which is the job it was always better at: changing something
+                 that already exists and already has a shape. */}
+              <Button variant="brand" onClick={() => setNaming(true)}>
+                <Plus size={15} strokeWidth={2.2} aria-hidden />
+                New zone
+              </Button>
+            </div>
           </header>
 
           {store.zones.length === 0 ? (
-            <EmptyState onCreate={() => setEditing('new')} />
+            <ZonesEmpty onCreate={() => setNaming(true)} />
           ) : (
             <>
               <div className="bz7__toolbar">
@@ -204,14 +230,34 @@ export function ZonesFinal() {
                   ))}
                 </ul>
               ) : (
-                <ZoneTable zones={shown} policies={store.policies} onOpen={setOpenId} />
+                <ZoneTable
+                zones={shown}
+                policies={store.policies}
+                onOpen={setOpenId}
+                onDuplicate={(z) => {
+                  const copy: Zone = {
+                    ...z,
+                    id: `z-${z.id}-copy-${store.zones.length}`,
+                    name: `${z.name} (copy)`,
+                    usedIn: 0,
+                  }
+                  store.addZone(copy)
+                  store.showToast(`${copy.name} created`)
+                }}
+                onDelete={(z) => {
+                  store.removeZone(z.id)
+                  store.showToast(`${z.name} deleted`)
+                }}
+              />
               )}
             </>
           )}
         </>
       )}
 
-      <ZoneFormModal
+      <NameOnlyModal open={naming} onClose={() => setNaming(false)} onCreate={createByName} />
+
+      <ZoneFormPanel
         open={editing !== null}
         zone={draftOf}
         onClose={() => setEditing(null)}
@@ -223,29 +269,22 @@ export function ZonesFinal() {
 
 /* --- Empty ---------------------------------------------------------------------- */
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function ZonesEmpty({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="bz7__empty">
-      <span className="bz7__empty-ico" aria-hidden>
-        <MapPin size={26} strokeWidth={1.6} />
-      </span>
-      <h2>No zones yet</h2>
-      <p>
-        A zone is a named boundary you can point a rule at — an office egress range, a country, a
-        network operator. Rules use them to relax a check inside somewhere you trust, or to step one
-        up outside it.
-      </p>
-      {/* The one thing an empty state here has to teach, because getting it
-          backwards is the model's sharpest edge. */}
-      <p className="bz7__empty-note">
-        A zone has two halves — addresses and places — and both must match. Leave one empty and it
-        places no constraint at all.
-      </p>
-      <Button variant="brand" onClick={onCreate}>
-        <Plus size={15} strokeWidth={2.2} aria-hidden />
-        Create your first zone
-      </Button>
-    </div>
+    <EmptyState
+      art={<ZoneArt />}
+      title="No zones yet"
+      blurb="A zone is a named boundary a rule can point at — an office range, a country, a network operator."
+      /* The one thing this screen has to teach, because getting it backwards is
+         the model's sharpest edge. */
+      note="A zone has two halves, addresses and places, and both must match. Leave one empty and it places no constraint at all."
+      action={
+        <Button variant="brand" onClick={onCreate}>
+          <Plus size={15} strokeWidth={2.2} aria-hidden />
+          Create your first zone
+        </Button>
+      }
+    />
   )
 }
 
@@ -320,9 +359,6 @@ function ZoneCard({ zone, policies, onOpen }: { zone: Zone; policies: Policy[]; 
           <Network size={13} strokeWidth={1.9} aria-hidden />
           {ipSectionEmpty(zone) ? <AnyBand what="address" /> : <Chips items={addressBits(zone)} />}
         </div>
-        <span className="bz7__and" aria-hidden>
-          AND
-        </span>
         <div className="bz7__op">
           <Globe size={13} strokeWidth={1.9} aria-hidden />
           {locationEmpty(zone.location) ? (
@@ -354,24 +390,29 @@ function ZoneTable({
   zones,
   policies,
   onOpen,
+  onDuplicate,
+  onDelete,
 }: {
   zones: Zone[]
   policies: Policy[]
   onOpen: (id: string) => void
+  onDuplicate: (z: Zone) => void
+  onDelete: (z: Zone) => void
 }) {
+  /* Which row's menu is open, by id. One at a time, and the page closes it on
+     any click that is not the kebab — same contract the policies table uses, so
+     the two tables behave identically. */
+  const [menuFor, setMenuFor] = useState<string | null>(null)
+
   return (
-    <div className="bz7__table" role="table">
+    <div className="bz7__table" role="table" onClick={() => setMenuFor(null)}>
       <div className="bz7__trow bz7__thead" role="row">
         <span role="columnheader" />
         <span role="columnheader">Zone</span>
         <span role="columnheader">Addresses</span>
-        {/* The conjunction, stated once for the whole screen rather than
-            repeated into every row's summary string. */}
-        <span role="columnheader" className="bz7__andhead">
-          AND
-        </span>
         <span role="columnheader">Locations</span>
         <span role="columnheader">Used by</span>
+        <span role="columnheader" />
       </div>
       {zones.map((z) => {
         const meta = SHAPE[shapeOf(z)]
@@ -389,7 +430,6 @@ function ZoneTable({
             <span role="cell" className="bz7__tcell">
               {ipSectionEmpty(z) ? <AnyBand what="address" /> : <Chips items={addressBits(z)} max={2} />}
             </span>
-            <span role="cell" className="bz7__andcell" aria-hidden />
             <span role="cell" className="bz7__tcell">
               {locationEmpty(z.location) ? (
                 <AnyBand what="location" />
@@ -399,6 +439,51 @@ function ZoneTable({
             </span>
             <span role="cell" className={`bz7__tuses ${uses === 0 ? 'is-quiet' : ''}`}>
               {uses === 0 ? '—' : `${uses} rule${uses === 1 ? '' : 's'}`}
+            </span>
+
+            {/* The row's own actions. They were only reachable by opening the
+                zone first, which made "delete the one I just made by mistake" a
+                two-page job. */}
+            <span role="cell" className="bz7__menuwrap">
+              <button
+                type="button"
+                className="bz7__kebab"
+                aria-label={`Actions for ${z.name}`}
+                aria-expanded={menuFor === z.id}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setMenuFor((m) => (m === z.id ? null : z.id))
+                }}
+              >
+                ⋯
+              </button>
+              <AnimatePresence>
+                {menuFor === z.id && (
+                  <motion.div
+                    className="bmenu"
+                    initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                    transition={{ duration: 0.13 }}
+                    onClick={(e) => e.stopPropagation()}
+                    role="menu"
+                  >
+                    <button role="menuitem" onClick={() => onOpen(z.id)}>
+                      <Eye size={14} strokeWidth={1.9} aria-hidden />
+                      View details
+                    </button>
+                    <button role="menuitem" onClick={() => onDuplicate(z)}>
+                      <Copy size={14} strokeWidth={1.9} aria-hidden />
+                      Duplicate
+                    </button>
+                    <span className="bmenu__rule" />
+                    <button role="menuitem" className="is-danger" onClick={() => onDelete(z)}>
+                      <Trash2 size={14} strokeWidth={1.9} aria-hidden />
+                      Delete zone
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </span>
           </div>
         )
@@ -415,20 +500,46 @@ function ZoneDetail({
   zone,
   policies,
   onBack,
-  onEdit,
-  onDuplicate,
+  onChange,
   onDelete,
 }: {
   zone: Zone
   policies: Policy[]
   onBack: () => void
-  onEdit: () => void
-  onDuplicate: () => void
+  onChange: (z: Zone) => void
   onDelete: () => void
 }) {
-  const meta = SHAPE[shapeOf(zone)]
+  /* For navigation only. "Used by" that cannot be followed makes you memorise a
+     policy name, leave, and search for it — the one thing the list exists to
+     save you. */
+  const store = useBrand()
+  /* "Used by" is a panel now, not a section. It is the question you ask BEFORE
+     changing something and then not again — so it earns a button at the top and
+     none of the page's vertical space the rest of the time. */
+  const [showUses, setShowUses] = useState(false)
   const issues = validateZone(zone)
   const users = policiesUsing(zone.id, policies)
+
+  const netCount = zone.ip.length + zone.asn.length
+  const placeCount =
+    zone.location.countries.length + zone.location.states.length + zone.location.cities.length
+
+  /* Which half is on screen — or NEITHER, which is the state a just-named zone
+     opens in.
+
+     This was a pair of checkboxes: tick a half to reveal its form, untick to
+     hide it and throw its contents away. Two problems. A checkbox that deletes
+     data on untick is a destructive control wearing the least destructive
+     affordance there is. And both halves rendered at once, stacked, so a zone
+     with two hundred addresses buried its locations under a scroll.
+
+     Null means nothing has been added and nothing has been chosen: the page
+     shows an empty state with the two ways in. After that it is two tabs, which
+     is what the zone actually has — two facets, one on screen at a time, both
+     always reachable. */
+  const [tab, setTab] = useState<'net' | 'place' | null>(
+    netCount > 0 ? 'net' : placeCount > 0 ? 'place' : null,
+  )
 
   return (
     <>
@@ -437,36 +548,130 @@ function ZoneDetail({
         All zones
       </button>
 
-      {/* A banner, not a page title.
+      {/* A heading, not a banner.
 
-          The name alone answers nothing — "Office Network" could be two
-          addresses or two hundred. The sentence underneath is what the zone
-          actually matches, written out, and it is the only line on this page an
-          admin can check against what they meant. */}
-      <header className={`bz7__hero is-${meta.tint}`}>
-        <span className="bz7__heroicon" aria-hidden>
-          <meta.icon size={26} strokeWidth={1.7} />
-        </span>
-        <div className="bz7__herotext">
+          This was a tinted hero that changed colour with the zone's shape —
+          amber when it matched everything, blue for addresses, green for
+          places. The tint was doing a job the page already does better: the
+          warning that a zone constrains nothing now lives inside the empty
+          state, where the thing to DO about it is. What was left was a coloured
+          slab whose colour meant something you had to learn.
+
+          Same shape as every other inner page here: back link, name, one line
+          of what it is, actions on the right. */}
+      <header className="bz7__pagehead">
+        <div>
           <h1>{zone.name}</h1>
           <p>{describeZone(zone)}</p>
         </div>
         <div className="bz7__actions">
-          <Button variant="secondary" size="sm" onClick={onDuplicate}>
-            <Copy size={14} strokeWidth={1.9} aria-hidden />
-            Duplicate
+          {/* Carries the count, so the answer to "does anything depend on this"
+              is on the page without opening anything — and opening it is only
+              needed for WHICH. */}
+          <Button variant="secondary" size="sm" onClick={() => setShowUses(true)}>
+            <Link2 size={14} strokeWidth={1.9} aria-hidden />
+            Used by
+            <i className="bz7__usecount">{users.length}</i>
           </Button>
+          {/* No Edit button, and none needed: the sections below save as they
+              are typed, so "edit" is just being on the page. */}
           <Button variant="secondary" size="sm" onClick={onDelete}>
             <Trash2 size={14} strokeWidth={1.9} aria-hidden />
             Delete
           </Button>
-          <Button variant="brand" size="sm" onClick={onEdit}>
-            Edit zone
-          </Button>
         </div>
       </header>
 
-      {issues.length > 0 && (
+      {/* The adding, on the page rather than behind an Edit button.
+
+          This is the half of "New zone 2" that matters. The panel is a form you
+          fill in and submit; here the zone already exists, so every change is
+          saved as it is made and the page can be left and returned to. That is
+          the difference worth comparing — not the modal, which is one field. */}
+      <section className="bz7__build">
+        {tab === null ? (
+          /* The empty state a just-named zone lands on.
+
+             It names the two things a zone can be made of and makes each one a
+             button, because at this point there is exactly one thing to do and
+             the page should be the doing of it — not a heading, two checkboxes
+             and a sentence explaining what will happen if you tick neither. */
+          <div className="bz7__buildempty">
+            <span className="bz7__buildicon" aria-hidden>
+              <Layers size={22} strokeWidth={1.6} />
+            </span>
+            <h3>This zone is empty</h3>
+            {/* The warning, folded in.
+
+                It used to be a red panel of its own below the sections, saying
+                a zone with nothing in it matches every request. True, and
+                exactly what this state IS — so it was a separate alarm about
+                the screen you were already looking at. One line here, where the
+                two buttons that fix it are. */}
+            <p>
+              Until it has an address or a place, it matches <strong>every request</strong>.
+            </p>
+            {/* Both secondary, and both the same width.
+
+                They were a brand button and a neutral one, which reads as a
+                recommendation — and there is none to make: a zone built from
+                addresses and a zone built from places are equally valid and
+                equally common. */}
+            <div className="bz7__buildactions">
+              <Button variant="secondary" onClick={() => setTab('net')}>
+                <Network size={15} strokeWidth={2} aria-hidden />
+                Addresses and networks
+              </Button>
+              <Button variant="secondary" onClick={() => setTab('place')}>
+                <Globe size={15} strokeWidth={2} aria-hidden />
+                Countries and cities
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Both tabs, always — including the empty one.
+
+                It is how the second facet gets added once the first exists, and
+                the count on each says which is which without opening it. */}
+            <div className="bz7__buildtabs" role="tablist" aria-label="What this zone matches on">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === 'net'}
+                className={tab === 'net' ? 'is-on' : ''}
+                onClick={() => setTab('net')}
+              >
+                <Network size={14} strokeWidth={1.9} aria-hidden />
+                Addresses
+                <em>{netCount}</em>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === 'place'}
+                className={tab === 'place' ? 'is-on' : ''}
+                onClick={() => setTab('place')}
+              >
+                <Globe size={14} strokeWidth={1.9} aria-hidden />
+                Locations
+                <em>{placeCount}</em>
+              </button>
+            </div>
+
+            {tab === 'net' ? (
+              <AddressSection draft={zone} onChange={onChange} />
+            ) : (
+              <PlaceSection draft={zone} onChange={onChange} />
+            )}
+          </>
+        )}
+      </section>
+
+      {/* Only the issues the empty state does not already carry. "Matches
+          everything" is the empty state, so repeating it underneath was the
+          same sentence twice on one screen. */}
+      {tab !== null && issues.length > 0 && (
         <div className="bz7__issues">
           {issues.map((i) => (
             <p key={i.id} className={`bz7__issue is-${i.level}`}>
@@ -479,91 +684,44 @@ function ZoneDetail({
         </div>
       )}
 
-      <div className="bz7__panes">
-        <section className="bz7__pane">
-          <h3>
-            <Network size={13} strokeWidth={2} aria-hidden />
-            Addresses and networks
-          </h3>
-          {ipSectionEmpty(zone) ? (
-            <AnyBand what="address" />
-          ) : (
-            <ul className="bz7__values">
-              {zone.ip.map((v) => (
-                <li key={v}>
-                  <code>{v}</code>
-                  <em>{classifyIp(v)}</em>
-                </li>
-              ))}
-              {zone.asn.map((a) => (
-                <li key={a}>
-                  <code>{a}</code>
-                  <em>{ASN_DIRECTORY[a] ?? 'network operator'}</em>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <span className="bz7__paneand" aria-hidden>
-          AND
-        </span>
-
-        <section className="bz7__pane">
-          <h3>
-            <Globe size={13} strokeWidth={2} aria-hidden />
-            Locations
-          </h3>
-          {locationEmpty(zone.location) ? (
-            <AnyBand what="location" />
-          ) : (
-            <ul className="bz7__values">
-              {zone.location.countries.map((v) => (
-                <li key={v}>
-                  <code>{v}</code>
-                  <em>country</em>
-                </li>
-              ))}
-              {zone.location.states.map((v) => (
-                <li key={v}>
-                  <code>{v}</code>
-                  <em>state</em>
-                </li>
-              ))}
-              {zone.location.cities.map((v) => (
-                <li key={v}>
-                  <code>{v}</code>
-                  <em>city</em>
-                </li>
-              ))}
-              {zone.location.radius && (
-                <li>
-                  <code>{zone.location.radius.label ?? 'Radius'}</code>
-                  <em>{zone.location.radius.km}km</em>
-                </li>
-              )}
-            </ul>
-          )}
-        </section>
-      </div>
-
-      <section className="bz7__pane">
-        <h3>Used by</h3>
+      <Drawer
+        open={showUses}
+        onClose={() => setShowUses(false)}
+        title="Used by"
+        caption={`Policy rules that name ${zone.name}.`}
+      >
         {users.length === 0 ? (
-          <p className="bz7__none">
-            No rule references this zone. It can be changed or deleted without affecting anything.
-          </p>
+          <EmptyState
+            compact
+            art={<UnusedArt />}
+            title="Nothing references this zone"
+            blurb="It can be changed or deleted without affecting a single sign-in."
+          />
         ) : (
           <ul className="bz7__uses">
             {users.map((u) => (
               <li key={u.policy.id}>
-                <strong>{u.policy.name}</strong>
-                <span>{u.rules.join(' · ')}</span>
+                <button
+                  type="button"
+                  className="bz7__usecard"
+                  onClick={() => store.go({ name: 'builder', policyId: u.policy.id })}
+                >
+                  <span className="bz7__usetop">
+                    <strong>{u.policy.name}</strong>
+                    <StatusPill status={u.policy.status} />
+                  </span>
+                  <span className="bz7__userules">
+                    {u.rules.map((r) => (
+                      <i key={r}>{r}</i>
+                    ))}
+                  </span>
+                  <ChevronRight size={15} strokeWidth={2} aria-hidden />
+                </button>
               </li>
             ))}
           </ul>
         )}
-      </section>
+      </Drawer>
     </>
   )
 }
@@ -584,7 +742,97 @@ const blank = (): Zone => ({
   usedIn: 0,
 })
 
-function ZoneFormModal({
+/* --- The other way in --------------------------------------------------------------
+   "New zone 2": one field, then the inner page.
+
+   It exists to test the opposite bet from the panel. The panel asks for
+   everything and commits once, which is right when the answer is short and
+   wrong when it is four hundred networks pasted in three goes — a form you
+   cannot leave is a form you cannot come back to. This one commits the only
+   thing that has to be decided up front, the name a rule will refer to, and
+   treats the contents as work done on a page that already exists and already
+   saves.
+
+   The zone it creates matches nothing, which is not a broken state: the list
+   already renders "Any address, anywhere" for it, and the detail page opens
+   asking what it should match on. */
+function NameOnlyModal({
+  open,
+  onClose,
+  onCreate,
+}: {
+  open: boolean
+  onClose: () => void
+  onCreate: (name: string) => void
+}) {
+  const [name, setName] = useState('')
+
+  const close = () => {
+    setName('')
+    onClose()
+  }
+
+  const go = () => {
+    if (name.trim()) onCreate(name)
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={close}
+      title="Name the zone"
+      width={460}
+      footer={
+        <>
+          <span className="bz7__footnote">You choose what it matches on next.</span>
+          <Button variant="ghost" onClick={close}>
+            Cancel
+          </Button>
+          <Button variant="brand" disabled={!name.trim()} onClick={go}>
+            Create and open
+          </Button>
+        </>
+      }
+    >
+      <label className="bz7__field">
+        <span>Zone name</span>
+        <input
+          type="text"
+          value={name}
+          autoFocus
+          placeholder="Pune office egress"
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              go()
+            }
+          }}
+        />
+      </label>
+    </Modal>
+  )
+}
+
+/* --- The form, as a side panel ------------------------------------------------------
+   It was a 980px centred modal holding two columns joined by an AND. Three
+   things were wrong with that, and all three came from the layout being drawn
+   before the question was asked.
+
+   - It opened showing BOTH halves, so a zone that only ever constrains a
+     country still made you look at an address field and decide to ignore it.
+     Every new zone started life as two empty forms.
+   - The AND between the columns described the engine, not the task. It is true
+     that the halves are ANDed, but that is a fact about evaluation, and the
+     person filling this in is naming a place, not writing a boolean.
+   - Side by side caps each half at about 460px. Survivable for four addresses,
+     wrong for five hundred, which is what this field actually accepts.
+
+   So: a panel, and a sequence. Name it, say what it matches on, then fill in
+   only what you said. The two kinds are a multi-select rather than a switch,
+   because "our ranges, but only from India" is a real zone and forcing a choice
+   between them would make it unbuildable. */
+function ZoneFormPanel({
   open,
   zone,
   onClose,
@@ -598,20 +846,30 @@ function ZoneFormModal({
   const [draft, setDraft] = useState<Zone>(zone ?? blank())
   const [seeded, setSeeded] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  /* Which halves the zone constrains. Not stored on the Zone: an empty list
+     already means "any", so this is disclosure state for the form, seeded from
+     whatever the zone already holds. */
+  const [use, setUse] = useState({ net: false, place: false })
 
-  /* Re-seed when the modal opens on a different subject. Keyed on the id rather
+  /* Re-seed when the panel opens on a different subject. Keyed on the id rather
      than the object, because the store replaces the array on every write and
      the object identity changes without the subject changing. */
   const subject = zone?.id ?? 'new'
   if (open && seeded !== subject) {
     setSeeded(subject)
-    setDraft(zone ? { ...zone, location: { ...zone.location } } : blank())
+    const next = zone ? { ...zone, location: { ...zone.location } } : blank()
+    setDraft(next)
+    /* An existing zone opens with the halves it already uses ticked. A new one
+       opens with neither, because which halves it needs is the first thing
+       being asked. */
+    setUse({ net: !ipSectionEmpty(next), place: !locationEmpty(next.location) })
     setConfirming(false)
   }
   if (!open && seeded !== null) setSeeded(null)
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(zone ?? blank())
-  const ok = draft.name.trim().length > 0 && canSaveZone(draft)
+  const named = draft.name.trim().length > 0
+  const ok = named && canSaveZone(draft)
 
   const close = () => {
     if (dirty && !confirming) {
@@ -622,13 +880,36 @@ function ZoneFormModal({
     onClose()
   }
 
+  const netCount = draft.ip.length + draft.asn.length
+  const placeCount =
+    draft.location.countries.length + draft.location.states.length + draft.location.cities.length
+
+  /* Unticking a half clears it, because leaving the values behind would save a
+     zone narrower than the form says it is. The count sits on the card so the
+     cost of unticking is visible before it is paid. */
+  const toggleNet = () => {
+    if (use.net) setDraft({ ...draft, ip: [], asn: [] })
+    setUse({ ...use, net: !use.net })
+  }
+  const togglePlace = () => {
+    if (use.place)
+      setDraft({ ...draft, location: { ...draft.location, countries: [], states: [], cities: [] } })
+    setUse({ ...use, place: !use.place })
+  }
+
   return (
-    <Modal
+    <Drawer
       open={open}
       onClose={close}
-      title={zone ? `Edit ${zone.name}` : 'New zone'}
-      width={980}
-      footer={
+      title={zone ? 'Edit ' + zone.name : 'New zone'}
+      caption={zone ? undefined : 'Name it, then choose what it matches on.'}
+      /* Wide for a drawer, because five hundred entries need a list that is not
+         a column of wrapped text, and resizable because how wide is enough
+         depends on whether this zone holds four addresses or four hundred. */
+      width={620}
+      resizable
+      maxWidth={900}
+      actions={
         confirming ? (
           <>
             <span className="bz7__footnote">Discard your changes?</span>
@@ -651,7 +932,7 @@ function ZoneFormModal({
               onClick={() =>
                 onSave({
                   ...draft,
-                  id: draft.id || `z-${draft.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+                  id: draft.id || 'z-' + draft.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
                   name: draft.name.trim(),
                 })
               }
@@ -668,24 +949,95 @@ function ZoneFormModal({
           <input
             type="text"
             value={draft.name}
+            autoFocus
             placeholder="Pune office egress"
             onChange={(e) => setDraft({ ...draft, name: e.target.value })}
           />
         </label>
 
-        {/* Side by side, because the two halves are ANDed and reading an AND
-            top-to-bottom makes the second condition look like a consequence of
-            the first. Left and right, with the conjunction between them, is the
-            shape of the thing being described. */}
-        <div className="bz7__cols">
-          <AddressSection draft={draft} onChange={setDraft} />
-          <span className="bz7__formand" aria-hidden>
-            AND
-          </span>
-          <PlaceSection draft={draft} onChange={setDraft} />
-        </div>
+        {/* The second question, and the one the old layout answered for you.
+
+            Both can be on: that is the whole reason this is a pair of
+            checkboxes and not a two-way switch. The zone the AND existed to
+            serve is still reachable, it is just no longer the default shape of
+            an empty form. */}
+        <fieldset className="bz7__pick" disabled={!named}>
+          <legend>What does this zone match on?</legend>
+          <PickCard
+            on={use.net}
+            icon={Network}
+            title="Addresses and networks"
+            blurb="IPs, CIDR blocks, ranges, or a whole operator by ASN."
+            count={netCount}
+            onToggle={toggleNet}
+          />
+          <PickCard
+            on={use.place}
+            icon={Globe}
+            title="Locations"
+            blurb="Countries, states and cities the request comes from."
+            count={placeCount}
+            onToggle={togglePlace}
+          />
+        </fieldset>
+
+        {!named && <p className="bz7__gate">Give the zone a name to carry on.</p>}
+
+        {/* Stacked, not columned, and with nothing between them. The AND was
+            describing how the engine joins these; the footer sentence says the
+            same thing in words that match the task. */}
+        {named && use.net && <AddressSection draft={draft} onChange={setDraft} />}
+        {named && use.place && <PlaceSection draft={draft} onChange={setDraft} />}
+
+        {named && !use.net && !use.place && (
+          <p className="bz7__gate">
+            Pick at least one. A zone that matches on neither matches everything.
+          </p>
+        )}
       </div>
-    </Modal>
+    </Drawer>
+  )
+}
+
+/* One of the two kinds, as a card you tick.
+
+   A card rather than a checkbox row because the choice needs its sentence:
+   "Locations" alone does not tell you a city counts, and an admin who does not
+   know that goes looking for a second form. */
+function PickCard({
+  on,
+  icon: Icon,
+  title,
+  blurb,
+  count,
+  onToggle,
+}: {
+  on: boolean
+  icon: typeof Network
+  title: string
+  blurb: string
+  count: number
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={on}
+      className={'bz7__pickcard ' + (on ? 'is-on' : '')}
+      onClick={onToggle}
+    >
+      <span className="bz7__pickbox" aria-hidden>
+        <Check size={11} strokeWidth={3.2} />
+      </span>
+      <Icon size={15} strokeWidth={1.9} aria-hidden className="bz7__pickico" />
+      <span className="bz7__pickbody">
+        <strong>{title}</strong>
+        <em>{blurb}</em>
+      </span>
+      {/* Says what unticking would throw away. */}
+      {on && count > 0 && <i className="bz7__pickcount">{count}</i>}
+    </button>
   )
 }
 
@@ -718,20 +1070,48 @@ const QUICK: { label: string; value: string; hint: string }[] = [
 
 function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
   const [text, setText] = useState('')
+  const [filter, setFilter] = useState('')
+  /* Says what the last paste did. A paste of four hundred lines that silently
+     drops sixty is the worst version of this field, so both numbers are
+     reported: what went in, and what did not. */
+  const [note, setNote] = useState<string | null>(null)
+
+  const total = draft.ip.length + draft.asn.length
 
   const add = () => {
     const { ip, asn, bad } = parseEntries(text, draft.ip, draft.asn)
     if (ip.length === draft.ip.length && asn.length === draft.asn.length && bad.length === 0) return
+
+    /* No ceiling. There was a 500 cap here and it was ours, not the field's —
+       a zone is a list of networks and the number of networks an estate has is
+       not something this form gets to decide. What is left is the reporting:
+       a paste says how much of it landed, because a list arriving from
+       somewhere else is one nobody counted first. */
     onChange({ ...draft, ip, asn })
+
+    const added = ip.length - draft.ip.length + (asn.length - draft.asn.length)
+    setNote(
+      [
+        added > 0 ? added + ' added' : null,
+        bad.length > 0 ? bad.length + ' could not be read' : null,
+      ]
+        .filter(Boolean)
+        .join(' \u00b7 ') || null,
+    )
     /* Whatever did not parse stays in the box so it can be corrected rather
        than silently swallowed. */
     setText(bad.join(' '))
   }
 
-  const rows = [
+  const all = [
     ...draft.ip.map((v) => ({ v, kind: classifyIp(v) as string, asn: false })),
     ...draft.asn.map((v) => ({ v, kind: ASN_DIRECTORY[v] ?? 'network operator', asn: true })),
   ]
+  /* A filter, not a search: it hides rows rather than ranking them, because the
+     question at four hundred entries is "is 10.2.x in here" and the answer is
+     the row or nothing. Only offered once scrolling starts. */
+  const needle = filter.trim().toLowerCase()
+  const rows = needle ? all.filter((r) => r.v.toLowerCase().includes(needle) || r.kind.toLowerCase().includes(needle)) : all
 
   return (
     <section className="bz7__sec">
@@ -764,14 +1144,18 @@ function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) 
             }
           />
         </h4>
-        <span>{rows.length === 0 ? 'Any address' : `${rows.length} entries`}</span>
+        <span>{total === 0 ? 'Any address' : `${total} ${total === 1 ? 'entry' : 'entries'}`}</span>
       </header>
 
       <div className="bz7__add">
         <input
           type="text"
           value={text}
-          placeholder="203.0.113.0/24, 10.0.0.1, AS15169 — paste as many as you like"
+          /* Three examples, no sentence. The tip on the heading already lists
+             every accepted format in full, so the placeholder only has to show
+             the SHAPE — and at sixty characters the old one was longer than the
+             field on a narrow panel and clipped mid-word. */
+          placeholder="10.0.0.1, 192.168.0.0/24, AS15169"
           aria-label="Add addresses or networks"
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -813,10 +1197,49 @@ function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) 
         })}
       </div>
 
-      {rows.length === 0 ? (
+      {note && (
+        <p className="bz7__note" role="status">
+          {note}
+          <button type="button" onClick={() => setNote(null)} aria-label="Dismiss">
+            <X size={12} strokeWidth={2.2} />
+          </button>
+        </p>
+      )}
+
+      {/* Both only earn their place once the list is long enough to lose
+          something in. Eight is about where a column stops being scannable. */}
+      {all.length > 8 && (
+        <div className="bz7__listbar">
+          <label className="bz7__filter">
+            <Search size={13} strokeWidth={1.9} aria-hidden />
+            <input
+              type="search"
+              value={filter}
+              placeholder={`Filter ${all.length} entries…`}
+              aria-label="Filter entries"
+              onChange={(e) => setFilter(e.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="bz7__clear"
+            onClick={() => {
+              onChange({ ...draft, ip: [], asn: [] })
+              setFilter('')
+              setNote(null)
+            }}
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {all.length === 0 ? (
         <AnyBand what="address" />
+      ) : rows.length === 0 ? (
+        <p className="bz7__gate">Nothing matches “{filter.trim()}”.</p>
       ) : (
-        <ul className="bz7__entries">
+        <ul className="bz7__entries is-scroll">
           {rows.map((r) => (
             <li key={r.v}>
               <code>{r.v}</code>

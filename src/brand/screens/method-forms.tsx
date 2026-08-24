@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState } from 'react'
 import { AlertTriangle, Check, Eye, EyeOff, Plus, X } from 'lucide-react'
 
-import { Button, Modal } from '../kit'
+import { Button, Modal, NumberStepper, TipDot } from '../kit'
 import { configFor, missingFields, setField, type ConfigField } from '../method-config'
 import type { AuthMethod } from '../methods'
 
@@ -58,7 +58,30 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
             </b>
           )}
         </label>
-        {f.help && <p>{f.help}</p>}
+        {/* The help on a tip rather than under the label.
+
+            RSA is twenty-six fields, and every one carried a sentence of vendor
+            prose beneath its name — a form where most of the vertical space is
+            explanation you read once and then scroll past forever. The words
+            still matter: half of these are values you can only read off the RSA
+            Security Console, and "Access ID" alone tells you nothing. So they
+            move to the dot: available on the row that needs it, absent on the
+            twenty-five that do not.
+
+            The sentence is ALSO kept in the DOM, hidden, and pointed at by the
+            control's `aria-describedby`. `Tip` puts `aria-describedby` on its
+            own trigger and only while open, which describes the question mark
+            rather than the field — so without this, deferring the prose
+            visually would have deleted it outright for anyone not using a
+            pointer. */}
+        {f.help && (
+          <>
+            <TipDot text={f.help} label={`About ${f.label}`} />
+            <p id={`${uid}-help`} className="u-sr-only">
+              {f.help}
+            </p>
+          </>
+        )}
       </div>
 
       <div className="bmc__control">
@@ -69,6 +92,7 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
             value={f.value}
             placeholder={f.placeholder}
             aria-invalid={missing}
+            aria-describedby={f.help ? `${uid}-help` : undefined}
             onChange={(e) => onChange(f.id, e.target.value)}
           />
         )}
@@ -85,6 +109,7 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
               value={f.value}
               autoComplete="off"
               aria-invalid={missing}
+              aria-describedby={f.help ? `${uid}-help` : undefined}
               onChange={(e) => onChange(f.id, e.target.value)}
             />
             <button
@@ -98,7 +123,12 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
         )}
 
         {f.kind === 'select' && (
-          <select id={`${uid}-c`} value={f.value} onChange={(e) => onChange(f.id, e.target.value)}>
+          <select
+            id={`${uid}-c`}
+            value={f.value}
+            aria-describedby={f.help ? `${uid}-help` : undefined}
+            onChange={(e) => onChange(f.id, e.target.value)}
+          >
             {f.options.map((o) => (
               <option key={o}>{o}</option>
             ))}
@@ -106,25 +136,18 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
         )}
 
         {f.kind === 'number' && (
-          <span className="bmc__number">
-            <input
-              id={`${uid}-c`}
-              type="number"
-              min={f.min}
-              max={f.max}
-              value={f.value}
-              onChange={(e) => {
-                // Clamped on the way in — the bounds are the guidance, so a
-                // value outside them should not be reachable by typing either.
-                const n = Number(e.target.value)
-                onChange(f.id, Number.isFinite(n) ? Math.min(f.max, Math.max(f.min, n)) : f.min)
-              }}
-            />
-            {f.unit && <em>{f.unit}</em>}
-            <span className="bmc__bounds">
-              {f.min}–{f.max}
-            </span>
-          </span>
+          /* Clamping now happens on commit rather than per keystroke. The old
+             version rewrote the field on every character, which made most of
+             each range untypable — see NumberStepper. */
+          <NumberStepper
+            id={`${uid}-c`}
+            label={f.label}
+            value={f.value}
+            min={f.min}
+            max={f.max}
+            unit={f.unit}
+            onChange={(n) => onChange(f.id, n)}
+          />
         )}
 
         {f.kind === 'toggle' && (
@@ -140,7 +163,12 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
         )}
 
         {f.kind === 'radio' && (
-          <div className="bmc__radios" role="radiogroup" aria-label={f.label}>
+          <div
+            className="bmc__radios"
+            role="radiogroup"
+            aria-label={f.label}
+            aria-describedby={f.help ? `${uid}-help` : undefined}
+          >
             {f.options.map((o) => (
               <label key={o.value} className={f.value === o.value ? 'is-on' : ''}>
                 <input
@@ -163,6 +191,7 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
             id={`${uid}-c`}
             rows={f.rows ?? 3}
             value={f.value}
+            aria-describedby={f.help ? `${uid}-help` : undefined}
             onChange={(e) => onChange(f.id, e.target.value)}
           />
         )}

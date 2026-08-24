@@ -13,43 +13,56 @@ const settings = () => allSettings().map((s) => s.setting)
 
 const named = (s: MfaSetting) => `${s.id} (${s.label})`
 
-describe('presets', () => {
+describe('number options', () => {
   it('are inside the range they belong to', () => {
     for (const s of settings()) {
-      if (s.field.kind !== 'number' || !s.field.presets) continue
-      for (const p of s.field.presets) {
-        expect(
-          `${named(s)}: ${p} in ${s.field.min}-${s.field.max} → ${p >= s.field.min && p <= s.field.max}`,
-        ).toBe(`${named(s)}: ${p} in ${s.field.min}-${s.field.max} → true`)
-      }
-    }
-  })
-
-  it('are unique and in ascending order, because they are drawn in the order given', () => {
-    for (const s of settings()) {
-      if (s.field.kind !== 'number' || !s.field.presets) continue
-      const p = s.field.presets
-      expect(`${named(s)}: ${p.join(',')}`).toBe(`${named(s)}: ${[...new Set(p)].sort((a, b) => a - b).join(',')}`)
-    }
-  })
-
-  /* The rule they exist under. A range small enough to read off the tick scale
-     does not need a shortcut to a value already printed under the track — and
-     otp-length, 4 to 8, is exactly that case. */
-  it('only appear on ranges too wide to show every step', () => {
-    for (const s of settings()) {
-      if (s.field.kind !== 'number' || !s.field.presets) continue
-      expect(`${named(s)} spans ${s.field.max - s.field.min}`).toBe(
-        `${named(s)} spans ${s.field.max - s.field.min > 12 ? s.field.max - s.field.min : 'too little to need presets'}`,
+      if (s.field.kind !== 'number') continue
+      const { min, max, options } = s.field
+      const outside = options.filter((o) => o < min || o > max)
+      expect(`${named(s)}: outside ${min}-${max} → ${outside.join(',') || 'none'}`).toBe(
+        `${named(s)}: outside ${min}-${max} → none`,
       )
     }
   })
 
-  it('leave the tick-scale ranges alone', () => {
+  it('are unique and ascending, because they are drawn in the order given', () => {
     for (const s of settings()) {
       if (s.field.kind !== 'number') continue
-      if (s.field.max - s.field.min > 12) continue
-      expect(`${named(s)}: ${s.field.presets ? 'has presets' : 'none'}`).toBe(`${named(s)}: none`)
+      const o = s.field.options
+      expect(`${named(s)}: ${o.join(',')}`).toBe(
+        `${named(s)}: ${[...new Set(o)].sort((x, y) => x - y).join(',')}`,
+      )
+    }
+  })
+
+  /* The whole point of naming the set: a control that offers five values and
+     opens showing a sixth is a control reporting a state you cannot return to. */
+  it('always contain the default the field opens on', () => {
+    for (const s of settings()) {
+      if (s.field.kind !== 'number') continue
+      expect(`${named(s)}: ${s.field.value} in [${s.field.options.join(',')}]`).toBe(
+        `${named(s)}: ${s.field.options.includes(s.field.value) ? s.field.value : 'MISSING'} in [${s.field.options.join(',')}]`,
+      )
+    }
+  })
+
+  it('give every number setting something to choose from', () => {
+    for (const s of settings()) {
+      if (s.field.kind !== 'number') continue
+      expect(`${named(s)}: ${s.field.options.length} options`).not.toBe(`${named(s)}: 0 options`)
+      expect(s.field.options.length, `${named(s)} offers only one value`).toBeGreaterThan(1)
+    }
+  })
+
+  /* Numbers all render through one control now — a dropdown — so the old
+     assertion that both a segmented group and a dropdown were reached has been
+     replaced rather than deleted. What matters instead is that every option can
+     carry its unit, because the dropdown puts the unit on each option and the
+     closed trigger has to read as a whole value rather than a bare number. */
+  it('gives every number setting a unit its options can carry', () => {
+    for (const s of settings()) {
+      if (s.field.kind !== 'number') continue
+      expect(`${named(s)}: unit=${s.field.unit ?? 'MISSING'}`).not.toBe(`${named(s)}: unit=MISSING`)
     }
   })
 })
@@ -105,15 +118,6 @@ describe('revealed settings', () => {
     }
   })
 
-  /* They store against the same scope as their parent, so an id that clashes
-     with a sibling silently shares its value. allSettings() walks them for
-     exactly this reason — see the key test in mfa-join.test.ts. */
-  it('are included in the walk that checks for key collisions', () => {
-    const ids = settings().map((s) => s.id)
-    expect(ids).toContain('sms-gw-url')
-    expect(ids).toContain('call-gw-auth')
-  })
-
   it('do not reveal further settings of their own', () => {
     // Two levels of disclosure inside one row is a form, not a setting.
     for (const s of settings()) {
@@ -122,17 +126,6 @@ describe('revealed settings', () => {
           expect(`${named(child)}: nested=${Boolean(child.reveals)}`).toBe(`${named(child)}: nested=false`)
         }
       }
-    }
-  })
-
-  /* The gap this closed: both provider settings offered "Custom provider" and
-     had nowhere to put a gateway, so the option was a dead end that looked like
-     a feature. If either loses its branch, that is the regression. */
-  it('give both custom-provider options somewhere to go', () => {
-    for (const id of ['sms-provider', 'call-provider']) {
-      const s = settings().find((x) => x.id === id)
-      expect(s, `${id} is missing`).toBeDefined()
-      expect(`${id}: ${s!.reveals?.['Custom provider']?.length ?? 0} fields`).toBe(`${id}: 3 fields`)
     }
   })
 })
@@ -161,5 +154,21 @@ describe('the catalogue as a whole', () => {
 
   it('still covers all eleven families', () => {
     expect(FAMILIES.length).toBe(11)
+  })
+
+  /* The catalogue was pruned to exactly the options the brief lists. Asserted by
+     id rather than by count, so re-adding one is a change somebody makes on
+     purpose rather than a drift nobody notices. */
+  it('holds only the settings the brief kept', () => {
+    const ids = settings().map((s) => s.id).sort()
+    expect(ids).toEqual(
+      [
+        'grid-length', 'grid-size',
+        'kba-change', 'kba-limit', 'kba-verify',
+        'otp-length', 'otp-length', 'otp-validity', 'otp-validity',
+        'push-biometric', 'push-number',
+        'token-assign',
+      ].sort(),
+    )
   })
 })

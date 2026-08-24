@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { BookmarkPlus, Copy, Pencil, Trash2 } from 'lucide-react'
 
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
@@ -8,6 +9,7 @@ import { AppLogoStack } from '../logos/AppLogo'
 import { Badge, Button, DecisionChip, InfoDot, StatusPill } from '../kit'
 import { enforces, type Policy, type PolicyType } from '../data'
 import { useBrand } from '../store'
+import { NoResults } from '../empty'
 import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
 
@@ -442,7 +444,7 @@ export function Policies() {
 
         {rows.length === 0 && (
           <div className="btable__empty">
-            <p>No policies match those filters.</p>
+            <NoResults>No policies match those filters.</NoResults>
             <Button
               onClick={() => {
                 setType('All')
@@ -572,21 +574,44 @@ function PolicyRow({
                 onClick={(e) => e.stopPropagation()}
                 role="menu"
               >
+                {/* An icon per item.
+
+                    Four bare strings in a column are read word by word; with a
+                    mark in front, the one you came for is found by shape before
+                    it is read — which is the whole reason a menu you open a
+                    hundred times has icons. Every row-action menu worth copying
+                    does it: Zoom, Amplitude, Lightfield. */}
                 <button role="menuitem" onClick={() => store.go({ name: 'builder', policyId: policy.id })}>
+                  <Pencil size={14} strokeWidth={1.9} aria-hidden />
                   Edit policy
                 </button>
                 <button role="menuitem" onClick={() => store.showToast(`${policy.name} saved as a template`)}>
+                  <BookmarkPlus size={14} strokeWidth={1.9} aria-hidden />
                   Save as template
                 </button>
                 <button role="menuitem" onClick={() => store.duplicatePolicy(policy.id)}>
+                  <Copy size={14} strokeWidth={1.9} aria-hidden />
                   Duplicate
                 </button>
                 {!policy.isSystem && (
                   <>
                     <span className="bmenu__rule" />
-                    {/* Destructive trigger is a neutral menu item. The red lives in
-                        the confirmation, where the decision is actually made. */}
-                    <button role="menuitem" onClick={() => store.showToast('Deleting a policy opens a confirmation with its blast radius')}>
+                    {/* This was deliberately neutral, on the reasoning that the
+                        red belongs in the confirmation where the decision is
+                        actually made. Reversed, because the two are not
+                        alternatives: a menu is scanned and clicked fast, and
+                        "Delete policy" sitting in identical grey among three
+                        harmless items is easy to hit by accident. The dialog
+                        still catches it — this reduces how often it has to.
+
+                        Every reference that has a destructive item colours it:
+                        Lightfield, Retool. The confirmation keeps its red too. */}
+                    <button
+                      role="menuitem"
+                      className="is-danger"
+                      onClick={() => store.showToast('Deleting a policy opens a confirmation with its blast radius')}
+                    >
+                      <Trash2 size={14} strokeWidth={1.9} aria-hidden />
                       Delete policy
                     </button>
                   </>

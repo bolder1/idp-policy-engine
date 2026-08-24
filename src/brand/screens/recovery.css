@@ -1,0 +1,209 @@
+/* -----------------------------------------------------------------------------
+   The recovery tab's stylesheet.
+
+   It was auth-methods-v5.css and it dressed a whole five-tab screen. That
+   screen was one of five alternatives kept side by side while the direction was
+   being chosen; the direction is chosen, the alternatives are deleted, and what
+   is left here are the rules the surviving Recovery tab and method mark still
+   render. The `bv5` prefix stays because the markup does — renaming both is a
+   separate change with no behaviour in it.
+   -------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+   V5 · MFA experience.
+
+   Every value resolves to a token. The deployed prototype paints these panels
+   with its own hex values; matching its *layout* is the brief, but matching its
+   colours literally would fork the palette that was just unified, so the shapes
+   are V5's and the colours are ours.
+   --------------------------------------------------------------------------- */
+
+/* Full width. The page was capped at 1180 and not centred, so it pinned left and
+   left the rest of the window empty on the right — 97px at 1512, and growing
+   with the window. The cap is gone; what replaces it is a measure on the text
+   that would otherwise stretch, because a description read across 1400px is a
+   worse line than the same description at 1180. Space goes to the table, not to
+   the sentences inside it. */
+.bv5 { max-width: none; }
+
+.bv5__pane { display: flex; flex-direction: column; gap: 26px; }
+
+/* --- Lettered sections ------------------------------------------------------ */
+
+.bv5__seclabel {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary);
+}
+.bv5__seclabel span {
+  display: grid; place-items: center;
+  width: 18px; height: 18px; border-radius: var(--radius-sm);
+  background: var(--brand-subtle-bg); border: 1px solid var(--brand-subtle-border);
+  color: var(--brand-active); letter-spacing: 0;
+}
+.bv5__seccard {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 4px 16px;
+}
+
+.bv5__row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bv5__row:last-child { border-bottom: 0; }
+.bv5__rn { display: block; font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bv5__sublabel {
+  margin: 14px 0 8px;
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary);
+}
+
+/* --- Radios ----------------------------------------------------------------- */
+
+/* Three alternatives, three columns, one row.
+
+   `auto-fit` rather than a hard `repeat(3, 1fr)`: the pane narrows when the
+   window does, and 212px is where 'OTP over Alternate Email' stops fitting on
+   one line. Below that they reflow to two and then to one, which is the stacked
+   list this replaced — the right thing to degrade to. The fourth track auto-fit
+   leaves over collapses to zero and takes its gutter with it, so three cards
+   still span the pane exactly. */
+.bv5__radios {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(212px, 1fr));
+  gap: 8px; margin-bottom: 10px;
+}
+.bv5__radio {
+  position: relative;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 30px 10px 11px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised); text-align: left;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.bv5__radio:hover:not(:disabled) { border-color: var(--border-strong); }
+/* The border and tint carry the selection; the tick confirms it without
+   relying on colour alone. No paired radio dot — with three cards that is
+   three affordances doing one card's job. */
+.bv5__radio.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bv5__radio.is-blocked { opacity: 0.55; cursor: not-allowed; }
+.bv5__radio-body { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.bv5__radio strong {
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+  line-height: 1.25;
+}
+.bv5__radio-tick, .bv5__radio-lock {
+  position: absolute; top: 9px; right: 9px;
+  display: grid; place-items: center;
+  width: 17px; height: 17px; border-radius: var(--radius-full);
+}
+.bv5__radio-tick { background: var(--brand); color: var(--text-on-brand); }
+.bv5__radio-lock { color: var(--text-muted); }
+
+/* Hugs its text. A pill radius stretched the full width of the pane reads as a
+   banner with rounded ends, which is a different and louder thing than the
+   one-line status this is. */
+.bv5__dep {
+  display: inline-flex; align-items: center; gap: 6px;
+  width: fit-content; margin-bottom: 14px; padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm); line-height: 1.4;
+}
+.bv5__dep svg { flex: none; }
+/* Only the warning state now. The green "everything is fine" variant was a
+   permanent confirmation on a correctly configured tenant, which is noise — and
+   it made the one case that matters look like more of the same. */
+.bv5__dep.is-warn { background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border); color: var(--fb-notice-fg); }
+
+/* --- Stats ------------------------------------------------------------------ */
+
+.bv5__stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.bv5__stat {
+  flex: 1; min-width: 120px;
+  padding: 12px 14px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+.bv5__stat strong { display: block; font-size: var(--fs-2xl); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bv5__stat span {
+  display: block; margin-top: 2px;
+  font-size: var(--fs-xs); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
+}
+.bv5__stat.is-green strong { color: var(--fb-positive-fg); }
+.bv5__stat.is-amber strong { color: var(--fb-notice-fg); }
+
+
+
+/* --- Method identity ---------------------------------------------------------
+   A vendor logo where a vendor exists, a channel icon where one does not.
+   Both render at the same box so rows stay aligned whichever a method gets. */
+.bv5__mico {
+  flex: none;
+  display: grid; place-items: center;
+  width: 26px; height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+.bv5__mico--logo { object-fit: contain; padding: 3px; background: var(--surface-raised); }
+
+/* Rows carry the rules, so every row gets one and the last in a section does
+   not — the section boundary is already a line. */
+.bv5__list .bv5__group2-body .bv5__row { padding: 13px 0; border-bottom: 1px solid var(--border-subtle); }
+.bv5__list .bv5__group2-body .bv5__row:first-child { border-bottom: 1px solid var(--border-subtle); }
+.bv5__list .bv5__group2-body .bv5__row:last-child { border-bottom: 0; }
+
+.bv5__list .bv5__scroller .bv5__mico { flex: none; }
+
+.bv5__group2-body .bv5__row { padding: 12px 0; }
+.bv5__group2-body .bv5__row:first-child { border-bottom: 0; }
+
+.bv5__rank .bv5__mico { flex: none; }
+.bv5__xferrow .bv5__mico { flex: none; }
+
+/* --- After the text cut ----------------------------------------------------------
+   Rows are a name and a control. The sentence that used to sit under every name
+   is on a TipDot beside it: one gesture away for anyone who needs it, and off
+   the page for the eight rows where it was competing with the eight controls it
+   described. */
+
+.bv5__row { align-items: center; }
+.bv5__rn { display: flex; align-items: center; gap: 7px; }
+
+.bv5__pick .bv5__mico { flex: none; box-sizing: border-box; }
+
+/* --- Recovery options ------------------------------------------------------------
+   What separates these three is how much proof each asks for, and that was
+   buried in a sentence per row. It is a pill now; the mechanics are on the
+   card's own title for anyone who wants them. */
+
+.bv5__radio-ico {
+  flex: none; display: grid; place-items: center;
+  width: 32px; height: 32px; border-radius: var(--radius-md);
+  background: var(--surface-inset); border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+/* On the selected card the tile stops being a chip and becomes an outline, so
+   the card's own tint runs through it. Naming a surface token here instead —
+   any surface token — puts a fixed colour on top of a tinted card, and in dark
+   `--surface-raised` is the exact colour of an *unselected* card, which reads
+   as a hole punched in the selected one. Transparent has no theme to get
+   wrong. */
+.bv5__radio.is-on .bv5__radio-ico { background: transparent; border-color: var(--brand-subtle-border); color: var(--brand-active); }
+
+/* Two classes, because `.bv5__dsetting span` at (0,1,1) already claims every
+   span in the row and would render this number control as a block of 12px
+   tertiary text. (0,2,0) beats it. */
+.bv5__dsetting .bv5__dnum {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 0; font-size: var(--fs-md); color: var(--text-secondary);
+}
+.bv5 .bv5__dnum input {
+  width: 68px; height: var(--ctl-height-sm); padding: 0 8px;
+  background: var(--surface-raised); border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm); font-size: var(--fs-md); color: var(--text-body);
+}

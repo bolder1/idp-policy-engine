@@ -225,8 +225,12 @@
   z-index: var(--z-dropdown);
   text-align: left;
 }
+/* Row, not block: every item now leads with a mark, and the label has to sit
+   on the icon's baseline rather than under it. */
 .bmenu button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
   width: 100%;
   padding: var(--space-4) var(--space-5);
   border-radius: var(--radius-md);
@@ -234,7 +238,23 @@
   color: var(--text-body);
   text-align: left;
 }
+.bmenu button svg { flex: none; color: var(--text-muted); }
 .bmenu button:hover { background: var(--surface-sunken); }
+.bmenu button:hover svg { color: var(--text-secondary); }
+.bmenu button:focus-visible {
+  outline: none; background: var(--surface-sunken);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+/* The one item that cannot be undone by clicking again.
+
+   Coloured at rest rather than only on hover, because the point is to be seen
+   while the menu is being SCANNED — a red that only appears once the pointer is
+   already on it arrives after the decision. */
+.bmenu button.is-danger,
+.bmenu button.is-danger svg { color: var(--fb-negative-fg); }
+.bmenu button.is-danger:hover { background: var(--fb-negative-bg); }
+.bmenu button.is-danger:hover svg { color: var(--fb-negative-fg); }
 .bmenu__rule { display: block; height: 1px; margin: var(--space-3) 0; background: var(--border-subtle); }
 
 .btable__empty { padding: var(--space-12); text-align: center; display: grid; gap: var(--space-5); justify-items: center; }

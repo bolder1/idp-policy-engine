@@ -175,12 +175,11 @@ export function policiesAt(depth: Depth): Policy[] {
 // --- Library objects ----------------------------------------------------------
 
 export function zonesAt(depth: Depth): Zone[] {
-  // The two locked defaults ship with every tenant and cannot be deleted.
-  const locked = seedZones.filter((z) => z.locked)
-  if (depth === 'none') return locked
+  // Nothing ships by default any more, so a day-one tenant gets the empty state.
+  if (depth === 'none') return []
   // One office network is what a small tenant has. The ASN zone, the geo zone
   // and the anonymiser list are things somebody had to know to want.
-  if (depth === 'small') return [...locked, ...seedZones.filter((z) => z.id === 'office')]
+  if (depth === 'small') return seedZones.filter((z) => z.id === 'office')
   if (depth === 'medium') return seedZones
 
   /* The bulk case made literal. The doc calls seven hundred ranges a task mode

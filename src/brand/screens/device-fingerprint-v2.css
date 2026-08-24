@@ -605,3 +605,60 @@
 .bfp2__uses li + li { border-top: 1px solid var(--border-subtle); }
 .bfp2__uses strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
 .bfp2__uses span { font-size: var(--fs-sm); color: var(--text-tertiary); text-align: right; }
+
+/* =============================================================================
+   The two sections the profile page was missing: how the mode decides, and
+   what the profile is allowed to read.
+   ========================================================================== */
+
+/* Settings that are questions rather than attributes reuse the attribute row,
+   so the page has one row shape rather than two. */
+.bfp2__rows--form { display: flex; flex-direction: column; }
+
+/* --- Per-attribute weight, risk mode -----------------------------------------
+   `weights` was a field the score read and no screen could write, so every risk
+   profile ran on the master's defaults and the override was dead. The number is
+   shown rather than a word — the score adds these up, and "High" beside an
+   invisible sum is exactly the console's mistake. */
+.bfp2__weight { display: inline-flex; align-items: center; gap: 6px; }
+.bfp2__weight > span { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bfp2__weight select {
+  height: 28px; padding: 0 6px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-family: inherit; font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  color: var(--text-secondary); font-variant-numeric: tabular-nums;
+}
+.bfp2__weight select:focus-visible {
+  outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-subtle-bg);
+}
+
+/* --- A platform limit, on the choice it limits -------------------------------
+   The console puts "Windows only" in the third bullet of a callout that appears
+   after agent-based has been chosen — one screen too late to be a decision
+   input, so it sits on the card instead. */
+.bfp2__mode-note {
+  display: flex; align-items: flex-start; gap: 5px;
+  margin-top: 6px;
+  font-style: normal; font-size: var(--fs-xs); line-height: 1.45;
+  color: var(--fb-notice-fg);
+}
+.bfp2__mode-note svg { flex: none; margin-top: 2px; }
+
+/* Said before the switch happens, not after it. */
+.bfp2__prereq {
+  display: flex; align-items: flex-start; gap: 7px;
+  margin: 0; padding: 9px 11px; border-radius: var(--radius-md);
+  background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border);
+  color: var(--fb-notice-fg); font-size: var(--fs-xs); line-height: 1.5;
+}
+.bfp2__prereq svg { flex: none; margin-top: 2px; }
+
+/* An attribute this reach cannot collect. Shown and refused rather than hidden:
+   "why is TPM ID missing" is a support ticket, and a greyed row is the answer. */
+.bfp2__opt.is-blocked { opacity: 0.4; cursor: not-allowed; }
+.bfp2__opt.is-blocked:hover { border-color: var(--border-subtle); background: var(--surface-raised); }
+
+.bfp2__roster { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.bfp2__roster strong { font-size: var(--fs-sm); color: var(--text-primary); }
+.bfp2__roster em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }

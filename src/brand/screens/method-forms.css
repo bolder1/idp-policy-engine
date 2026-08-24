@@ -1,0 +1,125 @@
+/* -----------------------------------------------------------------------------
+   The method configuration form.
+
+   Rescued from method-sets.css when that screen was deleted: the stylesheet
+   went with it, but `ConfigFields` did not — it is the form behind every "Set
+   up" button on the categories screen, and it had been rendering unstyled since
+   the purge. Kept in its own file this time so its lifetime is tied to the
+   component rather than to whichever screen happened to mount it first.
+   -------------------------------------------------------------------------- */
+
+/* --- Configuration form -------------------------------------------------------- */
+
+.bmc__blurb {
+  margin: 0 0 var(--space-6); padding: var(--space-5);
+  background: var(--fb-info-bg); border-radius: var(--radius-md);
+  font-size: var(--fs-md); color: var(--fb-info-fg); line-height: 1.55;
+}
+/* --- Configuration fields ------------------------------------------------------
+
+   Stacked: label and help above, control at full width below.
+
+   These used to be a 220px label column beside the control, which is the right
+   shape on a wide settings page and the wrong one in a 560px drawer — the label
+   wraps to three lines while the input it belongs to sits in half the panel.
+   Every narrow-panel form worth copying stacks instead: Maze, Tines and Google
+   AI Studio all do, and Maze is the closest analogue to this exact surface.
+
+   Toggles keep the row form, because a switch is small enough to sit beside its
+   label and stacking one wastes a line saying nothing. */
+
+.bmc__fields { display: flex; flex-direction: column; }
+.bmc__field {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-5) 0; border-top: 1px solid var(--border-subtle);
+}
+.bmc__field:first-child { border-top: 0; padding-top: 0; }
+/* A switch beside its label, not under it. */
+.bmc__field.is-toggle {
+  flex-direction: row; align-items: center; justify-content: space-between; gap: var(--space-6);
+}
+.bmc__field.is-toggle .bmc__label { flex: 1; min-width: 0; }
+.bmc__field.is-toggle .bmc__control { flex: none; }
+/* A row, because the help is now a dot beside the name rather than a sentence
+   under it. Twenty-six fields each lost a line of prose, which is most of the
+   scroll this form used to be. */
+.bmc__label { display: flex; align-items: center; gap: 6px; }
+.bmc__label label { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-body); }
+.bmc__label label b { margin-left: 2px; color: var(--fb-negative-fg); }
+
+.bmc__control input[type='text'], .bmc__control input[type='password'], .bmc__control input[type='number'],
+.bmc__control input[type='email'], .bmc__control select, .bmc__control textarea {
+  width: 100%; height: var(--ctl-height-md); padding: 0 var(--space-4);
+  background: var(--surface-raised); border: 1px solid var(--border-default);
+  border-radius: var(--radius-md); font-size: var(--fs-md); color: var(--text-primary); font-family: inherit;
+}
+.bmc__control textarea { height: auto; padding: var(--space-4); line-height: 1.6; resize: vertical; }
+.bmc__control input:focus-visible, .bmc__control select:focus-visible, .bmc__control textarea:focus-visible {
+  outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg);
+}
+/* No error styling on a field that is merely still empty.
+
+   The asterisk already says the field is required, and it says it once. Adding
+   a red label and a pink input on top says the same thing three times — and
+   says it as an ERROR, on a form the admin has not filled in yet and has not
+   submitted. Twenty-six fields opening with two of them already painted as
+   failures is a form that greets you by telling you off.
+
+   `aria-invalid` stays on the input, because "required and empty" is real and a
+   screen reader should hear it. What goes is the colour, which was announcing
+   it to everyone, constantly, before there was anything to announce. The footer
+   still names exactly which fields are outstanding. */
+
+.bmc__secret { position: relative; display: block; }
+.bmc__secret input { padding-right: 38px; font-family: var(--font-mono); letter-spacing: 0.06em; }
+.bmc__secret button {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: var(--radius-sm); color: var(--text-muted);
+}
+.bmc__secret button:hover { background: var(--surface-sunken); color: var(--text-primary); }
+
+/* The stepper's input is a text input, so the full-width control rule above
+   would otherwise give it a second border inside the stepper's own. Undone here
+   rather than narrowing that rule, which is right for every other field. */
+.bmc__control .bx-step input[type='text'] {
+  width: calc(var(--bx-digits, 3) * 1ch + 8px);
+  height: auto; padding: 0;
+  background: none; border: 0; border-radius: 0; box-shadow: none;
+  text-align: center;
+}
+
+.bmc__switch { display: inline-flex; align-items: center; gap: var(--space-4); font-size: var(--fs-md); color: var(--text-secondary); }
+.bmc__radios { display: flex; flex-direction: column; gap: var(--space-3); }
+.bmc__radios label {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); cursor: pointer;
+}
+.bmc__radios label.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bmc__radios label > span { display: flex; flex-direction: column; gap: 2px; }
+.bmc__radios strong { font-size: var(--fs-md); color: var(--text-primary); }
+.bmc__radios em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+.bmc__list { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.bmc__list ul { margin: 0; padding: 0; list-style: none; }
+.bmc__list li {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle); font-size: var(--fs-md); color: var(--text-body);
+}
+.bmc__list li.is-empty { color: var(--text-muted); font-size: var(--fs-sm); }
+.bmc__list li span { flex: 1; min-width: 0; }
+.bmc__list li button { display: grid; place-items: center; width: 22px; height: 22px; border-radius: var(--radius-sm); color: var(--text-muted); }
+.bmc__list li button:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bmc__listadd { display: flex; gap: var(--space-3); padding: var(--space-3); background: var(--surface-sunken); }
+.bmc__listadd input { flex: 1; height: var(--ctl-height-sm); padding: 0 var(--space-4); background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: var(--radius-sm); font-size: var(--fs-md); font-family: inherit; color: var(--text-primary); }
+.bmc__listadd button {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 0 var(--space-5); height: var(--ctl-height-sm);
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-raised); font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
+}
+.bmc__listadd button:disabled { opacity: 0.4; cursor: default; }
+
+.bmc__foot { flex: 1; display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); }

@@ -3,7 +3,7 @@ import { ipSectionEmpty, locationEmpty, type Zone } from '../data'
 /* -----------------------------------------------------------------------------
    Network zone validation.
 
-   The model is two optional sections combined with AND, where an empty section
+   The model is two optional sections, both of which must hold, where an empty section
    means MATCH ANY. That single rule produces both of the failure modes the spec
    calls out, and they are opposites:
 
@@ -179,5 +179,11 @@ export function describeZone(z: Zone): string {
   if (l.radius) geo.push(`${l.radius.km}km of ${l.radius.label ?? `${l.radius.lat}, ${l.radius.lon}`}`)
   parts.push(geo.length ? geo.join(' · ') : 'Any location')
 
-  return parts.join('  AND  ')
+  /* Joined as a list, not a conjunction.
+
+     This read "1 address AND Any location", which described the engine rather
+     than the zone: the AND is how the two halves combine internally, and
+     spelling it out made every summary look like a boolean expression an admin
+     had authored. The two facets are simply what the zone contains. */
+  return parts.join(' · ')
 }

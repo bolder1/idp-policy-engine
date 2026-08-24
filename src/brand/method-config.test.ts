@@ -60,24 +60,26 @@ describe('every blockable method can be configured', () => {
 })
 
 describe('completeness', () => {
-  /* Yubikey is unconfigured in the seed, so its validation-server credentials
-     are genuinely blank — the honest starting state for a provider nobody has
-     connected. `otp-sms` is NOT a valid subject here: it is configured, so its
-     form is correctly full and its key correctly held. */
+  /* Display Token is unconfigured in the seed, so its validation-server
+     credentials are genuinely blank — the honest starting state for a provider
+     nobody has connected. It replaced Yubikey here when the seed was changed so
+     that only the two token integrations still need setting up; `otp-sms` is
+     NOT a valid subject either way, because it is configured, so its form is
+     correctly full and its key correctly held. */
   it('reports a form with blank required fields as incomplete', () => {
-    const missing = missingFields(configFor('yubikey')!.fields)
+    const missing = missingFields(configFor('display-token')!.fields)
     expect(missing.map((f) => f.id)).toEqual(['server', 'client', 'secret'])
     expect(missing.every((f) => f.kind === 'text' || f.kind === 'secret')).toBe(true)
   })
 
   it('clears once the required fields are filled', () => {
-    let fields = configFor('yubikey')!.fields
+    let fields = configFor('display-token')!.fields
     for (const f of missingFields(fields)) fields = setField(fields, f.id, 'filled')
     expect(missingFields(fields)).toEqual([])
   })
 
   it('treats whitespace as blank — a space is not a client id', () => {
-    let fields = configFor('yubikey')!.fields
+    let fields = configFor('display-token')!.fields
     for (const f of missingFields(fields)) fields = setField(fields, f.id, '   ')
     expect(missingFields(fields).length).toBeGreaterThan(0)
   })

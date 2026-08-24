@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { AlertTriangle, Info, Link2, Plus, RefreshCw, Trash2, Webhook, Zap } from 'lucide-react'
+import { AlertTriangle, Info, Link2, Plus, RefreshCw, Trash2, Zap } from 'lucide-react'
 
 import { PageHead } from '../Shell'
 import { Badge, Button, Modal } from '../kit'
 import { useBrand } from '../store'
+import { EmptyState, HookArt } from '../empty'
 import type { Policy } from '../data'
 import {
   FAILURE_BLURB,
@@ -78,20 +79,17 @@ export function Hooks() {
       />
 
       {store.hooks.length === 0 ? (
-        <div className="bhk__empty">
-          <span aria-hidden>
-            <Webhook size={26} strokeWidth={1.6} />
-          </span>
-          <h2>No hooks yet</h2>
-          <p>
-            Every condition available to a rule today is decided from data this console already holds. A hook lets a
-            rule ask something else — an entitlement system, a fraud model, a rostering service — and use the answer.
-          </p>
-          <Button variant="brand" onClick={() => setEditing(blank())}>
-            <Plus size={15} strokeWidth={2.2} aria-hidden />
-            Create your first hook
-          </Button>
-        </div>
+        <EmptyState
+          art={<HookArt />}
+          title="No hooks yet"
+          blurb="A hook lets a rule ask something this console does not hold — an entitlement system, a fraud model — and use the answer."
+          action={
+            <Button variant="brand" onClick={() => setEditing(blank())}>
+              <Plus size={15} strokeWidth={2.2} aria-hidden />
+              Create your first hook
+            </Button>
+          }
+        />
       ) : (
         <ul className="bhk__list">
           {store.hooks.map((h) => {

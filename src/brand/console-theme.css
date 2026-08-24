@@ -163,9 +163,15 @@
 
 .brand-root { font-size: var(--fs-md); }
 
-/* Content density follows the console: white page, grey tiles, 6px radii. */
-.bpage { padding: 20px 24px 56px; }
-.bpage__headrow h1 { font-size: var(--fs-3xl); font-weight: 500; letter-spacing: -0.01em; }
+/* Content density follows the console: white page, grey tiles, 6px radii.
+
+   Padding measured off the shipping Applications screen, whose content column
+   is `p-3 pt-5` — 16px at the sides and a deep top inset that lets the title
+   clear the fixed bar without crowding it. Ours was 20/24 and read tighter at
+   the top and wider at the sides than the console it sits beside. The bottom
+   keeps its 56px so a page that ends in a table is not flush with the viewport.
+*/
+.bpage { padding: 32px 16px 56px; }
 .bpage__headrow p { font-size: var(--fs-md); }
 .btable-wrap, .bx-card, .bedit, .bmaster__list {
   border-color: var(--border-subtle);
@@ -193,8 +199,21 @@
 .bx-btn--setup { background: var(--int-setup-bg); color: #fff; border-color: var(--int-setup-bg); }
 .bx-btn--setup:not(:disabled):hover { background: var(--int-setup-bg-hover); border-color: var(--int-setup-bg-hover); }
 
-/* Page titles in the console are H5 at 20px/700, not a 24px display size. */
-.bpage__headrow h1, .bwiz__title h1 { font-size: 20px; font-weight: 700; letter-spacing: 0; }
+/* --- One heading scale, every page -------------------------------------------
+   The console's page title is an H5 at 20px/700, not a 24px display size — and
+   this rule used to say so while only reaching `.bpage__headrow`. Three screens
+   build their own header instead of using that component, so they never matched
+   it: Zones, Device fingerprint and Authentication methods were rendering at
+   the browser's default 28px, half again the size of the pages either side of
+   them in the same nav.
+
+   Scoped to `.bpage` so it catches every page however its header is composed,
+   and stepped down so a section heading cannot equal its own page title —
+   Authentication methods had h1 and h2 both at 20px, which is two levels drawn
+   as one. */
+.bpage h1, .bwiz__title h1 { font-size: 20px; font-weight: 700; letter-spacing: 0; }
+.bpage h2 { font-size: 16px; font-weight: 600; letter-spacing: 0; }
+.bpage h3 { font-size: 14px; font-weight: 600; letter-spacing: 0; }
 .bpage__headrow p, .bwiz__title p { font-size: var(--fs-md); color: var(--text-secondary); }
 
 /* Table chrome to match: checkbox column, selection bar, rows-per-page footer. */

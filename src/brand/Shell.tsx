@@ -15,6 +15,8 @@ import {
   Moon,
   Palette,
   Rocket,
+  HelpCircle,
+  ListChecks,
   Settings,
   ShieldCheck,
   Sun,
@@ -80,8 +82,8 @@ const NAV: { section?: string; items: NavItem[] }[] = [
           { label: 'All Policies', screen: { name: 'policies' } },
           { label: 'Templates', screen: { name: 'templates' } },
           { label: 'Zones', screen: { name: 'zones' } },
-          { label: 'Device Fingerprint', screen: { name: 'fingerprint' } },
-          { label: 'Method Sets', screen: { name: 'methods' } },
+          { label: 'Device Restrictions', screen: { name: 'fingerprint' } },
+          { label: 'Authentication methods', screen: { name: 'methods' } },
           { label: 'External Hooks', screen: { name: 'hooks' } },
         ],
       },
@@ -354,6 +356,26 @@ export function Shell({ children, onSwitchVersion }: { children: ReactNode; onSw
       <main className="bshell__main" ref={main}>
         {children}
       </main>
+
+      {/* The console's quick-access rail, down the right edge.
+
+          It is the one piece of the shipping chrome we did not have: two
+          buttons that follow the page rather than scrolling with it, so help
+          and the setup checklist are reachable from the bottom of a long table
+          without going back to the top. Deliberately not a third copy of the
+          topbar's icons — those open the same destinations, but from a bar that
+          scrolls away.
+
+          Narrow on purpose. It is a rail, not a panel: anything that needs more
+          than an icon belongs in what the icon opens. */}
+      <div className="bshell__quick" role="complementary" aria-label="Quick access">
+        <button className="bshell__quickbtn is-primary" title="Documentation" aria-label="Documentation">
+          <HelpCircle size={19} strokeWidth={2} />
+        </button>
+        <button className="bshell__quickbtn" title="Setup checklist" aria-label="Setup checklist">
+          <ListChecks size={19} strokeWidth={1.9} />
+        </button>
+      </div>
 
       <AnimatePresence>
         {toast && (

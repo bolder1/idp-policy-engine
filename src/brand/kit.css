@@ -729,3 +729,66 @@ html[data-theme='dark'] {
   color: var(--fb-notice-fg);
 }
 .bx-status--monitor i { background: var(--fb-notice-dot); }
+
+
+/* --- Number stepper ---------------------------------------------------------------
+   One bordered control holding the whole question: step down, the value, its
+   unit, step up. The unit lives inside the border so it cannot wrap away from
+   the number it belongs to, which is what the old loose-`em`-plus-bounds-chip
+   arrangement did at the first narrow column. */
+
+.bx-stepwrap { display: inline-flex; flex-direction: column; gap: 3px; }
+
+.bx-step {
+  display: inline-flex; align-items: center; gap: 2px;
+  height: var(--ctl-height-md); padding: 0 4px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+.bx-step.is-focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bx-step.is-invalid { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+
+/* The correction, made visible. Half a second of the negative tone is enough to
+   register that the number changed under you without turning into an error
+   state you have to dismiss. */
+.bx-step.is-corrected {
+  border-color: var(--fb-negative-border);
+  background: var(--fb-negative-bg);
+}
+
+.bx-step__btn {
+  flex: none; display: grid; place-items: center;
+  width: 26px; height: 26px; padding: 0;
+  border: 0; border-radius: var(--radius-sm);
+  background: none; color: var(--text-secondary); cursor: pointer;
+}
+.bx-step__btn:not(:disabled):hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bx-step__btn:not(:disabled):active { background: var(--border-subtle); }
+/* The bound, felt rather than read. */
+.bx-step__btn:disabled { opacity: 0.28; cursor: not-allowed; }
+
+.bx-step__val { display: inline-flex; align-items: baseline; gap: 4px; padding: 0 3px; }
+.bx-step__val input {
+  width: calc(var(--bx-digits, 3) * 1ch + 8px);
+  min-width: 22px; padding: 0; height: auto;
+  border: 0; background: none; box-shadow: none;
+  font-family: inherit; font-size: var(--fs-md); font-variant-numeric: tabular-nums;
+  color: var(--text-primary); text-align: center;
+}
+.bx-step__val input:focus-visible { outline: none; }
+.bx-step__val em {
+  font-style: normal; font-size: var(--fs-sm); color: var(--text-tertiary);
+  white-space: nowrap; user-select: none;
+}
+
+.bx-step__hint {
+  font-size: var(--fs-xs); color: var(--text-muted); text-align: center;
+  opacity: 0; transition: opacity 0.14s ease;
+}
+.bx-step__hint[data-on='true'] { opacity: 1; }
+.bx-step.is-corrected + .bx-step__hint { color: var(--fb-negative-fg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bx-step, .bx-step__hint { transition: none; }
+}

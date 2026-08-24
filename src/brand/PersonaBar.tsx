@@ -114,29 +114,3 @@ export function PersonaBar() {
   )
 }
 
-/* The strip that sits under the page head on every Policy tab screen.
-
-   One line, and it answers the only question a viewer has after the tenant
-   changes under them: who am I, and how much is in here. Without it the
-   switcher is invisible the moment the menu closes, and a screenshot of the
-   Zones page at `small` is indistinguishable from one taken at `large` by
-   somebody who does not already know the seed. */
-export function PersonaStrip() {
-  const store = useBrand()
-  const p = personaById(store.persona)
-  const depth = DEPTHS[p.depth]
-
-  return (
-    <div className="bpb__strip">
-      <span className="bpb__stripwho">
-        <Users size={13} strokeWidth={1.9} aria-hidden />
-        {p.label}
-        <em>{p.size}</em>
-      </span>
-      <span className="bpb__stripq">{p.question}</span>
-      <span className="bpb__stripdepth" title={depth.caption}>
-        {depth.label}
-      </span>
-    </div>
-  )
-}

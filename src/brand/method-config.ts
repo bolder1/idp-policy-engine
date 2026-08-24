@@ -23,8 +23,15 @@ import { methodById } from './methods'
    is a choice between three named positions rather than a free string.
    -------------------------------------------------------------------------- */
 
+/* Which block of the form a field belongs to. Optional, because most
+   integrations are four fields and grouping four things is filing for its own
+   sake. RSA has twenty-six, of which two are required — without groups that is
+   one scroll where the two that matter are indistinguishable from the
+   twenty-four that have defaults. */
+export type ConfigGroup = 'connect' | 'policy' | 'advanced'
+
 export type ConfigField =
-  | { kind: 'text'; id: string; label: string; help?: string; placeholder?: string; required?: boolean; value: string }
+  | { kind: 'text'; group?: ConfigGroup; id: string; label: string; help?: string; placeholder?: string; required?: boolean; value: string }
   /* `stored` means a value is already saved and is not readable back.
 
      A configured integration whose secret renders as an empty required field
@@ -32,15 +39,21 @@ export type ConfigField =
      retyping a key they may not have to hand — is how a live integration gets
      taken down while being inspected. Stored secrets show as held, with an
      explicit path to replace them. */
-  | { kind: 'secret'; id: string; label: string; help?: string; required?: boolean; stored?: boolean; value: string }
-  | { kind: 'select'; id: string; label: string; help?: string; options: string[]; value: string }
-  | { kind: 'number'; id: string; label: string; help?: string; min: number; max: number; unit?: string; value: number }
-  | { kind: 'toggle'; id: string; label: string; help?: string; value: boolean }
-  | { kind: 'radio'; id: string; label: string; help?: string; options: { value: string; label: string; help?: string }[]; value: string }
-  | { kind: 'textarea'; id: string; label: string; help?: string; rows?: number; value: string }
-  | { kind: 'list'; id: string; label: string; help?: string; itemLabel: string; value: string[] }
+  | { kind: 'secret'; group?: ConfigGroup; id: string; label: string; help?: string; required?: boolean; stored?: boolean; value: string }
+  | { kind: 'select'; group?: ConfigGroup; id: string; label: string; help?: string; options: string[]; value: string }
+  | { kind: 'number'; group?: ConfigGroup; id: string; label: string; help?: string; min: number; max: number; unit?: string; value: number }
+  | { kind: 'toggle'; group?: ConfigGroup; id: string; label: string; help?: string; value: boolean }
+  | { kind: 'radio'; group?: ConfigGroup; id: string; label: string; help?: string; options: { value: string; label: string; help?: string }[]; value: string }
+  | { kind: 'textarea'; group?: ConfigGroup; id: string; label: string; help?: string; rows?: number; value: string }
+  | { kind: 'list'; group?: ConfigGroup; id: string; label: string; help?: string; itemLabel: string; value: string[] }
 
 export interface MethodConfig {
+  /* What has to be true elsewhere before this form can be filled in at all.
+     RSA is the only integration that ships one: its five steps happen in the
+     RSA Security Console, and half its fields are values you can only read off
+     that screen. Stating them first turns a form you cannot complete into a
+     checklist you can go and complete. */
+  prereqs?: string[]
   /** One line on what this configuration is actually connecting to. */
   blurb: string
   fields: ConfigField[]
@@ -159,12 +172,62 @@ const BUILDERS: Record<string, (live: boolean) => MethodConfig> = {
       { kind: 'number', id: 'timeout', label: 'Prompt expires after', min: 15, max: 300, unit: 'seconds', value: 60 },
     ],
   }),
+  /* The console's RSA Authenticator (SecurID) Configuration form, in full.
+
+     Twenty-six fields, of which exactly two are required. The console renders
+     them as one flat scroll, which is why its dialog opens mid-form with the
+     endpoint above the fold and an optional context-message id in the middle of
+     the viewport — nothing on screen tells you which four you actually have to
+     fill in.
+
+     Grouped here instead, in the order the work happens: CONNECT is what you
+     need to reach the server at all, POLICY is which rule it should apply once
+     reached, and ADVANCED is the two dozen values that have working defaults
+     and exist for the tenants whose RSA deployment is unusual. Advanced is
+     collapsed, so the form opens as four fields rather than twenty-six.
+
+     Every `help` line is the console's own. */
   rsa: (live: boolean) => ({
     blurb: 'SecurID codes are validated by an RSA Authentication Manager. This console only forwards them.',
+    prereqs: [
+      'Ensure the end user is registered and active in RSA Authentication Manager.',
+      'Assign an RSA SecurID token or authentication method to the user in the RSA Security Console.',
+      'Create or identify an Authentication Agent in RSA Authentication Manager and note its Client ID and Access Key.',
+      'Verify the RSA Authentication Manager REST API is reachable from this server and note the Base URL (e.g. https://rsa-server:5555).',
+      'Confirm the authentication policy you want to apply exists in RSA Authentication Manager and note its Policy ID.',
+    ],
     fields: [
-      { kind: 'text', id: 'server', label: 'Authentication Manager URL', required: true, value: live ? 'https://rsa.acme.com/mfa/v1' : '' },
-      { kind: 'text', id: 'client', label: 'Client id', required: true, value: live ? 'acme-idp' : '' },
-      { kind: 'secret', id: 'secret', label: 'Access key', required: true, stored: live, value: '' },
+      // --- Connect -----------------------------------------------------------
+      { kind: 'text', group: 'connect', id: 'client', label: 'RSA Client ID', required: true, value: live ? 'acme-idp' : '', help: 'Client ID provided by RSA Authentication Manager for API authentication.' },
+      { kind: 'secret', group: 'connect', id: 'secret', label: 'Access Key', required: true, stored: live, value: '', help: 'Secret key for authenticating with the RSA API.' },
+      { kind: 'text', group: 'connect', id: 'access-id', label: 'Access ID', value: '', help: 'Access ID credential for RSA SecurID authentication.' },
+      { kind: 'text', group: 'connect', id: 'server', label: 'Default Base URL', value: live ? 'https://rsa.acme.com:5555' : '', placeholder: 'https://rsa-server:5555', help: 'Base URL of the RSA Authentication Manager REST API (e.g. https://rsa-server:5555).' },
+
+      // --- Policy ------------------------------------------------------------
+      { kind: 'select', group: 'policy', id: 'assurance', label: 'Assurance Level', options: ['Select', 'LOW', 'MEDIUM', 'HIGH'], value: 'Select', help: 'Required authentication assurance level for RSA verification.' },
+      { kind: 'text', group: 'policy', id: 'policy-id', label: 'Default Policy ID', value: '', help: 'ID of the authentication policy configured in RSA Authentication Manager.' },
+      { kind: 'text', group: 'policy', id: 'policy-cond', label: 'Default Policy Condition', value: '', help: 'Condition or rule applied to the default authentication policy.' },
+      { kind: 'text', group: 'policy', id: 'method-id', label: 'Method ID', value: 'RSA SecurID', help: 'Authentication methods allowed for RSA Authenticator (SecurID) verification.' },
+      { kind: 'text', group: 'policy', id: 'rsa-attr', label: 'End User Attribute', value: '', placeholder: 'username', help: 'User attribute used to identify the end user in RSA (e.g. username, email).' },
+
+      // --- Advanced ----------------------------------------------------------
+      { kind: 'number', group: 'advanced', id: 'read-timeout', label: 'Read Timeout', min: 5, max: 30, unit: 'seconds', value: 10, help: 'Timeout in seconds for HTTP read operations to the RSA server (5–30).' },
+      { kind: 'number', group: 'advanced', id: 'attempt-timeout', label: 'Attempt Timeout', min: 5, max: 120, unit: 'seconds', value: 30, help: 'Timeout in seconds for a single authentication attempt.' },
+      { kind: 'select', group: 'advanced', id: 'auth-method-version', label: 'Auth Method Version', options: ['Select', '1.0.0', '2.0.0'], value: 'Select', help: 'Version of the authentication method used by RSA.' },
+      { kind: 'toggle', group: 'advanced', id: 'keep-attempt', label: 'Keep Attempt', value: false, help: 'Whether to retain authentication attempt history.' },
+      { kind: 'text', group: 'advanced', id: 'api-version', label: 'RSA API Version', value: '', help: 'Version of the RSA REST API to use for communication.' },
+      { kind: 'text', group: 'advanced', id: 'context-msg-id', label: 'RSA Context Message ID', value: '', help: 'Context message identifier used in RSA API requests.' },
+      { kind: 'text', group: 'advanced', id: 'success-status', label: 'Success Status', value: '', help: 'Expected success status string returned by RSA on authentication.' },
+      { kind: 'text', group: 'advanced', id: 'interface-path', label: 'Default Interface Path', value: '', help: 'Default REST API interface path for RSA authentication endpoints.' },
+      { kind: 'text', group: 'advanced', id: 'default-client', label: 'Default Client ID', value: '', help: 'Default client identifier registered in the RSA platform.' },
+      { kind: 'text', group: 'advanced', id: 'system-uuid', label: 'System UUID', value: '', help: 'Unique system identifier for the RSA Authentication Manager instance.' },
+      { kind: 'select', group: 'advanced', id: 'platform', label: 'Platform', options: ['CLOUD', 'ON_PREMISE'], value: 'ON_PREMISE', help: 'Platform type for RSA integration (e.g. CLOUD, ON_PREMISE).' },
+      { kind: 'toggle', group: 'advanced', id: 'debug-client', label: 'Debug Client', value: false, help: 'Enable or disable debug logging for RSA client communication.' },
+      { kind: 'text', group: 'advanced', id: 'language', label: 'Default Language', value: 'en-US', help: 'Default language for the RSA authentication interface (e.g. en-US).' },
+      { kind: 'text', group: 'advanced', id: 'root-cert', label: 'Default Root Cert Filename', value: '', help: 'Filename of the root CA certificate for RSA SSL/TLS validation.' },
+      { kind: 'text', group: 'advanced', id: 'sid-passcode', label: 'SID Passcode Method', value: '', help: 'Method used for RSA SecurID passcode handling.' },
+      { kind: 'text', group: 'advanced', id: 'ia-token', label: 'IA Resource Prompt Token', value: '', help: 'Token for RSA Identity Assurance resource prompt operations.' },
+      { kind: 'text', group: 'advanced', id: 'rsa-version', label: 'RSA Version', value: '', help: 'Version of the RSA SecurID platform.' },
     ],
   }),
   'otp-sms': smsGateway,

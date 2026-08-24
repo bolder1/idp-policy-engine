@@ -1,146 +1,603 @@
-/* ---------------------------------------------------------------------------
-   Authentication methods — the consolidated 2FA page.
-   --------------------------------------------------------------------------- */
+/* -----------------------------------------------------------------------------
+   Authentication methods · final.
 
-.bam__facts { grid-template-columns: repeat(3, 1fr); margin-bottom: 14px; }
-.bam__facts .bmset__fact strong em {
-  font-style: normal; font-size: var(--fs-sm); font-weight: 400; color: var(--text-muted);
+   Measured off the deployed prototype's V2 rather than guessed at: 72px rows, a
+   36px tile at 8px radius, 16px between tile and text, 12px between rows, a
+   pill count chip in the section head, and a tab bar that is a 1px rule with a
+   2px brand underline on the active tab. Every value below is the token nearest
+   what was measured — the proportions are the prototype's, the colours are ours,
+   because the prototype only has a light theme and this has two.
+   -------------------------------------------------------------------------- */
+
+.bm8 { display: flex; flex-direction: column; gap: 18px; }
+
+.bm8__head h1 { margin: 0; }
+.bm8__head p {
+  margin: 4px 0 0; max-width: 68ch;
+  font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55;
 }
-.bam__facts .bmset__fact strong.is-bad { color: var(--fb-negative-fg); }
 
-.bam__tabs { margin-bottom: 20px; }
-.bam__tabs button { display: inline-flex; align-items: center; gap: 6px; }
-
-/* --- Tiers ------------------------------------------------------------------ */
-
-.bam__tier { margin-top: 26px; }
-.bam__tier:first-of-type { margin-top: 18px; }
-.bam__tierhead {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;
-  padding-bottom: 9px; margin-bottom: 2px;
+/* --- Tabs, horizontal ---------------------------------------------------------
+   The brief's one explicit layout change. Underline rather than a pill group:
+   two tabs in a pill group read as a segmented control, which implies switching
+   a setting rather than moving between views. */
+.bm8__tabbar {
+  display: flex; gap: 24px;
   border-bottom: 1px solid var(--border-subtle);
 }
-.bam__tierhead h2 {
-  display: flex; align-items: center; gap: 7px;
-  font-size: var(--fs-md); font-weight: 600;
+.bm8__tab {
+  padding: 0 0 10px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none; cursor: pointer;
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-tertiary);
+  transition: color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
 }
-.bam__tierhead h2 svg { color: var(--fb-positive-fg); }
-.bam__tierhead p { margin-top: 3px; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.55; max-width: 74ch; }
+.bm8__tab:hover { color: var(--text-secondary); }
+.bm8__tab.is-on { color: var(--text-primary); font-weight: var(--fw-semibold); border-bottom-color: var(--brand); }
+.bm8__tab:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
 
-/* --- A method --------------------------------------------------------------- */
+.bm8__pane { display: flex; flex-direction: column; gap: 14px; }
 
-.bam__row { border-bottom: 1px solid var(--border-subtle); }
-.bam__row:last-child { border-bottom: none; }
-.bam__main { display: flex; align-items: flex-start; gap: 16px; padding: 13px 0; }
-/* Dimmed, never hidden: a blocked method is exactly what the admin came to
-   find, and hiding it is how the console loses people. */
-.bam__row.is-blocked .bam__body { opacity: 0.62; }
+/* --- Section head -------------------------------------------------------------- */
 
-.bam__body { flex: 1; min-width: 0; }
-.bam__name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-md); font-weight: 500; }
-.bam__chan {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 1px 7px; border-radius: var(--radius-pill);
+.bm8__sechead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.bm8__sechead h2 {
+  margin: 0; font-size: var(--fs-2xl); font-weight: var(--fw-semibold);
+  color: var(--text-primary); letter-spacing: -0.01em;
+}
+.bm8__sechead p { margin: 4px 0 0; font-size: var(--fs-md); color: var(--text-tertiary); }
+
+/* Beside the heading, and secondary.
+
+   It was a solid brand pill pinned to the far right of the section row — the
+   loudest object on the page, describing a count, about 700px from the words it
+   counted. Read left to right you got "Categories", a sentence, and eventually
+   a number with nothing attached to it.
+
+   Neutral now, because a count is not an action and the page already spends its
+   orange on the primary button. Two of them sit together, so a filled pair
+   would read as a pair of buttons. */
+.bm8__sectitle { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.bm8__chip {
+  flex: none; padding: 3px 9px; border-radius: var(--radius-pill);
   background: var(--surface-inset);
-  font-size: 10px; font-weight: 400; color: var(--text-tertiary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.bm8__chip.is-quiet { background: var(--surface-inset); color: var(--text-tertiary); }
+
+.bm8__search {
+  display: flex; align-items: center; gap: 8px;
+  height: var(--ctl-height-md); padding: 0 11px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  color: var(--text-muted);
+}
+.bm8 .bm8__search input {
+  flex: 1; min-width: 0; height: auto; padding: 0;
+  background: none; border: 0;
+  font-size: var(--fs-md); color: var(--text-primary);
+}
+.bm8 .bm8__search input:focus-visible { outline: none; }
+.bm8__search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+
+/* --- The primary factor ---------------------------------------------------------
+   Password, above the eleven and outside them.
+
+   Same card as a category so it reads as part of the same catalogue, minus
+   every affordance that would suggest it can be acted on: no chevron, no hover
+   lift, no pointer. What is left is a row that states a fact — this is on, for
+   everyone, and not from here. */
+.bm8__primary { display: flex; flex-direction: column; gap: 12px; }
+/* Tighter than the category list below it: three rows that belong together
+   read as a group, where 14px apart they read as three more categories. */
+.bm8__primarylist { display: flex; flex-direction: column; gap: 8px; }
+/* Sits closer to the section it introduces than to the one above it. */
+.bm8__primary + .bm8__sechead { margin-top: 10px; }
+
+.bm8__card--locked { cursor: default; }
+
+/* The row carries no control at all, so its whole state has to be in words. */
+.bm8__always {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: var(--radius-sm);
+  background: var(--fb-positive-bg); color: var(--fb-positive-fg);
+  font-style: normal; font-size: 10px; font-weight: var(--fw-medium);
+  letter-spacing: 0.02em; white-space: nowrap;
 }
 
-/* The four states, in the order they must be fixed. */
-.bam__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 7px; }
-.bam__state {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: var(--fs-xs);
-}
-.bam__state::before {
-  content: ''; width: 6px; height: 6px; border-radius: 999px; flex: none;
-}
-.bam__state.is-yes { color: var(--text-secondary); }
-.bam__state.is-yes::before { background: var(--fb-positive-dot); }
-.bam__state.is-no { color: var(--text-muted); }
-.bam__state.is-no::before { box-shadow: inset 0 0 0 1px var(--border-strong); }
-.bam__enrol { font-size: var(--fs-xs); color: var(--text-muted); margin-left: 2px; }
+/* --- The rows ------------------------------------------------------------------ */
 
-/* The first thing standing between this method and a user being able to pick
-   it — one line, rather than three states to cross-reference. */
-.bam__blocker {
-  margin-top: 6px; font-size: var(--fs-xs); font-weight: 500;
-  color: var(--fb-notice-fg);
+.bm8__list { display: flex; flex-direction: column; gap: 14px; }
+
+.bm8__card {
+  display: flex; align-items: center; gap: 16px;
+  width: 100%; min-height: 76px; padding: 16px 20px;
+  background: var(--surface-raised);
+  /* --border-default, not --border-subtle. Subtle is for a divider inside a
+     panel that already has an edge; these rows ARE the edge, and at 14px apart
+     on the page background a hairline that faint reads as no border at all. */
+  border: 1px solid var(--border-default); border-radius: var(--radius-lg);
+  text-align: left;
+  transition:
+    border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
 }
 
-.bam__acts { display: flex; align-items: center; gap: 6px; flex: none; }
-.bam__more {
-  width: 26px; height: 26px; border-radius: var(--radius-sm);
-  display: grid; place-items: center; color: var(--text-tertiary);
+/* The category row is a button and goes somewhere; the method row is not, and
+   only the one that goes somewhere gets a hover. */
+button.bm8__card { cursor: pointer; }
+button.bm8__card:hover {
+  /* Brand-tinted rather than a darker grey. A row that is about to take you
+     somewhere should look like the brand's affordance, and a brand tint is the
+     one treatment that steps correctly in both themes — --border-strong is the
+     same value in light and dark, so it barely moves against a dark surface. */
+  border-color: var(--brand-subtle-border);
+  box-shadow: var(--el-mid);
+  transform: translateY(-1px);
 }
-.bam__more:hover { background: var(--surface-sunken); color: var(--text-primary); }
-.bam__more svg { transition: transform var(--dur-fast) var(--ease-standard); }
-.bam__more svg.is-open { transform: rotate(180deg); }
+button.bm8__card:active { transform: translateY(0); box-shadow: var(--el-low); }
+button.bm8__card:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--focus-ring); }
 
-/* --- Per-method detail ------------------------------------------------------ */
+/* The chevron leans the way the click goes. */
+button.bm8__card:hover .bm8__right > svg { transform: translateX(3px); color: var(--brand-active); }
+button.bm8__card:hover .bm8__name { color: var(--brand-active); }
+.bm8__card > svg, .bm8__right > svg { color: var(--text-muted); transition: transform var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard); }
+.bm8__name { transition: color var(--dur-fast) var(--ease-standard); }
 
-.bam__detail {
-  padding: 4px 0 16px 0;
-  display: flex; flex-direction: column; gap: 2px;
-}
-.bam__balance {
-  display: flex; align-items: center; gap: 7px;
-  padding: 8px 11px; margin-bottom: 8px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
-  font-size: var(--fs-xs); color: var(--text-secondary);
-}
-.bam__balance.is-empty {
-  background: var(--fb-negative-bg); color: var(--fb-negative-fg);
-}
-
-.bam__setting {
-  display: flex; align-items: center; justify-content: space-between; gap: 20px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
-}
-.bam__setting + .bam__setting { margin-top: 2px; }
-.bam__setting > div { min-width: 0; }
-.bam__setting p { font-size: var(--fs-sm); font-weight: 500; }
-.bam__setting span { display: block; margin-top: 2px; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; max-width: 70ch; }
-.bam__setting select { width: auto; min-width: 96px; }
-
-.bam__detailfoot {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  margin-top: 10px; padding-top: 10px;
-  border-top: 1px solid var(--border-subtle);
-}
-.bam__check { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
-.bam__check input:disabled + * { opacity: 0.5; }
-.bam__link { font-size: var(--fs-sm); font-weight: 500; color: var(--text-link); }
-.bam__link:hover { text-decoration: underline; }
-
-/* --- Other panes ------------------------------------------------------------ */
-
-.bam__pane { display: flex; flex-direction: column; gap: 2px; max-width: 900px; }
-.bam__pane > .bx-callout { margin-bottom: 12px; }
-.bam__sub { margin-top: 20px; margin-bottom: 4px; }
-.bam__note { font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; margin-bottom: 10px; max-width: 72ch; }
-.bam__chips { display: flex; flex-wrap: wrap; gap: 6px; }
-
-.bam__radio {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 11px 12px;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
-  font-size: var(--fs-sm);
-}
-.bam__radio + .bam__radio { margin-top: 4px; }
-.bam__radio.is-blocked { opacity: 0.6; }
-/* The dependency the console states in prose, drawn from the same catalogue so
-   it cannot fall out of step with it. */
-.bam__radio em {
-  display: block; margin-top: 2px;
-  font-style: normal; font-size: var(--fs-xs); color: var(--fb-notice-fg);
+/* Nothing lifts for someone who asked for no motion; the colour still moves. */
+@media (prefers-reduced-motion: reduce) {
+  button.bm8__card:hover { transform: none; }
+  button.bm8__card:hover .bm8__right > svg { transform: none; }
 }
 
-.bam__sets { margin-top: 4px; }
+/* --- The tile ------------------------------------------------------------------
+   Identity, not status: a family keeps its colour whether or not anything in it
+   is on. A family with nothing enabled gets the neutral tile instead, which is
+   the prototype's grey and the only status the tile carries. */
+.bm8__tile {
+  flex: none; display: grid; place-items: center;
+  width: 36px; height: 36px; border-radius: var(--radius-md);
+  background: var(--surface-inset); color: var(--text-muted);
+}
+.bm8__tile--lg { width: 48px; height: 48px; border-radius: var(--radius-lg); }
+/* No fill of its own — MethodIcon brings the vendor logo and its own box. */
+.bm8__tile--logo { width: auto; height: auto; background: none; }
+
+/* The one method that is not a choice. A subtle brand tint rather than a tint
+   token, because it is not another family in the set — it is the floor they all
+   sit on, and it is the only row on the page that gets the brand. */
+.bm8__tile.is-brand { background: var(--brand-subtle-bg); color: var(--brand-active); }
+
+.bm8__tile.is-teal { background: var(--tint-teal-bg); color: var(--tint-teal-fg); }
+.bm8__tile.is-green { background: var(--tint-green-bg); color: var(--tint-green-fg); }
+.bm8__tile.is-slate { background: var(--tint-slate-bg); color: var(--tint-slate-fg); }
+.bm8__tile.is-blue { background: var(--tint-blue-bg); color: var(--tint-blue-fg); }
+.bm8__tile.is-indigo { background: var(--tint-indigo-bg); color: var(--tint-indigo-fg); }
+.bm8__tile.is-amber { background: var(--tint-amber-bg); color: var(--tint-amber-fg); }
+.bm8__tile.is-slate { background: var(--tint-slate-bg); color: var(--tint-slate-fg); }
+
+/* --- Row text ------------------------------------------------------------------ */
+
+.bm8__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bm8__name {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bm8__desc {
+  font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.45;
+  overflow: hidden; text-overflow: ellipsis;
+}
+/* Not brand. The prototype puts this in orange and it does not earn it: a
+   count is information, not an action, and eleven of them down a page spends
+   the brand on the one thing that never needs clicking. Orange is reserved for
+   what is ACTIVE — the current tab, a selected chip, the row under the cursor. */
+.bm8__usage { font-size: var(--fs-sm); color: var(--text-secondary); }
+.bm8__usage.is-quiet { color: var(--text-muted); }
+
+.bm8__badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 7px; border-radius: var(--radius-sm);
+  background: var(--fb-positive-bg); color: var(--fb-positive-fg);
+  font-style: normal; font-size: 10px; font-weight: var(--fw-medium); white-space: nowrap;
+}
+
+/* --- The tenant default ----------------------------------------------------------
+   Brand-tinted rather than green: the phishing-resistant badge beside it is a
+   property of the method and true whether or not anyone chose it, while this is
+   a decision somebody made. Two green badges on one row would read as two
+   grades of the same thing. */
+.bm8__badge--default { background: var(--brand-subtle-bg); color: var(--brand-active); }
+
+/* --- Newly added ------------------------------------------------------------------
+   A new integration is worth showing off, and eleven identical white cards is
+   the one layout that guarantees nobody notices one of them changed. Three
+   things do the work, in descending order of how much they actually matter:
+
+   1. POSITION. It sits fifth, straight after miniOrange Authenticator, instead
+      of tenth. Nothing else on this list beats being above the fold.
+   2. The PILL, and only the pill. Solid brand, which is the exception to this
+      screen being otherwise grey: a promotional marker is the one element whose
+      whole job is to interrupt, and it is a single small object on one row of
+      eleven. It is the sidebar's badge, unchanged, so "new" looks the same
+      everywhere the product says it.
+
+   The row itself was tinted for one revision and that was a mistake worth
+   recording: on a list of eleven cards where the others are white, a filled row
+   does not read as "new", it reads as SELECTED — the same thing a chosen radio
+   card or an active row means everywhere else in this console. A promotional
+   marker that impersonates a state is worse than no marker, because the state
+   is the thing an admin acts on. The row stays white; the pill does the work. */
+.bm8__new {
+  flex: none; padding: 1px 7px; border-radius: var(--radius-pill);
+  background: var(--brand); color: var(--text-on-brand);
+  font-style: normal; font-size: 9px; font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap;
+}
+
+
+
+.bm8__right {
+  flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
+}
+/* The category row's chevron sits beside the count, not under it. */
+button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16px; }
+.bm8__enrolled { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; }
+
+/* --- The chip row ----------------------------------------------------------------
+   Every chip the card carries, on one line under the description.
+
+   They lived in the right-hand column, which also holds the reach figure and
+   the chevron — a fixed width shared with two things that are not going away.
+   Two chips fitted; the third would have squeezed the name into wrapping. Down
+   here the row has the whole card to spend and wraps on its own terms, so
+   adding a fourth chip is a data change rather than a layout problem.
+
+   The media query below still hides the funding chip on a narrow card, because
+   wrapping is a better failure than truncation but not better than fitting. */
+/* Empty on most cards now that the headline state moved up to the name, so it
+   collapses rather than leaving a 7px gap under every description. */
+.bm8__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bm8__chips:not(:empty) { margin-top: 7px; }
+
+/* --- Status and reach, on the category row --------------------------------------
+   The two facts the row reports: whether anything in this category is on, and
+   how many people are already on it.
+
+   Both were prose at the weight of the blurb — the status a third grey line
+   under the description, the enrolment a muted string. Reading a column of
+   eleven for "which of these is live" meant reading eleven paragraphs. As a
+   chip and a figure at fixed positions the column can be scanned straight
+   down, which is the only way this list gets used.
+
+   No brand colour on either: green means live, grey means dormant, and neither
+   is an action. Orange stays on the things you click. */
+/* --- Transactions left ------------------------------------------------------------
+   Only on the families that spend a purchased pool — SMS, Email and Call.
+
+   It sits beside the enabled chip because the two together are the whole answer
+   to "will this work": a category can read "2 of 3 enabled" and still deliver
+   nothing, since enabled and funded are separate facts and only one of them was
+   on the row before. Empty is drawn as a fault rather than a low number,
+   because it is one — the next send fails.
+
+   Outlined rather than filled, so a row can carry two chips without them
+   competing; the enabled chip is the primary state and this qualifies it. */
+.bm8__txn {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px; border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  color: var(--text-tertiary);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.bm8__txn.is-low { border-color: var(--fb-notice-border); color: var(--fb-notice-fg); background: var(--fb-notice-bg); }
+.bm8__txn.is-empty { border-color: var(--fb-negative-border); color: var(--fb-negative-fg); background: var(--fb-negative-bg); }
+
+@media (max-width: 900px) {
+  /* The funding tag goes before the enabled chip does — it qualifies a state
+     rather than being one. */
+  .bm8__txn { display: none; }
+}
+
+/* The figure reads first and the word explains it, rather than one muted string
+   where the number has to be found inside the sentence. */
+.bm8__reach {
+  display: flex; flex-direction: column; align-items: flex-end;
+  min-width: 62px; white-space: nowrap;
+}
+.bm8__reach b {
+  font-size: var(--fs-lg); font-weight: var(--fw-semibold);
+  color: var(--text-primary); font-variant-numeric: tabular-nums; line-height: 1.15;
+}
+.bm8__reach em {
+  font-style: normal; font-size: 10px; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+/* A category nobody has enrolled in. The dash holds the column open so the
+   chips beside it stay in line. */
+.bm8__reach i { font-style: normal; font-size: var(--fs-lg); color: var(--text-disabled); line-height: 1.15; }
+
+.bm8__card.is-off .bm8__reach b { color: var(--text-secondary); }
 
 @media (max-width: 720px) {
-  .bam__facts { grid-template-columns: 1fr; }
-  .bam__setting { flex-direction: column; align-items: flex-start; gap: 8px; }
+  /* The blurb is the first thing to go: the name and the two figures are what
+     the row is for. */
+  .bm8__card .bm8__desc { display: none; }
+  .bm8__reach { min-width: 0; }
+  button.bm8__card .bm8__right { gap: 10px; }
 }
+
+/* A family with nothing on, or a method that is off. Dimmed by desaturating the
+   text, never by `opacity` on the row — opacity would take the toggle down with
+   it, and the toggle is the one control that still has to look operable. */
+.bm8__card.is-off .bm8__name { color: var(--text-secondary); }
+.bm8__card.is-off .bm8__desc { color: var(--text-muted); }
+
+/* --- Slide-over -----------------------------------------------------------------
+   The category opens over the list rather than replacing it. Only the head
+   needs styling — the rows inside are the same .bm8__card the index uses, at
+   the same measurements, so a method looks identical in both places. */
+
+.bm8__dw { display: flex; flex-direction: column; gap: 16px; }
+
+/* --- Panel head ------------------------------------------------------------------
+   One header. It was the kit's own head — name, count, close — and then a banner
+   directly beneath repeating the same two facts next to a tile, plus a bar of
+   three grey slabs restating a count already written beside it in words. All of
+   that is one block now, rendered into the Drawer's `head` slot so it scrolls
+   with nothing and keeps the close button where it was.
+
+   No spine. The tile already carries the family's colour, and a second stroke
+   saying the same thing beside it is the tint stated twice. */
+.bm8__dwhead {
+  flex: 1; min-width: 0;
+  display: flex; align-items: flex-start; gap: 13px;
+}
+
+.bm8__dwtile {
+  flex: none; display: grid; place-items: center;
+  width: 38px; height: 38px; border-radius: var(--radius-md);
+  background: var(--surface-inset); color: var(--text-tertiary);
+}
+.bm8__dwhead.is-teal .bm8__dwtile { background: var(--tint-teal-bg); color: var(--tint-teal-fg); }
+.bm8__dwhead.is-green .bm8__dwtile { background: var(--tint-green-bg); color: var(--tint-green-fg); }
+.bm8__dwhead.is-blue .bm8__dwtile { background: var(--tint-blue-bg); color: var(--tint-blue-fg); }
+.bm8__dwhead.is-indigo .bm8__dwtile { background: var(--tint-indigo-bg); color: var(--tint-indigo-fg); }
+.bm8__dwhead.is-amber .bm8__dwtile { background: var(--tint-amber-bg); color: var(--tint-amber-fg); }
+.bm8__dwhead.is-slate .bm8__dwtile { background: var(--tint-slate-bg); color: var(--tint-slate-fg); }
+
+.bm8__dwtext { flex: 1; min-width: 0; }
+.bm8__dwtext h2 { margin: 0; font-size: var(--fs-lg); }
+.bm8__dwtext p { margin: 3px 0 0; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.45; }
+
+.bm8__dwstats { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+.bm8__dwstats span { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bm8__dwstats strong { font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bm8__dwstats .is-warn strong { color: var(--fb-notice-fg); }
+
+/* --- Panel tabs ------------------------------------------------------------------
+   These shipped as markup with no stylesheet, which is why they rendered as
+   "Methods 3Settings 5" — two buttons and their counts running together in
+   inline flow. Underlined, matching the page's own tab bar so the panel does not
+   invent a second idea of what a tab looks like. */
+.bm8__dwtabs {
+  display: flex; gap: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bm8__dwtab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 0 9px; margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  background: none; cursor: pointer;
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-tertiary);
+  transition: color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bm8__dwtab:hover { color: var(--text-secondary); }
+.bm8__dwtab.is-on { color: var(--text-primary); font-weight: var(--fw-semibold); border-bottom-color: var(--brand); }
+.bm8__dwtab:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.bm8__dwtab em {
+  font-style: normal; padding: 0 6px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); font-size: var(--fs-xs); color: var(--text-muted);
+}
+.bm8__dwtab.is-on em { background: var(--brand-subtle-bg); color: var(--brand-active); }
+
+/* The settings list. The row brings its own dividers, so this only stacks. */
+.bm8__setlist { display: flex; flex-direction: column; }
+
+/* --- The tenant default, chosen out here ---------------------------------------
+   Its own block between the primary factor and the catalogue, because it is
+   neither: it is one decision about the catalogue, and it used to be buried as
+   a link on a method row two clicks inside one of eleven drawers. */
+/* Stacked, because the control is no longer one line wide.
+
+   This was a heading on the left and a dropdown pinned right. The dropdown had
+   one real option in it, so the arrangement spent a full row of the page
+   pointing at a control that could not be used — and hid the one fact worth
+   showing, which is what the default actually IS. */
+.bm8__default {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 16px 18px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+}
+.bm8__default h2 { margin: 0; }
+.bm8__defaulthead > p { margin: 4px 0 0; font-size: var(--fs-md); color: var(--text-tertiary); }
+.bm8__defaultnone { margin: 0; font-size: var(--fs-md); color: var(--text-muted); line-height: 1.5; }
+
+/* --- The setting at rest: one row --------------------------------------------
+   A grid of every candidate was a list that grew without limit to express a
+   setting that holds a single value: seven eligible methods meant four rows of
+   cards, and the catalogue only gets longer. The row states the ANSWER, and the
+   alternatives cost no height until somebody asks for them. */
+.bm8__defaultrow {
+  display: flex; align-items: center; gap: 11px;
+  padding: 11px 13px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+
+.bm8__defaulticon { flex: none; display: grid; place-items: center; }
+.bm8__defaultbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bm8__defaultbody strong {
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bm8__defaultbody em {
+  font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary);
+}
+.bm8__defaulttick { flex: none; color: var(--brand); }
+
+/* --- Picking ------------------------------------------------------------------
+   Replaces the row rather than appending to it, and the list is capped so the
+   section is the same height with three candidates as with thirty. */
+.bm8__defaultpick { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+
+.bm8__defaultlist {
+  width: 100%;
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 216px; overflow-y: auto;
+  padding: 4px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+
+.bm8__defaultopt {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; text-align: left; cursor: pointer; width: 100%;
+  background: var(--surface-raised);
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  transition:
+    border-color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+.bm8__defaultopt:hover { border-color: var(--border-strong); }
+/* Brand tint: the selected state here IS the answer to the question. */
+.bm8__defaultopt.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bm8__defaultopt:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+.bm8__defaultcancel {
+  padding: 0; background: none; border: 0; cursor: pointer;
+  font-size: var(--fs-xs); color: var(--text-tertiary); text-decoration: underline;
+}
+.bm8__defaultcancel:hover { color: var(--text-primary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bm8__defaultopt { transition: none; }
+}
+
+/* The category holding it. Brand-tinted rather than green: the enabled chip
+   beside it is a count, and this is a choice somebody made. */
+.bm8__defchip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: var(--radius-pill);
+  background: var(--brand-subtle-bg); color: var(--brand-active);
+  font-style: normal; font-size: 10px; font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
+
+/* --- The setup form ---------------------------------------------------------------
+   Behind the Set up button. The blurb states what the integration actually
+   does, because the field labels are the vendor's vocabulary — "IA Resource
+   Prompt Token" tells an admin nothing about whether they need it. */
+.bm8__setup { display: flex; flex-direction: column; gap: 16px; }
+.bm8__setupblurb {
+  margin: 0; padding: 10px 12px; border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary);
+}
+
+/* Names what is still missing rather than only disabling Save. A greyed button
+   with no reason beside it is a dead end you have to hunt for. */
+.bm8__setupnote {
+  flex: 1; min-width: 0;
+  font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.45;
+}
+
+/* --- Prerequisites, and the grouped form -------------------------------------------
+   RSA is twenty-six fields with two required. Ungrouped it is one scroll where
+   the two that matter are indistinguishable from the twenty-four that ship with
+   defaults — which is what the console does, and why its dialog opens mid-form.
+*/
+.bm8__prereqs {
+  padding: 12px 14px; border-radius: var(--radius-md);
+  background: var(--fb-info-bg); border: 1px solid var(--fb-info-border);
+  color: var(--fb-info-fg);
+}
+.bm8__prereqhead { margin: 0 0 6px; font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+.bm8__prereqs ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.bm8__prereqs li { font-size: var(--fs-xs); line-height: 1.5; }
+
+/* Each group is a panel rather than a rule under a heading.
+
+   A hairline was enough while only Advanced could close: two static headings
+   and one control. Now all three collapse, and a header you can click needs to
+   look like a surface you can click — so the section gets a border, the header
+   gets its own ground, and the fields sit visibly inside it rather than
+   floating in the same column as the blurb and the prerequisites above. */
+.bm8__setupgroup {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-raised); overflow: hidden;
+}
+.bm8__setupgrouphead {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; padding: 10px 13px; text-align: left; cursor: pointer;
+  background: var(--surface-sunken); border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.14s ease;
+}
+/* Closed, the header is the whole panel — no rule under it to divide nothing. */
+.bm8__setupgroup.is-shut .bm8__setupgrouphead { border-bottom-color: transparent; }
+.bm8__setupgrouphead:hover { background: var(--surface-inset); }
+.bm8__setupchev { flex: none; color: var(--text-tertiary); transition: transform 0.16s ease; }
+.bm8__setupgroup.is-shut .bm8__setupchev { transform: rotate(-90deg); }
+.bm8__setupgrouphead > span { flex: none; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* One line, clipped. The blurb is orientation, not something to wrap a header
+   around. */
+.bm8__setupgrouphead > em {
+  flex: 1; min-width: 0;
+  font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bm8__setupcount {
+  flex: none; font-style: normal; font-size: var(--fs-xs);
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--surface-raised); border: 1px solid var(--border-subtle);
+  color: var(--text-tertiary); font-weight: var(--fw-medium); white-space: nowrap;
+}
+/* Outstanding work reads as outstanding whether the section is open or shut. */
+.bm8__setupcount.is-gap {
+  background: var(--fb-negative-bg); border-color: var(--fb-negative-border);
+  color: var(--fb-negative-fg);
+}
+.bm8__setupgrouphead:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.bm8__setupgroupbody { padding: 4px 13px 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bm8__setupchev, .bm8__setupgrouphead { transition: none; }
+}
+
+/* --- The configured card's two actions ----------------------------------------
+   Edit and the switch share a row, and the row sits where Set up sat before the
+   method was configured — so the card reads as one control that changes its
+   name rather than a button that vanishes and a link that appears somewhere
+   else. Costs one row of card height, which is the right trade for an action
+   that was previously an underlined word inside a line of values. */
+.bm8__ctlrow { display: flex; align-items: center; gap: 10px; }
+
+
+/* --- Funding, in the right-hand column ----------------------------------------
+   The transactions chip used to sit on its own row under the description,
+   because the name already carried an "enabled" chip and a third one across the
+   row pushed the name into wrapping. That chip is gone, so the constraint went
+   with it: funding and enrolment are the two numbers this column reports, and
+   they are read together. */
+.bm8__right .bm8__txn { margin-bottom: 2px; }
+
+/* The chips row is empty on every card now that its only occupant moved. */
+.bm8__chips { display: none; }

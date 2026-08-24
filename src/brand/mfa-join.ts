@@ -120,50 +120,5 @@ export function siblingsOf(
    Connection form, which keeps only what it should ever have held: credentials
    and endpoints. A gateway's API key belongs there. A sender name does not. */
 
-/** `method-config.ts` field ids to hide, keyed by catalogue method id. */
-export const SUPERSEDED_CONFIG: Record<string, string[]> = {
-  /* `matching` comes from the shared miniOrangeApp builder, so it is also on
-     mo-otp and mo-qr — where the sheet has nothing and it must stay. Only Push
-     has `push-number`, so only Push drops it. */
-  'mo-push': ['matching', 'timeout'],
-  /* 'Grid size' and 'Pattern length' are the sheet's grid-size / grid-length.
-     `shuffle` has no counterpart and stays. */
-  grid: ['size', 'length'],
-  /* 'Questions to answer' is kba-verify; 'Questions to set at enrolment' is
-     kba-limit; case sensitivity is now kba-case. `pool` stays. */
-  kba: ['required', 'enrol', 'caseSensitive'],
-  /* The three TOTP apps share one builder; issuer, digits and period are now
-     the Authenticator family's. `ms-push` has its own builder and is untouched. */
-  'google-auth': ['issuer', 'digits', 'period'],
-  'ms-auth': ['issuer', 'digits', 'period'],
-  authy: ['issuer', 'digits', 'period'],
-  /* WebAuthn's three tuning knobs move to the Biometric family. The relying-party
-     id, name and origins stay — those are deployment facts, not preferences. */
-  fido2: ['uv', 'attachment', 'attestation'],
-  'otp-call': ['provider', 'language'],
-  /* 'Code expires after' is the sheet's otp-validity, which arrives at family
-     level so SMS states it once for all three of its methods instead of three
-     times. One real consequence: the email builder allowed up to 60 minutes and
-     otp-validity caps at 30, so the ceiling for the email methods drops. The
-     sheet's bound wins because the sheet is the thing being migrated in. */
-  'otp-sms': ['expiry', 'sender', 'gateway'],
-  'sms-link': ['expiry', 'sender', 'gateway'],
-  'otp-sms-email': ['expiry', 'sender', 'gateway'],
-  'otp-email': ['expiry'],
-  'email-link': ['expiry'],
-  'otp-alt-email': ['expiry'],
-}
 
-/** `methods.ts` MethodSetting ids to hide, keyed by catalogue method id. */
-export const SUPERSEDED_LEGACY: Record<string, string[]> = {
-  /* Label-for-label the sheet's push-biometric and push-number. */
-  'mo-push': ['biometric', 'number-match'],
-  /* All three now. `grid-click` used to survive here because the sheet did not
-     model it — then the shipping console's Advanced Options turned out to have
-     it ("Grid Pattern Clickable"), so it moved into the sheet where it belongs
-     and the hand-rolled copy is a duplicate like the other two. */
-  grid: ['grid-size', 'grid-len', 'grid-click'],
-}
 
-export const configSuppressed = (v5Id: string) => SUPERSEDED_CONFIG[v5Id] ?? []
-export const legacySuppressed = (v5Id: string) => SUPERSEDED_LEGACY[v5Id] ?? []

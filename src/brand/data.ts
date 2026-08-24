@@ -400,35 +400,14 @@ export const groups: Group[] = [
 ]
 
 export const zones: Zone[] = [
-  /* The two defaults. Every tenant gets them, every rule can name them, and
-     neither can be deleted — only emptied, which is the honest way to switch
-     one off. */
-  {
-    id: 'default-allowed',
-    name: 'Allowed locations',
-    kind: 'allowed',
-    ip: ['10.0.0.0/8', '192.168.0.0/16'],
-    asn: [],
-    location: { countries: ['India'], states: [], cities: [] },
-    usedIn: 0,
-    locked: true,
-  },
-  {
-    /* Seeded rather than empty, and the linter is the reason: an empty zone
-       matches everything, so a default Blocked zone shipped blank would deny
-       every sign-in the moment somebody wrote the obvious rule against it. It
-       ships with the one thing every tenant agrees is worth blocking — known
-       anonymising infrastructure — and can be emptied deliberately by somebody
-       who has read the warning. */
-    id: 'default-blocked',
-    name: 'Blocked locations',
-    kind: 'blocked',
-    ip: ['185.220.101.0/24'],
-    asn: ['AS9009'],
-    location: { countries: [], states: [], cities: [] },
-    usedIn: 0,
-    locked: true,
-  },
+  /* No shipped defaults.
+
+     "Allowed locations" and "Blocked locations" used to be here, locked, on
+     every tenant. They were built around a zone being an address set AND a
+     location set evaluated together — and that pairing is gone, so a pair of
+     undeletable zones named after it describes a concept the product no longer
+     has. A day-one tenant now starts with none, which is also the honest
+     answer: nothing is restricted until somebody says so. */
   /* Worked example 1 — address only. Inside the zone regardless of where it
      geolocates, which is what an office egress block should mean. */
   {

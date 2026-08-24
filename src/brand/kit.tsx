@@ -1,7 +1,15 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, type LucideIcon } from 'lucide-react'
+import { ChevronDown, Minus, Plus, type LucideIcon } from 'lucide-react'
 
 import type { AccessDecision, PolicyStatus } from './data'
 
@@ -560,6 +568,222 @@ export function Counter({ value, className }: { value: number; className?: strin
   }, [value])
 
   return <span className={className}>{display.toLocaleString()}</span>
+}
+
+/* -----------------------------------------------------------------------------
+   Number stepper.
+
+   Replaces the bare `input type="number"` that every bounded setting used to
+   render: a 96px box, the unit floating loose beside it, and the permitted
+   range printed in a chip that wrapped to two lines — "5-" over "30" — as soon
+   as the unit was longer than a word.
+
+   The wrap is the least of it. The old field CLAMPED ON EVERY KEYSTROKE, which
+   made most of its own range untypable: in a 5-30 field, typing "12" clamps the
+   "1" up to 5, leaving "52", which clamps back down to 30. You could not type
+   twelve. Keystrokes go into a draft string here and the clamp happens on blur
+   or Enter — the only moment a typed number is finished.
+
+   The bounds are then enforced by the buttons rather than announced by a label:
+   minus dies at the floor, plus at the ceiling. So the range only has to appear
+   while the field is being edited. And a clamped correction flashes, because
+   silently rewriting what somebody typed is how they end up holding a value
+   they did not choose and did not see arrive.
+
+   The shape is the one dense settings forms converge on — steppers inside the
+   field, unit as an inline suffix. Contra, Tailscale and Wellfound all land
+   there. Airbnb's big centred plus/minus is right for a booking flow showing
+   one number and far too heavy for a form of twenty-six fields. */
+
+const DIGITS = /^[0-9]*$/
+
+export function NumberStepper({
+  id,
+  value,
+  min,
+  max,
+  step = 1,
+  unit,
+  label,
+  invalid,
+  onChange,
+}: {
+  id?: string
+  value: number
+  min: number
+  max: number
+  step?: number
+  unit?: string
+  label?: string
+  invalid?: boolean
+  onChange: (n: number) => void
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const [focused, setFocused] = useState(false)
+  const [corrected, setCorrected] = useState(false)
+  const latest = useRef(value)
+  const hold = useRef(0)
+  const flash = useRef(0)
+
+  /* The hold-to-repeat timer chain outlives the render that started it, so it
+     reads the current value through a ref rather than closing over a stale one. */
+  useEffect(() => {
+    latest.current = value
+  })
+  useEffect(
+    () => () => {
+      window.clearTimeout(hold.current)
+      window.clearTimeout(flash.current)
+    },
+    [],
+  )
+
+  const clamp = (n: number) => Math.min(max, Math.max(min, n))
+
+  const say = () => {
+    setCorrected(true)
+    window.clearTimeout(flash.current)
+    flash.current = window.setTimeout(() => setCorrected(false), 520)
+  }
+
+  const nudge = (delta: number) => {
+    const typed = draft !== null && draft.trim() !== '' ? Number(draft) : NaN
+    const from = Number.isFinite(typed) ? typed : latest.current
+    const next = clamp(from + delta)
+    setDraft(null)
+    if (next !== latest.current) onChange(next)
+  }
+
+  /* Press and hold accelerates. Attempt Timeout runs 5-120; walking there one
+     click at a time is a hundred and fifteen clicks. */
+  const startHold = (delta: number) => {
+    nudge(delta)
+    let wait = 380
+    const tick = () => {
+      nudge(delta)
+      wait = Math.max(45, wait * 0.7)
+      hold.current = window.setTimeout(tick, wait)
+    }
+    hold.current = window.setTimeout(tick, wait)
+  }
+  const endHold = () => window.clearTimeout(hold.current)
+
+  const commit = (raw: string) => {
+    setDraft(null)
+    if (raw.trim() === '') return
+    const next = clamp(Number(raw))
+    if (next !== Number(raw)) say()
+    if (next !== value) onChange(next)
+  }
+
+  const atMin = value <= min
+  const atMax = value >= max
+  const shown = draft ?? String(value)
+
+  return (
+    <span className="bx-stepwrap">
+      <span
+        className={`bx-step ${focused ? 'is-focus' : ''} ${invalid ? 'is-invalid' : ''} ${
+          corrected ? 'is-corrected' : ''
+        }`}
+      >
+        <button
+          type="button"
+          className="bx-step__btn"
+          disabled={atMin}
+          aria-label={`Decrease${label ? ` ${label}` : ''}`}
+          tabIndex={-1}
+          onPointerDown={(e) => {
+            e.preventDefault()
+            startHold(-step)
+          }}
+          onPointerUp={endHold}
+          onPointerLeave={endHold}
+          onPointerCancel={endHold}
+          /* Keyboard activation only — a pointer press has already stepped, and
+             a detail of 0 is how a synthetic click says it came from a key. */
+          onClick={(e) => e.detail === 0 && nudge(-step)}
+        >
+          <Minus size={14} strokeWidth={2.3} aria-hidden />
+        </button>
+
+        <span className="bx-step__val">
+          <input
+            id={id}
+            type="text"
+            inputMode="numeric"
+            role="spinbutton"
+            aria-label={label}
+            aria-valuenow={value}
+            aria-valuemin={min}
+            aria-valuemax={max}
+            aria-valuetext={unit ? `${value} ${unit}` : undefined}
+            aria-invalid={invalid}
+            value={shown}
+            style={{ '--bx-digits': String(max).length } as CSSProperties}
+            onChange={(e) => DIGITS.test(e.target.value) && setDraft(e.target.value)}
+            onFocus={(e) => {
+              setFocused(true)
+              e.target.select()
+            }}
+            onBlur={(e) => {
+              setFocused(false)
+              commit(e.target.value)
+            }}
+            onKeyDown={(e) => {
+              const by = e.shiftKey ? step * 10 : step
+              if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                nudge(by)
+              } else if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                nudge(-by)
+              } else if (e.key === 'Home') {
+                e.preventDefault()
+                setDraft(null)
+                onChange(min)
+              } else if (e.key === 'End') {
+                e.preventDefault()
+                setDraft(null)
+                onChange(max)
+              } else if (e.key === 'Enter') {
+                e.preventDefault()
+                commit(e.currentTarget.value)
+              } else if (e.key === 'Escape') {
+                setDraft(null)
+              }
+            }}
+          />
+          {unit && <em>{unit}</em>}
+        </span>
+
+        <button
+          type="button"
+          className="bx-step__btn"
+          disabled={atMax}
+          aria-label={`Increase${label ? ` ${label}` : ''}`}
+          tabIndex={-1}
+          onPointerDown={(e) => {
+            e.preventDefault()
+            startHold(step)
+          }}
+          onPointerUp={endHold}
+          onPointerLeave={endHold}
+          onPointerCancel={endHold}
+          onClick={(e) => e.detail === 0 && nudge(step)}
+        >
+          <Plus size={14} strokeWidth={2.3} aria-hidden />
+        </button>
+      </span>
+
+      {/* The range, while it is being edited. Printed permanently it is the chip
+          that wrapped; removed altogether it is a rule you find by breaking it.
+          Always rendered and faded, so nothing below it moves. */}
+      <span className="bx-step__hint" data-on={focused || corrected} aria-hidden>
+        {corrected ? `Must be ${min}-${max}` : `${min}-${max}${unit ? ` ${unit}` : ''}`}
+      </span>
+    </span>
+  )
 }
 
 /* The screen states what a control does and what the data says. The sentence

@@ -1,0 +1,94 @@
+/* -----------------------------------------------------------------------------
+   Empty states.
+
+   One block, used by every tab. The measurements come from the enterprise
+   consoles the drawings do: generous vertical air, a narrow measure on the
+   sentence, and the action close enough to the text that it reads as the
+   conclusion of it rather than a separate control on the page.
+   -------------------------------------------------------------------------- */
+
+.bempty {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  padding: 64px 24px 68px;
+  text-align: center;
+  /* A dashed edge, not a solid card. The region is a placeholder for content
+     that will live here — a solid border would draw it as a panel that belongs
+     on the page, which is exactly what it is not. */
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.bempty__art {
+  color: var(--text-primary);
+  margin-bottom: 18px;
+}
+/* The drawings are line art at low opacity, so they need no separate treatment
+   between themes — but they do need to stop being the loudest thing on a dark
+   surface, where a light stroke gains contrast the light theme does not give it. */
+[data-theme='dark'] .bempty__art { opacity: 0.9; }
+
+.bempty__title {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+/* One line at a comfortable measure. The old paragraphs ran to four lines of
+   explanation on a screen whose whole job is to get you off it. */
+.bempty__blurb {
+  margin: 6px 0 0;
+  max-width: 46ch;
+  font-size: var(--fs-md);
+  color: var(--text-tertiary);
+  line-height: 1.6;
+}
+
+.bempty__action { margin-top: 20px; }
+
+/* Below the action, quieter than the blurb, and only where a screen's model has
+   an edge somebody will otherwise cut themselves on. */
+.bempty__note {
+  margin: 22px 0 0;
+  max-width: 52ch;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  line-height: 1.55;
+}
+
+/* --- No results ------------------------------------------------------------
+   A filter or a search that matched nothing. Deliberately undrawn: the page
+   around it is still full, and an illustration here would be a picture of
+   something that DOES exist and is merely hidden. */
+.bempty__none {
+  margin: 0;
+  padding: 28px 16px;
+  text-align: center;
+  font-size: var(--fs-md);
+  color: var(--text-tertiary);
+}
+
+/* --- Compact: an empty SECTION -----------------------------------------------
+   Inside a panel that already carries a heading and a border, so it drops its
+   own border entirely and takes about half the air. The drawing shrinks with
+   it — at full size it would out-weigh the section it is reporting on. */
+.bempty.is-compact {
+  padding: 26px 16px 28px;
+  border: 0;
+  background: none;
+}
+.bempty.is-compact .bempty__art { margin-bottom: 10px; transform: scale(0.78); }
+.bempty.is-compact .bempty__title { font-size: var(--fs-md); }
+.bempty.is-compact .bempty__blurb { font-size: var(--fs-xs); max-width: 42ch; }
+
+@media (max-width: 600px) {
+  .bempty { padding: 44px 18px 48px; }
+  .bempty__art { transform: scale(0.86); }
+}

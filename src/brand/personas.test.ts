@@ -131,9 +131,11 @@ describe('the tenant loaded for each depth', () => {
     expect(t.hooks).toHaveLength(0)
     expect(t.fingerprints).toHaveLength(0)
     expect(t.methodSets).toHaveLength(0)
-    // The two locked zones ship with every tenant and cannot be deleted, so a
-    // day-one tenant having them is correct rather than a leak from the seed.
-    expect(t.zones.every((z) => z.locked)).toBe(true)
+    /* Zones too, now. The two locked defaults were removed with the
+       address-AND-location concept they were named after, so "nothing the
+       tenant authored" finally means nothing at all. `every` on an empty array
+       is vacuously true, so this asserts the length instead. */
+    expect(t.zones).toHaveLength(0)
   })
 
   /* The system catch-all survives at every depth. Removing it would misstate

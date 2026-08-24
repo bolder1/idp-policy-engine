@@ -55,6 +55,13 @@ export interface Attribute {
   weight: number
   /** Phase 1 attributes are the ones that actually collect today. */
   phase: 1 | 2
+  /* True when nothing but an installed agent can read this.
+
+     Not a preference — a hard limit on which signals EXIST. A page cannot ask
+     for a TPM identifier or a motherboard serial, so an agentless profile that
+     names one is not misconfigured, it is inert: the value never arrives, so it
+     never mismatches, and the profile is quietly weaker than it reads. */
+  needsAgent?: true
   /** Absent when the attribute has nothing to tune. */
   config?: AttrConfig
 }
@@ -71,12 +78,12 @@ export const ATTRIBUTES: Attribute[] = [
   {
     id: 'manufacturer', category: 'Hardware', name: 'Manufacturer and model',
     purpose: 'Apple, Samsung, Dell. Identifies hardware families with known weaknesses.',
-    priority: 'Medium', weight: 20, phase: 1,
+    priority: 'Medium', weight: 20, phase: 1, needsAgent: true,
   },
   {
     id: 'mac', category: 'Hardware', name: 'MAC address',
     purpose: 'The network adapter address. Strong, but changes when the adapter does.',
-    priority: 'High', weight: 30, phase: 1,
+    priority: 'High', weight: 30, phase: 1, needsAgent: true,
   },
   {
     id: 'os', category: 'Hardware', name: 'Operating system and version',
@@ -87,17 +94,17 @@ export const ATTRIBUTES: Attribute[] = [
   {
     id: 'os-install', category: 'Hardware', name: 'OS installation ID',
     purpose: 'Identifies one installation. Survives hardware changes, dies on a reinstall.',
-    priority: 'High', weight: 30, phase: 1,
+    priority: 'High', weight: 30, phase: 1, needsAgent: true,
   },
   {
     id: 'tpm', category: 'Hardware', name: 'TPM ID',
     purpose: 'The Trusted Platform Module identifier. The strongest signal available, where a TPM exists.',
-    priority: 'High', weight: 30, phase: 1,
+    priority: 'High', weight: 30, phase: 1, needsAgent: true,
   },
   {
     id: 'cpu', category: 'Hardware', name: 'Processor',
     purpose: 'CPU and GPU model. Stable for the life of the machine.',
-    priority: 'Medium', weight: 20, phase: 1,
+    priority: 'Medium', weight: 20, phase: 1, needsAgent: true,
   },
   {
     id: 'screen', category: 'Hardware', name: 'Screen resolution',
@@ -107,37 +114,37 @@ export const ATTRIBUTES: Attribute[] = [
   {
     id: 'ram', category: 'Hardware', name: 'Memory and storage',
     purpose: 'Capacity, not serials. Changes on an upgrade.',
-    priority: 'Medium', weight: 20, phase: 1,
+    priority: 'Medium', weight: 20, phase: 1, needsAgent: true,
   },
   {
     id: 'battery', category: 'Hardware', name: 'Battery status',
     purpose: 'Present or absent, and health. Distinguishes a laptop from a desktop.',
-    priority: 'Low', weight: 5, phase: 2,
+    priority: 'Low', weight: 5, phase: 2, needsAgent: true,
   },
   {
     id: 'motherboard', category: 'Hardware', name: 'Motherboard serial',
     purpose: 'Unique to the board. Effectively the machine itself.',
-    priority: 'High', weight: 30, phase: 1,
+    priority: 'High', weight: 30, phase: 1, needsAgent: true,
   },
   {
     id: 'bios', category: 'Hardware', name: 'BIOS UUID',
     purpose: 'A unique firmware identifier, set at manufacture.',
-    priority: 'High', weight: 30, phase: 1,
+    priority: 'High', weight: 30, phase: 1, needsAgent: true,
   },
   {
     id: 'disk', category: 'Hardware', name: 'Hard disk serial',
     purpose: 'Unique to the drive. Changes if the drive is replaced or cloned.',
-    priority: 'High', weight: 30, phase: 1,
+    priority: 'High', weight: 30, phase: 1, needsAgent: true,
   },
   {
     id: 'ram-serial', category: 'Hardware', name: 'RAM serials',
     purpose: 'Module serial numbers. Strong, but changes on any memory upgrade.',
-    priority: 'Medium', weight: 5, phase: 1,
+    priority: 'Medium', weight: 5, phase: 1, needsAgent: true,
   },
   {
     id: 'machine-sid', category: 'Hardware', name: 'Machine SID',
     purpose: 'The Windows security identifier for the machine.',
-    priority: 'High', weight: 30, phase: 1,
+    priority: 'High', weight: 30, phase: 1, needsAgent: true,
   },
 
   // --- Browser --------------------------------------------------------------
@@ -172,31 +179,31 @@ export const ATTRIBUTES: Attribute[] = [
   {
     id: 'root', category: 'Security', name: 'Root or jailbreak',
     purpose: 'A rooted device cannot be trusted to report anything else honestly.',
-    priority: 'High', weight: 30, phase: 2,
+    priority: 'High', weight: 30, phase: 2, needsAgent: true,
     config: { kind: 'choice', label: 'When detected', value: 'Deny', options: ['Deny', 'Challenge', 'Flag only'] },
   },
   {
     id: 'vm', category: 'Security', name: 'Virtual machine or emulator',
     purpose: 'Detects a device that is not physical. Legitimate in engineering, suspicious elsewhere.',
-    priority: 'High', weight: 30, phase: 1,
+    priority: 'High', weight: 30, phase: 1, needsAgent: true,
     config: { kind: 'choice', label: 'When detected', value: 'Challenge', options: ['Deny', 'Challenge', 'Flag only'] },
   },
   {
     id: 'secure-boot', category: 'Security', name: 'Secure Boot and certificates',
     purpose: 'Firmware integrity. Off is not proof of anything, but it is worth knowing.',
-    priority: 'High', weight: 20, phase: 1,
+    priority: 'High', weight: 20, phase: 1, needsAgent: true,
   },
   {
     id: 'app-integrity', category: 'Security', name: 'Application integrity',
     purpose: 'Whether the client has been tampered with since it was installed.',
-    priority: 'Medium', weight: 20, phase: 2,
+    priority: 'Medium', weight: 20, phase: 2, needsAgent: true,
   },
 
   // --- Network --------------------------------------------------------------
   {
     id: 'hostname', category: 'Network', name: 'Host name and user name',
     purpose: 'Set by the owner, so it is meaningful on managed estates and noise elsewhere.',
-    priority: 'Low', weight: 5, phase: 2,
+    priority: 'Low', weight: 5, phase: 2, needsAgent: true,
   },
   {
     id: 'ip', category: 'Network', name: 'IP address',
@@ -229,7 +236,7 @@ export const ATTRIBUTES: Attribute[] = [
   {
     id: 'domain', category: 'Network', name: 'Domain membership',
     purpose: 'Whether the machine is joined to your directory. Binary, and decisive when true.',
-    priority: 'High', weight: 20, phase: 1,
+    priority: 'High', weight: 20, phase: 1, needsAgent: true,
   },
 
   // --- Behaviour ------------------------------------------------------------
@@ -283,6 +290,42 @@ export const CATEGORIES: { id: AttrCategory; label: string; blurb: string }[] = 
 
 export type ProfileMode = 'match' | 'risk'
 
+/* The two ways a device can be identified, and the console's own split.
+
+   Agentless is what a browser and the request itself give up. Agent-based adds
+   everything only software running on the machine can read — the TPM, the disk,
+   whether Secure Boot is on. Higher assurance, and it has a prerequisite an
+   admin has to satisfy before any of it works. */
+export type ProfileReach = 'agentless' | 'agent'
+
+/* How a device gets onto a person's list in the first place. The console's two,
+   and they are a BRANCH rather than a menu: choosing a roster removes the
+   device allowance entirely and replaces it with an upload. */
+export type Registration = 'self' | 'pre-approved'
+
+export const REGISTRATION_LABEL: Record<Registration, string> = {
+  self: 'Users register their own devices',
+  'pre-approved': 'Pre-approved devices only',
+}
+
+/** An uploaded roster of approved devices. Keyed on MAC, so it needs an agent. */
+export interface Roster {
+  fileName: string
+  rows: number
+  uploadedAt: string
+}
+
+/** What a new profile starts watching, per reach. Agentless gets only what a
+    page can actually read. */
+export const DEFAULT_ATTRS: Record<ProfileReach, string[]> = {
+  agentless: ['browser', 'canvas', 'locale', 'ip', 'isp', 'conn'],
+  agent: ['tpm', 'bios', 'motherboard', 'machine-sid', 'disk', 'os', 'secure-boot'],
+}
+
+/** How many devices a new profile allows. The console ships 1, which denies
+    anybody with a laptop and a desktop on the day it goes live. */
+export const DEFAULT_MAX_DEVICES = 3
+
 export interface FingerprintProfile {
   id: string
   name: string
@@ -299,6 +342,25 @@ export interface FingerprintProfile {
   onMismatch: 'deny' | 'challenge' | 'allow'
   /** Risk mode: the upper bound of each band. Deny is everything above challenge. */
   bands: { allow: number; challenge: number }
+
+  /* --- Device restriction ----------------------------------------------------
+     Which signals this profile may draw on at all, and what happens the first
+     time a device is seen. The attributes above decide whether this is the SAME
+     device; these decide whether it is allowed to become a known one. */
+
+  /** Decides whether half the master is even collectable. */
+  reach: ProfileReach
+  /** How a device gets onto a person's list. */
+  registration: Registration
+  /** How many one person may register. Null when a roster replaces the limit. */
+  maxDevices: number | null
+  /** Pre-approved only. */
+  roster: Roster | null
+  /** Whether phones and tablets are held to this profile as well as computers. */
+  mobileRestriction: boolean
+  /** First sight of a device enrols it silently rather than challenging. */
+  autoRegister: boolean
+
   usedIn: number
 }
 
@@ -353,6 +415,13 @@ export const seedProfiles: FingerprintProfile[] = [
     weights: {},
     tolerance: 1,
     onMismatch: 'challenge',
+    /* Every signal it names is one only an agent can read. */
+    reach: 'agent',
+    registration: 'self',
+    maxDevices: 3,
+    roster: null,
+    mobileRestriction: true,
+    autoRegister: false,
     usedIn: 3,
     bands: DEFAULT_BANDS,
   },
@@ -365,6 +434,13 @@ export const seedProfiles: FingerprintProfile[] = [
     weights: {},
     tolerance: 2,
     onMismatch: 'challenge',
+    /* Personal machines, so nothing to install: browser and network only. */
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: 5,
+    roster: null,
+    mobileRestriction: true,
+    autoRegister: true,
     usedIn: 5,
     bands: DEFAULT_BANDS,
   },
@@ -377,6 +453,14 @@ export const seedProfiles: FingerprintProfile[] = [
     weights: {},
     tolerance: 0,
     onMismatch: 'deny',
+    /* A kiosk is a known machine, and nobody should be able to enrol another
+       one by walking up to it. */
+    reach: 'agent',
+    registration: 'pre-approved',
+    maxDevices: null,
+    roster: { fileName: 'kiosks-floor-3.csv', rows: 24, uploadedAt: '12 Aug 2026' },
+    mobileRestriction: false,
+    autoRegister: false,
     usedIn: 1,
     bands: DEFAULT_BANDS,
   },

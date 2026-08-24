@@ -29,7 +29,6 @@
   width: 28px; height: 28px; border-radius: var(--radius-sm);
   background: var(--surface-inset); color: var(--text-tertiary);
 }
-.bsf:hover .bsf__ico { color: var(--brand-active); }
 
 .bsf__label {
   flex: 1; min-width: 0;
@@ -136,7 +135,13 @@
   left: 0; top: 50%; transform: translateY(-50%);
   width: calc(10px + (100% - 20px) * var(--p));
   height: 8px; border-radius: var(--radius-pill);
-  background: var(--brand);
+  /* Grey, not brand. A filled track states a VALUE — it is not a thing you
+     click, and a panel of five of them in orange spends the brand on the one
+     element that never needs reaching for. --border-strong is the one neutral
+     that carries in both themes: --border-strong resolves to #adb5bd under the
+     console theme, which is only 1.9:1 against the track and reads as an empty
+     slider. */
+  background: var(--text-tertiary);
 }
 .bsf__thumb {
   top: 50%;
@@ -144,9 +149,14 @@
   transform: translate(-50%, -50%);
   width: 20px; height: 20px; border-radius: var(--radius-full);
   background: var(--surface-raised);
-  border: 2px solid var(--brand);
+  border: 2px solid var(--text-tertiary);
   box-shadow: var(--el-mid);
+  transition: border-color var(--dur-fast) var(--ease-standard);
 }
+/* Brand arrives on contact, which is where it earns its keep: the grab handle
+   under the pointer, and the one with the keyboard on it. */
+.bsf__range:hover ~ .bsf__thumb,
+.bsf__range:focus-visible ~ .bsf__thumb { border-color: var(--brand); }
 
 /* The ceiling, on the track. Drawn through the full height of the rail so it
    reads as a limit rather than a decoration, and sitting under the thumb so
@@ -178,8 +188,10 @@
   margin-top: 2px; padding: 0 2px;
   font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums;
 }
-/* Ticks behind the fill are part of the chosen range, so they read as on. */
-.bsf__ticks span.is-past { color: var(--brand-active); font-weight: var(--fw-medium); }
+/* Ticks behind the fill are part of the chosen range, so they read as on —
+   stated by weight and ink rather than by colour, for the same reason the fill
+   is grey. */
+.bsf__ticks span.is-past { color: var(--text-secondary); font-weight: var(--fw-medium); }
 
 /* --- Presets -----------------------------------------------------------------------
    The two or three values anyone actually picks, on the ranges wide enough that
@@ -200,11 +212,13 @@
 }
 .bsf__presets button em { font-style: normal; font-size: 10px; color: var(--text-muted); }
 .bsf__presets button:hover { border-color: var(--border-strong); color: var(--text-primary); }
-/* On means "the value is currently this", so it is a state and not a selection
-   the user made here — same fill as a chosen chip anywhere else in the kit. */
+/* On means "the value is currently this" — a state, not an action. It is drawn
+   as a raised chip on the row rather than a brand-tinted one: elevation and ink
+   separate it from its neighbours without adding a fifth orange object to a
+   panel that already has a primary button. */
 .bsf__presets button.is-on {
-  background: var(--brand-subtle-bg); border-color: var(--brand);
-  color: var(--brand-active); font-weight: var(--fw-medium);
+  background: var(--surface-inset); border-color: var(--border-strong);
+  color: var(--text-primary); font-weight: var(--fw-medium);
 }
 .bsf__presets button.is-on em { color: inherit; }
 .bsf__presets button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
@@ -232,11 +246,15 @@
   transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
 .bsf__seg button:hover { color: var(--text-primary); }
-/* Brand tint, never a surface step — inside a Drawer or Modal --surface-raised
-   is the panel's own colour and a "selected" segment would vanish. */
+/* A raised chip on a sunken track. The old note here said a surface step could
+   not work inside a Drawer, because --surface-raised is the panel's own colour
+   there — but the contrast that matters is chip against TRACK, and the track is
+   --surface-sunken, which is a clear step below raised in both themes. So the
+   selected segment can be neutral, and the brand is left for the button that
+   actually commits the panel. */
 .bsf__seg button.is-on {
-  background: var(--brand-subtle-bg); color: var(--brand-active); font-weight: var(--fw-medium);
-  box-shadow: inset 0 0 0 1px var(--brand-subtle-border);
+  background: var(--surface-raised); color: var(--text-primary); font-weight: var(--fw-medium);
+  box-shadow: inset 0 0 0 1px var(--border-default), var(--el-low);
 }
 .bsf__seg button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
@@ -272,8 +290,11 @@
   font-size: var(--fs-md); color: var(--text-secondary);
 }
 /* The tick holds its space so nothing shifts when the choice moves. */
-.bsf__ddlist button > svg { flex: none; opacity: 0; color: var(--brand-active); }
-.bsf__ddlist button.is-on { color: var(--brand-active); font-weight: var(--fw-medium); }
+/* The tick marks the current value; it does not need a colour to do it, and
+   an orange row inside an open list is the same "state, not action" the
+   segmented control just gave up. */
+.bsf__ddlist button > svg { flex: none; opacity: 0; color: var(--text-primary); }
+.bsf__ddlist button.is-on { color: var(--text-primary); font-weight: var(--fw-medium); }
 .bsf__ddlist button.is-on > svg { opacity: 1; }
 .bsf__ddlist button:hover { background: var(--surface-sunken); color: var(--text-primary); }
 .bsf__ddlist button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }

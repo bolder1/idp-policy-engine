@@ -166,10 +166,10 @@ describe('every seeded zone is valid', () => {
 })
 
 describe('describeZone', () => {
-  it('spells out the AND, with "any" on the empty side', () => {
-    expect(describeZone(zone({ ip: ['203.0.113.0/24'] }))).toBe('1 address  AND  Any location')
+  it('lists both facets, with "any" on the empty side', () => {
+    expect(describeZone(zone({ ip: ['203.0.113.0/24'] }))).toBe('1 address · Any location')
     expect(describeZone(zone({ location: loc({ countries: ['India'] }) }))).toBe(
-      'Any address  AND  India',
+      'Any address · India',
     )
   })
 

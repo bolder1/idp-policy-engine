@@ -18,6 +18,8 @@ import {
   type Family,
 } from './AuthMethods'
 import { RecoveryTab } from './recovery'
+import { UserMethodCard } from './user-config'
+import { SEED_ENROLMENT, type UserEnrolment } from '../user-methods'
 
 /* -----------------------------------------------------------------------------
    Authentication methods · v2 — master and detail.
@@ -47,7 +49,12 @@ import { RecoveryTab } from './recovery'
 
 type Tab = 'methods' | 'recovery'
 
-export function AuthMethodsV2() {
+/* Who is looking. Not a permission check — the prototype has no auth — but the
+   same split the real product makes: an admin decides what may exist, a person
+   decides which of those they use. */
+export type Role = 'admin' | 'user'
+
+export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
   const store = useBrand()
   const { methods, setMethods } = useBrand()
   const [tab, setTab] = useState<Tab>('methods')
@@ -64,6 +71,48 @@ export function AuthMethodsV2() {
   )
   const [setupOf, setSetupOf] = useState<AuthMethod | null>(null)
   const [savedConfig, setSavedConfig] = useState<Record<string, ConfigField[]>>({})
+
+  /* The person's own enrolment, which is a different thing from the tenant's
+     configuration and is why this cannot be one piece of state with a flag on
+     it. The admin decides a method may exist; this records whether THIS person
+     has set it up and which one of theirs actually runs. */
+  const [enrolment, setEnrolment] = useState<UserEnrolment>(SEED_ENROLMENT)
+  /* One card open at a time, matching the live end-user page. */
+  const [openCard, setOpenCard] = useState<string | null>(null)
+
+  const isUser = role === 'user'
+
+  /* What a person is allowed to see. `methodBlocker` already answers exactly
+     this question — it returns a reason whenever a method is unconfigured,
+     switched off, or not offered to end users — so the user view is the
+     catalogue with everything blocked removed, and nothing else. */
+  const visible = useMemo(
+    () => (isUser ? methods.filter((m) => !methodBlocker(m)) : methods),
+    [methods, isUser],
+  )
+
+  const activate = (id: string, on: boolean) => {
+    /* One active method at a time. Switching one on switches the last one off
+       rather than adding to a set — the live page names a single "Active
+       Method" above the list, and two actives would make that line a lie. */
+    setEnrolment((e) => ({ ...e, active: on ? id : e.active === id ? null : e.active }))
+    const m = methods.find((x) => x.id === id)
+    if (m) store.showToast(on ? `${m.name} is now your active method` : `${m.name} switched off`)
+  }
+
+  const saveEnrolment = (id: string, values: Record<string, string>) => {
+    const first = !enrolment.configured.includes(id)
+    setEnrolment((e) => ({
+      ...e,
+      configured: first ? [...e.configured, id] : e.configured,
+      values: { ...e.values, [id]: values },
+      /* Your first method becomes the active one on its own. Finishing setup
+         and still not being covered is a state nobody wants to be left in. */
+      active: e.active ?? id,
+    }))
+    const m = methods.find((x) => x.id === id)
+    if (m) store.showToast(first ? `${m.name} is set up` : `${m.name} updated`)
+  }
 
   const setEnabled = (id: string, on: boolean) => {
     setMethods((all) => all.map((m) => (m.id === id ? { ...m, active: on, allowed: on } : m)))
@@ -86,29 +135,54 @@ export function AuthMethodsV2() {
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return FAMILIES.map((f) => {
-      const inside = methods.filter((m) => m.channel === f.channel)
+      const inside = visible.filter((m) => m.channel === f.channel)
       return {
         f,
         total: inside.length,
         live: inside.filter((m) => !methodBlocker(m)).length,
-        holdsDefault: inside.some((m) => m.id === defaultMethod),
+        /* The starred family is whichever holds "the one" — and "the one"
+           is a different method for each role. An admin is looking for the
+           tenant default a rule falls back to; a person is looking for the
+           method that actually runs when they sign in. Same mark, same
+           meaning (this is the one), different underlying fact. */
+        holdsDefault: inside.some((m) => m.id === (isUser ? enrolment.active : defaultMethod)),
         hit:
           !needle ||
           f.channel.toLowerCase().includes(needle) ||
           inside.some((m) => m.name.toLowerCase().includes(needle)),
       }
-    }).filter((r) => r.hit)
-  }, [methods, q, defaultMethod])
+      /* A family the admin has emptied is not a family with nothing in it, it
+         is a family that does not apply here. */
+    }).filter((r) => r.hit && (r.total > 0 || !isUser))
+  }, [visible, q, defaultMethod, isUser, enrolment.active])
 
   const family = FAMILIES.find((f) => f.channel === channel) ?? FAMILIES[0]
 
   return (
     <div className="bpage bm8 bm2">
       <header className="bm8__head">
-        <h1>Authentication methods</h1>
-        <p>Choose how people prove who they are. Anything you enable here can be named by a policy rule.</p>
+        <h1>{isUser ? 'Two-step verification' : 'Authentication methods'}</h1>
+        <p>
+          {isUser
+            ? 'How you prove it is you, after your password. Set up as many as you like — one of them runs.'
+            : 'Choose how people prove who they are. Anything you enable here can be named by a policy rule.'}
+        </p>
       </header>
 
+      {/* The person's one active method, stated before the catalogue rather
+          than found inside it. The live page puts this line in the same place,
+          and it is the answer to the only question most visits are asking. */}
+      {isUser && (
+        <p className="bmu__active">
+          Active method
+          <strong>{methods.find((m) => m.id === enrolment.active)?.name ?? 'None yet'}</strong>
+        </p>
+      )}
+
+      {/* Recovery is a tenant policy, not a personal setting, so a person does
+          not get the tab at all — a single-tab tab bar is furniture describing a
+          choice that no longer exists. */}
+      {!isUser && (
       <div className="bm8__tabbar" role="tablist" aria-label="Authentication methods">
         {(['methods', 'recovery'] as Tab[]).map((t) => (
           <button
@@ -123,26 +197,29 @@ export function AuthMethodsV2() {
           </button>
         ))}
       </div>
+      )}
 
-      {tab === 'methods' ? (
+      {tab === 'methods' || isUser ? (
         <div className="bm8__pane">
           {/* Both tenant-wide, so both stay full width above the split. They
               are not properties of a category and putting them in either column
-              would file them under one. */}
-          <PrimarySignIn />
+              would file them under one — and neither is a person's to set. */}
+          {!isUser && <PrimarySignIn />}
 
           <div className="bm2__split">
             {/* Spans the split, because it is a fact about the whole
                 catalogue rather than about the selected family — but it sits
                 INSIDE it, under the same argument as v1: the fallback cannot be
                 understood before the things it falls back to. */}
-            <div className="bm2__defaultspan">
-              <DefaultMethodPicker
-                methods={methods}
-                defaultMethod={defaultMethod}
-                onDefault={setDefaultMethod}
-              />
-            </div>
+            {!isUser && (
+              <div className="bm2__defaultspan">
+                <DefaultMethodPicker
+                  methods={methods}
+                  defaultMethod={defaultMethod}
+                  onDefault={setDefaultMethod}
+                />
+              </div>
+            )}
 
             {/* "All methods", not "Categories": the rail is the catalogue,
                 and naming it after the filing scheme made eleven rows sound
@@ -194,13 +271,19 @@ export function AuthMethodsV2() {
             <section className="bm2__detail" aria-live="polite">
               <FamilyDetail
                 family={family}
-                methods={methods}
+                methods={visible}
                 policies={store.policies}
                 defaultMethod={defaultMethod}
                 behaviour={behaviour}
                 onBehaviour={setBehaviour}
                 onToggle={setEnabled}
                 onSetup={setSetupOf}
+                role={role}
+                enrolment={enrolment}
+                openCard={openCard}
+                onOpenCard={setOpenCard}
+                onActivate={activate}
+                onSaveEnrolment={saveEnrolment}
               />
             </section>
           </div>
@@ -234,6 +317,12 @@ function FamilyDetail({
   onBehaviour,
   onToggle,
   onSetup,
+  role,
+  enrolment,
+  openCard,
+  onOpenCard,
+  onActivate,
+  onSaveEnrolment,
 }: {
   family: Family
   methods: AuthMethod[]
@@ -243,18 +332,31 @@ function FamilyDetail({
   onBehaviour: (p: MfaValues) => void
   onToggle: (id: string, on: boolean) => void
   onSetup: (m: AuthMethod) => void
+  role: Role
+  enrolment: UserEnrolment
+  openCard: string | null
+  onOpenCard: (id: string | null) => void
+  onActivate: (id: string, on: boolean) => void
+  onSaveEnrolment: (id: string, values: Record<string, string>) => void
 }) {
+  const isUser = role === 'user'
   const [pane, setPane] = useState<'methods' | 'settings'>('methods')
   const inside = methods.filter((m) => m.channel === family.channel)
   const live = inside.filter((m) => !methodBlocker(m)).length
   const enrolled = inside.reduce((n, m) => n + (m.enrolled ?? 0), 0)
   const unconfigured = inside.filter((m) => !m.configured).length
 
+  const mine = inside.filter((m) => enrolment.configured.includes(m.id)).length
+  const holdsActive = inside.some((m) => m.id === enrolment.active)
+
   const famSettings = familySettingsFor(family.channel)
   const ownSettings = inside
     .map((m) => ({ m, settings: methodSettingsFor(m.id) }))
     .filter((x) => x.settings.length > 0)
-  const hasSettings = famSettings.length > 0 || ownSettings.length > 0
+  /* Family and per-method settings are the tenant's configuration — retry
+     limits, token length, which gateway. None of it is a person's to change,
+     so the Settings tab does not exist on their side. */
+  const hasSettings = !isUser && (famSettings.length > 0 || ownSettings.length > 0)
 
   return (
     <>
@@ -265,17 +367,33 @@ function FamilyDetail({
         <div className="bm8__dwtext">
           <h2>{family.channel}</h2>
           <p>{family.blurb}</p>
+          {/* Two different questions, so two different readouts. An admin is
+              asking how much of this family is in play across the tenant; a
+              person is asking which of these they have set up and whether one
+              of them is the one that runs. Showing an admin's counts to a
+              person would be showing them somebody else's numbers. */}
           <div className="bm8__dwstats">
-            <span>
-              <strong>{live}</strong> of {inside.length} enabled
-            </span>
-            <span>
-              <strong>{enrolled.toLocaleString()}</strong> enrolled
-            </span>
-            {unconfigured > 0 && (
-              <span className="is-warn">
-                <strong>{unconfigured}</strong> need setup
-              </span>
+            {isUser ? (
+              <>
+                <span>
+                  <strong>{mine}</strong> of {inside.length} set up
+                </span>
+                {holdsActive && <span className="is-live">Your active method is here</span>}
+              </>
+            ) : (
+              <>
+                <span>
+                  <strong>{live}</strong> of {inside.length} enabled
+                </span>
+                <span>
+                  <strong>{enrolled.toLocaleString()}</strong> enrolled
+                </span>
+                {unconfigured > 0 && (
+                  <span className="is-warn">
+                    <strong>{unconfigured}</strong> need setup
+                  </span>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -308,16 +426,30 @@ function FamilyDetail({
       {pane === 'methods' || !hasSettings ? (
         <>
           <div className="bm8__list">
-            {inside.map((m) => (
-              <MethodCard
-                key={m.id}
-                m={m}
-                policies={policies}
-                onToggle={onToggle}
-                isDefault={defaultMethod === m.id}
-                onSetup={onSetup}
-              />
-            ))}
+            {inside.map((m) =>
+              isUser ? (
+                <UserMethodCard
+                  key={m.id}
+                  m={m}
+                  enrolled={enrolment.configured.includes(m.id)}
+                  isActive={enrolment.active === m.id}
+                  values={enrolment.values[m.id] ?? {}}
+                  open={openCard === m.id}
+                  onOpen={(o) => onOpenCard(o ? m.id : null)}
+                  onActivate={(on) => onActivate(m.id, on)}
+                  onSave={(v) => onSaveEnrolment(m.id, v)}
+                />
+              ) : (
+                <MethodCard
+                  key={m.id}
+                  m={m}
+                  policies={policies}
+                  onToggle={onToggle}
+                  isDefault={defaultMethod === m.id}
+                  onSetup={onSetup}
+                />
+              ),
+            )}
           </div>
           {inside.length === 0 && <NoResults>No methods in this group yet.</NoResults>}
         </>

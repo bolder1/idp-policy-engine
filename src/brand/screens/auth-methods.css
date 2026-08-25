@@ -171,12 +171,22 @@ button.bm8__card:hover .bm8__name { color: var(--brand-active); }
    sit on, and it is the only row on the page that gets the brand. */
 .bm8__tile.is-brand { background: var(--brand-subtle-bg); color: var(--brand-active); }
 
-.bm8__tile.is-teal { background: var(--tint-teal-bg); color: var(--tint-teal-fg); }
-.bm8__tile.is-green { background: var(--tint-green-bg); color: var(--tint-green-fg); }
-.bm8__tile.is-slate { background: var(--tint-slate-bg); color: var(--tint-slate-fg); }
-.bm8__tile.is-blue { background: var(--tint-blue-bg); color: var(--tint-blue-fg); }
-.bm8__tile.is-indigo { background: var(--tint-indigo-bg); color: var(--tint-indigo-fg); }
-.bm8__tile.is-amber { background: var(--tint-amber-bg); color: var(--tint-amber-fg); }
+/* One colour, not six.
+
+   The per-category tints were decoration: a family's hue said nothing you could
+   act on, and eleven of them turned the rail into a legend nobody was given.
+   They are all the brand tint now, and the classes stay in the markup so an
+   UNtinted tile still means what it always meant — nothing enabled in here.
+
+   What is deliberately not collapsed: is-warn, is-error and the --fb-* feedback
+   colours. Those are the linter's verdict and a control's state, not category
+   decoration, and flattening them would delete meaning rather than noise. */
+.bm8__tile.is-teal,
+.bm8__tile.is-green,
+.bm8__tile.is-slate,
+.bm8__tile.is-blue,
+.bm8__tile.is-indigo,
+.bm8__tile.is-amber { background: var(--brand-subtle-bg); color: var(--brand-active); }
 
 /* --- Row text ------------------------------------------------------------------ */
 
@@ -338,12 +348,12 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
   width: 38px; height: 38px; border-radius: var(--radius-md);
   background: var(--surface-inset); color: var(--text-tertiary);
 }
-.bm8__dwhead.is-teal .bm8__dwtile { background: var(--tint-teal-bg); color: var(--tint-teal-fg); }
-.bm8__dwhead.is-green .bm8__dwtile { background: var(--tint-green-bg); color: var(--tint-green-fg); }
-.bm8__dwhead.is-blue .bm8__dwtile { background: var(--tint-blue-bg); color: var(--tint-blue-fg); }
-.bm8__dwhead.is-indigo .bm8__dwtile { background: var(--tint-indigo-bg); color: var(--tint-indigo-fg); }
-.bm8__dwhead.is-amber .bm8__dwtile { background: var(--tint-amber-bg); color: var(--tint-amber-fg); }
-.bm8__dwhead.is-slate .bm8__dwtile { background: var(--tint-slate-bg); color: var(--tint-slate-fg); }
+.bm8__dwhead.is-teal .bm8__dwtile,
+.bm8__dwhead.is-green .bm8__dwtile,
+.bm8__dwhead.is-blue .bm8__dwtile,
+.bm8__dwhead.is-indigo .bm8__dwtile,
+.bm8__dwhead.is-amber .bm8__dwtile,
+.bm8__dwhead.is-slate .bm8__dwtile { background: var(--brand-subtle-bg); color: var(--brand-active); }
 
 .bm8__dwtext { flex: 1; min-width: 0; }
 .bm8__dwtext h2 { margin: 0; font-size: var(--fs-lg); }

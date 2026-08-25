@@ -57,12 +57,27 @@
   transition: background var(--dur-fast) var(--ease-standard);
 }
 .bm2__railitem:hover { background: var(--surface-sunken); }
-/* Brand tint for the selection, because on this layout the selected row is not
-   a hover state that happens to persist — it is the answer to "which of these
-   am I looking at", and the pane beside it is only legible with that answered. */
+/* The selection is not a hover state that happens to persist — it is the answer
+   to "which of these am I looking at", and the pane beside it is only legible
+   once that is answered. So it needs to be unmistakable.
+
+   It used to be a brand-tinted fill, which stopped working the moment the
+   category tiles all became brand-tinted too: the row and the tile inside it
+   were the same colour, so the tile dissolved into its own background and the
+   selected row read as a wash.
+
+   An edge instead of a fill, which is also the console rail's own language for
+   the current page — a brand bar down the leading edge. The tile inverts to
+   solid brand so it separates from the row rather than melting into it, and it
+   is the one solid brand object in the column. */
 .bm2__railitem.is-on {
-  background: var(--brand-subtle-bg); border-color: var(--brand-subtle-border);
+  /* No border. The base row already reserves 1px of transparent border so
+     nothing shifts, and outlining the selected row as well as edging and
+     filling it was three statements of one fact. */
+  background: var(--surface-sunken);
+  box-shadow: inset 3px 0 0 var(--brand);
 }
+.bm2__railitem.is-on .bm8__tile { background: var(--brand); color: #fff; }
 .bm2__railitem:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
 .bm2__railname {
@@ -198,3 +213,16 @@
   font-size: var(--fs-sm); color: var(--text-primary); font-family: inherit; cursor: pointer;
 }
 .bzver__role select:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* The section's controls, beside its heading. The search used to sit inside the
+   rail, which read as though it searched the family list — it does not, it
+   matches method names too, so "yubikey" finds Hardware Token. Next to the
+   filter it reads as what it is: the other control that narrows the same set. */
+.bm8__sechead--tools { align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+.bm8__sectools { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.bm8__sectools .bm2__search { width: 240px; margin: 0; }
+
+@media (max-width: 860px) {
+  .bm8__sectools { width: 100%; margin-left: 0; }
+  .bm8__sectools .bm2__search { flex: 1; width: auto; }
+}

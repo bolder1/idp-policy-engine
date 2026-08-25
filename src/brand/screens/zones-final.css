@@ -82,9 +82,19 @@
   background: var(--surface-inset); color: var(--text-tertiary);
 }
 .bz7__tile--sm { width: 22px; height: 22px; }
-.bz7__tile.is-blue { background: var(--tint-blue-bg); color: var(--tint-blue-fg); }
-.bz7__tile.is-green { background: var(--tint-green-bg); color: var(--tint-green-fg); }
-.bz7__tile.is-indigo { background: var(--tint-indigo-bg); color: var(--tint-indigo-fg); }
+/* One colour, not six.
+
+   The per-category tints were decoration: a family's hue said nothing you could
+   act on, and eleven of them turned the rail into a legend nobody was given.
+   They are all the brand tint now, and the classes stay in the markup so an
+   UNtinted tile still means what it always meant — nothing enabled in here.
+
+   What is deliberately not collapsed: is-warn, is-error and the --fb-* feedback
+   colours. Those are the linter's verdict and a control's state, not category
+   decoration, and flattening them would delete meaning rather than noise. */
+.bz7__tile.is-blue,
+.bz7__tile.is-green,
+.bz7__tile.is-indigo { background: var(--brand-subtle-bg); color: var(--brand-active); }
 /* A zone constraining neither half matches everything. That is not a category,
    it is a defect, and the tile says so. */
 .bz7__tile.is-warn { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }

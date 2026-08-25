@@ -37,8 +37,13 @@
   background: var(--surface-inset); color: var(--text-tertiary);
 }
 .bfp2__tile--lg { width: 48px; height: 48px; border-radius: var(--radius-lg); }
-.bfp2__tile.is-match { background: var(--tint-blue-bg); color: var(--tint-blue-fg); }
-.bfp2__tile.is-risk { background: var(--tint-indigo-bg); color: var(--tint-indigo-fg); }
+/* The two profile modes were blue and indigo. Not a rainbow, but the worst
+   version of a small one: two colours a reader cannot reliably tell apart,
+   encoding something the row already says twice — the chip spells out
+   "Attribute based" or "Risk based", and the tile carries a different icon for
+   each. The colour was a third copy of a fact that was never in doubt. */
+.bfp2__tile.is-match,
+.bfp2__tile.is-risk { background: var(--brand-subtle-bg); color: var(--brand-active); }
 .bfp2__uses { font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; }
 .bfp2__uses.is-quiet { color: var(--text-muted); }
 
@@ -180,11 +185,21 @@
 /* The icon carries the tint. It is the one mark on the row, so it is doing the
    work the spine and the sentence used to share. */
 .bfp2__railico { flex: none; display: grid; place-items: center; color: var(--text-muted); }
-.bfp2__railitem.is-slate .bfp2__railico { color: var(--tint-slate-fg); }
-.bfp2__railitem.is-teal .bfp2__railico { color: var(--tint-teal-fg); }
-.bfp2__railitem.is-indigo .bfp2__railico { color: var(--tint-indigo-fg); }
-.bfp2__railitem.is-blue .bfp2__railico { color: var(--tint-blue-fg); }
-.bfp2__railitem.is-amber .bfp2__railico { color: var(--tint-amber-fg); }
+/* One colour, not six.
+
+   The per-category tints were decoration: a family's hue said nothing you could
+   act on, and eleven of them turned the rail into a legend nobody was given.
+   They are all the brand tint now, and the classes stay in the markup so an
+   UNtinted tile still means what it always meant — nothing enabled in here.
+
+   What is deliberately not collapsed: is-warn, is-error and the --fb-* feedback
+   colours. Those are the linter's verdict and a control's state, not category
+   decoration, and flattening them would delete meaning rather than noise. */
+.bfp2__railitem.is-slate .bfp2__railico,
+.bfp2__railitem.is-teal .bfp2__railico,
+.bfp2__railitem.is-indigo .bfp2__railico,
+.bfp2__railitem.is-blue .bfp2__railico,
+.bfp2__railitem.is-amber .bfp2__railico { color: var(--brand-active); }
 
 .bfp2__railitem > strong {
   flex: 1; min-width: 0;
@@ -227,11 +242,16 @@
 }
 /* The heading and its icon take the category tint together — the same mark the
    rail uses, so a search showing four groups reads as four families. */
-.bfp2__pang.is-slate .bfp2__panghead h4, .bfp2__pang.is-slate .bfp2__panghead > svg { color: var(--tint-slate-fg); }
-.bfp2__pang.is-teal .bfp2__panghead h4, .bfp2__pang.is-teal .bfp2__panghead > svg { color: var(--tint-teal-fg); }
-.bfp2__pang.is-indigo .bfp2__panghead h4, .bfp2__pang.is-indigo .bfp2__panghead > svg { color: var(--tint-indigo-fg); }
-.bfp2__pang.is-blue .bfp2__panghead h4, .bfp2__pang.is-blue .bfp2__panghead > svg { color: var(--tint-blue-fg); }
-.bfp2__pang.is-amber .bfp2__panghead h4, .bfp2__pang.is-amber .bfp2__panghead > svg { color: var(--tint-amber-fg); }
+.bfp2__pang.is-slate .bfp2__panghead h4,
+.bfp2__pang.is-slate .bfp2__panghead > svg,
+.bfp2__pang.is-teal .bfp2__panghead h4,
+.bfp2__pang.is-teal .bfp2__panghead > svg,
+.bfp2__pang.is-indigo .bfp2__panghead h4,
+.bfp2__pang.is-indigo .bfp2__panghead > svg,
+.bfp2__pang.is-blue .bfp2__panghead h4,
+.bfp2__pang.is-blue .bfp2__panghead > svg,
+.bfp2__pang.is-amber .bfp2__panghead h4,
+.bfp2__pang.is-amber .bfp2__panghead > svg { color: var(--brand-active); }
 .bfp2__panghead > span {
   flex: 1; min-width: 0;
   font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums;
@@ -286,27 +306,27 @@
 /* Selected takes the CATEGORY's colour, the same tint as the rail spine and the
    group heading — so a search showing hits from four categories reads as four
    categories rather than one long orange smear. */
-.bfp2__pang.is-slate .bfp2__opt.is-on { border-color: var(--tint-slate-fg); background: var(--tint-slate-bg); }
-.bfp2__pang.is-teal .bfp2__opt.is-on { border-color: var(--tint-teal-fg); background: var(--tint-teal-bg); }
-.bfp2__pang.is-indigo .bfp2__opt.is-on { border-color: var(--tint-indigo-fg); background: var(--tint-indigo-bg); }
-.bfp2__pang.is-blue .bfp2__opt.is-on { border-color: var(--tint-blue-fg); background: var(--tint-blue-bg); }
-.bfp2__pang.is-amber .bfp2__opt.is-on { border-color: var(--tint-amber-fg); background: var(--tint-amber-bg); }
-.bfp2__pang.is-slate .bfp2__opt.is-on .bfp2__optbox { background: var(--tint-slate-fg); border-color: var(--tint-slate-fg); }
-.bfp2__pang.is-teal .bfp2__opt.is-on .bfp2__optbox { background: var(--tint-teal-fg); border-color: var(--tint-teal-fg); }
-.bfp2__pang.is-indigo .bfp2__opt.is-on .bfp2__optbox { background: var(--tint-indigo-fg); border-color: var(--tint-indigo-fg); }
-.bfp2__pang.is-blue .bfp2__opt.is-on .bfp2__optbox { background: var(--tint-blue-fg); border-color: var(--tint-blue-fg); }
-.bfp2__pang.is-amber .bfp2__opt.is-on .bfp2__optbox { background: var(--tint-amber-fg); border-color: var(--tint-amber-fg); }
+.bfp2__pang.is-slate .bfp2__opt.is-on,
+.bfp2__pang.is-teal .bfp2__opt.is-on,
+.bfp2__pang.is-indigo .bfp2__opt.is-on,
+.bfp2__pang.is-blue .bfp2__opt.is-on,
+.bfp2__pang.is-amber .bfp2__opt.is-on,
+.bfp2__pang.is-slate .bfp2__opt.is-on .bfp2__optbox,
+.bfp2__pang.is-teal .bfp2__opt.is-on .bfp2__optbox,
+.bfp2__pang.is-indigo .bfp2__opt.is-on .bfp2__optbox,
+.bfp2__pang.is-blue .bfp2__opt.is-on .bfp2__optbox,
+.bfp2__pang.is-amber .bfp2__opt.is-on .bfp2__optbox { border-color: var(--brand-active); background: var(--brand-subtle-bg); }
 
 /* The attribute's own mark, quiet by default and taking the category tint once
    the row is on — so a ticked row reads as ticked from the icon as well as the
    fill, and an unticked column of marks stays scannable without competing with
    the names beside them. */
 .bfp2__optico { flex: none; display: grid; place-items: center; color: var(--text-muted); }
-.bfp2__pang.is-slate .bfp2__opt.is-on .bfp2__optico { color: var(--tint-slate-fg); }
-.bfp2__pang.is-teal .bfp2__opt.is-on .bfp2__optico { color: var(--tint-teal-fg); }
-.bfp2__pang.is-indigo .bfp2__opt.is-on .bfp2__optico { color: var(--tint-indigo-fg); }
-.bfp2__pang.is-blue .bfp2__opt.is-on .bfp2__optico { color: var(--tint-blue-fg); }
-.bfp2__pang.is-amber .bfp2__opt.is-on .bfp2__optico { color: var(--tint-amber-fg); }
+.bfp2__pang.is-slate .bfp2__opt.is-on .bfp2__optico,
+.bfp2__pang.is-teal .bfp2__opt.is-on .bfp2__optico,
+.bfp2__pang.is-indigo .bfp2__opt.is-on .bfp2__optico,
+.bfp2__pang.is-blue .bfp2__opt.is-on .bfp2__optico,
+.bfp2__pang.is-amber .bfp2__opt.is-on .bfp2__optico { color: var(--brand-active); }
 
 .bfp2__optname {
   flex: 1; min-width: 0;
@@ -455,20 +475,20 @@
   border-left: 3px solid var(--border-strong);
   margin-left: -1px;
 }
-.bfp2__cat.is-slate .bfp2__cathead { border-left-color: var(--tint-slate-fg); }
-.bfp2__cat.is-teal .bfp2__cathead { border-left-color: var(--tint-teal-fg); }
-.bfp2__cat.is-indigo .bfp2__cathead { border-left-color: var(--tint-indigo-fg); }
-.bfp2__cat.is-blue .bfp2__cathead { border-left-color: var(--tint-blue-fg); }
-.bfp2__cat.is-amber .bfp2__cathead { border-left-color: var(--tint-amber-fg); }
+.bfp2__cat.is-slate .bfp2__cathead,
+.bfp2__cat.is-teal .bfp2__cathead,
+.bfp2__cat.is-indigo .bfp2__cathead,
+.bfp2__cat.is-blue .bfp2__cathead,
+.bfp2__cat.is-amber .bfp2__cathead { border-left-color: var(--brand-active); }
 
 /* The picker's mark, repeated — so the group you configure under is visibly the
    group you chose under. */
 .bfp2__cathead > svg { flex: none; }
-.bfp2__cat.is-slate .bfp2__cathead > svg { color: var(--tint-slate-fg); }
-.bfp2__cat.is-teal .bfp2__cathead > svg { color: var(--tint-teal-fg); }
-.bfp2__cat.is-indigo .bfp2__cathead > svg { color: var(--tint-indigo-fg); }
-.bfp2__cat.is-blue .bfp2__cathead > svg { color: var(--tint-blue-fg); }
-.bfp2__cat.is-amber .bfp2__cathead > svg { color: var(--tint-amber-fg); }
+.bfp2__cat.is-slate .bfp2__cathead > svg,
+.bfp2__cat.is-teal .bfp2__cathead > svg,
+.bfp2__cat.is-indigo .bfp2__cathead > svg,
+.bfp2__cat.is-blue .bfp2__cathead > svg,
+.bfp2__cat.is-amber .bfp2__cathead > svg { color: var(--brand-active); }
 
 .bfp2__cathead h4 {
   margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
@@ -534,8 +554,8 @@
   font-style: normal; font-size: var(--fs-xs); font-weight: var(--fw-medium);
   white-space: nowrap;
 }
-.bfp2__modechip.is-match { background: var(--tint-blue-bg); color: var(--tint-blue-fg); }
-.bfp2__modechip.is-risk { background: var(--tint-indigo-bg); color: var(--tint-indigo-fg); }
+.bfp2__modechip.is-match,
+.bfp2__modechip.is-risk { background: var(--surface-inset); color: var(--text-secondary); }
 .bfp2__tnum { font-size: var(--fs-md); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .bfp2__tuses { font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; }
 .bfp2__tuses.is-quiet { color: var(--text-muted); }

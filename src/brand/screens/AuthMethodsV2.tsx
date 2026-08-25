@@ -48,6 +48,11 @@ import { SEED_ENROLMENT, type UserEnrolment } from '../user-methods'
 
 type Tab = 'methods' | 'recovery'
 
+/* The states a method can be in, from the tenant's side. `off` is deliberately
+   "connected but not reaching anyone" rather than "not enabled": a method that
+   was never configured has not been switched off, it has not been started. */
+type Status = 'all' | 'enabled' | 'off' | 'setup'
+
 /* The type lives on the store now, because the role decides the chrome too.
    Re-exported here so callers already importing it from this screen keep
    working. */
@@ -59,6 +64,10 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
   const { methods, setMethods } = useBrand()
   const [tab, setTab] = useState<Tab>('methods')
   const [q, setQ] = useState('')
+  /* The one axis the search cannot reach. Search matches names; this matches
+     state, which is the question an admin actually arrives with — what is off,
+     and what have we never finished connecting. */
+  const [status, setStatus] = useState<Status>('all')
 
   /* The selected family, by channel. Never null — a master-detail layout with
      nothing selected is a page with a permanent hole in it, and there is always
@@ -90,6 +99,17 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
     () => (isUser ? methods.filter((m) => !methodBlocker(m)) : methods),
     [methods, isUser],
   )
+
+  /* Read off methodBlocker rather than re-derived, so the filter and the reason
+     a card shows as unavailable can never disagree. */
+  const passes = (m: AuthMethod) => {
+    if (status === 'all') return true
+    if (status === 'setup') return !m.configured
+    if (status === 'enabled') return methodBlocker(m) === null
+    /* Configured, so somebody finished the connection, but not reaching anyone
+       — switched off for the tenant or not offered to end users. */
+    return m.configured && methodBlocker(m) !== null
+  }
 
   const activate = (id: string, on: boolean) => {
     /* One active method at a time. Switching one on switches the last one off
@@ -146,15 +166,18 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
            method that actually runs when they sign in. Same mark, same
            meaning (this is the one), different underlying fact. */
         holdsDefault: inside.some((m) => m.id === (isUser ? enrolment.active : defaultMethod)),
+        /* Search and filter narrow the same way: a family survives if it
+           still holds a method that satisfies both. */
         hit:
-          !needle ||
-          f.channel.toLowerCase().includes(needle) ||
-          inside.some((m) => m.name.toLowerCase().includes(needle)),
+          (!needle ||
+            f.channel.toLowerCase().includes(needle) ||
+            inside.some((m) => m.name.toLowerCase().includes(needle))) &&
+          inside.some(passes),
       }
       /* A family the admin has emptied is not a family with nothing in it, it
          is a family that does not apply here. */
     }).filter((r) => r.hit && (r.total > 0 || !isUser))
-  }, [visible, q, defaultMethod, isUser, enrolment.active])
+  }, [visible, q, status, defaultMethod, isUser, enrolment.active])
 
   /* The selected family, but only if the viewer can actually see it.
 
@@ -165,15 +188,18 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
      first family they DO have, and it also covers an admin disabling the last
      method in whatever family happens to be open.
 
-     Keyed on what is reachable rather than on the filtered rows: those are
-     narrowed by the search box too, and falling back on those would yank the
-     detail pane to a different family as you typed. */
+     Keyed on role and filter, but NOT on the search. A filter is one
+     deliberate choice, so moving the pane to a family that still has matches is
+     help; the search fires per keystroke, and following that would yank the
+     pane around as you typed. */
   /* The same count the v1 heading carries: how many methods a user could
      actually be offered, which is not the same as how many families are in
      play — five families in use can mean five methods or fifteen. */
   const liveMethods = methods.filter((m) => !methodBlocker(m)).length
 
-  const reachable = FAMILIES.filter((f) => !isUser || visible.some((m) => m.channel === f.channel))
+  const reachable = FAMILIES.filter(
+    (f) => visible.some((m) => m.channel === f.channel && passes(m)) || (!isUser && status === 'all'),
+  )
   const family = reachable.find((f) => f.channel === channel) ?? reachable[0] ?? FAMILIES[0]
 
   return (
@@ -224,16 +250,21 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
               would file them under one — and neither is a person's to set. */}
           {!isUser && <PrimarySignIn />}
 
-          {/* Named as the counterpart to the block above it. The split had no
-              heading at all, so the catalogue began with a search box and a
-              rail that started mid-page under someone else's section — and
-              "Primary sign-in methods" left an obvious question about what the
-              rest of the page was.
+          {/* The section's heading and the controls that narrow it, on one
+              row — which is where the search now lives too.
 
-              Admin only: "other" is only meaningful against a primary, and a
-              person is not shown one. */}
-          {!isUser && (
-            <div className="bm8__sechead">
+              It used to sit inside the rail, above the family list, which read
+              as though it searched the families. It does not: it matches method
+              names as well, so typing "yubikey" surfaces Hardware Token. Beside
+              the heading it belongs to the section rather than to the column,
+              and it sits next to the filter, which is the other control doing
+              the same job on a different axis.
+
+              The title block is admin-only — "other" is only meaningful against
+              a primary and a person is not shown one — but the toolbar is not.
+              A person still needs to find things. */}
+          <div className="bm8__sechead bm8__sechead--tools">
+            {!isUser && (
               <div>
                 <span className="bm8__sectitle">
                   <h2>Other sign-in methods</h2>
@@ -243,18 +274,9 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
                 </span>
                 <p>The second factors a policy rule can ask for, grouped by how the challenge reaches someone.</p>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="bm2__split">
-            {/* "All methods", not "Categories": the rail is the catalogue,
-                and naming it after the filing scheme made eleven rows sound
-                like a layer to get past rather than the thing itself. */}
-            {/* The accessible name follows the same rule the visible heading
-                does: "other" only means something against a primary, and a
-                person is not shown one. Leaving it here would put the problem
-                one layer down, where only a screen reader hits it. */}
-            <nav className="bm2__rail" aria-label={isUser ? 'Your sign-in methods' : 'Other sign-in methods'}>
+            <div className="bm8__sectools">
               <label className="bm2__search">
                 <Search size={14} strokeWidth={1.9} aria-hidden />
                 <input
@@ -266,6 +288,49 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
                 />
               </label>
 
+              {/* Admin only. The states it names — never configured, switched
+                  off for the tenant — are the tenant's, and a person cannot see
+                  a method in either of them anyway. */}
+              {!isUser && (
+                <select
+                  aria-label="Filter by status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as Status)}
+                  className={`btoolbar__select ${status !== 'all' ? 'is-set' : ''}`}
+                >
+                  <option value="all">All statuses</option>
+                  <option value="enabled">Enabled</option>
+                  <option value="off">Switched off</option>
+                  <option value="setup">Needs setup</option>
+                </select>
+              )}
+
+              {/* Only once something is filtered — a permanent Clear that
+                  clears nothing is one more thing to read. */}
+              {(status !== 'all' || q) && (
+                <button
+                  type="button"
+                  className="btoolbar__clear"
+                  onClick={() => {
+                    setStatus('all')
+                    setQ('')
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="bm2__split">
+            {/* "All methods", not "Categories": the rail is the catalogue,
+                and naming it after the filing scheme made eleven rows sound
+                like a layer to get past rather than the thing itself. */}
+            {/* The accessible name follows the same rule the visible heading
+                does: "other" only means something against a primary, and a
+                person is not shown one. Leaving it here would put the problem
+                one layer down, where only a screen reader hits it. */}
+            <nav className="bm2__rail" aria-label={isUser ? 'Your sign-in methods' : 'Other sign-in methods'}>
               {rows.length === 0 ? (
                 <NoResults>Nothing matches “{q}”.</NoResults>
               ) : (
@@ -314,6 +379,7 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
                 onToggle={setEnabled}
                 onSetup={setSetupOf}
                 onMakeDefault={setDefaultMethod}
+                passes={passes}
                 role={role}
                 enrolment={enrolment}
                 openCard={openCard}
@@ -354,6 +420,7 @@ function FamilyDetail({
   onToggle,
   onSetup,
   onMakeDefault,
+  passes,
   role,
   enrolment,
   openCard,
@@ -370,6 +437,7 @@ function FamilyDetail({
   onToggle: (id: string, on: boolean) => void
   onSetup: (m: AuthMethod) => void
   onMakeDefault: (id: string) => void
+  passes: (m: AuthMethod) => boolean
   role: Role
   enrolment: UserEnrolment
   openCard: string | null
@@ -384,6 +452,7 @@ function FamilyDetail({
   const enrolled = inside.reduce((n, m) => n + (m.enrolled ?? 0), 0)
   const unconfigured = inside.filter((m) => !m.configured).length
 
+  const shown = inside.filter(passes)
   const mine = inside.filter((m) => enrolment.configured.includes(m.id)).length
   const holdsActive = inside.some((m) => m.id === enrolment.active)
 
@@ -463,8 +532,12 @@ function FamilyDetail({
 
       {pane === 'methods' || !hasSettings ? (
         <>
+          {/* The filter narrows the CARDS, not the counts above them. "0 of 3
+              enabled" is a fact about the family and stays true whatever is
+              being filtered for; showing 0 of 0 while three rows exist would be
+              the readout describing the filter instead of the family. */}
           <div className="bm8__list">
-            {inside.map((m) =>
+            {shown.map((m) =>
               isUser ? (
                 <UserMethodCard
                   key={m.id}
@@ -491,6 +564,9 @@ function FamilyDetail({
             )}
           </div>
           {inside.length === 0 && <NoResults>No methods in this group yet.</NoResults>}
+          {inside.length > 0 && shown.length === 0 && (
+            <NoResults>Nothing in this group matches the filter.</NoResults>
+          )}
         </>
       ) : (
         <SettingsPane

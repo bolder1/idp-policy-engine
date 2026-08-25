@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 
 import { EditionBar } from './EditionBar'
+import { ProfileMenu } from './ProfileMenu'
 import { PersonaBar } from './PersonaBar'
 import { useBrand, useToast, type BrandScreen } from './store'
 
@@ -267,7 +268,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <button className="bshell__icon" title="Settings" aria-label="Settings">
             <Settings size={20} strokeWidth={1.7} />
           </button>
-          <span className="bshell__avatar">JT</span>
+          <ProfileMenu initials="JT" />
         </div>
       </header>
 

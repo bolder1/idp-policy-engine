@@ -48,10 +48,11 @@ import { SEED_ENROLMENT, type UserEnrolment } from '../user-methods'
 
 type Tab = 'methods' | 'recovery'
 
-/* Who is looking. Not a permission check — the prototype has no auth — but the
-   same split the real product makes: an admin decides what may exist, a person
-   decides which of those they use. */
-export type Role = 'admin' | 'user'
+/* The type lives on the store now, because the role decides the chrome too.
+   Re-exported here so callers already importing it from this screen keep
+   working. */
+import type { Role } from '../store'
+export type { Role }
 
 export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
   const store = useBrand()
@@ -155,7 +156,20 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
     }).filter((r) => r.hit && (r.total > 0 || !isUser))
   }, [visible, q, defaultMethod, isUser, enrolment.active])
 
-  const family = FAMILIES.find((f) => f.channel === channel) ?? FAMILIES[0]
+  /* The selected family, but only if the viewer can actually see it.
+
+     `channel` starts at the first family in the catalogue, which is SMS — and
+     an end user whose tenant does not offer SMS was landed on a pane headed
+     "SMS · 0 of 0 set up · No methods in this group yet", for a family with no
+     row in their own rail to explain where it came from. The fallback is the
+     first family they DO have, and it also covers an admin disabling the last
+     method in whatever family happens to be open.
+
+     Keyed on what is reachable rather than on the filtered rows: those are
+     narrowed by the search box too, and falling back on those would yank the
+     detail pane to a different family as you typed. */
+  const reachable = FAMILIES.filter((f) => !isUser || visible.some((m) => m.channel === f.channel))
+  const family = reachable.find((f) => f.channel === channel) ?? reachable[0] ?? FAMILIES[0]
 
   return (
     <div className="bpage bm8 bm2">
@@ -228,12 +242,17 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
               {rows.length === 0 ? (
                 <NoResults>Nothing matches “{q}”.</NoResults>
               ) : (
+                /* Compared against the EFFECTIVE family, not the raw `channel`
+                   state: when the stored channel is one this viewer cannot
+                   reach, the pane falls back to another and the rail has to
+                   agree with it, or the list renders with nothing selected
+                   beside a pane that is clearly showing something. */
                 rows.map(({ f, total, live, holdsDefault }) => (
                   <button
                     key={f.channel}
                     type="button"
-                    aria-current={f.channel === channel || undefined}
-                    className={`bm2__railitem ${f.channel === channel ? 'is-on' : ''}`}
+                    aria-current={f.channel === family.channel || undefined}
+                    className={`bm2__railitem ${f.channel === family.channel ? 'is-on' : ''}`}
                     onClick={() => setChannel(f.channel)}
                   >
                     <span className={`bm8__tile bm8__tile--sm is-${f.tint}`} aria-hidden>

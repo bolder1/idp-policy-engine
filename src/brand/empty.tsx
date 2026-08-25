@@ -185,3 +185,26 @@ export function HookArt() {
     </svg>
   )
 }
+
+/* Apps — a grid of tiles with one signed into. The launcher's whole job is
+   "these are yours", so the drawing is the grid; the brand-tinted one is the
+   one you just opened, which is the only thing that distinguishes a launcher
+   from a list. */
+export function AppsArt() {
+  return (
+    <svg viewBox="0 0 132 92" width="132" height="92" role="img">
+      <g {...S} opacity="0.32">
+        <rect x="22" y="18" width="24" height="24" rx="6" />
+        <rect x="54" y="18" width="24" height="24" rx="6" />
+        <rect x="86" y="18" width="24" height="24" rx="6" />
+        <rect x="22" y="50" width="24" height="24" rx="6" />
+        <rect x="86" y="50" width="24" height="24" rx="6" />
+      </g>
+      {/* The one that is yours. */}
+      <g fill="none" stroke="var(--brand)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="54" y="50" width="24" height="24" rx="6" />
+        <path d="M60 62l4 4 8-8" />
+      </g>
+    </svg>
+  )
+}

@@ -2,7 +2,9 @@ import { Suspense, lazy, useEffect } from 'react'
 import { MotionConfig } from 'motion/react'
 
 import { Shell } from './Shell'
+import { UserShell } from './UserShell'
 import { Policies } from './screens/Policies'
+import { UserApps } from './screens/UserApps'
 import { BrandProvider, useBrand } from './store'
 
 /* -----------------------------------------------------------------------------
@@ -61,6 +63,8 @@ function usePrefetchScreens() {
 function Screen() {
   const { screen } = useBrand()
   switch (screen.name) {
+    case 'apps':
+      return <UserApps />
     case 'policies':
       return <Policies />
     case 'builder':
@@ -80,6 +84,25 @@ function Screen() {
   }
 }
 
+/* Which chrome, decided inside the provider because the role lives there.
+
+   The two shells are not two skins over one navigation — they are different
+   navigations, which is the thing worth showing. An admin gets a rail of
+   fourteen destinations; a person gets a top bar with two. */
+function Chrome() {
+  const { role } = useBrand()
+  /* Inside whichever shell, so the chrome stays put if a fallback ever does
+     render — a navigation that blanks the frame reads as a page load rather
+     than a tab change. In practice the prefetch means this is only reachable by
+     clicking a nav item within the first second of the app being open. */
+  const body = (
+    <Suspense fallback={<div className="bpage" aria-busy="true" />}>
+      <Screen />
+    </Suspense>
+  )
+  return role === 'user' ? <UserShell>{body}</UserShell> : <Shell>{body}</Shell>
+}
+
 export function BrandApp() {
   usePrefetchScreens()
 
@@ -87,16 +110,7 @@ export function BrandApp() {
     <MotionConfig reducedMotion="user">
       <div className="brand-root">
         <BrandProvider>
-          <Shell>
-            {/* Inside the Shell, so the rail and header stay put if a fallback
-                ever does render — a navigation that blanks the chrome reads as
-                a page load rather than a tab change. In practice the prefetch
-                means this is only reachable by clicking a nav item within the
-                first second of the app being open. */}
-            <Suspense fallback={<div className="bpage" aria-busy="true" />}>
-              <Screen />
-            </Suspense>
-          </Shell>
+          <Chrome />
         </BrandProvider>
       </div>
     </MotionConfig>

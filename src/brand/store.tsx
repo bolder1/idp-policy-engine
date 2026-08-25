@@ -27,6 +27,11 @@ import type { AuthMethod } from './methods'
 import { TAB_SCREEN, personaById, type PersonaId } from './personas'
 import { featuresOf, type Edition, type Features } from './edition'
 
+/* Who is looking. Not a permission check — the prototype has no auth — but the
+   same split the real product makes: an admin decides what may exist, a person
+   decides which of those they use. */
+export type Role = 'admin' | 'user'
+
 export type BrandScreen =
   | { name: 'policies' }
   /* `open` lets a caller hand off INTO a surface rather than merely near it.
@@ -40,6 +45,10 @@ export type BrandScreen =
   | { name: 'hooks' }
   | { name: 'methods' }
   | { name: 'create' }
+  /* End-user only: the app launcher the person lands on. The real product's
+     end-user site has exactly two places — this and Setup 2FA — which is why
+     it has a top bar and no rail to put one in. */
+  | { name: 'apps' }
 
 interface BrandStore {
   apps: App[]
@@ -67,6 +76,13 @@ interface BrandStore {
      written against three policies into an estate of twenty-three would leave
      rules pointing at zones that tenant does not have. */
   persona: PersonaId
+
+  /* Whose console this is. It sits on the store rather than inside the methods
+     screen because it no longer only changes a screen: an end user gets
+     different chrome, a different landing screen and a nav with two items in
+     it, none of which a screen can decide for itself. */
+  role: Role
+  setRole: (r: Role) => void
   setPersona: (p: PersonaId) => void
   methodSets: MethodSet[]
   /* The catalogue is the same eleven methods for every tenant; only how many
@@ -163,6 +179,15 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [groups, setGroups] = useState<Group[]>(() => groupsAt('medium'))
   const [edition, setEdition] = useState<Edition>('full')
   const [persona, setPersonaId] = useState<PersonaId>('manager')
+  const [role, setRoleState] = useState<Role>('admin')
+
+  /* Switching role lands you somewhere that exists for it. An end user has no
+     policies screen to return to, and an admin arriving on the app launcher
+     would be looking at the one screen that is not theirs. */
+  const setRole = useCallback((r: Role) => {
+    setRoleState(r)
+    setScreen(r === 'user' ? { name: 'apps' } : { name: 'policies' })
+  }, [])
 
   /* One swap, every tab. Held here rather than in the switcher so that a screen
      mounted at the time reads the new tenant on its next render instead of
@@ -199,6 +224,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       setEdition,
       persona,
       setPersona,
+      role,
+      setRole,
       methodSets,
       methods,
       setMethods,
@@ -292,7 +319,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
       showToast,
     }),
-    [policies, zones, fingerprints, hooks, apps, groups, edition, persona, setPersona, methodSets, methods, screen, showToast, gauntletOverrides],
+    [policies, zones, fingerprints, hooks, apps, groups, edition, persona, setPersona, role, setRole, methodSets, methods, screen, showToast, gauntletOverrides],
   )
 
   return (

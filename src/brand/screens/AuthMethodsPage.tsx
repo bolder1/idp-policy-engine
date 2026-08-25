@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { useBrand } from '../store'
 import { AuthMethods } from './AuthMethods'
-import { AuthMethodsV2, type Role } from './AuthMethodsV2'
+import { AuthMethodsV2 } from './AuthMethodsV2'
 
 /* Two layouts and two points of view over one screen.
 
@@ -34,28 +34,27 @@ const VERSIONS: { id: V; label: string; blurb: string }[] = [
   { id: 'v1', label: 'v1 · slide-over', blurb: 'A list of eleven cards that opens a panel over itself' },
 ]
 
-const ROLES: { id: Role; label: string; blurb: string }[] = [
-  { id: 'admin', label: 'Admin', blurb: 'Decides which methods exist for the tenant, and configures the connection to each' },
-  { id: 'user', label: 'End user', blurb: 'Sees only what the admin enabled, sets up their own details, and picks the one that runs' },
-]
-
 export function AuthMethodsPage() {
   const store = useBrand()
   /* v2 is the proposal, so it is what opens. */
   const [v, setV] = useState<V>('v2')
-  const [role, setRole] = useState<Role>('admin')
 
-  /* The point of view only exists on v2. v1 is the archived arrangement and
-     giving it a second mode would mean maintaining four screens to compare
-     two things. */
-  const showRole = store.features.designSwitcher && v === 'v2'
+  /* Read, not owned. Switching sides is an account action taken from the
+     avatar menu — it changes the chrome, the nav and the landing screen, none
+     of which this page has any business deciding. It used to own a "Viewing
+     as" dropdown here, which put a global move inside one tab.
+
+     v1 has no end-user arrangement; it is the archived layout and giving it a
+     second mode would mean maintaining four screens to compare two things. So
+     an end user always gets v2. */
+  const role = store.role
 
   return (
     <>
       {/* Prototype furniture, gated the same way the builder's is: a
           watered-down product should not advertise that it has another version
           of itself. */}
-      {store.features.designSwitcher && (
+      {store.features.designSwitcher && role === 'admin' && (
         <div className="bzver">
           <span>Methods design</span>
           <div className="bviewswitch" role="tablist" aria-label="Methods version">
@@ -74,30 +73,10 @@ export function AuthMethodsPage() {
             ))}
           </div>
 
-          {showRole && (
-            <>
-              <span className="bzver__sep" aria-hidden />
-              <span>Viewing as</span>
-              <label className="bzver__role">
-                <span className="u-sr-only">Point of view</span>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as Role)}
-                  title={ROLES.find((r) => r.id === role)?.blurb}
-                >
-                  {ROLES.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
-          )}
         </div>
       )}
 
-      {v === 'v2' ? <AuthMethodsV2 role={role} /> : <AuthMethods />}
+      {v === 'v2' || role === 'user' ? <AuthMethodsV2 role={role} /> : <AuthMethods />}
     </>
   )
 }

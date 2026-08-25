@@ -50,6 +50,12 @@ export function UserMethodCard({
 }) {
   const shape = enrolShapeFor(m.id)
   const nothingToSetUp = shape.kind === 'none'
+  /* Can this be switched on yet? Enrolling is what earns the switch — except
+     for the methods that ask nothing of you, which are ready the moment they
+     are offered. The live page gives the CAC row a toggle and no setup step for
+     exactly that reason: the certificate is on the card, so there is nothing to
+     wait for. */
+  const ready = enrolled || nothingToSetUp
 
   return (
     <div className={`bm8__card bm8__card--method bmu__card ${open ? 'is-open' : ''}`}>
@@ -77,28 +83,48 @@ export function UserMethodCard({
           <span className="bm8__desc">{m.description}</span>
         </div>
 
+        {/* One control per state, which is the same rule the admin card already
+            follows and this card was breaking.
+
+            It shipped with Set up AND a switch side by side on a method nobody
+            had enrolled in yet — and because you cannot be challenged by
+            something you have not set up, the switch could not activate
+            anything either. It opened the form. Two controls, one outcome, in
+            the same corner: whichever you pressed, you got the form, so the
+            second one taught you nothing and cost a decision.
+
+            Before enrolment there is nothing to turn on, so there is no switch —
+            not a disabled one, no switch. After enrolment there are two real and
+            different choices, so there are two controls: change what you gave
+            us, and use this one or not. */}
         <div className="bm8__right">
-          <div className="bm8__ctlrow">
-            {/* No Edit where there is nothing to edit. The CAC row on the live
-                page has a toggle and no Edit at all, and inventing one would be
-                inventing a form. */}
-            {!nothingToSetUp && (
-              <Button variant="secondary" size="sm" onClick={() => onOpen(!open)}>
-                <Pencil size={13} strokeWidth={2} aria-hidden />
-                {enrolled ? 'Edit' : 'Set up'}
-              </Button>
-            )}
-            {/* Switching on an un-enrolled method opens its form instead of
-                activating it. You cannot be challenged by something you have
-                not set up, so the switch does the next honest thing rather than
-                sitting disabled next to the control that would fix it. */}
-            <Toggle
-              checked={isActive}
-              onChange={(on) => (on && !enrolled && !nothingToSetUp ? onOpen(true) : onActivate(on))}
-              label={`Use ${m.name}`}
-            />
-          </div>
-          <span className={`bmu__state ${isActive ? 'is-on' : ''}`}>{isActive ? 'Active' : 'Inactive'}</span>
+          {ready ? (
+            <>
+              <div className="bm8__ctlrow">
+                {/* No Edit where there is nothing to edit. The CAC row on the
+                    live page has a toggle and no Edit at all, and inventing one
+                    would be inventing a form. */}
+                {!nothingToSetUp && (
+                  <Button variant="secondary" size="sm" onClick={() => onOpen(!open)}>
+                    <Pencil size={13} strokeWidth={2} aria-hidden />
+                    Edit
+                  </Button>
+                )}
+                <Toggle checked={isActive} onChange={onActivate} label={`Use ${m.name}`} />
+              </div>
+              <span className={`bmu__state ${isActive ? 'is-on' : ''}`}>
+                {isActive ? 'Active' : 'Inactive'}
+              </span>
+            </>
+          ) : (
+            /* No state word either. "Inactive" on a method you have never set up
+               describes a switch position rather than the truth, which is that
+               there is nothing here yet. The button says that already. */
+            <Button variant="secondary" size="sm" onClick={() => onOpen(!open)}>
+              <Pencil size={13} strokeWidth={2} aria-hidden />
+              Set up
+            </Button>
+          )}
         </div>
       </div>
 

@@ -15,6 +15,7 @@ import {
   List,
   MapPin,
   Network,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -511,6 +512,29 @@ function ZoneDetail({
      changing something and then not again — so it earns a button at the top and
      none of the page's vertical space the rest of the time. */
   const [showUses, setShowUses] = useState(false)
+
+  /* Renaming, in place. The name was the one thing on this page you could not
+     change: every other field saves as it is typed, and the heading above them
+     was read-only, so fixing a typo meant deleting the zone and building it
+     again. Rules reference zones BY NAME, so the rename is also the one edit
+     here with a consequence worth confirming — hence a commit and a toast
+     rather than a field that saves silently like the rest. */
+  const [renaming, setRenaming] = useState(false)
+  const [draftName, setDraftName] = useState(zone.name)
+
+  const commitName = () => {
+    const name = draftName.trim()
+    setRenaming(false)
+    /* An empty name is not a rename, it is a mistake — and validateZone already
+       errors on one, so accepting it here would be creating the error the panel
+       below is about to complain about. */
+    if (!name || name === zone.name) {
+      setDraftName(zone.name)
+      return
+    }
+    onChange({ ...zone, name })
+    store.showToast(`Renamed to ${name}`)
+  }
   const issues = validateZone(zone)
   const users = policiesUsing('zone', zone.id, policies)
 
@@ -518,21 +542,21 @@ function ZoneDetail({
   const placeCount =
     zone.location.countries.length + zone.location.states.length + zone.location.cities.length
 
-  /* Which half is on screen — or NEITHER, which is the state a just-named zone
-     opens in.
+  /* Which half is on screen. Always one of them, including on a zone that has
+     just been named and holds nothing.
 
-     This was a pair of checkboxes: tick a half to reveal its form, untick to
-     hide it and throw its contents away. Two problems. A checkbox that deletes
-     data on untick is a destructive control wearing the least destructive
-     affordance there is. And both halves rendered at once, stacked, so a zone
-     with two hundred addresses buried its locations under a scroll.
+     It used to be a pair of checkboxes: tick a half to reveal its form, untick
+     to hide it and throw its contents away. A checkbox that deletes data on
+     untick is a destructive control wearing the least destructive affordance
+     there is, and both halves rendered at once, so a zone with two hundred
+     addresses buried its locations under a scroll.
 
-     Null means nothing has been added and nothing has been chosen: the page
-     shows an empty state with the two ways in. After that it is two tabs, which
-     is what the zone actually has — two facets, one on screen at a time, both
-     always reachable. */
-  const [tab, setTab] = useState<'net' | 'place' | null>(
-    netCount > 0 ? 'net' : placeCount > 0 ? 'place' : null,
+     It then had a third state — nothing chosen — which showed an empty state
+     offering the two ways in. That was a click to reveal a form the page could
+     simply have shown, on a page whose only purpose is to fill that form in.
+     An empty zone opens on Addresses with the field ready. */
+  const [tab, setTab] = useState<'net' | 'place'>(
+    netCount === 0 && placeCount > 0 ? 'place' : 'net',
   )
 
   return (
@@ -546,16 +570,50 @@ function ZoneDetail({
 
           This was a tinted hero that changed colour with the zone's shape —
           amber when it matched everything, blue for addresses, green for
-          places. The tint was doing a job the page already does better: the
-          warning that a zone constrains nothing now lives inside the empty
-          state, where the thing to DO about it is. What was left was a coloured
-          slab whose colour meant something you had to learn.
+          places. The tint was doing a job the page already does better: a zone
+          that constrains nothing is an error the validator raises by name
+          ("This zone would match everything"), in the panel below with the
+          reason attached. What was left was a coloured slab whose colour meant
+          something you had to learn.
 
           Same shape as every other inner page here: back link, name, one line
           of what it is, actions on the right. */}
       <header className="bz7__pagehead">
-        <div>
-          <h1>{zone.name}</h1>
+        <div className="bz7__namewrap">
+          {renaming ? (
+            <input
+              className="bz7__nameinput"
+              value={draftName}
+              autoFocus
+              aria-label="Zone name"
+              onChange={(e) => setDraftName(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitName()
+                /* Escape restores rather than saves. A rename you are halfway
+                   through is not a rename you asked for. */
+                if (e.key === 'Escape') {
+                  setDraftName(zone.name)
+                  setRenaming(false)
+                }
+              }}
+            />
+          ) : (
+            <span className="bz7__nameline">
+              <h1>{zone.name}</h1>
+              <button
+                type="button"
+                className="bz7__rename"
+                aria-label={`Rename ${zone.name}`}
+                onClick={() => {
+                  setDraftName(zone.name)
+                  setRenaming(true)
+                }}
+              >
+                <Pencil size={14} strokeWidth={1.9} aria-hidden />
+              </button>
+            </span>
+          )}
           <p>{describeZone(zone)}</p>
         </div>
         <div className="bz7__actions">
@@ -567,8 +625,10 @@ function ZoneDetail({
             Used by
             <i className="bz7__usecount">{users.length}</i>
           </Button>
-          {/* No Edit button, and none needed: the sections below save as they
-              are typed, so "edit" is just being on the page. */}
+          {/* No Edit button for the zone's CONTENTS, and none needed: the
+              sections below save as they are typed, so "edit" is just being on
+              the page. The name is the exception, and it has its own control
+              beside the heading it changes. */}
           <Button variant="secondary" size="sm" onClick={onDelete}>
             <Trash2 size={14} strokeWidth={1.9} aria-hidden />
             Delete
@@ -583,47 +643,6 @@ function ZoneDetail({
           saved as it is made and the page can be left and returned to. That is
           the difference worth comparing — not the modal, which is one field. */}
       <section className="bz7__build">
-        {tab === null ? (
-          /* The empty state a just-named zone lands on.
-
-             It names the two things a zone can be made of and makes each one a
-             button, because at this point there is exactly one thing to do and
-             the page should be the doing of it — not a heading, two checkboxes
-             and a sentence explaining what will happen if you tick neither. */
-          <div className="bz7__buildempty">
-            <span className="bz7__buildicon" aria-hidden>
-              <Layers size={22} strokeWidth={1.6} />
-            </span>
-            <h3>This zone is empty</h3>
-            {/* The warning, folded in.
-
-                It used to be a red panel of its own below the sections, saying
-                a zone with nothing in it matches every request. True, and
-                exactly what this state IS — so it was a separate alarm about
-                the screen you were already looking at. One line here, where the
-                two buttons that fix it are. */}
-            <p>
-              Until it has an address or a place, it matches <strong>every request</strong>.
-            </p>
-            {/* Both secondary, and both the same width.
-
-                They were a brand button and a neutral one, which reads as a
-                recommendation — and there is none to make: a zone built from
-                addresses and a zone built from places are equally valid and
-                equally common. */}
-            <div className="bz7__buildactions">
-              <Button variant="secondary" onClick={() => setTab('net')}>
-                <Network size={15} strokeWidth={2} aria-hidden />
-                Addresses and networks
-              </Button>
-              <Button variant="secondary" onClick={() => setTab('place')}>
-                <Globe size={15} strokeWidth={2} aria-hidden />
-                Countries and cities
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
             {/* Both tabs, always — including the empty one.
 
                 It is how the second facet gets added once the first exists, and
@@ -658,14 +677,12 @@ function ZoneDetail({
             ) : (
               <PlaceSection draft={zone} onChange={onChange} />
             )}
-          </>
-        )}
       </section>
 
       {/* Only the issues the empty state does not already carry. "Matches
           everything" is the empty state, so repeating it underneath was the
           same sentence twice on one screen. */}
-      {tab !== null && issues.length > 0 && (
+      {issues.length > 0 && (
         <div className="bz7__issues">
           {issues.map((i) => (
             <p key={i.id} className={`bz7__issue is-${i.level}`}>

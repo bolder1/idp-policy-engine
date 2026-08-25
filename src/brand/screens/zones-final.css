@@ -233,8 +233,7 @@
   display: flex; flex-direction: column; gap: 9px;
   padding: 13px 14px;
   background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-}
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);}
 .bz7__sec > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .bz7__sec h4 {
   display: flex; align-items: center; gap: 6px; margin: 0;
@@ -386,8 +385,7 @@
   display: flex; align-items: center; gap: 8px; margin: 0;
   padding: 7px 8px 7px 11px; border-radius: var(--radius-sm);
   background: var(--fb-info-bg); border: 1px solid var(--fb-info-border);
-  font-size: var(--fs-xs); color: var(--fb-info-fg);
-}
+  font-size: var(--fs-xs); color: var(--fb-info-fg);}
 .bz7__note button {
   margin-left: auto; display: grid; place-items: center;
   background: none; cursor: pointer; color: inherit; opacity: 0.7;
@@ -438,34 +436,6 @@
   border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
 }
 
-/* --- The zone's contents: empty state, then two tabs -------------------------
-   This section was a heading, two checkbox cards and both forms stacked below
-   whichever were ticked. Unticking threw the half's contents away, which made a
-   checkbox the most destructive control on the page, and a zone with two
-   hundred addresses buried its locations under a scroll.
-
-   A just-named zone now lands on an empty state whose two buttons ARE the two
-   things a zone can be made of; once either has been chosen it is two tabs. */
-
-.bz7__buildempty {
-  display: grid; justify-items: center; gap: 6px;
-  padding: 32px 24px;
-  text-align: center;
-}
-.bz7__buildicon {
-  display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 4px;
-  border-radius: var(--radius-lg);
-  background: var(--surface-inset); color: var(--text-muted);
-}
-.bz7__buildempty h3 {
-  margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-.bz7__buildempty p {
-  margin: 0; max-width: 46ch;
-  font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.55;
-}
-.bz7__buildactions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-
 /* Underlined rather than a pill group, matching the tab bars elsewhere in the
    console — a pill pair reads as a segmented control, which implies switching a
    setting rather than moving between two halves of the same object. */
@@ -507,8 +477,7 @@
 .bz7__usecount {
   font-style: normal; padding: 0 6px; border-radius: var(--radius-sm);
   background: var(--surface-inset); color: var(--text-tertiary);
-  font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
-}
+  font-size: var(--fs-xs); font-variant-numeric: tabular-nums;}
 
 /* --- The zone page heading ---------------------------------------------------
    Replaces the tinted hero. That banner changed colour with the zone's shape,
@@ -533,9 +502,6 @@
 @media (max-width: 720px) {
   .bz7__pagehead { flex-direction: column; gap: 12px; }}
 
-/* Equal width, so neither reads as the recommended one. */
-.bz7__buildactions > * { flex: 1 1 0; min-width: 190px; justify-content: center; }
-
 /* --- Row actions --------------------------------------------------------------
    The same kebab the policies table carries, so the two lists behave the same
    way — and the menu itself is the shared `.bmenu`, which means the icons and
@@ -549,11 +515,44 @@
   display: grid; place-items: center;
   width: 26px; height: 26px; border-radius: var(--radius-sm);
   background: none; border: 0; cursor: pointer;
-  color: var(--text-tertiary); font-size: var(--fs-base); line-height: 1;
-}
+  color: var(--text-tertiary); font-size: var(--fs-base); line-height: 1;}
 .bz7__kebab:hover { background: var(--surface-inset); color: var(--text-primary); }
 .bz7__kebab:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
 /* The last row's menu would otherwise open below the table and be clipped by
    its own rounded overflow. */
 .bz7__table { overflow: visible; }
+
+/* --- The name, renameable in place ---------------------------------------------
+   The pencil sits beside the heading rather than in the actions on the right,
+   because it changes THIS text and not the zone — the actions over there
+   operate on the whole thing. */
+.bz7__namewrap { min-width: 0; }
+.bz7__nameline { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.bz7__nameline h1 { margin: 0; }
+
+.bz7__rename {
+  flex: none; display: grid; place-items: center;
+  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  background: none; cursor: pointer; color: var(--text-muted);
+  /* Always visible, not hover-revealed. A control you cannot see is a control
+     you do not know you have, and this one answers a question people arrive
+     with — the name is wrong, can I fix it. Quiet is enough; hidden is not. */
+  transition: color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+}
+.bz7__rename:hover { background: var(--surface-inset); color: var(--text-primary); }
+.bz7__rename:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* Sized to the heading it replaces, so committing does not move the page. */
+.bz7 .bz7__nameinput {
+  width: 100%; max-width: 460px;
+  height: auto; padding: 2px 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--brand); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 20px; font-weight: 700; color: var(--text-primary);
+  letter-spacing: 0;
+}
+.bz7 .bz7__nameinput:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bz7__rename { transition: none; }}

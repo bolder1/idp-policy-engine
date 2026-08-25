@@ -644,3 +644,46 @@
 /* The name cell, which now carries the icon too. */
 .bfp2__tname { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .bfp2__tname .bfp2__tile { flex: none; }
+
+/* --- The stepped restriction dialog -------------------------------------------- */
+
+/* Where you are, and how much is left. Three is few enough to name every step
+   rather than counting them, which is the difference between a progress bar and
+   a table of contents. */
+.bfp2__steps {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  list-style: none; margin: 0 0 18px; padding: 0 0 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bfp2__steps li {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 10px 4px 5px; border-radius: var(--radius-full);
+  font-size: var(--fs-sm); color: var(--text-muted);
+}
+.bfp2__steps li > span {
+  flex: none; display: grid; place-items: center;
+  width: 19px; height: 19px; border-radius: var(--radius-full);
+  background: var(--surface-inset); color: var(--text-tertiary);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+}
+.bfp2__steps li.is-on { background: var(--brand-subtle-bg); color: var(--brand-active); font-weight: var(--fw-medium); }
+.bfp2__steps li.is-on > span { background: var(--brand); color: #fff; }
+.bfp2__steps li.is-done { color: var(--text-secondary); }
+.bfp2__steps li.is-done > span { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+
+/* One line per step saying what this question decides — the thing a flat panel
+   cannot tell you, because on a flat panel every question is asked at once. */
+.bfp2__stephint {
+  margin: 0 0 14px; max-width: 62ch;
+  font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.55;
+}
+
+/* The answers as a sentence on the page, now that the controls live behind the
+   button. Reads as a statement, not as a row of disabled fields. */
+.bfp2__restsummary {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 0; font-size: var(--fs-md); color: var(--text-secondary);
+}
+.bfp2__restsummary strong { font-weight: var(--fw-medium); color: var(--text-primary); }
+.bfp2__restsummary em { font-style: normal; color: var(--text-tertiary); }
+.bfp2__restsummary span { color: var(--border-strong); }

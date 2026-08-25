@@ -58,7 +58,6 @@ import { Button, Modal, NumberStepper, Toggle } from '../kit'
 import {
   ATTRIBUTES,
   CATEGORIES,
-  DEFAULT_ATTRS,
   DEFAULT_BANDS,
   DEFAULT_MAX_DEVICES,
   REGISTRATION_LABEL,
@@ -637,8 +636,19 @@ function CreateModal({
   onClose: () => void
   onCreate: (p: FingerprintProfile) => void
 }) {
+  /* Two steps, restored.
+
+     The picker was moved out of here and the profile seeded with six agentless
+     defaults instead, on the argument that a new profile should arrive working.
+     It arrived working and wrong: six attributes nobody chose, on a profile
+     whose whole point is choosing what identifies a device. Naming a thing and
+     saying what it watches are two decisions, and the second one is the profile.
+
+     One requirement per step, which is also where the boundary is. */
+  const [step, setStep] = useState<1 | 2>(1)
   const [name, setName] = useState('')
   const [mode, setMode] = useState<ProfileMode>('match')
+  const [picked, setPicked] = useState<string[]>([])
 
   /* Cleared on the way IN, not on the way out.
 
@@ -651,28 +661,28 @@ function CreateModal({
      which is what it should show. */
   useEffect(() => {
     if (!open) return
+    setStep(1)
     setName('')
     setMode('match')
+    setPicked([])
   }, [open])
 
-  /* A rule names a profile, so a nameless one cannot be referred to. That is now
-     the only requirement, because it is the only thing this dialog asks for. */
+  /* A rule names a profile, so a nameless one cannot be referred to. Nothing
+     ticked is not a profile either — it would watch no signals, and every
+     device would look identical to every other. */
   const named = name.trim().length > 0
+  const canSave = named && picked.length > 0
 
   const save = () => {
-    if (!named) return
+    if (!canSave) return
     onCreate({
       id: `fp-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
       name: name.trim(),
       mode,
-      /* Seeded rather than empty.
-
-         The picker used to live here, and a profile arrived watching exactly
-         what you ticked. Moving configuration to the page means a new profile
-         has to arrive WORKING — landing on "every attribute has been removed"
-         is a broken-looking profile you just made. Six agentless basics, which
-         the page then invites you to change. */
-      enabled: [...DEFAULT_ATTRS.agentless],
+      /* Exactly what was ticked. The profile arrives watching what you chose
+         and nothing else, which is the difference between a profile you made
+         and a profile that was made for you. */
+      enabled: picked,
       config: {},
       weights: {},
       tolerance: 1,
@@ -692,24 +702,48 @@ function CreateModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Create a device profile"
-      width={620}
+      title={step === 1 ? 'Create a device profile' : `What identifies a device — ${name.trim()}`}
+      width={step === 1 ? 620 : 900}
       footer={
         <>
           <span className="bfp2__footnote">
-            {named
-              ? 'You will pick its attributes and set the rest inside.'
-              : 'Name the profile to continue.'}
+            {step === 1
+              ? named
+                ? 'Next: choose what it watches.'
+                : 'Name the profile to continue.'
+              : picked.length > 0
+                ? `${picked.length} attribute${picked.length === 1 ? '' : 's'} — the rest is set inside.`
+                : 'Pick at least one. A profile that watches nothing cannot tell devices apart.'}
           </span>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="brand" disabled={!named} onClick={save}>
-            Create and configure
-          </Button>
+          {step === 1 ? (
+            <>
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button variant="brand" disabled={!named} onClick={() => setStep(2)}>
+                Next
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={() => setStep(1)}>
+                Back
+              </Button>
+              <Button variant="brand" disabled={!canSave} onClick={save}>
+                Create profile
+              </Button>
+            </>
+          )}
         </>
       }
     >
+      {step === 2 ? (
+        /* Agentless, because a profile being created has no reach yet and
+           agentless is what it will start as — so the picker greys the
+           eighteen attributes an agent would be needed for rather than
+           offering them and failing later. */
+        <AttrPicker picked={picked} setPicked={setPicked} reach="agentless" />
+      ) : (
       <div className="bfp2__form">
         <label className="bfp2__field">
           <span>Profile name</span>
@@ -751,6 +785,7 @@ function CreateModal({
           ))}
         </fieldset>
       </div>
+      )}
     </Modal>
   )
 }
@@ -799,6 +834,7 @@ function ProfilePage({
   onChange: (p: FingerprintProfile) => void
 }) {
   const [adding, setAdding] = useState(false)
+  const [restricting, setRestricting] = useState(false)
   const chosen = profile.enabled.map(byId).filter((a): a is Attribute => Boolean(a))
   const uses = rulesUsing('fingerprint', profile.id, policies)
   const users = policiesUsing('fingerprint', profile.id, policies)
@@ -900,13 +936,51 @@ function ProfilePage({
 
           The attributes above decide whether this is the SAME device. These
           decide whether it is allowed to become a known one at all: what can be
-          read, how a device gets registered, and how many a person may have. */}
+          read, how a device gets registered, and how many a person may have.
+
+          Behind a button rather than stacked on the page, and stepped rather
+          than flat, because the six settings are not six independent choices —
+          agentless cannot use a roster, and a roster replaces the per-person
+          allowance rather than sitting beside it. Laid out flat, the page shows
+          you controls that your earlier answers have already decided. Stepped,
+          each question is only asked when it is still open. */}
       <div className="bfp2__panelhead bfp2__panelhead--page">
         <h3>Device restriction</h3>
+        <Button variant="secondary" size="sm" onClick={() => setRestricting(true)}>
+          <Sliders size={14} strokeWidth={2} aria-hidden />
+          Configure
+        </Button>
       </div>
       <section className="bfp2__panel">
-        <RestrictionSection profile={profile} onChange={onChange} />
+        {/* The answers, in a sentence, so the page still states them without
+            holding the controls that set them. */}
+        <p className="bfp2__restsummary">
+          <strong>{profile.reach === 'agent' ? 'Agent-based' : 'Agentless'}</strong>
+          <span>·</span>
+          <strong>{REGISTRATION_LABEL[profile.registration]}</strong>
+          <span>·</span>
+          <strong>
+            {profile.registration === 'pre-approved'
+              ? profile.roster
+                ? `${profile.roster.rows} on the roster`
+                : 'No roster uploaded'
+              : `${profile.maxDevices ?? DEFAULT_MAX_DEVICES} device${(profile.maxDevices ?? DEFAULT_MAX_DEVICES) === 1 ? '' : 's'} per person`}
+          </strong>
+          {profile.autoRegister && (
+            <>
+              <span>·</span>
+              <em>registers silently</em>
+            </>
+          )}
+        </p>
       </section>
+
+      <RestrictionModal
+        open={restricting}
+        profile={profile}
+        onChange={onChange}
+        onClose={() => setRestricting(false)}
+      />
 
       <div className="bfp2__panelhead bfp2__panelhead--page">
         <h3>Attributes</h3>
@@ -1190,12 +1264,92 @@ function WeightPick({
 }
 
 /* Device restriction: what can be read, and how a device becomes a known one. */
+/* --- Device restriction, as three questions ------------------------------------
+
+   The order is the dependency order, which is the only order that works:
+
+     1  what it can READ      agentless or agent — decides whether a roster is
+                              even possible, since a roster matches on MAC and
+                              MAC is agent-only
+     2  how a device REGISTERS  self-service or a roster — decides whether the
+                              next question is a number or a file
+     3  the LIMIT             a per-person allowance, or the roster itself
+
+   Flat, the panel showed all six at once and greyed the ones your earlier
+   answers had ruled out. Stepped, they are simply not asked. */
+function RestrictionModal({
+  open,
+  profile,
+  onChange,
+  onClose,
+}: {
+  open: boolean
+  profile: FingerprintProfile
+  onChange: (p: FingerprintProfile) => void
+  onClose: () => void
+}) {
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+
+  useEffect(() => {
+    if (open) setStep(1)
+  }, [open])
+
+  const STEPS = ['What it can read', 'How devices register', 'How many, and which'] as const
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Device restriction"
+      width={640}
+      footer={
+        <>
+          <span className="bfp2__footnote">
+            Step {step} of 3 — {STEPS[step - 1]}
+          </span>
+          {step > 1 && (
+            <Button variant="ghost" onClick={() => setStep((n) => (n - 1) as 1 | 2)}>
+              Back
+            </Button>
+          )}
+          {step < 3 ? (
+            <Button variant="brand" onClick={() => setStep((n) => (n + 1) as 2 | 3)}>
+              Next
+            </Button>
+          ) : (
+            /* Done, not Save. Every control here writes through onChange as it
+               is touched, the same as the rest of this page — so there is
+               nothing held back to commit, and a Save button would imply there
+               was. */
+            <Button variant="brand" onClick={onClose}>
+              Done
+            </Button>
+          )}
+        </>
+      }
+    >
+      <ol className="bfp2__steps" aria-label="Device restriction steps">
+        {STEPS.map((label, i) => (
+          <li key={label} className={i + 1 === step ? 'is-on' : i + 1 < step ? 'is-done' : ''}>
+            <span aria-hidden>{i + 1 < step ? <Check size={11} strokeWidth={3} /> : i + 1}</span>
+            {label}
+          </li>
+        ))}
+      </ol>
+
+      <RestrictionSection profile={profile} onChange={onChange} step={step} />
+    </Modal>
+  )
+}
+
 function RestrictionSection({
   profile,
   onChange,
+  step,
 }: {
   profile: FingerprintProfile
   onChange: (p: FingerprintProfile) => void
+  step: 1 | 2 | 3
 }) {
   /* A roster is matched on MAC address, and MAC is one of the eighteen things
      only an agent can read. On an agentless profile it would match nothing, so
@@ -1220,8 +1374,13 @@ function RestrictionSection({
 
   const wouldDrop = profile.enabled.filter((id) => byId(id)?.needsAgent).length
 
-  return (
-    <>
+  if (step === 1)
+    return (
+      <>
+        <p className="bfp2__stephint">
+          Hardware identifiers need something installed on the machine. This decides which
+          attributes can arrive at all, so it is asked first.
+        </p>
       <fieldset className="bfp2__modes">
         <legend>What it can read</legend>
         {REACHES.map((r) => (
@@ -1263,7 +1422,18 @@ function RestrictionSection({
           </span>
         </p>
       )}
+      </>
+    )
 
+  // --- step 2: how a device gets registered ---------------------------------
+  if (step === 2)
+    return (
+      <>
+        <p className="bfp2__stephint">
+          {rosterPossible
+            ? 'Either people enrol their own machines, or you supply the list. A roster is matched on MAC address, which only the agent can read — so it is offered here because you chose agent-based.'
+            : 'An agentless profile cannot use a roster: a roster is matched on MAC address, and MAC is one of the attributes only an agent can read.'}
+        </p>
       <div className="bfp2__rows bfp2__rows--form">
         <FormRow
           icon={UserRound}
@@ -1300,6 +1470,33 @@ function RestrictionSection({
           </select>
         </FormRow>
 
+        <FormRow
+          icon={Repeat}
+          label="Register silently on first sign-in"
+          /* Worth stating rather than leaving to be discovered: the convenience
+             and the hole it opens are the same sentence. */
+          help="Convenient, and it means an attacker's machine registers itself."
+        >
+          <Toggle
+            checked={profile.autoRegister}
+            onChange={(autoRegister) => onChange({ ...profile, autoRegister })}
+            label="Register silently on first sign-in"
+            size="sm"
+          />
+        </FormRow>
+      </div>
+      </>
+    )
+
+  // --- step 3: the limit, whichever kind this turned out to be --------------
+  return (
+    <>
+      <p className="bfp2__stephint">
+        {profile.registration === 'self'
+          ? 'The allowance, and whether phones count against it.'
+          : 'The roster replaces the per-person allowance rather than sitting beside it.'}
+      </p>
+      <div className="bfp2__rows bfp2__rows--form">
         {profile.registration === 'self' ? (
           <FormRow
             icon={Smartphone}
@@ -1348,20 +1545,6 @@ function RestrictionSection({
           />
         </FormRow>
 
-        <FormRow
-          icon={Repeat}
-          label="Register silently on first sign-in"
-          /* Worth stating rather than leaving to be discovered: the convenience
-             and the hole it opens are the same sentence. */
-          help="Convenient, and it means an attacker's machine registers itself."
-        >
-          <Toggle
-            checked={profile.autoRegister}
-            onChange={(autoRegister) => onChange({ ...profile, autoRegister })}
-            label="Register silently on first sign-in"
-            size="sm"
-          />
-        </FormRow>
       </div>
     </>
   )

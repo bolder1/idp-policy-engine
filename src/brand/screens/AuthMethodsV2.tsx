@@ -8,7 +8,6 @@ import { methodBlocker, type AuthMethod } from '../methods'
 import { familySettingsFor, methodSettingsFor, type MfaValues } from '../mfa-join'
 import { useBrand } from '../store'
 import {
-  DefaultMethodPicker,
   FAMILIES,
   MethodCard,
   PrimarySignIn,
@@ -42,7 +41,7 @@ import { SEED_ENROLMENT, type UserEnrolment } from '../user-methods'
    What is NOT different: the primary sign-in block, the default-method picker,
    the setup form, the per-method toggles, the family and method settings, the
    search, and the Recovery tab. All of it is the same code — `PrimarySignIn`,
-   `DefaultMethodPicker`, `MethodCard`, `SettingsPane` and `SetupModal` are
+   `MethodCard`, `SettingsPane` and `SetupModal` are
    imported from v1 rather than copied, so a fix to either lands in both and the
    comparison stays honest. Only the arrangement is new.
    -------------------------------------------------------------------------- */
@@ -211,16 +210,6 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
                 catalogue rather than about the selected family — but it sits
                 INSIDE it, under the same argument as v1: the fallback cannot be
                 understood before the things it falls back to. */}
-            {!isUser && (
-              <div className="bm2__defaultspan">
-                <DefaultMethodPicker
-                  methods={methods}
-                  defaultMethod={defaultMethod}
-                  onDefault={setDefaultMethod}
-                />
-              </div>
-            )}
-
             {/* "All methods", not "Categories": the rail is the catalogue,
                 and naming it after the filing scheme made eleven rows sound
                 like a layer to get past rather than the thing itself. */}
@@ -278,6 +267,7 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
                 onBehaviour={setBehaviour}
                 onToggle={setEnabled}
                 onSetup={setSetupOf}
+                onMakeDefault={setDefaultMethod}
                 role={role}
                 enrolment={enrolment}
                 openCard={openCard}
@@ -317,6 +307,7 @@ function FamilyDetail({
   onBehaviour,
   onToggle,
   onSetup,
+  onMakeDefault,
   role,
   enrolment,
   openCard,
@@ -332,6 +323,7 @@ function FamilyDetail({
   onBehaviour: (p: MfaValues) => void
   onToggle: (id: string, on: boolean) => void
   onSetup: (m: AuthMethod) => void
+  onMakeDefault: (id: string) => void
   role: Role
   enrolment: UserEnrolment
   openCard: string | null
@@ -447,6 +439,7 @@ function FamilyDetail({
                   onToggle={onToggle}
                   isDefault={defaultMethod === m.id}
                   onSetup={onSetup}
+                  onMakeDefault={onMakeDefault}
                 />
               ),
             )}

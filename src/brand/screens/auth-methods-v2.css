@@ -10,8 +10,6 @@
 
 .bm2__split {
   display: grid;
-  /* Three rows: the default spans both columns, then the rail and the pane. */
-  grid-template-areas: 'def def' 'rail detail';
   /* A fixed rail rather than a fraction. The eleven family names are a known
      width and they do not get longer; letting the rail grow with the viewport
      would spend on a list that has nothing to do with the extra room, which is
@@ -102,25 +100,10 @@
    halved. The rail goes back to being a list above the detail. */
 @media (max-width: 1000px) {
   .bm2__split { grid-template-columns: minmax(0, 1fr); }
-  .bm2__rail { position: static; max-height: none; }
-}
+  .bm2__rail { position: static; max-height: none; }}
 
 @media (prefers-reduced-motion: reduce) {
-  .bm2__railitem { transition: none; }
-}
-
-
-/* The default spans the split. It is a fact about the whole catalogue, not
-   about whichever family is selected, so filing it in either column would
-   attach it to the wrong thing. */
-.bm2__defaultspan { grid-area: def; }
-.bm2__rail { grid-area: rail; }
-.bm2__detail { grid-area: detail; }
-
-@media (max-width: 1000px) {
-  .bm2__split { grid-template-areas: 'def' 'rail' 'detail'; }
-}
-
+  .bm2__railitem { transition: none; }}
 
 /* -----------------------------------------------------------------------------
    The end-user point of view.
@@ -153,12 +136,6 @@
 .bm8__badge.bmu__badge--set {
   background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg);
 }
-
-/* The word under the switch. The live page labels the control rather than
-   relying on the switch position alone, and at two states that is worth the
-   line — "Inactive" is not guessable from a grey track. */
-.bmu__state { font-size: var(--fs-xs); color: var(--text-muted); text-align: right; }
-.bmu__state.is-on { color: var(--brand-active); font-weight: var(--fw-medium); }
 
 /* --- The inline form ---------------------------------------------------------- */
 
@@ -205,8 +182,7 @@
 
 @media (max-width: 720px) {
   .bmu__pair { grid-template-columns: minmax(0, 1fr); }
-  .bmu__scan { flex-direction: column; }
-}
+  .bmu__scan { flex-direction: column; }}
 
 /* --- The point-of-view switch, in the prototype's own furniture --------------- */
 

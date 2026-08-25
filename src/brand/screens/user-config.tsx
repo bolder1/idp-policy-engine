@@ -99,27 +99,24 @@ export function UserMethodCard({
             us, and use this one or not. */}
         <div className="bm8__right">
           {ready ? (
-            <>
-              <div className="bm8__ctlrow">
-                {/* No Edit where there is nothing to edit. The CAC row on the
-                    live page has a toggle and no Edit at all, and inventing one
-                    would be inventing a form. */}
-                {!nothingToSetUp && (
-                  <Button variant="secondary" size="sm" onClick={() => onOpen(!open)}>
-                    <Pencil size={13} strokeWidth={2} aria-hidden />
-                    Edit
-                  </Button>
-                )}
-                <Toggle checked={isActive} onChange={onActivate} label={`Use ${m.name}`} />
-              </div>
-              <span className={`bmu__state ${isActive ? 'is-on' : ''}`}>
-                {isActive ? 'Active' : 'Inactive'}
-              </span>
-            </>
+            <div className="bm8__ctlrow">
+              {/* No Edit where there is nothing to edit. The CAC row on the
+                  live page has a toggle and no Edit at all, and inventing one
+                  would be inventing a form. */}
+              {!nothingToSetUp && (
+                <Button variant="secondary" size="sm" onClick={() => onOpen(!open)}>
+                  <Pencil size={13} strokeWidth={2} aria-hidden />
+                  Edit
+                </Button>
+              )}
+              {/* No word under the switch. It read "Active"/"Inactive", which is
+                  the switch position spelled out — the switch is already the
+                  clearer statement of it, the admin card has never captioned
+                  its own, and the one fact the position does NOT carry is
+                  whether you are enrolled, which the badge on the name says. */}
+              <Toggle checked={isActive} onChange={onActivate} label={`Use ${m.name}`} />
+            </div>
           ) : (
-            /* No state word either. "Inactive" on a method you have never set up
-               describes a switch position rather than the truth, which is that
-               there is nothing here yet. The button says that already. */
             <Button variant="secondary" size="sm" onClick={() => onOpen(!open)}>
               <Pencil size={13} strokeWidth={2} aria-hidden />
               Set up

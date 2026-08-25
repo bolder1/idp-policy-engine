@@ -162,8 +162,7 @@ button.bm8__card:hover .bm8__name { color: var(--brand-active); }
 .bm8__tile {
   flex: none; display: grid; place-items: center;
   width: 36px; height: 36px; border-radius: var(--radius-md);
-  background: var(--surface-inset); color: var(--text-muted);
-}
+  background: var(--surface-inset); color: var(--text-muted);}
 /* No fill of its own — MethodIcon brings the vendor logo and its own box. */
 .bm8__tile--logo { width: auto; height: auto; background: none; }
 
@@ -286,8 +285,7 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
    where the number has to be found inside the sentence. */
 .bm8__reach {
   display: flex; flex-direction: column; align-items: flex-end;
-  min-width: 62px; white-space: nowrap;
-}
+  min-width: 62px; white-space: nowrap;}
 .bm8__reach b {
   font-size: var(--fs-lg); font-weight: var(--fw-semibold);
   color: var(--text-primary); font-variant-numeric: tabular-nums; line-height: 1.15;
@@ -333,8 +331,7 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
    saying the same thing beside it is the tint stated twice. */
 .bm8__dwhead {
   flex: 1; min-width: 0;
-  display: flex; align-items: flex-start; gap: 13px;
-}
+  display: flex; align-items: flex-start; gap: 13px;}
 
 .bm8__dwtile {
   flex: none; display: grid; place-items: center;
@@ -386,84 +383,7 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
 /* The settings list. The row brings its own dividers, so this only stacks. */
 .bm8__setlist { display: flex; flex-direction: column; }
 
-/* --- The tenant default, chosen out here ---------------------------------------
-   Its own block between the primary factor and the catalogue, because it is
-   neither: it is one decision about the catalogue, and it used to be buried as
-   a link on a method row two clicks inside one of eleven drawers. */
-/* Stacked, because the control is no longer one line wide.
-
-   This was a heading on the left and a dropdown pinned right. The dropdown had
-   one real option in it, so the arrangement spent a full row of the page
-   pointing at a control that could not be used — and hid the one fact worth
-   showing, which is what the default actually IS. */
-.bm8__default {
-  display: flex; flex-direction: column; gap: 12px;
-  padding: 16px 18px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
-}
-.bm8__default h2 { margin: 0; }
-.bm8__defaulthead > p { margin: 4px 0 0; font-size: var(--fs-md); color: var(--text-tertiary); }
-.bm8__defaultnone { margin: 0; font-size: var(--fs-md); color: var(--text-muted); line-height: 1.5; }
-
-/* --- The setting at rest: one row --------------------------------------------
-   A grid of every candidate was a list that grew without limit to express a
-   setting that holds a single value: seven eligible methods meant four rows of
-   cards, and the catalogue only gets longer. The row states the ANSWER, and the
-   alternatives cost no height until somebody asks for them. */
-.bm8__defaultrow {
-  display: flex; align-items: center; gap: 11px;
-  padding: 11px 13px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-}
-
-.bm8__defaulticon { flex: none; display: grid; place-items: center; }
-.bm8__defaultbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.bm8__defaultbody strong {
-  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-.bm8__defaultbody em {
-  font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary);
-}
-.bm8__defaulttick { flex: none; color: var(--brand); }
-
-/* --- Picking ------------------------------------------------------------------
-   Replaces the row rather than appending to it, and the list is capped so the
-   section is the same height with three candidates as with thirty. */
-.bm8__defaultpick { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
-
-.bm8__defaultlist {
-  width: 100%;
-  display: flex; flex-direction: column; gap: 4px;
-  max-height: 216px; overflow-y: auto;
-  padding: 4px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-}
-
-.bm8__defaultopt {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; text-align: left; cursor: pointer; width: 100%;
-  background: var(--surface-raised);
-  border: 1px solid transparent; border-radius: var(--radius-sm);
-  transition:
-    border-color var(--dur-fast) var(--ease-standard),
-    background var(--dur-fast) var(--ease-standard);
-}
-.bm8__defaultopt:hover { border-color: var(--border-strong); }
-/* Brand tint: the selected state here IS the answer to the question. */
-.bm8__defaultopt.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
-.bm8__defaultopt:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-
-.bm8__defaultcancel {
-  padding: 0; background: none; border: 0; cursor: pointer;
-  font-size: var(--fs-xs); color: var(--text-tertiary); text-decoration: underline;
-}
-.bm8__defaultcancel:hover { color: var(--text-primary); }
-
-@media (prefers-reduced-motion: reduce) {
-  .bm8__defaultopt { transition: none; }}
+@media (prefers-reduced-motion: reduce) {}
 
 /* The category holding it. Brand-tinted rather than green: the enabled chip
    beside it is a count, and this is a choice somebody made. */
@@ -472,8 +392,7 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
   padding: 2px 8px; border-radius: var(--radius-pill);
   background: var(--brand-subtle-bg); color: var(--brand-active);
   font-style: normal; font-size: 10px; font-weight: var(--fw-semibold);
-  white-space: nowrap;
-}
+  white-space: nowrap;}
 
 /* --- The setup form ---------------------------------------------------------------
    Behind the Set up button. The blurb states what the integration actually

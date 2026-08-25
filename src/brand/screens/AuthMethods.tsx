@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import {
-  Check,
   ChevronDown,
   ChevronRight,
   CreditCard,
@@ -23,7 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { Button, Drawer, Modal, TipDot, Toggle } from '../kit'
+import { Button, Drawer, Modal, Toggle } from '../kit'
 import { methodBlocker, type AuthMethod } from '../methods'
 import { useBrand } from '../store'
 import { NoResults } from '../empty'
@@ -263,7 +262,6 @@ export function AuthMethods() {
             methods={methods}
             onOpen={setOpenChannel}
             defaultMethod={defaultMethod}
-            onDefault={setDefaultMethod}
           />
           <SetupModal
             method={setupOf}
@@ -280,6 +278,7 @@ export function AuthMethods() {
             onToggle={setEnabled}
             defaultMethod={defaultMethod}
             onSetup={goToSetup}
+            onMakeDefault={setDefaultMethod}
             behaviour={behaviour}
             onBehaviour={(p) => setBehaviour((v) => ({ ...v, ...p }))}
           />
@@ -463,12 +462,10 @@ function CategoryList({
   methods,
   onOpen,
   defaultMethod,
-  onDefault,
 }: {
   methods: AuthMethod[]
   onOpen: (channel: string) => void
   defaultMethod: string | null
-  onDefault: (id: string | null) => void
 }) {
   const [q, setQ] = useState('')
 
@@ -559,24 +556,6 @@ function CategoryList({
         </div>
       </div>
 
-      {/* Inside the catalogue, not above it.
-
-          This was its own full-width section between "Primary sign-in" and
-          "Categories", which put it in the one place it cannot be understood:
-          it names a SECOND factor, and nothing above it had mentioned second
-          factors yet. You met the fallback before you met the things it falls
-          back to, and it read as a peer of the two big sections when it is a
-          single setting derived from one of them.
-
-          Under the Categories heading it reads in the order the decision
-          happens — here is the catalogue, and this is the one a rule gets when
-          it names none. */}
-      <DefaultMethodPicker
-        methods={methods}
-        defaultMethod={defaultMethod}
-        onDefault={onDefault}
-      />
-
       <label className="bm8__search">
         <Search size={15} strokeWidth={1.9} aria-hidden />
         <input
@@ -610,7 +589,6 @@ function CategoryList({
                 {/* The same pill the sidebar already uses for a new section, so
                     "new" looks the same wherever the product says it. */}
                 {f.isNew && <i className="bm8__new">New</i>}
-
 
                 {/* Which category holds the tenant default. On the row rather
                     than only in the dropdown, so the answer is visible while
@@ -695,6 +673,7 @@ function CategoryDrawer({
   onToggle,
   defaultMethod,
   onSetup,
+  onMakeDefault,
   behaviour,
   onBehaviour,
 }: {
@@ -705,6 +684,7 @@ function CategoryDrawer({
   onToggle: (id: string, on: boolean) => void
   defaultMethod: string | null
   onSetup: (m: AuthMethod) => void
+  onMakeDefault: (id: string) => void
   behaviour: MfaValues
   onBehaviour: (p: MfaValues) => void
 }) {
@@ -815,6 +795,7 @@ function CategoryDrawer({
                     onToggle={onToggle}
                     isDefault={defaultMethod === m.id}
                     onSetup={onSetup}
+                    onMakeDefault={onMakeDefault}
                   />
                 ))}
               </div>
@@ -925,14 +906,29 @@ export function MethodCard({
   onToggle,
   isDefault,
   onSetup,
+  onMakeDefault,
 }: {
   m: AuthMethod
   policies: Policy[]
   onToggle: (id: string, on: boolean) => void
   isDefault: boolean
   onSetup: (m: AuthMethod) => void
+  onMakeDefault: (id: string) => void
 }) {
   const blocked = methodBlocker(m)
+
+  /* Whether this method could be the default, on the same rule the section that
+     used to own this decision applied: the sheet says which methods qualify, and
+     a default that is switched off or not yet configured is a default that
+     cannot run.
+
+     The decision moved onto the card because it is a fact ABOUT a method, and it
+     was being made in a full-width section of its own that listed the methods
+     again in order to ask about them. Two places showing the same catalogue, one
+     of them only so you could point at a row in it. Now the row is the control:
+     the one that holds it wears the badge, and the handful that could take it
+     offer to. */
+  const canBeDefault = Boolean(mfaMethodFor(m.id)?.canBeDefault) && !blocked
 
   /* RSA only.
 
@@ -1007,6 +1003,15 @@ export function MethodCard({
                 Putting it back there costs one row of card height and makes the
                 two states read as one control that changes its name. */}
             <div className="bm8__ctlrow">
+              {/* Offered only where it is available and not already true. The
+                  method that IS the default says so with the badge on its name
+                  and needs no button — there is nothing to press. */}
+              {canBeDefault && !isDefault && (
+                <Button variant="ghost" size="sm" onClick={() => onMakeDefault(m.id)}>
+                  <Star size={13} strokeWidth={2} aria-hidden />
+                  Make default
+                </Button>
+              )}
               {canEdit && (
                 <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
                   <Pencil size={13} strokeWidth={2} aria-hidden />
@@ -1146,150 +1151,6 @@ export function PrimarySignIn() {
         </div>
       </section>
     </>
-  )
-}
-
-export function DefaultMethodPicker({
-  methods,
-  defaultMethod,
-  onDefault,
-}: {
-  methods: AuthMethod[]
-  defaultMethod: string | null
-  onDefault: (id: string | null) => void
-}) {
-  /* Whether the picker is open. Closed, the section is one row tall no matter
-     how big the catalogue gets. */
-  const [picking, setPicking] = useState(false)
-
-  /* The sheet decides eligibility, not this screen: a default has to work for a
-     user who has enrolled in nothing, which rules out every method needing
-     setup first. Enabled, too — defaulting to something switched off is a
-     default that cannot run. */
-  const eligible = methods.filter((m) => mfaMethodFor(m.id)?.canBeDefault && !methodBlocker(m))
-
-  /* The one the row states. Falls back to the first eligible so the summary
-     never renders empty if the stored id has stopped qualifying. */
-  const current = methods.find((m) => m.id === defaultMethod) ?? eligible[0]
-
-  return (
-      <section className="bm8__default">
-        <div className="bm8__defaulthead">
-          <span className="bm8__sectitle">
-            <h2>Default method</h2>
-            {/* The rule behind the short list, on the tip rather than in a
-                sentence beside the control.
-
-                It has to be somewhere — without it, "why is Google
-                Authenticator not in this list" is a support ticket. But it is
-                read once, by one admin, on the day they first wonder; as a grey
-                line next to the dropdown it was longer than the label, the
-                heading and the value combined, and it competed with the control
-                every time anybody walked past. */}
-            <TipDot
-              label="Which methods can be the default"
-              text={
-                <>
-                  A default has to work for someone who has enrolled in nothing, so it must be an
-                  enabled delivery-based method — a code sent to a phone, a mailbox or a call.
-                  Anything needing prior enrolment or setup cannot be one.
-                  <br />
-                  <br />
-                  <em className="bsf__tipsrc">
-                    {eligible.length} of {methods.length} methods qualify today.
-                  </em>
-                </>
-              }
-            />
-          </span>
-          <p>Where a user is sent when a policy rule asks for a second factor without naming one.</p>
-        </div>
-
-        {eligible.length === 0 ? (
-          <p className="bm8__defaultnone">
-            Nothing qualifies yet. Enable a delivery-based method — a code by SMS, email or a
-            call — and it will appear here.
-          </p>
-        ) : picking ? (
-          /* Open, the list REPLACES the summary rather than sitting under it,
-             and it is capped and scrolls. That is the whole scalability
-             argument: the section is the same height with three eligible
-             methods as with thirty, open or shut. A grid of candidates was a
-             list that grew forever to express a setting holding one value. */
-          <div className="bm8__defaultpick">
-            <div className="bm8__defaultlist" role="radiogroup" aria-label="Default method">
-              {eligible.map((m) => {
-                const on = defaultMethod === m.id
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    className={`bm8__defaultopt ${on ? 'is-on' : ''}`}
-                    onClick={() => {
-                      onDefault(m.id)
-                      setPicking(false)
-                    }}
-                  >
-                    <span className="bm8__defaulticon" aria-hidden>
-                      <MethodIcon name={m.name} size={24} />
-                    </span>
-                    <span className="bm8__defaultbody">
-                      <strong>{m.name}</strong>
-                      <em>
-                        {m.channel}
-                        {m.enrolled !== undefined
-                          ? ` · ${m.enrolled.toLocaleString()} enrolled`
-                          : ' · nobody enrolled yet'}
-                      </em>
-                    </span>
-                    {on && (
-                      <Check size={14} strokeWidth={2.6} className="bm8__defaulttick" aria-hidden />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-            <button
-              type="button"
-              className="bm8__defaultcancel"
-              onClick={() => setPicking(false)}
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          /* At rest: the answer, not the options.
-
-             The setting holds ONE value, so the thing worth showing is which
-             one — with enough beside it to judge the choice. The alternatives
-             are one click away and cost no height until asked for. */
-          <div className="bm8__defaultrow">
-            <span className="bm8__defaulticon" aria-hidden>
-              <MethodIcon name={current?.name ?? ''} size={28} />
-            </span>
-            <span className="bm8__defaultbody">
-              <strong>{current?.name ?? 'Not set'}</strong>
-              {/* The enrolment figure is the decision. Defaulting to the channel
-                  most people are already on is the difference between a fallback
-                  that works and one that sends everybody to a setup screen. */}
-              <em>
-                {current?.channel}
-                {current?.enrolled !== undefined
-                  ? ` · ${current.enrolled.toLocaleString()} enrolled`
-                  : ' · nobody enrolled yet'}
-              </em>
-            </span>
-            {/* One eligible method is not a choice, so there is no control. */}
-            {eligible.length > 1 && (
-              <Button variant="secondary" size="sm" onClick={() => setPicking(true)}>
-                Change
-              </Button>
-            )}
-          </div>
-        )}
-      </section>
   )
 }
 

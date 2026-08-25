@@ -42,8 +42,6 @@
    encoding something the row already says twice — the chip spells out
    "Attribute based" or "Risk based", and the tile carries a different icon for
    each. The colour was a third copy of a fact that was never in doubt. */
-.bfp2__tile.is-match,
-.bfp2__tile.is-risk { background: var(--brand-subtle-bg); color: var(--brand-active); }
 .bfp2__uses { font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; }
 .bfp2__uses.is-quiet { color: var(--text-muted); }
 
@@ -185,21 +183,20 @@
 /* The icon carries the tint. It is the one mark on the row, so it is doing the
    work the spine and the sentence used to share. */
 .bfp2__railico { flex: none; display: grid; place-items: center; color: var(--text-muted); }
-/* One colour, not six.
+/* Grey at rest, brand for the one that is current.
 
-   The per-category tints were decoration: a family's hue said nothing you could
-   act on, and eleven of them turned the rail into a legend nobody was given.
-   They are all the brand tint now, and the classes stay in the markup so an
-   UNtinted tile still means what it always meant — nothing enabled in here.
+   These were six per-category tints — decoration, since a family's hue said
+   nothing you could act on, and eleven of them turned the rail into a legend
+   nobody was given. Collapsing them to the brand tint fixed the rainbow and
+   introduced a quieter version of the same problem: a column of pale orange
+   squares, brand everywhere and therefore brand meaning nothing.
 
-   What is deliberately not collapsed: is-warn, is-error and the --fb-* feedback
-   colours. Those are the linter's verdict and a control's state, not category
-   decoration, and flattening them would delete meaning rather than noise. */
-.bfp2__railitem.is-slate .bfp2__railico,
-.bfp2__railitem.is-teal .bfp2__railico,
-.bfp2__railitem.is-indigo .bfp2__railico,
-.bfp2__railitem.is-blue .bfp2__railico,
-.bfp2__railitem.is-amber .bfp2__railico { color: var(--brand-active); }
+   So the resting tile is the neutral it always was underneath, and brand is
+   spent only where it says something — the selected rail row, a chosen option,
+   an active count. One accent, one meaning.
+
+   Untouched either way: is-warn, is-error and the --fb-* feedback colours.
+   Those are the linter's verdict and a control's state, not decoration. */
 
 .bfp2__railitem > strong {
   flex: 1; min-width: 0;
@@ -242,16 +239,6 @@
 }
 /* The heading and its icon take the category tint together — the same mark the
    rail uses, so a search showing four groups reads as four families. */
-.bfp2__pang.is-slate .bfp2__panghead h4,
-.bfp2__pang.is-slate .bfp2__panghead > svg,
-.bfp2__pang.is-teal .bfp2__panghead h4,
-.bfp2__pang.is-teal .bfp2__panghead > svg,
-.bfp2__pang.is-indigo .bfp2__panghead h4,
-.bfp2__pang.is-indigo .bfp2__panghead > svg,
-.bfp2__pang.is-blue .bfp2__panghead h4,
-.bfp2__pang.is-blue .bfp2__panghead > svg,
-.bfp2__pang.is-amber .bfp2__panghead h4,
-.bfp2__pang.is-amber .bfp2__panghead > svg { color: var(--brand-active); }
 .bfp2__panghead > span {
   flex: 1; min-width: 0;
   font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums;
@@ -475,20 +462,10 @@
   border-left: 3px solid var(--border-strong);
   margin-left: -1px;
 }
-.bfp2__cat.is-slate .bfp2__cathead,
-.bfp2__cat.is-teal .bfp2__cathead,
-.bfp2__cat.is-indigo .bfp2__cathead,
-.bfp2__cat.is-blue .bfp2__cathead,
-.bfp2__cat.is-amber .bfp2__cathead { border-left-color: var(--brand-active); }
 
 /* The picker's mark, repeated — so the group you configure under is visibly the
    group you chose under. */
 .bfp2__cathead > svg { flex: none; }
-.bfp2__cat.is-slate .bfp2__cathead > svg,
-.bfp2__cat.is-teal .bfp2__cathead > svg,
-.bfp2__cat.is-indigo .bfp2__cathead > svg,
-.bfp2__cat.is-blue .bfp2__cathead > svg,
-.bfp2__cat.is-amber .bfp2__cathead > svg { color: var(--brand-active); }
 
 .bfp2__cathead h4 {
   margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold);

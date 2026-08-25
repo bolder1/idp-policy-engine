@@ -228,7 +228,6 @@ function ProfileList({
       ) : (
         <div className="bfp2__table" role="table" onClick={() => setMenuFor(null)}>
             <div className="bfp2__trow bfp2__thead" role="row">
-              <span role="columnheader" />
               <span role="columnheader">Profile</span>
               <span role="columnheader">Decides by</span>
               <span role="columnheader">Attributes</span>
@@ -239,14 +238,16 @@ function ProfileList({
               const uses = rulesUsing('fingerprint', p.id, policies)
               return (
               <div className="bfp2__trow" role="row" key={p.id}>
-                <span role="cell" className={`bfp2__tile bfp2__tile--sm is-${p.mode}`} aria-hidden>
-                  {p.mode === 'risk' ? (
-                    <Gauge size={13} strokeWidth={1.9} />
-                  ) : (
-                    <Sliders size={13} strokeWidth={1.9} />
-                  )}
-                </span>
-                <span role="cell">
+                {/* One cell, as on the zones table — the icon belongs to the
+                    name rather than to a column of its own. */}
+                <span role="cell" className="bfp2__tname">
+                  <span className={`bfp2__tile bfp2__tile--sm is-${p.mode}`} aria-hidden>
+                    {p.mode === 'risk' ? (
+                      <Gauge size={13} strokeWidth={1.9} />
+                    ) : (
+                      <Sliders size={13} strokeWidth={1.9} />
+                    )}
+                  </span>
                   <button type="button" className="bfp2__gname" onClick={() => onOpen(p.id)}>
                     {p.name}
                   </button>

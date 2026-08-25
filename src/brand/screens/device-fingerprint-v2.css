@@ -481,12 +481,14 @@
    which is a table. Neither answers both. */
 
 /* The profile name, in the table's second column. */
+/* Matches .btable__link on the policies screen — 14px medium, not 15px
+   semibold. This one is table-only, so it changes at the source. */
 .bfp2__gname {
   min-width: 0; background: none; cursor: pointer; text-align: left;
-  font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.bfp2__gname:hover { color: var(--brand-active); }
+.bfp2__gname:hover { color: var(--brand-active); text-decoration: underline; text-underline-offset: 2px; }
 .bfp2__gname:focus-visible { outline: none; text-decoration: underline; }
 
 /* One template, header and rows, so the columns cannot drift apart. */
@@ -514,7 +516,7 @@
 }
 .bfp2__trow {
   display: grid;
-  grid-template-columns: 28px minmax(140px, 1.3fr) 150px 100px 110px 32px;
+  grid-template-columns: minmax(170px, 1.4fr) 150px 100px 110px 32px;
   align-items: center; gap: 12px;
   padding: 9px 16px; min-height: 46px;
   border-bottom: 1px solid var(--border-subtle);
@@ -558,8 +560,10 @@
 @media (max-width: 860px) {
   /* The kebab keeps its column here — it is the only way to delete from the
      list, so it is the last thing that should be dropped for width. */
-  .bfp2__trow { grid-template-columns: 24px minmax(0, 1fr) 70px 32px; }
-  .bfp2__trow > :nth-child(3), .bfp2__trow > :nth-child(5) { display: none; }}
+  .bfp2__trow { grid-template-columns: minmax(0, 1fr) 70px 32px; }
+  /* Indexed off the template above: Decides-by and Attributes go, the name,
+     Used-by and the kebab stay. */
+  .bfp2__trow > :nth-child(2), .bfp2__trow > :nth-child(3) { display: none; }}
 
 /* --- Used by ---------------------------------------------------------------
 
@@ -636,3 +640,7 @@
 .bfp2__roster { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
 .bfp2__roster strong { font-size: var(--fs-sm); color: var(--text-primary); }
 .bfp2__roster em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+
+/* The name cell, which now carries the icon too. */
+.bfp2__tname { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bfp2__tname .bfp2__tile { flex: none; }

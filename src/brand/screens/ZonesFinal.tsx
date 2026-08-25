@@ -402,7 +402,6 @@ function ZoneTable({
   return (
     <div className="bz7__table" role="table" onClick={() => setMenuFor(null)}>
       <div className="bz7__trow bz7__thead" role="row">
-        <span role="columnheader" />
         <span role="columnheader">Zone</span>
         <span role="columnheader">Addresses</span>
         <span role="columnheader">Locations</span>
@@ -414,10 +413,17 @@ function ZoneTable({
         const uses = rulesUsing('zone', z.id, policies)
         return (
           <div className="bz7__trow" role="row" key={z.id}>
-            <span role="cell" className={`bz7__tile bz7__tile--sm is-${meta.tint}`} aria-hidden>
-              <meta.icon size={13} strokeWidth={1.9} />
-            </span>
-            <span role="cell">
+            {/* Icon and name in ONE cell, not two.
+
+                The icon had a column of its own, which meant the header's first
+                column was empty and every name started 30px further right than
+                the word "Zone" above it — a gutter down the left of the table
+                holding nothing but a 22px square. The icon is a property of the
+                name, so it lives with it. */}
+            <span role="cell" className="bz7__tname">
+              <span className={`bz7__tile bz7__tile--sm is-${meta.tint}`} aria-hidden>
+                <meta.icon size={13} strokeWidth={1.9} />
+              </span>
               <button type="button" className="bz7__open" onClick={() => onOpen(z.id)}>
                 {z.name}
               </button>

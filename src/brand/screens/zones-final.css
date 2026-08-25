@@ -157,7 +157,7 @@
    columns cannot drift apart. */
 .bz7__trow {
   display: grid;
-  grid-template-columns: 30px minmax(130px, 1.1fr) minmax(0, 1.3fr) minmax(0, 1.3fr) 92px 34px;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(0, 1.3fr) minmax(0, 1.3fr) 92px 34px;
   align-items: center; gap: 12px;
   padding: 9px 16px; min-height: 46px;
   border-bottom: 1px solid var(--border-subtle);
@@ -365,9 +365,11 @@
 .bz7__footnote { flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
 
 @media (max-width: 860px) {
-  .bz7__trow { grid-template-columns: 26px minmax(0, 1fr) 90px; }
-  .bz7__trow { grid-template-columns: 26px minmax(0, 1fr) 70px 34px; }
-  .bz7__trow > :nth-child(3), .bz7__trow > :nth-child(4) { display: none; }
+  /* Declared once. There were two of these, the first dead — and the columns
+     hidden below are indexed off this template, so a stale one is a table that
+     drops the wrong cells. */
+  .bz7__trow { grid-template-columns: minmax(0, 1fr) 70px 34px; }
+  .bz7__trow > :nth-child(2), .bz7__trow > :nth-child(3) { display: none; }
   .bz7__head { flex-direction: column; gap: 12px; }}
 
 @media (max-width: 720px) {
@@ -565,3 +567,17 @@
 
 @media (prefers-reduced-motion: reduce) {
   .bz7__rename { transition: none; }}
+
+/* The name cell, which now carries the icon too. */
+.bz7__tname { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bz7__tname .bz7__tile { flex: none; }
+/* In the TABLE the name matches .btable__link on the policies screen: 14px,
+   medium, and it is the row that is bold-ish rather than the word. Scoped to
+   this cell because .bz7__open is also the CARD title, where semibold is the
+   right weight — a card heading and a table cell are not the same object. */
+.bz7__tname .bz7__open {
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+}
+.bz7__tname .bz7__open:hover {
+  color: var(--brand-active); text-decoration: underline; text-underline-offset: 2px;
+}

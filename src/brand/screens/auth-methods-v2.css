@@ -66,16 +66,15 @@
    were the same colour, so the tile dissolved into its own background and the
    selected row read as a wash.
 
-   An edge instead of a fill, which is also the console rail's own language for
-   the current page — a brand bar down the leading edge. The tile inverts to
-   solid brand so it separates from the row rather than melting into it, and it
-   is the one solid brand object in the column. */
+   So: a quiet fill, a thin border to close it, and the tile inverted to solid
+   brand. The brand carries the selection from inside the row rather than from
+   its edge — one solid brand object in a column of tinted ones — which leaves
+   the row itself free to be plain. A brand bar down the leading edge as well
+   would be the third statement of a fact the fill and the tile have already
+   made twice. */
 .bm2__railitem.is-on {
-  /* No border. The base row already reserves 1px of transparent border so
-     nothing shifts, and outlining the selected row as well as edging and
-     filling it was three statements of one fact. */
   background: var(--surface-sunken);
-  box-shadow: inset 3px 0 0 var(--brand);
+  border-color: var(--border-subtle);
 }
 .bm2__railitem.is-on .bm8__tile { background: var(--brand); color: #fff; }
 .bm2__railitem:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }

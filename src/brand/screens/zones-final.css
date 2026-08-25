@@ -82,20 +82,8 @@
   background: var(--surface-inset); color: var(--text-tertiary);
 }
 .bz7__tile--sm { width: 22px; height: 22px; }
-/* Grey at rest, brand for the one that is current.
-
-   These were six per-category tints — decoration, since a family's hue said
-   nothing you could act on, and eleven of them turned the rail into a legend
-   nobody was given. Collapsing them to the brand tint fixed the rainbow and
-   introduced a quieter version of the same problem: a column of pale orange
-   squares, brand everywhere and therefore brand meaning nothing.
-
-   So the resting tile is the neutral it always was underneath, and brand is
-   spent only where it says something — the selected rail row, a chosen option,
-   an active count. One accent, one meaning.
-
-   Untouched either way: is-warn, is-error and the --fb-* feedback colours.
-   Those are the linter's verdict and a control's state, not decoration. */
+/* No tint rule here on purpose: the resting tile is the neutral in the base
+   above, and brand is spent only on what is current. */
 /* A zone constraining neither half matches everything. That is not a category,
    it is a defect, and the tile says so. */
 .bz7__tile.is-warn { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
@@ -143,9 +131,27 @@
 
 /* --- List ------------------------------------------------------------------------ */
 
+/* Matched to the policies table, which is the one measured off the console.
+
+   These two were built as CSS grids rather than <table>s — which is right, the
+   cells hold chips and bands that do not lay out in a table — but it meant they
+   never received console-theme.css's `.btable thead th` override and kept the
+   generic small-uppercase label pattern instead. Side by side with All Policies
+   the difference read as two different products: 12px caps in grey on a sunken
+   band, against 14px sentence case in near-black on white.
+
+   The console does not use the uppercase label pattern for table headers, so
+   neither do these. Same header height, same weight, same rule under it, and
+   the same raised card around it — radius-lg with the low shadow, not the flat
+   radius-md box these had. */
 .bz7__table {
   background: var(--surface-raised);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  /* Flat, like the console. console-theme.css takes the shadow off
+     .btable-wrap explicitly, so a shadow here would out-dress the table it is
+     meant to match. */
+  overflow: hidden;
 }
 /* One template, declared once, shared by the header and every row so the
    columns cannot drift apart. */
@@ -160,9 +166,11 @@
 .bz7__trow:not(.bz7__thead):hover { background: var(--surface-sunken); }
 .bz7__thead {
   min-height: var(--table-header-h); padding-top: 0; padding-bottom: 0;
-  background: var(--surface-sunken);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-tertiary);
+  background: var(--surface-raised);
+  border-bottom: var(--bw-thin) solid var(--border-default);
+  font-size: var(--fs-md); font-weight: 500;
+  letter-spacing: 0; text-transform: none; color: var(--text-primary);
+  white-space: nowrap;
 }
 .bz7__tcell { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: nowrap; overflow: hidden; }
 .bz7__tuses { font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; }

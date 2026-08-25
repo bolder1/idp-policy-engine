@@ -183,20 +183,8 @@
 /* The icon carries the tint. It is the one mark on the row, so it is doing the
    work the spine and the sentence used to share. */
 .bfp2__railico { flex: none; display: grid; place-items: center; color: var(--text-muted); }
-/* Grey at rest, brand for the one that is current.
-
-   These were six per-category tints — decoration, since a family's hue said
-   nothing you could act on, and eleven of them turned the rail into a legend
-   nobody was given. Collapsing them to the brand tint fixed the rainbow and
-   introduced a quieter version of the same problem: a column of pale orange
-   squares, brand everywhere and therefore brand meaning nothing.
-
-   So the resting tile is the neutral it always was underneath, and brand is
-   spent only where it says something — the selected rail row, a chosen option,
-   an active count. One accent, one meaning.
-
-   Untouched either way: is-warn, is-error and the --fb-* feedback colours.
-   Those are the linter's verdict and a control's state, not decoration. */
+/* No tint rule here on purpose: the resting tile is the neutral in the base
+   above, and brand is spent only on what is current. */
 
 .bfp2__railitem > strong {
   flex: 1; min-width: 0;
@@ -502,9 +490,27 @@
 .bfp2__gname:focus-visible { outline: none; text-decoration: underline; }
 
 /* One template, header and rows, so the columns cannot drift apart. */
+/* Matched to the policies table, which is the one measured off the console.
+
+   These two were built as CSS grids rather than <table>s — which is right, the
+   cells hold chips and bands that do not lay out in a table — but it meant they
+   never received console-theme.css's `.btable thead th` override and kept the
+   generic small-uppercase label pattern instead. Side by side with All Policies
+   the difference read as two different products: 12px caps in grey on a sunken
+   band, against 14px sentence case in near-black on white.
+
+   The console does not use the uppercase label pattern for table headers, so
+   neither do these. Same header height, same weight, same rule under it, and
+   the same raised card around it — radius-lg with the low shadow, not the flat
+   radius-md box these had. */
 .bfp2__table {
   background: var(--surface-raised);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  /* Flat, like the console. console-theme.css takes the shadow off
+     .btable-wrap explicitly, so a shadow here would out-dress the table it is
+     meant to match. */
+  overflow: hidden;
 }
 .bfp2__trow {
   display: grid;
@@ -517,9 +523,11 @@
 .bfp2__trow:not(.bfp2__thead):hover { background: var(--surface-sunken); }
 .bfp2__thead {
   min-height: var(--table-header-h); padding-top: 0; padding-bottom: 0;
-  background: var(--surface-sunken);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-tertiary);
+  background: var(--surface-raised);
+  border-bottom: var(--bw-thin) solid var(--border-default);
+  font-size: var(--fs-md); font-weight: 500;
+  letter-spacing: 0; text-transform: none; color: var(--text-primary);
+  white-space: nowrap;
 }
 .bfp2__tile--sm { width: 24px; height: 24px; border-radius: var(--radius-sm); }
 /* The mode as a chip, tinted to match its own tile in the first column — so the

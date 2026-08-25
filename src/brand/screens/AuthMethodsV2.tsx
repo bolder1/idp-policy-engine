@@ -168,6 +168,11 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
      Keyed on what is reachable rather than on the filtered rows: those are
      narrowed by the search box too, and falling back on those would yank the
      detail pane to a different family as you typed. */
+  /* The same count the v1 heading carries: how many methods a user could
+     actually be offered, which is not the same as how many families are in
+     play — five families in use can mean five methods or fifteen. */
+  const liveMethods = methods.filter((m) => !methodBlocker(m)).length
+
   const reachable = FAMILIES.filter((f) => !isUser || visible.some((m) => m.channel === f.channel))
   const family = reachable.find((f) => f.channel === channel) ?? reachable[0] ?? FAMILIES[0]
 
@@ -219,15 +224,37 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
               would file them under one — and neither is a person's to set. */}
           {!isUser && <PrimarySignIn />}
 
+          {/* Named as the counterpart to the block above it. The split had no
+              heading at all, so the catalogue began with a search box and a
+              rail that started mid-page under someone else's section — and
+              "Primary sign-in methods" left an obvious question about what the
+              rest of the page was.
+
+              Admin only: "other" is only meaningful against a primary, and a
+              person is not shown one. */}
+          {!isUser && (
+            <div className="bm8__sechead">
+              <div>
+                <span className="bm8__sectitle">
+                  <h2>Other sign-in methods</h2>
+                  <span className="bm8__chip">
+                    {liveMethods} method{liveMethods === 1 ? '' : 's'} enabled
+                  </span>
+                </span>
+                <p>The second factors a policy rule can ask for, grouped by how the challenge reaches someone.</p>
+              </div>
+            </div>
+          )}
+
           <div className="bm2__split">
-            {/* Spans the split, because it is a fact about the whole
-                catalogue rather than about the selected family — but it sits
-                INSIDE it, under the same argument as v1: the fallback cannot be
-                understood before the things it falls back to. */}
             {/* "All methods", not "Categories": the rail is the catalogue,
                 and naming it after the filing scheme made eleven rows sound
                 like a layer to get past rather than the thing itself. */}
-            <nav className="bm2__rail" aria-label="All methods">
+            {/* The accessible name follows the same rule the visible heading
+                does: "other" only means something against a primary, and a
+                person is not shown one. Leaving it here would put the problem
+                one layer down, where only a screen reader hits it. */}
+            <nav className="bm2__rail" aria-label={isUser ? 'Your sign-in methods' : 'Other sign-in methods'}>
               <label className="bm2__search">
                 <Search size={14} strokeWidth={1.9} aria-hidden />
                 <input

@@ -1086,7 +1086,7 @@ export function PrimarySignIn() {
       <section className="bm8__primary">
         <div className="bm8__sechead">
           <div>
-            <h2>Primary sign-in</h2>
+            <h2>Primary sign-in methods</h2>
             <p>How a session starts. Password is on for everyone; the passwordless options are yours to allow.</p>
           </div>
         </div>

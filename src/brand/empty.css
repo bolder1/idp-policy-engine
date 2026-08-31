@@ -21,14 +21,34 @@
   background: var(--surface-raised);
 }
 
-.bempty__art {
-  color: var(--text-primary);
-  margin-bottom: 18px;
+/* One mark, one circle, two numbers to change. It replaces five fixed-size
+   drawings that had to be scaled by transform to fit anywhere but a full page —
+   which is why the compact variant looked slightly soft. This one is drawn at
+   the size it is used. */
+/* Sized by PADDING, not by width and height, and that is the whole trick.
+
+   Centring a 26px glyph inside a 56px box needs the box to be a centring
+   context — grid, flex, whatever — and then it needs that context to survive.
+   It did not: the same rule computed `grid` on its own and `block` inside the
+   compact variant, and no rule in any sheet explains the difference. Rather
+   than keep chasing it, the box stops needing one. Ring the glyph in 15px of
+   padding and the circle is 56px with the mark dead centre by construction —
+   under grid, under block, under inline, under anything.
+
+   It is also less to maintain: one number per size instead of a width, a height
+   and an alignment mode that have to agree. `display: block` on the svg is
+   still worth having, because an inline svg carries a baseline descender that
+   would add a few pixels below the glyph and nothing above it. */
+.bempty__icon {
+  display: block;
+  width: max-content;
+  padding: 15px;
+  margin: 0 auto 20px;
+  border-radius: var(--radius-full);
+  background: var(--surface-inset);
+  color: var(--text-muted);
 }
-/* The drawings are line art at low opacity, so they need no separate treatment
-   between themes — but they do need to stop being the loudest thing on a dark
-   surface, where a light stroke gains contrast the light theme does not give it. */
-[data-theme='dark'] .bempty__art { opacity: 0.9; }
+.bempty__icon > svg { display: block; }
 
 .bempty__title {
   margin: 0;
@@ -50,18 +70,11 @@
 
 .bempty__action { margin-top: 20px; }
 
-/* Below the action, quieter than the blurb, and only where a screen's model has
-   an edge somebody will otherwise cut themselves on. */
-.bempty__note {
-  margin: 22px 0 0;
-  max-width: 52ch;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
-  line-height: 1.55;
-}
+/* `.bempty__note` — a second, boxed paragraph below the action — stood here.
+   Exactly one empty state used it, which made it the exception rather than the
+   pattern, and it spent four lines under a button explaining a rule the screen
+   it leads to explains in context. One line under the title is the whole
+   subheading now. */
 
 /* --- No results ------------------------------------------------------------
    A filter or a search that matched nothing. Deliberately undrawn: the page
@@ -84,11 +97,11 @@
   border: 0;
   background: none;
 }
-.bempty.is-compact .bempty__art { margin-bottom: 10px; transform: scale(0.78); }
+/* 44px: the same 26px mark in 9px of padding. */
+.bempty.is-compact .bempty__icon { padding: 9px; margin-bottom: 10px; }
 .bempty.is-compact .bempty__title { font-size: var(--fs-md); }
 .bempty.is-compact .bempty__blurb { font-size: var(--fs-xs); max-width: 42ch; }
 
 @media (max-width: 600px) {
   .bempty { padding: 44px 18px 48px; }
-  .bempty__art { transform: scale(0.86); }
 }

@@ -86,7 +86,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
           /* The page calls itself "Device fingerprint"; so does the screen id
              and every sentence on it. The rail was the only place still saying
              "Device Restrictions". */
-          { label: 'Device fingerprint', screen: { name: 'fingerprint' } },
+          { label: 'Device profiles', screen: { name: 'fingerprint' } },
           { label: 'Authentication methods', screen: { name: 'methods' } },
           { label: 'External Hooks', screen: { name: 'hooks' } },
         ],

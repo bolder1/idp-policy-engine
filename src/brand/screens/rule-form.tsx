@@ -813,7 +813,7 @@ function FieldPicker({ onPick, onClose }: { onPick: (typeId: string, preset?: st
                 <MonitorSmartphone size={14} strokeWidth={1.8} aria-hidden />
                 <span>
                   <strong>{p.name}</strong>
-                  <em>Device fingerprint · {modeLabel(p)}</em>
+                  <em>Device profile · {modeLabel(p)}</em>
                 </span>
               </button>
             ))}

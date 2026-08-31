@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 
-import { AppsArt, EmptyState } from '../empty'
+import { LayoutGrid } from 'lucide-react'
+import { EmptyState } from '../empty'
 import { AppLogo } from '../logos/AppLogo'
 import { useBrand } from '../store'
 
@@ -55,12 +56,12 @@ export function UserApps() {
 
       {shown.length === 0 ? (
         <EmptyState
-          art={<AppsArt />}
+          icon={LayoutGrid}
           title={q ? 'No apps match that' : 'No apps yet'}
           blurb={
             q
-              ? 'Nothing here is called that. Try part of the name.'
-              : 'Your administrator has not given you access to anything yet. When they do, it appears here.'
+              ? 'Try part of the name.'
+              : 'Nothing has been shared with you yet.'
           }
         />
       ) : (

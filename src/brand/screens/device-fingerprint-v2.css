@@ -60,8 +60,10 @@
    neither a state nor an action — which is exactly what a mode is. Neither
    borrows green or amber, because a profile's KIND must not read as its
    health. */
-.bfp2__tile.is-match { background: var(--fb-info-bg); color: var(--fb-info-fg); }
-.bfp2__tile.is-risk { background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
+/* The tile stays grey in both modes. The chip beside it already names the mode
+   in that mode's colour, and tinting the icon as well says the same thing twice
+   in the same row — which is how the colour got taken off these in the first
+   place. Grey at rest, colour where it is stating something. */
 .bfp2__uses { font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; }
 .bfp2__uses.is-quiet { color: var(--text-muted); }
 
@@ -101,15 +103,11 @@
   border-radius: var(--radius-sm);
   background: var(--surface-inset); color: var(--text-secondary);
 }
-/* The type's colour, on the card where the type is chosen. Learning which hue
-   means which costs nothing if the first place you meet the pair is the moment
-   you pick between them — and every chip afterwards is then a reminder rather
-   than a legend to look up. */
-.bfp2__mode-ico.is-match { background: var(--fb-info-bg); color: var(--fb-info-fg); }
-.bfp2__mode-ico.is-risk { background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
-/* Selection stays brand, and takes the icon with it. The card is answering
-   "which one is chosen", and that question outranks "which one is which" while
-   the dialog is open. */
+/* No type colour on these either. Two icons in two hues, on a card that already
+   spells out its own name in bold above a sentence explaining it, is colour
+   spent on a distinction the words have already made — and it is the same
+   colour the chip uses elsewhere, so it reads as a state rather than a kind.
+   Grey at rest, brand for the one that is chosen. */
 .bfp2__mode-card.is-on .bfp2__mode-ico { background: transparent; color: var(--brand-active); }
 .bfp2__mode-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .bfp2__mode-body strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
@@ -137,15 +135,26 @@
    and foot take about 114px of it, so a picker of 60vh plus its padding always
    fits inside that budget on any screen taller than ~520px. Sizing it to
    content instead is what put a scrollbar on the modal body as well. */
+/* Sized to its content up to a ceiling, rather than always the ceiling. The
+   fixed height was right for thirty-eight, where the list always overflowed;
+   with fourteen it reserved a scroller for a list that fits and left a band of
+   empty sunken panel under the last row. */
 .bfp2__pick {
   display: flex; flex-direction: column; gap: 10px;
-  height: min(56vh, 480px); min-height: 0;
+  max-height: min(56vh, 480px); min-height: 0;
 }
 
-.bfp2__pickbar { flex: none; display: flex; align-items: center; gap: 10px; }
+/* --- The picker's search row ----------------------------------------------------
+   A search, then the selection actions under it. The row of category pills that
+   sat between them went with the categories — see the note above AttrPicker. */
+.bfp2__filter { flex: none; display: flex; flex-direction: column; gap: 9px; }
 
+/* `flex: none` matters here. The search was written to sit in a ROW, where
+   `flex: 1` gave it the leftover width; in a column that same rule gives it the
+   leftover HEIGHT, and the field grows into a box with its icon stranded on a
+   line of its own. */
 .bfp2__search {
-  flex: 1; min-width: 0;
+  flex: none;
   display: flex; align-items: center; gap: 8px;
   height: var(--ctl-height-sm); padding: 0 10px;
   background: var(--surface-sunken);
@@ -159,169 +168,43 @@
 }
 .bfp2__search input:focus-visible { outline: none; }
 
-.bfp2__pickcount {
-  flex: none; padding: 3px 10px; border-radius: var(--radius-pill);
-  background: var(--surface-inset); color: var(--text-tertiary);
-  font-size: var(--fs-xs); font-weight: var(--fw-medium); white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.bfp2__pickcount.is-on { background: var(--brand); color: var(--text-on-brand); }
+.bfp2__filteractions { display: flex; align-items: center; gap: 12px; }
+.bfp2__filteractions .bfp2__pickcount { margin-right: auto; }
 
-/* Only rendered once there is something to clear, so it never sits there as a
-   dead control. */
-.bfp2__clear {
-  flex: none; background: none; cursor: pointer;
-  font-size: var(--fs-xs); color: var(--text-link); white-space: nowrap;
-}
-.bfp2__clear:hover { text-decoration: underline; }
-.bfp2__clear:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
-
-.bfp2__pickbody {
-  flex: 1; min-height: 0;
-  display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 12px;
-}
-
-/* --- The rail ---------------------------------------------------------------------
-   Five categories is a short enough list to show whole, so it is navigation
-   rather than an accordion: what is in the pane never moves, and the count
-   beside each label answers "have I done Hardware yet" without opening it.
-
-   One line each. The category's sentence went to the tip — five of them stacked
-   here was more reading than the five labels needed, and the icon does the
-   identifying faster than the sentence did. */
-.bfp2__rail {
-  min-height: 0; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 2px;
-  padding: 6px;
+/* --- The list ---------------------------------------------------------------------
+   One scroller. The rail that used to sit beside it and the sticky group
+   headings that used to divide it are both gone — the pills above do that job
+   without spending 196px of width or a heading per five rows. */
+.bfp2__pickpane {
+  flex: 0 1 auto; min-height: 0; overflow-y: auto;
+  padding: 12px;
   background: var(--surface-sunken);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
 }
-/* --- The five category tints ---------------------------------------------------
-   One declaration per family, published as variables, so every consumer of a
-   category's colour reads the same four values: the rail icon, the group
-   heading, the spine on a section, a selected row, its tick box and its icon.
-   They each used to restate five selectors of their own, which is how the
-   colour came to be missing in all of them at once — the selectors survived a
-   change that emptied their values, and five near-identical blocks all
-   resolving to brand orange does not look like a mistake until you count them.
-   A sixth category is one line here now.
 
-   The families are the kit's feedback ramps, picked for hue distance rather
-   than for meaning: five is exactly the count at which two neighbouring hues
-   stop being tellable apart, which is the failure this had before. None of
-   them is the positive or negative ramp — Behaviour is not a warning, Security
-   is not a pass, and a family must never read as a verdict on the attributes
-   filed under it. */
-.bfp2__pang.is-slate, .bfp2__cat.is-slate, .bfp2__railitem.is-slate {
-  --cat-bg: var(--fb-neutral-bg); --cat-border: var(--fb-neutral-border);
-  --cat-fg: var(--fb-neutral-fg); --cat-dot: var(--fb-neutral-dot);
-}
-.bfp2__pang.is-lime, .bfp2__cat.is-lime, .bfp2__railitem.is-lime {
-  --cat-bg: var(--fb-lime-bg); --cat-border: var(--fb-lime-border);
-  --cat-fg: var(--fb-lime-fg); --cat-dot: var(--fb-lime-dot);
-}
-.bfp2__pang.is-indigo, .bfp2__cat.is-indigo, .bfp2__railitem.is-indigo {
-  --cat-bg: var(--fb-accent-bg); --cat-border: var(--fb-accent-border);
-  --cat-fg: var(--fb-accent-fg); --cat-dot: var(--fb-accent-dot);
-}
-.bfp2__pang.is-blue, .bfp2__cat.is-blue, .bfp2__railitem.is-blue {
-  --cat-bg: var(--fb-info-bg); --cat-border: var(--fb-info-border);
-  --cat-fg: var(--fb-info-fg); --cat-dot: var(--fb-info-dot);
-}
-.bfp2__pang.is-amber, .bfp2__cat.is-amber, .bfp2__railitem.is-amber {
-  --cat-bg: var(--fb-notice-bg); --cat-border: var(--fb-notice-border);
-  --cat-fg: var(--fb-notice-fg); --cat-dot: var(--fb-notice-dot);
-}
+/* The five `--cat-*` tint declarations stood here — one per category, read by a
+   filter pill, a picker row and the mark on an attribute. All three of those
+   consumers are gone: there are no categories to tell apart, so a selected row
+   takes the brand tint like any other selected thing, and an attribute's icon
+   is just its icon. */
 
-.bfp2__railitem {
-  display: flex; align-items: center; gap: 9px;
-  padding: 8px 9px; border-radius: var(--radius-sm);
-  background: none; cursor: pointer; text-align: left;
-  transition: background var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard);
-}
-.bfp2__railitem:hover { background: var(--surface-inset); }
-.bfp2__railitem.is-on { background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--border-default); }
-.bfp2__railitem:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
-/* A category the running search cannot reach. Dimmed rather than hidden, so the
-   rail does not change length while you type. */
-.bfp2__railitem.is-dim { opacity: 0.4; }
+/* Two columns of seven, which is the whole master with nothing below the fold.
 
-/* The icon carries the tint. It is the one mark on the row, so it is doing the
-   work the spine and the sentence used to share — and it says the tint even
-   when the row is not the selected one, which is the point: the rail is where
-   the five colours are learned. */
-.bfp2__railico {
-  flex: none; display: grid; place-items: center;
-  color: var(--cat-fg, var(--text-muted));
-}
+   It was auto-fill at 300px over thirty-eight, so the column count was whatever
+   the modal happened to be and the list scrolled regardless. Fourteen changes
+   the question from "how do I fit these" to "can I see them all at once", and
+   two columns is the widest arrangement that still answers yes: names never
+   truncate, and the fold stops being part of the design. */
+.bfp2__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 
-.bfp2__railitem > strong {
-  flex: 1; min-width: 0;
-  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+@media (max-width: 720px) {
+  .bfp2__grid { grid-template-columns: minmax(0, 1fr); }
 }
-
-.bfp2__railcount {
-  flex: none;
-  padding: 1px 7px; border-radius: var(--radius-sm);
-  background: var(--surface-inset);
-  font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums;
-}
-.bfp2__railcount.is-on { background: var(--brand-subtle-bg); color: var(--brand-active); font-weight: var(--fw-medium); }
-
-/* --- The pane ---------------------------------------------------------------------
-   One group while browsing, every group with a hit while searching. */
-.bfp2__pane {
-  min-height: 0; overflow-y: auto;
-  padding: 0 12px 12px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-}
-.bfp2__pang + .bfp2__pang { margin-top: 6px; }
-
-/* Sticky, because a search can put five groups in the pane and the heading is
-   what tells you which family the card under your cursor belongs to. */
-.bfp2__panghead {
-  position: sticky; top: 0; z-index: 1;
-  display: flex; align-items: center; gap: 9px;
-  padding: 10px 0 8px;
-  background: var(--surface-sunken);
-  border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 8px;
-}
-.bfp2__panghead > svg { flex: none; }
-.bfp2__panghead h4 {
-  margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--cat-fg, var(--text-secondary));
-}
-.bfp2__panghead > svg { color: var(--cat-fg, var(--text-muted)); }
-/* The heading and its icon take the category tint together — the same mark the
-   rail uses, so a search showing four groups reads as four families. */
-.bfp2__panghead > span {
-  flex: 1; min-width: 0;
-  font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums;
-}
-
-.bfp2__selectall {
-  flex: none; background: none; cursor: pointer;
-  font-size: var(--fs-xs); color: var(--text-link); white-space: nowrap;
-}
-.bfp2__selectall:hover { text-decoration: underline; }
-.bfp2__selectall:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
-
-/* Two columns, not three. Three fitted, but a row is now a box, a mark, a name
-   and a chip — four things — and three columns of that is twelve objects across
-   the pane fighting for the same glance. Two gives each row room to read as one
-   line. */
-.bfp2__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px; }
 
 /* --- The attribute row --------------------------------------------------------------
-   One line: a box, a name, and the priority. Nothing else earns a place at
-   thirty-eight repetitions — the purpose sat under each name for a while and
-   turned the pane into a page of prose in front of a choice made from the
-   names. It is on the tip instead, and the whole of a category now fits without
-   scrolling, which the prose version could not manage for Hardware. */
+   One line: a box, a mark and a name. The purpose is on the tip rather than
+   under the name — fourteen sentences stacked is still a page of prose in front
+   of a choice made from the names. */
 .bfp2__opt {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 10px; text-align: left; cursor: pointer;
@@ -342,12 +225,13 @@
      never shifts sideways on selection. */
   color: transparent;
 }
-/* Selected takes the CATEGORY's colour, the same tint as the rail icon and the
-   group heading — so a search showing hits from four categories reads as four
-   categories rather than one long orange smear. */
+/* Selected takes the brand tint. It used to take the CATEGORY's, which was
+   worth doing while the pane could show hits from four families at once — but
+   there is one list now and nothing to tell apart, so a ticked row is simply a
+   ticked row. */
 .bfp2__opt.is-on {
-  border-color: var(--cat-border, var(--brand));
-  background: var(--cat-bg, var(--brand-subtle-bg));
+  border-color: var(--brand);
+  background: var(--brand-subtle-bg);
 }
 
 /* A ticked box is FILLED, which is the half that had gone missing: the box kept
@@ -362,8 +246,8 @@
    light on a dark one, so a white tick reading 7:1 in one reads under 3:1 in
    the other. --surface-raised is the near-opposite of the fill in both. */
 .bfp2__opt.is-on .bfp2__optbox {
-  border-color: var(--cat-dot, var(--brand-active));
-  background: var(--cat-dot, var(--brand-active));
+  border-color: var(--brand-active);
+  background: var(--brand-active);
   color: var(--surface-raised);
 }
 
@@ -372,7 +256,7 @@
    fill, and an unticked column of marks stays scannable without competing with
    the names beside them. */
 .bfp2__optico { flex: none; display: grid; place-items: center; color: var(--text-muted); }
-.bfp2__opt.is-on .bfp2__optico { color: var(--cat-fg, var(--brand-active)); }
+.bfp2__opt.is-on .bfp2__optico { color: var(--brand-active); }
 
 .bfp2__optname {
   flex: 1; min-width: 0;
@@ -385,25 +269,16 @@
    badge and priority is the one you compare across rows. */
 .bfp2__soonico { flex: none; display: grid; place-items: center; color: var(--fb-notice-fg); }
 
-/* Under about 820px the rail cannot be a column and stay legible, so it becomes
-   a scrolling row of labels and gives its width back to the cards. */
-@media (max-width: 820px) {
-  .bfp2__pickbody { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-  .bfp2__rail { flex-direction: row; overflow-x: auto; overflow-y: hidden; }
-  .bfp2__railitem { white-space: nowrap; }
-  .bfp2__railitem > strong { flex: none; }}
+/* `.bfp2__pri` — the High / Medium / Low pill — stood here.
 
-/* Priority is ORDINAL, so it is a sequential ramp rather than a traffic light.
-   It was green / blue / grey, and green for High reads as "safe" — a judgement
-   the data does not carry. One hue, three intensities: the ordering is legible
-   without a key and nothing implies approval. */
-.bfp2__pri {
-  font-style: normal; padding: 0 5px; border-radius: var(--radius-sm);
-  font-size: 10px; font-weight: var(--fw-medium); white-space: nowrap;
-}
-.bfp2__pri.is-low { background: var(--pri-1-bg); color: var(--pri-1-fg); }
-.bfp2__pri.is-medium { background: var(--pri-2-bg); color: var(--pri-2-fg); }
-.bfp2__pri.is-high { background: var(--pri-3-bg); color: var(--pri-3-fg); }
+   It was on every attribute in the picker and on every row of a profile, which
+   is thirty-eight repetitions of a number nobody was being asked for. Priority
+   is the master's own ranking of how much a signal is worth; on an
+   attribute-match profile it decides nothing at all, because matching does not
+   weigh. It was a fact on display next to the controls that mattered.
+
+   On a risk profile the same idea IS a decision, so it is a control there
+   instead: the weight dropdown, in three words, seeded from this ranking. */
 
 .bfp2__footnote { flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
 .bfp2__none { padding: 22px; text-align: center; font-size: var(--fs-md); color: var(--text-tertiary); }
@@ -510,43 +385,89 @@
    tints, same order. */
 .bfp2__panelhead--page { padding: 0 2px; }
 
-.bfp2__cat { padding: 0; overflow: hidden; }
-.bfp2__cathead {
-  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
-  padding: 11px 16px;
-  background: var(--surface-sunken);
-  border-bottom: 1px solid var(--border-subtle);
-  /* The tint as a spine. A fill behind the heading would put a saturated band
-     across every group; a spine identifies the group and stays out of the way. */
-  border-left: 3px solid var(--cat-dot, var(--border-strong));
-  margin-left: -1px;
+/* --- The restriction, in the page's own rows -------------------------------------
+   The answer sits where an attribute's control sits, so the two halves of the
+   page share a column. It replaces a two-column definition list with small-caps
+   labels and a line of consequence under every value — three type sizes and a
+   set of capitals nothing else on the screen used. The consequence is on a tip
+   now, which is where this page already puts a sentence you want once. */
+.bfp2__detailval {
+  display: inline-flex; align-items: center;
+  padding: 3px 11px; border-radius: var(--radius-pill);
+  background: var(--surface-inset);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+  white-space: nowrap;
 }
-.bfp2__cathead > svg { color: var(--cat-fg, var(--text-muted)); }
-.bfp2__cathead h4 { color: var(--cat-fg, var(--text-primary)); }
+/* Brand on exactly one of the four. Reach is the answer the rest follow from —
+   it decides which attributes can arrive and whether a roster is possible — so
+   it reads first. Four brand pills would be four things shouting the same
+   volume, which is the same as none of them shouting. */
+.bfp2__detailval.is-lead {
+  background: var(--brand-subtle-bg);
+  border-color: var(--brand-subtle-border);
+  color: var(--brand-active);
+}
 
-/* The picker's mark, repeated — so the group you configure under is visibly the
-   group you chose under. */
-.bfp2__cathead > svg { flex: none; }
+/* --- An operator and a value, read as one line ------------------------------------
+   The attribute's name is already to the left of these, so the row runs as a
+   sentence: "Operating system · is at least · Windows 10 22H2". The operator
+   box is narrow and the value box is not, because that is the ratio of the
+   words inside them — two equal boxes would give the short half the weight of
+   the long one. */
+/* One control, not two fields.
 
-.bfp2__cathead h4 {
+   Two bordered selects side by side read as two settings that happen to be
+   adjacent, and the row is a sentence: "Operating system · is at least ·
+   Windows 10 22H2". So they share a shell and a hairline, the same way the
+   weight pills do — one object with two parts, and the focus ring goes round
+   the whole thing.
+
+   The operator is the quieter half. It is grammar; the value is the answer. */
+.bfp2__rule {
+  display: inline-flex; align-items: stretch; min-width: 0;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-raised); overflow: hidden;
+}
+.bfp2__rule:focus-within { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-subtle-bg); }
+.bfp2__rule .bfp2__select {
+  height: 26px; border: 0; border-radius: 0; background: none;
+}
+.bfp2__rule .bfp2__select:focus-visible { outline: none; box-shadow: none; }
+/* Both need an explicit `width: auto`. The kit gives every select width:100% at
+   zero specificity, which is right for a select on its own line in a form and
+   wrong for two of them sharing a row — the first takes the whole box and the
+   second collapses to its chevron. */
+.bfp2__select--op {
+  flex: none; width: auto; min-width: 96px;
+  padding-left: 9px;
+  border-right: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+}
+.bfp2__select--val {
+  flex: none; width: auto; min-width: 148px; max-width: 210px;
+  color: var(--text-primary); font-weight: var(--fw-medium);
+}
+
+/* --- The restriction slide-over --------------------------------------------------
+   One surface where there were three steps, in the same dependency order. The
+   headings are what the steps used to be, so the sequencing survives as
+   structure rather than as paging. */
+.bfp2__restform { display: flex; flex-direction: column; gap: 22px; }
+.bfp2__restform > section { display: flex; flex-direction: column; gap: 9px; }
+.bfp2__restform h4 {
   margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
   letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-secondary);
 }
-.bfp2__cathead > span {
-  padding: 1px 7px; border-radius: var(--radius-sm);
-  background: var(--surface-inset);
-  font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums;
-}
-/* The category's own sentence, from the master. It is the one place on this page
-   that says why the group exists. */
-.bfp2__cathead > em {
-  flex: 1; min-width: 0;
-  font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary);
-}
-.bfp2__cat .bfp2__rows { padding: 4px 16px 8px; }
+.bfp2__restform .bfp2__stephint { margin: 0; }
+/* Stacked, not side by side: the drawer is 520px and two cards in it would be
+   two columns of wrapped text. */
+.bfp2__modes--stack { grid-template-columns: minmax(0, 1fr); }
 
-@media (max-width: 720px) {
-  .bfp2__cathead > em { display: none; }}
+/* `.bfp2__cat` and `.bfp2__cathead` — the five headed sections the profile page
+   grouped its attributes into — stood here. Seven attributes arrived as four
+   sections of one and two, more heading than content, and no way to read what
+   the profile watched without reading five boxes. One list and a filter now. */
 
 /* --- Card and table views ----------------------------------------------------------
    Same arrangement Zones uses, for the same reason: a profile is COMPARED by
@@ -677,17 +598,60 @@
    profile ran on the master's defaults and the override was dead. The number is
    shown rather than a word — the score adds these up, and "High" beside an
    invisible sum is exactly the console's mistake. */
-.bfp2__weight { display: inline-flex; align-items: center; gap: 6px; }
-.bfp2__weight > span { font-size: var(--fs-xs); color: var(--text-tertiary); }
-.bfp2__weight select {
-  height: 28px; padding: 0 6px;
+/* --- The weight, as three pills ---------------------------------------------------
+   A segmented group rather than a select. Three words fit on the row, and a
+   dropdown put two of them behind a click and rendered the third in form-field
+   grey — on the one control a risk profile exists to set.
+
+   One shared border and internal hairlines, so the three read as one control
+   with a position rather than as three chips that happen to be adjacent. Only
+   the chosen one is coloured — three lit pills would be a legend, not a
+   setting. */
+.bfp2__tiers {
+  display: inline-flex; align-items: center;
   border: 1px solid var(--border-default); border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-  font-family: inherit; font-size: var(--fs-xs); font-weight: var(--fw-medium);
-  color: var(--text-secondary); font-variant-numeric: tabular-nums;
+  background: var(--surface-raised); overflow: hidden;
 }
-.bfp2__weight select:focus-visible {
-  outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-subtle-bg);
+.bfp2__tier {
+  padding: 0 10px; height: 26px;
+  background: none; cursor: pointer;
+  border-left: 1px solid var(--border-subtle);
+  font-family: inherit; font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  color: var(--text-tertiary); white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bfp2__tier:first-child { border-left: 0; }
+.bfp2__tier:hover:not(.is-on) { background: var(--surface-inset); color: var(--text-secondary); }
+.bfp2__tier:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+
+/* Three hues, hot to cool: red, amber, green.
+
+   It was one hue at three intensities, on the argument that a weight is not
+   good or bad and a traffic light would say it was. The counter-argument won,
+   and it is about reading rather than semantics: three shades of one blue are
+   only ordered if you can see all three at once, and on this screen you see one
+   per row, fourteen rows apart. A hue you can name from a single row tells you
+   where that attribute sits without scanning the column for something to
+   compare it to.
+
+   Read as "how hard does this one push", not as approval: red is the attribute
+   that moves the score most, green the one that barely moves it. */
+.bfp2__tier.is-high.is-on {
+  background: var(--fb-negative-bg); color: var(--fb-negative-fg);
+  box-shadow: inset 0 0 0 1px var(--fb-negative-border);
+}
+.bfp2__tier.is-medium.is-on {
+  background: var(--fb-notice-bg); color: var(--fb-notice-fg);
+  box-shadow: inset 0 0 0 1px var(--fb-notice-border);
+}
+.bfp2__tier.is-low.is-on {
+  background: var(--fb-positive-bg); color: var(--fb-positive-fg);
+  box-shadow: inset 0 0 0 1px var(--fb-positive-border);
+}
+.bfp2__tier.is-on { font-weight: var(--fw-semibold); }
+
+@media (max-width: 720px) {
+  .bfp2__tier { padding: 0 8px; }
 }
 
 /* --- A platform limit, on the choice it limits -------------------------------

@@ -2,14 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   ATTRIBUTES,
-  CATEGORIES,
-  DEFAULT_BANDS,
-  bandOf,
+  TIER_WEIGHT,
   byId,
-  ceilingOf,
+  isRuleValue,
   scoreOf,
   seedProfiles,
-  unreachableBands,
+  tierOf,
   type FingerprintProfile,
 } from './fingerprint'
 
@@ -24,25 +22,31 @@ const profile = (over: Partial<FingerprintProfile> = {}): FingerprintProfile => 
   enabled: [],
   config: {},
   weights: {},
-  tolerance: 0,
-  onMismatch: 'challenge',
-  bands: { ...DEFAULT_BANDS },
   reach: 'agent',
   registration: 'self',
   maxDevices: 3,
   roster: null,
-  mobileRestriction: true,
   autoRegister: false,
+  restrictionSet: true,
   usedIn: 0,
   ...over,
 })
 
 describe('the attribute master', () => {
-  it('carries every category the sheet defines, and nothing orphaned', () => {
-    const declared = new Set(CATEGORIES.map((c) => c.id))
-    const used = new Set(ATTRIBUTES.map((a) => a.category))
-    expect([...used].filter((c) => !declared.has(c))).toEqual([])
-    expect([...declared].filter((c) => !used.has(c))).toEqual([])
+  /* The master is curated, not transcribed, and the number is the whole point:
+     one screen, no grouping, no filter. Let it drift past fifteen and the
+     screen needs a filing scheme again — which is the thing that was taken out.
+     This is the tripwire for that. */
+  it('stays small enough not to need a filing scheme', () => {
+    expect(ATTRIBUTES.length).toBeGreaterThanOrEqual(10)
+    expect(ATTRIBUTES.length).toBeLessThanOrEqual(15)
+  })
+
+  /* Agentless is the default reach for a new profile, so a master where every
+     attribute needed an agent would ship a picker with nothing pickable in it. */
+  it('leaves most of the list readable without an agent', () => {
+    const agentless = ATTRIBUTES.filter((a) => !a.needsAgent)
+    expect(agentless.length).toBeGreaterThan(ATTRIBUTES.length / 2)
   })
 
   it('has unique ids and no blank names', () => {
@@ -62,6 +66,15 @@ describe('the attribute master', () => {
       if (!a.config) continue
       if (a.config.kind === 'choice') expect(a.config.options.length).toBeGreaterThan(1)
       if (a.config.kind === 'tolerance') expect(a.config.max).toBeGreaterThan(a.config.min)
+      /* A rule with one operator is a label, and a rule whose default is not in
+         its own groups is a control that opens showing nothing selected. Both
+         are easy to write and invisible until somebody opens the row. */
+      if (a.config.kind === 'rule') {
+        expect(a.config.operators.length).toBeGreaterThan(1)
+        expect(a.config.groups.length).toBeGreaterThan(0)
+        expect(a.config.operators).toContain(a.config.value.op)
+        expect(a.config.groups.flatMap((g) => g.values)).toContain(a.config.value.value)
+      }
     }
   })
 })
@@ -78,41 +91,25 @@ describe('scoring', () => {
     expect(scoreOf(p, ['tpm'])).toBe(7)
   })
 
-  it('caps at 100, because the bands are expressed on that scale', () => {
+  it('caps at 100, because a score is expressed on that scale', () => {
     const all = ATTRIBUTES.map((a) => a.id)
     expect(scoreOf(profile({ enabled: all }), all)).toBe(100)
   })
-
-  it('puts the sheet band boundaries on the right side of the line', () => {
-    const p = profile()
-    expect(bandOf(p, 0)).toBe('allow')
-    expect(bandOf(p, 30)).toBe('allow')
-    expect(bandOf(p, 31)).toBe('challenge')
-    expect(bandOf(p, 70)).toBe('challenge')
-    expect(bandOf(p, 71)).toBe('deny')
-  })
 })
 
-describe('reachability', () => {
-  /* The one mistake this editor can make silently: a profile whose attributes
-     cannot add up to the threshold that is supposed to catch them. It reads as
-     configured and enforces nothing. */
-  it('names the bands a profile can never reach', () => {
-    // One 5-point attribute cannot clear an allow ceiling of 30.
-    const weak = profile({ enabled: ['battery'] })
-    expect(ceilingOf(weak)).toBe(5)
-    expect(unreachableBands(weak)).toEqual(['challenge', 'deny'])
-
-    // Enough to challenge, never enough to deny.
-    const mid = profile({ enabled: ['tpm', 'bios'] })
-    expect(ceilingOf(mid)).toBe(60)
-    expect(unreachableBands(mid)).toEqual(['deny'])
+describe('weight tiers', () => {
+  /* The profile picks from three where the sheet has four, so the mapping has
+     to be total: every weight in the master must land on a tier, and every tier
+     has to survive a round trip or a dropdown would silently rewrite a weight
+     the moment it was opened. */
+  it('lands every master weight on a tier', () => {
+    for (const a of ATTRIBUTES) expect(['High', 'Medium', 'Low']).toContain(tierOf(a.weight))
   })
 
-  it('reports nothing unreachable when the ceiling clears every band', () => {
-    const strong = profile({ enabled: ['tpm', 'bios', 'motherboard'] })
-    expect(ceilingOf(strong)).toBe(90)
-    expect(unreachableBands(strong)).toEqual([])
+  it('round-trips a tier through its weight', () => {
+    for (const tier of ['High', 'Medium', 'Low'] as const) {
+      expect(tierOf(TIER_WEIGHT[tier])).toBe(tier)
+    }
   })
 })
 
@@ -132,9 +129,21 @@ describe('the seeded profiles', () => {
     }
   })
 
-  it('leaves no risk profile with an unreachable band', () => {
-    for (const p of seedProfiles.filter((x) => x.mode === 'risk')) {
-      expect(`${p.id}: ${unreachableBands(p).join(',')}`).toBe(`${p.id}: `)
+  /* Replaces the unreachable-band check, which went with the thresholds. The
+     equivalent silent failure now is a stored rule that does not match the
+     attribute's own vocabulary — an operator or a value that was renamed in the
+     master and left behind in a seed. It renders as a select with nothing
+     chosen, which reads as "not configured" rather than as a mistake. */
+  it('store rule values the master still recognises', () => {
+    for (const p of seedProfiles) {
+      for (const [id, v] of Object.entries(p.config)) {
+        if (!isRuleValue(v)) continue
+        const c = byId(id)?.config
+        expect(`${p.id}/${id}: ${c?.kind}`).toBe(`${p.id}/${id}: rule`)
+        if (c?.kind !== 'rule') continue
+        expect(c.operators).toContain(v.op)
+        expect(c.groups.flatMap((g) => g.values)).toContain(v.value)
+      }
     }
   })
 })

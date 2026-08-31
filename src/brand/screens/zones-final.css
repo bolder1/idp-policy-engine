@@ -581,3 +581,116 @@
 .bz7__tname .bz7__open:hover {
   color: var(--brand-active); text-decoration: underline; text-underline-offset: 2px;
 }
+
+/* -----------------------------------------------------------------------------
+   Zones · v2 — one zone, one kind.
+
+   Everything shared with v1 keeps its `bz7__` class, because it IS v1's: the
+   table shell, the row, the name cell, the inner-page header, the address and
+   place sections. Only what the second version adds is named here, which keeps
+   the diff between the two designs the size of the actual difference.
+   -------------------------------------------------------------------------- */
+
+/* Four columns, not five. v1 spends two on "IP networks" and "Locations" and
+   one of them says "Any …" on every row; declaring the kind turns that pair
+   into a Type and a Contains, and the kebab column goes with the row menu v2
+   does not carry. */
+.bz8__trow {
+  grid-template-columns: minmax(160px, 1.3fr) 118px minmax(0, 1.6fr) 92px;
+}
+
+/* The type, as a chip. Tinted to match the mark in the name cell, so a row says
+   its kind twice in one colour rather than once in colour and once in grey. */
+.bz8__kind {
+  display: inline-flex; align-items: center;
+  padding: 2px 9px; border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-style: normal; font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
+.bz8__kind.is-blue {
+  background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg);
+}
+.bz8__kind.is-green {
+  background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg);
+}
+
+/* "Nothing yet", not "Any". A v1 zone with an empty half matches everything
+   through it, which is why that column reads "Any location". A v2 zone with an
+   empty list matches nothing at all — there is no second half left open — so
+   the same emptiness means the opposite thing and cannot borrow the same word. */
+.bz8__unset { font-style: normal; font-size: var(--fs-md); color: var(--text-muted); }
+
+/* --- The create dialog ---------------------------------------------------------- */
+
+.bz8__form { display: flex; flex-direction: column; gap: 18px; }
+
+.bz8__field { display: flex; flex-direction: column; gap: 6px; }
+.bz8__field > span:first-child {
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary);
+}
+.bz8__field input {
+  height: var(--ctl-height-md); padding: 0 11px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  font-size: var(--fs-base); color: var(--text-primary); font-family: inherit;
+}
+.bz8__field input:focus-visible {
+  outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg);
+}
+.bz8__hint { font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.5; }
+
+/* Stacked, not side by side. Two cards across a 520px dialog gives each of them
+   about 230px, which wraps both blurbs to four lines and makes the pair read as
+   a wall rather than a choice. */
+.bz8__kinds {
+  display: flex; flex-direction: column; gap: 8px;
+  margin: 0; padding: 0; border: 0;
+}
+.bz8__kinds legend {
+  padding: 0; margin-bottom: 8px;
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary);
+}
+.bz8__kindcard {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 12px 13px; text-align: left; cursor: pointer;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+}
+.bz8__kindcard:hover { border-color: var(--border-strong); }
+/* Brand tint rather than a surface step — inside a Modal, --surface-raised is
+   the modal's own background, so a "raised" selected card is invisible. */
+.bz8__kindcard.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bz8__kindcard:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bz8__kindico {
+  flex: none; display: grid; place-items: center; width: 30px; height: 30px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset); color: var(--text-secondary);
+}
+.bz8__kindcard.is-on .bz8__kindico { background: transparent; color: var(--brand-active); }
+.bz8__kindbody { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bz8__kindbody strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bz8__kindbody em {
+  font-style: normal; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.45;
+}
+
+/* The one thing about this dialog that is not obvious, said before the choice
+   rather than discovered after it. */
+.bz8__note {
+  margin: 0; padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55;
+}
+
+@media (max-width: 900px) {
+  .bz8__trow { grid-template-columns: minmax(0, 1fr) 100px 70px; }
+  .bz8__trow > :nth-child(3) { display: none; }
+}
+
+/* The mark travels with the name it marks. `bz7__pagehead` is space-between and
+   v1 gives it two children; v2 adds a tile, and a third loose child would push
+   the name into the middle of the row. */
+.bz8__pagelead { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.bz8__pagelead .bz7__tile { margin-top: 2px; }

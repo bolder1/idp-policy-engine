@@ -29,24 +29,53 @@
    71-100 deny.
    -------------------------------------------------------------------------- */
 
-export type AttrCategory =
-  | 'Hardware'
-  | 'Browser'
-  | 'Security'
-  | 'Network'
-  | 'Behaviour'
-
 export type Priority = 'High' | 'Medium' | 'Low'
+
+/* --- What an attribute is tuned WITH --------------------------------------------
+   Three of these are a single control: a number, a dropdown, a list of strings.
+   The fourth is a sentence.
+
+   Some attributes are not usefully described by "how loosely do you match
+   this". "Operating system, matched on major version" is a precision setting;
+   "operating system is not Android 12" is a different question, and the second
+   is the one an admin arrives with. Those attributes need an operator and a
+   value, and the value belongs to the attribute rather than to the control —
+   the versions that mean something for iOS are not the ones that mean
+   something for Windows.
+
+   Values are GROUPED for the same reason. An OS version means nothing without
+   its platform, and thirty version strings in one flat list is a list you
+   scroll rather than read. The group is the type; the values are that type's
+   own. Adding a platform is adding a group. */
+export interface AttrRuleValue {
+  op: string
+  value: string
+}
+
+/** What a profile has stored against one attribute. */
+export type AttrConfigValue = string | number | AttrRuleValue
+
+export const isRuleValue = (v: AttrConfigValue | undefined): v is AttrRuleValue =>
+  typeof v === 'object' && v !== null && 'op' in v
 
 /** How a configurable attribute is tuned. Only some attributes have one. */
 export type AttrConfig =
   | { kind: 'tolerance'; label: string; value: number; min: number; max: number; unit: string }
   | { kind: 'choice'; label: string; value: string; options: string[] }
   | { kind: 'list'; label: string; values: string[]; placeholder: string }
+  | {
+      kind: 'rule'
+      label: string
+      /* Named per attribute rather than shared, because the operators that make
+         sense are not the same everywhere: a version can be "at least", a
+         country cannot. */
+      operators: string[]
+      groups: { label: string; values: string[] }[]
+      value: AttrRuleValue
+    }
 
 export interface Attribute {
   id: string
-  category: AttrCategory
   name: string
   /** What the attribute is. Sits on a tip, never in the row. */
   purpose: string
@@ -66,224 +95,163 @@ export interface Attribute {
   config?: AttrConfig
 }
 
-/* The master. Order within a category follows the sheet. */
+/* --- The master, and why it is fourteen ----------------------------------------
+   The sheet has thirty-eight and this shows fourteen. That is not a
+   transcription that lost twenty-four rows, it is a decision about what a
+   profile is for.
+
+   Thirty-eight is a catalogue: it needs a filing scheme to be navigable, and
+   the filing scheme needs a rail, and the rail needs counts, and by then the
+   screen is about finding an attribute rather than about deciding which ones
+   identify a machine. Most of the twenty-four were also the weakest signals in
+   the sheet — behavioural patterns that need months of history, browser
+   properties that change on every update — so the list was long AND its tail
+   was the part nobody should pick.
+
+   Fourteen fits on one screen with nothing above it. No categories, no filter,
+   no search over five groups: the list IS the interface.
+
+   Ordered agentless first. Nine of these a browser and the request give up on
+   their own; five need an agent, and an agentless profile shows them greyed
+   with their reason. Putting the five last means such a profile meets what it
+   CAN have before what it cannot. */
 export const ATTRIBUTES: Attribute[] = [
-  // --- Hardware -------------------------------------------------------------
   {
-    id: 'device-type', category: 'Hardware', name: 'Device type',
+    id: 'device-type', name: 'Device type',
     purpose: 'Desktop, laptop, mobile or tablet. Different form factors carry different risk.',
     priority: 'Low', weight: 5, phase: 1,
     config: { kind: 'choice', label: 'Treat a change as', value: 'Significant', options: ['Significant', 'Minor', 'Ignore'] },
   },
   {
-    id: 'manufacturer', category: 'Hardware', name: 'Manufacturer and model',
-    purpose: 'Apple, Samsung, Dell. Identifies hardware families with known weaknesses.',
-    priority: 'Medium', weight: 20, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'mac', category: 'Hardware', name: 'MAC address',
-    purpose: 'The network adapter address. Strong, but changes when the adapter does.',
-    priority: 'High', weight: 30, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'os', category: 'Hardware', name: 'Operating system and version',
+    id: 'os', name: 'Operating system and version',
     purpose: 'An unpatched OS is a reason to ask for more, independent of whether the device is known.',
     priority: 'High', weight: 20, phase: 1,
-    config: { kind: 'choice', label: 'Match on', value: 'Major version', options: ['Exact build', 'Major version', 'Name only'] },
+    /* The worked example for the rule kind. "Matched on major version" answers
+       how loosely to compare; it cannot answer "not Android 12 or below",
+       which is the question an unpatched-OS policy is actually made of. */
+    config: {
+      kind: 'rule',
+      label: 'Operating system',
+      operators: ['is', 'is not', 'is at least', 'is below'],
+      groups: [
+        { label: 'Windows', values: ['Windows 11 24H2', 'Windows 11 23H2', 'Windows 10 22H2', 'Windows 10 21H2'] },
+        { label: 'macOS', values: ['macOS 15 Sequoia', 'macOS 14 Sonoma', 'macOS 13 Ventura'] },
+        { label: 'Android', values: ['Android 15', 'Android 14', 'Android 13', 'Android 12'] },
+        { label: 'iOS', values: ['iOS 18', 'iOS 17', 'iOS 16'] },
+        { label: 'Linux', values: ['Ubuntu 24.04 LTS', 'Ubuntu 22.04 LTS', 'RHEL 9'] },
+      ],
+      value: { op: 'is at least', value: 'Windows 10 22H2' },
+    },
   },
   {
-    id: 'os-install', category: 'Hardware', name: 'OS installation ID',
-    purpose: 'Identifies one installation. Survives hardware changes, dies on a reinstall.',
-    priority: 'High', weight: 30, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'tpm', category: 'Hardware', name: 'TPM ID',
-    purpose: 'The Trusted Platform Module identifier. The strongest signal available, where a TPM exists.',
-    priority: 'High', weight: 30, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'cpu', category: 'Hardware', name: 'Processor',
-    purpose: 'CPU and GPU model. Stable for the life of the machine.',
-    priority: 'Medium', weight: 20, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'screen', category: 'Hardware', name: 'Screen resolution',
-    purpose: 'Changes when a monitor is plugged in, so it is weak on its own.',
-    priority: 'Low', weight: 5, phase: 2,
-  },
-  {
-    id: 'ram', category: 'Hardware', name: 'Memory and storage',
-    purpose: 'Capacity, not serials. Changes on an upgrade.',
-    priority: 'Medium', weight: 20, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'battery', category: 'Hardware', name: 'Battery status',
-    purpose: 'Present or absent, and health. Distinguishes a laptop from a desktop.',
-    priority: 'Low', weight: 5, phase: 2, needsAgent: true,
-  },
-  {
-    id: 'motherboard', category: 'Hardware', name: 'Motherboard serial',
-    purpose: 'Unique to the board. Effectively the machine itself.',
-    priority: 'High', weight: 30, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'bios', category: 'Hardware', name: 'BIOS UUID',
-    purpose: 'A unique firmware identifier, set at manufacture.',
-    priority: 'High', weight: 30, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'disk', category: 'Hardware', name: 'Hard disk serial',
-    purpose: 'Unique to the drive. Changes if the drive is replaced or cloned.',
-    priority: 'High', weight: 30, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'ram-serial', category: 'Hardware', name: 'RAM serials',
-    purpose: 'Module serial numbers. Strong, but changes on any memory upgrade.',
-    priority: 'Medium', weight: 5, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'machine-sid', category: 'Hardware', name: 'Machine SID',
-    purpose: 'The Windows security identifier for the machine.',
-    priority: 'High', weight: 30, phase: 1, needsAgent: true,
-  },
-
-  // --- Browser --------------------------------------------------------------
-  {
-    id: 'browser', category: 'Browser', name: 'Browser and version',
+    id: 'browser', name: 'Browser and version',
     purpose: 'Changes on every browser update, so it is noisy unless matched loosely.',
     priority: 'Medium', weight: 10, phase: 1,
-    config: { kind: 'choice', label: 'Match on', value: 'Family only', options: ['Exact version', 'Major version', 'Family only'] },
+    /* Same shape as the OS, and for the same reason: "at least Chrome 130" is
+       a policy, "family only" is a comparison setting. */
+    config: {
+      kind: 'rule',
+      label: 'Browser',
+      operators: ['is', 'is not', 'is at least', 'is below'],
+      groups: [
+        { label: 'Chrome', values: ['Chrome 131', 'Chrome 130', 'Chrome 129'] },
+        { label: 'Edge', values: ['Edge 131', 'Edge 130'] },
+        { label: 'Safari', values: ['Safari 18', 'Safari 17'] },
+        { label: 'Firefox', values: ['Firefox 133', 'Firefox 132'] },
+      ],
+      value: { op: 'is at least', value: 'Chrome 130' },
+    },
   },
   {
-    id: 'user-agent', category: 'Browser', name: 'User agent',
-    purpose: 'The full UA string. Trivially spoofed, and included for completeness.',
-    priority: 'Low', weight: 10, phase: 1,
+    id: 'canvas', name: 'Canvas fingerprint',
+    purpose: 'A rendering signature derived from the GPU and font stack.',
+    priority: 'Medium', weight: 10, phase: 1,
   },
   {
-    id: 'plugins', category: 'Browser', name: 'Plugins and extensions',
-    purpose: 'A distinctive set, and one the user changes without warning.',
-    priority: 'Low', weight: 10, phase: 2,
-  },
-  {
-    id: 'locale', category: 'Browser', name: 'Language and locale',
+    id: 'locale', name: 'Language and locale',
     purpose: 'Stable for most people, and a strong tell when it moves.',
     priority: 'Medium', weight: 5, phase: 1,
   },
   {
-    id: 'canvas', category: 'Browser', name: 'Canvas fingerprint',
-    purpose: 'A rendering signature derived from the GPU and font stack.',
-    priority: 'Medium', weight: 10, phase: 1,
-  },
-
-  // --- Security -------------------------------------------------------------
-  {
-    id: 'root', category: 'Security', name: 'Root or jailbreak',
-    purpose: 'A rooted device cannot be trusted to report anything else honestly.',
-    priority: 'High', weight: 30, phase: 2, needsAgent: true,
-    config: { kind: 'choice', label: 'When detected', value: 'Deny', options: ['Deny', 'Challenge', 'Flag only'] },
-  },
-  {
-    id: 'vm', category: 'Security', name: 'Virtual machine or emulator',
-    purpose: 'Detects a device that is not physical. Legitimate in engineering, suspicious elsewhere.',
-    priority: 'High', weight: 30, phase: 1, needsAgent: true,
-    config: { kind: 'choice', label: 'When detected', value: 'Challenge', options: ['Deny', 'Challenge', 'Flag only'] },
-  },
-  {
-    id: 'secure-boot', category: 'Security', name: 'Secure Boot and certificates',
-    purpose: 'Firmware integrity. Off is not proof of anything, but it is worth knowing.',
-    priority: 'High', weight: 20, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'app-integrity', category: 'Security', name: 'Application integrity',
-    purpose: 'Whether the client has been tampered with since it was installed.',
-    priority: 'Medium', weight: 20, phase: 2, needsAgent: true,
-  },
-
-  // --- Network --------------------------------------------------------------
-  {
-    id: 'hostname', category: 'Network', name: 'Host name and user name',
-    purpose: 'Set by the owner, so it is meaningful on managed estates and noise elsewhere.',
-    priority: 'Low', weight: 5, phase: 2, needsAgent: true,
-  },
-  {
-    id: 'ip', category: 'Network', name: 'IP address',
+    id: 'ip', name: 'IP address',
     purpose: 'Public and private. Changes constantly on mobile networks.',
     priority: 'Medium', weight: 10, phase: 1,
-    config: { kind: 'choice', label: 'Match on', value: 'Subnet', options: ['Exact address', 'Subnet', 'Country only'] },
+    /* Ranges rather than a precision level. "Match on subnet" says how much of
+       the address to compare and never says WHICH — so a profile could not
+       express "from the office ranges, and nowhere else", which is the only
+       thing most people want an IP condition for.
+
+       The ranges below stand in for a tenant's own. A real deployment reads
+       them from the zones already defined next door rather than from a list
+       shipped in the master. */
+    config: {
+      kind: 'rule',
+      label: 'IP address',
+      operators: ['is in', 'is not in'],
+      groups: [
+        { label: 'Private ranges', values: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'] },
+        { label: 'Office ranges', values: ['203.0.113.0/24', '198.51.100.0/24'] },
+      ],
+      value: { op: 'is in', value: '10.0.0.0/8' },
+    },
   },
   {
-    id: 'isp', category: 'Network', name: 'ISP and carrier',
+    id: 'isp', name: 'ISP and carrier',
     purpose: 'Stable for a fixed line, and a good proxy for "somewhere else" on mobile.',
     priority: 'Medium', weight: 10, phase: 1,
   },
   {
-    id: 'geo', category: 'Network', name: 'Geolocation',
+    id: 'geo', name: 'Geolocation',
     purpose: 'Country, region, city. The signal behind impossible-travel checks.',
     priority: 'High', weight: 10, phase: 1,
-    config: { kind: 'choice', label: 'Match on', value: 'Country', options: ['City', 'Region', 'Country'] },
+    /* Places, not precisions, for the same reason as the address above: the
+       useful condition names somewhere. */
+    config: {
+      kind: 'rule',
+      label: 'Location',
+      operators: ['is in', 'is not in'],
+      groups: [
+        { label: 'Countries', values: ['India', 'United States', 'United Kingdom', 'Germany', 'Singapore'] },
+        { label: 'Regions', values: ['Maharashtra', 'Karnataka', 'California', 'Bavaria'] },
+      ],
+      value: { op: 'is in', value: 'India' },
+    },
   },
   {
-    id: 'vpn', category: 'Network', name: 'Proxy or VPN',
+    id: 'vpn', name: 'Proxy or VPN',
     purpose: 'A VPN hides every other network signal, which is why it is worth its own row.',
     priority: 'High', weight: 5, phase: 1,
     config: { kind: 'choice', label: 'When detected', value: 'Challenge', options: ['Deny', 'Challenge', 'Flag only'] },
   },
+
+  /* The five only an agent can read. Last, so an agentless profile meets the
+     nine it can have before the five it cannot — those render greyed, with the
+     reason on the row. */
   {
-    id: 'conn', category: 'Network', name: 'Connection type',
-    purpose: 'Cellular, Wi-Fi or Ethernet. Changes as somebody walks out of the building.',
-    priority: 'Medium', weight: 10, phase: 1,
+    id: 'tpm', name: 'TPM ID',
+    purpose: 'The Trusted Platform Module identifier. The strongest signal available, where a TPM exists.',
+    priority: 'High', weight: 30, phase: 1, needsAgent: true,
   },
   {
-    id: 'domain', category: 'Network', name: 'Domain membership',
-    purpose: 'Whether the machine is joined to your directory. Binary, and decisive when true.',
+    id: 'machine-sid', name: 'Machine SID',
+    purpose: 'The Windows security identifier for the machine.',
+    priority: 'High', weight: 30, phase: 1, needsAgent: true,
+  },
+  {
+    id: 'motherboard', name: 'Motherboard serial',
+    purpose: 'Unique to the board. Effectively the machine itself.',
+    priority: 'High', weight: 30, phase: 1, needsAgent: true,
+  },
+  {
+    id: 'mac', name: 'MAC address',
+    purpose: 'The network adapter address. Strong, but changes when the adapter does.',
+    priority: 'High', weight: 30, phase: 1, needsAgent: true,
+  },
+  {
+    id: 'secure-boot', name: 'Secure Boot and certificates',
+    purpose: 'Firmware integrity. Off is not proof of anything, but it is worth knowing.',
     priority: 'High', weight: 20, phase: 1, needsAgent: true,
   },
-
-  // --- Behaviour ------------------------------------------------------------
-  {
-    id: 'typing', category: 'Behaviour', name: 'Typing dynamics',
-    purpose: 'Keystroke speed and intervals. Needs a baseline before it says anything.',
-    priority: 'Low', weight: 5, phase: 2,
-  },
-  {
-    id: 'mouse', category: 'Behaviour', name: 'Mouse and scroll patterns',
-    purpose: 'Movement signatures. Same caveat: useless until there is history.',
-    priority: 'Low', weight: 5, phase: 2,
-  },
-  {
-    id: 'login-freq', category: 'Behaviour', name: 'Login frequency',
-    purpose: 'How often this person signs in, and from where.',
-    priority: 'High', weight: 10, phase: 2,
-  },
-  {
-    id: 'session', category: 'Behaviour', name: 'Session duration and navigation',
-    purpose: 'How long sessions run and where they go.',
-    priority: 'Medium', weight: 5, phase: 2,
-  },
-  {
-    id: 'time', category: 'Behaviour', name: 'Time of access',
-    purpose: 'Sign-ins outside the usual window are the cheapest anomaly to detect.',
-    priority: 'High', weight: 10, phase: 2,
-    config: { kind: 'tolerance', label: 'Hours either side of normal', value: 3, min: 0, max: 12, unit: 'hours' },
-  },
-  {
-    id: 'resource', category: 'Behaviour', name: 'Resource being accessed',
-    purpose: 'Which app. A finance system at 3am is a different question from a wiki.',
-    priority: 'High', weight: 10, phase: 2,
-  },
-  {
-    id: 'role', category: 'Behaviour', name: 'Role and privileges',
-    purpose: 'What the account can do if the sign-in is not who it claims to be.',
-    priority: 'High', weight: 20, phase: 2,
-  },
-]
-
-export const CATEGORIES: { id: AttrCategory; label: string; blurb: string }[] = [
-  { id: 'Hardware', label: 'Hardware', blurb: 'The machine itself. The strongest signals and the slowest to change.' },
-  { id: 'Browser', label: 'Browser', blurb: 'What the browser reports. Easy to collect, easy to change.' },
-  { id: 'Security', label: 'Security', blurb: 'Whether the device can be trusted to report the rest honestly.' },
-  { id: 'Network', label: 'Network', blurb: 'Where the sign-in came from. Moves with the person.' },
-  { id: 'Behaviour', label: 'Behaviour', blurb: 'Patterns over time. Needs history before it says anything.' },
 ]
 
 /* --- Profiles ---------------------------------------------------------------- */
@@ -318,7 +286,7 @@ export interface Roster {
 /** What a new profile starts watching, per reach. Agentless gets only what a
     page can actually read. */
 export const DEFAULT_ATTRS: Record<ProfileReach, string[]> = {
-  agentless: ['browser', 'canvas', 'locale', 'ip', 'isp', 'conn'],
+  agentless: ['browser', 'canvas', 'locale', 'ip', 'isp'],
   agent: ['tpm', 'bios', 'motherboard', 'machine-sid', 'disk', 'os', 'secure-boot'],
 }
 
@@ -333,15 +301,9 @@ export interface FingerprintProfile {
   /** Attribute ids that are switched on. */
   enabled: string[]
   /** Per-attribute overrides of the master's config default. */
-  config: Record<string, string | number>
-  /** Risk mode: per-attribute weight overrides. */
+  config: Record<string, AttrConfigValue>
+  /** Risk mode: per-attribute weight overrides, as one of three tiers. */
   weights: Record<string, number>
-  /** Match mode: how many enabled attributes may drift before it is a new device. */
-  tolerance: number
-  /** Match mode: what happens when the tolerance is exceeded. */
-  onMismatch: 'deny' | 'challenge' | 'allow'
-  /** Risk mode: the upper bound of each band. Deny is everything above challenge. */
-  bands: { allow: number; challenge: number }
 
   /* --- Device restriction ----------------------------------------------------
      Which signals this profile may draw on at all, and what happens the first
@@ -356,16 +318,34 @@ export interface FingerprintProfile {
   maxDevices: number | null
   /** Pre-approved only. */
   roster: Roster | null
-  /** Whether phones and tablets are held to this profile as well as computers. */
-  mobileRestriction: boolean
   /** First sight of a device enrols it silently rather than challenging. */
   autoRegister: boolean
+  /* Whether anybody has answered these questions yet.
+
+     Not derivable from the values: every field above has a working default, so
+     a profile nobody has opened is indistinguishable from one deliberately set
+     to exactly those defaults. The difference matters because the section shows
+     an empty state until it is true, and "agentless, self-service, 3 devices"
+     presented as a configuration nobody chose is a claim the screen cannot
+     support. */
+  restrictionSet: boolean
 
   usedIn: number
 }
 
-export const DEFAULT_BANDS = { allow: 30, challenge: 70 }
+/* --- The three weights a risk profile can give an attribute ---------------------
+   The master carries four (5, 10, 20, 30) because the sheet does. A profile
+   picks from three, because a person setting thirty-eight of these is choosing
+   how much something matters, and "how much" has never usefully had four
+   answers — the fourth is the one that makes the other three ambiguous.
 
+   The master weight still seeds it: an attribute the sheet scores at 5 or 10
+   arrives as Low, 20 as Medium, 30 as High, so the defaults are the sheet's
+   even though the vocabulary is not. */
+export const TIER_WEIGHT: Record<Priority, number> = { High: 30, Medium: 20, Low: 10 }
+
+export const tierOf = (weight: number): Priority =>
+  weight >= 30 ? 'High' : weight >= 20 ? 'Medium' : 'Low'
 
 /* A profile's kind, in the two words a picker row has space for. */
 export const modeLabel = (p: { mode: 'match' | 'risk' }) => (p.mode === 'match' ? 'Attribute match' : 'Risk score')
@@ -382,86 +362,67 @@ export function scoreOf(p: FingerprintProfile, changed: string[]): number {
   return Math.min(100, raw)
 }
 
-export type Band = 'allow' | 'challenge' | 'deny'
+/* `bandOf`, `ceilingOf` and `unreachableBands` lived here and went with the
+   thresholds they read. The profile page no longer offers an Allow-below /
+   Challenge-below pair to set, so there is nothing left for them to check, and
+   a reachability warning about numbers nobody can edit is a warning with no
+   action attached to it.
 
-export function bandOf(p: FingerprintProfile, score: number): Band {
-  if (score <= p.bands.allow) return 'allow'
-  if (score <= p.bands.challenge) return 'challenge'
-  return 'deny'
-}
-
-/** The most a profile can score — every enabled attribute changing at once. */
-export function ceilingOf(p: FingerprintProfile): number {
-  return scoreOf(p, p.enabled)
-}
-
-/* Reachability. A band nobody can land in is a rule that reads as configured and
-   is not, and it is the one mistake this editor can make silently. */
-export function unreachableBands(p: FingerprintProfile): Band[] {
-  const ceiling = ceilingOf(p)
-  const out: Band[] = []
-  if (ceiling <= p.bands.allow) out.push('challenge', 'deny')
-  else if (ceiling <= p.bands.challenge) out.push('deny')
-  return out
-}
-
+   `scoreOf` above stays. It is what a risk profile computes, and the
+   per-attribute tiers are only meaningful because something adds them up. */
 export const seedProfiles: FingerprintProfile[] = [
   {
     id: 'fp-corp',
     name: 'Corporate managed',
     mode: 'match',
-    enabled: ['tpm', 'bios', 'motherboard', 'machine-sid', 'domain', 'os', 'secure-boot'],
-    config: { os: 'Major version' },
+    enabled: ['tpm', 'machine-sid', 'motherboard', 'secure-boot', 'os'],
+    config: { os: { op: 'is at least', value: 'Windows 10 22H2' } },
     weights: {},
-    tolerance: 1,
-    onMismatch: 'challenge',
     /* Every signal it names is one only an agent can read. */
     reach: 'agent',
     registration: 'self',
     maxDevices: 3,
     roster: null,
-    mobileRestriction: true,
     autoRegister: false,
+    restrictionSet: true,
     usedIn: 3,
-    bands: DEFAULT_BANDS,
   },
   {
     id: 'fp-byod',
     name: 'BYOD risk scoring',
     mode: 'risk',
-    enabled: ['browser', 'canvas', 'locale', 'ip', 'isp', 'geo', 'vpn', 'conn', 'device-type', 'os'],
-    config: { browser: 'Family only', ip: 'Subnet', geo: 'Country', vpn: 'Challenge' },
+    enabled: ['device-type', 'os', 'browser', 'canvas', 'locale', 'ip', 'isp', 'geo', 'vpn'],
+    config: {
+      browser: { op: 'is at least', value: 'Chrome 130' },
+      ip: { op: 'is in', value: '10.0.0.0/8' },
+      geo: { op: 'is in', value: 'India' },
+      vpn: 'Challenge',
+    },
     weights: {},
-    tolerance: 2,
-    onMismatch: 'challenge',
     /* Personal machines, so nothing to install: browser and network only. */
     reach: 'agentless',
     registration: 'self',
     maxDevices: 5,
     roster: null,
-    mobileRestriction: true,
     autoRegister: true,
+    restrictionSet: true,
     usedIn: 5,
-    bands: DEFAULT_BANDS,
   },
   {
     id: 'fp-kiosk',
     name: 'Shared kiosk',
     mode: 'match',
-    enabled: ['machine-sid', 'hostname'],
+    enabled: ['machine-sid', 'mac'],
     config: {},
     weights: {},
-    tolerance: 0,
-    onMismatch: 'deny',
     /* A kiosk is a known machine, and nobody should be able to enrol another
        one by walking up to it. */
     reach: 'agent',
     registration: 'pre-approved',
     maxDevices: null,
     roster: { fileName: 'kiosks-floor-3.csv', rows: 24, uploadedAt: '12 Aug 2026' },
-    mobileRestriction: false,
     autoRegister: false,
+    restrictionSet: true,
     usedIn: 1,
-    bands: DEFAULT_BANDS,
   },
 ]

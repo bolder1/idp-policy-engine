@@ -224,6 +224,18 @@ export interface Zone {
   /** Autonomous System Numbers — a whole network operator at once. */
   asn: string[]
   location: ZoneLocation
+  /* v2 only: which half this zone IS.
+
+     v1's zone has two halves that are ANDed, and its shape is derived from what
+     you happened to fill in — a zone with addresses and no places matches
+     "those addresses, anywhere". v2 asks the question up front instead: a zone
+     is networks or it is places, chosen when it is named, and the inner page
+     only offers that one.
+
+     Optional, and read rather than enforced, so the two versions share a store:
+     a zone made in v1 with both halves filled still holds both, and v2 shows
+     the half this names. Nothing is deleted by looking at a zone in v2. */
+  matchOn?: 'net' | 'loc'
   usedIn: number
   /* The two defaults ship with the tenant and every rule can assume they
      exist, so they are editable but not removable. Deleting them would break
@@ -306,6 +318,7 @@ export const zones: Zone[] = [
      geolocates, which is what an office egress block should mean. */
   {
     id: 'office',
+    matchOn: 'net',
     kind: 'allowed',
     name: 'Office Network',
     ip: ['10.0.0.0/8', '192.168.1.0/24', '203.0.113.5', '198.51.100.0/24', '172.16.0.0/12', '2001:db8::/32'],
@@ -317,6 +330,7 @@ export const zones: Zone[] = [
      rotate, so they cannot be enumerated. */
   {
     id: 'eu',
+    matchOn: 'loc',
     kind: 'custom',
     name: 'EU Countries',
     ip: [],
@@ -326,6 +340,7 @@ export const zones: Zone[] = [
   },
   {
     id: 'asn',
+    matchOn: 'net',
     kind: 'allowed',
     name: 'Corporate ASN',
     ip: [],
@@ -338,6 +353,7 @@ export const zones: Zone[] = [
      what this zone says. */
   {
     id: 'jio-in',
+    matchOn: 'net',
     kind: 'custom',
     name: 'Reliance Jio · India',
     ip: [],
@@ -347,6 +363,7 @@ export const zones: Zone[] = [
   },
   {
     id: 'pune-hq',
+    matchOn: 'loc',
     name: 'Pune HQ · 25km',
     kind: 'custom',
     ip: [],
@@ -361,6 +378,7 @@ export const zones: Zone[] = [
   },
   {
     id: 'anon',
+    matchOn: 'net',
     kind: 'blocked',
     name: 'Anonymizers',
     ip: ['185.220.101.0/24', '185.220.102.0/24'],

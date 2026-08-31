@@ -19,6 +19,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Unlink,
   X,
 } from 'lucide-react'
 
@@ -34,7 +35,7 @@ import {
 } from '../data'
 import { coveredBy, placeContext, searchPlaces, type Place } from '../places'
 import { useBrand } from '../store'
-import { EmptyState, UnusedArt, ZoneArt } from '../empty'
+import { EmptyState } from '../empty'
 import { classifyIp, describeZone, validateZone } from './zone-validation'
 import { parseEntries } from './zone-entries'
 import { policiesUsing, rulesUsing } from './usage'
@@ -264,12 +265,11 @@ export function ZonesFinal() {
 function ZonesEmpty({ onCreate }: { onCreate: () => void }) {
   return (
     <EmptyState
-      art={<ZoneArt />}
+      icon={Network}
       title="No zones yet"
-      blurb="A zone is a named boundary a rule can point at — an office range, a country, a network operator."
+      blurb="A named boundary your policy rules can point at."
       /* The one thing this screen has to teach, because getting it backwards is
          the model's sharpest edge. */
-      note="A zone has two halves, networks and places, and both must match. Leave one empty and it places no constraint at all."
       action={
         <Button variant="brand" onClick={onCreate}>
           <Plus size={15} strokeWidth={2.2} aria-hidden />
@@ -288,7 +288,7 @@ function ZonesEmpty({ onCreate }: { onCreate: () => void }) {
    band that outweighs the chips next to it cannot read as blank — and it is
    tinted with the same info tone `validateZone` already grades this state as,
    so the card's colour is the linter's verdict rather than a second opinion. */
-function AnyBand({ what }: { what: string }) {
+export function AnyBand({ what }: { what: string }) {
   return (
     <span className="bz7__any">
       <InfinityIcon size={13} strokeWidth={2} aria-hidden />
@@ -297,7 +297,7 @@ function AnyBand({ what }: { what: string }) {
   )
 }
 
-function addressBits(z: Zone): string[] {
+export function addressBits(z: Zone): string[] {
   const out: string[] = []
   /* Counted as networks rather than addresses, matching the half's own name —
      and more accurate for it, since one entry here can be a single host, a /16
@@ -309,13 +309,13 @@ function addressBits(z: Zone): string[] {
   return out
 }
 
-function placeBits(l: ZoneLocation): string[] {
+export function placeBits(l: ZoneLocation): string[] {
   const out = [...l.countries, ...l.states, ...l.cities]
   if (l.radius) out.push(l.radius.label ?? `${l.radius.km}km radius`)
   return out
 }
 
-function Chips({ items, max = 3 }: { items: string[]; max?: number }) {
+export function Chips({ items, max = 3 }: { items: string[]; max?: number }) {
   const rest = items.length - max
   return (
     <>
@@ -723,9 +723,9 @@ function ZoneDetail({
         {users.length === 0 ? (
           <EmptyState
             compact
-            art={<UnusedArt />}
+            icon={Unlink}
             title="Nothing references this zone"
-            blurb="It can be changed or deleted without affecting a single sign-in."
+            blurb="Safe to change or delete."
           />
         ) : (
           <ul className="bz7__uses">
@@ -862,7 +862,7 @@ const QUICK: { label: string; value: string; hint: string }[] = [
   { label: 'My current IP', value: CURRENT_IP, hint: 'The address this session is coming from' },
 ]
 
-function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
+export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
   const [text, setText] = useState('')
   const [filter, setFilter] = useState('')
   /* Says what the last paste did. A paste of four hundred lines that silently
@@ -1075,7 +1075,7 @@ function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) 
    catalogue ranks the hits rather than filtering them, so three letters that
    match a country and a city inside it offer the country first. */
 
-function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
+export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
   const [q, setQ] = useState('')
   const [cursor, setCursor] = useState(0)
   const hits = useMemo(() => searchPlaces(q), [q])

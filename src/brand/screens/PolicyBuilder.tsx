@@ -2058,7 +2058,7 @@ function ObjectsPanel({
     },
     {
       id: 'fingerprint',
-      title: 'Device fingerprint',
+      title: 'Device profiles',
       icon: MonitorSmartphone,
       manage: () => store.go({ name: 'fingerprint' }),
       rows: store.fingerprints.map((p) => ({
@@ -2072,12 +2072,17 @@ function ObjectsPanel({
               <dt>Attributes</dt>
               <dd>{p.enabled.length} on</dd>
             </div>
+            {/* Was the tolerance or the bands, which no longer exist. The
+                restriction is the other half a rule author wants before
+                attaching one of these: what it can read, and how many machines
+                a person may bring to it. */}
             <div>
-              <dt>{p.mode === 'match' ? 'Tolerance' : 'Bands'}</dt>
+              <dt>Devices</dt>
               <dd>
-                {p.mode === 'match'
-                  ? `${p.tolerance} may drift, then ${p.onMismatch}`
-                  : `allow ≤${p.bands.allow}, challenge ≤${p.bands.challenge}`}
+                {p.reach === 'agent' ? 'Agent-based' : 'Agentless'}
+                {p.registration === 'pre-approved'
+                  ? ' · roster'
+                  : ` · ${p.maxDevices ?? 3} per person`}
               </dd>
             </div>
           </dl>

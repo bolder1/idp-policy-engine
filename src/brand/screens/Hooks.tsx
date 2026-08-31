@@ -4,7 +4,8 @@ import { AlertTriangle, Info, Link2, Plus, RefreshCw, Trash2, Zap } from 'lucide
 import { PageHead } from '../Shell'
 import { Badge, Button, Modal } from '../kit'
 import { useBrand } from '../store'
-import { EmptyState, HookArt } from '../empty'
+import { Webhook } from 'lucide-react'
+import { EmptyState } from '../empty'
 import { policiesUsing } from './usage'
 import {
   FAILURE_BLURB,
@@ -92,9 +93,9 @@ export function Hooks() {
 
       {store.hooks.length === 0 ? (
         <EmptyState
-          art={<HookArt />}
+          icon={Webhook}
           title="No hooks yet"
-          blurb="A hook lets a rule ask something this console does not hold — an entitlement system, a fraud model — and use the answer."
+          blurb="Ask a system this console does not hold, and use the answer."
           action={
             <Button variant="brand" onClick={() => setEditing(blank())}>
               <Plus size={15} strokeWidth={2.2} aria-hidden />

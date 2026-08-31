@@ -37,11 +37,31 @@
   background: var(--surface-inset); color: var(--text-tertiary);
 }
 .bfp2__tile--lg { width: 48px; height: 48px; border-radius: var(--radius-lg); }
-/* The two profile modes were blue and indigo. Not a rainbow, but the worst
-   version of a small one: two colours a reader cannot reliably tell apart,
-   encoding something the row already says twice — the chip spells out
-   "Attribute based" or "Risk based", and the tile carries a different icon for
-   each. The colour was a third copy of a fact that was never in doubt. */
+/* --- The two modes, in two colours -----------------------------------------
+   Colour is back on the mode, and the reason it went away is the reason it is
+   allowed back in this form.
+
+   It was blue and indigo before: two cool hues four steps apart, told apart
+   only by a 36px fill, encoding something the row already spelled out. Nobody
+   could name which was which without reading the chip anyway, so the colour was
+   a third copy of a fact that was never in doubt.
+
+   What is different now is the separation and the surface. Blue against violet
+   is far enough apart to be learned rather than compared, and the chip carries
+   the hue three ways — tinted ground, a border, and the label itself in the
+   saturated tone — so the difference is in the TEXT, not only in a square
+   beside it. That is the version a reader can recognise at a glance instead of
+   holding two swatches side by side.
+
+   Which colour goes where is not arbitrary either. Attribute match is a
+   comparison with a yes and a no in it, and blue is this system's factual
+   tone. Risk is a weighted judgement that lands somewhere on a scale, and
+   violet is the kit's own colour for a label that wants attention while being
+   neither a state nor an action — which is exactly what a mode is. Neither
+   borrows green or amber, because a profile's KIND must not read as its
+   health. */
+.bfp2__tile.is-match { background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.bfp2__tile.is-risk { background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
 .bfp2__uses { font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; }
 .bfp2__uses.is-quiet { color: var(--text-muted); }
 
@@ -81,6 +101,15 @@
   border-radius: var(--radius-sm);
   background: var(--surface-inset); color: var(--text-secondary);
 }
+/* The type's colour, on the card where the type is chosen. Learning which hue
+   means which costs nothing if the first place you meet the pair is the moment
+   you pick between them — and every chip afterwards is then a reminder rather
+   than a legend to look up. */
+.bfp2__mode-ico.is-match { background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.bfp2__mode-ico.is-risk { background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
+/* Selection stays brand, and takes the icon with it. The card is answering
+   "which one is chosen", and that question outranks "which one is which" while
+   the dialog is open. */
 .bfp2__mode-card.is-on .bfp2__mode-ico { background: transparent; color: var(--brand-active); }
 .bfp2__mode-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .bfp2__mode-body strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
@@ -167,6 +196,43 @@
   background: var(--surface-sunken);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
 }
+/* --- The five category tints ---------------------------------------------------
+   One declaration per family, published as variables, so every consumer of a
+   category's colour reads the same four values: the rail icon, the group
+   heading, the spine on a section, a selected row, its tick box and its icon.
+   They each used to restate five selectors of their own, which is how the
+   colour came to be missing in all of them at once — the selectors survived a
+   change that emptied their values, and five near-identical blocks all
+   resolving to brand orange does not look like a mistake until you count them.
+   A sixth category is one line here now.
+
+   The families are the kit's feedback ramps, picked for hue distance rather
+   than for meaning: five is exactly the count at which two neighbouring hues
+   stop being tellable apart, which is the failure this had before. None of
+   them is the positive or negative ramp — Behaviour is not a warning, Security
+   is not a pass, and a family must never read as a verdict on the attributes
+   filed under it. */
+.bfp2__pang.is-slate, .bfp2__cat.is-slate, .bfp2__railitem.is-slate {
+  --cat-bg: var(--fb-neutral-bg); --cat-border: var(--fb-neutral-border);
+  --cat-fg: var(--fb-neutral-fg); --cat-dot: var(--fb-neutral-dot);
+}
+.bfp2__pang.is-lime, .bfp2__cat.is-lime, .bfp2__railitem.is-lime {
+  --cat-bg: var(--fb-lime-bg); --cat-border: var(--fb-lime-border);
+  --cat-fg: var(--fb-lime-fg); --cat-dot: var(--fb-lime-dot);
+}
+.bfp2__pang.is-indigo, .bfp2__cat.is-indigo, .bfp2__railitem.is-indigo {
+  --cat-bg: var(--fb-accent-bg); --cat-border: var(--fb-accent-border);
+  --cat-fg: var(--fb-accent-fg); --cat-dot: var(--fb-accent-dot);
+}
+.bfp2__pang.is-blue, .bfp2__cat.is-blue, .bfp2__railitem.is-blue {
+  --cat-bg: var(--fb-info-bg); --cat-border: var(--fb-info-border);
+  --cat-fg: var(--fb-info-fg); --cat-dot: var(--fb-info-dot);
+}
+.bfp2__pang.is-amber, .bfp2__cat.is-amber, .bfp2__railitem.is-amber {
+  --cat-bg: var(--fb-notice-bg); --cat-border: var(--fb-notice-border);
+  --cat-fg: var(--fb-notice-fg); --cat-dot: var(--fb-notice-dot);
+}
+
 .bfp2__railitem {
   display: flex; align-items: center; gap: 9px;
   padding: 8px 9px; border-radius: var(--radius-sm);
@@ -181,10 +247,13 @@
 .bfp2__railitem.is-dim { opacity: 0.4; }
 
 /* The icon carries the tint. It is the one mark on the row, so it is doing the
-   work the spine and the sentence used to share. */
-.bfp2__railico { flex: none; display: grid; place-items: center; color: var(--text-muted); }
-/* No tint rule here on purpose: the resting tile is the neutral in the base
-   above, and brand is spent only on what is current. */
+   work the spine and the sentence used to share — and it says the tint even
+   when the row is not the selected one, which is the point: the rail is where
+   the five colours are learned. */
+.bfp2__railico {
+  flex: none; display: grid; place-items: center;
+  color: var(--cat-fg, var(--text-muted));
+}
 
 .bfp2__railitem > strong {
   flex: 1; min-width: 0;
@@ -224,7 +293,9 @@
 .bfp2__panghead h4 {
   margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
   letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--cat-fg, var(--text-secondary));
 }
+.bfp2__panghead > svg { color: var(--cat-fg, var(--text-muted)); }
 /* The heading and its icon take the category tint together — the same mark the
    rail uses, so a search showing four groups reads as four families. */
 .bfp2__panghead > span {
@@ -271,37 +342,37 @@
      never shifts sideways on selection. */
   color: transparent;
 }
-/* The tick is the surface colour rather than a fixed white, because the fill
-   under it flips lightness between themes: the category tint is dark on a
-   light theme and light on a dark one, so a white tick that reads at 7:1 in
-   one reads at under 3:1 in the other. --surface-raised is the near-opposite
-   of the tint in both. */
-.bfp2__opt.is-on .bfp2__optbox { color: var(--surface-raised); }
-
-/* Selected takes the CATEGORY's colour, the same tint as the rail spine and the
+/* Selected takes the CATEGORY's colour, the same tint as the rail icon and the
    group heading — so a search showing hits from four categories reads as four
    categories rather than one long orange smear. */
-.bfp2__pang.is-slate .bfp2__opt.is-on,
-.bfp2__pang.is-teal .bfp2__opt.is-on,
-.bfp2__pang.is-indigo .bfp2__opt.is-on,
-.bfp2__pang.is-blue .bfp2__opt.is-on,
-.bfp2__pang.is-amber .bfp2__opt.is-on,
-.bfp2__pang.is-slate .bfp2__opt.is-on .bfp2__optbox,
-.bfp2__pang.is-teal .bfp2__opt.is-on .bfp2__optbox,
-.bfp2__pang.is-indigo .bfp2__opt.is-on .bfp2__optbox,
-.bfp2__pang.is-blue .bfp2__opt.is-on .bfp2__optbox,
-.bfp2__pang.is-amber .bfp2__opt.is-on .bfp2__optbox { border-color: var(--brand-active); background: var(--brand-subtle-bg); }
+.bfp2__opt.is-on {
+  border-color: var(--cat-border, var(--brand));
+  background: var(--cat-bg, var(--brand-subtle-bg));
+}
+
+/* A ticked box is FILLED, which is the half that had gone missing: the box kept
+   the row's pale tint while the tick was painted --surface-raised, so a white
+   mark sat on a near-white ground and every selected row showed an empty
+   square. A checkbox is the one control on the row whose whole job is to be
+   unambiguous at 15px, so it takes the saturated tone and the tick takes the
+   surface.
+
+   The tick is --surface-raised rather than a fixed white because the fill under
+   it flips lightness between themes: the tint is dark on a light theme and
+   light on a dark one, so a white tick reading 7:1 in one reads under 3:1 in
+   the other. --surface-raised is the near-opposite of the fill in both. */
+.bfp2__opt.is-on .bfp2__optbox {
+  border-color: var(--cat-dot, var(--brand-active));
+  background: var(--cat-dot, var(--brand-active));
+  color: var(--surface-raised);
+}
 
 /* The attribute's own mark, quiet by default and taking the category tint once
    the row is on — so a ticked row reads as ticked from the icon as well as the
    fill, and an unticked column of marks stays scannable without competing with
    the names beside them. */
 .bfp2__optico { flex: none; display: grid; place-items: center; color: var(--text-muted); }
-.bfp2__pang.is-slate .bfp2__opt.is-on .bfp2__optico,
-.bfp2__pang.is-teal .bfp2__opt.is-on .bfp2__optico,
-.bfp2__pang.is-indigo .bfp2__opt.is-on .bfp2__optico,
-.bfp2__pang.is-blue .bfp2__opt.is-on .bfp2__optico,
-.bfp2__pang.is-amber .bfp2__opt.is-on .bfp2__optico { color: var(--brand-active); }
+.bfp2__opt.is-on .bfp2__optico { color: var(--cat-fg, var(--brand-active)); }
 
 .bfp2__optname {
   flex: 1; min-width: 0;
@@ -447,9 +518,11 @@
   border-bottom: 1px solid var(--border-subtle);
   /* The tint as a spine. A fill behind the heading would put a saturated band
      across every group; a spine identifies the group and stays out of the way. */
-  border-left: 3px solid var(--border-strong);
+  border-left: 3px solid var(--cat-dot, var(--border-strong));
   margin-left: -1px;
 }
+.bfp2__cathead > svg { color: var(--cat-fg, var(--text-muted)); }
+.bfp2__cathead h4 { color: var(--cat-fg, var(--text-primary)); }
 
 /* The picker's mark, repeated — so the group you configure under is visibly the
    group you chose under. */
@@ -532,17 +605,23 @@
   white-space: nowrap;
 }
 .bfp2__tile--sm { width: 24px; height: 24px; border-radius: var(--radius-sm); }
-/* The mode as a chip, tinted to match its own tile in the first column — so the
-   row states the kind twice in the same colour rather than once in colour and
-   once in grey text. Blue matches, indigo scores. */
+/* The mode as a chip, in the same colour as its own tile in the first column,
+   so a row states its kind twice in one colour rather than once in colour and
+   once in grey. The border is what keeps a pale tint legible where the row
+   behind it is already white. */
 .bfp2__modechip {
   display: inline-flex; align-items: center;
   padding: 2px 9px; border-radius: var(--radius-sm);
+  border: 1px solid transparent;
   font-style: normal; font-size: var(--fs-xs); font-weight: var(--fw-medium);
   white-space: nowrap;
 }
-.bfp2__modechip.is-match,
-.bfp2__modechip.is-risk { background: var(--surface-inset); color: var(--text-secondary); }
+.bfp2__modechip.is-match {
+  background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg);
+}
+.bfp2__modechip.is-risk {
+  background: var(--fb-accent-bg); border-color: var(--fb-accent-border); color: var(--fb-accent-fg);
+}
 .bfp2__tnum { font-size: var(--fs-md); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .bfp2__tuses { font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; }
 .bfp2__tuses.is-quiet { color: var(--text-muted); }

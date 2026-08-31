@@ -340,7 +340,11 @@ const MODES: { id: ProfileMode; label: string; blurb: string; icon: typeof Slide
    selected-vs-not is carried by the fill existing at all. */
 const CAT_META: Record<string, { tint: string; icon: typeof Cpu }> = {
   Hardware: { tint: 'slate', icon: Cpu },
-  Browser: { tint: 'teal', icon: Globe },
+  /* 'lime', not 'teal'. The tints resolve to the kit's feedback ramps and there
+     is no teal one — the class said teal while the colour came out green,
+     which is the kind of quiet disagreement that gets read as a bug in the
+     ramp rather than in the name. */
+  Browser: { tint: 'lime', icon: Globe },
   Security: { tint: 'indigo', icon: ShieldCheck },
   Network: { tint: 'blue', icon: Wifi },
   Behaviour: { tint: 'amber', icon: Activity },
@@ -771,7 +775,7 @@ function CreateModal({
               className={`bfp2__mode-card ${mode === m.id ? 'is-on' : ''}`}
               onClick={() => setMode(m.id)}
             >
-              <span className="bfp2__mode-ico" aria-hidden>
+              <span className={`bfp2__mode-ico is-${m.id}`} aria-hidden>
                 <m.icon size={17} strokeWidth={1.8} />
               </span>
               <span className="bfp2__mode-body">

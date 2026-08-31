@@ -167,14 +167,14 @@ describe('every seeded zone is valid', () => {
 
 describe('describeZone', () => {
   it('lists both facets, with "any" on the empty side', () => {
-    expect(describeZone(zone({ ip: ['203.0.113.0/24'] }))).toBe('1 address · Any location')
+    expect(describeZone(zone({ ip: ['203.0.113.0/24'] }))).toBe('1 network · Any location')
     expect(describeZone(zone({ location: loc({ countries: ['India'] }) }))).toBe(
-      'Any address · India',
+      'Any network · India',
     )
   })
 
   it('counts addresses and ASNs separately', () => {
     const z = zone({ ip: ['10.0.0.0/8', '10.1.0.0/16'], asn: ['AS64512'] })
-    expect(describeZone(z)).toContain('2 addresses + 1 ASN')
+    expect(describeZone(z)).toContain('2 networks + 1 ASN')
   })
 })

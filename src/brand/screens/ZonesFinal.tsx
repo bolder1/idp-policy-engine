@@ -82,8 +82,18 @@ function shapeOf(z: Zone): Shape {
   return 'none'
 }
 
+/* "IP networks", not "Addresses".
+
+   A zone has two halves and they were called Addresses and Locations, which
+   are not opposites — an address IS a location, and a reader working out which
+   tab holds what had to know in advance that one of them meant the network
+   sense of the word and the other meant the geographic one. Naming the first
+   half after the thing it actually holds ends the overlap: one half is where
+   the request comes FROM on the network, the other is where it comes from on
+   the map. ASNs live in this half too, and an ASN is a set of networks, so the
+   name still covers everything the field accepts. */
 const SHAPE: Record<Shape, { label: string; icon: typeof Network; tint: string }> = {
-  net: { label: 'Addresses', icon: Network, tint: 'blue' },
+  net: { label: 'IP networks', icon: Network, tint: 'blue' },
   loc: { label: 'Locations', icon: Globe, tint: 'green' },
   both: { label: 'Both', icon: Layers, tint: 'indigo' },
   none: { label: 'Matches everything', icon: AlertTriangle, tint: 'warn' },
@@ -145,7 +155,7 @@ export function ZonesFinal() {
           <header className="bz7__head">
             <div>
               <h1>Zones</h1>
-              <p>Named boundaries — addresses, networks and places — that your policy rules reference.</p>
+              <p>Named boundaries — IP networks and places — that your policy rules reference.</p>
             </div>
             <div className="bz7__headactions">
               {/* One way in now.
@@ -175,7 +185,7 @@ export function ZonesFinal() {
                   <input
                     type="text"
                     value={q}
-                    placeholder="Search zones, addresses or places…"
+                    placeholder="Search zones, networks or places…"
                     aria-label="Search zones"
                     onChange={(e) => setQ(e.target.value)}
                   />
@@ -259,7 +269,7 @@ function ZonesEmpty({ onCreate }: { onCreate: () => void }) {
       blurb="A zone is a named boundary a rule can point at — an office range, a country, a network operator."
       /* The one thing this screen has to teach, because getting it backwards is
          the model's sharpest edge. */
-      note="A zone has two halves, addresses and places, and both must match. Leave one empty and it places no constraint at all."
+      note="A zone has two halves, networks and places, and both must match. Leave one empty and it places no constraint at all."
       action={
         <Button variant="brand" onClick={onCreate}>
           <Plus size={15} strokeWidth={2.2} aria-hidden />
@@ -289,7 +299,10 @@ function AnyBand({ what }: { what: string }) {
 
 function addressBits(z: Zone): string[] {
   const out: string[] = []
-  if (z.ip.length) out.push(`${z.ip.length} address${z.ip.length === 1 ? '' : 'es'}`)
+  /* Counted as networks rather than addresses, matching the half's own name —
+     and more accurate for it, since one entry here can be a single host, a /16
+     or an entire ASN. */
+  if (z.ip.length) out.push(`${z.ip.length} network${z.ip.length === 1 ? '' : 's'}`)
   /* ASNs get named, addresses get counted. Nobody recognises 198.51.100.0/24,
      so six of them is six units of noise; everybody recognises "Reliance Jio". */
   for (const a of z.asn) out.push(ASN_DIRECTORY[a] ?? a)
@@ -344,7 +357,7 @@ function ZoneCard({ zone, policies, onOpen }: { zone: Zone; policies: Policy[]; 
       <div className="bz7__ops">
         <div className="bz7__op">
           <Network size={13} strokeWidth={1.9} aria-hidden />
-          {ipSectionEmpty(zone) ? <AnyBand what="address" /> : <Chips items={addressBits(zone)} />}
+          {ipSectionEmpty(zone) ? <AnyBand what="network" /> : <Chips items={addressBits(zone)} />}
         </div>
         <div className="bz7__op">
           <Globe size={13} strokeWidth={1.9} aria-hidden />
@@ -403,7 +416,7 @@ function ZoneTable({
     <div className="bz7__table" role="table" onClick={() => setMenuFor(null)}>
       <div className="bz7__trow bz7__thead" role="row">
         <span role="columnheader">Zone</span>
-        <span role="columnheader">Addresses</span>
+        <span role="columnheader">IP networks</span>
         <span role="columnheader">Locations</span>
         <span role="columnheader">Used by</span>
         <span role="columnheader" />
@@ -429,7 +442,7 @@ function ZoneTable({
               </button>
             </span>
             <span role="cell" className="bz7__tcell">
-              {ipSectionEmpty(z) ? <AnyBand what="address" /> : <Chips items={addressBits(z)} max={2} />}
+              {ipSectionEmpty(z) ? <AnyBand what="network" /> : <Chips items={addressBits(z)} max={2} />}
             </span>
             <span role="cell" className="bz7__tcell">
               {locationEmpty(z.location) ? (
@@ -662,7 +675,7 @@ function ZoneDetail({
                 onClick={() => setTab('net')}
               >
                 <Network size={14} strokeWidth={1.9} aria-hidden />
-                Addresses
+                IP networks
                 <em>{netCount}</em>
               </button>
               <button
@@ -771,7 +784,7 @@ const blank = (): Zone => ({
    saves.
 
    The zone it creates matches nothing, which is not a broken state: the list
-   already renders "Any address, anywhere" for it, and the detail page opens
+   already renders "Any network, anywhere" for it, and the detail page opens
    asking what it should match on. */
 function NameOnlyModal({
   open,
@@ -910,7 +923,7 @@ function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) 
       <header>
         <h4>
           <Network size={13} strokeWidth={2} aria-hidden />
-          Addresses and networks
+          IP addresses and networks
           {/* Written from what `classifyIp` and `isValidAsn` actually accept,
               not from the format note the reference showed — that one omits
               IPv6 and ASNs, both of which parse here, and a help text that
@@ -936,7 +949,7 @@ function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) 
             }
           />
         </h4>
-        <span>{total === 0 ? 'Any address' : `${total} ${total === 1 ? 'entry' : 'entries'}`}</span>
+        <span>{total === 0 ? 'Any network' : `${total} ${total === 1 ? 'entry' : 'entries'}`}</span>
       </header>
 
       <div className="bz7__add">
@@ -948,7 +961,7 @@ function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) 
              the SHAPE — and at sixty characters the old one was longer than the
              field on a narrow panel and clipped mid-word. */
           placeholder="10.0.0.1, 192.168.0.0/24, AS15169"
-          aria-label="Add addresses or networks"
+          aria-label="Add IP addresses or networks"
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -1027,7 +1040,7 @@ function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) 
       )}
 
       {all.length === 0 ? (
-        <AnyBand what="address" />
+        <AnyBand what="network" />
       ) : rows.length === 0 ? (
         <p className="bz7__gate">Nothing matches “{filter.trim()}”.</p>
       ) : (

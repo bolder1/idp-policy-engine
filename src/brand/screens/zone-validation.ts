@@ -143,7 +143,7 @@ export function validateZone(z: Zone): ZoneIssue[] {
       id: 'any-address',
       level: 'info',
       section: 'ip',
-      title: 'Any address',
+      title: 'Any network',
       detail: 'No addresses or ASNs, so this zone matches the location from any network.',
     })
   }
@@ -153,7 +153,7 @@ export function validateZone(z: Zone): ZoneIssue[] {
       level: 'info',
       section: 'location',
       title: 'Any location',
-      detail: 'No location, so this zone matches those addresses wherever they geolocate.',
+      detail: 'No location, so this zone matches those networks wherever they geolocate.',
     })
   }
 
@@ -167,9 +167,12 @@ export const canSaveZone = (z: Zone) => !validateZone(z).some((i) => i.level ===
 export function describeZone(z: Zone): string {
   const parts: string[] = []
   const net: string[] = []
-  if (z.ip.length) net.push(`${z.ip.length} address${z.ip.length === 1 ? '' : 'es'}`)
+  /* Counted as networks, which is what the half is called on screen. One entry
+     here can be a single host, a /16 or a whole range, so "networks" is also
+     the more honest collective for a count that treats them as one unit. */
+  if (z.ip.length) net.push(`${z.ip.length} network${z.ip.length === 1 ? '' : 's'}`)
   if (z.asn.length) net.push(`${z.asn.length} ASN${z.asn.length === 1 ? '' : 's'}`)
-  parts.push(net.length ? net.join(' + ') : 'Any address')
+  parts.push(net.length ? net.join(' + ') : 'Any network')
 
   const l = z.location
   const geo: string[] = []

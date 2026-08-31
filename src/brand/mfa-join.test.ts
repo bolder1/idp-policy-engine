@@ -40,16 +40,29 @@ describe('the key survives every collision the data contains', () => {
   })
 })
 
+/* Scoped to SECOND FACTORS, which is what these invariants were always about.
+
+   The catalogue gained the three ways a session can start — password, passkeys,
+   magic link — and none of them has the things asserted below: no provider
+   integration to configure, no enrolment ceremony to walk a person through, no
+   delivery family, and no row on the MFA sheet. Password in particular is on
+   for everyone and configured by nobody.
+
+   Asserting over the whole array would have forced a form and a shape to be
+   invented for each of them just to keep a test quiet, which is the test
+   changing the product. */
+const FACTORS = AUTH_METHODS.filter((m) => m.use === 'second')
+
 describe('every catalogue method reaches the sheet', () => {
   it('maps all 11 channels to a real family', () => {
-    for (const m of AUTH_METHODS) {
+    for (const m of FACTORS) {
       expect(FAMILY_OF_CHANNEL[m.channel], `no family for channel ${m.channel}`).toBeDefined()
       expect(familyForChannel(m.channel), `family missing for ${m.channel}`).toBeDefined()
     }
   })
 
-  it('maps all 21 methods to a real MfaMethod', () => {
-    for (const m of AUTH_METHODS) {
+  it('maps every second factor to a real MfaMethod', () => {
+    for (const m of FACTORS) {
       expect(mfaMethodFor(m.id), `${m.name} (${m.id}) does not reach the sheet`).toBeDefined()
     }
   })
@@ -71,7 +84,7 @@ describe('siblings are read off the catalogue, not the sheet', () => {
   it('never names a method that has no row', () => {
     // The sheet carries Vasco OTP and Digital Persona; the catalogue does not.
     const rows = new Set(AUTH_METHODS.map((m) => m.name))
-    for (const m of AUTH_METHODS) {
+    for (const m of FACTORS) {
       for (const s of siblingsOf(m)) {
         expect(rows.has(s.name), `${m.name} names an unreachable sibling: ${s.name}`).toBe(true)
       }
@@ -79,7 +92,7 @@ describe('siblings are read off the catalogue, not the sheet', () => {
   })
 
   it('excludes the method itself', () => {
-    for (const m of AUTH_METHODS) {
+    for (const m of FACTORS) {
       expect(siblingsOf(m).some((s) => s.id === m.id)).toBe(false)
     }
   })

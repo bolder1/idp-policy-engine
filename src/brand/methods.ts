@@ -27,9 +27,25 @@ export type MethodSetting =
   | { kind: 'toggle'; id: string; label: string; help?: string; value: boolean }
   | { kind: 'select'; id: string; label: string; help?: string; value: string; options: string[] }
 
+/* What a method is FOR, which is the axis the screen now sorts on.
+
+   The catalogue used to hold only second factors, and the three ways a session
+   can START — password, passkeys, magic link — lived as local state in a
+   component, because they were drawn as a block above the list rather than as
+   part of it. That made them unsearchable, unfilterable, and absent from every
+   count on the page: "21 methods" was never the number of ways into this
+   tenant.
+
+   They are catalogue entries now, marked by use. Recovery is deliberately NOT
+   one of these values — a method can be a second factor AND a way back in, and
+   three of them are, so it stays the separate `alsoRecovery` flag it always
+   was. `use` says what a method IS; `alsoRecovery` says what it can also do. */
+export type MethodUse = 'primary' | 'second'
+
 export interface AuthMethod {
   id: string
   name: string
+  use: MethodUse
   tier: MethodTier
   /** The console's own channel grouping, kept because admins know it. */
   channel: string
@@ -46,6 +62,10 @@ export interface AuthMethod {
   settings?: MethodSetting[]
   /** SMS, email and voice draw down a purchased balance. */
   balance?: { label: string; remaining: number }
+  /* On for everyone and not the tenant's to change — password, and nothing
+     else. The row says so in words rather than showing a switch it would have
+     to refuse. */
+  locked?: boolean
 }
 
 export const METHOD_TIERS: { name: MethodTier; blurb: string }[] = [
@@ -68,9 +88,67 @@ export const METHOD_TIERS: { name: MethodTier; blurb: string }[] = [
 ]
 
 export const AUTH_METHODS: AuthMethod[] = [
+  /* --- How a session starts ------------------------------------------------
+     Three entries that were never in this array and should always have been.
+
+     Password is `configured` and `active` and cannot be otherwise: it is the
+     one method every account has whether or not anything else is switched on,
+     and a screen listing twenty-one ways to prove an identity while never
+     mentioning the one everybody actually uses reads as though passwords had
+     been turned off. It carries `locked` so the row states the fact instead of
+     offering a switch that refuses the click.
+
+     The other two REPLACE the password rather than following it, which is what
+     makes them primary and not second factors. */
+  {
+    id: 'password',
+    use: 'primary',
+    name: 'Password',
+    tier: 'Knowledge & tokens',
+    channel: 'Password',
+    description: 'Standard password sign-in, enabled for every user in this tenant.',
+    configured: true,
+    active: true,
+    allowed: true,
+    locked: true,
+  },
+  {
+    id: 'passkey-primary',
+    use: 'primary',
+    name: 'Passkeys',
+    tier: 'Phishing-resistant',
+    /* Same reasoning as the magic link: the ceremony is biometric, the job is
+       starting a session. FIDO2 / Passkey stays in Biometric, because that one
+       IS a second factor — the two are the same technology doing two jobs, and
+       the family says which job. */
+    channel: 'Password',
+    description:
+      'Sign in with the device — Face ID, a fingerprint, or a security key. No password typed, and nothing a lookalike site can reuse.',
+    configured: true,
+    active: true,
+    allowed: true,
+  },
+  {
+    id: 'magic-link',
+    use: 'primary',
+    name: 'Magic link',
+    tier: 'Delivery-based',
+    /* Filed under Password rather than Email. It arrives by email, which is
+       what the Email family is about — but this one REPLACES the password
+       rather than following it, and filing it by delivery would put a way of
+       starting a session inside a family of second factors. */
+    channel: 'Password',
+    description:
+      'A one-click sign-in link sent to the address on the account. Convenient, and only ever as strong as the mailbox behind it.',
+    configured: true,
+    active: false,
+    allowed: false,
+  },
+
   // --- Phishing-resistant ---------------------------------------------------
   {
     id: 'fido2',
+    use: 'second',
     name: 'FIDO2 / Passkey',
     tier: 'Phishing-resistant',
     channel: 'Biometric',
@@ -83,6 +161,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'cac',
+    use: 'second',
     name: 'CAC Card',
     tier: 'Phishing-resistant',
     channel: 'Smart Cards',
@@ -104,6 +183,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   // --- App-based ------------------------------------------------------------
   {
     id: 'mo-push',
+    use: 'second',
     name: 'miniOrange Push',
     tier: 'App-based',
     channel: 'miniOrange Authenticator',
@@ -131,6 +211,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'mo-otp',
+    use: 'second',
     name: 'miniOrange OTP',
     tier: 'App-based',
     channel: 'miniOrange Authenticator',
@@ -142,6 +223,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'mo-qr',
+    use: 'second',
     name: 'miniOrange QR Verify',
     tier: 'App-based',
     channel: 'miniOrange Authenticator',
@@ -152,6 +234,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'google-auth',
+    use: 'second',
     name: 'Google Authenticator',
     tier: 'App-based',
     channel: 'Authenticator App',
@@ -163,6 +246,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'ms-auth',
+    use: 'second',
     name: 'Microsoft Authenticator',
     tier: 'App-based',
     channel: 'Authenticator App',
@@ -174,6 +258,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'ms-push',
+    use: 'second',
     name: 'Microsoft Push',
     tier: 'App-based',
     channel: 'Authenticator App',
@@ -184,6 +269,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'authy',
+    use: 'second',
     name: 'Authy Authenticator',
     tier: 'App-based',
     channel: 'Authenticator App',
@@ -194,6 +280,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'rsa',
+    use: 'second',
     name: 'RSA MFA (SecurID)',
     tier: 'App-based',
     channel: 'RSA Authenticator',
@@ -206,6 +293,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   // --- Delivery-based -------------------------------------------------------
   {
     id: 'otp-sms',
+    use: 'second',
     name: 'OTP over SMS',
     tier: 'Delivery-based',
     channel: 'SMS',
@@ -219,6 +307,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'sms-link',
+    use: 'second',
     name: 'SMS Link',
     tier: 'Delivery-based',
     channel: 'SMS',
@@ -231,6 +320,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'otp-sms-email',
+    use: 'second',
     name: 'OTP over SMS and Email',
     tier: 'Delivery-based',
     channel: 'SMS',
@@ -242,6 +332,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'otp-email',
+    use: 'second',
     name: 'OTP over Email',
     tier: 'Delivery-based',
     channel: 'Email',
@@ -255,6 +346,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'email-link',
+    use: 'second',
     name: 'Email Link',
     tier: 'Delivery-based',
     channel: 'Email',
@@ -266,6 +358,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'otp-alt-email',
+    use: 'second',
     name: 'OTP over Alternate Email',
     tier: 'Delivery-based',
     channel: 'Email',
@@ -278,6 +371,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'otp-call',
+    use: 'second',
     name: 'OTP over Phone Call',
     tier: 'Delivery-based',
     channel: 'Call Verification',
@@ -291,6 +385,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   // --- Knowledge & tokens ---------------------------------------------------
   {
     id: 'kba',
+    use: 'second',
     name: 'Security Questions',
     tier: 'Knowledge & tokens',
     channel: 'Security Questions',
@@ -303,6 +398,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'grid',
+    use: 'second',
     name: 'Grid Pattern',
     tier: 'Knowledge & tokens',
     channel: 'Grid Pattern',
@@ -338,6 +434,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'yubikey',
+    use: 'second',
     name: 'Yubikey Token',
     tier: 'Knowledge & tokens',
     channel: 'Hardware Token',
@@ -349,6 +446,7 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
   {
     id: 'display-token',
+    use: 'second',
     name: 'Display Token',
     tier: 'Knowledge & tokens',
     channel: 'Hardware Token',

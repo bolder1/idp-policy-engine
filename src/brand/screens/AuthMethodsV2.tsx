@@ -67,11 +67,6 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'recovery', label: 'Recovery methods' },
 ]
 
-/* The states a method can be in, from the tenant's side. `off` is deliberately
-   "connected but not reaching anyone" rather than "not enabled": a method that
-   was never configured has not been switched off, it has not been started. */
-type Status = 'all' | 'enabled' | 'off' | 'setup'
-
 /* The type lives on the store now, because the role decides the chrome too.
    Re-exported here so callers already importing it from this screen keep
    working. */
@@ -83,10 +78,6 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
   const { methods, setMethods } = useBrand()
   const [tab, setTab] = useState<Tab>('primary')
   const [q, setQ] = useState('')
-  /* The one axis the search cannot reach. Search matches names; this matches
-     state, which is the question an admin actually arrives with — what is off,
-     and what have we never finished connecting. */
-  const [status, setStatus] = useState<Status>('all')
 
   /* The selected family, by channel. Never null — a master-detail layout with
      nothing selected is a page with a permanent hole in it, and there is always
@@ -121,20 +112,27 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
      switched off, or not offered to end users — so the user view is the
      catalogue with everything blocked removed, and nothing else. */
   const visible = useMemo(
-    () => (isUser ? methods.filter((m) => !methodBlocker(m)) : methods),
+    () =>
+      /* Second factors only. The catalogue gained the three ways a session can
+         START, and v2 already draws those as their own tab — leaving them in
+         would file Passkeys under Biometric and Magic link under Email, inside
+         a rail whose whole subject is what comes AFTER the password. */
+      methods
+        .filter((m) => m.use === 'second')
+        .filter((m) => (isUser ? !methodBlocker(m) : true)),
     [methods, isUser],
   )
 
-  /* Read off methodBlocker rather than re-derived, so the filter and the reason
-     a card shows as unavailable can never disagree. */
-  const passes = (m: AuthMethod) => {
-    if (status === 'all') return true
-    if (status === 'setup') return !m.configured
-    if (status === 'enabled') return methodBlocker(m) === null
-    /* Configured, so somebody finished the connection, but not reaching anyone
-       — switched off for the tenant or not offered to end users. */
-    return m.configured && methodBlocker(m) !== null
-  }
+  /* The status filter — All / Enabled / Switched off / Needs setup — and the
+     `passes` predicate it fed both stood here.
+
+     It narrowed on the one axis the search could not reach, which was a real
+     gap on a screen of eleven families. What it cost was a second filter beside
+     the search that had to be cleared separately, on a rail whose counts
+     already carry the same answer: "0/3" IS "none of these are on", read
+     without choosing anything. A control that restates a number already on the
+     page earns its place only while the page is too long to scan, and this one
+     is not. */
 
   const activate = (id: string, on: boolean) => {
     /* One active method at a time. Switching one on switches the last one off
@@ -197,12 +195,12 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
           (!needle ||
             f.channel.toLowerCase().includes(needle) ||
             inside.some((m) => m.name.toLowerCase().includes(needle))) &&
-          inside.some(passes),
+          inside.length > 0,
       }
       /* A family the admin has emptied is not a family with nothing in it, it
          is a family that does not apply here. */
     }).filter((r) => r.hit && (r.total > 0 || !isUser))
-  }, [visible, q, status, defaultMethod, isUser, enrolment.active])
+  }, [visible, q, defaultMethod, isUser, enrolment.active])
 
   /* The selected family, but only if the viewer can actually see it.
 
@@ -213,12 +211,10 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
      first family they DO have, and it also covers an admin disabling the last
      method in whatever family happens to be open.
 
-     Keyed on role and filter, but NOT on the search. A filter is one
-     deliberate choice, so moving the pane to a family that still has matches is
-     help; the search fires per keystroke, and following that would yank the
-     pane around as you typed. */
+     Keyed on role, but NOT on the search. The search fires per keystroke, and
+     following it would yank the pane around as you typed. */
   const reachable = FAMILIES.filter(
-    (f) => visible.some((m) => m.channel === f.channel && passes(m)) || (!isUser && status === 'all'),
+    (f) => visible.some((m) => m.channel === f.channel) || !isUser,
   )
   const family = reachable.find((f) => f.channel === channel) ?? reachable[0] ?? FAMILIES[0]
 
@@ -319,33 +315,13 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
                 />
               </label>
 
-              {/* Admin only. The states it names — never configured, switched
-                  off for the tenant — are the tenant's, and a person cannot see
-                  a method in either of them anyway. */}
-              {!isUser && (
-                <select
-                  aria-label="Filter by status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as Status)}
-                  className={`btoolbar__select ${status !== 'all' ? 'is-set' : ''}`}
-                >
-                  <option value="all">All statuses</option>
-                  <option value="enabled">Enabled</option>
-                  <option value="off">Switched off</option>
-                  <option value="setup">Needs setup</option>
-                </select>
-              )}
-
               {/* Only once something is filtered — a permanent Clear that
                   clears nothing is one more thing to read. */}
-              {(status !== 'all' || q) && (
+              {q && (
                 <button
                   type="button"
                   className="btoolbar__clear"
-                  onClick={() => {
-                    setStatus('all')
-                    setQ('')
-                  }}
+                  onClick={() => setQ('')}
                 >
                   Clear
                 </button>
@@ -409,7 +385,6 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
                   onToggle={setEnabled}
                   onSetup={setSetupOf}
                   onMakeDefault={setDefaultMethod}
-                  passes={passes}
                   role={role}
                   enrolment={enrolment}
                   openCard={openCard}
@@ -583,7 +558,6 @@ function FamilyDetail({
   onToggle,
   onSetup,
   onMakeDefault,
-  passes,
   role,
   enrolment,
   openCard,
@@ -600,7 +574,6 @@ function FamilyDetail({
   onToggle: (id: string, on: boolean) => void
   onSetup: (m: AuthMethod) => void
   onMakeDefault: (id: string) => void
-  passes: (m: AuthMethod) => boolean
   role: Role
   enrolment: UserEnrolment
   openCard: string | null
@@ -635,7 +608,7 @@ function FamilyDetail({
   const pools = new Map<string, number>()
   for (const m of inside) if (m.balance) pools.set(m.balance.label, m.balance.remaining)
 
-  const shown = inside.filter(passes)
+  const shown = inside
   const mine = inside.filter((m) => enrolment.configured.includes(m.id)).length
   const holdsActive = inside.some((m) => m.id === enrolment.active)
 
@@ -772,9 +745,6 @@ function FamilyDetail({
             )}
           </div>
           {inside.length === 0 && <NoResults>No methods in this group yet.</NoResults>}
-          {inside.length > 0 && shown.length === 0 && (
-            <NoResults>Nothing in this group matches the filter.</NoResults>
-          )}
         </>
       ) : (
         <SettingsPane

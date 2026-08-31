@@ -41,20 +41,30 @@ export function AuthMethodsPage() {
 
   /* Read, not owned. Switching sides is an account action taken from the
      avatar menu — it changes the chrome, the nav and the landing screen, none
-     of which this page has any business deciding. It used to own a "Viewing
-     as" dropdown here, which put a global move inside one tab.
+     of which this page has any business deciding.
 
-     v1 has no end-user arrangement; it is the archived layout and giving it a
-     second mode would mean maintaining four screens to compare two things. So
-     an end user always gets v2. */
+     Both versions serve both roles now. v1 used to be admin-only on the
+     argument that it was the archived layout and a second mode would mean
+     maintaining four screens to compare two things — which held while v1 was a
+     wall of category cards with nothing a person could act on. It is one list
+     of rows now, and a row is the same object whichever side you are on: the
+     admin's toggle enables a method for the tenant, the person's picks the one
+     that runs for them. Same list, same filter, same search; the control on the
+     right means two different things, which is the difference worth showing. */
   const role = store.role
 
   return (
     <>
       {/* Prototype furniture, gated the same way the builder's is: a
           watered-down product should not advertise that it has another version
-          of itself. */}
-      {store.features.designSwitcher && role === 'admin' && (
+          of itself.
+
+          No longer admin-only. It was, because v1 had no end-user arrangement
+          and offering the switch to a person meant offering a screen that would
+          not render for them. Both versions serve both roles now, so the switch
+          is available on both sides — which is also the only way to see that
+          the two user views differ. */}
+      {store.features.designSwitcher && (
         <div className="bzver">
           <span>Methods design</span>
           <div className="bviewswitch" role="tablist" aria-label="Methods version">
@@ -76,7 +86,7 @@ export function AuthMethodsPage() {
         </div>
       )}
 
-      {v === 'v2' || role === 'user' ? <AuthMethodsV2 role={role} /> : <AuthMethods />}
+      {v === 'v2' ? <AuthMethodsV2 role={role} /> : <AuthMethods role={role} />}
     </>
   )
 }

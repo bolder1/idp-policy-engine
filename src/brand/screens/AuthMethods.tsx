@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   CreditCard,
@@ -15,6 +16,7 @@ import {
   ArrowUpRight,
   Search,
   Pencil,
+  Sliders,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -22,12 +24,14 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { Button, Drawer, Modal, Toggle } from '../kit'
+import { Button, Drawer, MenuButton, Modal, TipDot, Toggle } from '../kit'
 import { methodBlocker, type AuthMethod } from '../methods'
-import { useBrand } from '../store'
+import { useBrand, type Role } from '../store'
 import { NoResults } from '../empty'
 import type { Policy } from '../data'
 import { MethodIcon, RecoveryTab } from './recovery'
+import { UserMethodCard } from './user-config'
+import { SEED_ENROLMENT, type UserEnrolment } from '../user-methods'
 import { SettingField } from '../setting-field'
 import { ConfigFields } from './method-forms'
 import { configFor, isMissing, missingFields, setField, type ConfigField } from '../method-config'
@@ -76,6 +80,20 @@ export interface Family {
   blurb: string
   icon: LucideIcon
   tint: string
+  /* Whether the blurb earns a line on the card, or goes on a tip beside the
+     name.
+
+     The test is whether it says something the NAME does not. "SMS — one-time
+     codes and links sent to the phone number on the account" is the word SMS
+     spelled out. "Grid Pattern — a personal grid card; the user reads a
+     remembered path off it" is the only way to know what a grid pattern is.
+
+     Everything went to the tip for one revision and it read worse, which is the
+     useful thing this flag now records: a list of eleven names and nothing else
+     is tidy and tells you nothing, and the rows that needed explaining were
+     exactly the ones a reader stops on. Uniform row height is not worth a list
+     you cannot read. */
+  explains?: true
   /* Newly added to the product. Drives the pill and the position — a new
      integration nobody scrolls to is a new integration nobody knows about. The
      row itself stays white; see the note in the stylesheet for why.
@@ -89,17 +107,27 @@ export interface Family {
 }
 
 export const FAMILIES: Family[] = [
+  /* Eleven. There is no Password family, and briefly there was.
+
+     Grouping exists because SMS holds three methods that share a gateway, a
+     balance and an OTP length — open the card and you are configuring one
+     thing. The three ways a session starts share none of that: a password, a
+     passkey and a mailed link have nothing in common except the moment they
+     happen. A card called Password holding all three would be a bundle whose
+     only member in common is the position of the row.
+
+     So they are rows, beside the cards rather than inside one. */
   { channel: 'SMS', blurb: 'One-time codes and links sent to the phone number on the account.', icon: MessageSquare, tint: 'green' },
   { channel: 'Email', blurb: 'One-time codes and links sent to a mailbox the user already reads.', icon: Mail, tint: 'blue' },
-  { channel: 'Authenticator App', blurb: 'Time-based codes from Google, Microsoft or Authy — no network needed.', icon: Smartphone, tint: 'teal' },
-  { channel: 'miniOrange Authenticator', blurb: 'Our own app: push approval, a code, or a barcode scan.', icon: Sparkles, tint: 'indigo' },
-  { channel: 'RSA Authenticator', blurb: 'SecurID tokencodes, softtokens and push, via RSA Authentication Manager.', icon: ShieldCheck, tint: 'slate', isNew: true },
+  { channel: 'Authenticator App', blurb: 'Time-based codes from Google, Microsoft or Authy — no network needed.', icon: Smartphone, tint: 'teal' , explains: true },
+  { channel: 'miniOrange Authenticator', blurb: 'Our own app: push approval, a code, or a barcode scan.', icon: Sparkles, tint: 'indigo' , explains: true },
+  { channel: 'RSA Authenticator', blurb: 'SecurID tokencodes, softtokens and push, via RSA Authentication Manager.', icon: ShieldCheck, tint: 'slate', isNew: true , explains: true },
   { channel: 'Call Verification', blurb: 'An automated voice call reading the code aloud.', icon: Phone, tint: 'amber' },
   { channel: 'Hardware Token', blurb: 'A physical device the user carries and the tenant assigns.', icon: KeyRound, tint: 'slate' },
-  { channel: 'Security Questions', blurb: 'Answers the user set at enrolment. Weak alone, useful as a fallback.', icon: HelpCircle, tint: 'slate' },
-  { channel: 'Biometric', blurb: 'Bound to the device and the origin. Nothing to type, nothing to intercept.', icon: Fingerprint, tint: 'indigo' },
-  { channel: 'Grid Pattern', blurb: 'A personal grid card; the user reads a remembered path off it.', icon: Grid3x3, tint: 'teal' },
-  { channel: 'Smart Cards', blurb: 'A certificate on a physical card, presented by the browser.', icon: CreditCard, tint: 'blue' },
+  { channel: 'Security Questions', blurb: 'Answers the user set at enrolment. Weak alone, useful as a fallback.', icon: HelpCircle, tint: 'slate' , explains: true },
+  { channel: 'Biometric', blurb: 'Bound to the device and the origin. Nothing to type, nothing to intercept.', icon: Fingerprint, tint: 'indigo' , explains: true },
+  { channel: 'Grid Pattern', blurb: 'A personal grid card; the user reads a remembered path off it.', icon: Grid3x3, tint: 'teal' , explains: true },
+  { channel: 'Smart Cards', blurb: 'A certificate on a physical card, presented by the browser.', icon: CreditCard, tint: 'blue' , explains: true },
 ]
 
 /* Which method the tenant starts on, and where it falls back to.
@@ -123,11 +151,34 @@ export function firstDefaultable(all: AuthMethod[], exclude?: string): string | 
   return all.find(ok)?.id ?? null
 }
 
-export function AuthMethods() {
+export function AuthMethods({ role = 'admin' }: { role?: Role }) {
   const store = useBrand()
+  const isUser = role === 'user'
+
+  /* One list, and the two axes that narrow it.
+
+     `use` is the filter: primary, second factor, recovery. It replaces both the
+     tab bar and the eleven category cards — the tabs split one catalogue into
+     three screens you could not compare across, and the categories split what
+     was left into eleven cards you had to open one at a time to see anything at
+     all. What an admin arrives asking is "what can somebody sign in with", and
+     that question was answerable on none of the three.
+
+     Recovery is a filter VALUE rather than a fourth kind, because a method can
+     be a second factor and a way back in at the same time — three of them are.
+     `use` says what a method is; `alsoRecovery` says what it can also do, and a
+     row can honestly appear under both. */
+  const [use, setUse] = useState<UseFilter>('all')
+
   const [tab, setTab] = useState<Tab>('methods')
   /* The open category, by channel. Null closes the slide-over. */
   const [openChannel, setOpenChannel] = useState<string | null>(null)
+
+  /* The person's own enrolment, which is a different fact from the tenant's
+     configuration. The admin decides a method may exist; this records whether
+     THIS person has set it up and which one of theirs actually runs. */
+  const [enrolment, setEnrolment] = useState<UserEnrolment>(SEED_ENROLMENT)
+  const [openCard, setOpenCard] = useState<string | null>(null)
   /* From the store, not the module: enrolment counts move with the tenant,
      and a screen holding its own copy would keep the old tenant's numbers the
      moment the persona changes underneath it. */
@@ -203,66 +254,106 @@ export function AuthMethods() {
     )
   }
 
-  const open = openChannel ? FAMILIES.find((f) => f.channel === openChannel) ?? null : null
+  /* What this viewer may see at all. `methodBlocker` already answers exactly
+     this — it returns a reason whenever a method is unconfigured, switched off,
+     or not offered to end users — so a person's catalogue is the tenant's with
+     everything blocked removed, and nothing else. */
+  const reachable = isUser ? methods.filter((m) => !methodBlocker(m)) : methods
+
+  const openFamily = openChannel ? FAMILIES.find((f) => f.channel === openChannel) ?? null : null
+
+  const activate = (id: string, on: boolean) => {
+    /* One active method at a time. Switching one on switches the last one off
+       rather than adding to a set. */
+    setEnrolment((e) => ({ ...e, active: on ? id : e.active === id ? null : e.active }))
+    const m = methods.find((x) => x.id === id)
+    if (m) store.showToast(on ? `${m.name} is now your active method` : `${m.name} switched off`)
+  }
+
+  const saveEnrolment = (id: string, values: Record<string, string>) => {
+    const first = !enrolment.configured.includes(id)
+    setEnrolment((e) => ({
+      ...e,
+      configured: first ? [...e.configured, id] : e.configured,
+      values: { ...e.values, [id]: values },
+      active: e.active ?? id,
+    }))
+    const m = methods.find((x) => x.id === id)
+    if (m) store.showToast(first ? `${m.name} is set up` : `${m.name} updated`)
+  }
 
   return (
     <div className="bpage bm8">
       <header className="bm8__head">
-        <h1>Authentication methods</h1>
-        <p>Choose how people prove who they are. Anything you enable here can be named by a policy rule.</p>
+        <h1>{isUser ? 'Two-step verification' : 'Authentication methods'}</h1>
+        <p>
+          {isUser
+            ? 'How you prove it is you. Set up as many as you like — one of them runs.'
+            : 'Choose how people prove who they are. Anything you enable here can be named by a policy rule.'}
+        </p>
       </header>
 
       {/* Horizontal, per the brief. V5 ran these down the left, which reads as
           navigation between screens; across the top they read as two views of
-          one screen, which is what they are. */}
-      <div className="bm8__tabbar" role="tablist" aria-label="Authentication methods">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            type="button"
-            aria-selected={tab === t.id}
-            className={`bm8__tab ${tab === t.id ? 'is-on' : ''}`}
-            onClick={() => {
-              setTab(t.id)
-              setOpenChannel(null)
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+          one screen, which is what they are.
 
-      {/* Rendered inside a `bv5` wrapper on purpose.
+          Recovery is a tenant policy rather than a personal setting, so a person
+          does not get the tab — and a single-tab tab bar is furniture describing
+          a choice that no longer exists. */}
+      {!isUser && (
+        <div className="bm8__tabbar" role="tablist" aria-label="Authentication methods">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              type="button"
+              aria-selected={tab === t.id}
+              className={`bm8__tab ${tab === t.id ? 'is-on' : ''}`}
+              onClick={() => {
+                setTab(t.id)
+                setOpenChannel(null)
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
-          Recovery is V5's component unchanged, and six rules in
-          recovery.css are written as `.bv5 .bv5__x` rather than
-          `.bv5__x` — a deliberate specificity bump there, and a silent
-          style regression here if the ancestor is missing. Handing the
-          component the scope it was written under is cheaper and safer than
-          auditing which of its nested inputs happen to need it today, and it
-          cannot drift when that file changes. */}
-      {tab === 'recovery' && (
+      {/* Rendered inside a `bv5` wrapper on purpose: recovery.css writes some of
+          its rules as `.bv5 .bv5__x`, and handing the component the scope it was
+          written under is cheaper than auditing which of its nested inputs
+          happen to need it today. */}
+      {tab === 'recovery' && !isUser && (
         <div className="bv5">
           <RecoveryTab methods={methods} />
         </div>
       )}
 
-      {/* The list stays put and the category slides over it.
-
-          It was an inner page for one commit, and a page is the wrong weight
-          for this: opening a category is a peek at three or four rows, and
-          making it a navigation event means the eleven you were comparing
-          disappear to show you a list that fits in a corner of them. The
-          slide-over keeps the wall of categories on screen behind it, so
-          closing costs nothing and there is no "where was I". */}
-      {tab === 'methods' && (
+      {/* The list stays put and the category slides over it. Opening a category
+          is a peek at three or four rows, and making that a navigation event
+          means the eleven you were comparing disappear to show you a list that
+          fits in a corner of them. */}
+      {(tab === 'methods' || isUser) && (
         <>
           <CategoryList
-            methods={methods}
+            methods={reachable}
             onOpen={setOpenChannel}
             defaultMethod={defaultMethod}
+            use={use}
+            onUse={setUse}
+            isUser={isUser}
+            policies={store.policies}
+            onToggle={setEnabled}
+            onSetup={goToSetup}
+            onMakeDefault={setDefaultMethod}
+            enrolment={enrolment}
+            openCard={openCard}
+            onOpenCard={setOpenCard}
+            onActivate={activate}
+            onSaveEnrolment={saveEnrolment}
           />
+
           <SetupModal
             method={setupOf}
             saved={savedConfig}
@@ -271,8 +362,8 @@ export function AuthMethods() {
           />
 
           <CategoryDrawer
-            family={open}
-            methods={methods}
+            family={openFamily}
+            methods={reachable}
             policies={store.policies}
             onClose={() => setOpenChannel(null)}
             onToggle={setEnabled}
@@ -281,12 +372,48 @@ export function AuthMethods() {
             onMakeDefault={setDefaultMethod}
             behaviour={behaviour}
             onBehaviour={(p) => setBehaviour((v) => ({ ...v, ...p }))}
+            use={use}
+            isUser={isUser}
+            enrolment={enrolment}
+            openCard={openCard}
+            onOpenCard={setOpenCard}
+            onActivate={activate}
+            onSaveEnrolment={saveEnrolment}
           />
         </>
       )}
     </div>
   )
 }
+
+/* --- What a method is for, as a filter -------------------------------------- */
+
+type UseFilter = 'all' | 'primary' | 'second' | 'recovery'
+
+/* Password first, then the two that replace it. The catalogue's order, stated
+   here so it survives a reorder of the array. */
+const PRIMARY_ORDER = ['password', 'passkey-primary', 'magic-link']
+
+/* The four the dropdown offers. The words are the page's own — they are the
+   headings that used to sit above each block — so somebody who knew the old
+   screen finds the same three names doing the same job.
+
+   Names only. Each carried a line of explanation for one revision, and a
+   four-item menu where every item is a heading over a paragraph is a menu you
+   read rather than pick from: the descriptions were three times the height of
+   the choices and pushed the last option off the fold. The names say enough —
+   "Primary sign-in methods" is not a term that needs defining to somebody
+   already on this screen. */
+const USES: { id: UseFilter; label: string }[] = [
+  { id: 'all', label: 'All methods' },
+  { id: 'primary', label: 'Primary sign-in methods' },
+  { id: 'second', label: 'Other sign-in methods' },
+  { id: 'recovery', label: 'Recovery methods' },
+]
+
+const matchesUse = (m: AuthMethod, f: UseFilter) =>
+  f === 'all' ? true : f === 'recovery' ? Boolean(m.alsoRecovery) : m.use === f
+
 
 const GROUPS: { id: 'connect' | 'policy' | 'advanced'; label: string; blurb: string }[] = [
   { id: 'connect', label: 'Connection', blurb: 'What this console needs to reach the server.' },
@@ -462,17 +589,48 @@ function CategoryList({
   methods,
   onOpen,
   defaultMethod,
+  use,
+  onUse,
+  isUser,
+  policies,
+  onToggle,
+  onSetup,
+  onMakeDefault,
+  enrolment,
+  openCard,
+  onOpenCard,
+  onActivate,
+  onSaveEnrolment,
 }: {
   methods: AuthMethod[]
   onOpen: (channel: string) => void
   defaultMethod: string | null
+  use: UseFilter
+  onUse: (u: UseFilter) => void
+  isUser: boolean
+  /* The primaries are rows rather than a card, so this list renders methods as
+     well as families and needs everything a method row does. */
+  policies: Policy[]
+  onToggle: (id: string, on: boolean) => void
+  onSetup: (m: AuthMethod) => void
+  onMakeDefault: (id: string) => void
+  enrolment: UserEnrolment
+  openCard: string | null
+  onOpenCard: (id: string | null) => void
+  onActivate: (id: string, on: boolean) => void
+  onSaveEnrolment: (id: string, values: Record<string, string>) => void
 }) {
   const [q, setQ] = useState('')
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return FAMILIES.map((f) => {
-      const inside = methods.filter((m) => m.channel === f.channel)
+      /* Narrowed by the filter before anything is counted, so a card's numbers
+         describe what opening it will actually show. A count that survives the
+         filter is a count you cannot act on. */
+      const inside = methods.filter(
+        (m) => m.use === 'second' && m.channel === f.channel && matchesUse(m, use),
+      )
       const live = inside.filter((m) => !methodBlocker(m))
       /* Transactions are bought as a pool and a family can spend from one pool
          through several methods — OTP over SMS and SMS Link both draw on "SMS
@@ -488,86 +646,144 @@ function CategoryList({
         enrolled: inside.reduce((n, m) => n + (m.enrolled ?? 0), 0),
         txns: pools.size ? [...pools.values()].reduce((a, b) => a + b, 0) : null,
       }
-    }).filter(
-      (r) =>
-        !needle ||
-        r.f.channel.toLowerCase().includes(needle) ||
-        /* Searching for a method should find the family holding it — otherwise
-           typing "passkey" on a screen of eleven categories finds nothing and
-           reads as "we do not have that". */
-        methods.some((m) => m.channel === r.f.channel && m.name.toLowerCase().includes(needle)),
-    )
-  }, [methods, q])
+    })
+      /* A family the filter has emptied is not a family with nothing in it, it
+         is a family this filter does not reach. */
+      .filter((r) => r.total > 0)
+      .filter(
+        (r) =>
+          !needle ||
+          r.f.channel.toLowerCase().includes(needle) ||
+          /* Searching for a method should find the family holding it —
+             otherwise typing "passkey" on a screen of category cards finds
+             nothing and reads as "we do not have that". */
+          methods.some((m) => m.channel === r.f.channel && m.name.toLowerCase().includes(needle)),
+      )
+  }, [methods, q, use])
 
-  /* Counted off the whole catalogue, not off `rows` — `rows` is what the search
-     left behind, and a total that shrinks as you type is not a total. */
-  const liveMethods = methods.filter((m) => !methodBlocker(m)).length
+  const countOf = (f: UseFilter) => methods.filter((m) => matchesUse(m, f)).length
+  /* Recovery is a tenant policy, so a person is not offered it as a filter over
+     their own methods. */
+  const offered = USES.filter((u) => !(isUser && u.id === 'recovery'))
+  const current = offered.find((u) => u.id === use) ?? offered[0]
 
-  /* The primary row answers to the same search box, so a query that plainly is
-     not about it does not leave it stranded above an empty list. */
+  /* The primaries answer to the same search and the same filter as the cards
+     — they are in the list, not above it, so a query that excludes them has to
+     exclude them. */
   const needle = q.trim().toLowerCase()
-  const showPrimary = !needle || 'password passkeys magic link primary sign-in'.includes(needle)
+  const primaries = methods
+    .filter((m) => m.use === 'primary' && matchesUse(m, use))
+    .filter(
+      (m) => !needle || m.name.toLowerCase().includes(needle) || m.description.toLowerCase().includes(needle),
+    )
+    /* Pinned above the cards whatever else is showing. Not because they are
+       more important than the eleven, but because they happen first: a session
+       starts with one of these and is then stepped up by the rest. A list of
+       ways in that put the second step above the first would read backwards. */
+    .sort((a, b) => PRIMARY_ORDER.indexOf(a.id) - PRIMARY_ORDER.indexOf(b.id))
 
   return (
     <div className="bm8__pane">
-      {/* The primary factor, stated before the catalogue of the rest.
+      {/* `PrimarySignIn` and the "All methods" section head stood here — a
+          block of three rows, a heading with a count chip, and a paragraph,
+          between the page title and the catalogue.
 
-          Password is not one of the eleven and does not belong among them:
-          those are methods a tenant chooses between, and this is the one every
-          account has whether or not any of them is on. It is set for the whole
-          tenant, so there is nothing here to open and nothing to switch.
+          Password, Passkeys and Magic link are catalogue entries now, filed by
+          channel like everything else, so the block was a second list of things
+          that are already in the first one. What separated them was never a
+          property of the method, it was what the method is FOR — and that is a
+          filter, not a divider. It costs one row instead of a section, it
+          narrows the whole catalogue rather than sitting above part of it, and
+          nothing on the page is now above or below a line it cannot cross.
 
-          It is on the page anyway, because a methods screen that lists eleven
-          ways to prove an identity and never mentions the one everybody
-          actually uses reads as though passwords had been turned off. Saying
-          "always on" out loud is the entire point of the row.
+          The heading went with it. "All methods" over the only list on the tab,
+          with a sentence explaining that the rows are groups, was a title for
+          something already unambiguous. */}
 
-          Its own section rather than a twelfth card, because the count chip
-          below would then have to read "3 of 12 in use" about a set containing
-          one member nobody can choose. */}
-      {showPrimary && <PrimarySignIn />}
+      {/* What to look at, and what to look for, on one row. */}
+      <div className="bm8__bar">
+        <label className="bm8__search">
+          <Search size={15} strokeWidth={1.9} aria-hidden />
+          <input
+            type="text"
+            value={q}
+            placeholder="Search methods…"
+            aria-label="Search methods"
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </label>
 
-      <div className="bm8__sechead">
-        <div>
-          {/* Beside the heading, not pushed to the far edge of the row.
+        {/* The kit's own menu, not a native select.
 
-              It was a solid brand pill in the top-right corner — the loudest
-              object on the page, describing a count, sitting about 700px from
-              the words it counts. Read left to right you got "Categories", a
-              sentence, and then eventually a number with no subject attached.
+            A `<select>` renders as the operating system draws it — a different
+            control on every platform, no room for a description under an
+            option, and no way to mark which one is current beyond the collapsed
+            label. This one is the same object the rest of the console uses for
+            a group of related choices, which means it also arrives with the
+            keyboard handling, the outside-click dismissal and the roving cursor
+            already written.
 
-              Two facts rather than one, because they answer different
-              questions: how much of the catalogue is in play, and how many
-              methods a user could actually be offered. Five groups in use can
-              mean five methods or fifteen. */}
-          {/* "Categories" named the filing, not the thing filed. Nobody comes
-              to this screen to browse a taxonomy — they come to turn a method
-              on — and the word made the eleven rows sound like a layer standing
-              between them and that. "All methods" says what the list is: every
-              method the tenant has, gathered in one place. The rows are still
-              groups; the sentence under the heading is what says so. */}
-          <span className="bm8__sectitle">
-            <h2>All methods</h2>
-            <span className="bm8__chip">
-              {liveMethods} method{liveMethods === 1 ? '' : 's'} enabled
-            </span>
-          </span>
-          <p>Grouped by how the challenge reaches someone. Open a group to turn its methods on or off.</p>
-        </div>
+            The tip that sat beside it is gone and has not been replaced. Its
+            sentences moved into the options for a revision and made the menu
+            three times taller than its four choices — a control you read
+            instead of picking from. The names carry it: somebody on this screen
+            already knows what a primary sign-in method is.
+
+            The count stays on the trigger, so "how many are primary" is
+            answered without opening anything. */}
+        <MenuButton
+          size="sm"
+          /* Anchored to the trigger's RIGHT edge. The control sits at the right
+             of the bar, so a menu growing rightwards from its left edge runs
+             off the page and takes the horizontal scrollbar with it. */
+          align="end"
+          label={`${current.label} · ${countOf(current.id)}`}
+          items={offered.map((u) => ({
+            id: u.id,
+            label: u.label,
+            /* A tick on the one that is running. The trigger already names it;
+               this is so the open menu does not make you re-read the trigger to
+               find out where you are. */
+            icon: u.id === use ? Check : undefined,
+          }))}
+          onSelect={(id) => onUse(id as UseFilter)}
+        />
       </div>
 
-      <label className="bm8__search">
-        <Search size={15} strokeWidth={1.9} aria-hidden />
-        <input
-          type="text"
-          value={q}
-          placeholder="Search methods…"
-          aria-label="Search methods"
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </label>
-
       <div className="bm8__list">
+        {/* The three ways a session starts, as rows.
+
+            They are method rows, not cards, so they carry what a method row
+            carries — the phishing-resistant badge where the method earns it,
+            the default star, the description, and the control on the right. A
+            family card cannot show any of that, because a family is not
+            phishing-resistant; the methods inside it are, individually. */}
+        {primaries.map((m) =>
+          isUser ? (
+            <UserMethodCard
+              key={m.id}
+              m={m}
+              enrolled={enrolment.configured.includes(m.id)}
+              isActive={enrolment.active === m.id}
+              values={enrolment.values[m.id] ?? {}}
+              open={openCard === m.id}
+              onOpen={(o) => onOpenCard(o ? m.id : null)}
+              onActivate={(on) => onActivate(m.id, on)}
+              onSave={(v) => onSaveEnrolment(m.id, v)}
+            />
+          ) : (
+            <MethodCard
+              key={m.id}
+              m={m}
+              policies={policies}
+              onToggle={onToggle}
+              isDefault={defaultMethod === m.id}
+              onSetup={onSetup}
+              onMakeDefault={onMakeDefault}
+            />
+          ),
+        )}
+
         {rows.map(({ f, live, enrolled, txns }) => {
           const holdsDefault =
             defaultMethod !== null &&
@@ -599,8 +815,21 @@ function CategoryList({
                     Default
                   </i>
                 )}
+                {/* The sentence, where the name does not carry it. A tip
+                    rather than a deletion: somebody meeting "Grid Pattern" for
+                    the first time still needs telling, and somebody who already
+                    knows what SMS is should not have to read it eleven times to
+                    get down the list.
+
+                    Everything went to the tip for one revision, on the argument
+                    that a list where some rows are two lines and some are one
+                    has no rhythm to scan down. The rhythm was real and the
+                    price was not worth it: eleven names and nothing else is
+                    tidy and mute, and the rows that lost their line were the
+                    ones a reader stops on. */}
+                {!f.explains && <TipDot label={f.channel} text={f.blurb} />}
               </span>
-              <span className="bm8__desc">{f.blurb}</span>
+              {f.explains && <span className="bm8__desc">{f.blurb}</span>}
 
             </span>
 
@@ -676,6 +905,13 @@ function CategoryDrawer({
   onMakeDefault,
   behaviour,
   onBehaviour,
+  use,
+  isUser,
+  enrolment,
+  openCard,
+  onOpenCard,
+  onActivate,
+  onSaveEnrolment,
 }: {
   family: Family | null
   methods: AuthMethod[]
@@ -687,9 +923,20 @@ function CategoryDrawer({
   onMakeDefault: (id: string) => void
   behaviour: MfaValues
   onBehaviour: (p: MfaValues) => void
+  /* The same filter the cards were counted under. A panel that opens showing
+     more than the card said it held is a card that lied. */
+  use: UseFilter
+  isUser: boolean
+  enrolment: UserEnrolment
+  openCard: string | null
+  onOpenCard: (id: string | null) => void
+  onActivate: (id: string, on: boolean) => void
+  onSaveEnrolment: (id: string, values: Record<string, string>) => void
 }) {
   const [pane, setPane] = useState<'methods' | 'settings'>('methods')
-  const inside = family ? methods.filter((m) => m.channel === family.channel) : []
+  const inside = family
+    ? methods.filter((m) => m.channel === family.channel && matchesUse(m, use))
+    : []
   const live = inside.filter((m) => !methodBlocker(m)).length
   const enrolled = inside.reduce((n, m) => n + (m.enrolled ?? 0), 0)
   const unconfigured = inside.filter((m) => !m.configured).length
@@ -697,7 +944,10 @@ function CategoryDrawer({
   /* Settings from the MFA sheet. Two scopes: some belong to the whole family —
      an OTP length is a property of SMS, not of any one SMS method — and a few
      belong to a single method. */
-  const famSettings = family ? familySettingsFor(family.channel) : []
+  /* The tenant's configuration — retry limits, token length, which gateway.
+     None of it is a person's to change, so their panel has no Settings pane at
+     all rather than a greyed one. */
+  const famSettings = family && !isUser ? familySettingsFor(family.channel) : []
   const ownSettings = inside
     .map((m) => ({ m, settings: methodSettingsFor(m.id) }))
     .filter((x) => x.settings.length > 0)
@@ -786,18 +1036,37 @@ function CategoryDrawer({
 
           {pane === 'methods' || !hasSettings ? (
             <>
+              {/* Same list, same panel, and a row that means two different
+                  things depending on who opened it. The admin's toggle enables
+                  a method for the tenant; the person's picks the one that runs
+                  for them, and Edit opens their own details inline rather than
+                  the tenant's connection to a provider. */}
               <div className="bm8__list">
-                {inside.map((m) => (
-                  <MethodCard
-                    key={m.id}
-                    m={m}
-                    policies={policies}
-                    onToggle={onToggle}
-                    isDefault={defaultMethod === m.id}
-                    onSetup={onSetup}
-                    onMakeDefault={onMakeDefault}
-                  />
-                ))}
+                {inside.map((m) =>
+                  isUser ? (
+                    <UserMethodCard
+                      key={m.id}
+                      m={m}
+                      enrolled={enrolment.configured.includes(m.id)}
+                      isActive={enrolment.active === m.id}
+                      values={enrolment.values[m.id] ?? {}}
+                      open={openCard === m.id}
+                      onOpen={(o) => onOpenCard(o ? m.id : null)}
+                      onActivate={(on) => onActivate(m.id, on)}
+                      onSave={(v) => onSaveEnrolment(m.id, v)}
+                    />
+                  ) : (
+                    <MethodCard
+                      key={m.id}
+                      m={m}
+                      policies={policies}
+                      onToggle={onToggle}
+                      isDefault={defaultMethod === m.id}
+                      onSetup={onSetup}
+                      onMakeDefault={onMakeDefault}
+                    />
+                  ),
+                )}
               </div>
               {inside.length === 0 && <NoResults>No methods in this group yet.</NoResults>}
             </>
@@ -907,6 +1176,7 @@ export function MethodCard({
   isDefault,
   onSetup,
   onMakeDefault,
+  onSettings,
 }: {
   m: AuthMethod
   policies: Policy[]
@@ -914,6 +1184,10 @@ export function MethodCard({
   isDefault: boolean
   onSetup: (m: AuthMethod) => void
   onMakeDefault: (id: string) => void
+  /* Only where the method has settings of its own. Absent is not "disabled" —
+     the control is not drawn at all, because a row that offers a panel holding
+     nothing is worse than a row that offers nothing. */
+  onSettings?: () => void
 }) {
   const blocked = methodBlocker(m)
 
@@ -954,6 +1228,15 @@ export function MethodCard({
       <div className="bm8__info">
         <span className="bm8__name">
           {m.name}
+          {/* Which kind of method this is, where the row is not already
+              surrounded by its own kind. A primary row sits above eleven cards
+              of second factors with no heading between them, so it says what it
+              is; and a method that is also a way back in says that, because
+              nothing else on the row would. */}
+          {m.use === 'primary' && <i className="bm8__badge bm8__badge--use">Primary sign-in</i>}
+          {m.alsoRecovery && (
+            <i className="bm8__badge bm8__badge--use is-quiet">Recovery</i>
+          )}
           {m.tier === 'Phishing-resistant' && (
             <i className="bm8__badge">
               <ShieldCheck size={11} strokeWidth={2.2} aria-hidden />
@@ -991,7 +1274,14 @@ export function MethodCard({
           until setup completes, which is the truth the disabled switch was
           only gesturing at. */}
       <div className="bm8__right">
-        {m.configured ? (
+        {/* No switch on the one method that is not a choice. A disabled toggle
+            was here to say "on, but not yours to change" — and a control you
+            cannot operate is still a control: it invites the click it then
+            refuses. The chip says the same thing in words and cannot be misread
+            as broken. */}
+        {m.locked ? (
+          <i className="bm8__always">Always on</i>
+        ) : m.configured ? (
           <>
             {/* Edit is the same control Set up was, in the same corner.
 
@@ -1016,6 +1306,15 @@ export function MethodCard({
                 <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
                   <Pencil size={13} strokeWidth={2} aria-hidden />
                   Edit
+                </Button>
+              )}
+              {/* The method's own behaviour — retry limits, token length, which
+                  gateway. It reached these through the category panel before,
+                  which meant opening a family to change one method's settings. */}
+              {onSettings && (
+                <Button variant="ghost" size="sm" onClick={onSettings}>
+                  <Sliders size={13} strokeWidth={2} aria-hidden />
+                  Settings
                 </Button>
               )}
               <Toggle

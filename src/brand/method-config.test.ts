@@ -12,34 +12,47 @@ import { configFor, missingFields, setField, type ConfigField } from './method-c
    complete when the fields that actually gate the integration are filled.
    -------------------------------------------------------------------------- */
 
+/* Scoped to SECOND FACTORS, which is what these invariants were always about.
+
+   The catalogue gained the three ways a session can start — password, passkeys,
+   magic link — and none of them has the things asserted below: no provider
+   integration to configure, no enrolment ceremony to walk a person through, no
+   delivery family, and no row on the MFA sheet. Password in particular is on
+   for everyone and configured by nobody.
+
+   Asserting over the whole array would have forced a form and a shape to be
+   invented for each of them just to keep a test quiet, which is the test
+   changing the product. */
+const FACTORS = AUTH_METHODS.filter((m) => m.use === 'second')
+
 describe('every blockable method can be configured', () => {
   it('offers a form for every method in the catalogue', () => {
-    const without = AUTH_METHODS.filter((m) => configFor(m.id) === null).map((m) => `${m.name} (${m.id})`)
+    const without = FACTORS.filter((m) => configFor(m.id) === null).map((m) => `${m.name} (${m.id})`)
     expect(without, 'these methods report "Not configured yet" with nowhere to go').toEqual([])
   })
 
   it('never ships a form with no fields', () => {
-    for (const m of AUTH_METHODS) {
+    for (const m of FACTORS) {
       const c = configFor(m.id)
       expect(c!.fields.length, `${m.name} has an empty configuration form`).toBeGreaterThan(0)
     }
   })
 
   it('explains what each form connects to', () => {
-    for (const m of AUTH_METHODS) {
+    for (const m of FACTORS) {
       expect(configFor(m.id)!.blurb.length, `${m.name} has no blurb`).toBeGreaterThan(20)
     }
   })
 
   it('gives every field a unique id within its form', () => {
-    for (const m of AUTH_METHODS) {
+    for (const m of FACTORS) {
       const ids = configFor(m.id)!.fields.map((f) => f.id)
       expect(new Set(ids).size, `${m.name} has duplicate field ids`).toBe(ids.length)
     }
   })
 
   it('bounds every number field so the guidance is the control', () => {
-    for (const m of AUTH_METHODS) {
+    for (const m of FACTORS) {
       for (const f of configFor(m.id)!.fields) {
         if (f.kind !== 'number') continue
         expect(f.min, `${m.name}.${f.id}`).toBeLessThan(f.max)
@@ -50,7 +63,7 @@ describe('every blockable method can be configured', () => {
   })
 
   it('never marks a select or radio default that is not one of its options', () => {
-    for (const m of AUTH_METHODS) {
+    for (const m of FACTORS) {
       for (const f of configFor(m.id)!.fields) {
         if (f.kind === 'select') expect(f.options, `${m.name}.${f.id}`).toContain(f.value)
         if (f.kind === 'radio') expect(f.options.map((o) => o.value), `${m.name}.${f.id}`).toContain(f.value)
@@ -117,7 +130,7 @@ describe('the seed is coherent with the blocker ladder', () => {
      yet" simply means nobody has opened it and saved. Asserting the converse
      was my mistake, and it failed on exactly those methods. */
   it('never marks a method configured while a required value is blank', () => {
-    for (const m of AUTH_METHODS) {
+    for (const m of FACTORS) {
       if (!m.configured) continue
       expect(
         missingFields(configFor(m.id)!.fields).map((f) => f.label),
@@ -127,7 +140,7 @@ describe('the seed is coherent with the blocker ladder', () => {
   })
 
   it('never leaves a blank required field on a method the console calls ready', () => {
-    for (const m of AUTH_METHODS) {
+    for (const m of FACTORS) {
       if (missingFields(configFor(m.id)!.fields).length === 0) continue
       expect(m.configured, `${m.name} has blank required fields but is marked configured`).toBe(false)
       expect(methodBlocker(m), `${m.name}`).toBe('Not configured yet')

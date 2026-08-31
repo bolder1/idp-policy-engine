@@ -493,3 +493,79 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
    they are read together. */
 .bm8__right .bm8__txn { margin-bottom: 2px; }
 
+
+/* --- One list, and the row that narrows it ---------------------------------------
+   v1's toolbar. It replaces a tab bar, two section heads and their paragraphs:
+   a search, the filter that took over from eleven category cards, and the one
+   button for the tenant policy that is not a method.
+
+   The sentences those headings carried are on tips inside the pills, so the
+   explanation is one gesture away the first time somebody wonders what
+   "primary" means here and off the page every time after. */
+.bm8__bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.bm8__bar .bm8__search { flex: 1 1 220px; min-width: 0; }
+
+.bm8__uses { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* Grey at rest, brand for the one that is running — the same rule the rest of
+   this console follows. The count lives inside the pill so the row does not
+   reflow as it changes. */
+.bm8__use {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-pill);
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary);
+  cursor: pointer; white-space: nowrap;
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bm8__use > i {
+  font-style: normal; font-size: var(--fs-xs); color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.bm8__use:hover:not(:disabled) { border-color: var(--border-strong); }
+.bm8__use:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bm8__use.is-on {
+  background: var(--brand-subtle-bg);
+  border-color: var(--brand-subtle-border);
+  color: var(--brand-active);
+}
+.bm8__use.is-on > i { color: inherit; }
+/* An empty filter stays on the bar rather than vanishing: a bar that changes
+   length as you type is a bar you cannot aim at, and a zero is an answer. */
+.bm8__use:disabled { opacity: 0.45; cursor: default; }
+/* Beside the pill, not in it — a button cannot contain a button. Close enough
+   to read as belonging to it, far enough not to be part of the target. */
+.bm8__usewrap { display: inline-flex; align-items: center; gap: 3px; }
+
+@media (max-width: 720px) {
+  .bm8__bar { align-items: stretch; }
+  .bm8__bar .bm8__search { flex-basis: 100%; }
+}
+
+/* What kind of method a row is, where its surroundings do not already say.
+
+   Brand, and it is the only brand on the list. These three rows sit above
+   eleven cards with no heading between them, so the pill is the whole of what
+   separates "how a session starts" from "what it is stepped up with" — and grey
+   on a grey card was a label you had to go looking for to find the boundary it
+   was drawing. The console's rule is grey at rest and brand for what is
+   current; on this list the current thing is where the session begins.
+
+   The recovery pill stays quiet. It marks a second job a method can also do,
+   which is a footnote on the row rather than the row's identity — two loud
+   pills side by side would make neither of them the answer. */
+.bm8__badge.bm8__badge--use {
+  background: var(--brand-subtle-bg);
+  border: 1px solid var(--brand-subtle-border);
+  color: var(--brand-active);
+  font-weight: var(--fw-semibold);
+}
+.bm8__badge.bm8__badge--use.is-quiet {
+  background: var(--surface-inset);
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+  font-weight: var(--fw-medium);
+}

@@ -36,18 +36,31 @@ describe('the person can only be enrolled in what they can reach', () => {
   })
 })
 
+/* Scoped to SECOND FACTORS, which is what these invariants were always about.
+
+   The catalogue gained the three ways a session can start — password, passkeys,
+   magic link — and none of them has the things asserted below: no provider
+   integration to configure, no enrolment ceremony to walk a person through, no
+   delivery family, and no row on the MFA sheet. Password in particular is on
+   for everyone and configured by nobody.
+
+   Asserting over the whole array would have forced a form and a shape to be
+   invented for each of them just to keep a test quiet, which is the test
+   changing the product. */
+const FACTORS = AUTH_METHODS.filter((m) => m.use === 'second')
+
 describe('every method knows what to ask a person for', () => {
   it('gives each method in the catalogue an enrolment shape', () => {
     /* Falling through to 'none' is a legitimate answer for CAC and the grid,
        and a bug for anything that genuinely needs a form — so the assertion is
        that the fall-through set is exactly the two we decided on, not that
        every method has an entry. */
-    const fellThrough = AUTH_METHODS.filter((m) => enrolShapeFor(m.id).kind === 'none').map((m) => m.id)
+    const fellThrough = FACTORS.filter((m) => enrolShapeFor(m.id).kind === 'none').map((m) => m.id)
     expect(fellThrough.sort()).toEqual(['cac', 'grid'])
   })
 
   it('asks for a field wherever it says it will', () => {
-    for (const m of AUTH_METHODS) {
+    for (const m of FACTORS) {
       const s = enrolShapeFor(m.id)
       if (s.kind === 'phone' || s.kind === 'email' || s.kind === 'alt-email' || s.kind === 'token') {
         expect(s.label, `${m.name} (${s.kind}) has no field label`).toBeTruthy()

@@ -47,8 +47,12 @@ describe('the catalogue itself is coherent', () => {
     expect(new Set(AUTH_METHODS.map((m) => m.name)).size).toBe(AUTH_METHODS.length)
   })
 
-  it('carries all 21 methods the console lists', () => {
-    expect(AUTH_METHODS).toHaveLength(21)
+  /* Both numbers, because the catalogue holds two kinds now and either one
+     drifting is a different mistake: 21 is the console's own list of second
+     factors, and 3 is how many ways a session can start. */
+  it('carries all 21 second factors the console lists, plus the three primaries', () => {
+    expect(AUTH_METHODS.filter((m) => m.use === 'second')).toHaveLength(21)
+    expect(AUTH_METHODS.filter((m) => m.use === 'primary')).toHaveLength(3)
   })
 
   it('every method belongs to a declared tier', () => {

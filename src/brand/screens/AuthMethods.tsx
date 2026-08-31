@@ -1070,7 +1070,7 @@ function rulesUsing(name: string, policies: Policy[]): number {
    when it names no method. Only the arrangement differs, so these live here and
    both compose them rather than each keeping a copy that drifts. */
 
-export function PrimarySignIn() {
+export function PrimarySignIn({ heading = true }: { heading?: boolean }) {
   /* The two passwordless starts, held locally for now.
 
      Neither has a record in the catalogue that fits: `fido2` exists but is
@@ -1084,12 +1084,20 @@ export function PrimarySignIn() {
   return (
     <>
       <section className="bm8__primary">
-        <div className="bm8__sechead">
-          <div>
-            <h2>Primary sign-in methods</h2>
-            <p>How a session starts. Password is on for everyone; the passwordless options are yours to allow.</p>
+        {/* Dropped whole where the section already has a name above it. v2
+            gives this block a tab of its own, so the heading was the tab's six
+            words printed twice — and once that goes the sentence under it is a
+            gloss on a title that is no longer there, explaining "primary" to a
+            reader who just clicked the word. Three rows that say "Always on",
+            "Passkeys" and "Magic link" do not need introducing. */}
+        {heading && (
+          <div className="bm8__sechead">
+            <div>
+              <h2>Primary sign-in methods</h2>
+              <p>How a session starts. Password is on for everyone; the passwordless options are yours to allow.</p>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="bm8__primarylist">
           <div className="bm8__card bm8__card--locked">

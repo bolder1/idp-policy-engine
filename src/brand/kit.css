@@ -270,16 +270,43 @@ html[data-theme='dark'] {
 
 /* --- Badge ---------------------------------------------------------------- */
 
+/* One line, always, and a ceiling it cannot grow past.
+
+   A badge is a label, not a paragraph. "Account Management" wrapping to two
+   lines in a table cell makes that one row taller than every other row, and a
+   column of rows at two different heights reads as a fault long before it
+   reads as a long word. So the label is one line, clipped at the ceiling, and
+   the full text is on hover — set from measurement in `Badge`, so only the
+   clipped ones carry it.
+
+   The ceiling is a variable with its default in the `var()` fallback rather
+   than declared here, which is the difference between a knob and a constant: a
+   declaration on `.bx-badge` would beat anything an ancestor said, so the
+   fallback is where the default has to live. Any context with room to spare
+   raises it by setting `--badge-max` on itself, and every badge underneath
+   follows without knowing where it is.
+
+   `min()` keeps 100% as the real ceiling underneath that, so a badge in a
+   column narrower than the cap clips at the column rather than overflowing
+   it. */
 .bx-badge {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  max-width: min(100%, var(--badge-max, 14ch));
   padding: 1px var(--space-4);
   border-radius: var(--radius-sm);
   font-size: var(--fs-xs);
   font-weight: var(--fw-medium);
   line-height: 18px;
   border: var(--bw-thin) solid transparent;
+}
+/* `min-width: 0` is the load-bearing one: a flex item defaults to `auto`, which
+   refuses to shrink below its own min-content, and a label that will not shrink
+   is a label that never ellipses. */
+.bx-badge__label {
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .bx-badge--neutral { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); border-color: var(--fb-neutral-border); }
 .bx-badge--brand { background: var(--brand-subtle-bg); color: var(--brand-active); border-color: var(--brand-subtle-border); }

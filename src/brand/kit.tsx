@@ -275,6 +275,51 @@ function MenuIcon({ icon: Icon, size }: { icon: LucideIcon; size: 'sm' | 'md' })
   return <Icon size={size === 'sm' ? 13 : 14} strokeWidth={2} aria-hidden />
 }
 
+/* --- Clipped, and a tooltip only where one is earned ---------------------------
+   `title` on every badge would put a hover box on "Session" and "System" too —
+   a delay and a grey rectangle to tell you what you can already read, on the
+   labels that need it least. So the attribute is set from measurement rather
+   than from hope: a label carries one only while its box is narrower than its
+   text, which is exactly when the ellipsis is on screen.
+
+   Re-measured on resize, because a column getting narrower is the whole reason
+   this exists, and re-run when the label changes, because a longer word in a
+   box that did not move is a clip the observer never fires for.
+
+   Reusable on purpose. Anything with a hard width and a label that can outgrow
+   it wants this, and the alternative is each of them deciding separately
+   whether to always show a tooltip. */
+function useClipped(label: ReactNode) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [full, setFull] = useState<string | null>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    /* A pixel of slack. Sub-pixel layout leaves scrollWidth a fraction above
+       clientWidth on labels that are not clipped at all, and a tooltip that
+       repeats a fully visible label is the thing this is here to avoid. */
+    let live = true
+    const measure = () => {
+      if (live) setFull(el.scrollWidth > el.clientWidth + 1 ? el.textContent : null)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    /* And again once the real face has loaded. A webfont swapping in widens the
+       text inside a box whose own size never changes, so the observer never
+       fires for the one event most likely to push a label over its cap. This is
+       the one caller that can outlive the effect, hence the flag. */
+    void document.fonts?.ready.then(measure)
+    return () => {
+      live = false
+      ro.disconnect()
+    }
+  }, [label])
+
+  return [ref, full] as const
+}
+
 export function Badge({
   children,
   tone = 'neutral',
@@ -282,7 +327,18 @@ export function Badge({
   children: ReactNode
   tone?: 'neutral' | 'brand' | 'positive' | 'negative' | 'notice' | 'info' | 'accent' | 'lime' | 'magenta' | 'system'
 }) {
-  return <span className={`bx-badge bx-badge--${tone}`}>{children}</span>
+  /* The label is its own element rather than a bare text node because
+     text-overflow does not reach an anonymous flex item — the badge stays a
+     flex row so it can hold a mark beside the word, and the word gets the box
+     that can be clipped. */
+  const [ref, full] = useClipped(children)
+  return (
+    <span className={`bx-badge bx-badge--${tone}`}>
+      <span className="bx-badge__label" ref={ref} title={full ?? undefined}>
+        {children}
+      </span>
+    </span>
+  )
 }
 
 export function DecisionChip({

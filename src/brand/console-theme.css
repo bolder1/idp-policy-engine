@@ -165,13 +165,35 @@
 
 /* Content density follows the console: white page, grey tiles, 6px radii.
 
-   Padding measured off the shipping Applications screen, whose content column
-   is `p-3 pt-5` — 16px at the sides and a deep top inset that lets the title
-   clear the fixed bar without crowding it. Ours was 20/24 and read tighter at
-   the top and wider at the sides than the console it sits beside. The bottom
-   keeps its 56px so a page that ends in a table is not flush with the viewport.
-*/
-.bpage { padding: 32px 16px 56px; }
+   The TOP inset is still measured off the shipping Applications screen, whose
+   content column is `p-3 pt-5` — a deep top inset that lets the title clear the
+   fixed bar without crowding it. The bottom keeps its 56px so a page ending in
+   a table is not flush with the viewport.
+
+   The SIDES are not measured any more, and the 16px they were is the reason.
+   That is what the console uses, and on the console it is 16px between a
+   full-bleed table and the window edge. Here the left edge is not a window, it
+   is the navigation rail — a dark column of its own — and 16px against it does
+   not read as an inset, it reads as content that has been pushed up against a
+   wall. Square with the top instead: the page gets the same air at the sides as
+   it has above, and the rail becomes a neighbour rather than an edge.
+
+   One value, on .bpage, so it lands on every screen at once — the tables, the
+   tabbed screens, the builder and the end-user pages all take their outer inset
+   from here and none of them should disagree about where a page starts. */
+.bpage { padding: 32px 32px 56px; }
+
+/* Where the rail has already narrowed, the sides narrow with it: 32px of margin
+   is air on a wide page and width you cannot spare on a cramped one.
+
+   shell.css sets the same intent at the same breakpoint and cannot be heard —
+   this sheet loads last and restates .bpage at equal weight, so its unmediated
+   rule wins at every size. Stated here rather than fixed there on purpose: the
+   theme is meant to be the last word on density, and the fix for that is to
+   keep the last word complete. */
+@media (max-width: 1120px) {
+  .bpage { padding: 24px 20px 48px; }
+}
 .bpage__headrow p { font-size: var(--fs-md); }
 .btable-wrap, .bx-card, .bedit, .bmaster__list {
   border-color: var(--border-subtle);
@@ -221,24 +243,34 @@
 .btable tbody td { font-size: var(--fs-md); }
 .btable__foot { background: var(--surface-raised); color: var(--text-secondary); }
 
-/* Page head on one line -------------------------------------------------------
-   The title and its caption sit on the same baseline, divided by a hairline,
-   and the caption truncates rather than wrapping. Stacked it cost two lines and
-   ~40px of vertical space on every page to restate the nav item you just
-   clicked. */
+/* Page head, stacked ----------------------------------------------------------
+   Title, then caption beneath it — which is how Zones, Device fingerprint and
+   Authentication methods have drawn theirs all along. Those three build their
+   own headers rather than using PageHead, so the console had two page-head
+   shapes and which one you got depended on which nav item you clicked.
+
+   This was one line on purpose: title and caption sharing a baseline, divided
+   by a hairline, the caption truncating rather than wrapping, because stacked
+   it costs a second line on every page to restate the nav item you just came
+   from. That reasoning has not stopped being true — it is worth less than the
+   two shapes agreeing, and it was also buying less than it looked. A truncated
+   caption clipped mid-sentence at ordinary widths and disappeared outright
+   below 1000px, so the pages that saved the most height were the ones where
+   the sentence never arrived at all.
+
+   Every value below is the other headers' own — 4px under the title, --fs-md
+   secondary, 1.55 leading, 68ch — so this is the same block rather than a near
+   miss that reads as a third shape. */
 .bpage__head { margin-bottom: 16px; }
-.bpage__headrow { align-items: center; }
-.bpage__title { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
-.bpage__title h1 { flex: none; }
+/* Top, not centre. The caption makes the left column two lines tall on the
+   longer ones, and an action centred against that sits below the title it
+   belongs to. */
+.bpage__headrow { align-items: flex-start; }
+.bpage__title { min-width: 0; }
 .bpage__title p {
-  min-width: 0;
-  padding-left: 12px;
-  border-left: 1px solid var(--border-subtle);
+  margin: 4px 0 0;
+  max-width: 68ch;
   font-size: var(--fs-md);
-  color: var(--text-tertiary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-@media (max-width: 1000px) {
-  /* Below this the caption cannot survive a truncate and stay useful. */
-  .bpage__title p { display: none; }
+  color: var(--text-secondary);
+  line-height: 1.55;
 }

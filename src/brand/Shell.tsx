@@ -414,14 +414,18 @@ export function PageHead({
   return (
     <header className="bpage__head">
       {breadcrumb && <div className="bpage__crumb">{breadcrumb}</div>}
-      {/* Title and caption share one line. Stacked, the caption wrapped to two
-          lines and pushed the whole page down by 40px on every screen to
-          restate what the nav item already said. Beside the title it is a
-          subtitle; under it, it was a paragraph. */}
+      {/* Title, then caption under it, matching the three screens that build
+          their own header — Zones, Device fingerprint and Authentication
+          methods. They have always stacked; this shared one did not, so the
+          console drew its page head two ways depending on the screen.
+
+          No `title` on the caption any more. It was there because the caption
+          used to truncate, and a tooltip repeating a sentence that is now
+          printed in full is a hover box with nothing in it. */}
       <div className="bpage__headrow">
         <div className="bpage__title">
           <h1>{title}</h1>
-          {caption && <p title={caption}>{caption}</p>}
+          {caption && <p>{caption}</p>}
         </div>
         {actions && <div className="bpage__actions">{actions}</div>}
       </div>

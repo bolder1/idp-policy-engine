@@ -112,37 +112,54 @@
 
 /* --- The rows ------------------------------------------------------------------ */
 
-.bm8__list { display: flex; flex-direction: column; gap: 14px; }
+/* Separate cards, and nothing drawn around them.
+
+   Five shapes, and the notes are here so none of the four rejected ones gets
+   tried again:
+
+     outlined          eleven rectangles down a white page, and the rectangle
+                       was louder than the name inside it.
+     filled at 6%      --surface-inset. Read as DISABLED — a flat mid-grey is
+                       what that means everywhere — and put body text on a tint.
+     one panel, ruled  swapped eleven boxes for a ladder of hairlines. Same
+                       noise, different hat.
+     white + shadow    drew nothing, and separated almost nothing with it.
+
+   What works is the same idea as the filled one at a third of the strength:
+   #f8f8f8 against #ffffff. Light enough that nothing reads as switched off,
+   present enough that a card has an edge without one being drawn. */
+.bm8__list { display: flex; flex-direction: column; gap: 10px; }
 
 .bm8__card {
   display: flex; align-items: center; gap: 16px;
   width: 100%; min-height: 76px; padding: 16px 20px;
-  background: var(--surface-raised);
-  /* --border-default, not --border-subtle. Subtle is for a divider inside a
-     panel that already has an edge; these rows ARE the edge, and at 14px apart
-     on the page background a hairline that faint reads as no border at all. */
-  border: 1px solid var(--border-default); border-radius: var(--radius-lg);
+  /* Not a surface token, because none of them is this value and none should
+     be bent to it: --surface-sunken is close in light but INVERTS in dark,
+     where it is darker than the page and a card would read as a well rather
+     than a card. Declared here, with dark handed back to the raised surface
+     below. */
+  background: #f8f8f8;
+  border: 0; border-radius: var(--radius-lg);
   text-align: left;
-  transition:
-    border-color var(--dur-fast) var(--ease-standard),
-    box-shadow var(--dur-fast) var(--ease-standard),
-    transform var(--dur-fast) var(--ease-standard);
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+
+/* Dark keeps the raised surface, which is already lighter than the page there
+   and separates on its own. Both selectors, because the theme can be chosen or
+   inherited from the OS. */
+:root[data-theme='dark'] .bm8__card { background: var(--surface-raised); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bm8__card { background: var(--surface-raised); }
 }
 
 /* The category row is a button and goes somewhere; the method row is not, and
    only the one that goes somewhere gets a hover. */
+/* The category row is a button and goes somewhere; the method row is not, and
+   only the one that goes somewhere gets a hover. The fill steps once more —
+   the same signal the resting state uses, not a new one. */
 button.bm8__card { cursor: pointer; }
-button.bm8__card:hover {
-  /* Brand-tinted rather than a darker grey. A row that is about to take you
-     somewhere should look like the brand's affordance, and a brand tint is the
-     one treatment that steps correctly in both themes — --border-strong is the
-     same value in light and dark, so it barely moves against a dark surface. */
-  border-color: var(--brand-subtle-border);
-  box-shadow: var(--el-mid);
-  transform: translateY(-1px);
-}
-button.bm8__card:active { transform: translateY(0); box-shadow: var(--el-low); }
-button.bm8__card:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--focus-ring); }
+button.bm8__card:hover { background: var(--surface-inset); }
+button.bm8__card:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
 /* The chevron leans the way the click goes. */
 button.bm8__card:hover .bm8__right > svg { transform: translateX(3px); color: var(--brand-active); }
@@ -159,6 +176,8 @@ button.bm8__card:hover .bm8__name { color: var(--brand-active); }
    Identity, not status: a family keeps its colour whether or not anything in it
    is on. A family with nothing enabled gets the neutral tile instead, which is
    the prototype's grey and the only status the tile carries. */
+/* Inset again: the row is white, so a grey chip is the step, the way it was
+   before the row briefly went grey itself. */
 .bm8__tile {
   flex: none; display: grid; place-items: center;
   width: 36px; height: 36px; border-radius: var(--radius-md);
@@ -502,10 +521,16 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
    The sentences those headings carried are on tips inside the pills, so the
    explanation is one gesture away the first time somebody wonders what
    "primary" means here and off the page every time after. */
+/* The two controls sit together at the left rather than at opposite ends.
+
+   The search used to take every pixel the bar had, which pushed the filter to
+   the far right and left a metre of nothing between two controls that are used
+   in the same breath. Neither needs the width: nobody types a long query into a
+   list of twenty-four names. */
 .bm8__bar {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
-.bm8__bar .bm8__search { flex: 1 1 220px; min-width: 0; }
+.bm8__bar .bm8__search { flex: 0 1 300px; min-width: 0; }
 
 .bm8__uses { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
@@ -617,3 +642,8 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
   font-weight: var(--fw-medium);
 }
 .bmact__pill.is-none > svg { flex: none; }
+
+/* The filter sits at the far end of the bar; the search keeps its 300px at the
+   near end. They are used in the same breath but they are not the same control,
+   and the gap is what says so. */
+.bm8__bar .bx-menu { margin-left: auto; }

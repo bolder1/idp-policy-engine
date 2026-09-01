@@ -255,11 +255,22 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
     )
   }
 
-  /* What this viewer may see at all. `methodBlocker` already answers exactly
-     this — it returns a reason whenever a method is unconfigured, switched off,
-     or not offered to end users — so a person's catalogue is the tenant's with
-     everything blocked removed, and nothing else. */
-  const reachable = isUser ? methods.filter((m) => !methodBlocker(m)) : methods
+  /* What this viewer may see at all.
+
+     `methodBlocker` answers most of it — it returns a reason whenever a method
+     is unconfigured, switched off, or not offered to end users — so a person's
+     catalogue is the tenant's with everything blocked removed.
+
+     The primaries come out too, and that is a different kind of exclusion. They
+     are not blocked; they are not this person's to see. Password, Passkeys and
+     Magic link are how the tenant lets a session START, decided once by an
+     admin for everybody — and this page is headed "Two-step verification" and
+     tells the reader to set up as many as they like. A row nobody can act on,
+     under a heading about a second step, is a promise the screen cannot keep.
+     They stay in full on the admin side, where they are a real decision. */
+  const reachable = isUser
+    ? methods.filter((m) => m.use !== 'primary' && !methodBlocker(m))
+    : methods
 
   const openFamily = openChannel ? FAMILIES.find((f) => f.channel === openChannel) ?? null : null
 
@@ -663,9 +674,10 @@ function CategoryList({
   }, [methods, q, use])
 
   const countOf = (f: UseFilter) => methods.filter((m) => matchesUse(m, f)).length
-  /* Recovery is a tenant policy, so a person is not offered it as a filter over
-     their own methods. */
-  const offered = USES.filter((u) => !(isUser && u.id === 'recovery'))
+  /* Recovery is a tenant policy, and the primaries are not in a person's
+     catalogue at all — so neither is offered as a filter over their own
+     methods. A filter that can only ever return nothing is a dead option. */
+  const offered = USES.filter((u) => !(isUser && (u.id === 'recovery' || u.id === 'primary')))
   const current = offered.find((u) => u.id === use) ?? offered[0]
 
   /* The primaries answer to the same search and the same filter as the cards

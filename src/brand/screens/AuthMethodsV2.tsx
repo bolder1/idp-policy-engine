@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Search, ShieldAlert, ShieldCheck, Star } from 'lucide-react'
+import { Search, Star } from 'lucide-react'
 
 import { NoResults } from '../empty'
-import { Button } from '../kit'
 import type { Policy } from '../data'
 import type { ConfigField } from '../method-config'
 import { methodBlocker, type AuthMethod } from '../methods'
@@ -17,9 +16,10 @@ import {
   firstDefaultable,
   type Family,
 } from './AuthMethods'
-import { MethodIcon, RecoveryTab } from './recovery'
+import { ActiveMethod } from './active-method'
+import { RecoveryTab } from './recovery'
 import { UserMethodCard } from './user-config'
-import { SEED_ENROLMENT, enrolShapeFor, type UserEnrolment } from '../user-methods'
+import { SEED_ENROLMENT, type UserEnrolment } from '../user-methods'
 
 /* -----------------------------------------------------------------------------
    Authentication methods · v2 — master and detail.
@@ -232,20 +232,7 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
       {/* The person's one active method, stated before the catalogue rather
           than found inside it. The live page puts it in the same place, and it
           is the answer to the only question most visits are asking. */}
-      {isUser && (
-        <ActiveMethod
-          methods={methods}
-          enrolment={enrolment}
-          onManage={(m) => {
-            /* Select the family that holds it and open its card, so the panel
-               is a way into the list rather than a label above it. No card to
-               open where the method asks for nothing — opening one on an
-               empty form is a click that lands on nothing. */
-            setChannel(m.channel)
-            setOpenCard(enrolShapeFor(m.id).kind === 'none' ? null : m.id)
-          }}
-        />
-      )}
+      {isUser && <ActiveMethod methods={methods} enrolment={enrolment} />}
 
       {/* Every tab on this bar is the tenant’s, so a person gets none of the
           bar. Primary sign-in and recovery are both tenant policy, and what is
@@ -407,139 +394,6 @@ export function AuthMethodsV2({ role = 'admin' }: { role?: Role }) {
         onClose={() => setSetupOf(null)}
         onSave={finishSetup}
       />
-    </div>
-  )
-}
-
-/* -----------------------------------------------------------------------------
-   The one method that runs.
-
-   This was a line: the words “Active method” and the name in a pill, above the
-   catalogue. It named the right thing and then said nothing else about it —
-   and it is the answer to the question almost every visit to this page is
-   actually asking, sitting at a weight below the search box.
-
-   So it is a section now, carrying the three facts the list underneath cannot
-   state about the one method that matters:
-
-     · WHICH — the vendor mark and the name, at the size of a decision rather
-       than a caption, with the phishing-resistant badge where the method earns
-       it.
-     · WHERE — the address or serial this person actually enrolled. A code is
-       no use going to a mailbox they stopped reading, and nobody opens a card
-       to check something they believe is already right.
-     · WHAT IF NOT — whether anything else is set up. One method and no backup
-       is a lockout waiting for a lost phone, and it is invisible in a list
-       where every enrolled card looks the same.
-
-   Nothing active is not a quieter version of this panel, it is the opposite of
-   it, so it does not render as an empty value in the same frame — same shape,
-   notice colours, and a sentence saying what that leaves standing in front of
-   the account.
-   -------------------------------------------------------------------------- */
-
-/* The shapes whose stored value is an ADDRESS — where a challenge is sent, or
-   which token is yours. Security Questions keeps its answers under the same
-   key, and the whole point of an answer is that it is not printed across the
-   top of the page; the enrolment ceremonies keep codes there. Neither is shown,
-   because neither is a fact about where the method reaches you. */
-const ADDRESS_SHAPES = new Set(['phone', 'email', 'alt-email', 'phone-and-email', 'token'])
-
-function ActiveMethod({
-  methods,
-  enrolment,
-  onManage,
-}: {
-  methods: AuthMethod[]
-  enrolment: UserEnrolment
-  onManage: (m: AuthMethod) => void
-}) {
-  const m = methods.find((x) => x.id === enrolment.active) ?? null
-
-  /* Counted against the catalogue, not against the enrolment list alone: a
-     method the admin has withdrawn since is still in `configured` and is not
-     something anyone can fall back on. */
-  const backups = enrolment.configured.filter(
-    (id) => id !== enrolment.active && methods.some((x) => x.id === id),
-  ).length
-
-  const shape = m ? enrolShapeFor(m.id) : null
-  const address =
-    m && shape && ADDRESS_SHAPES.has(shape.kind)
-      ? Object.values(enrolment.values[m.id] ?? {})
-          .filter(Boolean)
-          .join(' · ')
-      : ''
-
-  if (!m) {
-    return (
-      <div className="bmu__hero bmu__hero--none">
-        <span className="bmu__heroalert" aria-hidden>
-          <ShieldAlert size={26} strokeWidth={1.7} />
-        </span>
-        <div className="bmu__herobody">
-          <p className="bmu__heroeyebrow">Active method</p>
-          <h2 className="bmu__heroname">Nothing runs yet</h2>
-          <p className="bmu__heroblurb">
-            Set one of these up and switch it on. Until you do, your password is the only thing
-            standing in front of this account.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="bmu__hero">
-      {/* The same mark the card below carries, at four times the size. A method
-          should look like itself wherever it appears, and this is the one place
-          on the page with room to say so properly. */}
-      <span className="bm8__tile bm8__tile--logo bmu__herotile" aria-hidden>
-        <MethodIcon name={m.name} size={56} />
-      </span>
-
-      <div className="bmu__herobody">
-        <p className="bmu__heroeyebrow">
-          <i className="bmu__herodot" aria-hidden />
-          Active method
-        </p>
-
-        <h2 className="bmu__heroname">
-          {m.name}
-          {m.tier === 'Phishing-resistant' && (
-            <i className="bm8__badge">
-              <ShieldCheck size={11} strokeWidth={2.2} aria-hidden />
-              Phishing-resistant
-            </i>
-          )}
-        </h2>
-        <p className="bmu__heroblurb">{m.description}</p>
-
-        <dl className="bmu__herofacts">
-          {address && (
-            <div>
-              <dt>{shape?.label ?? 'Sent to'}</dt>
-              <dd>{address}</dd>
-            </div>
-          )}
-          {/* Stated whichever way it falls. “Nothing else” is the more useful
-              of the two answers and the one a list of identical cards hides. */}
-          <div className={backups === 0 ? 'is-warn' : undefined}>
-            <dt>Backup</dt>
-            <dd>
-              {backups === 0
-                ? 'Nothing else is set up'
-                : `${backups} other method${backups === 1 ? '' : 's'} ready`}
-            </dd>
-          </div>
-        </dl>
-      </div>
-
-      <div className="bmu__heroside">
-        <Button size="sm" variant="secondary" onClick={() => onManage(m)}>
-          Manage
-        </Button>
-      </div>
     </div>
   )
 }

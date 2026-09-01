@@ -32,6 +32,7 @@ import type { Policy } from '../data'
 import { MethodIcon, RecoveryTab } from './recovery'
 import { UserMethodCard } from './user-config'
 import { SEED_ENROLMENT, type UserEnrolment } from '../user-methods'
+import { ActiveMethod } from './active-method'
 import { SettingField } from '../setting-field'
 import { ConfigFields } from './method-forms'
 import { configFor, isMissing, missingFields, setField, type ConfigField } from '../method-config'
@@ -700,6 +701,18 @@ function CategoryList({
           with a sentence explaining that the rows are groups, was a title for
           something already unambiguous. */}
 
+      {/* The one method that runs, stated before the catalogue rather than
+          found inside it.
+
+          A person opening this page is almost always asking one question — what
+          happens when I sign in — and the list answers it only by making them
+          read every row until they find the enrolled one. The line says it
+          outright.
+
+          Only on the person's side. An admin has no active method here; a
+          tenant has a default, and the star on the row already says which. */}
+      {isUser && <ActiveMethod methods={methods} enrolment={enrolment} />}
+
       {/* What to look at, and what to look for, on one row. */}
       <div className="bm8__bar">
         <label className="bm8__search">
@@ -1231,14 +1244,18 @@ export function MethodCard({
       <div className="bm8__info">
         <span className="bm8__name">
           {m.name}
-          {/* Which kind of method this is, where the row is not already
-              surrounded by its own kind. A primary row sits above eleven cards
-              of second factors with no heading between them, so it says what it
-              is; and a method that is also a way back in says that, because
-              nothing else on the row would. */}
-          {m.use === 'primary' && <i className="bm8__badge bm8__badge--use">Primary sign-in</i>}
+          {/* A "Primary sign-in" chip stood on the first three rows. It was
+              answering a question their position already answers — they are the
+              three rows above every family card, in the order a session
+              actually happens — and it said the same three words three times
+              running down the top of the list. The filter still names them, for
+              anyone who wants only those.
+
+              Recovery keeps its chip, because nothing else on the row says it:
+              a method can be a second factor and a way back in at once, and
+              which ones are is not derivable from where they sit. */}
           {m.alsoRecovery && (
-            <i className="bm8__badge bm8__badge--use is-quiet">Recovery</i>
+            <i className="bm8__badge bm8__badge--use">Recovery</i>
           )}
           {m.tier === 'Phishing-resistant' && (
             <i className="bm8__badge">

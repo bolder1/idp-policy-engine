@@ -557,31 +557,63 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
    The recovery pill stays quiet. It marks a second job a method can also do,
    which is a footnote on the row rather than the row's identity — two loud
    pills side by side would make neither of them the answer. */
-/* Info blue, and the Default star keeps the brand tint — they were the same
-   colour, and they are not the same kind of fact.
+/* One use badge left, and it is the quiet one.
 
-   "Default" is a state somebody chose: one method out of twenty-four, starred
-   by this tenant, changeable this afternoon. Brand is right for the one you
-   picked. "Primary sign-in" is what the method IS — a property of passwords and
-   passkeys that no admin sets and none can unset. Two facts of different sorts
-   painted identically read as one repeated label, which is exactly how it
-   looked: a red pill beside a red pill.
+   There were two: "Primary sign-in" and "Recovery". The first was brand-tinted,
+   which made it indistinguishable from the Default star beside it — two facts
+   of different sorts painted identically read as one repeated label — so it
+   went info blue, the colour this product already uses for what-kind-of-thing.
+   Then it went entirely: position says it better than a chip repeated down
+   three consecutive rows.
 
-   Blue rather than any other free hue, because the product already answers
-   "what kind of thing is this" in blue — the zone type chip and the device
-   profile mode chip both do. Green stays reserved for the security property
-   beside it (Phishing-resistant), so a passkey row now reads in three colours
-   that each mean something: what it is, what it guarantees, whether it is the
-   one in use. */
+   Recovery is the one that survives, and it is deliberately quiet. It qualifies
+   the row rather than classifying it — a method can be a second factor and a
+   way back in at the same time — so it should not compete with the
+   Phishing-resistant badge, which states a property of the method itself. */
 .bm8__badge.bm8__badge--use {
-  background: var(--fb-info-bg);
-  border: 1px solid var(--fb-info-border);
-  color: var(--fb-info-fg);
-  font-weight: var(--fw-semibold);
-}
-.bm8__badge.bm8__badge--use.is-quiet {
   background: var(--surface-inset);
-  border-color: var(--border-subtle);
+  border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
   font-weight: var(--fw-medium);
 }
+
+/* =============================================================================
+   The one method that runs — the line above the person's catalogue.
+
+   Three versions stood here before this one: a brand-tinted panel with a 56px
+   logo and a fact list, then a bordered full-width row with a live pill and a
+   chevron, then the same row stacked over its label. Each was accurate and each
+   was still competing with the list it introduces. This is a label and a pill
+   on one line — the size a one-word answer should be.
+   ========================================================================== */
+
+.bmact {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 2px 0 14px;
+}
+
+/* Two classes, because `.bpage h2` sets 16px semibold at one specificity point
+   more than a bare class — right for a section heading, and this is a label
+   introducing a value on the same line rather than a heading over a block. */
+.bmact .bmact__head {
+  margin: 0;
+  font-size: var(--fs-base); font-weight: var(--fw-regular);
+  letter-spacing: 0; color: var(--text-secondary);
+}
+
+.bmact__pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px; border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
+  white-space: nowrap;
+}
+/* The method's own mark, at the size of the words beside it. */
+.bmact__pill .bv5__mico { flex: none; }
+
+/* Nothing active is the opposite of this, not a quieter version of it. */
+.bmact__pill.is-none {
+  background: var(--fb-notice-bg); color: var(--fb-notice-fg);
+  font-weight: var(--fw-medium);
+}
+.bmact__pill.is-none > svg { flex: none; }

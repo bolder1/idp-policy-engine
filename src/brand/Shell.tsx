@@ -15,8 +15,6 @@ import {
   Moon,
   Palette,
   Rocket,
-  HelpCircle,
-  ListChecks,
   Settings,
   ShieldCheck,
   Sun,
@@ -352,25 +350,11 @@ export function Shell({ children }: { children: ReactNode }) {
         {children}
       </main>
 
-      {/* The console's quick-access rail, down the right edge.
-
-          It is the one piece of the shipping chrome we did not have: two
-          buttons that follow the page rather than scrolling with it, so help
-          and the setup checklist are reachable from the bottom of a long table
-          without going back to the top. Deliberately not a third copy of the
-          topbar's icons — those open the same destinations, but from a bar that
-          scrolls away.
-
-          Narrow on purpose. It is a rail, not a panel: anything that needs more
-          than an icon belongs in what the icon opens. */}
-      <div className="bshell__quick" role="complementary" aria-label="Quick access">
-        <button className="bshell__quickbtn is-primary" title="Documentation" aria-label="Documentation">
-          <HelpCircle size={19} strokeWidth={2} />
-        </button>
-        <button className="bshell__quickbtn" title="Setup checklist" aria-label="Setup checklist">
-          <ListChecks size={19} strokeWidth={1.9} />
-        </button>
-      </div>
+      {/* A quick-access rail floated down the right edge here — help and the
+          setup checklist, following the page rather than scrolling with it.
+          Both open destinations the topbar already offers, and the pair sat
+          over the content on every screen to save a scroll to the top. Out for
+          now; the topbar keeps the icons. */}
 
       <Toast />
     </div>

@@ -207,59 +207,7 @@
   .bpage { padding: var(--space-7) var(--space-6) var(--space-12); }
 }
 
-/* --- Quick access, right edge --------------------------------------------------
-   Fixed to the viewport rather than placed in the grid, so it stays put while
-   the main column scrolls — which is the whole point of it. Sitting in the grid
-   would have meant a fourth column that is 44px wide and empty on every screen
-   narrower than a laptop.
+/* `.bshell__quick` — a floating rail of two icon buttons down the right edge —
+   stood here. Removed with the markup; the topbar still carries both. */
 
-   Below the topbar, not beside it: the topbar already owns the full width, and
-   a rail starting level with it would read as part of it. */
-.bshell__quick {
-  position: fixed;
-  top: calc(var(--nav-topbar-h) + 16px);
-  right: 12px;
-  z-index: 20;
-  display: flex; flex-direction: column; gap: 10px;
-}
-
-.bshell__quickbtn {
-  display: grid; place-items: center;
-  width: 38px; height: 38px;
-  border-radius: var(--radius-full);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default);
-  color: var(--text-secondary);
-  box-shadow: var(--el-low);
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-standard),
-              color var(--dur-fast) var(--ease-standard),
-              border-color var(--dur-fast) var(--ease-standard);
-}
-.bshell__quickbtn:hover { border-color: var(--border-strong); color: var(--text-primary); }
-.bshell__quickbtn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
-
-/* The console draws help as a filled dark circle — the one button here that is
-   asked for rather than stumbled on. */
-.bshell__quickbtn.is-primary {
-  background: var(--int-setup-bg, #263746);
-  border-color: transparent;
-  color: #fff;
-}
-.bshell__quickbtn.is-primary:hover { background: var(--int-setup-bg-hover, #1e2c38); color: #fff; }
-
-/* The rail floats over the main column, so the column has to stop short of it.
-   Without this a page-level action in the top-right — "New hook", "New zone",
-   "Create policy" — renders underneath the help button and loses its last few
-   characters to it. Reserved on the scroll container rather than on .bpage, so
-   the builder and any future full-bleed surface get the same clearance without
-   each remembering to ask. */
-@media (min-width: 901px) {
-  .bshell__main { padding-right: 50px; }
-}
-
-/* On a narrow viewport it would sit on top of the content it is meant to help
-   with, and both destinations are still in the topbar. */
-@media (max-width: 900px) {
-  .bshell__quick { display: none; }
 }

@@ -282,3 +282,20 @@
   color: var(--text-secondary);
   line-height: 1.55;
 }
+
+/* --- Side spacing on the library screens ------------------------------------
+   Zones, device profiles and authentication methods sit further in from both
+   edges than the rest of the console, matching the live product: on the SIEM
+   Management page the content starts about 9% of the content area in, on each
+   side, rather than the 32px this theme gives every other page.
+
+   `clamp` rather than a fixed inset, because 148px is right at 1920 and absurd
+   at 1100 — the floor keeps a narrow window usable and the ceiling stops the
+   measure drifting on a very wide one. Only these three: it is a deliberate
+   difference for the screens being revamped, not a new default, and applying it
+   everywhere would silently re-lay-out the builders and the gallery too. */
+.bpage.bz7,
+.bpage.bfp2,
+.bpage.bm8 {
+  padding-inline: clamp(20px, 9%, 148px);
+}

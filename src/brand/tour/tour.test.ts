@@ -38,13 +38,20 @@ describe('the builder tour', () => {
     }
   })
 
-  it('only asks the builder for steps and panels the builder actually has', () => {
-    const steps = new Set(['who', 'when', 'then', 'check', 'review'])
-    const panels = new Set(['preview', 'review', 'launch'])
+  /* Was "only asks the builder for steps and panels the builder actually has".
+
+     Both are gone: the five-step trail and the three-faced side panel were
+     deleted, so a stop can no longer ask the builder to rearrange itself before
+     it points at something. What replaced that guarantee is stronger — every
+     stop now anchors to something simply on screen, which the first assertion
+     in this file already checks — so this asserts the machinery stays gone
+     rather than that it is used correctly. */
+  it('never asks the builder to change mode before a stop', () => {
     for (const s of STOPS) {
-      if (s.step) expect(steps.has(s.step)).toBe(true)
-      if (s.panel) expect(panels.has(s.panel)).toBe(true)
+      expect(s).not.toHaveProperty('step')
+      expect(s).not.toHaveProperty('panel')
     }
+    expect(builder).not.toContain('onPanel')
   })
 
   /* "Show me that again" used to mean finding the Policy menu. The bar button is

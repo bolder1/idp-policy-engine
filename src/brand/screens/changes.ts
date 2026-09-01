@@ -1,4 +1,5 @@
-import { DECISION_LABEL, type Policy, type Rule } from '../data'
+import { DECISION_LABEL, groups as seedGroups, users as seedUsers, type Group, type Policy, type Rule, type User } from '../data'
+import { leafCount, sig } from '../predicate'
 
 /* -----------------------------------------------------------------------------
    What changed, in words.
@@ -15,8 +16,13 @@ import { DECISION_LABEL, type Policy, type Rule } from '../data'
    prose two clicks later, which is the right place for detail.
    -------------------------------------------------------------------------- */
 
-const conditionKey = (r: Rule) =>
-  r.conditions.map((c) => `${c.typeId}|${c.operator}|${c.values.join(',')}|${c.joiner}`).join('␟')
+/* `sig` rather than a hand-rolled join, because this has to see a REGROUPING.
+
+   The old key was a positional list over a flat array. Move a condition from
+   one alternative to another and the leaves are identical, so the key matched
+   and the save bar reported nothing — while the rule now catches a different
+   set of people. `sig` nests the join characters, so it distinguishes them. */
+const conditionKey = (r: Rule) => sig(r.when)
 
 const factorKey = (r: Rule) =>
   [
@@ -32,10 +38,33 @@ const factorKey = (r: Rule) =>
     r.allowDisable2fa,
   ].join('|')
 
-export function describeChanges(saved: Policy, draft: Policy): string[] {
+export function describeChanges(
+  saved: Policy,
+  draft: Policy,
+  groups: Group[] = seedGroups,
+  directory: User[] = seedUsers,
+): string[] {
   const out: string[] = []
 
   if (saved.name !== draft.name) out.push(`Renamed to “${draft.name}”`)
+
+  /* --- Audience ------------------------------------------------------------
+
+     Named, not merely flagged. This used to be a per-rule line reading "now
+     applies to a different audience", which tells the reader that the single
+     biggest claim the policy makes has changed and refuses to say how. It is
+     one policy-level fact now, so it can be diffed properly and say who. */
+  const a = saved.audience
+  const b = draft.audience
+  if (a.everyone !== b.everyone) {
+    out.push(b.everyone ? 'Now applies to everyone in the directory' : 'No longer applies to everyone')
+  }
+  const gname = (id: string) => groups.find((g) => g.id === id)?.name ?? id
+  const uname = (id: string) => directory.find((u) => u.id === id)?.name ?? id
+  for (const id of b.groupIds) if (!a.groupIds.includes(id)) out.push(`${gname(id)} added to the audience`)
+  for (const id of a.groupIds) if (!b.groupIds.includes(id)) out.push(`${gname(id)} removed from the audience`)
+  for (const id of b.userIds) if (!a.userIds.includes(id)) out.push(`${uname(id)} added to the audience`)
+  for (const id of a.userIds) if (!b.userIds.includes(id)) out.push(`${uname(id)} removed from the audience`)
 
   const savedById = new Map(saved.rules.map((r) => [r.id, r]))
   const draftById = new Map(draft.rules.map((r) => [r.id, r]))
@@ -60,7 +89,10 @@ export function describeChanges(saved: Policy, draft: Policy): string[] {
       out.push(`“${r.name}” now ${DECISION_LABEL[r.decision]} instead of ${DECISION_LABEL[before.decision]}`)
 
     if (conditionKey(before) !== conditionKey(r)) {
-      const d = r.conditions.length - before.conditions.length
+      /* Leaves, not containers. Counting `cards` would report "+1 condition
+         added" when the author merely wrapped two existing conditions in a new
+         alternative, and nothing was added at all. */
+      const d = leafCount(r.when) - leafCount(before.when)
       out.push(
         d === 0
           ? `Conditions edited on “${r.name}”`
@@ -69,9 +101,6 @@ export function describeChanges(saved: Policy, draft: Policy): string[] {
             : `${-d} condition${d === -1 ? '' : 's'} removed from “${r.name}”`,
       )
     }
-
-    if (JSON.stringify(before.appliesTo) !== JSON.stringify(r.appliesTo))
-      out.push(`“${r.name}” now applies to a different audience`)
 
     if (before.enabled !== r.enabled) out.push(`“${r.name}” switched ${r.enabled ? 'on' : 'off'}`)
 

@@ -1,5 +1,6 @@
-import { blankRule, cond, type AccessDecision, type Policy, type Rule } from '../data'
-import { SIM_USERS, decide, walk, type SimEnv, type SimUser, type TraceResult } from './simulate'
+import { blankRule, card, cond, when, type AccessDecision, type Policy, type Rule } from '../data'
+import { ckey, sig } from '../predicate'
+import { SIM_USERS, decide, inAudience, walk, type SimEnv, type SimUser, type TraceResult } from './simulate'
 
 /* -----------------------------------------------------------------------------
    The Gauntlet — the "check" function, played rather than read.
@@ -394,8 +395,10 @@ export interface ProposedFix {
   headline: string
 }
 
-/** Identity of a predicate, ignoring running ids and value order. */
-const predicateKey = (conditions: { typeId: string; operator: string; values: string[] }[]) =>
+/* Identity of a predicate. Points at `sig`, the one canonical form, so a twin
+   is recognised by the same rule the linter and the change list use. A card
+   spec here is one AND-run, which is exactly one card. */
+const specKey = (conditions: { typeId: string; operator: string; values: string[] }[]) =>
   conditions
     .map((c) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}`)
     .sort()
@@ -423,12 +426,30 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
      So a rule counts as a twin when it shares the predicate and its audience
      covers the person on the card. Re-aiming it is then the minimal edit that
      closes the card, and the placement text says whose treatment changed. */
-  const cardGroup = userOf(round.challenge.userId).groupId
-  const twinIndex = policy.rules.findIndex(
-    (r) =>
-      predicateKey(r.conditions) === predicateKey(spec.conditions) &&
-      (r.appliesTo.includes('all') || r.appliesTo.includes(cardGroup)),
-  )
+  /* The audience half of the twin test is gone: every rule in a policy covers
+     the same people now, so "and its audience covers the person on the card" is
+     a question about the POLICY, asked once by the deck filter before any card
+     is scored.
+
+     What replaced it is SUPERSET matching, and that is not a convenience — it
+     is required for correctness. A rule that used to be `appliesTo: ['finance']`
+     plus one condition is now ONE card holding a group condition AND that
+     condition, so an exact predicate match no longer finds it. Falling through
+     to `insert` then puts the fix's broader predicate directly above the
+     narrower rule and makes it permanently unreachable, which the linter
+     correctly refuses to publish — a one-click fix that breaks the policy it
+     was offered on.
+
+     So: the twin is the earliest single-card rule whose conditions CONTAIN the
+     spec's, preferring an exact match. Only single-card rules qualify, because
+     a rule with alternatives is not made unreachable by a broader rule above it
+     in the same way and re-aiming it would change more than the card asks. */
+  const want = new Set(spec.conditions.map((c) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}`))
+  const covers = (r: Rule) =>
+    r.when.cards.length === 1 &&
+    [...want].every((k) => r.when.cards[0].conditions.some((c) => ckey(c) === k))
+  const exact = policy.rules.findIndex((r) => sig(r.when) === specKey(spec.conditions))
+  const twinIndex = exact !== -1 ? exact : policy.rules.findIndex(covers)
 
   if (twinIndex !== -1) {
     const twin = policy.rules[twinIndex]
@@ -445,7 +466,7 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
         tooWeak && tooLate
           ? `Rule ${twinIndex + 1} · ${twin.name} already checks this, but it is weaker than the card asks for and sits below rule ${at + 1}, which decides the sign-in first. Re-aimed and moved above it.`
           : tooWeak
-            ? `Rule ${twinIndex + 1} · ${twin.name} already checks this and answers ${EXPECT_LABEL[twin.decision]}${twin.appliesTo.includes('all') ? '' : ` for ${twin.appliesTo.join(', ')}`}. A second rule with the same conditions would make one of the two unreachable, so this changes the answer instead of adding one.`
+            ? `Rule ${twinIndex + 1} · ${twin.name} already checks this and answers ${EXPECT_LABEL[twin.decision]}. A second rule with the same conditions would make one of the two unreachable, so this changes the answer instead of adding one.`
             : `Rule ${twinIndex + 1} · ${twin.name} already says this, but sits below rule ${at + 1}, which decides the sign-in first. Moved above it.`,
       headline:
         tooLate && !tooWeak
@@ -456,11 +477,11 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
 
   const rule: Rule = {
     ...blankRule(spec.name),
-    conditions: spec.conditions.map((c) => cond(c.typeId, c.operator, [...c.values])),
+    /* One card: a fix spec is a set of conditions that must all hold. The
+       hardcoded `appliesTo: ['all']` that used to sit here is gone — a rule
+       cannot be broader than its policy, so there is nothing to widen it to. */
+    when: when(card(...spec.conditions.map((c) => cond(c.typeId, c.operator, [...c.values])))),
     decision: round.want,
-    // The deck's cards are written about everyone, so a fix scoped to one group
-    // would close the card and leave the same hole open for every other group.
-    appliesTo: ['all'],
   }
 
   return {
@@ -492,7 +513,15 @@ export function runGauntlet(
   overrides: Record<string, Expect> = {},
   deck: Challenge[] = DECK,
 ): GauntletResult {
-  const rounds: Round[] = deck.map((c) => {
+  /* Cards about people this policy does not govern are not scored at all.
+
+     Grading a Finance-only policy on whether it stopped a contractor is a
+     category error: the policy was never asked. Counting it as a breach makes
+     every scoped policy look porous, and the grade stops meaning anything —
+     the same failure the policies list already records from scoring Session
+     policies with app-access cards. */
+  const governed = deck.filter((c) => inAudience(policy, contextFor(c)))
+  const rounds: Round[] = governed.map((c) => {
     const { decision, hitIndex } = decide(policy, contextFor(c), env)
     const want = overrides[c.id] ?? c.want
     return {

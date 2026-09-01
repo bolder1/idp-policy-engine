@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { cond, groups, policies, type Policy, type Rule } from '../data'
+import { EVERYONE, anySignIn, card, cond, groups, policies, when, type Policy, type Rule } from '../data'
 import { DECK, applyFix, classify, proposeFix, runGauntlet, contextFor } from './gauntlet'
 import { rawEnv, decide } from './simulate'
 import { diagnose } from './diagnostics'
@@ -24,8 +24,7 @@ function rule(over: Partial<Rule> = {}): Rule {
     id: `t${seq}`,
     name: `Rule ${seq}`,
     enabled: true,
-    appliesTo: ['all'],
-    conditions: [],
+    when: anySignIn(),
     decision: '2fa',
     firstFactor: 'Password',
     secondFactor: 'any',
@@ -45,6 +44,10 @@ function policy(rules: Rule[], over: Partial<Policy> = {}): Policy {
     status: 'active',
     lastModified: 'now',
     modifiedBy: 'test',
+    /* The deck and the sweep are both audience-gated now, so a test policy has
+       to govern everybody or half the cards silently stop being scored. Where a
+       test wants a narrower policy it passes its own `audience`. */
+    audience: EVERYONE,
     rules,
     ...over,
   }
@@ -114,8 +117,8 @@ describe('runGauntlet', () => {
 
   it('agrees with the evaluator every other surface uses', () => {
     const p = policy([
-      rule({ name: 'Anonymised', conditions: [cond('zone', 'in zone', ['anon'])], decision: 'deny' }),
-      rule({ name: 'Off network', conditions: [cond('zone', 'not in zone', ['office'])], decision: '2fa' }),
+      rule({ name: 'Anonymised', when: when(card(cond('zone', 'in zone', ['anon']))), decision: 'deny' }),
+      rule({ name: 'Off network', when: when(card(cond('zone', 'not in zone', ['office']))), decision: '2fa' }),
     ])
     const r = runGauntlet(p, rawEnv)
     for (const round of r.rounds) {
@@ -159,7 +162,7 @@ describe('sweep', () => {
   })
 
   it('is stable — the same policy swept twice gives the same grid', () => {
-    const p = policy([rule({ conditions: [cond('zone', 'in zone', ['office'])], decision: '1fa' })])
+    const p = policy([rule({ when: when(card(cond('zone', 'in zone', ['office']))), decision: '1fa' })])
     expect(sweep(p, env, noon).decisions).toEqual(sweep(p, env, noon).decisions)
   })
 })
@@ -215,8 +218,8 @@ describe('badges', () => {
     /* Deny anonymised sources and every unrecognised device; both gate badges
        should then hold, and they should not hold for an empty policy. */
     const guarded = policy([
-      rule({ conditions: [cond('zone', 'in zone', ['anon'])], decision: 'deny' }),
-      rule({ conditions: [cond('fingerprint', 'not recognised by', ['fp-corp'])], decision: 'deny' }),
+      rule({ when: when(card(cond('zone', 'in zone', ['anon']))), decision: 'deny' }),
+      rule({ when: when(card(cond('fingerprint', 'not recognised by', ['fp-corp']))), decision: 'deny' }),
     ])
     const got = badges(guarded, sweep(guarded, env, noon), null, 0)
     expect(got.find((b) => b.id === 'anon-gated')?.earned).toBe(true)
@@ -289,7 +292,7 @@ describe('proposeFix', () => {
        rule already decides the card would change nothing at all. */
     const p = policy([
       rule({ name: 'Everyone in on one factor', decision: '1fa' }),
-      rule({ name: 'Filler', conditions: [cond('country', 'is', ['India'])], decision: '2fa' }),
+      rule({ name: 'Filler', when: when(card(cond('country', 'is', ['India']))), decision: '2fa' }),
     ])
     const r = runGauntlet(p, rawEnv)
     const leak = r.rounds.find((x) => x.outcome === 'breach' && x.hitIndex === 0)!
@@ -309,7 +312,7 @@ describe('a fix must not create a policy that cannot be published', () => {
     const p = policy([
       rule({
         name: 'Contractor baseline',
-        conditions: [cond('user-type', 'is', ['Contractor'])],
+        when: when(card(cond('user-type', 'is', ['Contractor']))),
         decision: '1fa',
       }),
     ])

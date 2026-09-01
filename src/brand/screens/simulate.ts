@@ -1,4 +1,5 @@
 import { conditionType, type AccessDecision, type Condition, type Policy, type Rule } from '../data'
+import { blame, cardName, credit, leaves } from '../predicate'
 
 /* -----------------------------------------------------------------------------
    The simulation core.
@@ -191,8 +192,20 @@ export function evalCond(c: Condition, ctx: SimContext): { state: CondState; det
       return decide(vals.includes(ctx.user.userType), `${ctx.user.name} is a ${ctx.user.userType.toLowerCase()}`)
     case 'user-role':
       return decide(vals.includes(ctx.user.role), `${ctx.user.name} has the ${ctx.user.role} role`)
+    /* Keyed by group ID, not display name.
+
+       It used to compare against `groupName`, which meant renaming a group in
+       the directory silently stopped every rule that named it from matching.
+       The catalogue entry now carries no hardcoded options at all — the picker
+       reads live groups — so ids are the only stable key. */
     case 'group':
-      return decide(vals.includes(ctx.user.groupName), `${ctx.user.name} is in ${ctx.user.groupName}`)
+      return decide(vals.includes(ctx.user.groupId), `${ctx.user.name} is in ${ctx.user.groupName}`)
+    /* New, and load-bearing: with the audience hoisted to the policy, naming a
+       person or a group inside a rule is the ONLY way to narrow within a
+       policy. It has to actually evaluate, or the first thing an admin reaches
+       for after the hoist returns "unknown". */
+    case 'user':
+      return decide(vals.includes(ctx.user.id), `this sign-in is ${ctx.user.name}`)
 
     case 'time': {
       const from = toMinutes(vals[0] ?? '00:00')
@@ -210,38 +223,62 @@ export function evalCond(c: Condition, ctx: SimContext): { state: CondState; det
 export interface RuleVerdict {
   match: boolean
   reason: string
+  /** Which card carried the match, or came closest to it. Null when there are no cards. */
+  card: number | null
 }
 
+/* One rule against one context.
+
+   The audience test that used to sit at the top of this function is gone — it
+   is a policy-level fact now, short-circuited once in `walk` rather than
+   re-asked for every rule. What is left is the predicate, and the predicate is
+   a disjunction: the rule matches when ANY card has every one of its conditions
+   met.
+
+   `unknown` is not a pass, here as in `evalCond`. A card the simulator cannot
+   fully decide does not carry the match. */
 export function evalRule(rule: Rule, ctx: SimContext, env: SimEnv): RuleVerdict {
-  /* The audience is condition zero. A rule scoped to Finance never gets to look
-     at its conditions for a contractor, and saying so is far more useful than
-     reporting the first condition of a rule that was never in play. */
-  if (!rule.appliesTo.includes('all') && !rule.appliesTo.includes(ctx.user.groupId)) {
-    const to = rule.appliesTo.map(env.groupName).join(', ')
-    return { match: false, reason: `Applies to ${to} — ${ctx.user.name} is in ${ctx.user.groupName}` }
+  const p = rule.when
+
+  if (p.cards.length === 0) {
+    return { match: true, reason: 'No conditions — this step catches everything that reaches it', card: null }
   }
 
-  if (rule.conditions.length === 0) {
-    return { match: true, reason: 'No conditions — this step catches everything that reaches it' }
+  const results = new Map<string, { state: CondState; detail: string }>()
+  for (const c of leaves(p)) results.set(c.id, evalCond(c, ctx))
+  const passed = (c: Condition) => results.get(c.id)?.state === 'pass'
+
+  const won = credit(p, passed)
+  if (won) {
+    const n = won.card.conditions.length
+    /* "All N conditions met" is only true when there is one card. With
+       alternatives it is false — the other card's conditions were NOT met —
+       and a trace that overstates what it checked is a trace nobody believes
+       the second time. */
+    return {
+      match: true,
+      reason:
+        p.cards.length === 1
+          ? `All ${n} condition${n === 1 ? '' : 's'} met`
+          : `Matched ${cardName(won.card, won.index)}`,
+      card: won.index,
+    }
   }
 
-  const results = rule.conditions.map((c) => evalCond(c, ctx))
-  // Left to right, no precedence — the same way the builder writes the rule out
-  // as a sentence. Anything else would make the UI and the trace disagree.
-  let acc = results[0].state === 'pass'
-  for (let i = 1; i < results.length; i++) {
-    const ok = results[i].state === 'pass'
-    acc = rule.conditions[i].joiner === 'OR' ? acc || ok : acc && ok
-  }
+  /* One reason, not a list — but "the first thing that failed" is meaningless
+     across three alternatives that each failed differently. The useful answer
+     is the alternative that came closest. */
+  const near = blame(p, passed)
+  if (!near) return { match: false, reason: 'No card could be satisfied', card: null }
+  const detail = results.get(near.condition.id)?.detail ?? ''
+  const prefix = p.cards.length > 1 ? `Closest was ${cardName(near.card, near.index)}: ` : ''
+  return { match: false, reason: `${prefix}${condPhrase(near.condition, env)} — ${detail}`, card: near.index }
+}
 
-  if (acc) {
-    const n = rule.conditions.length
-    return { match: true, reason: `All ${n} condition${n === 1 ? '' : 's'} met` }
-  }
-
-  // One reason, not a list. The first thing that failed is the thing to fix.
-  const i = results.findIndex((r) => r.state !== 'pass')
-  return { match: false, reason: `${condPhrase(rule.conditions[i], env)} — ${results[i].detail}` }
+/** Does this policy govern the person signing in? Asked once, above the rules. */
+export function inAudience(policy: Policy, ctx: SimContext): boolean {
+  const a = policy.audience
+  return a.everyone || a.groupIds.includes(ctx.user.groupId) || a.userIds.includes(ctx.user.id)
 }
 
 export type StepKind = 'off' | 'miss' | 'hit' | 'unreached'
@@ -257,11 +294,24 @@ export interface TraceResult {
   steps: TraceStep[]
   hitIndex: number | null
   decision: AccessDecision
+  /* The policy did not govern this person at all, so no rule ran.
+
+     Distinct from "every rule missed": the surfaces that count what the engine
+     decided must not fold these together, or a policy scoped to Finance reads
+     as though it evaluated — and let through — every contractor in the tenant. */
+  outOfAudience: boolean
 }
 
 export function walk(policy: Policy, ctx: SimContext, env: SimEnv): TraceResult {
   const steps: TraceStep[] = []
   let hitIndex: number | null = null
+
+  /* The audience, asked once. It used to be re-asked inside every rule, which
+     produced a trace where five rules each explained separately that they were
+     not for this person. The policy either governs somebody or it does not. */
+  if (!inAudience(policy, ctx)) {
+    return { steps, hitIndex: null, decision: '1fa', outOfAudience: true }
+  }
 
   for (let i = 0; i < policy.rules.length; i++) {
     const rule = policy.rules[i]
@@ -280,18 +330,29 @@ export function walk(policy: Policy, ctx: SimContext, env: SimEnv): TraceResult 
 
   // No hit falls through to the engine default, which lets the sign-in proceed
   // on the first factor alone. There is no 'allow' decision in the model.
-  return { steps, hitIndex, decision: hitIndex === null ? '1fa' : policy.rules[hitIndex].decision }
+  return { steps, hitIndex, decision: hitIndex === null ? '1fa' : policy.rules[hitIndex].decision, outOfAudience: false }
 }
 
 /** The decision only — used by the situation sweep, which runs thousands of
     walks and would otherwise allocate a trace array for every one of them. */
-export function decide(policy: Policy, ctx: SimContext, env: SimEnv): { decision: AccessDecision; hitIndex: number | null } {
+export function decide(
+  policy: Policy,
+  ctx: SimContext,
+  env: SimEnv,
+): { decision: AccessDecision; hitIndex: number | null; outOfAudience: boolean } {
+  /* Same gate as `walk`, and it has to be here too. The sweep runs 1,440
+     situations through this function; without the gate, every person outside
+     the audience is counted as "the engine looked and let them through", which
+     inflates the fell-through lane on every scoped policy and corrupts the
+     blast-radius numbers the review stage is built on. */
+  if (!inAudience(policy, ctx)) return { decision: '1fa', hitIndex: null, outOfAudience: true }
+
   for (let i = 0; i < policy.rules.length; i++) {
     const rule = policy.rules[i]
     if (!rule.enabled) continue
-    if (evalRule(rule, ctx, env).match) return { decision: rule.decision, hitIndex: i }
+    if (evalRule(rule, ctx, env).match) return { decision: rule.decision, hitIndex: i, outOfAudience: false }
   }
-  return { decision: '1fa', hitIndex: null }
+  return { decision: '1fa', hitIndex: null, outOfAudience: false }
 }
 
 /** A stand-in environment for callers with no store — tests, mostly. */

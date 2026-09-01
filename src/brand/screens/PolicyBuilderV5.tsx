@@ -24,12 +24,16 @@ import { Button, DecisionChip, SaveBar } from '../kit'
 import {
   CONDITION_CATALOGUE,
   blankRule,
+  card,
   cond,
   conditionType,
+  when,
   type Policy,
   type Rule,
 } from '../data'
-import { useBrand } from '../store'
+import { cardName } from '../predicate'
+import { predicateSentence, predicateSummary, type NameLookup } from './predicate-prose'
+import { useBrand, useNameLookup } from '../store'
 import { AssignAppsDialog, CopyRuleDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
 import { DecisionLogDialog, TestPolicyDialog } from './builder-test'
 import { describeChanges } from './changes'
@@ -99,11 +103,19 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
   const store = useBrand()
   const reduce = useReducedMotion()
   const saved = store.policyById(policyId)
+  /* Every place this host prints a predicate goes through the one renderer in
+     predicate-prose, and the renderer needs the live directory to turn a stored
+     zone or group id back into the name somebody typed. */
+  const resolve = useNameLookup()
 
   const [hist, setHist] = useState<History>(() => historyOf(saved ?? ({} as Policy)))
   const [mode, setMode] = useState<Mode>('steps')
   const [selected, setSelected] = useState(0)
-  const [ifView, setIfView] = useState<'build' | 'check'>('build')
+  /* The build/check toggle this host used to own is gone with `RuleForm`'s
+     `ifView` prop. It was a two-state switch over the whole WHEN — compose it,
+     or read it back checked against the preview — and the card composer answers
+     both at once, so hoisting the state up here was buying a control the form
+     no longer offers. Nothing else in v5 read it. */
   const [railTab, setRailTab] = useState<'ready' | 'preview'>('ready')
   const [pv, setPv] = useState<PreviewState>(DEFAULT_PREVIEW)
   const [openStep, setOpenStep] = useState<string | null>(null)
@@ -172,7 +184,11 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
   const rules = draft.rules
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft)
   const changes = dirty ? describeChanges(saved, draft) : []
-  const diagnostics = diagnose(draft, store.groups, store.hooks)
+  /* The directory is handed in now that the linter has policy-scoped findings
+     about the audience — it names the people it is talking about, and naming
+     them from the seed while the tenant edits its own store would print the
+     wrong names. */
+  const diagnostics = diagnose(draft, store.groups, store.hooks, store.users)
   const index = Math.min(selected, Math.max(0, rules.length - 1))
   const rule: Rule | undefined = rules[index]
 
@@ -185,7 +201,14 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
     let r = blankRule(`Rule ${rules.length + 1}`)
     if (typeId) {
       const t = conditionType(typeId)
-      r = { ...r, name: t.label, conditions: [cond(typeId, t.operators[0], seedValues(t, store.zones[0]?.id, store.fingerprints[0]?.id, store.hooks.find((h) => h.mode === 'sync')?.id))] }
+      /* One condition, so one card. A rule seeded from the catalogue has no
+         alternatives yet — the second card is a thing the author adds in the
+         composer once they know what the alternative IS. */
+      r = {
+        ...r,
+        name: t.label,
+        when: when(card(cond(typeId, t.operators[0], seedValues(t, store.zones[0]?.id, store.fingerprints[0]?.id, store.hooks.find((h) => h.mode === 'sync')?.id)))),
+      }
     }
     patch({ rules: [...rules.slice(0, at), r, ...rules.slice(at)] })
     setSelected(at)
@@ -218,8 +241,28 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
     const t = conditionType(typeId)
     const values = preset ? [preset] : seedValues(t, store.zones[0]?.id, store.fingerprints[0]?.id, store.hooks.find((h) => h.mode === 'sync')?.id)
     if (!rule) return addRule(rules.length, typeId)
-    patchRule({ conditions: [...rule.conditions, cond(typeId, t.operators[0], values)] })
-    setLive(`${t.label} added to ${rule.name}`)
+
+    /* "Append" now has to name a card, because a rule has more than one place a
+       condition can land. It lands in the LAST card, which is the reading that
+       preserves what this click used to do — the old palette appended with an
+       AND joiner, and a card is exactly a run of ANDs. A catch-all rule has no
+       card to append to, so the first click makes one.
+
+       Adding an ALTERNATIVE is deliberately not on this palette: which card a
+       condition belongs to is the whole judgement the composer exists to make,
+       and a catalogue that quietly guessed would author brackets nobody chose.
+       The announcement names the card whenever there is more than one, so the
+       guess this does make is never silent. */
+    const cards = rule.when.cards
+    const c = cond(typeId, t.operators[0], values)
+    const last = cards.length - 1
+    patchRule({
+      when:
+        cards.length === 0
+          ? when(card(c))
+          : { cards: cards.map((k, i) => (i === last ? { ...k, conditions: [...k.conditions, c] } : k)) },
+    })
+    setLive(`${t.label} added to ${rule.name}${cards.length > 1 ? `, ${cardName(cards[last], last)}` : ''}`)
   }
 
   const shadowed = hoverShadow === null ? [] : shadowedBy(draft, hoverShadow)
@@ -231,8 +274,6 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
       ctx={ctx}
       env={env}
       diagnostics={diagnostics.filter((d) => d.ruleIndex === index)}
-      ifView={ifView}
-      onIfView={setIfView}
       onPatch={patchRule}
       onJump={jump}
       sticky={mode === 'form'}
@@ -341,7 +382,11 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
                     </span>
                     <span className="bm__spinetext">
                       <strong>{r.name}</strong>
-                      <em>{r.conditions.length === 0 ? 'catches everything' : `${r.conditions.length} condition${r.conditions.length === 1 ? '' : 's'}`}</em>
+                      {/* A count is no longer enough on its own: two rules with
+                          four conditions each are different rules if one of them
+                          spends them on two alternatives. `predicateSummary`
+                          says both numbers in the width a spine row has. */}
+                      <em>{predicateSummary(r.when)}</em>
                     </span>
                   </button>
                   <span className="bm__move">
@@ -400,7 +445,7 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
                     selected={i === index}
                     dimmed={shadowed.includes(i)}
                     state={ruleState(diagnostics.filter((d) => d.ruleIndex === i))}
-                    env={env}
+                    resolve={resolve}
                     onHover={(on) => setHoverShadow(on ? i : null)}
                     onToggle={() => {
                       setSelected(i)
@@ -453,7 +498,7 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
                   <span className={`bm__n is-${DEC_KEY[r.decision]}`}>{i + 1}</span>
                   <span className="bm__nodetext">
                     <strong>{r.name}</strong>
-                    <em>{predicate(r, env)}</em>
+                    <em>{predicateSentence(r.when, resolve)}</em>
                   </span>
                   <DecisionChip decision={r.decision} size="sm" />
                 </button>
@@ -578,22 +623,13 @@ export function PolicyBuilderV5({ policyId, open }: { policyId: string; open?: '
 
 /* --- Steps -------------------------------------------------------------------- */
 
-function predicate(r: Rule, env: SimEnv): string {
-  if (r.conditions.length === 0) return 'Everyone who reaches it'
-  return r.conditions
-    .map((c, i) => {
-      const t = conditionType(c.typeId)
-      const shown =
-        t.valueKind === 'zone'
-          ? c.values.map(env.zoneName).join(', ')
-          : t.valueKind === 'fingerprint'
-            ? c.values.map(env.fingerprintName).join(', ')
-            : c.values.filter(Boolean).join(', ')
-      const body = `${t.label} ${c.operator} ${shown || '…'}`
-      return i === 0 ? body : `${c.joiner} ${body}`
-    })
-    .join(' ')
-}
+/* v5's own `predicate(rule, env)` used to live here — a left-to-right walk that
+   printed each condition after its joiner. It was one of the six renderers that
+   have been collapsed into predicate-prose, and it is deleted rather than
+   ported: a flattening renderer under a card model prints a rule that catches
+   different people than the one that runs, and the step header and the board
+   node are precisely where somebody reads a rule they are not editing. Both now
+   call `predicateSentence`, which draws the brackets the cards are. */
 
 function Connector({ onAdd }: { onAdd: () => void }) {
   return (
@@ -613,7 +649,7 @@ function Step({
   selected,
   dimmed,
   state,
-  env,
+  resolve,
   onHover,
   onToggle,
   onMove,
@@ -630,7 +666,10 @@ function Step({
   selected: boolean
   dimmed: boolean
   state: 'ready' | 'setup' | 'warn'
-  env: SimEnv
+  /* Was the whole `SimEnv`, when the step header rendered its own prose and
+     needed the zone and fingerprint name functions off it. The prose comes from
+     predicate-prose now, so all a step wants is the one resolver it hands in. */
+  resolve: NameLookup
   onHover: (on: boolean) => void
   onToggle: () => void
   onMove: (d: -1 | 1) => void
@@ -659,7 +698,7 @@ function Step({
           </span>
           <h2>{rule.name}</h2>
           <p>
-            When <em>{predicate(rule, env)}</em>
+            When <em>{predicateSentence(rule.when, resolve)}</em>
           </p>
         </div>
         <span className="bm__stepright">

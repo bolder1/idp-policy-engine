@@ -566,14 +566,35 @@ export function Card({
 }
 
 /** Spring-damped counter for live match estimates. */
+/* A number that counts to its new value.
+
+   The animation is decoration; the number is not. So this never lets the
+   animation be the only path to the truth: a safety timer lands the exact value
+   whether or not a single frame ever arrives, and reduced-motion skips straight
+   to it.
+
+   That is not hypothetical. `requestAnimationFrame` is suspended in background
+   tabs, in some embedded webviews, and in at least one browser pane that still
+   reports `visibilityState: 'visible'` — and this component is what prints how
+   many people a policy governs. A frozen audience count is not a missing
+   flourish, it is a wrong number sitting next to the chips that contradict it. */
 export function Counter({ value, className }: { value: number; className?: string }) {
   const [display, setDisplay] = useState(value)
   const raf = useRef(0)
+  const timer = useRef(0)
   const from = useRef(value)
   const start = useRef(0)
 
   useEffect(() => {
     if (value === display) return
+
+    const still =
+      typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (still) {
+      setDisplay(value)
+      return
+    }
+
     from.current = display
     start.current = performance.now()
     const tick = (now: number) => {
@@ -583,7 +604,13 @@ export function Counter({ value, className }: { value: number; className?: strin
       if (t < 1) raf.current = requestAnimationFrame(tick)
     }
     raf.current = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf.current)
+    // Longer than the animation, so it only ever fires when the frames did not.
+    timer.current = window.setTimeout(() => setDisplay(value), 520)
+
+    return () => {
+      cancelAnimationFrame(raf.current)
+      window.clearTimeout(timer.current)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
 

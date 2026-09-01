@@ -89,7 +89,12 @@
 .bm__inspector .bf__outs { grid-template-columns: 1fr; }
 .bm__inspector .bf__groups { grid-template-columns: 1fr; }
 .bm__inspector .bf__impact { grid-template-columns: 1fr; gap: var(--space-4); }
-.bm__inspector .bf__condrow { grid-template-columns: 1fr; gap: var(--space-3); }
+/* The condition row's own single-column override used to sit here, because a
+   380px inspector is far narrower than the stage the four-column row was drawn
+   for. The row now carries a container query, so it measures the box it is
+   actually in rather than waiting for a host to know it is cramped — and a
+   descendant override that says the same thing is one more place to forget when
+   the row changes. Deleted, not moved. */
 
 /* --- Spine --------------------------------------------------------------------- */
 

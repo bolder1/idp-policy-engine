@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowRight, Check, Swords, Target } from 'lucide-react'
 
 import { Button, DecisionChip, TipDot } from '../kit'
 import type { Policy, PolicyStatus } from '../data'
-import { useBrand } from '../store'
+import { useBrand, useNameLookup } from '../store'
 import { ruleSentence } from './builder-dialogs'
 import { describeChanges } from './changes'
 import { diagnose } from './diagnostics'
@@ -60,12 +60,7 @@ export function ReviewStep({
   const attached = draft.allApps === true || draft.appIds.length > 0
   const changes = dirty ? describeChanges(saved, draft) : []
 
-  const resolve = (kind: 'zone' | 'fingerprint' | 'hook', id: string) =>
-    kind === 'zone'
-      ? store.zoneById(id)?.name
-      : kind === 'hook'
-        ? store.hookById(id)?.name
-        : store.fingerprintById(id)?.name
+  const resolve = useNameLookup()
 
   const gates: Gate[] = [
     {
@@ -173,11 +168,11 @@ export function ReviewStep({
       <section className="bf__revblock">
         <h3 className="u-label">
           The policy, in order
-          <TipDot text="Each sentence is generated from the same condition array the editor writes, so the two cannot disagree." />
+          <TipDot text="Each sentence comes from the same renderer the editor uses, so the two cannot disagree." />
         </h3>
         <ol className="bf__revrules">
           {draft.rules.map((rule, i) => {
-            const { iff, then } = ruleSentence(rule, store.groups, resolve)
+            const { iff, then } = ruleSentence(rule, resolve)
             return (
               <li key={rule.id} className={rule.enabled ? '' : 'is-off'}>
                 <button type="button" onClick={() => onJump(i)}>

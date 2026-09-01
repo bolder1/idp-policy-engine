@@ -6,6 +6,7 @@ import { Button, DecisionChip } from '../kit'
 import { AppLogo } from '../logos/AppLogo'
 import { blankPolicy, conditionType, scenarios, type Scenario } from '../data'
 import { useBrand } from '../store'
+import { leaves } from '../predicate'
 import { TemplateCard, TemplatePreview, type CardModel } from './TemplateCard'
 
 /* Mounted only while it is open — the gallery is the common path and does not
@@ -65,8 +66,12 @@ export function CreatePolicy() {
 
   function create() {
     const policy = blankPolicy(name.trim() || 'Untitled policy', appIds)
-    // Built here, so what the card promised is what the builder receives.
-    if (picked) policy.rules = picked.rules.map((r) => r.build())
+    // Built here, so what the card promised is what the builder receives —
+    // including who it is for, which is now the template's to state.
+    if (picked) {
+      policy.rules = picked.rules.map((r) => r.build())
+      policy.audience = picked.audience
+    }
     store.addPolicy(policy)
     store.showToast(
       picked
@@ -164,9 +169,10 @@ export function CreatePolicy() {
           <Interview
             open={interview}
             onClose={() => setInterview(false)}
-            onCreate={(rules, builtName) => {
+            onCreate={(rules, builtName, audience) => {
               const policy = blankPolicy(builtName, [])
               policy.rules = rules
+              policy.audience = audience
               store.addPolicy(policy)
               store.showToast(`${policy.name} created with ${rules.length} rule${rules.length === 1 ? '' : 's'}`)
               store.go({ name: 'builder', policyId: policy.id })
@@ -486,7 +492,7 @@ export function scenarioCard(s: Scenario): CardModel {
 
   const signals: string[] = []
   for (const r of built)
-    for (const c of r.conditions) {
+    for (const c of leaves(r.when)) {
       const label = SIGNAL_OF[conditionType(c.typeId).group] ?? 'Other'
       if (!signals.includes(label)) signals.push(label)
     }

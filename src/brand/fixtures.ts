@@ -1,6 +1,9 @@
 import {
+  HEADCOUNT_ALL,
   apps as seedApps,
   groups as seedGroups,
+  reidRule,
+  users as seedUsers,
   methodSets as seedMethodSets,
   policies as seedPolicies,
   zones as seedZones,
@@ -8,6 +11,7 @@ import {
   type Group,
   type MethodSet,
   type Policy,
+  type User,
   type Zone,
 } from './data'
 import { seedProfiles, type FingerprintProfile } from './fingerprint'
@@ -89,6 +93,23 @@ export function groupsAt(depth: Depth): Group[] {
   return seedGroups.map((g) => ({ ...g, memberCount: g.memberCount * f }))
 }
 
+/* The directory at this tenant's size.
+
+   FABRICATED, like `users` in data.ts. Twenty-four named people exist; the
+   tenant claims far more, so this returns what is listed AND what is not, and
+   every picker built on it says "showing 24 of 1,240" rather than implying the
+   list is the directory. Generating twenty thousand rows nobody will scroll
+   would make the fixture look like data. */
+export function usersAt(depth: Depth): { people: User[]; unlisted: number } {
+  if (depth === 'none') return { people: [], unlisted: 0 }
+  if (depth === 'small') {
+    const people = seedUsers.filter((u) => ['finance', 'contractors'].includes(u.groupId))
+    return { people, unlisted: Math.max(0, Math.round(HEADCOUNT_ALL * 0.24) - people.length) }
+  }
+  const total = HEADCOUNT_ALL * HEADCOUNT[depth]
+  return { people: seedUsers, unlisted: Math.max(0, total - seedUsers.length) }
+}
+
 export function appsAt(depth: Depth): App[] {
   // Small tenants connect a handful of apps; the catalogue is not the tenant.
   if (depth === 'small') return seedApps.slice(0, 4)
@@ -121,9 +142,11 @@ function clonePolicy(src: Policy, i: number, dept: string, scale: number): Polic
     isSystem: false,
     lastModified: `${1 + Math.floor(r() * 40)} days ago`,
     modifiedBy: ['Mehak Garg', 'Jaspreet T.', 'Rohit K.', 'System'][Math.floor(r() * 4)],
-    rules: (i % 3 === 0 ? src.rules.slice(1) : src.rules).map((rule, ri) => ({
-      ...rule,
-      id: `syn-${i}-${rule.id}-${ri}`,
+    /* `reidRule` rather than a spread: the clone must not share Condition or
+       ConditionCard objects with the policy it was cloned from, because the
+       linter and the composer both address those by id. */
+    rules: (i % 3 === 0 ? src.rules.slice(1) : src.rules).map((rule) => ({
+      ...reidRule(rule),
       matchEstimate: rule.matchEstimate * scale,
     })),
   }
@@ -155,7 +178,7 @@ export function policiesAt(depth: Depth): Policy[] {
             // A Delegator does not write four-rule policies. They take the
             // first two the template gave them and leave.
             .slice(0, 2)
-            .map((r) => ({ ...r, matchEstimate: Math.round(r.matchEstimate * 0.24) })),
+            .map((r) => ({ ...reidRule(r), matchEstimate: Math.round(r.matchEstimate * 0.24) })),
         })),
     ]
   }
@@ -166,7 +189,7 @@ export function policiesAt(depth: Depth): Policy[] {
   return [
     ...seedPolicies.map((p) => ({
       ...p,
-      rules: p.rules.map((r) => ({ ...r, matchEstimate: r.matchEstimate * HEADCOUNT.large })),
+      rules: p.rules.map((r) => ({ ...reidRule(r), matchEstimate: r.matchEstimate * HEADCOUNT.large })),
     })),
     ...DEPARTMENTS.map((d, i) => clonePolicy(base[i % base.length], i, d, HEADCOUNT.large)),
   ]

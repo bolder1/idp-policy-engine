@@ -1,4 +1,5 @@
 import type { Policy, Rule } from '../data'
+import { leaves } from '../predicate'
 
 /* -----------------------------------------------------------------------------
    What depends on this object.
@@ -37,8 +38,12 @@ export function policiesUsing(typeId: string, valueId: string, policies: Policy[
   return policies
     .map((policy) => ({
       policy,
+      /* `leaves`, not the top level. This is the only thing between an admin
+         and deleting a zone or a hook that live rules still name — the store
+         does not unlink on delete — so a scan that missed conditions nested in
+         a second alternative would under-state the blast radius silently. */
       rules: policy.rules.filter((r) =>
-        r.conditions.some((c) => c.typeId === typeId && c.values.includes(valueId)),
+        leaves(r.when).some((c) => c.typeId === typeId && c.values.includes(valueId)),
       ),
     }))
     .filter((x) => x.rules.length > 0)

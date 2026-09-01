@@ -16,7 +16,8 @@ import {
 } from 'lucide-react'
 
 import { Button, Counter, DecisionChip, Modal, TipDot } from '../kit'
-import { conditionType } from '../data'
+import { predicateSentence } from './predicate-prose'
+import { useNameLookup } from '../store'
 import type { Policy } from '../data'
 import { useBrand } from '../store'
 import {
@@ -225,6 +226,7 @@ function TileDetail({
 }) {
   const c = round.challenge
   const reduce = useReducedMotion()
+  const resolve = useNameLookup()
   const trace = useMemo(() => traceFor(policy, c, env), [policy, c, env])
   const fix = useMemo(() => proposeFix(round, policy), [round, policy])
   const self = useRef<HTMLDivElement | null>(null)
@@ -287,18 +289,7 @@ function TileDetail({
           </div>
           <p className="bgt__fixrule">
             <b>{fix.rule.name}</b> — when{' '}
-            {fix.rule.conditions
-              .map((fc) => {
-                const t = conditionType(fc.typeId)
-                const shown =
-                  t.valueKind === 'zone'
-                    ? fc.values.map(env.zoneName).join(', ')
-                    : t.valueKind === 'fingerprint'
-                      ? fc.values.map(env.fingerprintName).join(', ')
-                      : fc.values.join(', ')
-                return `${t.label} ${fc.operator} ${shown}`
-              })
-              .join(' AND ')}{' '}
+            {predicateSentence(fix.rule.when, resolve)}{' '}
             → <em>{EXPECT_LABEL[round.want]}</em>
           </p>
           <p className="bgt__fixwhy">{fix.why}</p>

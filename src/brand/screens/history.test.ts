@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Policy, Rule } from '../data'
+import { anySignIn, EVERYONE, type Policy, type Rule } from '../data'
 import { canRedo, canUndo, commit, historyOf, HISTORY_LIMIT, redo, undo } from './history'
 
 /* -----------------------------------------------------------------------------
@@ -19,8 +19,7 @@ function rule(name: string): Rule {
     id: `r${seq}`,
     name,
     enabled: true,
-    appliesTo: ['all'],
-    conditions: [],
+    when: anySignIn(),
     decision: '2fa',
     firstFactor: 'Password',
     secondFactor: 'any',
@@ -35,6 +34,7 @@ const policy = (rules: Rule[]): Policy => ({
   name: 'Test',
   type: 'App Access',
   appIds: ['salesforce'],
+  audience: EVERYONE,
   status: 'active',
   lastModified: 'now',
   modifiedBy: 'test',

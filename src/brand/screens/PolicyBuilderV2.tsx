@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   Clock,
@@ -27,14 +27,20 @@ import { Button, Counter, DecisionChip, Toggle } from '../kit'
 import {
   CONDITION_CATALOGUE,
   blankRule,
+  card,
   cond,
   conditionType,
+  reidRule,
+  when,
   type AccessDecision,
   type Policy,
   type Rule,
 } from '../data'
-import { useBrand } from '../store'
+import { leaves } from '../predicate'
+import { useBrand, useNameLookup } from '../store'
+import { AudienceBar } from './audience-drawer'
 import { diagnose, impactOf, shadowedBy } from './diagnostics'
+import { predicateParts } from './predicate-prose'
 import './builder-v2.css'
 
 /* -----------------------------------------------------------------------------
@@ -63,6 +69,25 @@ import './builder-v2.css'
    Nothing here re-derives policy semantics. diagnose / impactOf / shadowedBy
    are imported unchanged — they are the sound-only linter, and a second
    opinion about what a rule means is exactly the bug they exist to prevent.
+
+   **What this version no longer edits, since a rule's WHEN became a disjunction
+   of cards.**
+
+   v4 is the shipping candidate and owns the card composer. v2 is kept behind
+   the design switcher as the three-zone comparison, and its argument — a
+   palette you drag onto a canvas — is the one that does not survive the model
+   change intact: a card model needs a drop target per card, which is new
+   interaction design rather than a port, and four editors for one model is four
+   editors that drift apart. So the WHEN is a read-only readout here and the
+   hand-off to v4 is a button. The palette's add path stays, because appending a
+   condition needs no grouping decision from the user: it lands in the first
+   card, and the readout shows where it went.
+
+   All four claims above are still testable in this layout — the palette, the
+   narrow inspector, the opening gap and the keyboard route all survive
+   untouched, which is the whole reason to keep this on screen. The audience
+   moved up to the policy at the same time and is stated once above the flow
+   rather than on every node; everything else here is as it was.
    -------------------------------------------------------------------------- */
 
 const GROUP_ICON: Record<string, LucideIcon> = {
@@ -181,7 +206,10 @@ export function PolicyBuilderV2({ policyId }: { policyId: string }) {
 
   const rules = draft.rules
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft)
-  const diagnostics = diagnose(draft, store.groups, store.hooks)
+  /* The live directory, not the seed. The audience can name individuals now, so
+     the fourth argument decides whether a policy scoped to somebody who has
+     left the tenant is reported or silently passes. */
+  const diagnostics = diagnose(draft, store.groups, store.hooks, store.users)
   const selRule = sel !== null ? rules[sel] : undefined
 
   const patch = (p: Partial<Policy>) => setDraft({ ...draft, ...p })
@@ -218,9 +246,28 @@ export function PolicyBuilderV2({ policyId }: { policyId: string }) {
       else if (t.options?.length) values = [t.options[0]]
 
       const c = cond(typeId, t.operators[0], values)
-      patchRule(ruleIndex, { conditions: [...rules[ruleIndex].conditions, c] })
+
+      /* It lands in the FIRST card, and a rule with no cards gets one.
+
+         The drag gesture asks a question the card model answers with a choice —
+         *which* alternative does this belong to — and there is no drop target
+         per card here to ask it with. Appending to the first card is the only
+         answer that is stable regardless of where the pointer was released, so
+         it is the one that can be announced honestly; the readout in the
+         inspector then says which alternative grew, and v4 is one click away
+         for anyone who wanted a different one. */
+      const cur = rules[ruleIndex].when
+      const cards =
+        cur.cards.length === 0
+          ? [card(c)]
+          : cur.cards.map((k, n) => (n === 0 ? { ...k, conditions: [...k.conditions, c] } : k))
+      patchRule(ruleIndex, { when: { cards } })
       setSel(ruleIndex)
-      setLive(`${t.label} added to rule ${ruleIndex + 1}`)
+      setLive(
+        cur.cards.length > 1
+          ? `${t.label} added to the first alternative of rule ${ruleIndex + 1}`
+          : `${t.label} added to rule ${ruleIndex + 1}`,
+      )
     }
 
   const move = (from: number, to: number) => {
@@ -259,7 +306,11 @@ export function PolicyBuilderV2({ policyId }: { policyId: string }) {
               : t.options?.length
                 ? [t.options[0]]
                 : ['']
-      insertRule(gap, { conditions: [cond(drag.typeId, t.operators[0], values)] })
+      /* One condition, so one card — `when(card(...))`, never a bare array. A
+         rule whose `when` is `{ cards: [] }` is the catch-all, and building a
+         new rule that silently matches everybody is the one mistake that makes
+         every rule under it unreachable. */
+      insertRule(gap, { when: when(card(cond(drag.typeId, t.operators[0], values))) })
     } else if (drag.kind === 'outcome') {
       insertRule(gap, { decision: drag.decision })
     }
@@ -370,6 +421,20 @@ export function PolicyBuilderV2({ policyId }: { policyId: string }) {
               <span className="bwb__startdot" aria-hidden />A user attempts to sign in
             </div>
 
+            {/* Who reaches this flow at all.
+
+                Each rule node used to print its own `appliesTo` on its meta
+                line, which let five nodes state five different scopes for one
+                policy. Audience is one standing fact about the policy now, so
+                it is stated once, at the top, where the sign-in enters — and it
+                is read-only here because the drawer that edits it lives in v4.
+                A per-rule chip would be a smaller lie than the old one, not a
+                different kind. */}
+            <div className="bwb__nmeta" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
+              <span>Applies to</span>
+              <AudienceBar audience={draft.audience} groups={store.groups} users={store.users} />
+            </div>
+
             <div className="bwb__flow">
               <Gap
                 index={0}
@@ -394,7 +459,12 @@ export function PolicyBuilderV2({ policyId }: { policyId: string }) {
                       onToggle={(v) => patchRule(i, { enabled: v })}
                       onRemove={() => removeRule(i)}
                       onDuplicate={() => {
-                        const copy = { ...r, id: `r${Date.now()}`, name: `${r.name} (copy)` }
+                        /* `reidRule`, not a spread. A shallow copy shares the
+                           same card and condition objects with the rule it came
+                           from, and both the composer and the linter address
+                           those by id — so editing the copy would edit the
+                           original, and two findings would collide on one id. */
+                        const copy = { ...reidRule(r), name: `${r.name} (copy)` }
                         patch({ rules: [...rules.slice(0, i + 1), copy, ...rules.slice(i + 1)] })
                         setSel(i + 1)
                       }}
@@ -718,10 +788,17 @@ function RuleNode({
   onLeave: () => void
   onDrop: () => void
 }) {
-  const store = useBrand()
-  const audience = rule.appliesTo.includes('all')
-    ? 'Everyone'
-    : rule.appliesTo.map((g) => store.groupById(g).name).join(', ')
+  /* The audience line that used to sit here is gone — see the readout above the
+     flow. `store` went with it: the node reads nothing from the tenant now, and
+     the chips below name condition TYPES, which come from the catalogue. */
+
+  /* Flattened deliberately, and only this far. The chips are a glance, not a
+     reading of the rule: they name which fields are involved, and the count of
+     alternatives says whether that list is one set or several. Printing the
+     leaves as though they were a single AND-run is the exact misreading the
+     card model exists to stop, so the alternatives chip is not optional
+     decoration. The full shape is in the inspector. */
+  const clauses = leaves(rule.when)
 
   return (
     <div
@@ -757,21 +834,24 @@ function RuleNode({
       <div className="bwb__nbody">
         <div className="bwb__nname">{rule.name}</div>
         <div className="bwb__nchips">
-          {rule.conditions.length === 0 ? (
+          {rule.when.cards.length === 0 ? (
             <span className="bwb__nchip is-any">matches everyone</span>
           ) : (
-            rule.conditions.slice(0, 3).map((c) => (
-              <span className="bwb__nchip" key={c.id}>
-                {conditionType(c.typeId).label}
-              </span>
-            ))
-          )}
-          {rule.conditions.length > 3 && (
-            <span className="bwb__nchip">+{rule.conditions.length - 3}</span>
+            <>
+              {clauses.slice(0, 3).map((c) => (
+                <span className="bwb__nchip" key={c.id}>
+                  {conditionType(c.typeId).label}
+                </span>
+              ))}
+              {clauses.length > 3 && <span className="bwb__nchip">+{clauses.length - 3}</span>}
+              {rule.when.cards.length > 1 && (
+                <span className="bwb__nchip is-any">{rule.when.cards.length} alternatives</span>
+              )}
+            </>
           )}
         </div>
         <div className="bwb__nmeta">
-          {audience} · ≈{rule.matchEstimate.toLocaleString()} users
+          ≈{rule.matchEstimate.toLocaleString()} users
           {shadowed && <em className="bwb__nwarn"> · shadows a rule below</em>}
         </div>
       </div>
@@ -833,8 +913,13 @@ function Inspector({
     )
   }
 
-  const impact = impactOf(draft, index, store.groups)
-  const mine = diagnostics.filter((d) => d.ruleIndex === index)
+  const impact = impactOf(draft, index, store.groups, undefined, store.users)
+  /* Rule-scoped only, said out loud rather than left to `ruleIndex === index`
+     doing it by accident. Policy-scoped findings carry -1 and are about the
+     audience and the app binding — neither of which this panel edits, and both
+     of which belong to the whole policy rather than to whichever rule happens
+     to be selected. They are reported in v4. */
+  const mine = diagnostics.filter((d) => d.scope === 'rule' && d.ruleIndex === index)
 
   return (
     <aside className="bwb__inspect">
@@ -874,54 +959,20 @@ function Inspector({
           </div>
         </section>
 
-        <section className="bwb__isec">
-          <span className="bwb__ilabel">Conditions <em>{rule.conditions.length}</em></span>
-          {rule.conditions.length === 0 ? (
-            <p className="bwb__ihint">
-              No conditions, so this rule matches every sign-in that reaches it. Drag one from the
-              palette to narrow it.
-            </p>
-          ) : (
-            <ul className="bwb__conds">
-              {rule.conditions.map((c, ci) => {
-                const t = conditionType(c.typeId)
-                return (
-                  <li key={c.id}>
-                    <div className="bwb__cond">
-                      <span className="bwb__condname">{t.label}</span>
-                      <select
-                        aria-label={`${t.label} operator`}
-                        value={c.operator}
-                        onChange={(e) =>
-                          onPatch({
-                            conditions: rule.conditions.map((x, n) =>
-                              n === ci ? { ...x, operator: e.target.value } : x,
-                            ),
-                          })
-                        }
-                      >
-                        {t.operators.map((op) => (
-                          <option key={op}>{op}</option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        className="bwb__condx"
-                        aria-label={`Remove ${t.label}`}
-                        onClick={() =>
-                          onPatch({ conditions: rule.conditions.filter((_, n) => n !== ci) })
-                        }
-                      >
-                        <Trash2 size={12} strokeWidth={2} />
-                      </button>
-                    </div>
-                    <p className="bwb__condhint">{t.hint}</p>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </section>
+        {/* The condition editor was here: a row per condition with an operator
+            select and a delete button, over the flat `rule.conditions` array.
+
+            It is a readout now. A WHEN is a disjunction of cards, and a flat
+            list of rows cannot say which conditions are required together —
+            rendering `(zone and time) or device` as three rows in a column
+            prints a rule that catches different people than the one that runs,
+            which is worse than not editing it here at all. Rebuilding it as a
+            card editor would be a fourth composer to keep in step with v4's,
+            and this version's whole argument is drag-onto-a-target, which under
+            cards needs a drop target per card — new interaction design, not a
+            port. So: the shape is shown, the hand-off is a button, and the
+            palette still appends into the first card. */}
+        <WhenReadout rule={rule} onEditInV4={() => store.go({ name: 'builder', policyId: draft.id })} />
 
         <section className="bwb__isec">
           <span className="bwb__ilabel">Impact</span>
@@ -964,5 +1015,93 @@ function Inspector({
         )}
       </div>
     </aside>
+  )
+}
+
+/* --- Zone 3 · the WHEN, read rather than edited -------------------------------
+
+   `predicateParts` rather than a rendering of `rule.when` written here.
+
+   Six versions of "condition, joiner, condition" were collapsed into
+   predicate-prose for a reason that applies to this panel exactly: the sentence
+   next to a rule and the rule that runs must not be able to disagree, and every
+   extra renderer is another chance for them to. Parts rather than
+   `predicateSentence` only because the `and` and the `OR` want to be muted
+   elements rather than words in a paragraph — the text of every clause still
+   comes from the one place.
+   -------------------------------------------------------------------------- */
+
+function WhenReadout({ rule, onEditInV4 }: { rule: Rule; onEditInV4: () => void }) {
+  const resolve = useNameLookup()
+  const cards = predicateParts(rule.when, resolve)
+  const total = cards.reduce((n, k) => n + k.clauses.length, 0)
+
+  return (
+    <section className="bwb__isec">
+      <span className="bwb__ilabel">
+        When it applies <em>{total}</em>
+      </span>
+
+      {cards.length === 0 ? (
+        <p className="bwb__ihint">
+          No conditions, so this rule matches every sign-in that reaches it. Drag one from the
+          palette to narrow it.
+        </p>
+      ) : (
+        <ul className="bwb__conds">
+          {cards.map((k, ci) => (
+            <li key={k.id}>
+              {/* Not a control, here least of all. Between two cards the
+                  relationship is fixed by the shape of the rule, and this
+                  version cannot change the shape. */}
+              {ci > 0 && (
+                <div className="bwb__ilabel" style={{ marginBottom: 6 }} aria-hidden>
+                  OR
+                </div>
+              )}
+              {/* A lone unnamed card gets no heading. "Alternative A" over a
+                  rule that has no alternative is a container announcing itself,
+                  and the whole point of the letters is to tell two of them
+                  apart. A label the author wrote always shows: it is the one
+                  thing the predicate itself cannot say. */}
+              {(cards.length > 1 || k.label) && (
+                <div className="bwb__condname" style={{ whiteSpace: 'normal' }}>
+                  {k.label ?? `Alternative ${k.letter}`}
+                </div>
+              )}
+              <p className="bwb__condhint">
+                {k.clauses.map((cl, i) => (
+                  <Fragment key={cl.id}>
+                    {i > 0 && <span style={{ color: 'var(--text-muted)' }}> and </span>}
+                    {cl.text}
+                  </Fragment>
+                ))}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Said plainly, because the alternative is a panel that looks broken.
+
+          Somebody who drags a condition in and then looks for the operator
+          select that used to be here deserves the actual reason it is gone, not
+          a disabled control or a silence. */}
+      <p className="bwb__ihint" style={{ marginTop: 10 }}>
+        Conditions are grouped now: everything in one alternative must be true, and any one
+        alternative is enough. This version's editor cannot express groups, so it shows them and
+        hands editing over.
+      </p>
+
+      <div style={{ marginTop: 8 }}>
+        {/* v4 owns the composer. The design switcher that chooses between the
+            builders is state inside BuilderPage, so this lands on v4 from
+            anywhere except the builder itself — closing that gap means lifting
+            the switcher, which is BuilderPage's call and not this file's. */}
+        <Button variant="secondary" size="sm" onClick={onEditInV4}>
+          Edit in v4
+        </Button>
+      </div>
+    </section>
   )
 }

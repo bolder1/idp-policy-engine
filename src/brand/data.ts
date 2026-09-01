@@ -48,7 +48,11 @@ export interface Group {
 
 // --- Conditions --------------------------------------------------------------
 
-export type Joiner = 'AND' | 'OR'
+/* `Joiner` is deleted rather than renamed.
+
+   There is no joiner in this model — the card IS the joiner. Keeping the name
+   while changing the meaning is how half of ninety call sites get missed, so
+   the type goes and every site that wanted one becomes a compile error. */
 
 export interface ConditionType {
   id: string
@@ -57,9 +61,28 @@ export interface ConditionType {
   hint: string
   operators: string[]
   /** Where the value comes from: a library object, a fixed list, or free text. */
-  valueKind: 'zone' | 'fingerprint' | 'hook' | 'list' | 'text' | 'range' | 'time'
+  valueKind: 'zone' | 'fingerprint' | 'hook' | 'group' | 'user' | 'list' | 'text' | 'range' | 'time'
   options?: string[]
 }
+
+/* The nine major components the condition catalogue is organised by.
+
+   The old picker's top level was the twenty-four types, with every zone and
+   every fingerprint profile listed beside them as if each were its own
+   condition. That put the CONTENTS of a library in the place where its NAME
+   belongs — a zone is a value, "Network Zone" is the condition — and it meant
+   the list grew every time somebody saved a zone. */
+export const CONDITION_GROUPS = [
+  'Network',
+  'Location',
+  'Time',
+  'Device',
+  'Risk',
+  'User',
+  'Group',
+  'Custom attributes',
+  'Webhooks',
+] as const
 
 export const CONDITION_CATALOGUE: ConditionType[] = [
   { id: 'ip', label: 'IP Address', group: 'Network', hint: 'Match by IPv4/IPv6 address, range, or CIDR', operators: ['is', 'is not'], valueKind: 'text' },
@@ -77,8 +100,8 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
   { id: 'os', label: 'Operating System', group: 'Device', hint: 'Match OS name and version', operators: ['is', 'is not'], valueKind: 'list', options: ['Windows', 'macOS', 'iOS', 'Android', 'Linux', 'ChromeOS'] },
   { id: 'mdm', label: 'MDM Managed', group: 'Device', hint: 'Require MDM enrollment', operators: ['is', 'is not'], valueKind: 'list', options: ['Enrolled', 'Not enrolled'] },
   { id: 'browser', label: 'Browser', group: 'Device', hint: 'Match browser name and version', operators: ['is', 'is not'], valueKind: 'list', options: ['Chrome', 'Edge', 'Safari', 'Firefox'] },
-  { id: 'device-risk', label: 'Device Risk Score', group: 'Device', hint: 'Device risk management score', operators: ['above', 'below'], valueKind: 'range' },
-  { id: 'ml-risk', label: 'ML Risk Score', group: 'Device', hint: 'AI-derived overall risk score', operators: ['is', 'is not'], valueKind: 'list', options: ['Low', 'Medium', 'High'] },
+  { id: 'device-risk', label: 'Device Risk Score', group: 'Risk', hint: 'Device risk management score', operators: ['above', 'below'], valueKind: 'range' },
+  { id: 'ml-risk', label: 'ML Risk Score', group: 'Risk', hint: 'AI-derived overall risk score', operators: ['is', 'is not'], valueKind: 'list', options: ['Low', 'Medium', 'High'] },
   { id: 'device-count', label: 'Number of Devices', group: 'Device', hint: 'Limit registered devices per user', operators: ['above', 'below'], valueKind: 'range' },
   { id: 'device-reg', label: 'Device Registration', group: 'Device', hint: 'Registered, pending, or unregistered', operators: ['is', 'is not'], valueKind: 'list', options: ['Registered', 'Pending', 'Unregistered'] },
   /* Replaced the old Device Posture Policy condition. Posture asked whether a
@@ -86,7 +109,8 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      which is what the fingerprint profiles actually decide. */
   { id: 'fingerprint', label: 'Device Fingerprint', group: 'Device', hint: 'Match by saved fingerprint profile from your library', operators: ['recognised by', 'not recognised by'], valueKind: 'fingerprint' },
 
-  { id: 'group', label: 'Group Membership', group: 'User', hint: "Match by user's group", operators: ['in', 'not in'], valueKind: 'list', options: ['All Employees', 'Finance', 'Engineering', 'Executives', 'Contractors', 'IT Admins'] },
+  { id: 'group', label: 'Group Membership', group: 'Group', hint: "Match by the user's group", operators: ['in', 'not in'], valueKind: 'group' },
+  { id: 'user', label: 'Specific people', group: 'User', hint: 'Match named individuals from the directory', operators: ['is', 'is not'], valueKind: 'user' },
   { id: 'user-type', label: 'User Type', group: 'User', hint: 'Employee, contractor, or partner', operators: ['is', 'is not'], valueKind: 'list', options: ['Employee', 'Contractor', 'Partner'] },
   { id: 'user-role', label: 'User Role', group: 'User', hint: 'Match by assigned user role', operators: ['is', 'is not'], valueKind: 'list', options: ['Admin', 'Manager', 'Member', 'Auditor'] },
   { id: 'auth-state', label: 'Auth State', group: 'User', hint: 'First login, MFA reset, preferred method', operators: ['is'], valueKind: 'list', options: ['First time login', 'MFA recently reset', 'No MFA configured', 'Normal returning user'] },
@@ -106,13 +130,34 @@ export function conditionType(id: string): ConditionType {
   return CONDITION_CATALOGUE.find((c) => c.id === id) ?? CONDITION_CATALOGUE[0]
 }
 
+/** A single predicate. `values: []` means UNSET — a first-class, diagnosable state. */
 export interface Condition {
   id: string
   typeId: string
   operator: string
   values: string[]
-  /** Joiner to the PREVIOUS condition. Ignored on the first. */
-  joiner: Joiner
+}
+
+/* An AND-set, and the unit of grouping.
+
+   Never empty: removing the last condition removes the card. That invariant is
+   what makes `cards.length === 1` a sound test for "this rule is one unbroken
+   run of ANDs", which is the sentence the whole linter is built on. */
+export interface ConditionCard {
+  id: string
+  /** The author's name for this alternative — "Corp laptops". Optional. */
+  label?: string
+  conditions: Condition[]
+}
+
+/* A rule's WHEN: a disjunction of cards, exactly two levels, forever.
+
+     match ⟺ cards.length === 0 || cards.some(k => k.conditions.every(pass))
+
+   `cards: []` is the catch-all. It replaces every `conditions.length === 0`
+   test the codebase used to make. See predicate.ts for the reasoning. */
+export interface Predicate {
+  cards: ConditionCard[]
 }
 
 // --- Rules -------------------------------------------------------------------
@@ -149,8 +194,18 @@ export interface Rule {
      afterwards that the field is noise. */
   description?: string
   enabled: boolean
-  appliesTo: string[]
-  conditions: Condition[]
+  /* The audience used to live here, as `appliesTo: string[]`.
+
+     It has moved to the policy. Audience is a standing fact about who a policy
+     governs, not a per-rule predicate — the shipping product agrees, binding an
+     application to a user group one level above the adaptive policy — and
+     holding it per rule let a policy build "rule 1 covers Finance, rule 2
+     covers everyone", which reads as a scoped policy and is not one.
+
+     Narrowing INSIDE a policy is still expressible, and now says so: it is a
+     `group` or `user-type` condition in the rule's WHEN, evaluated like every
+     other condition instead of being a second, invisible gate. */
+  when: Predicate
   decision: AccessDecision
   firstFactor: 'Password' | 'Any' | 'Specific'
   /** Which method, when firstFactor is 'Specific'. */
@@ -172,12 +227,48 @@ export interface Rule {
   matchEstimate: number
 }
 
+/* Who a policy governs.
+
+   `everyone` is a flag rather than a magic id in `groupIds`, for the same
+   reason `allApps` is a flag rather than every app id: a synthetic "All
+   Employees" row that lives in the same list as real groups is a row you can
+   tick alongside Finance, and "All AND Finance" reads narrower than it is. As a
+   flag the contradiction cannot be typed. */
+export interface Audience {
+  everyone: boolean
+  groupIds: string[]
+  /* Named individuals, alongside groups rather than instead of them. A person
+     already inside a selected group is legal and sometimes deliberate — an
+     exception you want to survive someone editing the group — so this is a
+     union, and the picker says when a name is redundant rather than refusing it. */
+  userIds: string[]
+}
+
+export const EVERYONE: Audience = { everyone: true, groupIds: [], userIds: [] }
+
+export const audienceOf = (groupIds: string[], userIds: string[] = []): Audience => ({
+  everyone: false,
+  groupIds,
+  userIds,
+})
+
+export interface User {
+  id: string
+  name: string
+  email: string
+  groupId: string
+  userType: 'Employee' | 'Contractor' | 'Partner'
+  role: string
+}
+
 export interface Policy {
   id: string
   name: string
   type: PolicyType
   appIds: string[]
   allApps?: boolean
+  /** Who this policy governs. Every rule inherits it; no rule can be broader. */
+  audience: Audience
   status: PolicyStatus
   lastModified: string
   modifiedBy: string
@@ -296,14 +387,92 @@ export const apps: App[] = [
   { id: 'servicenow', name: 'ServiceNow', protocol: 'SAML', glyph: '◉', tint: '#62d84e' },
 ]
 
+/* The synthetic `all` row is gone.
+
+   "All Employees" was a group id sitting in the same list as Finance and
+   Engineering, which meant a picker could tick both and build "All AND
+   Finance" — a selection that reads narrower than it is. Everyone is now a
+   flag on `Audience`, so the contradiction cannot be expressed. */
 export const groups: Group[] = [
-  { id: 'all', name: 'All Employees', memberCount: 1240 },
   { id: 'finance', name: 'Finance', memberCount: 86 },
   { id: 'engineering', name: 'Engineering', memberCount: 310 },
   { id: 'executives', name: 'Executives', memberCount: 12 },
   { id: 'contractors', name: 'Contractors', memberCount: 154 },
   { id: 'it-admins', name: 'IT Admins', memberCount: 9 },
 ]
+
+/** Everyone the tenant claims, for the audience readout. */
+export const HEADCOUNT_ALL = 1240
+
+/* ---------------------------------------------------------------------------
+   The directory. FABRICATED.
+
+   There was no user directory in this prototype before this pass — no `User`
+   type, no list, nothing on the store. The only people anywhere were the four
+   simulator fixtures in simulate.ts. A policy audience that can name
+   individuals needs a directory to name them from, so here is one.
+
+   The four simulator people keep their identities and lead their groups, so
+   the person you test a policy against is a row in the same directory you
+   scoped it with, rather than a parallel universe. Everyone else is invented.
+
+   Twenty-four named people against a tenant that claims 1,240: the pickers say
+   so rather than pretending the list is complete. Generating 1,240 rows nobody
+   will scroll would make the fixture look like data.
+   --------------------------------------------------------------------------- */
+export const users: User[] = [
+  { id: 'priya', name: 'Priya Sharma', email: 'priya@mo.com', groupId: 'finance', userType: 'Employee', role: 'Member' },
+  { id: 'u-fin-2', name: 'Rohan Kulkarni', email: 'rohan.k@mo.com', groupId: 'finance', userType: 'Employee', role: 'Manager' },
+  { id: 'u-fin-3', name: 'Anita Desai', email: 'anita.d@mo.com', groupId: 'finance', userType: 'Employee', role: 'Member' },
+  { id: 'u-fin-4', name: 'Thomas Byrne', email: 'thomas.b@mo.com', groupId: 'finance', userType: 'Employee', role: 'Auditor' },
+  { id: 'u-fin-5', name: 'Leena Iyer', email: 'leena.i@mo.com', groupId: 'finance', userType: 'Employee', role: 'Member' },
+
+  { id: 'arun', name: 'Arun Patel', email: 'arun@mo.com', groupId: 'engineering', userType: 'Employee', role: 'Member' },
+  { id: 'u-eng-2', name: 'Sofia Marchetti', email: 'sofia.m@mo.com', groupId: 'engineering', userType: 'Employee', role: 'Manager' },
+  { id: 'u-eng-3', name: 'Kenji Watanabe', email: 'kenji.w@mo.com', groupId: 'engineering', userType: 'Employee', role: 'Member' },
+  { id: 'u-eng-4', name: 'Grace Oyelaran', email: 'grace.o@mo.com', groupId: 'engineering', userType: 'Employee', role: 'Member' },
+  { id: 'u-eng-5', name: 'Daniel Fischer', email: 'daniel.f@mo.com', groupId: 'engineering', userType: 'Employee', role: 'Member' },
+
+  { id: 'mehak', name: 'Mehak Garg', email: 'mehak@mo.com', groupId: 'executives', userType: 'Employee', role: 'Admin' },
+  { id: 'u-exec-2', name: 'Vikram Nair', email: 'vikram.n@mo.com', groupId: 'executives', userType: 'Employee', role: 'Admin' },
+  { id: 'u-exec-3', name: 'Helen Osei', email: 'helen.o@mo.com', groupId: 'executives', userType: 'Employee', role: 'Manager' },
+  { id: 'u-exec-4', name: 'Marco Silveira', email: 'marco.s@mo.com', groupId: 'executives', userType: 'Employee', role: 'Manager' },
+
+  { id: 'devon', name: 'Devon Rao', email: 'devon@ext.com', groupId: 'contractors', userType: 'Contractor', role: 'Member' },
+  { id: 'u-con-2', name: 'Ivy Zhang', email: 'ivy.z@ext.com', groupId: 'contractors', userType: 'Contractor', role: 'Member' },
+  { id: 'u-con-3', name: 'Peter Ahlgren', email: 'peter.a@ext.com', groupId: 'contractors', userType: 'Contractor', role: 'Member' },
+  { id: 'u-con-4', name: 'Nadia Haddad', email: 'nadia.h@ext.com', groupId: 'contractors', userType: 'Partner', role: 'Member' },
+  { id: 'u-con-5', name: 'Sam Okonkwo', email: 'sam.o@ext.com', groupId: 'contractors', userType: 'Contractor', role: 'Member' },
+
+  { id: 'u-it-1', name: 'Ravi Menon', email: 'ravi.m@mo.com', groupId: 'it-admins', userType: 'Employee', role: 'Admin' },
+  { id: 'u-it-2', name: 'Clara Boucher', email: 'clara.b@mo.com', groupId: 'it-admins', userType: 'Employee', role: 'Admin' },
+  { id: 'u-it-3', name: 'Yusuf Demir', email: 'yusuf.d@mo.com', groupId: 'it-admins', userType: 'Employee', role: 'Admin' },
+  { id: 'u-it-4', name: 'Bethany Cole', email: 'bethany.c@mo.com', groupId: 'it-admins', userType: 'Employee', role: 'Auditor' },
+  { id: 'u-it-5', name: 'Omar Haddadi', email: 'omar.h@mo.com', groupId: 'it-admins', userType: 'Employee', role: 'Member' },
+]
+
+/** Two letters for an avatar. "Priya Sharma" → PS, "Devon" → DE. */
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  return parts.length > 1 ? (parts[0][0] + parts[1][0]).toUpperCase() : name.slice(0, 2).toUpperCase()
+}
+
+/* How many people an audience reaches.
+
+   Overlapping groups are NOT deduplicated — the directory does not model
+   multi-group membership, so the honest thing is to say "about" and to say in
+   the picker that overlaps are counted twice, rather than to invent a precision
+   the data cannot support. Named individuals already inside a chosen group ARE
+   deduplicated, because that relationship IS modelled. */
+export function reach(a: Audience, allGroups: Group[], allUsers: User[]): number {
+  if (a.everyone) return HEADCOUNT_ALL
+  const fromGroups = a.groupIds.reduce((n, id) => n + (allGroups.find((g) => g.id === id)?.memberCount ?? 0), 0)
+  const named = a.userIds.filter((id) => {
+    const u = allUsers.find((x) => x.id === id)
+    return u ? !a.groupIds.includes(u.groupId) : false
+  }).length
+  return fromGroups + named
+}
 
 export const zones: Zone[] = [
   /* No shipped defaults.
@@ -427,8 +596,7 @@ function rule(over: Partial<Rule> & Pick<Rule, 'name'>): Rule {
   return {
     id: `r${ruleSeq}`,
     enabled: true,
-    appliesTo: ['all'],
-    conditions: [],
+    when: anySignIn(),
     decision: '2fa',
     firstFactor: 'Password',
     secondFactor: 'any',
@@ -440,9 +608,61 @@ function rule(over: Partial<Rule> & Pick<Rule, 'name'>): Rule {
 }
 
 let condSeq = 0
-export function cond(typeId: string, operator: string, values: string[], joiner: Joiner = 'AND'): Condition {
-  condSeq += 1
-  return { id: `c${condSeq}`, typeId, operator, values, joiner }
+let cardSeq = 0
+const nextCondId = () => `c${(condSeq += 1)}`
+const nextCardId = () => `k${(cardSeq += 1)}`
+
+/* `cond` has lost its fourth positional `joiner` argument.
+
+   That is deliberate: it turns every authored call site into an arity error
+   rather than a silent no-op, which is the only reliable way to find seventy of
+   them. */
+export function cond(typeId: string, operator: string, values: string[] = []): Condition {
+  return { id: nextCondId(), typeId, operator, values }
+}
+
+/** One alternative. Throws on empty, because an empty card matches everything. */
+export function card(...conditions: Condition[]): ConditionCard {
+  if (conditions.length === 0) throw new Error('A card must hold at least one condition')
+  return { id: nextCardId(), conditions }
+}
+
+/** A named alternative — the label the author gave this card. */
+export function namedCard(label: string, ...conditions: Condition[]): ConditionCard {
+  return { ...card(...conditions), label }
+}
+
+export function when(...cards: ConditionCard[]): Predicate {
+  return { cards }
+}
+
+/** The catch-all: no conditions, so it decides every sign-in that reaches it. */
+export const anySignIn = (): Predicate => ({ cards: [] })
+
+/** A blank card with one unset condition of the given type — what "+ Add condition" inserts. */
+export const blankCard = (typeId: string, operator: string): ConditionCard => card(cond(typeId, operator, []))
+
+/* Deep clone with fresh ids, mandatory wherever a rule is reused.
+
+   `store.copyRuleInto` and the three synthetic-tenant builders in fixtures.ts
+   all shallow-spread rules today, so the same `Condition` object is aliased
+   across policies estate-wide. That was harmless while ids were only React
+   keys. It is not harmless now: diagnostics build finding ids as
+   `${rule.id}-${condition.id}`, and the composer addresses cards and conditions
+   by id — aliased ids mean editing one policy edits another. */
+export function reidRule(r: Rule): Rule {
+  ruleSeq += 1
+  return {
+    ...r,
+    id: `r${ruleSeq}`,
+    when: {
+      cards: r.when.cards.map((k) => ({
+        ...k,
+        id: nextCardId(),
+        conditions: k.conditions.map((c) => ({ ...c, id: nextCondId() })),
+      })),
+    },
+  }
 }
 
 export const policies: Policy[] = [
@@ -456,10 +676,10 @@ export const policies: Policy[] = [
     lastModified: 'System',
     modifiedBy: 'System',
     isSystem: true,
+    audience: EVERYONE,
     rules: [
       rule({
         name: 'Baseline access',
-        appliesTo: ['all'],
         decision: '1fa',
         matchEstimate: 1240,
       }),
@@ -473,30 +693,27 @@ export const policies: Policy[] = [
     status: 'active',
     lastModified: '2 hours ago',
     modifiedBy: 'Mehak Garg',
+    audience: EVERYONE,
     rules: [
       rule({
         name: 'Block compromised devices',
-        appliesTo: ['all'],
-        conditions: [cond('fingerprint', 'not recognised by', ['fp-corp'])],
+        when: when(card(cond('fingerprint', 'not recognised by', ['fp-corp']))),
         decision: 'deny',
         matchEstimate: 108,
       }),
       rule({
         name: 'Off-network finance access',
         description: 'Required by the FY26 audit finding on remote access to ledger systems. The 09:00–17:00 window is the auditor’s, not ours — check with Compliance before widening it.',
-        appliesTo: ['finance'],
-        conditions: [
-          cond('zone', 'not in zone', ['office']),
-          cond('time', 'between', ['09:00', '17:00'], 'AND'),
-          cond('device-type', 'is', ['Mobile', 'Tablet'], 'OR'),
-        ],
+        when: when(
+          card(cond('group', 'in', ['finance']), cond('zone', 'not in zone', ['office']), cond('time', 'between', ['09:00', '17:00'])),
+          card(cond('group', 'in', ['finance']), cond('device-type', 'is', ['Mobile', 'Tablet'])),
+        ),
         decision: '2fa',
         matchEstimate: 85,
       }),
       rule({
         name: 'Executive step-up',
-        appliesTo: ['executives'],
-        conditions: [cond('ml-risk', 'is', ['High']), cond('zone', 'not in zone', ['office'], 'AND')],
+        when: when(card(cond('group', 'in', ['executives']), cond('ml-risk', 'is', ['High']), cond('zone', 'not in zone', ['office']))),
         decision: '2fa',
         secondFactor: 'specific',
         /* "Specific" with nothing named is a rule that cannot be satisfied —
@@ -514,8 +731,7 @@ export const policies: Policy[] = [
       }),
       rule({
         name: 'Contractor baseline',
-        appliesTo: ['contractors'],
-        conditions: [cond('user-type', 'is', ['Contractor'])],
+        when: when(card(cond('group', 'in', ['contractors']), cond('user-type', 'is', ['Contractor']))),
         decision: '1fa',
         matchEstimate: 154,
       }),
@@ -542,34 +758,31 @@ export const policies: Policy[] = [
     status: 'active',
     lastModified: '4 hours ago',
     modifiedBy: 'Mehak Garg',
+    audience: EVERYONE,
     rules: [
       rule({
         name: 'Block anonymised sources',
         description: 'No legitimate sign-in to these apps has ever arrived from a Tor exit or a hosting ASN. Written after the March access review; delete only if a customer is genuinely behind one of these networks.',
-        appliesTo: ['all'],
-        conditions: [cond('zone', 'in zone', ['anon'])],
+        when: when(card(cond('zone', 'in zone', ['anon']))),
         decision: 'deny',
         matchEstimate: 31,
       }),
       rule({
         name: 'Block accounts with no second factor',
         description: 'A challenge nobody can complete is a lockout dressed as security. Refusing the sign-in outright sends the user to enrolment instead of to the help desk.',
-        appliesTo: ['all'],
-        conditions: [cond('auth-state', 'is', ['No MFA configured'])],
+        when: when(card(cond('auth-state', 'is', ['No MFA configured']))),
         decision: 'deny',
         matchEstimate: 6,
       }),
       rule({
         name: 'Verify elevated risk',
-        appliesTo: ['all'],
-        conditions: [cond('ml-risk', 'is', ['High'])],
+        when: when(card(cond('ml-risk', 'is', ['High']))),
         decision: '2fa',
         matchEstimate: 64,
       }),
       rule({
         name: 'Verify unmanaged devices',
-        appliesTo: ['all'],
-        conditions: [cond('mdm', 'is', ['Not enrolled'])],
+        when: when(card(cond('mdm', 'is', ['Not enrolled']))),
         decision: '2fa',
         matchEstimate: 410,
       }),
@@ -579,11 +792,10 @@ export const policies: Policy[] = [
       rule({
         name: 'Verify first login and resets',
         description: 'Redundant against the unmanaged-device rule above for most people, and kept deliberately: a first login from a managed device is still the one moment an account is worth binding to a person.',
-        appliesTo: ['all'],
-        conditions: [
-          cond('auth-state', 'is', ['First time login']),
-          cond('auth-state', 'is', ['MFA recently reset'], 'OR'),
-        ],
+        when: when(
+          card(cond('auth-state', 'is', ['First time login'])),
+          card(cond('auth-state', 'is', ['MFA recently reset'])),
+        ),
         decision: '2fa',
         matchEstimate: 60,
       }),
@@ -597,9 +809,10 @@ export const policies: Policy[] = [
     status: 'active',
     lastModified: 'Yesterday',
     modifiedBy: 'Jaspreet T.',
+    audience: audienceOf(['contractors']),
     rules: [
-      rule({ name: 'Cap session length', appliesTo: ['contractors'], conditions: [cond('user-type', 'is', ['Contractor'])], decision: '1fa', matchEstimate: 154 }),
-      rule({ name: 'Re-auth after idle', appliesTo: ['contractors'], conditions: [cond('trust-age', 'over', ['30'])], decision: '2fa', matchEstimate: 96 }),
+      rule({ name: 'Cap session length',when: when(card(cond('user-type', 'is', ['Contractor']))), decision: '1fa', matchEstimate: 154 }),
+      rule({ name: 'Re-auth after idle',when: when(card(cond('trust-age', 'over', ['30']))), decision: '2fa', matchEstimate: 96 }),
     ],
   },
   {
@@ -611,10 +824,11 @@ export const policies: Policy[] = [
     lastModified: '3 days ago',
     modifiedBy: 'Mehak Garg',
     configIssue: 'No applications assigned — this policy cannot take effect until at least one app is attached.',
+    audience: EVERYONE,
     rules: [
-      rule({ name: 'First login enforcement', appliesTo: ['all'], conditions: [cond('auth-state', 'is', ['First time login'])], decision: '2fa', matchEstimate: 42 }),
-      rule({ name: 'After MFA reset', appliesTo: ['all'], conditions: [cond('auth-state', 'is', ['MFA recently reset'])], decision: '2fa', matchEstimate: 18 }),
-      rule({ name: 'No MFA configured', appliesTo: ['all'], conditions: [cond('auth-state', 'is', ['No MFA configured'])], decision: 'deny', matchEstimate: 6 }),
+      rule({ name: 'First login enforcement',when: when(card(cond('auth-state', 'is', ['First time login']))), decision: '2fa', matchEstimate: 42 }),
+      rule({ name: 'After MFA reset',when: when(card(cond('auth-state', 'is', ['MFA recently reset']))), decision: '2fa', matchEstimate: 18 }),
+      rule({ name: 'No MFA configured',when: when(card(cond('auth-state', 'is', ['No MFA configured']))), decision: 'deny', matchEstimate: 6 }),
     ],
   },
   {
@@ -625,8 +839,9 @@ export const policies: Policy[] = [
     status: 'active',
     lastModified: '5 days ago',
     modifiedBy: 'Mehak Garg',
+    audience: audienceOf(['executives']),
     rules: [
-      rule({ name: 'Deny anonymized traffic', appliesTo: ['executives'], conditions: [cond('zone', 'in zone', ['anon'])], decision: 'deny', matchEstimate: 12 }),
+      rule({ name: 'Deny anonymized traffic',when: when(card(cond('zone', 'in zone', ['anon']))), decision: 'deny', matchEstimate: 12 }),
       /* The Lenskart/Oberoi shape, seeded so the capability is exercised rather
          than merely available: a condition this engine cannot evaluate, asked
          of a system that can. Paired with a fail-open hook on a deny rule
@@ -635,15 +850,14 @@ export const policies: Policy[] = [
       rule({
         name: 'External risk verdict',
         description: 'The risk platform sees payment history this console never will. Owner is the risk team; changes to the threshold happen there, not here.',
-        appliesTo: ['executives'],
-        conditions: [cond('webhook', 'returns true', ['hk-fraud'])],
+        when: when(card(cond('webhook', 'returns true', ['hk-fraud']))),
         decision: 'deny',
         matchEstimate: 3,
       }),
-      rule({ name: 'New country', appliesTo: ['executives'], conditions: [cond('country', 'is not', ['India'])], decision: '2fa', matchEstimate: 9 }),
-      rule({ name: 'Unmanaged device', appliesTo: ['executives'], conditions: [cond('mdm', 'is', ['Not enrolled'])], decision: '2fa', matchEstimate: 7 }),
-      rule({ name: 'High ML risk', appliesTo: ['executives'], conditions: [cond('ml-risk', 'is', ['High'])], decision: '2fa', matchEstimate: 4 }),
-      rule({ name: 'Trusted office access', appliesTo: ['executives'], conditions: [cond('zone', 'in zone', ['office'])], decision: '1fa', matchEstimate: 12 }),
+      rule({ name: 'New country',when: when(card(cond('country', 'is not', ['India']))), decision: '2fa', matchEstimate: 9 }),
+      rule({ name: 'Unmanaged device',when: when(card(cond('mdm', 'is', ['Not enrolled']))), decision: '2fa', matchEstimate: 7 }),
+      rule({ name: 'High ML risk',when: when(card(cond('ml-risk', 'is', ['High']))), decision: '2fa', matchEstimate: 4 }),
+      rule({ name: 'Trusted office access',when: when(card(cond('zone', 'in zone', ['office']))), decision: '1fa', matchEstimate: 12 }),
     ],
   },
   {
@@ -654,7 +868,8 @@ export const policies: Policy[] = [
     status: 'inactive',
     lastModified: '1 week ago',
     modifiedBy: 'System',
-    rules: [rule({ name: 'Everyone', appliesTo: ['all'], decision: '1fa', matchEstimate: 1240 })],
+    audience: EVERYONE,
+    rules: [rule({ name: 'Everyone', decision: '1fa', matchEstimate: 1240 })],
   },
   {
     id: 'partner-portal',
@@ -665,6 +880,7 @@ export const policies: Policy[] = [
     lastModified: '2 weeks ago',
     modifiedBy: 'Jaspreet T.',
     configIssue: 'No rules configured — every sign-in falls straight through to the default rule.',
+    audience: audienceOf(['contractors']),
     rules: [],
   },
   {
@@ -679,10 +895,11 @@ export const policies: Policy[] = [
     status: 'monitor',
     lastModified: '2 weeks ago',
     modifiedBy: 'Mehak Garg',
+    audience: audienceOf(['engineering']),
     rules: [
-      rule({ name: 'Require corporate ASN', description: 'Written during the VPN migration and never revisited. Engineering now works from home two days a week, so this may be denying more than it was meant to.', appliesTo: ['engineering'], conditions: [cond('zone', 'not in zone', ['asn'])], decision: 'deny', matchEstimate: 310 }),
-      rule({ name: 'Known device', appliesTo: ['engineering'], conditions: [cond('device-reg', 'is', ['Registered'])], decision: '1fa', matchEstimate: 280 }),
-      rule({ name: 'Everything else', appliesTo: ['engineering'], decision: '2fa', matchEstimate: 30 }),
+      rule({ name: 'Require corporate ASN', description: 'Written during the VPN migration and never revisited. Engineering now works from home two days a week, so this may be denying more than it was meant to.',when: when(card(cond('zone', 'not in zone', ['asn']))), decision: 'deny', matchEstimate: 310 }),
+      rule({ name: 'Known device',when: when(card(cond('device-reg', 'is', ['Registered']))), decision: '1fa', matchEstimate: 280 }),
+      rule({ name: 'Everything else',decision: '2fa', matchEstimate: 30 }),
     ],
   },
   {
@@ -693,9 +910,10 @@ export const policies: Policy[] = [
     status: 'active',
     lastModified: '3 weeks ago',
     modifiedBy: 'System',
+    audience: EVERYONE,
     rules: [
-      rule({ name: 'Standard idle window', appliesTo: ['all'], conditions: [cond('trust-age', 'over', ['15'])], decision: '1fa', matchEstimate: 1240 }),
-      rule({ name: 'Shorter for contractors', appliesTo: ['contractors'], conditions: [cond('user-type', 'is', ['Contractor'])], decision: '2fa', matchEstimate: 154 }),
+      rule({ name: 'Standard idle window',when: when(card(cond('trust-age', 'over', ['15']))), decision: '1fa', matchEstimate: 1240 }),
+      rule({ name: 'Shorter for contractors',when: when(card(cond('group', 'in', ['contractors']), cond('user-type', 'is', ['Contractor']))), decision: '2fa', matchEstimate: 154 }),
     ],
   },
 ]
@@ -763,6 +981,12 @@ export interface Scenario {
   /** Who wrote it, on the tenant's own templates. */
   author?: string
   when?: string
+  /* Who the policy this template builds should govern.
+
+     It used to be stamped on each built rule, which meant a two-rule template
+     could produce a policy whose rules disagreed about their own scope. One
+     audience per template, applied to the policy it creates. */
+  audience: Audience
   rules: { name: string; ifText: string; decision: AccessDecision; build: () => Rule }[]
 }
 
@@ -770,103 +994,115 @@ export const scenarios: Scenario[] = [
   {
     id: 's-mfa', provided: true, reviewed: { by: 'miniOrange Security', on: '2025-09' }, name: 'Require MFA for all users', category: 'Quick Protection', tag: 'Identity',
     description: 'Every user must verify with a second factor on every login.',
+    audience: EVERYONE,
     rules: [{
       name: 'Require MFA', ifText: 'All users, every login', decision: '2fa',
-      build: () => rule({ name: 'Require MFA', appliesTo: ['all'], decision: '2fa', matchEstimate: 1240 }),
+      build: () => rule({ name: 'Require MFA',decision: '2fa', matchEstimate: 1240 }),
     }],
   },
   {
     id: 's-office', provided: true, name: 'Block access outside office network', category: 'Quick Protection', tag: 'Network',
     description: 'Deny login attempts from IPs outside your network zones.',
+    audience: EVERYONE,
     rules: [{
       name: 'Outside office network', ifText: 'Not in Office Network', decision: 'deny',
-      build: () => rule({ name: 'Outside office network', appliesTo: ['all'], conditions: [cond('zone', 'not in zone', ['office'])], decision: 'deny', matchEstimate: 340 }),
+      build: () => rule({ name: 'Outside office network',when: when(card(cond('zone', 'not in zone', ['office']))), decision: 'deny', matchEstimate: 340 }),
     }],
   },
   {
     id: 's-contractor', provided: true, name: 'Stricter auth for contractors', category: 'Quick Protection', tag: 'Identity',
     description: 'Contractors face stronger authentication requirements than employees.',
+    audience: audienceOf(['contractors']),
     rules: [{
       name: 'Contractor step-up', ifText: 'User type is Contractor', decision: '2fa',
-      build: () => rule({ name: 'Contractor step-up', appliesTo: ['contractors'], conditions: [cond('user-type', 'is', ['Contractor'])], decision: '2fa', matchEstimate: 154 }),
+      build: () => rule({ name: 'Contractor step-up',when: when(card(cond('user-type', 'is', ['Contractor']))), decision: '2fa', matchEstimate: 154 }),
     }],
   },
   {
     id: 's-passwordless', provided: true, name: 'Passwordless for executives', category: 'Quick Protection', tag: 'Identity',
     description: 'Executives with miniOrange App can sign in with a push notification.',
+    audience: audienceOf(['executives']),
     rules: [{
       name: 'Executive passwordless', ifText: 'Group is Executives', decision: '1fa',
-      build: () => rule({ name: 'Executive passwordless', appliesTo: ['executives'], conditions: [cond('group', 'in', ['Executives'])], decision: '1fa', firstFactor: 'Any', matchEstimate: 12 }),
+      build: () => rule({ name: 'Executive passwordless',when: when(card(cond('group', 'in', ['Executives']))), decision: '1fa', firstFactor: 'Any', matchEstimate: 12 }),
     }],
   },
   {
     id: 's-trust', provided: true, reviewed: { by: 'miniOrange Security', on: '2026-01' }, name: 'Adaptive device trust (90-day)', category: 'Device-based', tag: 'Device', badge: 'Recommended for SIB/HRS',
     description: 'Known devices skip extra auth. New or expired devices require full verification.',
+    audience: EVERYONE,
     rules: [
       {
         name: 'Trusted device', ifText: 'Known device trusted < 90 days', decision: '1fa',
-        build: () => rule({ name: 'Trusted device', appliesTo: ['all'], conditions: [cond('trust-age', 'under', ['90'])], decision: '1fa', matchEstimate: 980 }),
+        build: () => rule({ name: 'Trusted device',when: when(card(cond('trust-age', 'under', ['90']))), decision: '1fa', matchEstimate: 980 }),
       },
       {
         name: 'New or expired device', ifText: 'New, unrecognized, or expired device', decision: '2fa',
-        build: () => rule({ name: 'New or expired device', appliesTo: ['all'], conditions: [cond('device-reg', 'is', ['Unregistered'])], decision: '2fa', matchEstimate: 260 }),
+        build: () => rule({ name: 'New or expired device',when: when(card(cond('device-reg', 'is', ['Unregistered']))), decision: '2fa', matchEstimate: 260 }),
       },
     ],
   },
   {
     id: 's-compromised', provided: true, reviewed: { by: 'miniOrange Security', on: '2025-11' }, name: 'Block compromised devices', category: 'Device-based', tag: 'Device',
     description: 'Deny access from jailbroken, rooted, or unrecognised devices.',
+    audience: EVERYONE,
     rules: [{
       name: 'Block compromised devices', ifText: 'Not recognised by Corporate managed', decision: 'deny',
-      build: () => rule({ name: 'Block compromised devices', appliesTo: ['all'], conditions: [cond('fingerprint', 'not recognised by', ['fp-corp'])], decision: 'deny', matchEstimate: 108 }),
+      build: () => rule({ name: 'Block compromised devices',when: when(card(cond('fingerprint', 'not recognised by', ['fp-corp']))), decision: 'deny', matchEstimate: 108 }),
     }],
   },
   {
     id: 's-managed', provided: true, name: 'Managed devices only', category: 'Device-based', tag: 'Device',
     description: 'Restrict access to devices enrolled in your MDM.',
+    audience: EVERYONE,
     rules: [{
       name: 'MDM enrolled only', ifText: 'MDM Managed is Not enrolled', decision: 'deny',
-      build: () => rule({ name: 'MDM enrolled only', appliesTo: ['all'], conditions: [cond('mdm', 'is', ['Not enrolled'])], decision: 'deny', matchEstimate: 210 }),
+      build: () => rule({ name: 'MDM enrolled only',when: when(card(cond('mdm', 'is', ['Not enrolled']))), decision: 'deny', matchEstimate: 210 }),
     }],
   },
   {
     id: 's-suspicious', provided: true, name: 'Step up on suspicious login', category: 'Risk-based', tag: 'Risk',
     description: 'Challenge users when behavioral signals indicate elevated risk.',
+    audience: EVERYONE,
     rules: [{
       name: 'Elevated risk', ifText: 'ML Risk Score is High', decision: '2fa',
-      build: () => rule({ name: 'Elevated risk', appliesTo: ['all'], conditions: [cond('ml-risk', 'is', ['High'])], decision: '2fa', matchEstimate: 64 }),
+      build: () => rule({ name: 'Elevated risk',when: when(card(cond('ml-risk', 'is', ['High']))), decision: '2fa', matchEstimate: 64 }),
     }],
   },
   {
     id: 's-anon', provided: true, reviewed: { by: 'miniOrange Security', on: '2025-06' }, name: 'Block anonymized traffic', category: 'Risk-based', tag: 'Network',
     description: 'Deny access from Tor, VPNs, and known proxies.',
+    audience: EVERYONE,
     rules: [{
       name: 'Anonymized source', ifText: 'In zone Anonymizers', decision: 'deny',
-      build: () => rule({ name: 'Anonymized source', appliesTo: ['all'], conditions: [cond('zone', 'in zone', ['anon'])], decision: 'deny', matchEstimate: 31 }),
+      build: () => rule({ name: 'Anonymized source',when: when(card(cond('zone', 'in zone', ['anon']))), decision: 'deny', matchEstimate: 31 }),
     }],
   },
   {
     id: 's-country', provided: true, name: 'New country detection', category: 'Risk-based', tag: 'Risk',
     description: 'Require additional verification from a new country.',
+    audience: EVERYONE,
     rules: [{
       name: 'Unfamiliar country', ifText: 'Country is not India', decision: '2fa',
-      build: () => rule({ name: 'Unfamiliar country', appliesTo: ['all'], conditions: [cond('country', 'is not', ['India'])], decision: '2fa', matchEstimate: 88 }),
+      build: () => rule({ name: 'Unfamiliar country',when: when(card(cond('country', 'is not', ['India']))), decision: '2fa', matchEstimate: 88 }),
     }],
   },
   {
     id: 's-firstlogin', author: 'Mehak Garg', when: '1 week ago', name: 'First login enforcement', category: 'Compliance', tag: 'Identity', badge: 'SIB/HRS',
     description: 'First-time users and users with reset MFA must complete a specific auth chain.',
+    audience: EVERYONE,
     rules: [{
       name: 'First login chain', ifText: 'Auth state is First time login', decision: '2fa',
-      build: () => rule({ name: 'First login chain', appliesTo: ['all'], conditions: [cond('auth-state', 'is', ['First time login'])], decision: '2fa', secondFactor: 'chain', matchEstimate: 42 }),
+      build: () => rule({ name: 'First login chain',when: when(card(cond('auth-state', 'is', ['First time login']))), decision: '2fa', secondFactor: 'chain', matchEstimate: 42 }),
     }],
   },
   {
     id: 's-session', provided: true, name: 'Session limits for contractors', category: 'Compliance', tag: 'Identity',
     description: 'Cap session duration and require re-authentication for contractors.',
+    audience: audienceOf(['contractors']),
     rules: [{
       name: 'Contractor session cap', ifText: 'User type is Contractor', decision: '2fa',
-      build: () => rule({ name: 'Contractor session cap', appliesTo: ['contractors'], conditions: [cond('user-type', 'is', ['Contractor'])], decision: '2fa', matchEstimate: 154 }),
+      build: () => rule({ name: 'Contractor session cap',when: when(card(cond('user-type', 'is', ['Contractor']))), decision: '2fa', matchEstimate: 154 }),
     }],
   },
 
@@ -876,53 +1112,56 @@ export const scenarios: Scenario[] = [
   {
     id: 's-zerotrust', provided: true, reviewed: { by: 'miniOrange Security', on: '2026-01' }, name: 'Zero-Trust baseline', category: 'Device-based', tag: 'Device', badge: 'Recommended',
     description: 'Layered checks in order — block the broken, trust the known, verify everything in between.',
+    audience: EVERYONE,
     rules: [
       { name: 'Block unrecognised devices', ifText: 'Device not recognised by Corporate managed', decision: 'deny',
-        build: () => rule({ name: 'Block unrecognised devices', appliesTo: ['all'], conditions: [cond('fingerprint', 'not recognised by', ['fp-corp'])], decision: 'deny', matchEstimate: 108 }) },
+        build: () => rule({ name: 'Block unrecognised devices',when: when(card(cond('fingerprint', 'not recognised by', ['fp-corp']))), decision: 'deny', matchEstimate: 108 }) },
       { name: 'Block anonymised sources', ifText: 'Connection is Tor, VPN or a known proxy', decision: 'deny',
-        build: () => rule({ name: 'Block anonymised sources', appliesTo: ['all'], conditions: [cond('zone', 'in zone', ['anon'])], decision: 'deny', matchEstimate: 31 }) },
+        build: () => rule({ name: 'Block anonymised sources',when: when(card(cond('zone', 'in zone', ['anon']))), decision: 'deny', matchEstimate: 31 }) },
       { name: 'Trusted office device', ifText: 'On Office Network and device registered', decision: '1fa',
-        build: () => rule({ name: 'Trusted office device', appliesTo: ['all'], conditions: [cond('zone', 'in zone', ['office']), cond('device-reg', 'is', ['Registered'], 'AND')], decision: '1fa', matchEstimate: 820 }) },
+        build: () => rule({ name: 'Trusted office device',when: when(card(cond('zone', 'in zone', ['office']), cond('device-reg', 'is', ['Registered']))), decision: '1fa', matchEstimate: 820 }) },
       { name: 'Off-network step-up', ifText: 'Outside Office Network', decision: '2fa',
-        build: () => rule({ name: 'Off-network step-up', appliesTo: ['all'], conditions: [cond('zone', 'not in zone', ['office'])], decision: '2fa', matchEstimate: 340 }) },
+        build: () => rule({ name: 'Off-network step-up',when: when(card(cond('zone', 'not in zone', ['office']))), decision: '2fa', matchEstimate: 340 }) },
       { name: 'Elevated risk', ifText: 'ML Risk Score is High', decision: '2fa',
-        build: () => rule({ name: 'Elevated risk', appliesTo: ['all'], conditions: [cond('ml-risk', 'is', ['High'])], decision: '2fa', matchEstimate: 64 }) },
+        build: () => rule({ name: 'Elevated risk',when: when(card(cond('ml-risk', 'is', ['High']))), decision: '2fa', matchEstimate: 64 }) },
     ],
   },
   {
     id: 's-regulated', author: 'Mehak Garg', when: '3 days ago', name: 'Regulated data access', category: 'Compliance', tag: 'Identity', badge: 'SIB/HRS',
     description: 'For apps holding regulated records: managed devices, approved geography, working hours, and a phishing-resistant factor.',
+    audience: audienceOf(['finance']),
     rules: [
       { name: 'Deny unmanaged devices', ifText: 'MDM Managed is Not enrolled', decision: 'deny',
-        build: () => rule({ name: 'Deny unmanaged devices', appliesTo: ['finance'], conditions: [cond('mdm', 'is', ['Not enrolled'])], decision: 'deny', matchEstimate: 42 }) },
+        build: () => rule({ name: 'Deny unmanaged devices',when: when(card(cond('mdm', 'is', ['Not enrolled']))), decision: 'deny', matchEstimate: 42 }) },
       { name: 'Deny outside approved countries', ifText: 'Country is not India', decision: 'deny',
-        build: () => rule({ name: 'Deny outside approved countries', appliesTo: ['finance'], conditions: [cond('country', 'is not', ['India'])], decision: 'deny', matchEstimate: 18 }) },
+        build: () => rule({ name: 'Deny outside approved countries',when: when(card(cond('country', 'is not', ['India']))), decision: 'deny', matchEstimate: 18 }) },
       { name: 'Out-of-hours verification', ifText: 'Outside 09:00–18:00', decision: '2fa',
-        build: () => rule({ name: 'Out-of-hours verification', appliesTo: ['finance'], conditions: [cond('time', 'not between', ['09:00', '18:00'])], decision: '2fa', matchEstimate: 51 }) },
+        build: () => rule({ name: 'Out-of-hours verification',when: when(card(cond('time', 'not between', ['09:00', '18:00']))), decision: '2fa', matchEstimate: 51 }) },
       { name: 'New device verification', ifText: 'Device trust age under 30 days', decision: '2fa',
-        build: () => rule({ name: 'New device verification', appliesTo: ['finance'], conditions: [cond('trust-age', 'under', ['30'])], decision: '2fa', matchEstimate: 26 }) },
+        build: () => rule({ name: 'New device verification',when: when(card(cond('trust-age', 'under', ['30']))), decision: '2fa', matchEstimate: 26 }) },
       { name: 'Everything else in-office', ifText: 'On Office Network', decision: '1fa',
-        build: () => rule({ name: 'Everything else in-office', appliesTo: ['finance'], conditions: [cond('zone', 'in zone', ['office'])], decision: '1fa', matchEstimate: 86 }) },
+        build: () => rule({ name: 'Everything else in-office',when: when(card(cond('zone', 'in zone', ['office']))), decision: '1fa', matchEstimate: 86 }) },
     ],
   },
   {
     id: 's-contractor-life', author: 'Jaspreet T.', when: '2 weeks ago', name: 'Contractor lifecycle', category: 'Compliance', tag: 'Identity',
     description: 'Tighter treatment for non-employees across first login, device state, hours and session length.',
+    audience: audienceOf(['contractors']),
     rules: [
       { name: 'First login chain', ifText: 'Auth state is First time login', decision: '2fa',
-        build: () => rule({ name: 'First login chain', appliesTo: ['contractors'], conditions: [cond('auth-state', 'is', ['First time login'])], decision: '2fa', secondFactor: 'chain', matchEstimate: 22 }) },
+        build: () => rule({ name: 'First login chain',when: when(card(cond('auth-state', 'is', ['First time login']))), decision: '2fa', secondFactor: 'chain', matchEstimate: 22 }) },
       { name: 'Unregistered device', ifText: 'Device Registration is Unregistered', decision: 'deny',
-        build: () => rule({ name: 'Unregistered device', appliesTo: ['contractors'], conditions: [cond('device-reg', 'is', ['Unregistered'])], decision: 'deny', matchEstimate: 37 }) },
+        build: () => rule({ name: 'Unregistered device',when: when(card(cond('device-reg', 'is', ['Unregistered']))), decision: 'deny', matchEstimate: 37 }) },
       { name: 'Outside contract hours', ifText: 'Outside 09:00–18:00 Mon–Fri', decision: '2fa',
-        build: () => rule({ name: 'Outside contract hours', appliesTo: ['contractors'], conditions: [cond('time', 'not between', ['09:00', '18:00'])], decision: '2fa', matchEstimate: 64 }) },
+        build: () => rule({ name: 'Outside contract hours',when: when(card(cond('time', 'not between', ['09:00', '18:00']))), decision: '2fa', matchEstimate: 64 }) },
       { name: 'Standard contractor access', ifText: 'User type is Contractor', decision: '2fa',
-        build: () => rule({ name: 'Standard contractor access', appliesTo: ['contractors'], conditions: [cond('user-type', 'is', ['Contractor'])], decision: '2fa', matchEstimate: 154 }) },
+        build: () => rule({ name: 'Standard contractor access',when: when(card(cond('user-type', 'is', ['Contractor']))), decision: '2fa', matchEstimate: 154 }) },
     ],
   },
 ]
 
 export function blankRule(name = 'New rule'): Rule {
-  return rule({ name, appliesTo: ['all'], decision: '2fa', matchEstimate: 1240 })
+  return rule({ name, decision: '2fa', matchEstimate: 1240 })
 }
 
 export function blankPolicy(name: string, appIds: string[]): Policy {
@@ -934,6 +1173,10 @@ export function blankPolicy(name: string, appIds: string[]): Policy {
     status: 'inactive',
     lastModified: 'Just now',
     modifiedBy: 'You',
+    /* A new policy governs everyone until somebody narrows it. The opposite
+       default — nobody — makes a policy that silently does nothing, which is
+       the one failure an access console must never ship quietly. */
+    audience: EVERYONE,
     rules: [],
   }
 }

@@ -19,11 +19,11 @@ import {
 } from 'lucide-react'
 
 import { Button, DecisionChip, TipDot } from '../kit'
-import type { Rule } from '../data'
+import { EVERYONE, type Audience, type Rule } from '../data'
 import { useBrand } from '../store'
 import { runGauntlet } from '../screens/gauntlet'
 import type { SimEnv } from '../screens/simulate'
-import { QUESTIONS, compose, nameFor, narrate, readPrompt, type Answers, type QuestionId } from './interview-model'
+import { QUESTIONS, compose, composeAudience, nameFor, narrate, readPrompt, type Answers, type QuestionId } from './interview-model'
 
 /* -----------------------------------------------------------------------------
    The guided build.
@@ -101,8 +101,10 @@ export function Interview({
 }: {
   open: boolean
   onClose: () => void
-  /** Handed the finished rules and a name. The host decides what to do with them. */
-  onCreate: (rules: Rule[], name: string) => void
+  /* Handed the finished rules, the audience they were written for, and a name.
+     The audience travels with them because it is a property of the policy the
+     host is about to build, and the host has no other way to know it. */
+  onCreate: (rules: Rule[], name: string, audience: Audience) => void
 }) {
   const store = useBrand()
   const reduce = useReducedMotion()
@@ -144,6 +146,7 @@ export function Interview({
      adds the guard and the relief as those answers arrive — so the same
      function feeds the live panel, the loader and the finished policy. */
   const rules = useMemo(() => compose(answers), [answers])
+  const audience = useMemo(() => composeAudience(answers), [answers])
   const lines = useMemo(() => narrate(rules), [rules])
   const tasks = useMemo(() => buildTasks(rules), [rules])
 
@@ -151,8 +154,8 @@ export function Interview({
      900ms, and re-grading the deck on every frame of that would be the most
      expensive animation on the page. */
   const grade = useMemo(
-    () => (stage === 'done' ? runGauntlet({ ...blankShell(), rules }, env, {}) : null),
-    [stage, rules, env],
+    () => (stage === 'done' ? runGauntlet({ ...blankShell(), audience, rules }, env, {}) : null),
+    [stage, rules, audience, env],
   )
 
   /* How many rules the spine has drawn. During the build it trails the
@@ -605,7 +608,7 @@ export function Interview({
           </span>
 
           {stage === 'done' ? (
-            <Button variant="primary" iconRight={ArrowRight} onClick={() => onCreate(rules, name)}>
+            <Button variant="primary" iconRight={ArrowRight} onClick={() => onCreate(rules, name, audience)}>
               Open it in the builder
             </Button>
           ) : stage === 'ask' ? (
@@ -763,6 +766,7 @@ function blankShell() {
     status: 'inactive' as const,
     lastModified: '',
     modifiedBy: '',
+    audience: EVERYONE,
     rules: [] as Rule[],
   }
 }

@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { groups } from '../data'
+import { EVERYONE, audienceOf, groups } from '../data'
+import { leaves } from '../predicate'
 import { diagnose } from '../screens/diagnostics'
-import { QUESTIONS, compose, nameFor, narrate, readPrompt, type Answers } from './interview-model'
+import {
+  QUESTIONS,
+  compose,
+  composeAudience,
+  nameFor,
+  narrate,
+  readPrompt,
+  type Answers,
+} from './interview-model'
 
 /* The interview writes rules on somebody's behalf, which means it has to be
    held to a higher bar than the builder: a person editing a rule can see their
@@ -10,7 +19,11 @@ import { QUESTIONS, compose, nameFor, narrate, readPrompt, type Answers } from '
    combination of answers is composed and linted, and none of them is allowed to
    produce an error. */
 
-const shell = (rules: ReturnType<typeof compose>) => ({
+/* The shell takes the ANSWERS rather than the rules, because the interview now
+   produces two things — the ordered rules and the one audience the policy
+   governs — and linting the rules without the audience they were written for
+   would leave the policy-scoped findings (PE310 and friends) untested. */
+const shell = (answers: Answers) => ({
   id: 'test',
   name: 'Test',
   type: 'App Access' as const,
@@ -18,7 +31,8 @@ const shell = (rules: ReturnType<typeof compose>) => ({
   status: 'inactive' as const,
   lastModified: '',
   modifiedBy: '',
-  rules,
+  audience: composeAudience(answers),
+  rules: compose(answers),
 })
 
 /** Every combination of every answer — 6 × 4 × 3 × 2 × 4 = 576 policies. */
@@ -36,10 +50,10 @@ describe('the interview', () => {
     expect(combos).toHaveLength(576)
 
     const broken = combos
-      .map((a) => ({ a, errors: diagnose(shell(compose(a)), groups).filter((d) => d.severity === 'error') }))
+      .map((a) => ({ a, errors: diagnose(shell(a), groups).filter((d) => d.severity === 'error') }))
       .filter((x) => x.errors.length > 0)
 
-    expect(broken.map((b) => `${JSON.stringify(b.a)} → ${b.errors[0].title}`)).toEqual([])
+    expect(broken.map((b) => `${JSON.stringify(b.a)} → ${b.errors[0].code} ${b.errors[0].title}`)).toEqual([])
   })
 
   it('always governs the audience rather than letting it fall through', () => {
@@ -48,15 +62,23 @@ describe('the interview', () => {
       const last = rules[rules.length - 1]
       // A catch-all at the end is what stops the engine default deciding for
       // people this policy was written for.
-      expect(last.conditions).toHaveLength(0)
-      expect(rules.every((r) => r.appliesTo[0] === (a.audience ?? 'all'))).toBe(true)
+      expect(last.when.cards).toHaveLength(0)
+      /* The audience used to be stamped on every rule, so this asserted all
+         three agreed. It is one policy-level fact now, and the equivalent
+         assertion is that the single audience is exactly the one answered —
+         "Everyone" being the flag rather than a group id. */
+      expect(composeAudience(a)).toEqual(
+        !a.audience || a.audience === 'all' ? EVERYONE : audienceOf([a.audience]),
+      )
     }
   })
 
   it('puts the guard above the relief, because first match wins', () => {
     const rules = compose({ audience: 'finance', threat: 'unmanaged', response: 'mfa', relief: 'yes', remember: '30' })
-    const guard = rules.findIndex((r) => r.conditions.some((c) => c.typeId === 'mdm'))
-    const relief = rules.findIndex((r) => r.conditions.some((c) => c.typeId === 'zone' && c.operator === 'in zone'))
+    const guard = rules.findIndex((r) => leaves(r.when).some((c) => c.typeId === 'mdm'))
+    const relief = rules.findIndex((r) =>
+      leaves(r.when).some((c) => c.typeId === 'zone' && c.operator === 'in zone'),
+    )
     expect(guard).toBeGreaterThanOrEqual(0)
     expect(relief).toBeGreaterThan(guard)
   })
@@ -84,6 +106,9 @@ describe('the interview', () => {
     expect(loose[0].decision).toBe('2fa')
     expect(strict).toHaveLength(2)
     expect(loose).toHaveLength(3)
+    // The two audiences differ at the policy, which is where scope now lives.
+    expect(composeAudience({ audience: 'executives' })).toEqual(audienceOf(['executives']))
+    expect(composeAudience({ audience: 'all' })).toEqual(EVERYONE)
   })
 
   it('asks for a phishing-resistant factor when that is what was chosen', () => {

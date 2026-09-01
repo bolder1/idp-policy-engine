@@ -1,4 +1,15 @@
-import { blankRule, cond, type Rule } from '../data'
+import {
+  EVERYONE,
+  anySignIn,
+  audienceOf,
+  blankRule,
+  card,
+  cond,
+  when,
+  type Audience,
+  type Rule,
+} from '../data'
+import { leaves } from '../predicate'
 
 /* -----------------------------------------------------------------------------
    The interview — a policy built from answers.
@@ -174,9 +185,19 @@ const THREAT_NAME: Record<string, string> = {
   newuser: 'Accounts without a second factor',
 }
 
+/* Who the composed POLICY governs.
+
+   The interview's audience question always described one audience; it was
+   stamped onto all three composed rules, which is where a policy whose rules
+   disagree about their own scope came from. It is one policy-level answer now,
+   which is what it always meant. */
+export function composeAudience(answers: Answers): Audience {
+  const picked = answers.audience
+  return !picked || picked === 'all' ? EVERYONE : audienceOf([picked])
+}
+
 /** Ordered rules, first-match-wins, built from the answers. */
 export function compose(answers: Answers): Rule[] {
-  const audience = [answers.audience ?? 'all']
   const rules: Rule[] = []
 
   /* 1 — the guard. It goes first because everything below it is relief, and
@@ -187,8 +208,7 @@ export function compose(answers: Answers): Rule[] {
     rules.push(
       make({
         name: THREAT_NAME[threat],
-        appliesTo: audience,
-        conditions: [THREAT_CONDITION[threat]()],
+        when: when(card(THREAT_CONDITION[threat]())),
         decision: response === 'deny' ? 'deny' : '2fa',
         ...(response === 'strong'
           ? { secondFactor: 'specific' as const, secondFactorMethods: ['WebAuthn / FIDO2'] }
@@ -203,8 +223,7 @@ export function compose(answers: Answers): Rule[] {
     rules.push(
       make({
         name: 'On the office network',
-        appliesTo: audience,
-        conditions: [cond('zone', 'in zone', ['office'])],
+        when: when(card(cond('zone', 'in zone', ['office']))),
         decision: '1fa',
         matchEstimate: 620,
       }),
@@ -217,8 +236,7 @@ export function compose(answers: Answers): Rule[] {
   rules.push(
     make({
       name: 'Everyone else in this audience',
-      appliesTo: audience,
-      conditions: [],
+      when: anySignIn(),
       decision: '2fa',
       rememberMfa: days > 0,
       ...(days > 0 ? { rememberDays: days } : { forceMfaEachLogin: true }),
@@ -233,13 +251,13 @@ export function compose(answers: Answers): Rule[] {
 export function narrate(rules: Rule[]): string[] {
   return rules.map((r, i) => {
     const what = r.decision === 'deny' ? 'is refused' : r.decision === '1fa' ? 'signs in on one factor' : 'is asked for a second factor'
-    const when = r.conditions.length === 0 ? 'anyone still unmatched' : describe(r)
-    return `${i + 1}. ${when} ${what}.`
+    const trigger = r.when.cards.length === 0 ? 'anyone still unmatched' : describe(r)
+    return `${i + 1}. ${trigger} ${what}.`
   })
 }
 
 function describe(r: Rule): string {
-  const c = r.conditions[0]
+  const c = leaves(r.when)[0]
   if (!c) return 'anyone still unmatched'
   if (c.typeId === 'mdm') return 'a device we do not manage'
   if (c.typeId === 'zone') return c.operator === 'in zone' ? 'a sign-in from the office network' : 'a sign-in from outside the office network'

@@ -1,4 +1,14 @@
-import { conditionType, type AccessDecision, type Group, type Policy, type Rule } from '../data'
+import {
+  conditionType,
+  reach,
+  users as seedUsers,
+  type AccessDecision,
+  type Group,
+  type Policy,
+  type Rule,
+  type User,
+} from '../data'
+import { ckey, isSingleCard, leaves, matchesEverything, sig } from '../predicate'
 import { SLOW_TIMEOUT_MS, seedHooks, type Hook } from '../hooks'
 
 /* -----------------------------------------------------------------------------
@@ -30,8 +40,17 @@ export interface Diagnostic {
   severity: Severity
   title: string
   detail: string
-  /** Rule this is reported against. */
+  /* A stable, greppable code. Findings get renamed as copy improves; a test or
+     a bug report that names one should not go stale when it does. */
+  code: string
+  /* Rule this is reported against, or -1 for a finding about the policy itself.
+
+     A sentinel rather than an optional field, deliberately: every consumer
+     already guards with `policy.rules[d.ruleIndex]?.`, so -1 flows through them
+     unchanged and only the two renderers that print "Open rule N" have to
+     branch. Making it optional would force all six to change. */
   ruleIndex: number
+  scope: 'rule' | 'policy'
   /** The other rule involved, when the problem is a relationship. */
   relatedIndex?: number
 }
@@ -45,29 +64,32 @@ const NEGATIONS: Record<string, string> = {
   'not in': 'in',
 }
 
-/** True when `outer` matches at least everyone `inner` does. */
-function audienceCovers(outer: Rule, inner: Rule) {
-  if (outer.appliesTo.includes('all')) return true
-  if (inner.appliesTo.includes('all')) return false
-  return inner.appliesTo.every((g) => outer.appliesTo.includes(g))
-}
+/* `audienceCovers` is gone.
 
-/** A rule with no conditions matches every sign-in that reaches it. */
-const isCatchAll = (r: Rule) => r.enabled && r.conditions.length === 0
+   With one audience per policy, "does this rule cover at least everyone that
+   rule covers" is tautologically true, and a predicate that always returns true
+   is not a filter — it is a comment. Removing it makes the four checks that
+   depended on it (subsumption, unreachable, the shadow count, `shadowedBy`)
+   strictly stronger: they now compare predicates alone.
 
-/** Identity of a condition, ignoring the running id and value order. */
-const ckey = (c: { typeId: string; operator: string; values: string[] }) =>
-  `${c.typeId}|${c.operator}|${[...c.values].sort().join('␟')}`
+   That will look like a regression. More rules get reported unreachable than
+   before, because a rule that used to be excused by "well, it targets a
+   different group" no longer has that excuse — the group narrowing is a
+   condition now, and the checks read conditions. */
 
-const allAnd = (r: Rule) => r.conditions.length < 2 || r.conditions.slice(1).every((c) => c.joiner === 'AND')
-const allOr = (r: Rule) => r.conditions.length > 1 && r.conditions.slice(1).every((c) => c.joiner === 'OR')
+/** A rule that matches every sign-in reaching it. */
+const isCatchAll = (r: Rule) => r.enabled && matchesEverything(r.when)
 
-/** Audience + predicate, normalised — the thing that decides whether a rule fires. */
-const signature = (r: Rule) =>
-  JSON.stringify({
-    a: [...r.appliesTo].sort(),
-    c: r.conditions.map((c, i) => ({ k: ckey(c), j: i === 0 ? 'AND' : c.joiner })),
-  })
+/* One card is one unbroken run of ANDs, by construction. That is the whole
+   reason the model is a disjunction of cards rather than an arbitrary tree:
+   every check below that needed "an unbroken run of ANDs" gets it for free
+   instead of having to prove it, and none of them has to bail out on the mixed
+   case — which is exactly the case grouping exists to enable. */
+const allAnd = (r: Rule) => isSingleCard(r.when)
+const allOr = (r: Rule) => r.when.cards.length > 1 && r.when.cards.every((k) => k.conditions.length === 1)
+
+/** The predicate, normalised. Audience is no longer part of it — it is the policy's. */
+const signature = (r: Rule) => sig(r.when)
 
 /* Which rules below `index` that rule puts out of reach.
 
@@ -80,7 +102,7 @@ export function shadowedBy(policy: Policy, index: number): number[] {
   if (!rule || !isCatchAll(rule)) return []
   const out: number[] = []
   policy.rules.forEach((r, j) => {
-    if (j > index && r.enabled && audienceCovers(rule, r)) out.push(j)
+    if (j > index && r.enabled) out.push(j)
   })
   return out
 }
@@ -89,11 +111,62 @@ export function shadowedBy(policy: Policy, index: number): number[] {
    resolver in builder-dialogs does. Callers with a store pass the live list so
    a hook deleted five seconds ago is reported; callers without one (the tests,
    the interview composer) still get sound answers about the seeded catalogue. */
-export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHooks): Diagnostic[] {
+export function diagnose(
+  policy: Policy,
+  groups: Group[],
+  hooks: Hook[] = seedHooks,
+  directory: User[] = seedUsers,
+): Diagnostic[] {
   const out: Diagnostic[] = []
   const rules = policy.rules
   // The global default is a deliberate catch-all; warning about it is noise.
   if (policy.isSystem) return out
+
+  /* --- The policy's own audience -------------------------------------------
+
+     Three findings that used to be one per-rule warning. They move up with the
+     audience, and the first is new: an empty audience was unreachable before
+     because the old editor forced a fallback to "all" whenever you deselected
+     the last group. It is reachable now, so it has to be caught — a policy that
+     governs nobody is a policy that looks like protection and is not. */
+  const a = policy.audience
+  if (!a.everyone && a.groupIds.length === 0 && a.userIds.length === 0) {
+    out.push({
+      id: 'emptyaudience',
+      code: 'PE310',
+      severity: 'error',
+      scope: 'policy',
+      ruleIndex: -1,
+      title: 'This policy applies to nobody',
+      detail: 'No groups and no people are selected, so none of these rules can ever run. Choose who this policy governs.',
+    })
+  }
+
+  const hollow = a.groupIds.filter((g) => (groups.find((x) => x.id === g)?.memberCount ?? 0) === 0)
+  if (hollow.length > 0) {
+    out.push({
+      id: 'emptygroup',
+      code: 'PE311',
+      severity: 'warning',
+      scope: 'policy',
+      ruleIndex: -1,
+      title: 'Targets an empty group',
+      detail: `${hollow.map((g) => groups.find((x) => x.id === g)?.name ?? g).join(', ')} has no members, so this policy reaches nobody through it.`,
+    })
+  }
+
+  const ghosts = a.userIds.filter((id) => !directory.some((u) => u.id === id))
+  if (ghosts.length > 0) {
+    out.push({
+      id: 'ghostuser',
+      code: 'PE312',
+      severity: 'warning',
+      scope: 'policy',
+      ruleIndex: -1,
+      title: `${ghosts.length} named ${ghosts.length === 1 ? 'person is' : 'people are'} no longer in the directory`,
+      detail: 'They were named on this policy individually and cannot be resolved now. Remove them, or cover them with a group.',
+    })
+  }
 
   const seen = new Map<string, number>()
 
@@ -112,13 +185,15 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
         const same = rules[first].decision === r.decision
         out.push({
           id: `dupe-${r.id}`,
+          code: 'PE101',
           severity: 'error',
+          scope: 'rule',
           ruleIndex: i,
           relatedIndex: first,
           title: same ? 'Duplicate of an earlier rule' : 'Contradicts an earlier rule',
           detail: same
-            ? `Rule ${first + 1} · ${rules[first].name} has the same audience and conditions, so it always matches first. This rule never runs.`
-            : `Rule ${first + 1} · ${rules[first].name} has the same audience and conditions but a different outcome. It matches first, so ${DECISION_WORD[rules[first].decision]} wins and this rule never runs.`,
+            ? `Rule ${first + 1} · ${rules[first].name} matches on exactly the same conditions, so it always matches first. This rule never runs.`
+            : `Rule ${first + 1} · ${rules[first].name} matches on exactly the same conditions but decides differently. It matches first, so ${DECISION_WORD[rules[first].decision]} wins and this rule never runs.`,
         })
       }
     }
@@ -129,25 +204,26 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
        already matched there and stopped. The pure-OR mirror holds too. Webhook
        conditions are excluded — their result is opaque, so nothing can be
        proved about them. */
-    if (r.enabled && allAnd(r) && r.conditions.length > 0) {
-      const mine = new Set(r.conditions.map(ckey))
-      const opaque = (x: Rule) => x.conditions.some((c) => c.typeId === 'webhook')
+    if (r.enabled && allAnd(r) && r.when.cards.length > 0) {
+      const mine = new Set(r.when.cards[0].conditions.map(ckey))
+      const opaque = (x: Rule) => leaves(x.when).some((c) => c.typeId === 'webhook')
       const idx = rules.findIndex(
         (e, j) =>
           j < i &&
           e.enabled &&
-          e.conditions.length > 0 &&
+          e.when.cards.length > 0 &&
           !opaque(e) &&
           !opaque(r) &&
-          audienceCovers(e, r) &&
           (allAnd(e)
-            ? e.conditions.every((c) => mine.has(ckey(c)))
-            : allOr(e) && e.conditions.some((c) => mine.has(ckey(c)))),
+            ? e.when.cards[0].conditions.every((c) => mine.has(ckey(c)))
+            : allOr(e) && e.when.cards.some((k) => mine.has(ckey(k.conditions[0])))),
       )
       if (idx !== -1 && !out.some((d) => d.id === `dupe-${r.id}`)) {
         out.push({
           id: `subsumed-${r.id}`,
+          code: 'PE102',
           severity: 'error',
+          scope: 'rule',
           ruleIndex: i,
           relatedIndex: idx,
           title: 'This rule can never run',
@@ -156,30 +232,33 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
       }
     }
 
-    /* --- Mixed joiners -------------------------------------------------------
-       The model stores a joiner per condition with no precedence anywhere, so
-       `A AND B OR C` has no defined meaning — it reads differently depending on
-       where the brackets go. The engine evaluates left to right; the admin
-       almost certainly did not intend that. */
-    if (r.conditions.length > 2) {
-      const joiners = new Set(r.conditions.slice(1).map((c) => c.joiner))
-      if (joiners.size > 1) {
-        out.push({
-          id: `mixed-${r.id}`,
-          severity: 'warning',
-          ruleIndex: i,
-          title: 'Mixes AND with OR',
-          detail: 'There is no grouping in this model, so these are read strictly left to right. Split the rule in two if you meant something else.',
-        })
-      }
+    /* --- An empty card -------------------------------------------------------
+       Should be unreachable: removing the last condition removes the card, and
+       `card()` refuses to build one. The check exists because that invariant
+       lives in code rather than in the type, and the failure is silent and
+       total — an empty card matches everything, so the rule becomes a catch-all
+       and every rule below it stops running. */
+    const hollowCards = r.when.cards.filter((k) => k.conditions.length === 0)
+    for (const k of hollowCards) {
+      out.push({
+        id: `emptycard-${r.id}-${k.id}`,
+        code: 'PE320',
+        severity: 'error',
+        scope: 'rule',
+        ruleIndex: i,
+        title: 'An alternative has no conditions',
+        detail: 'An empty alternative matches every sign-in, which silently turns this rule into a catch-all. Delete it, or give it a condition.',
+      })
     }
 
     /* --- A condition with nothing to match on -------------------------------- */
-    const blank = r.conditions.filter((c) => c.values.length === 0 || c.values.every((v) => !v.trim()))
+    const blank = leaves(r.when).filter((c) => c.values.length === 0 || c.values.every((v) => !v.trim()))
     if (blank.length > 0) {
       out.push({
         id: `blank-${r.id}`,
+        code: 'PE110',
         severity: 'error',
+        scope: 'rule',
         ruleIndex: i,
         title: `${blank.length} condition${blank.length === 1 ? ' has' : 's have'} no value`,
         detail: `${blank.map((c) => conditionType(c.typeId).label).join(', ')} — a condition with nothing to compare against can never match, so this rule cannot fire.`,
@@ -190,6 +269,8 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
     if (r.decision === 'deny' && (r.secondFactor === 'specific' || r.rememberMfa || r.allowDisable2fa)) {
       out.push({
         id: `denyfactors-${r.id}`,
+        code: 'PE120',
+        scope: 'rule',
         severity: 'warning',
         ruleIndex: i,
         title: 'Authentication settings on a Deny rule',
@@ -200,6 +281,8 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
     if (r.decision === '2fa' && r.allowDisable2fa) {
       out.push({
         id: `optout-${r.id}`,
+        code: 'PE121',
+        scope: 'rule',
         severity: 'warning',
         ruleIndex: i,
         title: 'Users can opt out of this requirement',
@@ -210,6 +293,8 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
     if (r.decision === '2fa' && r.secondFactor === 'specific' && (r.secondFactorMethods?.length ?? 0) === 0) {
       out.push({
         id: `nomethods-${r.id}`,
+        code: 'PE122',
+        scope: 'rule',
         severity: 'error',
         ruleIndex: i,
         title: 'No second factor chosen',
@@ -228,7 +313,7 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
        purpose is to deny, gated on a hook that fails open, stops denying the
        moment somebody else's service has a bad afternoon — and it does so
        silently, because from the engine's point of view nothing went wrong. */
-    for (const c of r.conditions.filter((x) => x.typeId === 'webhook')) {
+    for (const c of leaves(r.when).filter((x) => x.typeId === 'webhook')) {
       const id = c.values[0]
       if (!id) continue
       const hook = hooks.find((h) => h.id === id)
@@ -236,6 +321,8 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
       if (!hook) {
         out.push({
           id: `hookgone-${r.id}-${c.id}`,
+        code: 'PE130',
+        scope: 'rule',
           severity: 'error',
           ruleIndex: i,
           title: 'This rule calls a hook that no longer exists',
@@ -247,6 +334,8 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
       if (r.decision === 'deny' && hook.onFailure === 'fail-open') {
         out.push({
           id: `hookopen-${r.id}-${c.id}`,
+        code: 'PE131',
+        scope: 'rule',
           severity: 'warning',
           ruleIndex: i,
           title: 'This rule stops denying when the hook is unavailable',
@@ -257,6 +346,8 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
       if (r.decision !== 'deny' && hook.onFailure === 'fail-closed') {
         out.push({
           id: `hookclosed-${r.id}-${c.id}`,
+        code: 'PE132',
+        scope: 'rule',
           severity: 'warning',
           ruleIndex: i,
           title: 'An outage at the hook locks these users out',
@@ -267,6 +358,8 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
       if (hook.timeoutMs > SLOW_TIMEOUT_MS) {
         out.push({
           id: `hookslow-${r.id}-${c.id}`,
+        code: 'PE133',
+        scope: 'rule',
           severity: 'warning',
           ruleIndex: i,
           title: 'This rule can add most of a second to a sign-in',
@@ -280,10 +373,12 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
        conditions and an audience covering this one will always match first.
        An earlier rule *with* conditions might not fire, so it is left alone —
        guessing there would produce warnings on correct policies. */
-    const blocker = rules.findIndex((e, j) => j < i && isCatchAll(e) && audienceCovers(e, r))
+    const blocker = rules.findIndex((e, j) => j < i && isCatchAll(e))
     if (blocker !== -1) {
       out.push({
         id: `unreachable-${r.id}`,
+        code: 'PE103',
+        scope: 'rule',
         severity: 'error',
         ruleIndex: i,
         relatedIndex: blocker,
@@ -293,40 +388,44 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
     }
 
     /* --- Contradictory conditions -------------------------------------------
-       Same field asserted and denied on the same value, joined by AND. Only
-       checked across an unbroken run of ANDs: once an OR appears the group can
-       still be satisfied by the other side. */
-    for (let a = 0; a < r.conditions.length; a++) {
-      for (let b = a + 1; b < r.conditions.length; b++) {
-        const ca = r.conditions[a]
-        const cb = r.conditions[b]
-        if (ca.typeId !== cb.typeId) continue
-        // Every joiner between them must be AND for both to be required.
-        const allAnd = r.conditions.slice(a + 1, b + 1).every((c) => c.joiner === 'AND')
-        if (!allAnd) continue
+       Same field asserted and denied on the same value, inside one card.
 
-        const overlap = ca.values.filter((v) => cb.values.includes(v))
-        const opposed = NEGATIONS[cb.operator] === ca.operator || NEGATIONS[ca.operator] === cb.operator
+       "Inside one card" is the whole test, and it is free. The old model had to
+       walk the joiners between two positions and prove every one of them was an
+       AND before it could claim both conditions were required; a card IS that
+       proof. Two conditions in different cards are alternatives and contradict
+       nothing. */
+    for (const k of r.when.cards) {
+      for (let a = 0; a < k.conditions.length; a++) {
+        for (let b = a + 1; b < k.conditions.length; b++) {
+          const ca = k.conditions[a]
+          const cb = k.conditions[b]
+          if (ca.typeId !== cb.typeId) continue
 
-        if (opposed && overlap.length > 0) {
-          out.push({
-            id: `contradiction-${r.id}-${a}-${b}`,
-            severity: 'error',
-            ruleIndex: i,
-            title: 'These conditions cancel out',
-            detail: `${conditionType(ca.typeId).label} is required to be both “${ca.operator} ${overlap.join(', ')}” and “${cb.operator} ${overlap.join(', ')}”. Nothing can satisfy both, so this rule never matches.`,
-          })
-        } else if (
-          ca.operator === cb.operator &&
-          JSON.stringify(ca.values) === JSON.stringify(cb.values)
-        ) {
-          out.push({
-            id: `duplicate-${r.id}-${a}-${b}`,
-            severity: 'info',
-            ruleIndex: i,
-            title: 'Duplicate condition',
-            detail: `${conditionType(ca.typeId).label} “${ca.operator} ${ca.values.join(', ')}” is listed twice. The second one changes nothing.`,
-          })
+          const overlap = ca.values.filter((v) => cb.values.includes(v))
+          const opposed = NEGATIONS[cb.operator] === ca.operator || NEGATIONS[ca.operator] === cb.operator
+
+          if (opposed && overlap.length > 0) {
+            out.push({
+              id: `contradiction-${r.id}-${ca.id}-${cb.id}`,
+              code: 'PE111',
+              scope: 'rule',
+              severity: 'error',
+              ruleIndex: i,
+              title: 'These conditions cancel out',
+              detail: `${conditionType(ca.typeId).label} is required to be both “${ca.operator} ${overlap.join(', ')}” and “${cb.operator} ${overlap.join(', ')}” in the same alternative. Nothing can satisfy both.`,
+            })
+          } else if (ca.operator === cb.operator && JSON.stringify(ca.values) === JSON.stringify(cb.values)) {
+            out.push({
+              id: `duplicate-${r.id}-${ca.id}-${cb.id}`,
+              code: 'PE112',
+              scope: 'rule',
+              severity: 'info',
+              ruleIndex: i,
+              title: 'Duplicate condition',
+              detail: `${conditionType(ca.typeId).label} “${ca.operator} ${ca.values.join(', ')}” is listed twice in the same alternative. The second one changes nothing.`,
+            })
+          }
         }
       }
     }
@@ -335,10 +434,12 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
        Reported on the cause rather than each victim: fixing the one rule fixes
        all of them, so one actionable warning beats five identical ones. */
     if (isCatchAll(r) && i < rules.length - 1) {
-      const shadowed = rules.filter((o, j) => j > i && audienceCovers(r, o)).length
+      const shadowed = rules.filter((_, j) => j > i).length
       if (shadowed > 0) {
         out.push({
           id: `catchall-${r.id}`,
+        code: 'PE104',
+        scope: 'rule',
           severity: 'warning',
           ruleIndex: i,
           title: `Shadows ${shadowed} rule${shadowed === 1 ? '' : 's'} below it`,
@@ -351,6 +452,8 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
     if (!r.enabled) {
       out.push({
         id: `disabled-${r.id}`,
+        code: 'PE140',
+        scope: 'rule',
         severity: 'info',
         ruleIndex: i,
         title: 'Switched off',
@@ -362,6 +465,8 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
     if (r.enabled && r.matchEstimate === 0) {
       out.push({
         id: `empty-${r.id}`,
+        code: 'PE141',
+        scope: 'rule',
         severity: 'warning',
         ruleIndex: i,
         title: 'Matches nobody today',
@@ -369,21 +474,6 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
       })
     }
 
-    /* --- Audience with no members ------------------------------------------- */
-    if (!r.appliesTo.includes('all')) {
-      const empty = r.appliesTo.filter((g) => (groups.find((x) => x.id === g)?.memberCount ?? 0) === 0)
-      if (empty.length > 0) {
-        out.push({
-          id: `emptygroup-${r.id}`,
-          severity: 'warning',
-          ruleIndex: i,
-          title: 'Targets an empty group',
-          detail: `${empty
-            .map((g) => groups.find((x) => x.id === g)?.name ?? g)
-            .join(', ')} has no members, so this rule cannot apply to anyone through it.`,
-        })
-      }
-    }
   })
 
   return out
@@ -399,7 +489,7 @@ export function diagnose(policy: Policy, groups: Group[], hooks: Hook[] = seedHo
    -------------------------------------------------------------------------- */
 
 export interface Impact {
-  /** Exact: total membership of the groups this rule targets. Its ceiling. */
+  /** Exact: how many people the POLICY governs. Every rule's ceiling. */
   audience: number
   /** Estimate: how many of them this rule is expected to match. */
   matches: number
@@ -419,32 +509,36 @@ export interface Impact {
   basis: 'exact' | 'estimate' | 'stale'
 }
 
-export function impactOf(policy: Policy, index: number, groups: Group[], saved?: Policy): Impact {
+export function impactOf(
+  policy: Policy,
+  index: number,
+  groups: Group[],
+  saved?: Policy,
+  directory: User[] = seedUsers,
+): Impact {
   const rule = policy.rules[index]
-  const audience = rule.appliesTo.includes('all')
-    ? groups.reduce((n, g) => (g.id === 'all' ? Math.max(n, g.memberCount) : n), 0) ||
-      groups.reduce((n, g) => n + g.memberCount, 0)
-    : rule.appliesTo.reduce((n, g) => n + (groups.find((x) => x.id === g)?.memberCount ?? 0), 0)
+  /* The ceiling is the POLICY's audience now, not the rule's. Every rule
+     inherits it and no rule can be broader, so a per-rule number would be
+     answering a question the model no longer asks. */
+  const audience = reach(policy.audience, groups, directory)
 
-  /* Structural, not statistical: the next enabled rule whose audience overlaps
-     this one is exactly who inherits these sign-ins. */
-  const nextIdx = policy.rules.findIndex(
-    (r, j) =>
-      j > index &&
-      r.enabled &&
-      (r.appliesTo.includes('all') ||
-        rule.appliesTo.includes('all') ||
-        r.appliesTo.some((g) => rule.appliesTo.includes(g))),
-  )
+  /* Structural, not statistical: the next enabled rule is exactly who inherits
+     these sign-ins. There is no audience test left to make here — every rule in
+     a policy covers the same people, which is precisely what hoisting the
+     audience bought. */
+  const nextIdx = policy.rules.findIndex((r, j) => j > index && r.enabled)
   const next = nextIdx === -1 ? null : policy.rules[nextIdx]
 
   /* No conditions means every one of them matches — that is arithmetic, not an
      estimate, so it is reported as a fact. */
-  const exact = rule.conditions.length === 0
+  const exact = matchesEverything(rule.when)
   const before = saved?.rules.find((r) => r.id === rule.id)
-  const edited =
-    !!before &&
-    JSON.stringify(before.conditions.map(ckey)) !== JSON.stringify(rule.conditions.map(ckey))
+  /* `sig` rather than a positional list, and the difference is load-bearing:
+     the old compare was order-sensitive on a flat array, so it could not see a
+     pure REGROUPING — the same conditions moved between alternatives, which is
+     a different rule catching different people. That is the exact failure the
+     `stale` basis exists to catch. */
+  const edited = !!before && sig(before.when) !== sig(rule.when)
 
   const matches = exact ? audience : rule.matchEstimate
 

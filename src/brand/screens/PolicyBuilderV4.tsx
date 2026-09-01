@@ -1,22 +1,22 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  ChevronDown,
   ClipboardCheck,
   Command,
   Copy,
   CopyPlus,
-  Eye,
   FileDown,
   Grid3x3,
-  LayoutList,
-  ListChecks,
+  Info,
   ListOrdered,
+  MoreHorizontal,
   Plus,
   Redo2,
-  Rocket,
   ScrollText,
   Sparkles,
   Swords,
@@ -24,20 +24,23 @@ import {
   Trash2,
   GraduationCap,
   Undo2,
+  Users,
   Wand2,
-  X,
-  type LucideIcon,
+  XCircle,
 } from 'lucide-react'
 
-import { Button, IconButton, MenuButton, Tip, TipDot, Toggle, type MenuItem } from '../kit'
-import { blankRule, type Policy, type Rule } from '../data'
-import { useBrand } from '../store'
+import { Button, Counter, DecisionChip, IconButton, MenuButton, Tip, Toggle, type MenuItem } from '../kit'
+import { Picker } from '../picker'
+import { blankRule, reach, type Audience, type Policy, type Rule } from '../data'
+import { useBrand, useNameLookup } from '../store'
+import { AudienceBar, AudienceDrawer } from './audience-drawer'
+import { predicateSummary, ruleSentence } from './predicate-prose'
 import { AssignAppsDialog, CopyRuleDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
 import { DecisionLogDialog, TestPolicyDialog } from './builder-test'
 import { describeChanges } from './changes'
 import { CommandBar, baseCommands } from './command-bar'
 import { diagnose, shadowedBy } from './diagnostics'
-import { tourSeen, type Stop } from '../tour/tour-stops'
+import { tourSeen } from '../tour/tour-stops'
 
 /* Both are mounted only while they are open, and both are the whole reason the
    builder's chunk was carrying the create flow and six animated figures it does
@@ -49,24 +52,22 @@ const LearnPanel = lazy(() => import('../tour/LearnPanel').then((m) => ({ defaul
 import { FlowRail } from './flow-rail'
 import { canRedo, canUndo, commit, historyKey, historyOf, redo, undo, type History } from './history'
 import { PolicyOverview } from './overview'
-import { Readiness } from './readiness'
 import { ReviewStep } from './review-step'
 import { applyFix } from './gauntlet'
 import { GauntletDialog, GauntletPip } from './gauntlet-dialog'
 import { ImpactArenaDialog, ImpactPip } from './impact-arena-dialog'
 import {
-  AudienceSection,
-  ChecksSection,
   DEC_KEY,
   DEFAULT_PREVIEW,
-  IfSection,
   PREVIEW_CAVEAT,
-  PreviewPanel,
   ThenSection,
+  WhenSection,
   previewContext,
+  ruleState,
   type PreviewState,
 } from './rule-form'
-import type { SimEnv } from './simulate'
+import { DEVICE_OPTIONS, PLACES, RISKS, SIM_USERS, evalRule, walk, type SimEnv } from './simulate'
+import type { Diagnostic } from './diagnostics'
 
 /* -----------------------------------------------------------------------------
    Policy builder v4 — the trail.
@@ -99,35 +100,17 @@ import type { SimEnv } from './simulate'
    them.
    -------------------------------------------------------------------------- */
 
-type StepId = 'who' | 'when' | 'then' | 'check' | 'review'
-type StepState = 'ok' | 'warn' | 'error' | 'idle'
-type SlideId = 'preview' | 'review' | 'launch'
+/* Two stages, not five steps.
 
-/* The side panel's three faces. One slider, three things to put in it — the
-   answer to "what would this do", the answer to "is it safe to ship", and the
-   act of shipping. */
-const SLIDES: { id: SlideId; label: string; title: string; icon: LucideIcon }[] = [
-  { id: 'preview', label: 'Preview', title: 'Live preview', icon: Eye },
-  { id: 'review', label: 'Review', title: 'Ready to publish', icon: ListChecks },
-  { id: 'launch', label: 'Launch', title: 'Launch', icon: Rocket },
-]
+   `rules` is where the work happens: an ordered list of rule cards, one open at
+   a time, each showing its When and its Then together. `review` is the policy's
+   own final stage — the linter, the gauntlet, the blast radius and the ship
+   button — entered once, when the rules are done.
 
-type Step = { id: StepId; label: string; title: string; hint?: string }
-
-const ALL_STEPS: Step[] = [
-  { id: 'who', label: 'Who', title: 'Who it applies to' },
-  { id: 'when', label: 'When', title: 'When it applies' },
-  { id: 'then', label: 'Then', title: 'What happens' },
-  { id: 'check', label: 'Check', title: 'Checks & impact' },
-  { id: 'review', label: 'Review', title: 'Review & publish' },
-]
-
-/* The trail is built from the edition rather than filtered at every use site.
-   Half the file walks STEPS by index — next, back, "step 3 of 5" — and an array
-   with holes in it would need every one of those to learn about the holes. */
-function stepsFor(f: { checkStep: boolean; reviewStep: boolean }): Step[] {
-  return ALL_STEPS.filter((s) => (s.id === 'check' ? f.checkStep : s.id === 'review' ? f.reviewStep : true))
-}
+   The five-step trail this replaces made a rule feel like a form to be walked,
+   and put Check and Review inside a rule when both are questions about the
+   whole policy. */
+type Stage = 'rules' | 'review'
 
 /* The flow is wider than a list rail needs to be, because it is a diagram: v1's
    canvas earned that width and this is the same drawing. Draggable from there,
@@ -139,56 +122,20 @@ const TRAIL_MIN = 560
 const clampFlow = (want: number, avail: number) =>
   Math.min(FLOW_MAX, Math.max(FLOW_MIN, Math.min(want, Math.max(FLOW_MIN, avail - TRAIL_MIN))))
 
-/* Which step owns which diagnostic. A finding that appears on the step where it
-   can be fixed is a finding somebody acts on. */
-const STEP_OF: Record<string, StepId> = {
-  emptygroup: 'who',
-  blank: 'when',
-  contradiction: 'when',
-  duplicate: 'when',
-  catchall: 'when',
-  mixed: 'when',
-  empty: 'when',
-  dupe: 'when',
-  subsumed: 'when',
-  unreachable: 'when',
-  denyfactors: 'then',
-  optout: 'then',
-  nomethods: 'then',
-  disabled: 'check',
-  /* A condition naming a hook that no longer exists is fixed where conditions
-     are edited. */
-  hookgone: 'when',
-  /* The other two hook findings are a mismatch between the rule's OUTCOME and
-     the hook's failure behaviour, so Then is where one half of the fix lives —
-     the other half is on the hook itself, which is why the message names it.
-
-     `hookslow` is deliberately absent: nothing on this rule fixes a slow
-     endpoint, so it belongs to Check alone rather than being routed to a step
-     that cannot act on it. Check sees every finding regardless of mapping. */
-  hookopen: 'then',
-  hookclosed: 'then',
-}
-
 export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: 'gauntlet' | 'impact' }) {
   const store = useBrand()
-  const reduce = useReducedMotion()
   const saved = store.policyById(policyId)
 
   const [hist, setHist] = useState<History>(() => historyOf(saved ?? ({} as Policy)))
   const [selected, setSelected] = useState(0)
-  const [step, setStep] = useState<StepId>('who')
-  const [together, setTogether] = useState(false)
-  const [slide, setSlide] = useState<SlideId | null>(null)
-  const [ifView, setIfView] = useState<'build' | 'check'>('build')
+  const [stage, setStage] = useState<Stage>('rules')
+  const [audienceOpen, setAudienceOpen] = useState(false)
   const [live, setLive] = useState('')
   const [pv, setPv] = useState<PreviewState>(DEFAULT_PREVIEW)
   const [hoverShadow, setHoverShadow] = useState<number | null>(null)
   const [cmd, setCmd] = useState(false)
   const [overview, setOverview] = useState(false)
   const features = store.features
-  /* One array, derived once. Everything downstream indexes into it. */
-  const STEPS = useMemo(() => stepsFor(features), [features])
   const [interview, setInterview] = useState(false)
   const [tour, setTour] = useState(false)
   const [learn, setLearn] = useState(false)
@@ -196,7 +143,7 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
     open ?? null,
   )
 
-  const stage = useRef<HTMLDivElement | null>(null)
+  const stageEl = useRef<HTMLDivElement | null>(null)
   const work = useRef<HTMLDivElement | null>(null)
 
   /* --- The flow's width, dragged. v1's grammar ---------------------------------
@@ -284,6 +231,13 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
     if (saved) setHist(historyOf(saved))
   }, [saved?.id])
 
+  /* Switching to lite while the review stage is open would leave somebody on a
+     screen the edition says does not exist, with the only way back being a
+     button that has just been re-labelled. */
+  useEffect(() => {
+    if (!features.reviewStep) setStage('rules')
+  }, [features.reviewStep])
+
   /* Registered above the early return, so the hook count cannot depend on
      whether the policy still exists. */
   useEffect(() => {
@@ -317,6 +271,7 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
   )
 
   const ctx = useMemo(() => previewContext(pv), [pv])
+  const resolve = useNameLookup()
   const draft = hist.present
 
   if (!saved || !draft.id) {
@@ -330,58 +285,30 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
   const rules = draft.rules
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft)
   const changes = dirty ? describeChanges(saved, draft) : []
-  const diagnostics = diagnose(draft, store.groups, store.hooks)
+  const diagnostics = diagnose(draft, store.groups, store.hooks, store.users)
   const index = Math.min(selected, Math.max(0, rules.length - 1))
   const rule: Rule | undefined = rules[index]
-  const mine = diagnostics.filter((d) => d.ruleIndex === index)
 
   const patch = (p: Partial<Policy>) => setHist((h) => commit(h, { ...h.present, ...p }))
-  const patchRule = (p: Partial<Rule>) => patch({ rules: rules.map((r, n) => (n === index ? { ...r, ...p } : r)) })
+  const patchRuleAt = (at: number, p: Partial<Rule>) =>
+    patch({ rules: rules.map((r, n) => (n === at ? { ...r, ...p } : r)) })
 
-  const blockers = diagnostics.filter((d) => d.severity === 'error' && rules[d.ruleIndex]?.enabled !== false).length
+  const blockers = diagnostics.filter(
+    (d) => d.severity === 'error' && (d.scope === 'policy' || rules[d.ruleIndex]?.enabled !== false),
+  ).length
+
+  /* One walk, feeding both the docked tester's verdict and the highlight on the
+     card that carried the match. It is the same evaluator every other surface
+     answers through, so the builder cannot disagree with the test dialog. */
+  const trace = walk(draft, ctx, env)
+  const hitCard = trace.hitIndex === index ? (evalRule(rules[index], ctx, env).card ?? null) : null
   const shadowed = hoverShadow === null ? [] : shadowedBy(draft, hoverShadow)
-
-  /* Derived, never awarded. A step is clear because nothing is wrong with it
-     right now, and it goes back to unclear the moment something is. */
-  /* Which diagnostics a step is answerable for. Check is the step that reports,
-     so it sees all of them; every other step sees only the ones it can fix. */
-  const diagsFor = (id: StepId) =>
-    id === 'check' ? mine : mine.filter((d) => STEP_OF[d.id.split('-')[0]] === id)
-
-  const stateOf = (id: StepId): StepState => {
-    /* Green is only ever earned, and only here: a policy with nothing left to
-       fix and nothing waiting to ship. Painting every untouched step green on
-       arrival is awarding a state rather than deriving one, and it makes the
-       one green that means something impossible to see. */
-    if (id === 'review') return blockers > 0 ? 'error' : dirty ? 'warn' : 'ok'
-    if (!rule) return 'idle'
-    const scoped = diagsFor(id)
-    if (scoped.some((d) => d.severity === 'error')) return 'error'
-    if (scoped.some((d) => d.severity === 'warning')) return 'warn'
-    return 'idle'
-  }
-
-  /* A badge and the chip around it must not disagree about how bad something
-     is. Both are read from the same diagnostics. */
-  const badgeTone = (id: StepId) => {
-    const scoped = diagsFor(id)
-    if (scoped.some((d) => d.severity === 'error')) return 'is-bad'
-    if (scoped.some((d) => d.severity === 'warning')) return 'is-warn'
-    return ''
-  }
-
-  const stepIndex = STEPS.findIndex((s) => s.id === step)
-  const goStep = (id: StepId) => {
-    setStep(id)
-    setTogether(false)
-    stage.current?.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
-  }
 
   const addRule = (at = rules.length) => {
     const r = blankRule(`Rule ${rules.length + 1}`)
     patch({ rules: [...rules.slice(0, at), r, ...rules.slice(at)] })
     setSelected(at)
-    setStep('who')
+    setStage('rules')
     setLive(`Rule added at position ${at + 1}`)
   }
 
@@ -400,8 +327,7 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
     setDialog(null)
     setCmd(false)
     setOverview(false)
-    if (step === 'review') setStep(features.checkStep ? 'check' : 'then')
-    stage.current?.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
+    setStage('rules')
   }
 
   const duplicate = () => {
@@ -447,16 +373,6 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
     { id: 'learn', label: 'Learn the builder', icon: GraduationCap, hint: 'The tour, and five guides', divide: true },
   ]
 
-  const ruleItems: MenuItem[] = [
-    { id: 'add', label: 'Add a rule below', icon: Plus },
-    { id: 'duplicate', label: 'Duplicate', icon: Copy, hint: 'Below this one, in this policy' },
-    /* Gap 3 in the framework doc. Sits beside Duplicate because they are the
-       same gesture aimed at two places, and separating them would make the
-       admin who wants the second one go looking for a different menu. */
-    { id: 'copy', label: 'Copy to another policy…', icon: CopyPlus, hint: 'An independent copy' },
-    { id: 'delete', label: 'Delete', icon: Trash2, danger: true, divide: true },
-  ]
-
   const onAction = (id: string) => {
     if (id === 'add') return addRule(index + 1)
     if (id === 'duplicate') return duplicate()
@@ -498,18 +414,39 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
           <IconButton icon={Undo2} label="Undo" size="sm" tone="ghost" disabled={!canUndo(hist)} onClick={() => setHist(undo)} />
           <IconButton icon={Redo2} label="Redo" size="sm" tone="ghost" disabled={!canRedo(hist)} onClick={() => setHist(redo)} />
           <MenuButton label="Policy" items={policyItems} onSelect={onAction} />
-          {/* One primary per view. On the Review step the primary is the
+          {/* One primary per view. In the review stage the primary is the
               Publish button at the end of the checks, so this one stands down
-              rather than competing with it. */}
-          {/* The publish gate. In lite there is no Review step to send anyone
-              to, and v0 commits from Review & Save in the Policy menu. */}
-          {features.publish && step !== 'review' && (
-            <Button variant="secondary" disabled={!rule && rules.length === 0} onClick={() => goStep('review')}>
+              rather than competing with it. In lite there is no review stage to
+              send anyone to; v0 commits from Review & Save in the Policy menu. */}
+          {features.publish && stage !== 'review' && (
+            <Button variant="secondary" disabled={rules.length === 0} onClick={() => setStage('review')}>
               {blockers > 0 ? `${blockers} to fix` : 'Review & publish'}
             </Button>
           )}
         </div>
       </header>
+
+      {/* --- Who this policy governs. -----------------------------------------
+
+          Not a step. A step implies you set it and move on; this is a standing
+          fact every rule inherits, and the single biggest claim the policy
+          makes — so it sits where it is always readable rather than behind a
+          chip you have to remember to revisit. */}
+      <div className="bf__pol" data-tour="audience">
+        <span className="u-label">Applies to</span>
+        <AudienceBar audience={draft.audience} groups={store.groups} users={store.users} />
+        <Counter value={reach(draft.audience, store.groups, store.users)} /> people
+        <button type="button" className="bf__poledit" onClick={() => setAudienceOpen(true)}>
+          <Users size={12} strokeWidth={2} aria-hidden />
+          Edit
+        </button>
+        {narrow && (
+          <button type="button" className="bf__flowbtn" aria-expanded={flowOpen} onClick={() => setFlowOpen((v) => !v)}>
+            <ListOrdered size={13} strokeWidth={1.9} aria-hidden />
+            <span>{rules.length}</span>
+          </button>
+        )}
+      </div>
 
       <div
         className={`bf__work ${narrow ? 'is-narrow' : ''} ${flowOpen ? 'is-flowopen' : ''}`}
@@ -564,309 +501,204 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
 
         {/* --- Middle: the trail --------------------------------------------- */}
         <main className="bf__main">
-          <nav className="bf__trail" aria-label="Steps" data-tour="trail">
-            {/* Only where the flow is a drawer. On a wide window the sequence is
-                already on screen and a button to reveal it would be a lie. */}
-            {narrow && (
-              <button
-                type="button"
-                className="bf__flowbtn"
-                aria-expanded={flowOpen}
-                onClick={() => setFlowOpen((v) => !v)}
-              >
-                <ListOrdered size={14} strokeWidth={1.9} aria-hidden />
-                <span>{rules.length}</span>
+          {/* --- The rules, or the review. Two scopes, drawn as two scopes. ---
+
+              There was a five-step trail here — Who, When, Then, Check, Review
+              — and it is gone. Who is a property of the policy, so it is in the
+              header above. Check and Review are about the whole policy, so they
+              are one stage at the end. What is left is a rule, and a rule is
+              one card that shows its When and its Then together, which is what
+              "figma style when and then" means: a conditional is a thing that
+              contains its branches, not a wizard you walk. */}
+          {stage === 'review' ? (
+            <div className="bf__reviewstage" ref={stageEl}>
+              <button type="button" className="bf__backrules" onClick={() => setStage('rules')}>
+                <ArrowLeft size={13} strokeWidth={2} aria-hidden />
+                Back to rules
               </button>
-            )}
-
-            {STEPS.map((s, i) => {
-              const st = stateOf(s.id)
-              const locked = s.id === 'review' && rules.length === 0
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  className={`bf__step is-${st} ${step === s.id && !together ? 'is-on' : ''}`}
-                  aria-current={step === s.id && !together ? 'step' : undefined}
-                  disabled={locked || (!rule && s.id !== 'review')}
-                  onClick={() => goStep(s.id)}
-                >
-                  <span className="bf__stepn">{i + 1}</span>
-                  <span className="bf__steplabel">{s.label}</span>
-                  {/* The When badge counts conditions, not problems — it is the
-                      one badge here that is content rather than severity, so it
-                      stays neutral and lets the chip carry the state. */}
-                  {s.id === 'when' && rule && rule.conditions.length > 0 && <em>{rule.conditions.length}</em>}
-                  {s.id === 'check' && mine.length > 0 && <em className={badgeTone('check')}>{mine.length}</em>}
-                  {s.id === 'review' && blockers > 0 && <em className="is-bad">{blockers}</em>}
-                </button>
-              )
-            })}
-
-            <span className="bf__trailend">
-              <button
-                type="button"
-                className={`bf__together ${together ? 'is-on' : ''}`}
-                aria-pressed={together}
-                onClick={() => setTogether((v) => !v)}
-                disabled={!rule}
-              >
-                <LayoutList size={13} strokeWidth={2} aria-hidden />
-                {together ? 'One at a time' : 'All together'}
-              </button>
-
-              {/* The three panel toggles live at the top right, on the side the
-                  panel comes in from. They used to sit loose under the form,
-                  which pointed at nothing. */}
-              {/* Icon only. Three labelled buttons here read as three more
-                  things to do; the panel they open says its own name in its
-                  header, and the tooltip carries it before you click. */}
-              <span className="bf__slidetabs" role="group" aria-label="Side panel" data-tour="panels">
-                {SLIDES.map((s) => (
-                  <Tip key={s.id} text={s.title} placement="bottom">
-                    <button
-                      type="button"
-                      className={slide === s.id ? 'is-on' : ''}
-                      aria-pressed={slide === s.id}
-                      aria-label={s.title}
-                      onClick={() => setSlide(slide === s.id ? null : s.id)}
-                    >
-                      <s.icon size={14} strokeWidth={1.9} aria-hidden />
-                    </button>
-                  </Tip>
-                ))}
-              </span>
-            </span>
-          </nav>
-
-          <div className="bf__stage" ref={stage} data-tour="stage">
-            {!rule ? (
-              <div className="bf__blank">
-                <Sparkles size={22} strokeWidth={1.6} aria-hidden />
-                <h2>This policy has no rules</h2>
-                <p>Every sign-in falls through to the engine default until there is one.</p>
-                <div className="bf__blankacts">
-                  {/* Offered first, because an empty builder is exactly where
-                      somebody who has not met an ordered rule list is stuck. */}
-                  {features.guidedSetup && (
-                    <Button variant="primary" icon={Wand2} onClick={() => setInterview(true)}>
-                      Guided setup
-                    </Button>
-                  )}
-                  <Button icon={Plus} onClick={() => addRule()}>
-                    Add the first rule
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* The rule's own identity, once, at the top of the stage —
-                    where the old form spent 156px and a whole section on it.
-                    Review is about the policy, so the rule's name is not its
-                    heading. */}
-                <div className="bf__rulehead" hidden={step === 'review' && !together}>
-                  <span className={`bf__ruleno is-${DEC_KEY[rule.decision]}`}>{index + 1}</span>
-                  <input
-                    className="bf__ruleName"
-                    aria-label="Rule name"
-                    value={rule.name}
-                    onChange={(e) => patchRule({ name: e.target.value })}
-                  />
-                  <label className="bf__ruleon">
-                    <Toggle checked={rule.enabled} onChange={(v) => patchRule({ enabled: v })} label={`Enable ${rule.name}`} size="sm" />
-                    <span>{rule.enabled ? 'On' : 'Off'}</span>
-                  </label>
-                  {/* Rule-scoped actions, on the rule. In the top bar they had
-                      to say "this rule" to be unambiguous, and sat next to
-                      policy-wide ones that could not be undone by the same
-                      gesture. */}
-                  <MenuButton label="⋯" items={ruleItems} onSelect={onAction} size="sm" align="end" />
-                </div>
-
-                {/* The rationale, under the name rather than beside it.
-
-                    Borderless until focused, so an empty one is an invitation
-                    and a filled one reads as a caption rather than as a form
-                    control. That matters more here than anywhere else the field
-                    appears: the head above it is one line by design, and giving
-                    "why" a boxed input would put it on a level with the rule's
-                    own name and cost the row the compactness it was built for. */}
-                <textarea
-                  className="bf__rulewhy"
-                  hidden={step === 'review' && !together}
-                  aria-label="Why this rule exists"
-                  rows={1}
-                  placeholder="Why does this rule exist? The next person will read this before changing it."
-                  value={rule.description ?? ''}
-                  onChange={(e) => patchRule({ description: e.target.value })}
-                />
-
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.div
-                    key={together ? 'all' : step}
-                    initial={{ opacity: 0, x: reduce ? 0 : 12 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: reduce ? 0 : -12 }}
-                    transition={{ duration: reduce ? 0 : 0.18, ease: [0.2, 0, 0, 1] }}
-                    className="bf__panel"
-                  >
-                    {together ? (
-                      /* Every step at once, still editable. The trail is for
-                         doing the work in order; this is for seeing whether the
-                         whole rule says what you meant. */
-                      <>
-                        <AudienceSection rule={rule} onPatch={patchRule} n={1} />
-                        <IfWrapper rule={rule} ifView={ifView} setIfView={setIfView} ctx={ctx} env={env} onPatch={patchRule} full />
-                        <ThenSection rule={rule} onPatch={patchRule} n={3} />
-                        <ChecksSection policy={draft} index={index} env={env} diagnostics={mine} onJump={jump} n={4} />
-                      </>
-                    ) : step === 'who' ? (
-                      <AudienceSection rule={rule} onPatch={patchRule} bare />
-                    ) : step === 'when' ? (
-                      <IfWrapper rule={rule} ifView={ifView} setIfView={setIfView} ctx={ctx} env={env} onPatch={patchRule} />
-                    ) : step === 'then' ? (
-                      <ThenSection rule={rule} onPatch={patchRule} bare />
-                    ) : step === 'check' ? (
-                      <ChecksSection policy={draft} index={index} env={env} diagnostics={mine} onJump={jump} bare />
-                    ) : (
-                      <ReviewStep
-                        draft={draft}
-                        saved={saved}
-                        env={env}
-                        onJump={jump}
-                        onOpen={(d) => setDialog(d)}
-                        onPublish={(status) => {
-                          /* The status is patched into the draft rather than
-                             saved alongside it, so the builder's own dirty
-                             check and the undo stack see the same policy the
-                             store does. */
-                          const shipped = { ...draft, status }
-                          patch({ status })
-                          store.savePolicy(shipped)
-                          store.showToast(
-                            status === 'monitor'
-                              ? `${draft.name} is monitoring — evaluating every sign-in, enforcing nothing`
-                              : `${draft.name} published and enforcing`,
-                          )
-                        }}
-                      />
+              <ReviewStep
+                draft={draft}
+                saved={saved}
+                env={env}
+                onJump={jump}
+                onOpen={(d) => setDialog(d)}
+                onPublish={(status) => {
+                  const shipped = { ...draft, status }
+                  patch({ status })
+                  store.savePolicy(shipped)
+                  store.showToast(
+                    status === 'monitor'
+                      ? `${draft.name} is monitoring — evaluating every sign-in, enforcing nothing`
+                      : `${draft.name} published and enforcing`,
+                  )
+                }}
+              />
+            </div>
+          ) : (
+            <div className="bf__stage" ref={stageEl} data-tour="stage">
+              {rules.length === 0 ? (
+                <div className="bf__blank">
+                  <Sparkles size={22} strokeWidth={1.6} aria-hidden />
+                  <h2>This policy has no rules</h2>
+                  <p>Every sign-in falls through to the engine default until there is one.</p>
+                  <div className="bf__blankacts">
+                    {features.guidedSetup && (
+                      <Button variant="primary" icon={Wand2} onClick={() => setInterview(true)}>
+                        Guided setup
+                      </Button>
                     )}
-                  </motion.div>
-                </AnimatePresence>
-
-              </>
-            )}
-          </div>
-
-          {/* --- The footer. One bar, docked.
-
-              The unsaved-changes bar used to float over this one — two bars
-              arguing for the same strip of screen, one of them on top of the
-              other. There is one bar now: it carries the step navigation, and
-              when there is something unsaved it says what changed and offers to
-              throw it away, in the place you were already looking. ---------- */}
-          {rule && (
-            <footer className={`bf__stepnav ${dirty ? 'is-dirty' : ''}`}>
-              {!together && (
-                <Button
-                  variant="ghost"
-                  icon={ArrowLeft}
-                  disabled={stepIndex === 0}
-                  onClick={() => goStep(STEPS[Math.max(0, stepIndex - 1)].id)}
-                >
-                  {stepIndex === 0 ? 'Back' : STEPS[stepIndex - 1].label}
-                </Button>
-              )}
-
-              <span className="bf__stepwhere">
-                {dirty ? (
-                  <>
-                    <b>{changes[0]}</b>
-                    {changes.length > 1 && <i>and {changes.length - 1} more</i>}
-                  </>
-                ) : together ? (
-                  'The whole rule, in one piece'
-                ) : (
-                  `Step ${stepIndex + 1} of ${STEPS.length}`
-                )}
-              </span>
-
-              {dirty && (
-                <Button variant="ghost" onClick={() => setHist(historyOf(saved))}>
-                  Discard
-                </Button>
-              )}
-
-              {together || stepIndex === STEPS.length - 1 ? (
-                <Button variant="primary" iconRight={ArrowRight} onClick={() => goStep('review')}>
-                  Review &amp; publish
-                </Button>
-              ) : (
-                <Button variant="primary" iconRight={ArrowRight} onClick={() => goStep(STEPS[stepIndex + 1].id)}>
-                  {STEPS[stepIndex + 1].label}
-                </Button>
-              )}
-            </footer>
-          )}
-        </main>
-
-        {/* --- The slider ----------------------------------------------------
-            A real column rather than an overlay: it slides in from the right
-            and the trail gives up the width, so nothing you are editing is ever
-            covered by the panel that is describing it. */}
-        <aside className={`bf__slide ${slide ? 'is-open' : ''}`} aria-hidden={!slide}>
-          <div className="bf__slideinner">
-            <header className="bf__slidehead">
-              <strong>{SLIDES.find((s) => s.id === slide)?.title ?? ''}</strong>
-              {slide === 'preview' && <TipDot label="How this preview is calculated" text={PREVIEW_CAVEAT} />}
-              <IconButton icon={X} label="Close the panel" size="sm" tone="ghost" onClick={() => setSlide(null)} />
-            </header>
-
-            <div className="bf__slidebody">
-              {slide === 'preview' && rule && (
-                <PreviewPanel policy={draft} index={index} pv={pv} onPv={setPv} ctx={ctx} env={env} onJump={jump} hideHeading />
-              )}
-              {slide === 'review' && (
-                <Readiness draft={draft} saved={saved} env={env} blockers={blockers} onOpen={setDialog} onJump={jump} />
-              )}
-              {slide === 'launch' && (
-                <div className="bf__launch">
-                  {changes.length > 0 ? (
-                    <>
-                      <h4 className="u-label">What publishing changes</h4>
-                      <ul className="bf__revchanges">
-                        {changes.map((c) => (
-                          <li key={c}>{c}</li>
-                        ))}
-                      </ul>
-                    </>
-                  ) : (
-                    <p className="bf__launchclean">The draft matches what is live. Nothing to publish.</p>
-                  )}
-
-                  <div className="bf__launchacts">
-                    <Button variant="secondary" block onClick={() => goStep('review')}>
-                      Open the full review
-                    </Button>
-                    <Button
-                      variant="primary"
-                      block
-                      disabled={!dirty || blockers > 0}
-                      onClick={() => {
-                        store.savePolicy(draft)
-                        store.showToast(`${draft.name} published`)
-                        setSlide(null)
-                      }}
-                    >
-                      {blockers > 0 ? `${blockers} error${blockers === 1 ? '' : 's'} to fix` : 'Publish this policy'}
+                    <Button icon={Plus} onClick={() => addRule()}>
+                      Add the first rule
                     </Button>
                   </div>
                 </div>
+              ) : (
+                <ol className="bf__rules">
+                  {rules.map((r, i) => (
+                    <RuleCard
+                      key={r.id}
+                      rule={r}
+                      index={i}
+                      open={i === index}
+                      ctx={ctx}
+                      hit={i === index ? hitCard : null}
+                      diagnostics={diagnostics.filter((d) => d.ruleIndex === i)}
+                      features={features}
+                      onOpen={() => jump(i)}
+                      onPatch={(p) => patchRuleAt(i, p)}
+                      onAction={(a) => {
+                        setSelected(i)
+                        onAction(a)
+                      }}
+                      onJump={jump}
+                    />
+                  ))}
+                  <li className="bf__addrule">
+                    <button type="button" onClick={() => addRule()}>
+                      <Plus size={13} strokeWidth={2.4} aria-hidden />
+                      Add a rule
+                    </button>
+                  </li>
+                </ol>
               )}
             </div>
-          </div>
-        </aside>
+          )}
+
+          {/* --- The tester, docked. -------------------------------------------
+
+              This used to be one of three panels taking turns behind an icon in
+              the top right. It is not optional: it is the only writer of the
+              preview context every condition is evaluated against, so hiding it
+              behind a toggle froze the whole builder's answer to "would this
+              match" on a default nobody chose, with nothing on screen saying
+              so. Always on, one line, at the bottom of the work. */}
+          {rules.length > 0 && stage === 'rules' && (
+            <footer className="bf__try" data-tour="try">
+              <span className="u-label">Try it</span>
+              <Picker
+                label="Person"
+                value={pv.userId}
+                options={SIM_USERS.map((u) => ({ value: u.id, label: u.name, meta: u.groupName }))}
+                onChange={(userId) => setPv({ ...pv, userId })}
+              />
+              <em>from</em>
+              <Picker
+                label="Where from"
+                value={pv.place}
+                options={PLACES.map((p) => ({ value: p, label: p }))}
+                onChange={(place) => setPv({ ...pv, place })}
+              />
+              <em>on</em>
+              <Picker
+                label="Device"
+                value={pv.device}
+                options={DEVICE_OPTIONS.map((d) => ({ value: d, label: d }))}
+                onChange={(device) => setPv({ ...pv, device })}
+              />
+              <Picker
+                label="Risk"
+                value={pv.risk}
+                options={RISKS.map((r) => ({ value: r, label: `${r} risk` }))}
+                onChange={(risk) => setPv({ ...pv, risk })}
+              />
+
+              <span className={`bf__tryout is-${DEC_KEY[trace.decision]}`}>
+                {trace.outOfAudience ? (
+                  <>Not governed — this policy does not apply to {ctx.user.name}</>
+                ) : trace.hitIndex === null ? (
+                  <>No rule matched · falls through to the default</>
+                ) : (
+                  <>
+                    Rule {trace.hitIndex + 1} · {rules[trace.hitIndex].name}
+                  </>
+                )}
+              </span>
+
+              <Tip text={PREVIEW_CAVEAT} placement="top">
+                <span className="bf__trynote" aria-label="How this is calculated">
+                  ?
+                </span>
+              </Tip>
+            </footer>
+          )}
+
+          {/* --- One bar, docked. Unsaved changes and the way forward. ------- */}
+          <footer className={`bf__stepnav ${dirty ? 'is-dirty' : ''}`}>
+            <span className="bf__stepwhere">
+              {dirty ? (
+                <>
+                  <b>{changes[0]}</b>
+                  {changes.length > 1 && <i>and {changes.length - 1} more</i>}
+                </>
+              ) : stage === 'review' ? (
+                'Read it back, then ship it'
+              ) : (
+                `${rules.length} rule${rules.length === 1 ? '' : 's'} · evaluated top to bottom, first match wins`
+              )}
+            </span>
+
+            {dirty && (
+              <Button variant="ghost" onClick={() => setHist(historyOf(saved))}>
+                Discard
+              </Button>
+            )}
+
+            {stage === 'rules' ? (
+              features.reviewStep ? (
+                <Button
+                  variant="primary"
+                  iconRight={ArrowRight}
+                  disabled={rules.length === 0}
+                  onClick={() => setStage('review')}
+                >
+                  {blockers > 0 ? `${blockers} to fix` : 'Check & review'}
+                </Button>
+              ) : (
+                /* Lite has no publish gate. v0 commits from Review & Save in
+                   the Policy menu, which is a v0 requirement rather than one of
+                   ours, so the menu keeps it and this stands down. */
+                <Button variant="secondary" onClick={() => setDialog('review')}>
+                  Review &amp; save
+                </Button>
+              )
+            ) : (
+              <Button variant="secondary" icon={ArrowLeft} onClick={() => setStage('rules')}>
+                Keep editing
+              </Button>
+            )}
+          </footer>
+        </main>
       </div>
+
+      <AudienceDrawer
+        open={audienceOpen}
+        audience={draft.audience}
+        groups={store.groups}
+        users={store.users}
+        unlisted={store.unlistedUsers}
+        onClose={() => setAudienceOpen(false)}
+        onApply={(audience: Audience) => patch({ audience })}
+      />
 
       <AnimatePresence>
         {features.commands && cmd && (
@@ -879,14 +711,14 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
               if (id === 'add') return addRule()
               if (id === 'undo') return setHist(undo)
               if (id === 'redo') return setHist(redo)
-              if (id === 'publish') return goStep('review')
+              if (id === 'publish') return setStage('review')
               setDialog(id as typeof dialog)
             }}
           />
         )}
       </AnimatePresence>
 
-      <PolicyOverview open={overview} policy={draft} env={env} diagnostics={diagnostics} onClose={() => setOverview(false)} onJump={jump} />
+      <PolicyOverview open={overview} policy={draft} resolve={resolve} diagnostics={diagnostics} onClose={() => setOverview(false)} onJump={jump} />
 
       {/* Scoped to the builder. The create flow already has guided setup; this
           is for the screen you land on afterwards. */}
@@ -901,11 +733,6 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
           <Tour
             open={tour}
             onClose={() => setTour(false)}
-            onStep={(s) => {
-              setStep(s)
-              setTogether(false)
-            }}
-            onPanel={(p: Stop['panel']) => setSlide(p ?? null)}
             onFinish={() => setDialog('gauntlet')}
           />
         </Suspense>
@@ -917,11 +744,10 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
           <Interview
             open={interview}
             onClose={() => setInterview(false)}
-            onCreate={(built, builtName) => {
-              patch({ rules: built, name: draft.name === 'Untitled policy' ? builtName : draft.name })
+            onCreate={(built, builtName, audience) => {
+              patch({ rules: built, audience, name: draft.name === 'Untitled policy' ? builtName : draft.name })
               setInterview(false)
               setSelected(0)
-              setStep('who')
               store.showToast(`${built.length} rules written — review them before publishing`)
             }}
           />
@@ -977,40 +803,174 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
   )
 }
 
-/* The condition composer owns a picker that has to close when the step changes,
-   so its open state lives with the step rather than with the builder. */
-function IfWrapper({
+/* -----------------------------------------------------------------------------
+   One rule, one card.
+
+   Collapsed it is a row you can scan: order, name, what it decides, what it
+   matches on, and whether anything is wrong with it. Open it is the whole rule
+   — When and Then side by side on a wide window — with the linter's findings
+   about it in a strip at the bottom.
+
+   This is what replaced the five-step trail and the "All together" toggle. The
+   toggle existed to answer "show me this whole rule at once"; the answer is now
+   structural rather than a mode, because a rule IS one card and every part of
+   it is on screen at the same time.
+   -------------------------------------------------------------------------- */
+function RuleCard({
   rule,
-  ifView,
-  setIfView,
+  index,
+  open,
   ctx,
-  env,
+  hit,
+  diagnostics,
+  features,
+  onOpen,
   onPatch,
-  full,
+  onAction,
+  onJump,
 }: {
   rule: Rule
-  ifView: 'build' | 'check'
-  setIfView: (v: 'build' | 'check') => void
+  index: number
+  open: boolean
   ctx: ReturnType<typeof previewContext>
-  env: SimEnv
+  hit: number | null
+  diagnostics: Diagnostic[]
+  features: { checkStep: boolean }
+  onOpen: () => void
   onPatch: (p: Partial<Rule>) => void
-  /** All-together mode keeps the numbered section chrome. */
-  full?: boolean
+  onAction: (id: string) => void
+  onJump: (i: number) => void
 }) {
-  const [adding, setAdding] = useState(false)
+  const reduce = useReducedMotion()
+  const resolve = useNameLookup()
+  const st = ruleState(diagnostics)
+  const errors = diagnostics.filter((d) => d.severity === 'error').length
+
+  const ruleItems: MenuItem[] = [
+    { id: 'add', label: 'Add a rule below', icon: Plus },
+    { id: 'duplicate', label: 'Duplicate', icon: Copy },
+    { id: 'copy', label: 'Copy to another policy…', icon: CopyPlus, hint: 'An independent copy' },
+    { id: 'delete', label: 'Delete', icon: Trash2, danger: true, divide: true },
+  ]
+
   return (
-    <IfSection
-      rule={rule}
-      view={ifView}
-      onView={setIfView}
-      adding={adding}
-      onAdding={setAdding}
-      ctx={ctx}
-      env={env}
-      onPatch={onPatch}
-      bare={!full}
-      n={2}
-    />
+    <li className={`bf__rule ${open ? 'is-open' : ''} ${rule.enabled ? '' : 'is-off'}`}>
+      <div className="bf__rulehead">
+        <span className={`bf__ruleno is-${DEC_KEY[rule.decision]}`}>{index + 1}</span>
+
+        {open ? (
+          <input
+            className="bf__ruleName"
+            aria-label="Rule name"
+            value={rule.name}
+            onChange={(e) => onPatch({ name: e.target.value })}
+          />
+        ) : (
+          <button type="button" className="bf__ruleopen" onClick={onOpen}>
+            <strong>{rule.name}</strong>
+            <em>{predicateSummary(rule.when)}</em>
+          </button>
+        )}
+
+        <DecisionChip decision={rule.decision} size="sm" />
+
+        {/* Dot and label, never colour alone. */}
+        <span className={`bf__rulestate is-${st}`}>
+          <i aria-hidden />
+          {st === 'ready' ? 'Ready' : st === 'warn' ? 'Worth a look' : `${errors || 'Needs'} to fix`}
+        </span>
+
+        <label className="bf__ruleon">
+          <Toggle
+            checked={rule.enabled}
+            onChange={(v) => onPatch({ enabled: v })}
+            label={`Enable ${rule.name}`}
+            size="sm"
+          />
+        </label>
+
+        <MenuButton
+          label={`${rule.name} actions`}
+          iconOnly
+          icon={MoreHorizontal}
+          size="sm"
+          align="end"
+          items={ruleItems}
+          onSelect={onAction}
+        />
+
+        <button
+          type="button"
+          className="bf__ruletoggle"
+          aria-expanded={open}
+          aria-label={open ? `Collapse ${rule.name}` : `Open ${rule.name}`}
+          onClick={onOpen}
+        >
+          <ChevronDown size={14} strokeWidth={2} aria-hidden />
+        </button>
+      </div>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            className="bf__rulebody"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: reduce ? 0 : 0.22, ease: [0.2, 0, 0, 1] }}
+          >
+            <div className="bf__ruleinner">
+              {/* Borderless until focused, so an empty one is an invitation and
+                  a filled one reads as a caption rather than as a form field. */}
+              <textarea
+                className="bf__rulewhy"
+                aria-label="Why this rule exists"
+                rows={1}
+                placeholder="Why does this rule exist? The next person will read this before changing it."
+                value={rule.description ?? ''}
+                onChange={(e) => onPatch({ description: e.target.value })}
+              />
+
+              {/* When and Then, together. Side by side once there is room —
+                  which is the honest version of what "All together" was a
+                  toggle for. */}
+              <div className="bf__rulegrid">
+                <WhenSection rule={rule} ctx={ctx} onPatch={onPatch} bare hit={hit} />
+                <ThenSection rule={rule} onPatch={onPatch} bare />
+              </div>
+
+              {features.checkStep && diagnostics.length > 0 && (
+                <div className="bf__rulechecks">
+                  {diagnostics.map((d) => (
+                    <p key={d.id} className={`bf__rulecheck is-${d.severity}`}>
+                      {d.severity === 'error' ? (
+                        <XCircle size={13} strokeWidth={2} aria-hidden />
+                      ) : d.severity === 'warning' ? (
+                        <AlertTriangle size={13} strokeWidth={2} aria-hidden />
+                      ) : (
+                        <Info size={13} strokeWidth={2} aria-hidden />
+                      )}
+                      <span>
+                        <strong>{d.title}</strong> {d.detail}
+                      </span>
+                      {d.relatedIndex !== undefined && (
+                        <button type="button" onClick={() => onJump(d.relatedIndex!)}>
+                          Open rule {d.relatedIndex + 1}
+                        </button>
+                      )}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              <p className="bf__ruleprose">
+                <span className="u-label">In words</span>
+                {ruleSentence(rule, resolve).then}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </li>
   )
 }
-

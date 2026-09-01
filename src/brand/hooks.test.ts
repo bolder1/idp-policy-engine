@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { blankRule, cond, groups, policies, type Policy, type Rule } from './data'
+import { EVERYONE, blankRule, card, cond, groups, policies, when, type Policy, type Rule } from './data'
 import { SLOW_TIMEOUT_MS, canSaveHook, describeHook, seedHooks, validateHook, type Hook } from './hooks'
+import { leaves } from './predicate'
 import { diagnose } from './screens/diagnostics'
 
 const hook = (over: Partial<Hook> = {}): Hook => ({
@@ -18,11 +19,20 @@ const hook = (over: Partial<Hook> = {}): Hook => ({
 
 const gatedRule = (over: Partial<Rule> = {}): Rule => ({
   ...blankRule('Hook gated'),
-  conditions: [cond('webhook', 'returns true', ['hk-t'])],
+  when: when(card(cond('webhook', 'returns true', ['hk-t']))),
   ...over,
 })
 
-const policyWith = (r: Rule): Policy => ({ ...policies[1], isSystem: false, rules: [r] })
+/* Audience is stated rather than inherited from the seed. Every check under
+   test here is about the hook, so the policy has to govern somebody for the
+   rule findings to be the only ones in the list — and pinning it means a later
+   edit to the seed's audience cannot quietly change what these tests exercise. */
+const policyWith = (r: Rule): Policy => ({
+  ...policies[1],
+  isSystem: false,
+  audience: EVERYONE,
+  rules: [r],
+})
 
 /* -----------------------------------------------------------------------------
    Problem 7 — external hooks.
@@ -126,7 +136,7 @@ describe('a rule gated on a hook', () => {
   })
 
   it('says nothing about a rule that names no hook', () => {
-    const plain = { ...blankRule('No hook'), conditions: [cond('country', 'is not', ['India'])] }
+    const plain = { ...blankRule('No hook'), when: when(card(cond('country', 'is not', ['India']))) }
     const found = diagnose(policyWith(plain), groups, [hook()])
     expect(found.filter((d) => d.id.startsWith('hook'))).toHaveLength(0)
   })
@@ -137,15 +147,18 @@ describe('the seeded catalogue', () => {
      sees fire. The seeded estate has to contain at least one hook-gated rule,
      and the hook it names has to exist. */
   it('contains a rule that actually calls a hook', () => {
+    /* `leaves` rather than a card walk: a hook named inside any alternative is
+       a hook this rule can call, so the question "does the id resolve" is asked
+       of every condition in the predicate, whichever card holds it. */
     const gated = policies.flatMap((p) =>
       p.rules
-        .filter((r) => r.conditions.some((c) => c.typeId === 'webhook'))
+        .filter((r) => leaves(r.when).some((c) => c.typeId === 'webhook'))
         .map((r) => ({ p, r })),
     )
     expect(gated.length).toBeGreaterThan(0)
 
     for (const { r } of gated) {
-      for (const c of r.conditions.filter((x) => x.typeId === 'webhook')) {
+      for (const c of leaves(r.when).filter((x) => x.typeId === 'webhook')) {
         expect(seedHooks.some((h) => h.id === c.values[0]), `${r.name} names ${c.values[0]}`).toBe(true)
       }
     }

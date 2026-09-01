@@ -1,5 +1,5 @@
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { diagnose, impactOf, shadowedBy, type Diagnostic, type Impact } from './diagnostics'
 import { describeZone } from './zone-validation'
@@ -26,6 +26,7 @@ import {
   XCircle,
   ZoomIn,
   ZoomOut,
+  type LucideIcon,
 } from 'lucide-react'
 
 import { AppLogo } from './../logos/AppLogo'
@@ -42,22 +43,31 @@ import {
   Toggle,
 } from '../kit'
 import {
-  CONDITION_CATALOGUE,
   DECISION_CAPTION,
   DECISION_LABEL,
   blankRule,
-  conditionType,
-  cond,
   decisionLog,
   enforces,
   type AccessDecision,
-  type Condition,
   type Policy,
+  type Predicate,
   type Rule,
   ipSectionEmpty,
   locationEmpty,
 } from '../data'
-import { useBrand } from '../store'
+import { leafCount, leaves, sig } from '../predicate'
+/* One prose renderer for the whole product, and this file is a consumer of it
+   rather than a seventh implementation. `predicateParts` is the structured form
+   of exactly the sentence `predicateSentence` prints, so the readout below and
+   the sentence in the review dialog cannot describe different rules. */
+import {
+  audienceSentence,
+  predicateParts,
+  predicateSentence,
+  predicateSummary,
+  type NameLookup,
+} from './predicate-prose'
+import { useBrand, useNameLookup } from '../store'
 import './builder-canvas.css'
 import './builder-branch.css'
 import './builder-panels.css'
@@ -65,9 +75,18 @@ import './builder-panels.css'
 /* -----------------------------------------------------------------------------
    Policy builder — a canvas tool, not a page with a list.
 
-   The model is untouched: a policy holds ordered rules, they evaluate top to
-   bottom, the first match wins, and a pinned default rule catches the rest.
-   Per-pair AND/OR joiners stay, because that is what the engine does today.
+   The model is a policy of ordered rules: they evaluate top to bottom, the
+   first match wins, and a pinned default rule catches the rest.
+
+   What this version no longer does is EDIT the predicate. A rule's WHEN is a
+   disjunction of cards now — conditions inside a card are all required, cards
+   are alternatives — and v4 owns the composer for it. v1 is kept as a
+   historical comparison behind the design switcher, and porting a card-aware
+   editor into it would be a second composer to keep in step with the first.
+   So every place v1 used to add, remove, reorder or re-join a condition now
+   renders the same predicate read-only and hands off to v4. Everything else —
+   decisions, factors, naming, the Spine/Branch views, drag-to-reorder rules —
+   is untouched.
 
    The layout is the one every flow tool converges on: the diagram in the
    middle, a contextual inspector on the right, chrome out of the way. Our
@@ -95,11 +114,15 @@ interface Trace {
 
 export function PolicyBuilder({ policyId }: { policyId: string }) {
   const store = useBrand()
+  /* The live directory, so a zone, profile, hook, group or person renamed after
+     a rule named it prints under its current name here and everywhere else. */
+  const resolve = useNameLookup()
   const original = store.policyById(policyId)
   const [draft, setDraft] = useState<Policy | null>(original ?? null)
   // -1 is a real state: nothing selected, the inspector shows the policy.
   const [selected, setSelected] = useState(-1)
-  const [addingCondition, setAddingCondition] = useState(false)
+  /* `addingCondition` and the ConditionPicker it opened are gone with the rest
+     of this version's condition editor. See the note on the IF block below. */
   const [review, setReview] = useState(false)
   const [testing, setTesting] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
@@ -131,8 +154,8 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
   /* Recomputed from the draft on every edit, so the panel can never disagree
      with the canvas — the same discipline as the plain-English summary. */
   const checks = useMemo(
-    () => (draft ? diagnose(draft, store.groups, store.hooks) : []),
-    [draft, store.groups],
+    () => (draft ? diagnose(draft, store.groups, store.hooks, store.users) : []),
+    [draft, store.groups, store.hooks, store.users],
   )
   /* The split is the user's to shape. Three working modes fall out of the
      width — roughly 20/40/60% of the container: slim (a nested, accordion
@@ -211,8 +234,10 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
   /* The reusable-objects shelf is its own dock at the inspector's foot —
      always reachable, closable, and independent of what is being edited. */
   const [dockOpen, setDockOpen] = useState(true)
-  /** True while a dock row is being dragged over the IF block. */
-  const [dropHot, setDropHot] = useState(false)
+  /* `dropHot` went with the drag-a-zone-onto-the-IF-block gesture. Dropping a
+     library object appended a condition to the selected rule, and there is no
+     longer a place in this version to append one TO — a condition belongs to a
+     card, and choosing the card is the editing decision v4 owns. */
   const [trace, setTrace] = useState<Trace | null>(null)
   /* Which step of the trace the animation has reached. Counts through
      trace.steps and then one more, which is the landing. */
@@ -269,8 +294,13 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
   /* Scoped to the rule in hand, so the badge counts what you are looking at
      rather than the whole policy — a "3" that turns out to be about other
      rules is worse than no badge. */
-  const ruleChecks = checks.filter((d) => d.ruleIndex === selected)
-  const impact = rule ? impactOf(draft, selected, store.groups, original) : null
+  const ruleChecks = checks.filter((d) => d.scope === 'rule' && d.ruleIndex === selected)
+  const impact = rule ? impactOf(draft, selected, store.groups, original, store.users) : null
+
+  /* Who the POLICY governs, said once. It used to be a per-rule fact stamped on
+     every rule and shown on every node; it is one standing fact now, so it is
+     resolved here and handed to the nodes rather than recomputed in each. */
+  const audienceLine = audienceSentence(draft.audience, store.groups, store.users)
 
   function update(next: Partial<Policy>) {
     setDraft({ ...draft!, ...next })
@@ -321,47 +351,35 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
     setSelected(to)
   }
 
-  /* One routine behind both gestures: clicking a dock row's attach action and
-     dropping the row onto the IF block do exactly the same thing. */
-  function attachObject(kind: string, id: string) {
+  /* What is left of the dock's attach actions.
+
+     Zones and device profiles used to attach as CONDITIONS — one click appended
+     `zone in zone X` to the selected rule. A condition now lives inside a card,
+     and which card it joins is the whole editing decision, so a one-click
+     append has no honest answer to give: joining an existing card narrows every
+     alternative it holds, and opening a new one widens the rule. Both are edits
+     this version cannot show the consequences of, so both actions are gone and
+     the dock rows for zones and profiles are now reference only.
+
+     Method sets are untouched. A set names the second factor, not the
+     predicate, so nothing about grouping reaches it. */
+  function applyMethodSet(id: string) {
     if (!rule) return
-    if (kind === 'zones') {
-      updateRule(selected, { conditions: [...rule.conditions, cond('zone', 'in zone', [id])] })
-      store.showToast(`${store.zones.find((z) => z.id === id)?.name} attached as a condition`)
-    } else if (kind === 'fingerprint') {
-      updateRule(selected, {
-        conditions: [...rule.conditions, cond('fingerprint', 'recognised by', [id])],
-      })
-      store.showToast(`${store.fingerprints.find((p) => p.id === id)?.name} attached as a condition`)
-    } else if (kind === 'methods') {
-      // Carry the set's methods onto the rule. Without this, attaching set A
-      // and set B produced byte-identical rules while the toast claimed
-      // otherwise — the action looked like it worked and configured nothing.
-      const set = store.methodSets.find((m) => m.id === id)
-      updateRule(selected, {
-        decision: '2fa',
-        secondFactor: 'specific',
-        secondFactorMethods: set?.methods ?? [],
-      })
-      store.showToast(`${set?.name} set as the 2FA method set`)
-    }
+    // Carry the set's methods onto the rule. Without this, attaching set A
+    // and set B produced byte-identical rules while the toast claimed
+    // otherwise — the action looked like it worked and configured nothing.
+    const set = store.methodSets.find((m) => m.id === id)
+    updateRule(selected, {
+      decision: '2fa',
+      secondFactor: 'specific',
+      secondFactorMethods: set?.methods ?? [],
+    })
+    store.showToast(`${set?.name} set as the 2FA method set`)
   }
 
-  function addCondition(typeId: string) {
-    if (!rule) return
-    const t = conditionType(typeId)
-    const value =
-      t.valueKind === 'zone'
-        ? [store.zones[0].id]
-        : t.valueKind === 'fingerprint'
-          ? [store.fingerprints[0].id]
-          : t.options
-            ? [t.options[0]]
-            : t.valueKind === 'time'
-              ? ['09:00', '17:00']
-              : ['']
-    updateRule(selected, { conditions: [...rule.conditions, cond(typeId, t.operators[0], value)] })
-    setAddingCondition(false)
+  /** Hand this policy to the builder that owns the card composer. */
+  function editInV4() {
+    store.go({ name: 'builder', policyId: draft!.id })
   }
 
   return (
@@ -511,6 +529,7 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
                         {canvasView === 'spine' ? (
                           <FlowNode
                             rule={r}
+                            audience={audienceLine}
                             index={i}
                             count={draft.rules.length}
                             selected={selected === i}
@@ -524,8 +543,16 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
                             onDragEnd={() => setDrag(null)}
                           />
                         ) : (
+                          /* The three condition callbacks this node used to
+                             take — add, remove, flip the joiner — are gone
+                             with the flat array they addressed. It draws the
+                             cards and hands off; the decision stays editable
+                             on the node, because a decision has not changed
+                             shape. */
                           <BranchNode
                             rule={r}
+                            audience={audienceLine}
+                            resolve={resolve}
                             index={i}
                             count={draft.rules.length}
                             selected={selected === i}
@@ -536,21 +563,7 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
                             onMove={(d) => moveRule(i, d)}
                             onRemove={() => removeRule(i)}
                             onDecision={(d) => updateRule(i, { decision: d })}
-                            onAddCondition={() => {
-                              setSelected(i)
-                              setAddingCondition(true)
-                            }}
-                            onRemoveCondition={(ci) =>
-                              updateRule(i, { conditions: r.conditions.filter((_, x) => x !== ci) })
-                            }
-                            onJoiner={(ci) => {
-                              const conditions = [...r.conditions]
-                              conditions[ci] = {
-                                ...conditions[ci],
-                                joiner: conditions[ci].joiner === 'AND' ? 'OR' : 'AND',
-                              }
-                              updateRule(i, { conditions })
-                            }}
+                            onEditInV4={editInV4}
                           />
                         )}
                       </motion.div>
@@ -696,7 +709,7 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
                  scattered above the grid. */
               <div className="binspect__overview">
                 <h2 className="u-label">Policy</h2>
-                <p className="binspect__sentence">{summarize(draft, store)}</p>
+                <p className="binspect__sentence">{summarize(draft, resolve)}</p>
 
                 <dl className="binspect__facts">
                   <div>
@@ -754,62 +767,55 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
                 </button>
               </div>
 
+              {/* Audience, read-only, and belonging to the policy.
+
+                  This was a per-rule editor: chips over `rule.appliesTo` and a
+                  <select> that appended a group id to them. Both halves had to
+                  go. The field is gone — audience is one standing fact about
+                  the policy, and holding it per rule let a policy build "rule 1
+                  covers Finance, rule 2 covers everyone", which reads as a
+                  scoped policy and is not one. And the <select> could build an
+                  audience the model now refuses: it appended freely, so the
+                  synthetic all-employees row could be ticked alongside Finance
+                  and produce "All AND Finance", a selection narrower-looking
+                  than what it meant.
+
+                  What is left says who the policy governs and does not pretend
+                  a rule can narrow it. Narrowing inside a policy is still
+                  expressible — as a `group` or `user-type` condition in the
+                  rule's WHEN, evaluated like every other condition — which is
+                  the readout directly below this one. */}
               <div className="bedit__applies">
-                <span className="u-label">Applies to</span>
+                <span className="u-label">Policy applies to</span>
                 <div className="bedit__chips">
-                  {rule.appliesTo.map((gid) => (
-                    <Chip
-                      key={gid}
-                      removable={rule.appliesTo.length > 1}
-                      onRemove={() => updateRule(selected, { appliesTo: rule.appliesTo.filter((g) => g !== gid) })}
-                    >
-                      {store.groupById(gid).name}
-                      <em>{store.groupById(gid).memberCount}</em>
-                    </Chip>
-                  ))}
-                  <select
-                    className="bedit__addgroup"
-                    aria-label="Add a group"
-                    value=""
-                    onChange={(e) => {
-                      if (!e.target.value) return
-                      updateRule(selected, { appliesTo: [...rule.appliesTo, e.target.value] })
-                    }}
-                  >
-                    <option value="">+ Add group</option>
-                    {store.groups
-                      .filter((g) => !rule.appliesTo.includes(g.id))
-                      .map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.name}
-                        </option>
+                  {draft.audience.everyone ? (
+                    <Chip>Everyone</Chip>
+                  ) : draft.audience.groupIds.length === 0 && draft.audience.userIds.length === 0 ? (
+                    <span className="u-muted">Nobody — this policy governs no one.</span>
+                  ) : (
+                    <>
+                      {draft.audience.groupIds.map((gid) => (
+                        <Chip key={gid}>
+                          {store.groupById(gid).name}
+                          <em>{store.groupById(gid).memberCount}</em>
+                        </Chip>
                       ))}
-                  </select>
+                      {/* A person named in the audience who has left the
+                          directory is shown as missing rather than silently
+                          dropped — `userById` returns undefined on purpose. */}
+                      {draft.audience.userIds.map((uid) => (
+                        <Chip key={uid}>{store.userById(uid)?.name ?? `Unknown person · ${uid}`}</Chip>
+                      ))}
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* ---- IF ---- */}
-              <section
-                className={`bblock ${dropHot ? 'is-drop' : ''}`}
-                onDragOver={(e) => {
-                  if (e.dataTransfer.types.includes('application/x-idp-object')) {
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = 'copy'
-                    setDropHot(true)
-                  }
-                }}
-                onDragLeave={() => setDropHot(false)}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  setDropHot(false)
-                  try {
-                    const { kind, id } = JSON.parse(e.dataTransfer.getData('application/x-idp-object'))
-                    attachObject(kind, id)
-                  } catch {
-                    /* not ours */
-                  }
-                }}
-              >
+              {/* ---- IF ----
+                  The drop target went with the attach actions: an object
+                  dropped here appended a condition, and there is no longer a
+                  single place to append one to. See `applyMethodSet` above. */}
+              <section className="bblock">
                 <header
                   className={`bblock__head ${mode === 'slim' ? 'is-toggle' : ''}`}
                   onClick={mode === 'slim' ? () => setOpenSec('if') : undefined}
@@ -839,47 +845,26 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
                   transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
                   style={{ overflow: 'hidden' }}
                 >
+                {/* The editor that stood here — a row per condition, with an
+                    operator select, a value control, a remove button and an
+                    AND/OR pill flipping the joiner to its neighbour — is gone,
+                    and what replaces it is a readout of the same predicate.
+
+                    It was built on a flat array read strictly left to right,
+                    which is a shape the model no longer has. The replacement is
+                    not a smaller version of that editor; there is no editor
+                    here at all, because the honest v1-shaped edit does not
+                    exist. Adding a condition means choosing which alternative
+                    it joins, and every gesture this panel could offer answers
+                    that question silently and differently from what the author
+                    meant. v4's composer asks it out loud. */}
                 <div className="bblock__body">
-                  {rule.conditions.length === 0 ? (
-                    <div className="bcond__empty">
-                      This rule has no conditions, so it matches every sign-in that reaches it. Add
-                      a condition to narrow it.
-                    </div>
-                  ) : (
-                    <div className="bcond__list">
-                      {/* New cards draw themselves in — adding a condition is
-                          the builder's most repeated act, and it should feel
-                          like placing a piece, not refreshing a form. */}
-                      <AnimatePresence mode="popLayout" initial={false}>
-                        {rule.conditions.map((c, ci) => (
-                          <motion.div
-                            key={c.id}
-                            layout
-                            initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.96, height: 0, marginBottom: 0 }}
-                            transition={{ type: 'spring', stiffness: 480, damping: 34 }}
-                          >
-                            <ConditionRow
-                              condition={c}
-                              index={ci}
-                              onChange={(patch) => {
-                                const conditions = [...rule.conditions]
-                                conditions[ci] = { ...conditions[ci], ...patch }
-                                updateRule(selected, { conditions })
-                              }}
-                              onRemove={() =>
-                                updateRule(selected, { conditions: rule.conditions.filter((_, i) => i !== ci) })
-                              }
-                            />
-                          </motion.div>
-                        ))}
-                      </AnimatePresence>
-                    </div>
-                  )}
+                  <PredicateReadout when={rule.when} resolve={resolve} />
 
                   <div className="bcond__addwrap">
-                    <Button onClick={() => setAddingCondition(true)}>+ Add condition</Button>
+                    <Button variant="secondary" size="sm" onClick={editInV4}>
+                      Edit in v4
+                    </Button>
                   </div>
                 </div>
                 </motion.div>
@@ -1254,16 +1239,10 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
                 <div className="bdock__body">
                   {!rule && (
                     <p className="bdock__hint">
-                      Select a rule on the canvas to attach one of these with a click.
+                      Select a rule on the canvas to apply a method set to it.
                     </p>
                   )}
-                  <ObjectsPanel
-                    mode={mode}
-                    canAttach={!!rule}
-                    onAttachZone={(id) => attachObject('zones', id)}
-                    onAttachFingerprint={(id) => attachObject('fingerprint', id)}
-                    onUseMethods={(id) => attachObject('methods', id)}
-                  />
+                  <ObjectsPanel mode={mode} canAttach={!!rule} onUseMethods={applyMethodSet} />
                 </div>
               </motion.div>
             )}
@@ -1272,8 +1251,11 @@ export function PolicyBuilder({ policyId }: { policyId: string }) {
         </aside>
       </div>
 
-      {/* ---------------- overlays ---------------- */}
-      <ConditionPicker open={addingCondition} onClose={() => setAddingCondition(false)} onPick={addCondition} />
+      {/* ---------------- overlays ----------------
+          The condition picker used to live here. It answered "which attribute"
+          and nothing else, which was the whole question while a rule was a flat
+          list; under cards the second half — which alternative does this join —
+          has no answer this version can offer. It went with the editor. */}
 
       {/* The floating SaveBar is gone — it sat on top of the canvas tools.
           Its two jobs moved into the toolbar's dirty chip. */}
@@ -1358,6 +1340,7 @@ function SpineLink({
 
 function FlowNode({
   rule: r,
+  audience,
   index,
   count,
   selected,
@@ -1371,6 +1354,11 @@ function FlowNode({
   onDragEnd,
 }: {
   rule: Rule
+  /* Who the POLICY governs, already resolved. It used to be read off
+     `r.appliesTo` here; every rule in a policy covers the same people now, so
+     the string is computed once by the caller and the same line rides every
+     node — which is what a policy-level fact should look like. */
+  audience: string
   index: number
   count: number
   selected: boolean
@@ -1384,11 +1372,6 @@ function FlowNode({
   onDragStart: () => void
   onDragEnd: () => void
 }) {
-  const store = useBrand()
-  const groups = r.appliesTo.includes('all')
-    ? 'Everyone'
-    : r.appliesTo.map((g) => store.groupById(g).name).join(', ')
-
   return (
     <div
       className={`bnode ${selected ? 'is-selected' : ''} ${r.enabled ? '' : 'is-off'} ${anim}`}
@@ -1449,16 +1432,16 @@ function FlowNode({
             </span>
           </button>
           <span className="bnode__chips">
-            <span className="bnode__chip">
-              {r.conditions.length === 0
-                ? 'Always matches'
-                : `${r.conditions.length} condition${r.conditions.length === 1 ? '' : 's'}`}
-            </span>
+            {/* Counts leaves and says when there is more than one alternative
+                — "2 alternatives · 5 conditions". A bare condition count over
+                a grouped rule reads as one long AND-run, which is a different
+                rule catching different people. */}
+            <span className="bnode__chip">{predicateSummary(r.when)}</span>
             <span className="bnode__chip">
               ≈{r.matchEstimate.toLocaleString()} users
             </span>
           </span>
-          <span className="bnode__meta" title={groups}>{groups}</span>
+          <span className="bnode__meta" title={audience}>{audience}</span>
         </span>
 
         {/* Quiet until the node is the one being worked on. */}
@@ -1502,14 +1485,22 @@ function FlowNode({
 
 /* --- Branch node -------------------------------------------------------------
    The same rule, drawn as the fork it actually is. The IF conditions are cards
-   on the node and editable there; below them a decision diamond splits — match
-   goes right to the outcome, no-match carries on down the spine to the next
-   rule. Population rides the edges, the way Intercom and Customer.io label
-   theirs, because "how many people take this path" is the question the diagram
-   exists to answer.
+   on the node; below them a decision diamond splits — match goes right to the
+   outcome, no-match carries on down the spine to the next rule. Population
+   rides the edges, the way Intercom and Customer.io label theirs, because "how
+   many people take this path" is the question the diagram exists to answer.
+
+   The IF row used to be editable here: a × on every condition and an AND/OR
+   pill between neighbours. Both addressed a flat array by index, and neither
+   has a meaning under cards — an × has to say which alternative it is emptying,
+   and a joiner pill between two conditions in the same card would be offering
+   to break the card in half. The row draws the alternatives and hands off; the
+   outcome below it stays editable, because a decision has not changed shape.
    -------------------------------------------------------------------------- */
 function BranchNode({
   rule: r,
+  audience,
+  resolve,
   index,
   count,
   selected,
@@ -1520,11 +1511,12 @@ function BranchNode({
   onMove,
   onRemove,
   onDecision,
-  onAddCondition,
-  onRemoveCondition,
-  onJoiner,
+  onEditInV4,
 }: {
   rule: Rule
+  /** Who the POLICY governs — see the note on FlowNode. */
+  audience: string
+  resolve: NameLookup
   index: number
   count: number
   selected: boolean
@@ -1535,14 +1527,9 @@ function BranchNode({
   onMove: (dir: -1 | 1) => void
   onRemove: () => void
   onDecision: (d: AccessDecision) => void
-  onAddCondition: () => void
-  onRemoveCondition: (i: number) => void
-  onJoiner: (i: number) => void
+  onEditInV4: () => void
 }) {
-  const store = useBrand()
-  const groups = r.appliesTo.includes('all')
-    ? 'Everyone'
-    : r.appliesTo.map((g) => store.groupById(g).name).join(', ')
+  const parts = predicateParts(r.when, resolve)
   const tone = DEC_TONE[r.decision]
 
   return (
@@ -1567,7 +1554,7 @@ function BranchNode({
           </span>
           <span className="bbn__headbody">
             <strong title={r.name}>{r.name}</strong>
-            <span title={groups}>{groups}</span>
+            <span title={audience}>{audience}</span>
           </span>
           <span className="bbn__acts" onClick={(e) => e.stopPropagation()}>
             <Toggle size="sm" checked={r.enabled} label={`Enable ${r.name}`} onChange={onToggle} />
@@ -1583,55 +1570,36 @@ function BranchNode({
           </span>
         </header>
 
-        {/* IF — the conditions, editable here rather than only in the panel. */}
+        {/* IF — the alternatives, drawn and not edited. `and` is lowercase and
+            quiet because it is punctuation inside a card rather than a choice
+            anybody made; OR is the loud one, because it is the only place two
+            genuinely different rules are being offered. */}
         <div className="bbn__if" onClick={(e) => e.stopPropagation()}>
           <span className="bbn__kw">IF</span>
-          {r.conditions.length === 0 ? (
+          {parts.length === 0 ? (
             <span className="bbn__any">no conditions — matches everyone who reaches it</span>
           ) : (
             <span className="bbn__conds">
-              <AnimatePresence mode="popLayout" initial={false}>
-                {r.conditions.map((c, ci) => (
-                  <motion.span
-                    key={c.id}
-                    layout
-                    className="bbn__condwrap"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ type: 'spring', stiffness: 520, damping: 36 }}
-                  >
-                    {ci > 0 && (
-                      <button
-                        type="button"
-                        className={`bbn__joiner is-${c.joiner.toLowerCase()}`}
-                        onClick={() => onJoiner(ci)}
-                        title={`Joined with ${c.joiner}. Click to switch.`}
-                      >
-                        {c.joiner}
-                      </button>
-                    )}
-                    <span className="bbn__cond">
-                      <b>{conditionType(c.typeId).label}</b>
-                      <i>{c.operator}</i>
-                      {c.values.join(', ') || '—'}
-                      <button
-                        type="button"
-                        className="bbn__condx"
-                        onClick={() => onRemoveCondition(ci)}
-                        aria-label={`Remove ${conditionType(c.typeId).label}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  </motion.span>
-                ))}
-              </AnimatePresence>
+              {parts.map((k, ki) => (
+                <Fragment key={k.id}>
+                  {ki > 0 && <span className="bbn__joiner is-or">OR</span>}
+                  <span className="bbn__condwrap">
+                    {k.label && <em className="bbn__any">{k.label}:</em>}
+                    {k.clauses.map((cl, ci) => (
+                      <Fragment key={cl.id}>
+                        {ci > 0 && <span className="bbn__joiner is-and">and</span>}
+                        <span className="bbn__cond">{cl.text}</span>
+                      </Fragment>
+                    ))}
+                  </span>
+                </Fragment>
+              ))}
             </span>
           )}
-          <button type="button" className="bbn__addcond" onClick={onAddCondition}>
-            <Plus size={12} strokeWidth={2.4} aria-hidden /> Condition
-          </button>
+          <em className="bbn__any">read-only — conditions are grouped now</em>
+          <Button variant="secondary" size="sm" onClick={onEditInV4}>
+            Edit in v4
+          </Button>
         </div>
       </div>
 
@@ -1675,193 +1643,101 @@ function BranchNode({
   )
 }
 
-/* --- Condition row --------------------------------------------------------- */
+/* --- The predicate, read back -----------------------------------------------
+   What stands where `ConditionRow` and `ConditionPicker` used to.
 
-function ConditionRow({
-  condition,
-  index,
-  onChange,
-  onRemove,
-}: {
-  condition: Condition
-  index: number
-  onChange: (patch: Partial<Condition>) => void
-  onRemove: () => void
-}) {
-  const store = useBrand()
-  const t = conditionType(condition.typeId)
+   ConditionRow was the editor: an operator <select>, a value control per
+   `valueKind`, a remove ×, and an AND/OR pill flipping `condition.joiner`
+   against the row above. Every one of those addressed a flat array by index and
+   read strictly left to right with no precedence — the shape the model no
+   longer has. ConditionPicker fed it, and answered only half of the question a
+   card model asks: which attribute, never which alternative.
 
-  return (
-    <div className="bcond">
-      {index > 0 && (
-        <button
-          type="button"
-          className={`bcond__joiner bcond__joiner--${condition.joiner.toLowerCase()}`}
-          onClick={() => onChange({ joiner: condition.joiner === 'AND' ? 'OR' : 'AND' })}
-          aria-label={`Joined to the previous condition with ${condition.joiner}. Activate to switch.`}
-        >
-          {condition.joiner}
-        </button>
-      )}
+   Neither was ported. v4 owns the composer, and a second card-aware editor kept
+   here would be a second one to hold in step with it — which is how the six
+   prose renderers this file no longer contains came about in the first place.
 
-      <div className="bcond__row">
-        <span className="bcond__type">
-          <span className="bcond__group">{t.group}</span>
-          {t.label}
-        </span>
+   So: the same predicate, rendered rather than edited. The text of each clause
+   comes from `predicateParts`, which is the structured form of the sentence
+   `predicateSentence` prints, so this readout and the sentence in the review
+   dialog cannot describe different rules.
+   -------------------------------------------------------------------------- */
 
-        <select
-          className="bcond__op"
-          aria-label={`${t.label} operator`}
-          value={condition.operator}
-          onChange={(e) => onChange({ operator: e.target.value })}
-        >
-          {t.operators.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
+function PredicateReadout({ when: p, resolve }: { when: Predicate; resolve: NameLookup }) {
+  const parts = predicateParts(p, resolve)
 
-        <span className="bcond__val">
-          {t.valueKind === 'zone' && (
-            <select aria-label="Zone" value={condition.values[0]} onChange={(e) => onChange({ values: [e.target.value] })}>
-              {store.zones.map((z) => (
-                <option key={z.id} value={z.id}>
-                  {z.name}
-                </option>
-              ))}
-            </select>
-          )}
-          {t.valueKind === 'fingerprint' && (
-            <select aria-label="Device posture" value={condition.values[0]} onChange={(e) => onChange({ values: [e.target.value] })}>
-              {store.fingerprints.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          )}
-          {t.valueKind === 'list' && (
-            <span className="bcond__multi">
-              {t.options!.map((o) => {
-                const on = condition.values.includes(o)
-                return (
-                  <button
-                    key={o}
-                    type="button"
-                    aria-pressed={on}
-                    className={`bcond__opt ${on ? 'is-on' : ''}`}
-                    onClick={() =>
-                      onChange({ values: on ? condition.values.filter((v) => v !== o) : [...condition.values, o] })
-                    }
-                  >
-                    {o}
-                  </button>
-                )
-              })}
-            </span>
-          )}
-          {t.valueKind === 'time' && (
-            <span className="bcond__time">
-              <input
-                type="text"
-                aria-label="From"
-                value={condition.values[0] ?? ''}
-                onChange={(e) => onChange({ values: [e.target.value, condition.values[1] ?? ''] })}
-              />
-              <span>to</span>
-              <input
-                type="text"
-                aria-label="To"
-                value={condition.values[1] ?? ''}
-                onChange={(e) => onChange({ values: [condition.values[0] ?? '', e.target.value] })}
-              />
-            </span>
-          )}
-          {(t.valueKind === 'text' || t.valueKind === 'range') && (
-            <input
-              type="text"
-              aria-label={`${t.label} value`}
-              value={condition.values[0] ?? ''}
-              placeholder={t.valueKind === 'range' ? 'e.g. 60' : 'Enter a value'}
-              onChange={(e) => onChange({ values: [e.target.value] })}
-            />
-          )}
-        </span>
-
-        <button type="button" className="bcond__x" onClick={onRemove} aria-label={`Remove ${t.label} condition`}>
-          ×
-        </button>
+  if (parts.length === 0) {
+    return (
+      <div className="bcond__empty">
+        This rule has no conditions, so it matches every sign-in that reaches it. Open it in v4 to
+        narrow it.
       </div>
-    </div>
-  )
-}
-
-/* --- Condition picker ------------------------------------------------------ */
-
-function ConditionPicker({
-  open,
-  onClose,
-  onPick,
-}: {
-  open: boolean
-  onClose: () => void
-  onPick: (id: string) => void
-}) {
-  const [q, setQ] = useState('')
-  const groups = useMemo(() => {
-    const filtered = CONDITION_CATALOGUE.filter(
-      (c) => !q || c.label.toLowerCase().includes(q.toLowerCase()) || c.hint.toLowerCase().includes(q.toLowerCase()),
     )
-    const byGroup = new Map<string, typeof CONDITION_CATALOGUE>()
-    filtered.forEach((c) => {
-      const arr = byGroup.get(c.group) ?? []
-      arr.push(c)
-      byGroup.set(c.group, arr)
-    })
-    return [...byGroup.entries()]
-  }, [q])
+  }
 
   return (
-    <Modal open={open} onClose={onClose} title="Add a condition" width={620} padded={false}>
-      <div className="bpick">
-        <div className="bpick__search">
-          <input
-            type="search"
-            placeholder="Search conditions…"
-            aria-label="Search conditions"
-            value={q}
-            autoFocus
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-        <div className="bpick__scroll">
-          {groups.map(([group, items]) => (
-            <div key={group} className="bpick__group">
-              <p className="u-label">{group}</p>
-              {items.map((c) => (
-                <button key={c.id} type="button" className="bpick__item" onClick={() => onPick(c.id)}>
-                  <strong>{c.label}</strong>
-                  <span>{c.hint}</span>
-                </button>
-              ))}
+    <>
+      <div className="bcond__list">
+        {parts.map((k, ki) => (
+          <Fragment key={k.id}>
+            {/* Between alternatives, and loud: this is the one join in the
+                predicate where two genuinely different rules are on offer. */}
+            {ki > 0 && (
+              <span className="bcond__joiner bcond__joiner--or" aria-hidden>
+                OR
+              </span>
+            )}
+            <div className="bcond__row">
+              <span className="bcond__type">
+                {/* Cards are lettered, never numbered — rules are numbered and
+                    evaluate in order, and cards have no order at all. */}
+                <span className="bcond__group">
+                  {parts.length > 1 ? `Alternative ${k.letter}` : 'All required'}
+                </span>
+                {k.label ?? `${k.clauses.length} condition${k.clauses.length === 1 ? '' : 's'}`}
+              </span>
+              <span className="bcond__val">
+                <span>
+                  {k.clauses.map((cl, ci) => (
+                    <Fragment key={cl.id}>
+                      {/* Lowercase and muted on purpose. Inside a card every
+                          condition is required, so this is punctuation rather
+                          than an operator anybody chose. */}
+                      {ci > 0 && <em className="u-muted"> and </em>}
+                      {cl.text}
+                    </Fragment>
+                  ))}
+                </span>
+              </span>
             </div>
-          ))}
-          {groups.length === 0 && <p className="bnew__none">Nothing matches “{q}”.</p>}
-        </div>
+          </Fragment>
+        ))}
       </div>
-    </Modal>
+
+      {/* Said plainly rather than implied by a missing button. Somebody who
+          knows this screen will go looking for the × and the AND/OR pill. */}
+      <p className="bcond__empty">
+        Conditions are grouped now. Each alternative above is a set that must all be true, and the
+        rule matches if any one of them does. This version's editor was built for a single flat list
+        with AND/OR between neighbours, so it can show groups but cannot express them — edit the
+        rule in v4.
+      </p>
+    </>
   )
 }
+
 
 /* --- Reusable objects -------------------------------------------------------
    The prototype's right panel, given the full treatment it only gestured at:
    collapsible sections, and every row expands into the thing itself — a zone's
    entries, a posture's requirements, a method set's methods — plus how many
-   policies lean on it and a jump to its page. When a rule is selected, rows
-   grow an attach action, so "use this zone in this rule" is one click instead
-   of a trip through the condition picker.
+   policies lean on it and a jump to its page.
+
+   The one-click attach is down to method sets. Zones and device profiles used
+   to grow "Add as condition" when a rule was selected; a condition belongs to a
+   card now, and picking the card is the edit v4 owns — see `applyMethodSet`.
+   What the rows still do is the part that never depended on editing: say what
+   is inside an object and how much of the estate leans on it.
    -------------------------------------------------------------------------- */
 
 /** Loudest severity present — drives the badge's colour. */
@@ -1919,9 +1795,14 @@ function ChecksPanel({
             </strong>
             <span>{d.detail}</span>
             <span className="bchecks__acts">
-              <button type="button" onClick={() => onGo(d.ruleIndex)}>
-                Go to rule {d.ruleIndex + 1}
-              </button>
+              {/* A policy-scoped finding carries `ruleIndex: -1` — there is no
+                  rule to go to, and "Go to rule 0" would be a lie about a
+                  finding that is about the policy itself. */}
+              {d.scope === 'rule' && (
+                <button type="button" onClick={() => onGo(d.ruleIndex)}>
+                  Go to rule {d.ruleIndex + 1}
+                </button>
+              )}
               {d.relatedIndex !== undefined && (
                 <button type="button" onClick={() => onGo(d.relatedIndex!)}>
                   Show rule {d.relatedIndex + 1}
@@ -2004,17 +1885,38 @@ function ImpactPanel({
   )
 }
 
+/* One row of the shelf. Written out as a type rather than inferred, because
+   `attach` is now present on method sets and absent on the other two sections —
+   see the note on `applyMethodSet`. */
+interface DockRow {
+  id: string
+  name: string
+  tag: string
+  used: number
+  detail: ReactNode
+  /** Only method sets can still be applied to a rule from here. */
+  attach?: () => void
+  attachLabel?: string
+}
+
+interface DockSection {
+  id: string
+  title: string
+  icon: LucideIcon
+  manage: () => void
+  rows: DockRow[]
+}
+
 function ObjectsPanel({
   mode,
   canAttach,
-  onAttachZone,
-  onAttachFingerprint,
   onUseMethods,
 }: {
   mode: 'slim' | 'mid' | 'wide'
   canAttach: boolean
-  onAttachZone?: (id: string) => void
-  onAttachFingerprint?: (id: string) => void
+  /* `onAttachZone` and `onAttachFingerprint` are gone. They appended a
+     condition to the selected rule, and a condition now belongs to a card —
+     see the note on `applyMethodSet` in the builder above. */
   onUseMethods?: (id: string) => void
 }) {
   const store = useBrand()
@@ -2022,12 +1924,15 @@ function ObjectsPanel({
   const [openSec, setOpenSec] = useState<string | null>('zones')
   const [openRow, setOpenRow] = useState<string | null>(null)
 
+  /* Leaves, not the top level. A rule's conditions live inside cards now, so a
+     scan over `r.when.cards` would count only containers and report every zone
+     as used by nothing — which on this panel reads as "safe to delete". */
   const usedBy = (typeId: string, objId: string) =>
     store.policies.filter((p) =>
-      p.rules.some((r) => r.conditions.some((c) => c.typeId === typeId && c.values.includes(objId))),
+      p.rules.some((r) => leaves(r.when).some((c) => c.typeId === typeId && c.values.includes(objId))),
     ).length
 
-  const sections = [
+  const sections: DockSection[] = [
     {
       id: 'zones',
       title: 'Zones',
@@ -2052,8 +1957,6 @@ function ObjectsPanel({
             </ul>
           </>
         ),
-        attach: onAttachZone ? () => onAttachZone(z.id) : undefined,
-        attachLabel: 'Add as condition',
       })),
     },
     {
@@ -2087,8 +1990,6 @@ function ObjectsPanel({
             </div>
           </dl>
         ),
-        attach: onAttachFingerprint ? () => onAttachFingerprint(p.id) : undefined,
-        attachLabel: 'Require compliance',
       })),
     },
     {
@@ -2120,6 +2021,9 @@ function ObjectsPanel({
         <h2 className="u-label">Reusable objects</h2>
         <p>Referenced by conditions. Editing one changes every policy using it.</p>
       </div>
+      {/* Zones and device profiles are reference only in this version — the
+          counts and the contents still answer "what breaks if I change this",
+          which is the question the shelf exists for. */}
 
       {sections.map((sec) => {
         const SecIcon = sec.icon
@@ -2156,17 +2060,14 @@ function ObjectsPanel({
                     {sec.rows.map((row) => {
                       const expanded = openRow === `${sec.id}:${row.id}`
                       return (
+                        /* Not draggable any more. The drag existed to reach one
+                           drop target — the IF block — and dropping there
+                           appended a condition, which is the gesture that went
+                           with the editor. The explicit action below survives
+                           for method sets, which configure the outcome. */
                         <div
                           key={row.id}
-                          className={`bobj__row ${expanded ? 'is-open' : ''} ${canAttach && row.attach ? 'is-draggable' : ''}`}
-                          draggable={canAttach && !!row.attach}
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData(
-                              'application/x-idp-object',
-                              JSON.stringify({ kind: sec.id, id: row.id }),
-                            )
-                            e.dataTransfer.effectAllowed = 'copy'
-                          }}
+                          className={`bobj__row ${expanded ? 'is-open' : ''}`}
                         >
                           <button
                             type="button"
@@ -2245,6 +2146,7 @@ function ReviewDialog({
   onStatus: (s: Policy['status']) => void
 }) {
   const store = useBrand()
+  const resolve = useNameLookup()
   const before = original.rules.reduce((n, r) => Math.max(n, r.matchEstimate), 0)
   const after = draft.rules.reduce((n, r) => Math.max(n, r.matchEstimate), 0)
   const denied = draft.rules.filter((r) => r.enabled && r.decision === 'deny').reduce((n, r) => n + r.matchEstimate, 0)
@@ -2309,13 +2211,21 @@ function ReviewDialog({
 
       <div className="breview__rules">
         <p className="u-label">Evaluation order</p>
+        {/* Audience, once, above the list. The old per-rule sentence opened
+            with the rule's own `appliesTo` — "Finance — Country is not India" —
+            and that prefix repeated a fact every rule in a policy now shares.
+            Said once here it is the same information without the implication
+            that a rule could disagree with it. */}
+        <p className="u-muted">
+          Applies to {audienceSentence(draft.audience, store.groups, store.users)}.
+        </p>
         <ol>
           {draft.rules.map((r, i) => (
             <li key={r.id} className={r.enabled ? '' : 'is-off'}>
               <span className="breview__n">{i + 1}</span>
               <span className="breview__body">
                 <strong>{r.name}</strong>
-                <span>{ruleSentence(r, store)}</span>
+                <span>{predicateSentence(r.when, resolve)}</span>
               </span>
               <DecisionChip decision={r.decision} size="sm" />
             </li>
@@ -2385,11 +2295,15 @@ function TestDrawer({
   function run() {
     // Deterministic stand-in for the engine: the first enabled rule whose
     // conditions plausibly fit the chosen context.
+    /* `leaves`, because the interesting conditions are inside cards now. A scan
+       over the top level would find nothing on every grouped rule and quietly
+       report that the sign-in fell through to the default. */
     const matches = (r: Rule) => {
+      const has = (typeId: string) => leaves(r.when).some((c) => c.typeId === typeId)
       if (risk === 'High' && r.decision !== '1fa') return true
-      if (place === 'Outside all zones' && r.conditions.some((c) => c.typeId === 'zone')) return true
-      if (device === 'Changed fingerprint' && r.conditions.some((c) => c.typeId === 'fingerprint')) return true
-      if (authState === 'First time login' && r.conditions.some((c) => c.typeId === 'auth-state')) return true
+      if (place === 'Outside all zones' && has('zone')) return true
+      if (device === 'Changed fingerprint' && has('fingerprint')) return true
+      if (authState === 'First time login' && has('auth-state')) return true
       return false
     }
 
@@ -2686,47 +2600,54 @@ function AppsDrawer({
 
 /* --- Helpers --------------------------------------------------------------- */
 
-type Store = ReturnType<typeof useBrand>
+/* The three local prose functions that stood here — `conditionSentence`,
+   `ruleSentence` and `conditionSummary` — are gone.
 
-function conditionSentence(c: Condition, store: Store): string {
-  const t = conditionType(c.typeId)
-  let value = c.values.join(', ')
-  if (t.valueKind === 'zone') value = store.zoneById(c.values[0])?.name ?? value
-  if (t.valueKind === 'fingerprint') value = store.fingerprintById(c.values[0])?.name ?? value
-  if (t.valueKind === 'time') value = c.values.join('–')
-  return `${t.label} ${c.operator} ${value}`.trim()
-}
+   They were three of the six re-implementations of "condition, joiner,
+   condition" scattered across this codebase, and this file's copies had already
+   drifted from the others: `conditionSummary` joined every condition with the
+   SECOND one's joiner, so a rule reading `a AND b OR c` printed as `a OR b OR
+   c` — a different rule, catching different people, in the sentence the review
+   dialog shows you before you enforce it. Under cards that class of bug gets
+   worse rather than better: a renderer that flattens the alternatives away
+   prints an unbroken AND-run that no engine will ever evaluate.
 
-/**
- * Renders the rule as a sentence from the same condition array the editor
- * writes, joiner included. In the current prototype the review dialog rewrites
- * OR as AND; generating from one source makes that class of bug impossible.
- */
-function ruleSentence(r: Rule, store: Store): string {
-  const who = r.appliesTo.map((g) => store.groupById(g).name).join(', ')
-  if (r.conditions.length === 0) return `Anyone in ${who} who reaches this rule.`
-  const parts = r.conditions.map((c, i) => (i === 0 ? conditionSentence(c, store) : `${c.joiner} ${conditionSentence(c, store)}`))
-  return `${who} — ${parts.join(' ')}`
-}
+   `predicate-prose.ts` is the one renderer now. This file consumes it. */
 
-function summarize(p: Policy, store: Store): string {
+function summarize(p: Policy, resolve: NameLookup): string {
   const enabled = p.rules.filter((r) => r.enabled)
   if (enabled.length === 0) return 'No active rules — every sign-in falls through to the default rule.'
   const first = enabled[0]
   const more = enabled.length - 1
-  return `${conditionSummary(first, store)} → ${DECISION_LABEL[first.decision]}${more > 0 ? `, then ${more} more rule${more === 1 ? '' : 's'}` : ''}`
+  return `${predicateSentence(first.when, resolve)} → ${DECISION_LABEL[first.decision]}${more > 0 ? `, then ${more} more rule${more === 1 ? '' : 's'}` : ''}`
 }
 
-function conditionSummary(r: Rule, store: Store): string {
-  if (r.conditions.length === 0) return r.name
-  return r.conditions.map((c) => conditionSentence(c, store)).join(` ${r.conditions[1]?.joiner ?? 'AND'} `)
-}
+/* Names each change, so the save bar and review dialog can list them.
 
-/** Names each change, so the save bar and review dialog can list them. */
+   `describeChanges` in changes.ts is the canonical version of this and says
+   more — it names who joined the audience, and it distinguishes a regrouping
+   from an edit. This copy stays because it is v1's, and its wording is what
+   this version's save bar has always said; swapping it for the shared one would
+   rewrite copy the model change does not force. What the model change DOES
+   force is fixed below: the condition compare and the audience line. */
 function diffPolicies(a: Policy, b: Policy): string[] {
   const out: string[] = []
   if (a.name !== b.name) out.push(`Renamed to “${b.name}”`)
   if (a.status !== b.status) out.push(`Status set to ${b.status}`)
+
+  /* Audience is one policy-level fact now, so it is diffed once here instead of
+     once per rule. v1 has no audience editor, so nothing in this screen can
+     produce these lines — but this function diffs a Policy, and a diff that
+     cannot see the single biggest claim a policy makes is a diff that lies by
+     omission the moment a draft reaches it from anywhere else. */
+  if (a.audience.everyone !== b.audience.everyone) {
+    out.push(b.audience.everyone ? 'Now applies to everyone' : 'No longer applies to everyone')
+  } else if (
+    a.audience.groupIds.join(',') !== b.audience.groupIds.join(',') ||
+    a.audience.userIds.join(',') !== b.audience.userIds.join(',')
+  ) {
+    out.push('Policy audience changed')
+  }
   if (a.appIds.length !== b.appIds.length) out.push(`${b.appIds.length - a.appIds.length > 0 ? 'Attached' : 'Detached'} apps`)
   if (a.rules.length !== b.rules.length) {
     const d = b.rules.length - a.rules.length
@@ -2747,9 +2668,24 @@ function diffPolicies(a: Policy, b: Policy): string[] {
     if (prev.name !== r.name) out.push(`Rule ${i + 1} renamed to “${r.name}”`)
     if (prev.decision !== r.decision) out.push(`Rule ${i + 1} outcome → ${DECISION_LABEL[r.decision]}`)
     if (prev.enabled !== r.enabled) out.push(`Rule ${i + 1} ${r.enabled ? 'enabled' : 'disabled'}`)
-    if (prev.conditions.length !== r.conditions.length) out.push(`Rule ${i + 1} conditions changed`)
-    else if (JSON.stringify(prev.conditions) !== JSON.stringify(r.conditions)) out.push(`Rule ${i + 1} conditions edited`)
-    if (JSON.stringify(prev.appliesTo) !== JSON.stringify(r.appliesTo)) out.push(`Rule ${i + 1} audience changed`)
+    /* `sig` rather than a JSON compare, and `leafCount` rather than an array
+       length. The old pair compared a flat array positionally, which reported a
+       change when two conditions merely swapped places and reported nothing
+       when one moved between alternatives — the second being the case that
+       actually changes who the rule catches. `sig` sorts within a card and
+       across cards but nests the join characters, so it sees the regrouping and
+       ignores the reordering. `leafCount` counts conditions rather than the
+       cards holding them, so wrapping two existing conditions in a new
+       alternative does not report "1 condition added" when none was. */
+    if (sig(prev.when) !== sig(r.when)) {
+      out.push(
+        leafCount(prev.when) !== leafCount(r.when)
+          ? `Rule ${i + 1} conditions changed`
+          : `Rule ${i + 1} conditions edited`,
+      )
+    }
+    /* The per-rule audience line is gone with `appliesTo`. See the policy-level
+       compare above — a rule cannot have its own audience any more. */
   })
 
   /* One entry for the whole reorder. Order is the logic, so it is worth saying

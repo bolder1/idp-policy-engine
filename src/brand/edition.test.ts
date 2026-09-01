@@ -56,11 +56,20 @@ describe('the two editions', () => {
     expect(builderSrc).toMatch(/features\.commands &&\s*\(e\.metaKey/)
   })
 
-  it('builds the trail from the edition instead of filtering at each use', () => {
-    // Half the builder walks STEPS by index. Holes would need every one of
-    // those sites to learn about holes.
-    expect(builderSrc).toContain('stepsFor(features)')
-    expect(builderSrc).not.toMatch(/const STEPS: \{/)
+  /* Was "builds the trail from the edition instead of filtering at each use".
+
+     The five-step trail is gone. It existed so a rule could be walked one
+     question at a time, and `checkStep`/`reviewStep` punched holes in it — which
+     is what needed guarding, because half the builder indexed into that array.
+
+     Both flags survive and still gate real capability, so what this asserts now
+     is that they gate it rather than that an array is built from them:
+     `checkStep` gates the per-rule findings strip, `reviewStep` gates the review
+     stage. An array with holes cannot be indexed wrongly if there is no array. */
+  it('gates the check strip and the review stage on their own flags', () => {
+    expect(builderSrc).toContain('features.checkStep')
+    expect(builderSrc).toContain('features.reviewStep')
+    expect(builderSrc).not.toMatch(/const STEPS/)
   })
 })
 

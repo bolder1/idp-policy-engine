@@ -29,13 +29,19 @@ import { Button, Counter, Toggle } from '../kit'
 import {
   CONDITION_CATALOGUE,
   blankRule,
+  card,
   cond,
   conditionType,
+  reidRule,
+  when,
   type AccessDecision,
   type Policy,
   type Rule,
 } from '../data'
-import { useBrand } from '../store'
+import { leaves } from '../predicate'
+import { useBrand, useNameLookup } from '../store'
+import { AudienceBar } from './audience-drawer'
+import { predicateParts } from './predicate-prose'
 import { diagnose, impactOf } from './diagnostics'
 import { AssignAppsDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
 import { GauntletDialog, GauntletPip } from './gauntlet-dialog'
@@ -72,6 +78,22 @@ import './builder-v3.css'
      where a chip row only lists its parts.
 
    Semantics are untouched: diagnose / impactOf are imported unchanged.
+
+   What v3 no longer edits, and why.
+
+   A rule's WHEN is now a disjunction of cards — conditions inside a card are
+   all required, cards are alternatives — and the audience belongs to the
+   policy rather than to each rule. Both of those were edited here, and both
+   editors were built on shapes that no longer exist: a flat condition list
+   with a clickable AND/OR on every row, and a per-rule group picker.
+
+   Neither is ported. v4 is the shipping candidate and owns the card composer;
+   four more editors over the same model is four more chances for them to
+   disagree about what a rule means, and this version is kept as a comparison
+   exhibit, not as a second way to author. So the check becomes a read-only
+   readout of the cards with a way through to v4, and the audience is shown as
+   the policy's, read-only, where the rule's used to be. Everything else — the
+   steps, the picker, ordering, outcomes, impact, the dialogs — is unchanged.
    -------------------------------------------------------------------------- */
 
 const GROUP_ICON: Record<string, LucideIcon> = {
@@ -99,7 +121,10 @@ const outcomeOf = (d: AccessDecision) => OUTCOMES.find((o) => o.id === d)!
 type StepState = 'ready' | 'setup' | 'warn'
 
 function stepState(rule: Rule, warned: boolean): StepState {
-  if (rule.conditions.some((c) => c.values.length === 0 || c.values.every((v) => !v.trim()))) return 'setup'
+  /* Every condition in the predicate, cards flattened away: an unset value
+     blocks publish wherever it sits, and which alternative it sits in does not
+     change that. */
+  if (leaves(rule.when).some((c) => c.values.length === 0 || c.values.every((v) => !v.trim()))) return 'setup'
   if (warned) return 'warn'
   return 'ready'
 }
@@ -168,7 +193,10 @@ export function PolicyBuilderV3({ policyId }: { policyId: string }) {
                 : t.options?.length
                   ? [t.options[0]]
                   : ['']
-        seed.conditions = [cond(typeId, t.operators[0], values)]
+        /* One condition, so one card. The picker inserts a step that checks a
+           single thing; an alternative is a second card and there is nowhere
+           in this version to make one. */
+        seed.when = when(card(cond(typeId, t.operators[0], values)))
         /* A library pick names the step after the object, not the condition
            type — "Office Network" says more than "Network Zone". */
         seed.name = preset
@@ -355,7 +383,13 @@ export function PolicyBuilderV3({ policyId }: { policyId: string }) {
                     setLive(`${r.name} deleted`)
                   }}
                   onDuplicate={() => {
-                    const copy = { ...r, id: `r${Date.now()}`, name: `${r.name} (copy)` }
+                    /* `reidRule` rather than a spread with a fresh rule id.
+                       A spread hands the copy the SAME card and condition
+                       objects, so the two steps would share ids — and ids now
+                       address cards and conditions in v4's composer and in the
+                       finding ids diagnostics builds. Editing one step would
+                       edit the other. */
+                    const copy = { ...reidRule(r), name: `${r.name} (copy)` }
                     patch({ rules: [...rules.slice(0, i + 1), copy, ...rules.slice(i + 1)] })
                   }}
                   onMove={(d) => move(i, i + d)}
@@ -556,33 +590,43 @@ function Step({
   reduce: boolean
 }) {
   const store = useBrand()
+  const resolve = useNameLookup()
   const impact = impactOf(policy, index, store.groups)
   const out = outcomeOf(rule.decision)
 
   /* The collapsed face is a sentence, not a chip row. Notion Automations and
      monday.com both do this and it is the reason their recipes read as rules
-     rather than as a list of parts. */
+     rather than as a list of parts.
+
+     It is built from `predicateParts` rather than from the conditions
+     directly, so the clause a step advertises is the same string the readout
+     below it, v4's composer and the review dialog print. The separators are
+     the model's own: `and` inside a card, `OR` where one card ends and the
+     next begins. */
+  const parts = predicateParts(rule.when, resolve)
+  const clauses = parts.flatMap((k, ki) =>
+    k.clauses.map((cl, n) => ({ ...cl, joiner: ki > 0 && n === 0 ? 'OR' : n > 0 ? 'and' : null })),
+  )
+  const shown = clauses.slice(0, 2)
+
   const sentence =
-    rule.conditions.length === 0 ? (
+    clauses.length === 0 ? (
       <>
         <em>Everyone</em> who reaches this step — {out.verb}
       </>
     ) : (
       <>
         When{' '}
-        {rule.conditions.slice(0, 2).map((c, n) => {
-          const t = conditionType(c.typeId)
-          return (
-            <span key={c.id}>
-              {n > 0 && <span className="bz__joiner"> {c.joiner} </span>}
-              <em>
-                {t.label} {c.operator} {c.values.filter(Boolean).join(', ') || '…'}
-              </em>
-            </span>
-          )
-        })}
-        {rule.conditions.length > 2 && <span className="bz__more"> +{rule.conditions.length - 2} more</span>} —{' '}
-        {out.verb}
+        {shown.map((cl) => (
+          <span key={cl.id}>
+            {cl.joiner && <span className="bz__joiner"> {cl.joiner} </span>}
+            <em>{cl.text}</em>
+          </span>
+        ))}
+        {clauses.length > shown.length && (
+          <span className="bz__more"> +{clauses.length - shown.length} more</span>
+        )}{' '}
+        — {out.verb}
       </>
     )
 
@@ -661,117 +705,80 @@ function Step({
                 />
               </Section>
 
-              {/* Gap 1. Every rule has an audience and impactOf() already reads
-                  it, so a builder that renders it but cannot edit it is showing
-                  you a value you are not allowed to touch. */}
-              <Section n={2} title="Choose who it applies to" done={rule.appliesTo.length > 0}>
-                <div className="bz__groups">
-                  {store.groups.map((g) => {
-                    const all = g.id === 'all'
-                    const on = rule.appliesTo.includes(g.id)
-                    return (
-                      <button
-                        key={g.id}
-                        type="button"
-                        role="checkbox"
-                        aria-checked={on}
-                        className={`bz__group ${on ? 'is-on' : ''}`}
-                        onClick={() => {
-                          /* "All Employees" is not one group among many — it is
-                             the whole directory, so it replaces a selection
-                             rather than joining it. Leaving both selectable
-                             would let you build "All AND Finance", which reads
-                             as narrower than it is. */
-                          if (all) return onPatch({ appliesTo: ['all'] })
-                          const rest = rule.appliesTo.filter((x) => x !== 'all')
-                          const next = rest.includes(g.id)
-                            ? rest.filter((x) => x !== g.id)
-                            : [...rest, g.id]
-                          onPatch({ appliesTo: next.length ? next : ['all'] })
-                        }}
-                      >
-                        <span className="bz__groupcheck" aria-hidden />
-                        <span className="bz__groupname">{g.name}</span>
-                        <span className="bz__groupn">{g.memberCount.toLocaleString()}</span>
-                      </button>
-                    )
-                  })}
-                </div>
+              {/* The per-rule group picker that used to be here is gone.
+                  It edited `rule.appliesTo`, and audience is no longer a
+                  property of a rule: it belongs to the policy, every rule
+                  inherits it, and no rule can be broader. A picker per step
+                  could build "step 2 covers Finance, step 3 covers everyone",
+                  which reads as a scoped policy and is not one.
+
+                  What impactOf() reads is what is drawn here — the policy's
+                  audience, read-only. Narrowing INSIDE a policy is still
+                  expressible and now says so: it is a Group or User Type check
+                  on the step, evaluated like every other check rather than as
+                  a second, invisible gate. */}
+              <Section n={2} title="Who this policy governs">
+                <AudienceBar audience={policy.audience} groups={store.groups} users={store.users} />
+                <p className="bz__hint" style={{ marginTop: 8 }}>
+                  The whole policy governs these people, this step included. It is set on the policy
+                  in v4, not on a step.
+                </p>
               </Section>
 
-              <Section n={3} title="Set up the check" done={rule.conditions.length > 0}>
-                {rule.conditions.length === 0 ? (
+              {/* The condition editor that used to be here is gone.
+                  It was a flat list of rows with a clickable AND/OR between
+                  them, and that shape no longer exists. A rule's WHEN is a
+                  disjunction of cards: conditions inside a card are all
+                  required, cards are alternatives, and there is no joiner to
+                  click because the card IS the joiner.
+
+                  Rebuilding it here would mean a fourth card composer over one
+                  model. v4 owns that one; this is the readout, and the button
+                  is the way to the editor. */}
+              <Section n={3} title="The check" done={rule.when.cards.length > 0}>
+                {rule.when.cards.length === 0 ? (
                   <p className="bz__hint">
                     No check — this step catches every sign-in that reaches it. That is valid, and it
                     also means nothing below it can ever run.
                   </p>
                 ) : (
-                  <ul className="bz__conds">
-                    {rule.conditions.map((c, ci) => {
-                      const t = conditionType(c.typeId)
-                      const blank = c.values.length === 0 || c.values.every((v) => !v.trim())
-                      return (
-                        <li key={c.id} className={blank ? 'is-blank' : ''}>
-                          {/* Gap 2. The joiner is on the model and diagnose()
-                              already warns when a rule mixes AND with OR, so
-                              the warning existed for a control the user could
-                              not reach. It sits on the condition it joins TO
-                              the previous one, which is what `joiner` means. */}
-                          {ci > 0 && (
-                            <button
-                              type="button"
-                              className={`bz__jn is-${c.joiner.toLowerCase()}`}
-                              aria-label={`Joiner before ${t.label}: ${c.joiner}. Click to change.`}
-                              onClick={() =>
-                                onPatch({
-                                  conditions: rule.conditions.map((x, n) =>
-                                    n === ci ? { ...x, joiner: x.joiner === 'AND' ? 'OR' : 'AND' } : x,
-                                  ),
-                                })
-                              }
-                            >
-                              {c.joiner}
-                            </button>
-                          )}
-                          <span className="bz__condname">{t.label}</span>
-                          <select
-                            aria-label={`${t.label} operator`}
-                            value={c.operator}
-                            onChange={(e) =>
-                              onPatch({
-                                conditions: rule.conditions.map((x, n) =>
-                                  n === ci ? { ...x, operator: e.target.value } : x,
-                                ),
-                              })
-                            }
-                          >
-                            {t.operators.map((o) => (
-                              <option key={o}>{o}</option>
-                            ))}
-                          </select>
-                          <ValueField
-                            type={t}
-                            values={c.values}
-                            onChange={(values) =>
-                              onPatch({
-                                conditions: rule.conditions.map((x, n) => (n === ci ? { ...x, values } : x)),
-                              })
-                            }
-                          />
-                          <button
-                            type="button"
-                            aria-label={`Remove ${t.label}`}
-                            onClick={() =>
-                              onPatch({ conditions: rule.conditions.filter((_, n) => n !== ci) })
-                            }
-                          >
-                            <X size={13} strokeWidth={2} />
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {predicateParts(rule.when, resolve).map((k, ki) => (
+                      <div key={k.id}>
+                        {/* Alternatives, so `OR` on its own line: two cards
+                            are two different ways for this step to match, and
+                            running them into one paragraph is exactly the
+                            reading the cards exist to prevent. */}
+                        {ki > 0 && <p className="bz__joiner">OR</p>}
+                        <p className="bz__sentence">
+                          {k.label && <strong>{k.label}: </strong>}
+                          {k.clauses.map((cl, n) => (
+                            <span key={cl.id}>
+                              {n > 0 && <span className="bz__joiner"> and </span>}
+                              <em>{cl.text}</em>
+                            </span>
+                          ))}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 )}
+
+                <p className="bz__hint" style={{ marginTop: 10 }}>
+                  Checks are grouped now — each box is a set that must all be true, and the boxes are
+                  alternatives. This version's editor was one flat list with a joiner between rows and
+                  cannot express a group, so it shows the check rather than pretending to edit it.
+                  Publish anything unsaved here first: v4 opens the saved policy.
+                </p>
+                <div style={{ marginTop: 8 }}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => store.go({ name: 'builder', policyId: policy.id })}
+                  >
+                    Edit in v4
+                  </Button>
+                </div>
               </Section>
 
               <Section n={4} title="Choose the outcome">
@@ -861,79 +868,12 @@ function Section({
   )
 }
 
-/* The value control follows the condition's own valueKind, so a zone offers the
-   zone library and a country offers countries. A single free-text box for all
-   of them is what makes a builder feel like a form over a database. */
-function ValueField({
-  type,
-  values,
-  onChange,
-}: {
-  type: ReturnType<typeof conditionType>
-  values: string[]
-  onChange: (v: string[]) => void
-}) {
-  const store = useBrand()
-  const v = values[0] ?? ''
+/* `ValueField` lived here — one control per valueKind, so a zone offered the
+   zone library and a country offered countries. It had exactly one caller, the
+   condition editor above, and it went with it: a value control with nothing to
+   edit is a component kept warm for a return that this version is not going to
+   make. v4's composer has its own, over the card model.
 
-  if (type.valueKind === 'zone') {
-    return (
-      <select aria-label="Zone" value={v} onChange={(e) => onChange([e.target.value])}>
-        <option value="">Choose a zone…</option>
-        {store.zones.map((z) => (
-          <option key={z.id} value={z.id}>
-            {z.name}
-          </option>
-        ))}
-      </select>
-    )
-  }
-  if (type.valueKind === 'fingerprint') {
-    return (
-      <select aria-label="Device posture" value={v} onChange={(e) => onChange([e.target.value])}>
-        <option value="">Choose a posture…</option>
-        {store.fingerprints.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-    )
-  }
-  if (type.options?.length) {
-    return (
-      <select aria-label={type.label} value={v} onChange={(e) => onChange([e.target.value])}>
-        <option value="">Choose…</option>
-        {type.options.map((o) => (
-          <option key={o}>{o}</option>
-        ))}
-      </select>
-    )
-  }
-  if (type.valueKind === 'time') {
-    return (
-      <span className="bz__times">
-        <input
-          type="time"
-          aria-label="From"
-          value={values[0] ?? '09:00'}
-          onChange={(e) => onChange([e.target.value, values[1] ?? '17:00'])}
-        />
-        <input
-          type="time"
-          aria-label="To"
-          value={values[1] ?? '17:00'}
-          onChange={(e) => onChange([values[0] ?? '09:00', e.target.value])}
-        />
-      </span>
-    )
-  }
-  return (
-    <input
-      aria-label={type.label}
-      placeholder="Enter a value…"
-      value={v}
-      onChange={(e) => onChange([e.target.value])}
-    />
-  )
-}
+   The step picker still seeds a sensible first value when it inserts a step —
+   see `insert` — so a new step is not born blank just because there is no
+   longer a field here to fill in. */

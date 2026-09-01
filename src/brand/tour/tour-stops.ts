@@ -30,10 +30,10 @@ export interface Stop {
   anchor?: string
   heading: string
   body: string
-  /** Switch the trail to this step before the stop is shown. */
-  step?: 'who' | 'when' | 'then' | 'check' | 'review'
-  /** Open this side panel before the stop is shown. */
-  panel?: 'preview' | 'review' | 'launch'
+/* `step` and `panel` are gone with the five-step trail and the three-faced side
+   panel they drove. Every stop now anchors to something that is simply on
+   screen, which is a better tour anyway: a stop that has to rearrange the app
+   before it can point at something is a stop about a mode, not about the work. */
   /** Replaces "Next" on the last stop. */
   finish?: string
 }
@@ -52,25 +52,21 @@ export const STOPS: Stop[] = [
   },
   {
     id: 'trail',
-    anchor: 'trail',
-    heading: 'A rule is four questions',
-    body: 'Who it applies to, when it applies, what happens, and what the checks say — one at a time, or all together.',
-    step: 'who',
+    anchor: 'audience',
+    heading: 'The audience belongs to the policy',
+    body: 'One audience over groups and named people, inherited by every rule — so no rule can quietly reach further than the policy does.',
   },
   {
     id: 'conditions',
     anchor: 'stage',
-    heading: 'Conditions compose',
-    body: 'Each row is one signal, coloured by the kind of thing it looks at, and the junction between two rows is yours to change.',
-    step: 'when',
+    heading: 'A box is an AND, a second box is an OR',
+    body: 'Everything inside one box must be true, and any one box is enough — which is the whole grammar, and why there is no operator here to get wrong.',
   },
   {
     id: 'answer',
-    anchor: 'panels',
+    anchor: 'try',
     heading: 'Ask what it would do',
-    body: 'Pick somebody and a situation, and the panel says which rule decides it and why — before anything is saved.',
-    step: 'when',
-    panel: 'preview',
+    body: 'Pick somebody and a situation, and the box that decides it lights up — before anything is saved.',
   },
   {
     id: 'publish',

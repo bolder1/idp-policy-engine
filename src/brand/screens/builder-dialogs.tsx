@@ -2,20 +2,10 @@ import { AlertTriangle, Info, XCircle } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useId, useMemo, useState } from 'react'
 
-import {
-  conditionType,
-  enforces,
-  zones as seedZones,
-  type Group,
-  type Policy,
-  type PolicyType,
-  type Rule,
-} from '../data'
-import { seedProfiles } from '../fingerprint'
-import { seedHooks } from '../hooks'
+import { enforces, type Policy, type PolicyType, type Rule } from '../data'
 import { Badge, Button, Counter, DecisionChip, Field, Modal, StatusPill, Tabs } from '../kit'
 import { AppLogo } from '../logos/AppLogo'
-import { useBrand } from '../store'
+import { useBrand, useNameLookup } from '../store'
 import { diagnose, type Diagnostic } from './diagnostics'
 
 import './builder-dialogs.css'
@@ -34,126 +24,14 @@ import './builder-dialogs.css'
    not the dialog's.
    -------------------------------------------------------------------------- */
 
-/* --- Prose ----------------------------------------------------------------- */
+/* --- Prose -----------------------------------------------------------------
 
-export interface RuleProse {
-  /** Everything after "IF:" — audience, then the conditions with their joiners. */
-  iff: string
-  /** Everything after "THEN: →" — what the decision does, in one sentence. */
-  then: string
-}
+   Was six divergent implementations of "condition, joiner, condition". Now one,
+   in predicate-prose.ts, re-exported here so the callers that import it from
+   this module keep working. */
 
-/* Zone and fingerprint conditions store an id, and the object it points at can be
-   renamed after the rule was written. The resolver is how a caller hands in the
-   live directory; without one the seed is used, which is right for tests and
-   for any caller that has no store. */
-type NameLookup = (kind: 'zone' | 'fingerprint' | 'hook', id: string) => string | undefined
-
-
-function seedName(kind: 'zone' | 'fingerprint' | 'hook', id: string) {
-  if (kind === 'zone') return seedZones.find((z) => z.id === id)?.name
-  if (kind === 'hook') return seedHooks.find((h) => h.id === id)?.name
-  return seedProfiles.find((p) => p.id === id)?.name
-}
-
-/* One condition as English.
-
-   The type label is dropped for zone and fingerprint because the object's own name
-   already says which field it is — "Not recognised by Corporate managed" reads
-   as a sentence where "Device Fingerprint not recognised by Corporate managed"
-   reads as a form field. Every other kind keeps its label, because
-   "is not India" alone does not say what is not India. */
-function conditionSentence(
-  c: { typeId: string; operator: string; values: string[] },
-  resolve?: NameLookup,
-): string {
-  const t = conditionType(c.typeId)
-  const raw = c.values.filter((v) => v.trim() !== '')
-
-  let value: string
-  if (t.valueKind === 'zone' || t.valueKind === 'fingerprint' || t.valueKind === 'hook') {
-    const kind = t.valueKind
-    value = raw.map((v) => resolve?.(kind, v) ?? seedName(kind, v) ?? v).join(', ')
-  } else if (t.valueKind === 'time' || t.valueKind === 'range') {
-    value = raw.join('–')
-  } else {
-    value = raw.join(', ')
-  }
-
-  // Said out loud rather than left blank: diagnose() calls this an error, and
-  // the prose has to agree with the panel next to it.
-  if (!value) value = '(no value set)'
-
-  /* The type label is dropped wherever the object's own name already says which
-     field this is. "Fraud score lookup returns true" reads as a sentence;
-     "External hook Fraud score lookup returns true" reads as a form field with
-     its label left on. */
-  const body =
-    t.valueKind === 'zone' || t.valueKind === 'fingerprint'
-      ? `${c.operator} ${value}`
-      : t.valueKind === 'hook'
-        ? `${value} ${c.operator}`
-        : `${t.label} ${c.operator} ${value}`
-
-  /* Not capitalised: this is only ever embedded mid-sentence, after "users in
-     X AND ". For zone/fingerprint the label is dropped so `body` starts with the
-     operator, and capitalising gave "... AND Not recognised by Corporate
-     Managed". Those two valueKinds were the only cases where it fired at all —
-     everywhere else the label already carried a capital. */
-  return body
-}
-
-function decisionSentence(rule: Rule): string {
-  if (rule.decision === 'deny') return 'Access is blocked. No alternative path.'
-
-  if (rule.decision === '2fa') {
-    if (rule.secondFactor === 'specific') {
-      const named = rule.secondFactorMethods ?? []
-      return named.length > 0
-        ? `The user completes a second factor — ${named.join(' or ')} — before access is granted.`
-        : 'The user completes a second factor before access is granted, but no method is chosen yet.'
-    }
-    if (rule.secondFactor === 'chain') {
-      const steps = rule.methodChain ?? []
-      return steps.length > 0
-        ? `The user completes every step in order — ${steps.join(' → ')} — before access is granted.`
-        : 'The user completes an ordered chain of factors before access is granted.'
-    }
-    if (rule.secondFactor === 'preferred') {
-      return 'The user completes their preferred second factor before access is granted.'
-    }
-    return 'The user completes any enabled second factor before access is granted.'
-  }
-
-  if (rule.firstFactor === 'Any') {
-    return 'Access is granted after any single enabled factor. Nothing further is asked.'
-  }
-  if (rule.firstFactor === 'Specific') {
-    return `Access is granted after ${rule.firstFactorMethod ?? 'the chosen factor'} alone. Nothing further is asked.`
-  }
-  return 'Access is granted after the password alone. No second factor is requested.'
-}
-
-/**
- * The rule as the two lines V0 prints under its name. Generated from the same
- * condition array the editor writes, joiner included — the current prototype
- * rewrites OR as AND in its review copy, and one source makes that class of bug
- * impossible.
- */
-export function ruleSentence(rule: Rule, groups: Group[], resolve?: NameLookup): RuleProse {
-  const who = rule.appliesTo.map((id) => groups.find((g) => g.id === id)?.name ?? id).join(', ')
-
-  const iff =
-    rule.conditions.length === 0
-      ? `users in ${who} — any sign-in that reaches this rule`
-      : `users in ${who} AND ${rule.conditions
-          .map((c, i) =>
-            i === 0 ? conditionSentence(c, resolve) : `${c.joiner} ${conditionSentence(c, resolve)}`,
-          )
-          .join(' ')}`
-
-  return { iff, then: decisionSentence(rule) }
-}
+export { ruleSentence, type NameLookup, type RuleProse } from './predicate-prose'
+import { ruleSentence } from './predicate-prose'
 
 /* --- Assign apps ------------------------------------------------------------ */
 
@@ -353,14 +231,8 @@ export function ReviewDialog({
   onAssignApps?: () => void
 }) {
   const store = useBrand()
+  const resolve = useNameLookup()
   const reduce = useReducedMotion()
-
-  const resolve: NameLookup = (kind, id) =>
-    kind === 'zone'
-      ? store.zoneById(id)?.name
-      : kind === 'hook'
-        ? store.hookById(id)?.name
-        : store.fingerprintById(id)?.name
 
   const diagnostics = diagnose(policy, store.groups, store.hooks)
   /* Only errors on rules that actually run can block the save. diagnose()
@@ -425,7 +297,7 @@ export function ReviewDialog({
 
         <ol className="bdlg-rev__rules">
           {policy.rules.map((rule, i) => {
-            const { iff, then } = ruleSentence(rule, store.groups, resolve)
+            const { iff, then } = ruleSentence(rule, resolve)
             const mine = diagnostics.filter((d) => d.ruleIndex === i)
             return (
               <motion.li

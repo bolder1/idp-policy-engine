@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Swords, X } from 'lucide-react'
 
 import { Button } from '../kit'
 import { TourHero } from './TourHero'
-import { STOPS, markTourSeen, type Stop } from './tour-stops'
+import { STOPS, markTourSeen } from './tour-stops'
 
 /* -----------------------------------------------------------------------------
    The builder tour.
@@ -70,14 +70,11 @@ const COPY_ID = 'btr-copy'
 export function Tour({
   open,
   onClose,
-  onStep,
-  onPanel,
+
   onFinish,
 }: {
   open: boolean
   onClose: () => void
-  onStep: (s: NonNullable<Stop['step']>) => void
-  onPanel: (p: Stop['panel']) => void
   /** The last stop hands over to the thing it just described. */
   onFinish: () => void
 }) {
@@ -97,15 +94,11 @@ export function Tour({
      render. Held in a ref, the drive effect below can depend on the stop alone —
      otherwise it re-runs on every render, which drives the builder, which
      re-renders, which drives it again. */
-  const drive = useRef({ onStep, onPanel })
-  drive.current = { onStep, onPanel }
 
   /* Drive the builder into the state the stop describes, before measuring — the
      anchor for the conditions stop does not exist until the trail is on When. */
   useEffect(() => {
     if (!open) return
-    if (stop.step) drive.current.onStep(stop.step)
-    drive.current.onPanel(stop.panel)
   }, [open, stop])
 
   const measure = useCallback(() => {

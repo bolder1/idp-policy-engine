@@ -10,6 +10,7 @@ import {
 } from 'react'
 
 import {
+  reidRule,
   templates as seedTemplates,
   type AccessDecision,
   type App,
@@ -18,14 +19,16 @@ import {
   type Policy,
   type Rule,
   type Template,
+  type User,
   type Zone,
 } from './data'
 import { type FingerprintProfile } from './fingerprint'
 import { type Hook } from './hooks'
-import { appsAt, fingerprintsAt, groupsAt, hooksAt, methodSetsAt, methodsAt, policiesAt, zonesAt } from './fixtures'
+import { appsAt, fingerprintsAt, groupsAt, hooksAt, methodSetsAt, methodsAt, policiesAt, usersAt, zonesAt } from './fixtures'
 import type { AuthMethod } from './methods'
 import { TAB_SCREEN, personaById, type PersonaId } from './personas'
 import { featuresOf, type Edition, type Features } from './edition'
+import type { NameLookup } from './screens/predicate-prose'
 
 /* Who is looking. Not a permission check — the prototype has no auth — but the
    same split the real product makes: an admin decides what may exist, a person
@@ -53,6 +56,12 @@ export type BrandScreen =
 interface BrandStore {
   apps: App[]
   groups: Group[]
+  /* The directory. Fabricated fixture data — see the note on `users` in
+     data.ts. A policy audience can name individuals, so there has to be a
+     directory to name them from. */
+  users: User[]
+  /** People the tenant has that this fixture does not list, for the pickers to admit to. */
+  unlistedUsers: number
   zones: Zone[]
   fingerprints: FingerprintProfile[]
   /* External hooks. A library object like zones, for the reason set out in
@@ -97,6 +106,13 @@ interface BrandStore {
 
   appById: (id: string) => App
   groupById: (id: string) => Group
+  /* Returns undefined for an unknown id, deliberately — no `?? users[0]`.
+
+     `groupById` below falls back to the first group, which is why a stale group
+     reference renders as a real group instead of failing. That bug is not
+     copied to people: a policy that names somebody who has left should say so,
+     not silently point at a colleague. */
+  userById: (id: string) => User | undefined
   zoneById: (id: string) => Zone | undefined
   fingerprintById: (id: string) => FingerprintProfile | undefined
   hookById: (id: string) => Hook | undefined
@@ -177,6 +193,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [methods, setMethods] = useState<AuthMethod[]>(() => methodsAt('medium'))
   const [apps, setApps] = useState<App[]>(() => appsAt('medium'))
   const [groups, setGroups] = useState<Group[]>(() => groupsAt('medium'))
+  const [directory, setDirectory] = useState(() => usersAt('medium'))
   const [edition, setEdition] = useState<Edition>('full')
   const [persona, setPersonaId] = useState<PersonaId>('manager')
   const [role, setRoleState] = useState<Role>('admin')
@@ -203,6 +220,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     setHooks(hooksAt(depth))
     setApps(appsAt(depth))
     setGroups(groupsAt(depth))
+    setDirectory(usersAt(depth))
     setOverrides({})
     setScreen(TAB_SCREEN[landing])
   }, [])
@@ -216,6 +234,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     () => ({
       apps,
       groups,
+      users: directory.people,
+      unlistedUsers: directory.unlisted,
       zones,
       fingerprints,
       hooks,
@@ -237,6 +257,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
       appById: (id) => apps.find((a) => a.id === id) ?? apps[0],
       groupById: (id) => groups.find((g) => g.id === id) ?? groups[0],
+      userById: (id) => directory.people.find((u) => u.id === id),
       // Reads live state, not the seed — otherwise a deleted or renamed zone
       // keeps resolving everywhere it is referenced.
       zoneById: (id) => zones.find((z) => z.id === id),
@@ -286,7 +307,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
             p.id === targetPolicyId
               ? {
                   ...p,
-                  rules: [...p.rules, { ...r, id: `r${Date.now()}-${p.rules.length}` }],
+                  /* Fresh ids all the way down, not just on the rule.
+
+                     A shallow spread shares every Condition and ConditionCard
+                     object with the original, and both the linter and the
+                     composer address those by id — so editing the copy would
+                     edit the rule it was copied from. */
+                  rules: [...p.rules, reidRule(r)],
                   lastModified: 'Just now',
                   modifiedBy: 'You',
                 }
@@ -319,7 +346,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
       showToast,
     }),
-    [policies, zones, fingerprints, hooks, apps, groups, edition, persona, setPersona, role, setRole, methodSets, methods, screen, showToast, gauntletOverrides],
+    [policies, zones, fingerprints, hooks, apps, groups, directory, edition, persona, setPersona, role, setRole, methodSets, methods, screen, showToast, gauntletOverrides],
   )
 
   return (
@@ -339,4 +366,26 @@ export function useBrand(): BrandStore {
   const s = useContext(Ctx)
   if (!s) throw new Error('useBrand must be used inside BrandProvider')
   return s
+}
+
+/* Resolve an id stored in a condition to the live name of the thing it points
+   at. Zones, device profiles, hooks, groups and people can all be renamed after
+   a rule names them, so every surface that prints a rule needs this and every
+   surface must use the same one — otherwise two screens disagree about what a
+   rule says, which is the failure the single prose renderer exists to prevent. */
+export function useNameLookup(): NameLookup {
+  const s = useBrand()
+  return useCallback<NameLookup>(
+    (kind, id) =>
+      kind === 'zone'
+        ? s.zoneById(id)?.name
+        : kind === 'hook'
+          ? s.hookById(id)?.name
+          : kind === 'group'
+            ? s.groups.find((g) => g.id === id)?.name
+            : kind === 'user'
+              ? s.userById(id)?.name
+              : s.fingerprintById(id)?.name,
+    [s],
+  )
 }

@@ -5,6 +5,7 @@ import { GripVertical, Home, KeyRound, Plus, ShieldAlert, UserCheck } from 'luci
 import type { Policy } from '../data'
 import { ruleState } from './rule-form'
 import type { Diagnostic } from './diagnostics'
+import { predicateSummary } from './predicate-prose'
 
 /* -----------------------------------------------------------------------------
    The flow — v1's left side, brought forward.
@@ -121,10 +122,11 @@ export function FlowRail({
 
                     <button type="button" className="bf__nodeselect" aria-pressed={selected === i} onClick={() => onSelect(i)}>
                       <strong title={r.name}>{r.name}</strong>
+                      {/* The rule's SHAPE, not just its size — "2 alternatives"
+                          tells you there is an OR in there without opening it,
+                          which is the one thing a count could never say. */}
                       <em>
-                        {r.conditions.length === 0
-                          ? 'Always matches'
-                          : `${r.conditions.length} condition${r.conditions.length === 1 ? '' : 's'}`}
+                        {predicateSummary(r.when)}
                         {!r.enabled && ' · off'}
                       </em>
                     </button>

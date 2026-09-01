@@ -50,9 +50,12 @@ function match(p: Policy, app: App, group: Group): Cell | null {
   // Every rule that could apply, not just the first. Which one wins depends on
   // conditions evaluated at sign-in, so the honest static answer is the range —
   // and the number an admin acts on is the strictest thing that can happen.
-  const applicable = p.rules.filter(
-    (r) => r.enabled && (r.appliesTo.includes('all') || r.appliesTo.includes(group.id)),
-  )
+  /* The audience test moved up: it is the POLICY that governs a group now, so
+     a policy either covers this column or it does not, and every one of its
+     rules covers it equally. Named individuals do not appear on this matrix at
+     all — see the footnote the table renders under it. */
+  if (!p.audience.everyone && !p.audience.groupIds.includes(group.id)) return null
+  const applicable = p.rules.filter((r) => r.enabled)
   if (applicable.length === 0) return null
 
   const worst = applicable.reduce((a, b) => (STRICTNESS[b.decision] > STRICTNESS[a.decision] ? b : a))

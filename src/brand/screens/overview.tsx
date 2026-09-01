@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { AlertTriangle, Check, LogIn } from 'lucide-react'
 
 import { Button, DecisionChip, Modal } from '../kit'
-import { conditionType, type Policy } from '../data'
+import { type Policy } from '../data'
 import { shadowedBy, type Diagnostic } from './diagnostics'
-import type { SimEnv } from './simulate'
+import { predicateSentence, type NameLookup } from './predicate-prose'
 
 /* -----------------------------------------------------------------------------
    Reading the policy.
@@ -26,37 +26,26 @@ import type { SimEnv } from './simulate'
    property of the SEQUENCE — invisible while you are looking at any one rule.
    -------------------------------------------------------------------------- */
 
-function predicate(policy: Policy, index: number, env: SimEnv): string {
-  const r = policy.rules[index]
-  if (r.conditions.length === 0) return 'everyone who reaches it'
-  return r.conditions
-    .map((c, i) => {
-      const t = conditionType(c.typeId)
-      const shown =
-        t.valueKind === 'zone'
-          ? c.values.map(env.zoneName).join(', ')
-          : t.valueKind === 'fingerprint'
-            ? c.values.map(env.fingerprintName).join(', ')
-            : t.valueKind === 'time'
-              ? c.values.filter(Boolean).join('–')
-              : c.values.filter(Boolean).join(', ')
-      const body = `${t.label} ${c.operator} ${shown || '…'}`
-      return i === 0 ? body : `${c.joiner} ${body}`
-    })
-    .join(' ')
+/* One renderer, shared with every other surface that prints a rule. This used
+   to be a fifth private implementation of "condition, joiner, condition" — and
+   like the others it flattened the joiners, so it printed the wrong predicate
+   for any rule that mixed them. */
+function predicate(policy: Policy, index: number, resolve: NameLookup): string {
+  const p = policy.rules[index].when
+  return p.cards.length === 0 ? 'everyone who reaches it' : predicateSentence(p, resolve)
 }
 
 export function PolicyOverview({
   open,
   policy,
-  env,
+  resolve,
   diagnostics,
   onClose,
   onJump,
 }: {
   open: boolean
   policy: Policy
-  env: SimEnv
+  resolve: NameLookup
   diagnostics: Diagnostic[]
   onClose: () => void
   onJump: (index: number) => void
@@ -137,7 +126,7 @@ export function PolicyOverview({
                     </span>
                     <h3>{r.name}</h3>
                     <p>
-                      When <em>{predicate(policy, i, env)}</em>
+                      When <em>{predicate(policy, i, resolve)}</em>
                     </p>
                     {r.description && <p className="bov__why">{r.description}</p>}
                   </div>

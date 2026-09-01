@@ -208,6 +208,9 @@
 }
 
 /* `.bshell__quick` — a floating rail of two icon buttons down the right edge —
-   stood here. Removed with the markup; the topbar still carries both. */
+   stood here. Removed with the markup; the topbar still carries both.
 
-}
+   A stray `}` was left behind with it, closing a media query whose contents had
+   gone. The dev server tolerated the empty rule and lightningcss did not, so
+   `npm run build` failed on it — invisible in development, fatal in
+   production. */

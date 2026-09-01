@@ -1,29 +1,7 @@
 /* ---------------------------------------------------------------------------
    External hooks. Shaped like the zones library, because a hook is the same
    kind of object — named once, referenced everywhere, dangerous to edit.
-   --------------------------------------------------------------------------- */
-
-.bhk__empty {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-5);
-  max-width: 520px;
-  margin: var(--space-12) auto;
-  text-align: center;
-}
-.bhk__empty > span {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-xl);
-  background: var(--surface-inset);
-  color: var(--text-tertiary);
-}
-.bhk__empty h2 { margin: 0; font-size: var(--fs-xl); }
-.bhk__empty p { margin: 0; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.55; }
-
-.bhk__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-6); }
+   --------------------------------------------------------------------------- *.bhk__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-6); }
 
 .bhk__card {
   padding: var(--space-6);

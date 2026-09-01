@@ -73,6 +73,25 @@ export type AttrConfig =
       groups: { label: string; values: string[] }[]
       value: AttrRuleValue
     }
+  /* A comparison against a version the admin TYPES.
+
+     `rule` offers a dropdown of known values, which is right for a closed set
+     and wrong for a version: the list is never complete, it is stale the week
+     after a release, and the value an admin has in mind is usually the one that
+     just shipped. A free field is also the honest shape — an admin drawing a
+     floor under Android knows the number, and making them find it in thirty
+     options is asking them to recognise what they can already state.
+
+     Operators are shared across the four version attributes because a version
+     compares the same way whatever platform it belongs to. */
+  | {
+      kind: 'version'
+      label: string
+      value: AttrRuleValue
+      /** Real examples for THIS platform, since the formats genuinely differ. */
+      placeholder: string
+      hint: string
+    }
 
 export interface Attribute {
   id: string
@@ -95,162 +114,125 @@ export interface Attribute {
   config?: AttrConfig
 }
 
-/* --- The master, and why it is fourteen ----------------------------------------
-   The sheet has thirty-eight and this shows fourteen. That is not a
-   transcription that lost twenty-four rows, it is a decision about what a
-   profile is for.
+/* --- The master, and why it is five --------------------------------------------
+   This was thirty-eight in the sheet, then fourteen on the screen, and it is
+   five here. That is not attrition, it is the list narrowing onto the two
+   questions a device profile is actually asked in this product:
 
-   Thirty-eight is a catalogue: it needs a filing scheme to be navigable, and
-   the filing scheme needs a rail, and the rail needs counts, and by then the
-   screen is about finding an attribute rather than about deciding which ones
-   identify a machine. Most of the twenty-four were also the weakest signals in
-   the sheet — behavioural patterns that need months of history, browser
-   properties that change on every update — so the list was long AND its tail
-   was the part nobody should pick.
+     what KIND of device is this, and what is it RUNNING?
 
-   Fourteen fits on one screen with nothing above it. No categories, no filter,
-   no search over five groups: the list IS the interface.
+   Everything else the sheet offered — canvas hashes, ISP, MAC, TPM, geolocation
+   — answers "is this the same machine as last time", which is a different
+   product surface with different plumbing. They are not deleted from the sheet;
+   they are simply not what this screen configures today.
 
-   Ordered agentless first. Nine of these a browser and the request give up on
-   their own; five need an agent, and an agentless profile shows them greyed
-   with their reason. Putting the five last means such a profile meets what it
-   CAN have before what it cannot. */
+   The five are one form-factor question and four version questions, one per
+   platform. Four rather than one combined "OS version" because a comparison
+   only means anything inside a platform: "greater than 14" is a coherent thing
+   to ask of Android and of iOS, and asking it of both at once is not a
+   question. A profile names the platforms it cares about and leaves the rest
+   alone.
+
+   Everything here is readable without an agent — a form factor and an OS
+   version arrive with the request — so nothing in this list carries
+   `needsAgent`, and an agentless profile can use all five. */
+/* The comparisons a version supports — a symbol, and the words for it.
+
+   Stored as an id and shown as a SYMBOL, which is the shape Figma's conditional
+   row uses and the right one here. A version comparison is an expression, and
+   an expression reads as one line when its operator is one glyph: `Windows OS
+   version  ≥  10` is a sentence, where "Windows OS version · is at least ·
+   10" is three controls that happen to be adjacent. The words are not lost —
+   they are how the menu names each symbol, so nobody has to know what ≥ means
+   before choosing it.
+
+   Both directions and both edges, because a policy is written either way round:
+   ≥ 14 draws a floor and < 14 names what to challenge, and those are not the
+   same rule with the sign flipped — one says who may in, the other who gets
+   stopped. = and ≠ pin an exact build, which is what a rollback or a known-bad
+   release needs. */
+export interface VersionOp {
+  id: string
+  label: string
+  symbol: string
+}
+
+export const VERSION_OPS: VersionOp[] = [
+  { id: 'gte', label: 'Greater than or equal to', symbol: '≥' },
+  { id: 'gt', label: 'Greater than', symbol: '>' },
+  { id: 'lte', label: 'Less than or equal to', symbol: '≤' },
+  { id: 'lt', label: 'Less than', symbol: '<' },
+  { id: 'eq', label: 'Equal to', symbol: '=' },
+  { id: 'ne', label: 'Not equal to', symbol: '≠' },
+]
+
+/** Falls back rather than rendering an empty token: an operator that went out
+    of the list should read as the nearest thing, not as a blank chip. */
+export const versionOp = (id: string): VersionOp =>
+  VERSION_OPS.find((o) => o.id === id) ?? VERSION_OPS[0]
+
 export const ATTRIBUTES: Attribute[] = [
   {
     id: 'device-type', name: 'Device type',
-    purpose: 'Desktop, laptop, mobile or tablet. Different form factors carry different risk.',
+    purpose: 'The form factor the request came from. A laptop and a phone are not the same risk, and some apps have no business being opened on one of them.',
     priority: 'Low', weight: 5, phase: 1,
-    config: { kind: 'choice', label: 'Treat a change as', value: 'Significant', options: ['Significant', 'Minor', 'Ignore'] },
+    /* Three, and no "Desktop". The distinction that pays is portable versus
+       not, and a desktop and a laptop answer that the same way for every rule
+       anyone writes here — splitting them adds an option and no decision. */
+    config: {
+      kind: 'choice',
+      label: 'Device type',
+      value: 'Laptop',
+      options: ['Mobile', 'Tablet', 'Laptop'],
+    },
   },
   {
-    id: 'os', name: 'Operating system and version',
-    purpose: 'An unpatched OS is a reason to ask for more, independent of whether the device is known.',
+    id: 'os-windows', name: 'Windows OS version',
+    purpose: 'The Windows build the request came from. Compare it to draw a floor under what may sign in.',
     priority: 'High', weight: 20, phase: 1,
-    /* The worked example for the rule kind. "Matched on major version" answers
-       how loosely to compare; it cannot answer "not Android 12 or below",
-       which is the question an unpatched-OS policy is actually made of. */
     config: {
-      kind: 'rule',
-      label: 'Operating system',
-      operators: ['is', 'is not', 'is at least', 'is below'],
-      groups: [
-        { label: 'Windows', values: ['Windows 11 24H2', 'Windows 11 23H2', 'Windows 10 22H2', 'Windows 10 21H2'] },
-        { label: 'macOS', values: ['macOS 15 Sequoia', 'macOS 14 Sonoma', 'macOS 13 Ventura'] },
-        { label: 'Android', values: ['Android 15', 'Android 14', 'Android 13', 'Android 12'] },
-        { label: 'iOS', values: ['iOS 18', 'iOS 17', 'iOS 16'] },
-        { label: 'Linux', values: ['Ubuntu 24.04 LTS', 'Ubuntu 22.04 LTS', 'RHEL 9'] },
-      ],
-      value: { op: 'is at least', value: 'Windows 10 22H2' },
+      kind: 'version',
+      label: 'Windows version',
+      value: { op: 'gte', value: '10' },
+      placeholder: '10, 11, 10.0.19045',
+      hint: 'A build number works as well as a major version — 10, 11, 22H2, 10.0.19045.',
     },
   },
   {
-    id: 'browser', name: 'Browser and version',
-    purpose: 'Changes on every browser update, so it is noisy unless matched loosely.',
-    priority: 'Medium', weight: 10, phase: 1,
-    /* Same shape as the OS, and for the same reason: "at least Chrome 130" is
-       a policy, "family only" is a comparison setting. */
+    id: 'os-android', name: 'Android OS version',
+    purpose: 'The Android version the request came from. Compare it to keep unpatched handsets out.',
+    priority: 'High', weight: 20, phase: 1,
     config: {
-      kind: 'rule',
-      label: 'Browser',
-      operators: ['is', 'is not', 'is at least', 'is below'],
-      groups: [
-        { label: 'Chrome', values: ['Chrome 131', 'Chrome 130', 'Chrome 129'] },
-        { label: 'Edge', values: ['Edge 131', 'Edge 130'] },
-        { label: 'Safari', values: ['Safari 18', 'Safari 17'] },
-        { label: 'Firefox', values: ['Firefox 133', 'Firefox 132'] },
-      ],
-      value: { op: 'is at least', value: 'Chrome 130' },
+      kind: 'version',
+      label: 'Android version',
+      value: { op: 'gte', value: '13' },
+      placeholder: '13, 14, 15',
+      hint: 'Android numbers its releases whole — 13, 14, 15.',
     },
   },
   {
-    id: 'canvas', name: 'Canvas fingerprint',
-    purpose: 'A rendering signature derived from the GPU and font stack.',
-    priority: 'Medium', weight: 10, phase: 1,
-  },
-  {
-    id: 'locale', name: 'Language and locale',
-    purpose: 'Stable for most people, and a strong tell when it moves.',
-    priority: 'Medium', weight: 5, phase: 1,
-  },
-  {
-    id: 'ip', name: 'IP address',
-    purpose: 'Public and private. Changes constantly on mobile networks.',
-    priority: 'Medium', weight: 10, phase: 1,
-    /* Ranges rather than a precision level. "Match on subnet" says how much of
-       the address to compare and never says WHICH — so a profile could not
-       express "from the office ranges, and nowhere else", which is the only
-       thing most people want an IP condition for.
-
-       The ranges below stand in for a tenant's own. A real deployment reads
-       them from the zones already defined next door rather than from a list
-       shipped in the master. */
+    id: 'os-ios', name: 'iOS version',
+    purpose: 'The iOS version the request came from. Compare it to keep unpatched phones out.',
+    priority: 'High', weight: 20, phase: 1,
     config: {
-      kind: 'rule',
-      label: 'IP address',
-      operators: ['is in', 'is not in'],
-      groups: [
-        { label: 'Private ranges', values: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'] },
-        { label: 'Office ranges', values: ['203.0.113.0/24', '198.51.100.0/24'] },
-      ],
-      value: { op: 'is in', value: '10.0.0.0/8' },
+      kind: 'version',
+      label: 'iOS version',
+      value: { op: 'gte', value: '17' },
+      placeholder: '17, 18.1, 18.1.2',
+      hint: 'Major, minor and patch all work — 17, 18.1, 18.1.2.',
     },
   },
   {
-    id: 'isp', name: 'ISP and carrier',
-    purpose: 'Stable for a fixed line, and a good proxy for "somewhere else" on mobile.',
-    priority: 'Medium', weight: 10, phase: 1,
-  },
-  {
-    id: 'geo', name: 'Geolocation',
-    purpose: 'Country, region, city. The signal behind impossible-travel checks.',
-    priority: 'High', weight: 10, phase: 1,
-    /* Places, not precisions, for the same reason as the address above: the
-       useful condition names somewhere. */
+    id: 'os-macos', name: 'macOS version',
+    purpose: 'The macOS version the request came from. Compare it to draw a floor under what may sign in.',
+    priority: 'High', weight: 20, phase: 1,
     config: {
-      kind: 'rule',
-      label: 'Location',
-      operators: ['is in', 'is not in'],
-      groups: [
-        { label: 'Countries', values: ['India', 'United States', 'United Kingdom', 'Germany', 'Singapore'] },
-        { label: 'Regions', values: ['Maharashtra', 'Karnataka', 'California', 'Bavaria'] },
-      ],
-      value: { op: 'is in', value: 'India' },
+      kind: 'version',
+      label: 'macOS version',
+      value: { op: 'gte', value: '14' },
+      placeholder: '14, 15.1, 15.1.1',
+      hint: 'The version number, not the cat or the mountain — 14, 15.1.',
     },
-  },
-  {
-    id: 'vpn', name: 'Proxy or VPN',
-    purpose: 'A VPN hides every other network signal, which is why it is worth its own row.',
-    priority: 'High', weight: 5, phase: 1,
-    config: { kind: 'choice', label: 'When detected', value: 'Challenge', options: ['Deny', 'Challenge', 'Flag only'] },
-  },
-
-  /* The five only an agent can read. Last, so an agentless profile meets the
-     nine it can have before the five it cannot — those render greyed, with the
-     reason on the row. */
-  {
-    id: 'tpm', name: 'TPM ID',
-    purpose: 'The Trusted Platform Module identifier. The strongest signal available, where a TPM exists.',
-    priority: 'High', weight: 30, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'machine-sid', name: 'Machine SID',
-    purpose: 'The Windows security identifier for the machine.',
-    priority: 'High', weight: 30, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'motherboard', name: 'Motherboard serial',
-    purpose: 'Unique to the board. Effectively the machine itself.',
-    priority: 'High', weight: 30, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'mac', name: 'MAC address',
-    purpose: 'The network adapter address. Strong, but changes when the adapter does.',
-    priority: 'High', weight: 30, phase: 1, needsAgent: true,
-  },
-  {
-    id: 'secure-boot', name: 'Secure Boot and certificates',
-    purpose: 'Firmware integrity. Off is not proof of anything, but it is worth knowing.',
-    priority: 'High', weight: 20, phase: 1, needsAgent: true,
   },
 ]
 
@@ -375,8 +357,13 @@ export const seedProfiles: FingerprintProfile[] = [
     id: 'fp-corp',
     name: 'Corporate managed',
     mode: 'match',
-    enabled: ['tpm', 'machine-sid', 'motherboard', 'secure-boot', 'os'],
-    config: { os: { op: 'is at least', value: 'Windows 10 22H2' } },
+    /* A managed Windows fleet: the form factor it should be, and a floor
+       under the build. */
+    enabled: ['device-type', 'os-windows'],
+    config: {
+      'device-type': 'Laptop',
+      'os-windows': { op: 'gte', value: '10' },
+    },
     weights: {},
     /* Every signal it names is one only an agent can read. */
     reach: 'agent',
@@ -391,12 +378,13 @@ export const seedProfiles: FingerprintProfile[] = [
     id: 'fp-byod',
     name: 'BYOD risk scoring',
     mode: 'risk',
-    enabled: ['device-type', 'os', 'browser', 'canvas', 'locale', 'ip', 'isp', 'geo', 'vpn'],
+    /* Personal phones and tablets, so both mobile platforms are named and the
+       floor is the one the vendor still patches. */
+    enabled: ['device-type', 'os-android', 'os-ios'],
     config: {
-      browser: { op: 'is at least', value: 'Chrome 130' },
-      ip: { op: 'is in', value: '10.0.0.0/8' },
-      geo: { op: 'is in', value: 'India' },
-      vpn: 'Challenge',
+      'device-type': 'Mobile',
+      'os-android': { op: 'gte', value: '13' },
+      'os-ios': { op: 'gte', value: '17' },
     },
     weights: {},
     /* Personal machines, so nothing to install: browser and network only. */
@@ -412,8 +400,8 @@ export const seedProfiles: FingerprintProfile[] = [
     id: 'fp-kiosk',
     name: 'Shared kiosk',
     mode: 'match',
-    enabled: ['machine-sid', 'mac'],
-    config: {},
+    enabled: ['device-type'],
+    config: { 'device-type': 'Laptop' },
     weights: {},
     /* A kiosk is a known machine, and nobody should be able to enrol another
        one by walking up to it. */

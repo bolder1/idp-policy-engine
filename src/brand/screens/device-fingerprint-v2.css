@@ -316,10 +316,21 @@
 }
 .bfp2__attrow:last-child { border-bottom: none; }
 .bfp2__attmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* Truncation lands on the words, so the mark beside them never leaves. */
+.bfp2__attname { overflow: hidden; text-overflow: ellipsis; }
+/* One line, and the tip stays on it.
+
+   `flex-wrap: wrap` let the name break and then dropped the `?` onto a line of
+   its own, which reads as a stray control rather than as part of the label. The
+   name now takes the width it needs and truncates if it ever cannot — a name
+   that is too long to fit is a naming problem, not a layout one, and an ellipsis
+   says so where a silent second line does not. */
 .bfp2__attname {
-  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 7px; flex-wrap: nowrap; min-width: 0;
   font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+  white-space: nowrap;
 }
+.bfp2__attname > .bx-tip { flex: none; }
 .bfp2__attpurpose { font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.45; }
 .bfp2__attctl { flex: none; }
 .bfp2__nocfg { font-size: var(--fs-xs); color: var(--text-muted); font-style: italic; }
@@ -467,9 +478,16 @@
    structure rather than as paging. */
 .bfp2__restform { display: flex; flex-direction: column; gap: 22px; }
 .bfp2__restform > section { display: flex; flex-direction: column; gap: 9px; }
+/* A row, so the tip sits beside the heading rather than under it — and no caps.
+
+   These were 11px uppercase with letter-spacing, which is a label treatment: it
+   shouts, and in a drawer carrying three sections and six sentences the shouting
+   was part of the clutter. Sentence case at the body size reads as a heading
+   without raising its voice. */
 .bfp2__restform h4 {
-  margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 6px;
+  margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold);
+  letter-spacing: 0; text-transform: none; color: var(--text-primary);
 }
 .bfp2__restform .bfp2__stephint { margin: 0; }
 /* `.bfp2__modes--stack` stood here — the drawer opting out of the side-by-side
@@ -734,3 +752,57 @@
 .bfp2__restsummary strong { font-weight: var(--fw-medium); color: var(--text-primary); }
 .bfp2__restsummary em { font-style: normal; color: var(--text-tertiary); }
 .bfp2__restsummary span { color: var(--border-strong); }
+
+/* --- A version comparison, as an expression ---------------------------------
+   Two tokens that read as one line: `≥` then `10`, with the attribute's name
+   already to the left of them supplying the subject. Figma's conditional row is
+   the reference — the operator is a glyph, not a phrase, so the eye goes
+   name → relation → value in one pass instead of reading three controls.
+
+   They sit tight together with a hairline between, so the pair reads as one
+   field rather than a menu that happens to be beside an input. */
+/* No `overflow: hidden` here, and that is not a style choice.
+
+   It was, to make the two tokens share one rounded edge — and it clipped the
+   operator menu, which renders inside this wrapper. The menu opened on every
+   click and was invisible, so the control read as broken. The corners are
+   rounded on the children instead. */
+.bfp2__expr {
+  display: inline-flex; align-items: stretch;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+
+/* The operator token. Square-ish and monospaced, because a glyph in a box wants
+   to look like a glyph in a box — and because ≥ and < have wildly different
+   natural widths, and a fixed one stops the value shifting as the operator
+   changes. */
+.bfp2__expr .bx-menu__trigger {
+  flex: none; min-width: 40px; height: var(--ctl-height-sm);
+  justify-content: center; gap: 3px;
+  padding: 0 6px;
+  background: var(--surface-inset);
+  border: 0; border-right: 1px solid var(--border-default);
+  /* Its own left corners, since the wrapper can no longer clip them. 1px less
+     than the wrapper's, so the fill sits inside the border rather than riding
+     over it. */
+  border-radius: calc(var(--radius-sm) - 1px) 0 0 calc(var(--radius-sm) - 1px);
+  font-family: var(--font-mono); font-size: var(--fs-base); color: var(--text-primary);
+}
+.bfp2__expr .bx-menu__trigger:hover { background: var(--surface-sunken); }
+.bfp2__expr .bx-menu__trigger svg { opacity: 0.55; }
+
+/* The typed half. Monospaced digits so 10.0.19045 does not jitter as it is
+   typed, and no border of its own — the wrapper carries the edge. */
+.bfp2__exprval {
+  width: auto; min-width: 118px; max-width: 180px;
+  height: var(--ctl-height-sm); padding: 0 10px;
+  background: none; border: 0;
+  font-size: var(--fs-sm); color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.bfp2__exprval::placeholder { color: var(--text-muted); }
+.bfp2__exprval:focus-visible { outline: none; }
+/* The ring goes on the pair, so focusing the value lights the whole expression
+   rather than half of it. */
+.bfp2__expr:focus-within { border-color: var(--brand); box-shadow: 0 0 0 2px var(--focus-ring); }

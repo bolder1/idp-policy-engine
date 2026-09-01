@@ -38,9 +38,11 @@ import {
   UserRound,
 } from 'lucide-react'
 
-import { Button, Drawer, Modal, NumberStepper, TipDot, Toggle } from '../kit'
+import { Button, Drawer, MenuButton, Modal, NumberStepper, TipDot, Toggle } from '../kit'
 import {
   ATTRIBUTES,
+  VERSION_OPS,
+  versionOp,
   DEFAULT_MAX_DEVICES,
   REGISTRATION_LABEL,
   TIER_WEIGHT,
@@ -1087,6 +1089,66 @@ function AttrControl({
     )
   }
 
+  /* A comparison and a version the admin types.
+
+     The same two-part sentence the rule kind makes — "Android OS version · is
+     at least · 13" reads across the row as English — but the second half is a
+     text field rather than a dropdown. A version list is never complete: it is
+     stale the week after a release, and the number an admin wants is usually
+     the one that just shipped. Making them find it in a list is asking them to
+     recognise what they can already state.
+
+     `inputMode="decimal"` rather than `type="number"`, because 18.1.2 is a
+     version and not a number — a numeric input would refuse the second dot and
+     silently mangle it. Nothing is validated on the way in for the same reason:
+     the formats genuinely differ per platform, so the placeholder and the tip
+     carry real examples for THIS one and the field takes what it is given. */
+  if (c.kind === 'version') {
+    const v: AttrRuleValue = isRuleValue(raw) ? raw : c.value
+    const set = (next: Partial<AttrRuleValue>) => onChange(attr.id, { ...v, ...next })
+    const op = versionOp(v.op)
+    return (
+      <span className="bfp2__expr">
+        {/* The operator as one glyph, the way a conditional row states it —
+            Figma's prototype panel is the reference. A dropdown reading "is at
+            least" is three words competing with the attribute name to its left;
+            the symbol is the join between two operands and disappears into the
+            expression, which is what an operator should do.
+
+            The menu is where the words live. Each row names the symbol and
+            shows it on the right — the kit's `kbd` slot, which already renders
+            exactly that — so ≥ is choosable by somebody who does not read
+            mathematical notation, and recognisable afterwards by somebody who
+            does. */}
+        <MenuButton
+          size="sm"
+          align="start"
+          label={op.symbol}
+          items={VERSION_OPS.map((o) => ({ id: o.id, label: o.label, kbd: o.symbol }))}
+          onSelect={(id) => set({ op: id })}
+        />
+        {/* Typed, not picked. A version list is stale the week after a release
+            and the number an admin wants is usually the one that just shipped.
+
+            `inputMode="decimal"` and not `type="number"`: 18.1.2 is a version,
+            not a number, and a numeric field refuses the second dot. Nothing is
+            validated on the way in — the formats genuinely differ per platform,
+            so the placeholder carries real examples for THIS one and the field
+            takes what it is given. */}
+        <input
+          type="text"
+          inputMode="decimal"
+          className="bfp2__exprval"
+          aria-label={c.label}
+          value={v.value}
+          placeholder={c.placeholder}
+          title={c.hint}
+          onChange={(e) => set({ value: e.target.value })}
+        />
+      </span>
+    )
+  }
+
   /* A list is edited on the inner page, but not in a row this narrow — it gets
      the count and opens where there is room. Kept honest: the count is the
      real length, not a placeholder. */
@@ -1135,15 +1197,25 @@ function DetailRow({
 }
 
 /* One labelled row, for the settings that are questions rather than attributes. */
+/* One row, and a choice about its second line.
+
+   `help` prints under the name; `tip` hides behind a mark beside it. The test
+   is whether the sentence says something the NAME and the CONTROL do not.
+   "Devices per person — how many they may register before the next one is
+   refused" is the name restated next to a stepper showing 3; "Register silently
+   on first sign-in — it means an attacker's machine registers itself" is the
+   consequence of the toggle, and nobody should have to hover for that. */
 function FormRow({
   icon: Icon,
   label,
   help,
+  tip,
   children,
 }: {
   icon: typeof Sliders
   label: string
-  help: string
+  help?: string
+  tip?: string
   children: React.ReactNode
 }) {
   return (
@@ -1152,8 +1224,11 @@ function FormRow({
         <Icon size={15} strokeWidth={1.8} />
       </span>
       <div className="bfp2__attmain">
-        <span className="bfp2__attname">{label}</span>
-        <span className="bfp2__attpurpose">{help}</span>
+        <span className="bfp2__attname">
+          {label}
+          {tip && <TipDot label={label} text={tip} />}
+        </span>
+        {help && <span className="bfp2__attpurpose">{help}</span>}
       </div>
       <div className="bfp2__attctl">{children}</div>
     </div>
@@ -1288,7 +1363,12 @@ function RestrictionDrawer({
       onClose={onClose}
       title="Device restriction"
       caption={profile.name}
-      width={520}
+      /* 600, not 520. The widest row here is a label and a select reading
+         "Users register their own devices", and at 520 the label wrapped to two
+         lines and pushed its own tip onto a third — a three-line row for one
+         dropdown. The extra 80px is what it takes for every label to sit on one
+         line, which is the only reason it is not the default 460. */
+      width={600}
       actions={
         /* Done, not Save. Every control here writes through as it is touched,
            the same as the rest of this page, so there is nothing held back to
@@ -1305,11 +1385,16 @@ function RestrictionDrawer({
     >
       <div className="bfp2__restform">
         <section>
-          <h4 id="bfp2-reach">What it can read</h4>
-          <p className="bfp2__stephint">
-            Hardware identifiers need something installed on the machine. This decides which
-            attributes can arrive at all, so it is first.
-          </p>
+          <h4 id="bfp2-reach">
+            What it can read
+            {/* Why this question comes first. True, and not needed at a glance —
+                the two cards below are the decision and they explain
+                themselves. */}
+            <TipDot
+              label="What it can read"
+              text="Hardware identifiers need something installed on the machine. This decides which attributes can arrive at all, so it is first."
+            />
+          </h4>
           {/* The section's own <h4> is the visible heading, so the legend would
               print it twice. Removed rather than hidden: `aria-labelledby` on
               the fieldset points at the heading that is already there, which is
@@ -1359,16 +1444,23 @@ function RestrictionDrawer({
 
         <section>
           <h4>How devices register</h4>
-          <p className="bfp2__stephint">
-            {rosterPossible
-              ? 'Either people enrol their own machines, or you supply the list.'
-              : 'An agentless profile cannot use a roster: a roster is matched on MAC address, and MAC is one of the attributes only an agent can read.'}
-          </p>
+          {/* Only where it explains something the screen cannot: why the roster
+              option is greyed out. The other branch said "either people enrol
+              their own machines, or you supply the list", which is the two
+              options in the dropdown directly below it, read aloud. */}
+          {!rosterPossible && (
+            <p className="bfp2__stephint">
+              An agentless profile cannot use a roster: a roster is matched on MAC address, and MAC
+              is one of the attributes only an agent can read.
+            </p>
+          )}
           <div className="bfp2__rows bfp2__rows--form">
             <FormRow
               icon={UserRound}
               label="How a device gets registered"
-              help={
+              /* The select beside it already reads "Users register their own
+                 devices". This was that sentence again in the third person. */
+              tip={
                 profile.registration === 'self'
                   ? 'People enrol their own machines, up to a limit.'
                   : 'Only devices on the uploaded roster may sign in.'
@@ -1418,12 +1510,19 @@ function RestrictionDrawer({
         </section>
 
         <section>
-          <h4>{profile.registration === 'self' ? 'How many' : 'Which ones'}</h4>
-          <p className="bfp2__stephint">
-            {profile.registration === 'self'
-              ? 'The allowance, and whether phones count against it.'
-              : 'The roster replaces the per-person allowance rather than sitting beside it.'}
-          </p>
+          <h4>
+            {profile.registration === 'self' ? 'How many' : 'Which ones'}
+            {/* The self branch's hint — "the allowance, and whether phones count
+                against it" — described a mobile row that no longer exists, and
+                the half that was still true restated the heading. The roster
+                branch says something real, so it keeps it on a tip. */}
+            {profile.registration !== 'self' && (
+              <TipDot
+                label="Which ones"
+                text="The roster replaces the per-person allowance rather than sitting beside it."
+              />
+            )}
+          </h4>
           <div className="bfp2__rows bfp2__rows--form">
             {/* One or the other. This is the branch the third step used to
                 carry, and it is still a branch — just not a page. */}
@@ -1431,7 +1530,8 @@ function RestrictionDrawer({
               <FormRow
                 icon={Smartphone}
                 label="Devices per person"
-                help="How many they may register before the next one is refused."
+                /* The name, restated, beside a stepper showing the number. */
+                tip="How many they may register before the next one is refused."
               >
                 <NumberStepper
                   label="Devices per person"

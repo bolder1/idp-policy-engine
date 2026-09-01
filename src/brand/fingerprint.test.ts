@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   ATTRIBUTES,
+  VERSION_OPS,
   TIER_WEIGHT,
   byId,
   isRuleValue,
@@ -38,8 +39,12 @@ describe('the attribute master', () => {
      screen needs a filing scheme again — which is the thing that was taken out.
      This is the tripwire for that. */
   it('stays small enough not to need a filing scheme', () => {
-    expect(ATTRIBUTES.length).toBeGreaterThanOrEqual(10)
-    expect(ATTRIBUTES.length).toBeLessThanOrEqual(15)
+    /* Was 10-15, when the master was the sheet's fourteen. It is five now — one
+       form factor and one version per platform — and the ceiling is what this
+       test is actually for: the moment the list needs scrolling it needs
+       grouping, and grouping is the thing that was taken out. */
+    expect(ATTRIBUTES.length).toBeGreaterThanOrEqual(4)
+    expect(ATTRIBUTES.length).toBeLessThanOrEqual(10)
   })
 
   /* Agentless is the default reach for a new profile, so a master where every
@@ -81,19 +86,25 @@ describe('the attribute master', () => {
 
 describe('scoring', () => {
   it('only counts attributes that are switched on', () => {
-    const p = profile({ enabled: ['tpm'] })
-    // bios is changed but not enabled, so it contributes nothing.
-    expect(scoreOf(p, ['tpm', 'bios'])).toBe(byId('tpm')!.weight)
+    const p = profile({ enabled: ['os-windows'] })
+    // device-type is changed but not enabled, so it contributes nothing.
+    expect(scoreOf(p, ['os-windows', 'device-type'])).toBe(byId('os-windows')!.weight)
   })
 
   it('respects a per-profile weight override', () => {
-    const p = profile({ enabled: ['tpm'], weights: { tpm: 7 } })
-    expect(scoreOf(p, ['tpm'])).toBe(7)
+    const p = profile({ enabled: ['os-windows'], weights: { 'os-windows': 7 } })
+    expect(scoreOf(p, ['os-windows'])).toBe(7)
   })
 
   it('caps at 100, because a score is expressed on that scale', () => {
     const all = ATTRIBUTES.map((a) => a.id)
-    expect(scoreOf(profile({ enabled: all }), all)).toBe(100)
+    /* The master's own weights no longer reach 100 — five attributes come to 85
+       — so the cap has to be provoked rather than assumed. Overriding one
+       weight past the ceiling is the case that matters anyway: the arithmetic
+       is per-profile, and nothing stops somebody setting a weight of 200. */
+    expect(scoreOf(profile({ enabled: all }), all)).toBeLessThanOrEqual(100)
+    const heavy = profile({ enabled: all, weights: { 'os-windows': 200 } })
+    expect(scoreOf(heavy, all)).toBe(100)
   })
 })
 
@@ -139,10 +150,22 @@ describe('the seeded profiles', () => {
       for (const [id, v] of Object.entries(p.config)) {
         if (!isRuleValue(v)) continue
         const c = byId(id)?.config
-        expect(`${p.id}/${id}: ${c?.kind}`).toBe(`${p.id}/${id}: rule`)
-        if (c?.kind !== 'rule') continue
-        expect(c.operators).toContain(v.op)
-        expect(c.groups.flatMap((g) => g.values)).toContain(v.value)
+        /* Two kinds carry an operator now. `rule` picks its value from the
+           attribute's own list, so both halves are checkable; `version` takes
+           a typed string, so only the operator can be — the whole point of the
+           field is that the value is not enumerated. */
+        expect(`${p.id}/${id}: ${c?.kind}`).toMatch(/: (rule|version)$/)
+        if (c?.kind === 'rule') {
+          expect(c.operators).toContain(v.op)
+          expect(c.groups.flatMap((g) => g.values)).toContain(v.value)
+        }
+        if (c?.kind === 'version') {
+          /* By id, not by label — the operator is stored as `gte` and shown as
+             ≥, so a seed holding the old wordy string would render as the
+             fallback and look deliberate. */
+          expect(VERSION_OPS.map((o) => o.id)).toContain(v.op)
+          expect(v.value.trim()).not.toBe('')
+        }
       }
     }
   })

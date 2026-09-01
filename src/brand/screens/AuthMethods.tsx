@@ -8,8 +8,6 @@ import {
   Grid3x3,
   HelpCircle,
   KeyRound,
-  Link2,
-  Lock,
   Mail,
   MessageSquare,
   Phone,
@@ -76,7 +74,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 /* The eleven families, in the order the shipping console's rail lists them, so
    an admin moving between the two screens finds them in the same place. */
-export interface Family {
+interface Family {
   channel: string
   blurb: string
   icon: LucideIcon
@@ -107,7 +105,7 @@ export interface Family {
   isNew?: boolean
 }
 
-export const FAMILIES: Family[] = [
+const FAMILIES: Family[] = [
   /* Eleven. There is no Password family, and briefly there was.
 
      Grouping exists because SMS holds three methods that share a gateway, a
@@ -142,7 +140,7 @@ const DEFAULT_PREFERENCE = ['otp-email', 'email-link', 'otp-sms', 'otp-call']
 /* The seeded default, and the replacement when the current one is switched off.
    `exclude` is the method being disabled: `setEnabled` runs this against the
    state as it was BEFORE the write, so the one on its way out has to be named. */
-export function firstDefaultable(all: AuthMethod[], exclude?: string): string | null {
+function firstDefaultable(all: AuthMethod[], exclude?: string): string | null {
   const ok = (m: AuthMethod) =>
     m.id !== exclude && Boolean(mfaMethodFor(m.id)?.canBeDefault) && !methodBlocker(m)
   for (const id of DEFAULT_PREFERENCE) {
@@ -445,7 +443,7 @@ const GROUPS: { id: 'connect' | 'policy' | 'advanced'; label: string; blurb: str
    Required fields decide the primary button, not a validation pass on submit:
    the console's own dialog lets you press Save on an empty form and then tells
    you off, which is a round trip to learn something the button already knew. */
-export function SetupModal({
+function SetupModal({
   method,
   saved,
   onClose,
@@ -820,7 +818,16 @@ function CategoryList({
             className={`bm8__card ${live === 0 ? 'is-off' : ''}`}
             onClick={() => onOpen(f.channel)}
           >
-            <span className={`bm8__tile ${live > 0 ? `is-${f.tint}` : ''}`} aria-hidden>
+            {/* Brand on every tile, live or not.
+
+                `f.tint` was here and had not resolved to anything for a while —
+                the per-family hues were deleted from the sheet and the class
+                kept being emitted, so every tile fell back to grey whatever its
+                state. It was briefly conditional on `live > 0`, which made the
+                tile a second copy of a status the row already states twice: the
+                toggle on the right, and the enrolment figure beside it. The
+                mark is identity, and identity does not switch off. */}
+            <span className="bm8__tile is-brand" aria-hidden>
               <f.icon size={19} strokeWidth={1.7} />
             </span>
 
@@ -1122,7 +1129,7 @@ function CategoryDrawer({
    the family, and an admin editing "OTP length" from a drawer titled SMS has to
    know it lands on all three SMS methods, not just the one they were looking
    at. */
-export function SettingsPane({
+function SettingsPane({
   family,
   famSettings,
   ownSettings,
@@ -1197,7 +1204,7 @@ export function SettingsPane({
   )
 }
 
-export function MethodCard({
+function MethodCard({
   m,
   policies,
   onToggle,
@@ -1395,101 +1402,9 @@ function rulesUsing(name: string, policies: Policy[]): number {
   )
 }
 
-/* --- Shared between the two layouts ------------------------------------------
-   Both versions of this screen ask the same two tenant-wide questions before
-   they get to the catalogue: how a session may start, and where a rule is sent
-   when it names no method. Only the arrangement differs, so these live here and
-   both compose them rather than each keeping a copy that drifts. */
-
-export function PrimarySignIn({ heading = true }: { heading?: boolean }) {
-  /* The two passwordless starts, held locally for now.
-
-     Neither has a record in the catalogue that fits: `fido2` exists but is
-     filed as a phishing-resistant factor under Biometric, and magic link is
-     modelled as "Include a one-click link", a setting on the Email family —
-     which is the right home for how the mail is composed and the wrong one for
-     whether a link may start a session at all. */
-  const [passkeys, setPasskeys] = useState(true)
-  const [magicLink, setMagicLink] = useState(false)
-
-  return (
-    <>
-      <section className="bm8__primary">
-        {/* Dropped whole where the section already has a name above it. v2
-            gives this block a tab of its own, so the heading was the tab's six
-            words printed twice — and once that goes the sentence under it is a
-            gloss on a title that is no longer there, explaining "primary" to a
-            reader who just clicked the word. Three rows that say "Always on",
-            "Passkeys" and "Magic link" do not need introducing. */}
-        {heading && (
-          <div className="bm8__sechead">
-            <div>
-              <h2>Primary sign-in methods</h2>
-              <p>How a session starts. Password is on for everyone; the passwordless options are yours to allow.</p>
-            </div>
-          </div>
-        )}
-
-        <div className="bm8__primarylist">
-          <div className="bm8__card bm8__card--locked">
-            <span className="bm8__tile is-brand" aria-hidden>
-              <Lock size={19} strokeWidth={1.7} />
-            </span>
-
-            <span className="bm8__info">
-              <span className="bm8__name">
-                Password
-                <i className="bm8__always">Always on</i>
-              </span>
-              <span className="bm8__desc">
-                Standard password sign-in, enabled for every user in this tenant.
-              </span>
-            </span>
-
-            {/* No switch. A disabled one was here to say "on, but not yours to
-                change" — and a control you cannot operate is still a control:
-                it invites the click it then refuses. The chip says the same
-                thing in words and cannot be misread as broken. */}
-          </div>
-
-          {/* The two that replace the password rather than follow it. Unlike
-              the row above they are the tenant's call, so they keep a live
-              switch — the section is "how a session may start", and only the
-              first line of it is fixed. */}
-          <div className="bm8__card">
-            <span className="bm8__tile is-indigo" aria-hidden>
-              <Fingerprint size={19} strokeWidth={1.7} />
-            </span>
-            <span className="bm8__info">
-              <span className="bm8__name">Passkeys</span>
-              <span className="bm8__desc">
-                Sign in with the device — Face ID, a fingerprint, or a security key. No password
-                typed, and nothing a lookalike site can reuse.
-              </span>
-            </span>
-            <span className="bm8__right">
-              <Toggle checked={passkeys} onChange={setPasskeys} label="Allow passkeys" />
-            </span>
-          </div>
-
-          <div className="bm8__card">
-            <span className="bm8__tile is-blue" aria-hidden>
-              <Link2 size={19} strokeWidth={1.7} />
-            </span>
-            <span className="bm8__info">
-              <span className="bm8__name">Magic link</span>
-              <span className="bm8__desc">
-                A one-click sign-in link sent to the address on the account. Convenient, and only
-                ever as strong as the mailbox behind it.
-              </span>
-            </span>
-            <span className="bm8__right">
-              <Toggle checked={magicLink} onChange={setMagicLink} label="Allow magic link" />
-            </span>
-          </div>
-        </div>
-      </section>
-    </>
-  )
-}
+/* `PrimarySignIn` stood here — a block stating the two passwordless starts and
+   the tenant default, written to be composed by both layouts. Password,
+   Passkeys and Magic link are catalogue entries now and render as their own
+   rows at the top of the list, so nothing had rendered this in a while; v2 was
+   the last thing importing it, and v2 is gone. */
 

@@ -1,5 +1,6 @@
+import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
-import { AlertTriangle, ArrowLeft, Globe, Link2, Network, Pencil, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Copy, Globe, Link2, Network, Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { Button, Drawer, Modal, TipDot } from '../kit'
 import { EmptyState } from '../empty'
@@ -68,6 +69,7 @@ export function ZonesV2() {
   const store = useBrand()
   const [openId, setOpenId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [duplicating, setDuplicating] = useState<Zone | null>(null)
 
   const open = openId ? store.zones.find((z) => z.id === openId) ?? null : null
 
@@ -87,6 +89,27 @@ export function ZonesV2() {
     /* Straight inside. A zone that has been named and typed but holds nothing
        is not a zone yet, and landing back on the list would imply it was. */
     setOpenId(zone.id)
+  }
+
+  /* A copy of everything, under a new name, referenced by nothing.
+
+     `usedIn` resets because a rule names a zone by id — the copy is a new id
+     and no rule has heard of it. Carrying the count over would be the one
+     number on the row that is a lie the moment it is made. */
+  const duplicate = (from: Zone, name: string) => {
+    const copy: Zone = {
+      ...from,
+      id: `z-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${store.zones.length}`,
+      name: name.trim(),
+      kind: 'custom',
+      ip: [...from.ip],
+      asn: [...from.asn],
+      location: { ...from.location },
+      usedIn: 0,
+    }
+    store.addZone(copy)
+    setDuplicating(null)
+    store.showToast(`${copy.name} created`)
   }
 
   return (
@@ -138,12 +161,26 @@ export function ZonesV2() {
               }
             />
           ) : (
-            <ZoneTableV2 zones={store.zones} policies={store.policies} onOpen={setOpenId} />
+            <ZoneTableV2
+              zones={store.zones}
+              policies={store.policies}
+              onOpen={setOpenId}
+              onDuplicate={setDuplicating}
+              onDelete={(z) => {
+                store.removeZone(z.id)
+                store.showToast(`${z.name} deleted`)
+              }}
+            />
           )}
         </>
       )}
 
       <NewZoneModal open={creating} onClose={() => setCreating(false)} onCreate={create} />
+      <DuplicateZoneModal
+        zone={duplicating}
+        onClose={() => setDuplicating(null)}
+        onDuplicate={duplicate}
+      />
     </div>
   )
 }
@@ -157,18 +194,40 @@ function ZoneTableV2({
   zones,
   policies,
   onOpen,
+  onDuplicate,
+  onDelete,
 }: {
   zones: Zone[]
   policies: Policy[]
   onOpen: (id: string) => void
+  onDuplicate: (z: Zone) => void
+  onDelete: (z: Zone) => void
 }) {
+  const [menuFor, setMenuFor] = useState<string | null>(null)
+
+  /* Picking an item closes the menu. The menu stops its own clicks reaching the
+     table, which is what dismisses it, so without this a chosen menu stayed
+     open — invisible on Delete because the row went with it, but on Duplicate it
+     hung over the table while a second kebab could be opened beside it. */
+  const choose = (run: () => void) => {
+    setMenuFor(null)
+    run()
+  }
+
   return (
-    <div className="bz7__table bz8__table" role="table">
+    <div className="bz7__table bz8__table" role="table" onClick={() => setMenuFor(null)}>
       <div className="bz7__trow bz8__trow bz7__thead" role="row">
         <span role="columnheader">Zone</span>
         <span role="columnheader">Type</span>
         <span role="columnheader">Contains</span>
         <span role="columnheader">Used by</span>
+        {/* Named, the way the policies table names it. v1's zones table leaves
+            this header empty; the two are the same table to an admin, and one
+            of them labelling its last column and the other not is the kind of
+            difference nobody decides on purpose. */}
+        <span role="columnheader" className="bz8__thactions">
+          Actions
+        </span>
       </div>
 
       {zones.map((z) => {
@@ -207,6 +266,55 @@ function ZoneTableV2({
 
             <span role="cell" className={`bz7__tuses ${uses === 0 ? 'is-quiet' : ''}`}>
               {uses === 0 ? '—' : `${uses} rule${uses === 1 ? '' : 's'}`}
+            </span>
+
+            {/* The row's own actions, in the shape the policies and device
+                profile tables already use: a kebab, a popover, an icon per
+                item, and the destructive one ruled off and red. */}
+            <span role="cell" className="bz7__menuwrap">
+              <button
+                type="button"
+                className="bz7__kebab"
+                aria-label={`Actions for ${z.name}`}
+                aria-expanded={menuFor === z.id}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setMenuFor((m) => (m === z.id ? null : z.id))
+                }}
+              >
+                ⋯
+              </button>
+              <AnimatePresence>
+                {menuFor === z.id && (
+                  <motion.div
+                    className="bmenu"
+                    initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                    transition={{ duration: 0.13 }}
+                    onClick={(e) => e.stopPropagation()}
+                    role="menu"
+                  >
+                    <button role="menuitem" onClick={() => choose(() => onOpen(z.id))}>
+                      <Pencil size={14} strokeWidth={1.9} aria-hidden />
+                      Edit
+                    </button>
+                    <button role="menuitem" onClick={() => choose(() => onDuplicate(z))}>
+                      <Copy size={14} strokeWidth={1.9} aria-hidden />
+                      Duplicate
+                    </button>
+                    <span className="bmenu__rule" />
+                    <button
+                      role="menuitem"
+                      className="is-danger"
+                      onClick={() => choose(() => onDelete(z))}
+                    >
+                      <Trash2 size={14} strokeWidth={1.9} aria-hidden />
+                      Delete zone
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </span>
           </div>
         )
@@ -339,7 +447,13 @@ function ZoneDetailV2({
             Used by
             <i className="bz7__usecount">{users.length}</i>
           </Button>
-          <Button variant="secondary" size="sm" onClick={onDelete}>
+          {/* Danger, not neutral. The kit reserves red for the confirming
+              control inside a destructive dialog, on the argument that a
+              trigger only opens that dialog. It is the one action on this
+              header that destroys something a rule may be pointing at, and
+              looking identical to "Used by" beside it is the wrong kind of
+              quiet. */}
+          <Button variant="danger" size="sm" onClick={onDelete}>
             <Trash2 size={14} strokeWidth={1.9} aria-hidden />
             Delete
           </Button>
@@ -395,6 +509,98 @@ function ZoneDetailV2({
    one decides the whole of the next page. v1 asks only for a name and lets the
    shape emerge from what you type afterwards; here the kind IS the zone, so it
    is asked where the name is. */
+/* --- Duplicating ---------------------------------------------------------------
+   A copy needs a name before it exists, for the same reason a new zone does: two
+   rows called "Office Network" and "Office Network" are a support ticket. It is
+   prefilled with the obvious answer so the common case is one Return.
+
+   The dialog also says what a duplicate actually takes, because "Duplicate" is
+   the one row action whose scope is genuinely unclear — a reader cannot know
+   from the word whether they are about to get an empty zone with a familiar
+   name or the whole list. It is the whole list.
+   -------------------------------------------------------------------------- */
+
+function DuplicateZoneModal({
+  zone,
+  onClose,
+  onDuplicate,
+}: {
+  zone: Zone | null
+  onClose: () => void
+  onDuplicate: (from: Zone, name: string) => void
+}) {
+  const [name, setName] = useState('')
+
+  /* Seeded on the way in, so reopening on a different zone does not offer the
+     last one's name. */
+  useEffect(() => {
+    if (zone) setName(`${zone.name} copy`)
+  }, [zone])
+
+  if (!zone) return null
+
+  const on = matchOf(zone)
+  const count = on === 'net' ? zone.ip.length + zone.asn.length : placeBits(zone.location).length
+  const noun =
+    on === 'net'
+      ? count === 1
+        ? 'network entry'
+        : 'network entries'
+      : count === 1
+        ? 'place'
+        : 'places'
+  /* Lower case and mid-sentence, because it continues the clause before it. */
+  const what = count === 0 ? 'it is empty, so the copy will be too' : `all ${count} ${noun} come with it`
+
+  const clean = name.trim()
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Duplicate zone"
+      footer={
+        <>
+          <span className="bz8__foot">{clean ? '' : 'Name the copy to continue.'}</span>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="brand" disabled={!clean} onClick={() => onDuplicate(zone, clean)}>
+            Duplicate zone
+          </Button>
+        </>
+      }
+    >
+      <div className="bz8__form">
+        <label className="bz8__field">
+          <span>Name</span>
+          <input
+            type="text"
+            value={name}
+            autoFocus
+            aria-label={`Name for the copy of ${zone.name}`}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && clean) onDuplicate(zone, clean)
+            }}
+          />
+        </label>
+
+        {/* What comes with it, stated before the click rather than discovered
+            after. */}
+        <p className="bz8__dupnote">
+          <Copy size={14} strokeWidth={1.9} aria-hidden />
+          <span>
+            Everything inside this zone is copied — its type stays <strong>{KIND[on].label}</strong>,
+            and {what}. No policy rule points at the copy, so nothing changes until you name it in
+            one.
+          </span>
+        </p>
+      </div>
+    </Modal>
+  )
+}
+
 function NewZoneModal({
   open,
   onClose,

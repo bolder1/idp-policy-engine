@@ -299,7 +299,60 @@
   flex: none; display: grid; place-items: center; width: 22px; height: 22px;
   border-radius: var(--radius-sm); background: none; cursor: pointer; color: var(--text-muted);
 }
-.bz7__entries button:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+/* Edit is the neutral one, remove is the destructive one, and only the second
+   turns red. They sit side by side, so a shared hover would say they do the
+   same sort of thing. */
+.bz7__entries button:hover { background: var(--surface-inset); color: var(--text-primary); }
+.bz7__entries .bz7__entrydel:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+
+/* --- Editing one entry in place ---------------------------------------------
+   An address is one short string; a dialog to change four characters costs more
+   than it protects. The row becomes the field. */
+.bz7__entries li.is-editing { gap: 8px; }
+.bz7__editin {
+  flex: 1; min-width: 0;
+  height: 28px; padding: 0 9px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-primary);
+}
+.bz7__editin:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--focus-ring); }
+.bz7__editin[aria-invalid='true'] { border-color: var(--fb-negative-border); }
+.bz7__editerr {
+  flex: none; font-size: var(--fs-xs); color: var(--fb-negative-fg); white-space: nowrap;
+}
+
+/* --- What the field accepts, before anything is typed into it ----------------
+   This was a `?` on the section heading. A tip is right for a sentence somebody
+   may want once; it is wrong for the reference you need BEFORE acting. */
+.bz7__formats {
+  margin: 0 0 12px; padding: 11px 13px;
+  background: var(--surface-inset);
+  border-radius: var(--radius-md);
+}
+.bz7__formatslead {
+  display: block; margin-bottom: 7px;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em; color: var(--text-secondary);
+}
+.bz7__formats ul {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 6px 10px;
+}
+.bz7__formats li {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 3px 9px; border-radius: var(--radius-sm);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle);
+}
+.bz7__formats code {
+  font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-primary);
+}
+.bz7__formats em {
+  font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); white-space: nowrap;
+}
+.bz7__formats p {
+  margin: 8px 0 0; font-size: var(--fs-xs); line-height: 1.5; color: var(--text-tertiary);
+}
 
 /* --- The place search ----------------------------------------------------------------- */
 
@@ -565,9 +618,12 @@
    one of them says "Any …" on every row; declaring the kind turns that pair
    into a Type and a Contains, and the kebab column goes with the row menu v2
    does not carry. */
+/* 34px for the kebab, the same as v1's table and the device profile one. */
 .bz8__trow {
-  grid-template-columns: minmax(160px, 1.3fr) 118px minmax(0, 1.6fr) 92px;
+  grid-template-columns: minmax(160px, 1.3fr) 118px minmax(0, 1.6fr) 92px 34px;
 }
+/* Over a column of kebabs, so it sits where they do. */
+.bz8__thactions { justify-self: end; }
 
 /* The type, as a chip. Tinted to match the mark in the name cell, so a row says
    its kind twice in one colour rather than once in colour and once in grey. */
@@ -653,7 +709,9 @@
    dialog that is not advice. */
 
 @media (max-width: 900px) {
-  .bz8__trow { grid-template-columns: minmax(0, 1fr) 100px 70px; }
+  /* The kebab keeps its column: it is the only way to duplicate or delete
+     from the list, so it is the last thing to drop for width. */
+  .bz8__trow { grid-template-columns: minmax(0, 1fr) 100px 70px 34px; }
   .bz8__trow > :nth-child(3) { display: none; }
 }
 
@@ -662,3 +720,17 @@
    the name into the middle of the row. */
 .bz8__pagelead { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
 .bz8__pagelead .bz7__tile { margin-top: 2px; }
+
+/* --- Duplicating a zone -----------------------------------------------------
+   "Duplicate" is the one row action whose scope a reader cannot get from the
+   word: an empty zone with a familiar name, or the whole list? Said in the
+   dialog, before the click that answers it. */
+.bz8__dupnote {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: 0; padding: 11px 13px;
+  background: var(--fb-info-bg);
+  border: 1px solid var(--fb-info-border); border-radius: var(--radius-md);
+  font-size: var(--fs-sm); line-height: 1.55; color: var(--fb-info-fg);
+}
+.bz8__dupnote svg { flex: none; margin-top: 2px; }
+.bz8__dupnote strong { font-weight: var(--fw-semibold); }

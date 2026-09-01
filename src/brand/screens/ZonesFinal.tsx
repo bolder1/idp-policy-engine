@@ -22,7 +22,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { Button, Drawer, Modal, TipDot } from '../kit'
+import { Button, Drawer, Modal } from '../kit'
 import {
   ASN_DIRECTORY,
   emptyLocation,
@@ -35,7 +35,7 @@ import {
 import { coveredBy, placeContext, searchPlaces, type Place } from '../places'
 import { useBrand } from '../store'
 import { EmptyState } from '../empty'
-import { classifyIp, describeZone, validateZone } from './zone-validation'
+import { classifyIp, describeZone, isValidAsn, validateZone } from './zone-validation'
 import { parseEntries } from './zone-entries'
 import { policiesUsing, rulesUsing } from './usage'
 import { UsedByList } from './used-by'
@@ -659,7 +659,13 @@ function ZoneDetail({
               sections below save as they are typed, so "edit" is just being on
               the page. The name is the exception, and it has its own control
               beside the heading it changes. */}
-          <Button variant="secondary" size="sm" onClick={onDelete}>
+          {/* Danger, not neutral. The kit reserves red for the confirming
+              control inside a destructive dialog, on the argument that a
+              trigger only opens that dialog. It is the one action on this
+              header that destroys something a rule may be pointing at, and
+              looking identical to "Used by" beside it is the wrong kind of
+              quiet. */}
+          <Button variant="danger" size="sm" onClick={onDelete}>
             <Trash2 size={14} strokeWidth={1.9} aria-hidden />
             Delete
           </Button>
@@ -864,6 +870,60 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
 
   const total = draft.ip.length + draft.asn.length
 
+  /* One entry open for editing, by value — the list is keyed by value and
+     values are unique within a zone, so there is nothing else to key on. */
+  const [editing, setEditing] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
+  const [editErr, setEditErr] = useState<string | null>(null)
+
+  const startEdit = (v: string) => {
+    setEditing(v)
+    setEditText(v)
+    setEditErr(null)
+  }
+
+  /* A typo in one address used to mean removing it and retyping it, which on a
+     long list also meant finding it again afterwards — the new value appends to
+     the end. Editing keeps the row where it is. */
+  const commitEdit = (old: string, wasAsn: boolean) => {
+    const next = editText.trim()
+    if (!next || next === old) {
+      setEditing(null)
+      return
+    }
+
+    const asAsn = isValidAsn(next)
+    const asIp = classifyIp(next) !== 'invalid'
+    if (!asAsn && !asIp) {
+      setEditErr('Not an address, CIDR block, range or ASN.')
+      return
+    }
+    if (draft.ip.includes(next) || draft.asn.includes(next)) {
+      setEditErr('Already in this zone.')
+      return
+    }
+
+    /* Same kind: replaced where it sits, so the order somebody pasted survives.
+       Different kind: it has to move lists, and the end is the only honest
+       place for it — there is no position in `asn` that corresponds to one in
+       `ip`. */
+    let ip = draft.ip
+    let asn = draft.asn
+    if (asAsn === wasAsn) {
+      if (asAsn) asn = draft.asn.map((x) => (x === old ? next : x))
+      else ip = draft.ip.map((x) => (x === old ? next : x))
+    } else {
+      ip = draft.ip.filter((x) => x !== old)
+      asn = draft.asn.filter((x) => x !== old)
+      if (asAsn) asn = [...asn, next]
+      else ip = [...ip, next]
+    }
+
+    onChange({ ...draft, ip, asn })
+    setEditing(null)
+    setEditErr(null)
+  }
+
   const add = () => {
     const { ip, asn, bad } = parseEntries(text, draft.ip, draft.asn)
     if (ip.length === draft.ip.length && asn.length === draft.asn.length && bad.length === 0) return
@@ -916,42 +976,56 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
         <h4>
           <Network size={13} strokeWidth={2} aria-hidden />
           IP addresses and networks
-          {/* Written from what `classifyIp` and `isValidAsn` actually accept,
-              not from the format note the reference showed — that one omits
-              IPv6 and ASNs, both of which parse here, and a help text that
-              undersells the field is why people paste one value at a time. */}
-          <TipDot
-            label="What you can paste here"
-            text={
-              <>
-                One per line, or separated by commas or spaces. Every entry is checked as you add it.
-                <br />
-                <br />
-                <strong>A single address</strong> — 10.0.0.1 or 2001:db8::1
-                <br />
-                <strong>A CIDR block</strong> — 192.168.0.0/24 or 2001:db8::/32
-                <br />
-                <strong>A range</strong>, ends joined by a dash — 192.168.0.1-192.168.0.254
-                <br />
-                <strong>A network operator</strong>, by ASN — AS15169
-                <br />
-                <br />
-                Anything that does not parse stays in the box so you can fix it.
-              </>
-            }
-          />
         </h4>
         <span>{total === 0 ? 'Any network' : `${total} ${total === 1 ? 'entry' : 'entries'}`}</span>
       </header>
+
+      {/* What this field takes, before anything is typed into it.
+
+          It was a `?` on the heading. A tip is right for a sentence somebody
+          may want once; it is wrong for the reference you need BEFORE acting,
+          because the cost of not knowing is a rejected paste and the cost of
+          finding out is a deliberate hover on a mark that looks optional. The
+          field's own placeholder can only ever show three examples.
+
+          Written from what `classifyIp` and `isValidAsn` actually accept, not
+          from the format note the reference showed — that one omits IPv6 and
+          ASNs, both of which parse here, and a help text that undersells the
+          field is why people paste one value at a time. */}
+      <div className="bz7__formats">
+        <span className="bz7__formatslead">Accepts</span>
+        <ul>
+          <li>
+            <code>10.0.0.1</code>
+            <em>a single address, v4 or v6</em>
+          </li>
+          <li>
+            <code>192.168.0.0/24</code>
+            <em>a CIDR block</em>
+          </li>
+          <li>
+            <code>192.168.0.1-192.168.0.254</code>
+            <em>a range</em>
+          </li>
+          <li>
+            <code>AS15169</code>
+            <em>a network operator</em>
+          </li>
+        </ul>
+        <p>
+          One per line, or separated by commas or spaces. Anything that does not parse stays in the
+          box so you can fix it.
+        </p>
+      </div>
 
       <div className="bz7__add">
         <input
           type="text"
           value={text}
-          /* Three examples, no sentence. The tip on the heading already lists
-             every accepted format in full, so the placeholder only has to show
-             the SHAPE — and at sixty characters the old one was longer than the
-             field on a narrow panel and clipped mid-word. */
+          /* Three examples, no sentence. The banner above lists every accepted
+             format in full, so the placeholder only has to show the SHAPE — and
+             at sixty characters the old one was longer than the field on a
+             narrow panel and clipped mid-word. */
           placeholder="10.0.0.1, 192.168.0.0/24, AS15169"
           aria-label="Add IP addresses or networks"
           onChange={(e) => setText(e.target.value)}
@@ -1037,25 +1111,74 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
         <p className="bz7__gate">Nothing matches “{filter.trim()}”.</p>
       ) : (
         <ul className="bz7__entries is-scroll">
-          {rows.map((r) => (
-            <li key={r.v}>
-              <code>{r.v}</code>
-              <em>{r.kind}</em>
-              <button
-                type="button"
-                aria-label={`Remove ${r.v}`}
-                onClick={() =>
-                  onChange(
-                    r.asn
-                      ? { ...draft, asn: draft.asn.filter((x) => x !== r.v) }
-                      : { ...draft, ip: draft.ip.filter((x) => x !== r.v) },
-                  )
-                }
-              >
-                <X size={13} strokeWidth={2} />
-              </button>
-            </li>
-          ))}
+          {rows.map((r) =>
+            editing === r.v ? (
+              <li key={r.v} className="is-editing">
+                {/* The same row, in a field. Not a dialog: an address is one
+                    short string, and a modal to change four characters costs
+                    more than it protects. */}
+                <input
+                  type="text"
+                  className="bz7__editin"
+                  value={editText}
+                  autoFocus
+                  aria-label={`Edit ${r.v}`}
+                  aria-invalid={editErr ? true : undefined}
+                  onChange={(e) => {
+                    setEditText(e.target.value)
+                    setEditErr(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      commitEdit(r.v, r.asn)
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault()
+                      setEditing(null)
+                      setEditErr(null)
+                    }
+                  }}
+                />
+                {editErr && <span className="bz7__editerr">{editErr}</span>}
+                <button type="button" aria-label="Save" onClick={() => commitEdit(r.v, r.asn)}>
+                  <Check size={13} strokeWidth={2.4} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Cancel"
+                  onClick={() => {
+                    setEditing(null)
+                    setEditErr(null)
+                  }}
+                >
+                  <X size={13} strokeWidth={2} />
+                </button>
+              </li>
+            ) : (
+              <li key={r.v}>
+                <code>{r.v}</code>
+                <em>{r.kind}</em>
+                <button type="button" aria-label={`Edit ${r.v}`} onClick={() => startEdit(r.v)}>
+                  <Pencil size={12} strokeWidth={2} />
+                </button>
+                <button
+                  type="button"
+                  className="bz7__entrydel"
+                  aria-label={`Remove ${r.v}`}
+                  onClick={() =>
+                    onChange(
+                      r.asn
+                        ? { ...draft, asn: draft.asn.filter((x) => x !== r.v) }
+                        : { ...draft, ip: draft.ip.filter((x) => x !== r.v) },
+                    )
+                  }
+                >
+                  <X size={13} strokeWidth={2} />
+                </button>
+              </li>
+            ),
+          )}
         </ul>
       )}
     </section>

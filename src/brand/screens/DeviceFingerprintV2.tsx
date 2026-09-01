@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   Brush,
+  Activity,
   Check,
   CircuitBoard,
   Clock,
@@ -13,6 +14,7 @@ import {
   Cpu,
   Eye,
   Gauge,
+  Wifi,
   Globe,
   Hash,
   IdCard,
@@ -40,7 +42,9 @@ import {
 
 import { Button, Drawer, MenuButton, Modal, NumberStepper, TipDot, Toggle } from '../kit'
 import {
-  ATTRIBUTES,
+  CATEGORIES,
+  RISK_ATTRIBUTES,
+  attributesFor,
   VERSION_OPS,
   versionOp,
   DEFAULT_MAX_DEVICES,
@@ -365,6 +369,234 @@ const ATTR_ICON: Record<string, typeof Cpu> = {
 
 /* --- The picker ----------------------------------------------------------------
    Thirty-eight checkboxes, filtered rather than filed. */
+const CAT_META: Record<string, { tint: string; icon: typeof Cpu }> = {
+  Hardware: { tint: 'slate', icon: Cpu },
+  /* 'lime', not 'teal'. The tints resolve to the kit's feedback ramps and there
+     is no teal one — the class said teal while the colour came out green,
+     which is the kind of quiet disagreement that gets read as a bug in the
+     ramp rather than in the name. */
+  Browser: { tint: 'lime', icon: Globe },
+  Security: { tint: 'indigo', icon: ShieldCheck },
+  Network: { tint: 'blue', icon: Wifi },
+  Behaviour: { tint: 'amber', icon: Activity },
+}
+
+const metaOf = (id: string) => CAT_META[id] ?? { tint: 'slate', icon: Cpu }
+
+/* --- The risk picker, restored --------------------------------------------------
+   Risk scoring wants many weak signals, so its catalogue is thirty-eight and
+   filed into five categories. That needs a rail: a flat list of thirty-eight
+   checkboxes is a list you scroll rather than read, which is exactly the
+   argument that removed it when the master narrowed to five.
+
+   It came back because the two modes stopped sharing a catalogue. Attribute
+   match asks a handful of stated conditions and its five fit on one pane with
+   nothing above them; risk asks for a sum and needs the whole sheet. One picker
+   could not be right for both, and the flat one was right for the smaller list.
+
+   Lifted from `ba0e53d^` rather than rewritten, so the counts, the tints and
+   the select-all-acts-on-what-is-shown behaviour are the ones already reasoned
+   about. The one thing NOT brought back is the agentless refusal — see the
+   option row below.
+   -------------------------------------------------------------------------- */
+
+function RiskAttrPicker({
+  picked,
+  setPicked,
+}: {
+  picked: string[]
+  setPicked: (ids: string[]) => void
+}) {
+  const [q, setQ] = useState('')
+  const [cat, setCat] = useState<string>(CATEGORIES[0]?.id ?? '')
+
+  const needle = q.trim().toLowerCase()
+  const matches = (a: Attribute) =>
+    !needle ||
+    a.name.toLowerCase().includes(needle) ||
+    a.purpose.toLowerCase().includes(needle) ||
+    /* Optional on the type now, because the match catalogue does not file
+       its five. Every attribute in THIS list has one. */
+    (a.category ?? '').toLowerCase().includes(needle)
+
+  const toggle = (id: string) =>
+    setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id])
+
+  /* One group while browsing, every group with a hit while searching. */
+  const groups = CATEGORIES.map((c) => ({
+    cat: c,
+    rows: RISK_ATTRIBUTES.filter((a) => a.category === c.id && matches(a)),
+  })).filter((g) => (needle ? g.rows.length > 0 : g.cat.id === cat))
+
+  return (
+    <div className="bfp2__pick">
+      <div className="bfp2__pickbar">
+        <label className="bfp2__search">
+          <Search size={14} strokeWidth={1.9} aria-hidden />
+          <input
+            type="search"
+            value={q}
+            placeholder={`Search all ${RISK_ATTRIBUTES.length} attributes…`}
+            aria-label="Search attributes"
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </label>
+        <span className={`bfp2__pickcount ${picked.length ? 'is-on' : ''}`}>
+          {picked.length} of {RISK_ATTRIBUTES.length} selected
+        </span>
+        {picked.length > 0 && (
+          <button type="button" className="bfp2__clear" onClick={() => setPicked([])}>
+            Clear all
+          </button>
+        )}
+      </div>
+
+      <div className="bfp2__pickbody">
+        <nav className="bfp2__rail" aria-label="Attribute categories">
+          {CATEGORIES.map((c) => {
+            const all = RISK_ATTRIBUTES.filter((a) => a.category === c.id)
+            const on = all.filter((a) => picked.includes(a.id)).length
+            /* The count is always progress and never hit count, so it means
+               the same thing whether or not a search is running. A category the
+               search cannot reach is dimmed rather than re-labelled. */
+            const dim = needle ? !all.some(matches) : false
+            const here = !needle && cat === c.id
+            const { tint, icon: Icon } = metaOf(c.id)
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-current={here || undefined}
+                /* The blurb stays on the tip rather than the row: available if
+                   you want it, not five paragraphs deep if you do not. */
+                title={c.blurb}
+                className={`bfp2__railitem is-${tint} ${here ? 'is-on' : ''} ${dim ? 'is-dim' : ''}`}
+                onClick={() => {
+                  setQ('')
+                  setCat(c.id)
+                }}
+              >
+                <span className="bfp2__railico" aria-hidden>
+                  <Icon size={15} strokeWidth={1.9} />
+                </span>
+                <strong>{c.label}</strong>
+                <span className={`bfp2__railcount ${on > 0 ? 'is-on' : ''}`}>
+                  {on}/{all.length}
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+
+        <div className="bfp2__pane">
+          {groups.length === 0 ? (
+            <p className="bfp2__none">No attribute matches “{q.trim()}”.</p>
+          ) : (
+            groups.map(({ cat: c, rows }) => {
+              const on = rows.filter((a) => picked.includes(a.id)).length
+              const full = on === rows.length
+              const { tint, icon: Icon } = metaOf(c.id)
+              return (
+                <section key={c.id} className={`bfp2__pang is-${tint}`}>
+                  <header className="bfp2__panghead">
+                    <Icon size={13} strokeWidth={2} aria-hidden />
+                    <h4>{c.label}</h4>
+                    <span>
+                      {on}/{rows.length}
+                    </span>
+                    {/* Select-all acts on what is visible, so with a search
+                        running it takes the matches rather than the whole
+                        category behind them. */}
+                    <button
+                      type="button"
+                      className="bfp2__selectall"
+                      onClick={() =>
+                        setPicked(
+                          full
+                            ? picked.filter((x) => !rows.some((a) => a.id === x))
+                            : [
+                                ...new Set([
+                                  ...picked,
+                                  /* Every row shown, since none of them is
+                                     refused any more. */
+                                  ...rows.map((a) => a.id),
+                                ]),
+                              ],
+                        )
+                      }
+                    >
+                      {full ? 'Clear these' : 'Select all'}
+                    </button>
+                  </header>
+
+                  <div className="bfp2__grid">
+                    {rows.map((a) => {
+                      const isOn = picked.includes(a.id)
+                      /* Nothing is refused here.
+
+                         The old version greyed out every agent-only attribute
+                         when the reach was agentless, on the argument that "why
+                         is TPM ID missing" is a support ticket. It answers that
+                         question by breaking a worse one: the reach is chosen on
+                         a different panel and often AFTER the attributes, so the
+                         picker was refusing a choice on the strength of a
+                         setting the person had not made yet. A profile that
+                         names an agent-only signal and then goes agentless is
+                         told so on the restriction panel, where the reach lives
+                         and where the warning can be acted on. */
+                      const AIcon = ATTR_ICON[a.id] ?? Icon
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          aria-pressed={isOn}
+                          className={`bfp2__opt ${isOn ? 'is-on' : ''}`}
+                          /* The purpose is a tip rather than a second line. It
+                             is worth having, but thirty-eight of them on the
+                             page is a wall of prose in front of a choice you
+                             make from the names. */
+                          title={a.purpose}
+                          onClick={() => toggle(a.id)}
+                        >
+                          <span className="bfp2__optbox" aria-hidden>
+                            <Check size={11} strokeWidth={3.2} />
+                          </span>
+                          {/* Falls back to the category's mark, so an attribute
+                              added to the master without one still gets an icon
+                              rather than a hole in the column. */}
+                          <span className="bfp2__optico" aria-hidden>
+                            <AIcon size={14} strokeWidth={1.8} />
+                          </span>
+                          <span className="bfp2__optname">{a.name}</span>
+                          {/* Marked here rather than only on the inner page.
+                              Whether a signal is collected at all is part of
+                              deciding to include it, and learning it afterwards
+                              is learning it too late. */}
+                          {a.phase === 2 && (
+                            <span
+                              className="bfp2__soonico"
+                              role="img"
+                              aria-label="Not collected yet"
+                              title="Not collected yet"
+                            >
+                              <Clock size={12} strokeWidth={2} />
+                            </span>
+                          )}
+                          <i className={`bfp2__pri is-${a.priority.toLowerCase()}`}>{a.priority}</i>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
+              )
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AttrPicker({
   picked,
   setPicked,
@@ -385,7 +617,9 @@ function AttrPicker({
 }) {
   const [q, setQ] = useState('')
 
-  const offered = ATTRIBUTES.filter((a) => !(reach === 'agentless' && a.needsAgent))
+  /* The five. `attributesFor('match')` rather than the constant, so the two
+     pickers name their catalogue the same way. */
+  const offered = attributesFor('match').filter((a) => !(reach === 'agentless' && a.needsAgent))
   const needle = q.trim().toLowerCase()
   const rows = offered.filter(
     (a) =>
@@ -619,9 +853,17 @@ function CreateModal({
       {step === 2 ? (
         /* Agentless, because a profile being created has no reach yet and
            agentless is what it will start as — so the picker greys the
-           eighteen attributes an agent would be needed for rather than
-           offering them and failing later. */
-        <AttrPicker picked={picked} setPicked={setPicked} reach="agentless" />
+           attributes an agent would be needed for rather than offering them and
+           failing later.
+
+           Which picker depends on the mode chosen a step earlier: risk draws
+           from the thirty-eight and needs the category rail, match draws from
+           the five and does not. */
+        mode === 'risk' ? (
+          <RiskAttrPicker picked={picked} setPicked={setPicked} />
+        ) : (
+          <AttrPicker picked={picked} setPicked={setPicked} reach="agentless" />
+        )
       ) : (
       <div className="bfp2__form">
         <label className="bfp2__field">
@@ -1604,7 +1846,11 @@ function AddModal({
         </>
       }
     >
-      <AttrPicker picked={picked} setPicked={setPicked} reach={profile.reach} />
+      {profile.mode === 'risk' ? (
+        <RiskAttrPicker picked={picked} setPicked={setPicked} />
+      ) : (
+        <AttrPicker picked={picked} setPicked={setPicked} reach={profile.reach} />
+      )}
     </Modal>
   )
 }

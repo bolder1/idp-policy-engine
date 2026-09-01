@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   ATTRIBUTES,
+  MATCH_ATTRIBUTES,
+  RISK_ATTRIBUTES,
+  attributesFor,
   VERSION_OPS,
   TIER_WEIGHT,
   byId,
@@ -38,13 +41,25 @@ describe('the attribute master', () => {
      one screen, no grouping, no filter. Let it drift past fifteen and the
      screen needs a filing scheme again — which is the thing that was taken out.
      This is the tripwire for that. */
-  it('stays small enough not to need a filing scheme', () => {
-    /* Was 10-15, when the master was the sheet's fourteen. It is five now — one
-       form factor and one version per platform — and the ceiling is what this
-       test is actually for: the moment the list needs scrolling it needs
-       grouping, and grouping is the thing that was taken out. */
-    expect(ATTRIBUTES.length).toBeGreaterThanOrEqual(4)
-    expect(ATTRIBUTES.length).toBeLessThanOrEqual(10)
+  it('keeps the match catalogue small enough not to need a filing scheme', () => {
+    /* The ceiling is what this test is for, and it now applies to ONE of the two
+       lists. Attribute match offers five — a form factor and a version per
+       platform — and the moment that list needs scrolling it needs grouping,
+       which is the thing the flat picker exists to avoid.
+
+       The risk catalogue is deliberately the opposite: thirty-eight weak signals
+       that only mean something summed, filed into five categories with a rail to
+       navigate them. Holding it to the same bound would be holding it to the
+       wrong screen's constraint. */
+    expect(MATCH_ATTRIBUTES.length).toBeGreaterThanOrEqual(4)
+    expect(MATCH_ATTRIBUTES.length).toBeLessThanOrEqual(10)
+    expect(RISK_ATTRIBUTES.length).toBeGreaterThan(20)
+    expect(RISK_ATTRIBUTES.every((a) => a.category)).toBe(true)
+  })
+
+  it('offers each mode its own catalogue', () => {
+    expect(attributesFor('match')).toBe(MATCH_ATTRIBUTES)
+    expect(attributesFor('risk')).toBe(RISK_ATTRIBUTES)
   })
 
   /* Agentless is the default reach for a new profile, so a master where every

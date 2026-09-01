@@ -557,10 +557,26 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
    The recovery pill stays quiet. It marks a second job a method can also do,
    which is a footnote on the row rather than the row's identity — two loud
    pills side by side would make neither of them the answer. */
+/* Info blue, and the Default star keeps the brand tint — they were the same
+   colour, and they are not the same kind of fact.
+
+   "Default" is a state somebody chose: one method out of twenty-four, starred
+   by this tenant, changeable this afternoon. Brand is right for the one you
+   picked. "Primary sign-in" is what the method IS — a property of passwords and
+   passkeys that no admin sets and none can unset. Two facts of different sorts
+   painted identically read as one repeated label, which is exactly how it
+   looked: a red pill beside a red pill.
+
+   Blue rather than any other free hue, because the product already answers
+   "what kind of thing is this" in blue — the zone type chip and the device
+   profile mode chip both do. Green stays reserved for the security property
+   beside it (Phishing-resistant), so a passkey row now reads in three colours
+   that each mean something: what it is, what it guarantees, whether it is the
+   one in use. */
 .bm8__badge.bm8__badge--use {
-  background: var(--brand-subtle-bg);
-  border: 1px solid var(--brand-subtle-border);
-  color: var(--brand-active);
+  background: var(--fb-info-bg);
+  border: 1px solid var(--fb-info-border);
+  color: var(--fb-info-fg);
   font-weight: var(--fw-semibold);
 }
 .bm8__badge.bm8__badge--use.is-quiet {

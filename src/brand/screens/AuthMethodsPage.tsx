@@ -36,8 +36,16 @@ const VERSIONS: { id: V; label: string; blurb: string }[] = [
 
 export function AuthMethodsPage() {
   const store = useBrand()
-  /* v2 is the proposal, so it is what opens. */
-  const [v, setV] = useState<V>('v2')
+  /* v1 is what opens, for an admin and for a person alike.
+
+     v2 opened while it was the proposal and v1 was the archived layout
+     kept for comparison. That stopped being true when v1 became one
+     filtered catalogue serving both roles: it is the arrangement being
+     argued for now, and the one that should be on screen before anybody
+     touches the switch. One default for both sides, because the layout is
+     not what differs between them — the meaning of the control on the
+     right of each row is. */
+  const [v, setV] = useState<V>('v1')
 
   /* Read, not owned. Switching sides is an account action taken from the
      avatar menu — it changes the chrome, the nav and the landing screen, none

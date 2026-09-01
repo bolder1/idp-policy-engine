@@ -950,6 +950,26 @@ export function TipDot({ text, label = 'Why this matters' }: { text: ReactNode; 
   )
 }
 
+/* The same dot, on a span rather than a button.
+
+   `TipDot` is a button, so it cannot go inside one — nested buttons are invalid
+   HTML and React refuses to hydrate them. Rows that are themselves one big
+   button still want a "why" beside a name, which is the case this exists for.
+
+   The trigger is aria-hidden and not focusable, so it is a mouse affordance
+   only. Anything placed behind it must therefore also reach a keyboard: put the
+   same words in the enclosing control's accessible name (`.u-sr-only`), rather
+   than treating the hover as the only way to the sentence. */
+export function TipMark({ text }: { text: ReactNode }) {
+  return (
+    <Tip text={text}>
+      <span className="bx-tipdot" aria-hidden>
+        ?
+      </span>
+    </Tip>
+  )
+}
+
 /** Small "why" affordance — the current prototype shows bare red dots. */
 export function InfoDot({ text, tone = 'notice' }: { text: string; tone?: 'notice' | 'negative' }) {
   const [open, setOpen] = useState(false)

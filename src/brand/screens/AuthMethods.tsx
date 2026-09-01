@@ -24,7 +24,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { Button, Drawer, MenuButton, Modal, TipDot, Toggle } from '../kit'
+import { Button, Drawer, MenuButton, Modal, TipMark, Toggle } from '../kit'
 import { methodBlocker, type AuthMethod } from '../methods'
 import { useBrand, type Role } from '../store'
 import { NoResults } from '../empty'
@@ -827,9 +827,15 @@ function CategoryList({
                     price was not worth it: eleven names and nothing else is
                     tidy and mute, and the rows that lost their line were the
                     ones a reader stops on. */}
-                {!f.explains && <TipDot label={f.channel} text={f.blurb} />}
+                {/* TipMark, not TipDot: this row is itself a button, and
+                    a button inside a button is invalid HTML that React refuses
+                    to hydrate — the same fault the filter pill had. */}
+                {!f.explains && <TipMark text={f.blurb} />}
               </span>
               {f.explains && <span className="bm8__desc">{f.blurb}</span>}
+              {/* The tip is a mouse affordance and cannot be tabbed to, so the
+                  sentence behind it rides on the card's own accessible name. */}
+              {!f.explains && <span className="u-sr-only">{f.blurb}</span>}
 
             </span>
 
@@ -878,14 +884,11 @@ function CategoryList({
         })}
       </div>
 
-      {rows.length === 0 && (
-        <NoResults>
-          Nothing matches “{q}”.{' '}
-          <button type="button" className="bm8__link" onClick={() => setQ('')}>
-            Clear
-          </button>
-        </NoResults>
-      )}
+      {/* A "nothing matches" line stood here, and it was firing on a list with
+          rows on it: `rows` is the family cards, and the three primaries are
+          not families, so filtering to Primary sign-in methods emptied every
+          card and tripped the message underneath three visible rows — with an
+          empty query in the quotation marks, because there was no search. */}
     </div>
   )
 }

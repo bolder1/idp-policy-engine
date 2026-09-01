@@ -118,7 +118,23 @@ html[data-theme='dark'] {
    severity prefixes as visible text. */
 .u-sr,
 .u-sr-only {
-  position: absolute; width: 1px; height: 1px;
+  /* Pinned to 0,0, and that is not cosmetic.
+
+     Absolute with no coordinates leaves the box at its STATIC position while
+     its containing block is the nearest positioned ancestor — and where there
+     is none, that is the initial containing block. The scroller it appears to
+     live in then does not clip it, so the document grows to reach it. Four of
+     these in the authentication list put one at y=1185 and gave the whole app a
+     second scrollbar and 392px of white below it: the page was 794 tall and the
+     document 1186.
+
+     Reading order comes from the DOM, not from coordinates, so a screen reader
+     is unaffected by where the 1px box sits. Pinning it means the utility is
+     safe wherever it is used rather than only where its host happens to be
+     positioned — and it is used inside the builders, user-config and the method
+     forms, all of which scroll. */
+  position: absolute; top: 0; left: 0;
+  width: 1px; height: 1px;
   padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }

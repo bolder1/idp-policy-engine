@@ -599,7 +599,8 @@
    The same shape as the zones page's equivalent. Two pages answering the same
    question about two shared objects should not answer it in two visual
    languages. */
-.bfp2__usecount { font-size: var(--fs-sm); color: var(--text-tertiary); }
+/* `.bfp2__usecount` moved to used-by.css as `.buse__count` — the two screens
+   draw the same button and had drawn it differently. */
 
 /* The used-by drawer's own list stood here — a policy name on the left, its
    rule names run together on the right. It is `.buse` in used-by.css now,

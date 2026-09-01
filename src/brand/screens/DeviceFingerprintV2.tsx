@@ -62,8 +62,8 @@ import {
 import { useBrand } from '../store'
 import { EmptyState } from '../empty'
 import type { Policy } from '../data'
-import { policiesUsing, rulesUsing } from './usage'
-import { UsedByList } from './used-by'
+import { policiesUsing } from './usage'
+import { UsedByList, UsedByPeek } from './used-by'
 
 /* -----------------------------------------------------------------------------
    Device fingerprint · profiles.
@@ -232,7 +232,7 @@ function ProfileList({
               <span role="columnheader" />
             </div>
             {profiles.map((p) => {
-              const uses = rulesUsing('fingerprint', p.id, policies)
+              const users = policiesUsing('fingerprint', p.id, policies)
               return (
               <div className="bfp2__trow" role="row" key={p.id}>
                 {/* One cell, as on the zones table — the icon belongs to the
@@ -253,8 +253,10 @@ function ProfileList({
                   <i className={`bfp2__modechip is-${p.mode}`}>{modeLabel(p)}</i>
                 </span>
                 <span role="cell" className="bfp2__tnum">{p.enabled.length}</span>
-                <span role="cell" className={`bfp2__tuses ${uses === 0 ? 'is-quiet' : ''}`}>
-                  {uses === 0 ? '—' : `${uses} rule${uses === 1 ? '' : 's'}`}
+                {/* The count, and what is behind it — the same peek the zones
+                    table and the policies table use. */}
+                <span role="cell">
+                  <UsedByPeek users={users} />
                 </span>
 
                 {/* The same three actions the zones table carries, in the same
@@ -714,7 +716,6 @@ function ProfilePage({
   const [restricting, setRestricting] = useState(false)
   const [showUses, setShowUses] = useState(false)
   const chosen = profile.enabled.map(byId).filter((a): a is Attribute => Boolean(a))
-  const uses = rulesUsing('fingerprint', profile.id, policies)
   const users = policiesUsing('fingerprint', profile.id, policies)
 
   const setConfig = (id: string, v: AttrConfigValue) =>
@@ -751,11 +752,15 @@ function ProfilePage({
         </div>
 
         {/* Carries the count, so "does anything depend on this" is answered on
-            the page and opening it is only needed for WHICH. */}
+            the page and opening it is only needed for WHICH.
+
+            Policies, not rules, matching the column on the list — a rule is not
+            a thing anybody navigates to, and the two counts disagreeing on the
+            same object is worse than either being wrong. */}
         <Button variant="secondary" size="sm" onClick={() => setShowUses(true)}>
           <Link2 size={14} strokeWidth={1.9} aria-hidden />
           Used by
-          <i className="bfp2__usecount">{uses}</i>
+          <i className="buse__count">{users.length}</i>
         </Button>
       </header>
 

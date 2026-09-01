@@ -7,10 +7,10 @@ import { EmptyState } from '../empty'
 import type { Policy, Zone } from '../data'
 import { emptyLocation, ipSectionEmpty, locationEmpty } from '../data'
 import { useBrand } from '../store'
-import { policiesUsing, rulesUsing } from './usage'
-import { UsedByList } from './used-by'
+import { policiesUsing } from './usage'
+import { UsedByList, UsedByPeek } from './used-by'
 import { validateZone } from './zone-validation'
-import { AddressSection, Chips, PlaceSection, addressBits, placeBits } from './ZonesFinal'
+import { AcceptsNote, AddressSection, Chips, PlaceSection, addressBits, placeBits } from './ZonesFinal'
 
 /* -----------------------------------------------------------------------------
    Zones · v2 — one zone, one kind.
@@ -233,7 +233,7 @@ function ZoneTableV2({
       {zones.map((z) => {
         const on = matchOf(z)
         const meta = KIND[on]
-        const uses = rulesUsing('zone', z.id, policies)
+        const users = policiesUsing('zone', z.id, policies)
         const items = on === 'net' ? addressBits(z) : placeBits(z.location)
         return (
           <div className="bz7__trow bz8__trow" role="row" key={z.id}>
@@ -264,8 +264,11 @@ function ZoneTableV2({
               )}
             </span>
 
-            <span role="cell" className={`bz7__tuses ${uses === 0 ? 'is-quiet' : ''}`}>
-              {uses === 0 ? '—' : `${uses} rule${uses === 1 ? '' : 's'}`}
+            {/* The count, and what is behind it. Hovering opens the rules
+                themselves — which is the question the number was standing in
+                for. */}
+            <span role="cell">
+              <UsedByPeek users={users} />
             </span>
 
             {/* The row's own actions, in the shape the policies and device
@@ -445,7 +448,7 @@ function ZoneDetailV2({
           <Button variant="secondary" size="sm" onClick={() => setShowUses(true)}>
             <Link2 size={14} strokeWidth={1.9} aria-hidden />
             Used by
-            <i className="bz7__usecount">{users.length}</i>
+            <i className="buse__count">{users.length}</i>
           </Button>
           {/* Danger, not neutral. The kit reserves red for the confirming
               control inside a destructive dialog, on the argument that a
@@ -476,6 +479,12 @@ function ZoneDetailV2({
           ))}
         </div>
       )}
+
+      {/* Page-level reference, under the page's own heading — not wedged between
+          the add field and the list it fills. Only for a network zone: a
+          location zone takes places, and the formats here would be a note about
+          something this page cannot do. */}
+      {on === 'net' && <AcceptsNote />}
 
       {on === 'net' ? (
         <AddressSection draft={zone} onChange={onChange} />

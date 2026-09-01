@@ -4,9 +4,11 @@ import {
   AlertTriangle,
   ArrowLeft,
   Check,
+  ChevronDown,
   Copy,
   Eye,
   Globe,
+  Info,
   Infinity as InfinityIcon,
   LayoutGrid,
   Layers,
@@ -653,7 +655,7 @@ function ZoneDetail({
           <Button variant="secondary" size="sm" onClick={() => setShowUses(true)}>
             <Link2 size={14} strokeWidth={1.9} aria-hidden />
             Used by
-            <i className="bz7__usecount">{users.length}</i>
+            <i className="buse__count">{users.length}</i>
           </Button>
           {/* No Edit button for the zone's CONTENTS, and none needed: the
               sections below save as they are typed, so "edit" is just being on
@@ -860,6 +862,64 @@ const QUICK: { label: string; value: string; hint: string }[] = [
   { label: 'My current IP', value: CURRENT_IP, hint: 'The address this session is coming from' },
 ]
 
+/* What the field takes, at the top of the page and foldable.
+
+   Five shapes before this one: a `?` on the section heading, a panel of
+   bordered chips that looked clickable, a two-column legend costing 130px, one
+   dense inline row, and a note inside the address section. Each was tried
+   because the last one was in the way — which is the tell that the block was in
+   the wrong PLACE, not the wrong style. It is reference for the whole page, so
+   it sits under the page's own heading rather than wedged between a field and
+   the list it fills.
+
+   `<details>`, not a state hook. The disclosure keyboard behaviour, the ARIA
+   and the open/closed toggle are all free and correct, and nothing here needs
+   to know whether it is open.
+
+   Closed by default, and the summary carries the shapes — "addresses, CIDR
+   blocks, ranges, ASNs" is enough to know whether you need the examples, which
+   is what a reader is deciding when they glance at it. */
+export function AcceptsNote() {
+  return (
+    <details className="bz7__accepts">
+      <summary>
+        <Info size={14} strokeWidth={2} aria-hidden />
+        <strong>What you can add</strong>
+        <em>addresses, CIDR blocks, ranges and network operators</em>
+        <ChevronDown size={14} strokeWidth={2} aria-hidden />
+      </summary>
+      <div className="bz7__acceptsbody">
+        {/* The gloss is its own element rather than a bare text node, so it
+            can be dimmed without dimming the sample beside it — opacity on the
+            row would take both, since a child cannot be more opaque than its
+            parent. */}
+        <ul>
+          <li>
+            <code>10.0.0.1</code>
+            <em>a single address, v4 or v6</em>
+          </li>
+          <li>
+            <code>192.168.0.0/24</code>
+            <em>a CIDR block</em>
+          </li>
+          <li>
+            <code>192.168.0.1-192.168.0.254</code>
+            <em>a range</em>
+          </li>
+          <li>
+            <code>AS15169</code>
+            <em>a network operator</em>
+          </li>
+        </ul>
+        <p>
+          One per line, or separated by commas or spaces. Anything that does not parse stays in the
+          box so you can fix it.
+        </p>
+      </div>
+    </details>
+  )
+}
+
 export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
   const [text, setText] = useState('')
   const [filter, setFilter] = useState('')
@@ -979,44 +1039,6 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
         </h4>
         <span>{total === 0 ? 'Any network' : `${total} ${total === 1 ? 'entry' : 'entries'}`}</span>
       </header>
-
-      {/* What this field takes, before anything is typed into it.
-
-          It was a `?` on the heading. A tip is right for a sentence somebody
-          may want once; it is wrong for the reference you need BEFORE acting,
-          because the cost of not knowing is a rejected paste and the cost of
-          finding out is a deliberate hover on a mark that looks optional. The
-          field's own placeholder can only ever show three examples.
-
-          Written from what `classifyIp` and `isValidAsn` actually accept, not
-          from the format note the reference showed — that one omits IPv6 and
-          ASNs, both of which parse here, and a help text that undersells the
-          field is why people paste one value at a time. */}
-      <div className="bz7__formats">
-        <span className="bz7__formatslead">Accepts</span>
-        <ul>
-          <li>
-            <code>10.0.0.1</code>
-            <em>a single address, v4 or v6</em>
-          </li>
-          <li>
-            <code>192.168.0.0/24</code>
-            <em>a CIDR block</em>
-          </li>
-          <li>
-            <code>192.168.0.1-192.168.0.254</code>
-            <em>a range</em>
-          </li>
-          <li>
-            <code>AS15169</code>
-            <em>a network operator</em>
-          </li>
-        </ul>
-        <p>
-          One per line, or separated by commas or spaces. Anything that does not parse stays in the
-          box so you can fix it.
-        </p>
-      </div>
 
       <div className="bz7__add">
         <input

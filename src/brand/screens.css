@@ -725,3 +725,36 @@
   .bnew { grid-template-columns: minmax(0, 1fr); }
   .bnew__other { border-left: none; border-top: var(--bw-thin) solid var(--border-subtle); }
   .bdec { grid-template-columns: minmax(0, 1fr); }}
+
+/* --- The peek, on a library object's count -----------------------------------
+   `.btable__rules` is the policies table's trigger and carries that table's
+   cell metrics. Zones and device profiles put the same peek in a grid cell, so
+   the trigger brings its own — otherwise the underline sits against the wrong
+   baseline and the cell loses its right alignment. */
+.bz7__usespeek {
+  padding: 0; background: none; border: 0; cursor: help;
+  font-size: var(--fs-sm); color: var(--text-secondary);
+  text-decoration: underline dotted var(--border-strong); text-underline-offset: 3px;
+}
+.bz7__usespeek:hover,
+.bz7__usespeek.is-open { color: var(--brand-active); text-decoration-color: var(--brand); }
+.bz7__usespeek:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+
+/* The policy's state, as a dot. `.brpk__where` and a rule count stood here;
+   both were answering questions nobody asked of a hover — the NAME is what this
+   panel exists to give, and it now has the row to itself.
+
+   Same colours the status pill uses, so a green dot means the same thing here
+   as it does in the table it came from. */
+.brpk__dot {
+  flex: none; width: 7px; height: 7px; border-radius: var(--radius-full);
+  background: var(--fb-neutral-dot);
+}
+.brpk__dot.is-active,
+.brpk__dot.is-always-on { background: var(--fb-positive-dot); }
+.brpk__dot.is-monitor { background: var(--fb-notice-dot); }
+.brpk__dot.is-inactive { background: var(--fb-neutral-dot); }
+
+/* The name carries the row now, so it reads at full strength rather than as one
+   of three competing fragments. */
+.brpk .brpk__name { font-weight: var(--fw-medium); color: var(--text-primary); }

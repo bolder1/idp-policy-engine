@@ -69,3 +69,15 @@
 @media (prefers-reduced-motion: reduce) {
   .buse__open { transition: none; }
 }
+
+/* The count on a "Used by" button, wherever one appears.
+
+   Zones had it as a chip and device profiles as a bare <i>, which renders as
+   small italic text — so the same button read as a chip on one screen and as an
+   afterthought on the other. One class, in the file both already load, because
+   the two buttons are the same button. */
+.buse__count {
+  font-style: normal; padding: 0 6px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); color: var(--text-tertiary);
+  font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
+}

@@ -120,18 +120,11 @@
   color: var(--text-muted);
 }
 .bhk__usesnone { margin: var(--space-3) 0 0; font-size: var(--fs-sm); color: var(--text-muted); }
-.bhk__uses ul { margin: var(--space-3) 0 0; padding: 0; list-style: none; }
-.bhk__uses ul li {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-6);
-  padding: var(--space-3) 0;
-  font-size: var(--fs-sm);
-}
-.bhk__uses ul li + li { border-top: 1px solid var(--border-subtle); }
-.bhk__uses ul strong { font-weight: var(--fw-medium); color: var(--text-primary); }
-.bhk__uses ul span { color: var(--text-tertiary); text-align: right; }
+/* The rows this section drew for its used-by list are `.buse` in used-by.css
+   now. Removed rather than left: they were `.bhk__uses ul li` and friends, so
+   they went on matching the shared list that replaced them and re-flattened its
+   cards back into two-column rows. */
+.bhk__uses .buse { margin-top: var(--space-3); }
 
 .bhk__confirm { margin: 0; font-size: var(--fs-md); line-height: 1.55; color: var(--text-body); }
 

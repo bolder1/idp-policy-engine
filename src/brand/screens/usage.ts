@@ -1,4 +1,4 @@
-import type { Policy } from '../data'
+import type { Policy, Rule } from '../data'
 
 /* -----------------------------------------------------------------------------
    What depends on this object.
@@ -20,14 +20,26 @@ import type { Policy } from '../data'
    join, and collapsing them would only hide that.
    -------------------------------------------------------------------------- */
 
+/** A policy and the rules of it that name the object. */
+export interface PolicyUse {
+  policy: Policy
+  /* The rules themselves, not their names.
+
+     Names were enough while the answer was printed as a line of text. It is a
+     card now, and what makes the card worth reading is the decision each rule
+     lands on — which the name cannot carry, and which is the difference between
+     "editing this is awkward" and "editing this stops people signing in". */
+  rules: Rule[]
+}
+
 /** Every policy with at least one rule referencing `valueId`, and which rules. */
-export function policiesUsing(typeId: string, valueId: string, policies: Policy[]) {
+export function policiesUsing(typeId: string, valueId: string, policies: Policy[]): PolicyUse[] {
   return policies
     .map((policy) => ({
       policy,
-      rules: policy.rules
-        .filter((r) => r.conditions.some((c) => c.typeId === typeId && c.values.includes(valueId)))
-        .map((r) => r.name),
+      rules: policy.rules.filter((r) =>
+        r.conditions.some((c) => c.typeId === typeId && c.values.includes(valueId)),
+      ),
     }))
     .filter((x) => x.rules.length > 0)
 }

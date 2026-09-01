@@ -1,0 +1,71 @@
+/* =============================================================================
+   `UsedByList` — what depends on a library object, as cards.
+
+   Shared by the zones, device-profile and hook screens, so it is named for what
+   it is rather than for the screen it first appeared on. See the note in
+   used-by.tsx for why it stopped being a two-column row.
+   ========================================================================== */
+
+.buse { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.buse__card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+/* The header row: the policy, and the way out to it. */
+.buse__open {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 10px 12px; text-align: left; cursor: pointer;
+  background: none; border: 0;
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+.buse__open strong {
+  flex: 1; min-width: 0;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.buse__open > svg { flex: none; color: var(--text-muted); }
+.buse__open:hover { background: var(--surface-hover); }
+.buse__open:hover > svg { color: var(--brand-active); }
+.buse__open:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+
+/* The rules, on an inset strip so the card reads as a policy WITH rules rather
+   than as four peer lines that happen to be boxed together. */
+.buse__rules {
+  list-style: none; margin: 0; padding: 4px 6px 6px;
+  display: flex; flex-direction: column; gap: 3px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-inset);
+}
+.buse__rules > li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 7px; border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.buse__n {
+  flex: none; display: grid; place-items: center;
+  width: 17px; height: 17px; border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: var(--fs-xs); font-variant-numeric: tabular-nums; color: var(--text-muted);
+}
+.buse__rname {
+  flex: 1; min-width: 0;
+  font-size: var(--fs-sm); color: var(--text-body);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Still named, still a constraint on a rename — but not deciding anything
+   today, so it is stated rather than left to look live. */
+.buse__rules > li.is-off { background: transparent; }
+.buse__rules > li.is-off .buse__rname { color: var(--text-muted); }
+.buse__off {
+  flex: none; font-style: normal; font-size: var(--fs-xs);
+  padding: 1px 6px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buse__open { transition: none; }
+}

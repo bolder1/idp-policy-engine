@@ -7,6 +7,7 @@ import { useBrand } from '../store'
 import { Webhook } from 'lucide-react'
 import { EmptyState } from '../empty'
 import { policiesUsing } from './usage'
+import { UsedByList } from './used-by'
 import {
   FAILURE_BLURB,
   FAILURE_LABEL,
@@ -83,11 +84,15 @@ export function Hooks() {
       <PageHead
         title="External hooks"
         caption="A condition the engine cannot answer itself, answered by a system that can."
+        /* Withheld while the empty state is showing, which offers the same
+           action with the sentence that explains it. */
         actions={
-          <Button variant="brand" onClick={() => setEditing(blank())}>
-            <Plus size={15} strokeWidth={2.2} aria-hidden />
-            New hook
-          </Button>
+          store.hooks.length > 0 ? (
+            <Button variant="brand" onClick={() => setEditing(blank())}>
+              <Plus size={15} strokeWidth={2.2} aria-hidden />
+              New hook
+            </Button>
+          ) : undefined
         }
       />
 
@@ -95,7 +100,10 @@ export function Hooks() {
         <EmptyState
           icon={Webhook}
           title="No hooks yet"
-          blurb="Ask a system this console does not hold, and use the answer."
+          /* Three real callees. The caption above already says "a condition
+             the engine cannot answer itself" — naming a fraud score and a
+             CMDB is what turns that into something you can picture wanting. */
+          blurb="Call a service this console does not hold — a fraud score, a CMDB, your own risk API — and let a policy rule decide on the answer it returns."
           action={
             <Button variant="brand" onClick={() => setEditing(blank())}>
               <Plus size={15} strokeWidth={2.2} aria-hidden />
@@ -184,14 +192,7 @@ export function Hooks() {
                       No rule references this hook. It can be changed or deleted without affecting any sign-in.
                     </p>
                   ) : (
-                    <ul>
-                      {users.map((u) => (
-                        <li key={u.policy.id}>
-                          <strong>{u.policy.name}</strong>
-                          <span>{u.rules.join(' · ')}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <UsedByList users={users} />
                   )}
                 </div>
               </li>

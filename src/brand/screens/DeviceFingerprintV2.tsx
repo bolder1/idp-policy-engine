@@ -61,6 +61,7 @@ import { useBrand } from '../store'
 import { EmptyState } from '../empty'
 import type { Policy } from '../data'
 import { policiesUsing, rulesUsing } from './usage'
+import { UsedByList } from './used-by'
 
 /* -----------------------------------------------------------------------------
    Device fingerprint · profiles.
@@ -193,17 +194,25 @@ function ProfileList({
             a profile the way they name a zone.
           </p>
         </div>
-        <Button variant="brand" onClick={onCreate}>
-          <Plus size={15} strokeWidth={2.2} aria-hidden />
-          Create new profile
-        </Button>
+        {/* Not while the empty state is up: it offers the same action in
+            the middle of the page, and two brand buttons pointing at one
+            dialog is a question the reader has to stop and answer. */}
+        {profiles.length > 0 && (
+          <Button variant="brand" onClick={onCreate}>
+            <Plus size={15} strokeWidth={2.2} aria-hidden />
+            Create new profile
+          </Button>
+        )}
       </header>
 
       {profiles.length === 0 ? (
         <EmptyState
           icon={MonitorSmartphone}
           title="No profiles yet"
-          blurb="What identifies a device, and what to do when it changes."
+          /* The signals by name. "What identifies a device" is the page
+             caption again; a TPM key and an OS build are the things somebody
+             is actually about to choose between. */
+          blurb="The signals that identify a machine — its TPM key, its serial, its OS build — and what should happen on the day they stop matching."
           action={
             <Button variant="brand" onClick={onCreate}>
               <Plus size={15} strokeWidth={2.2} aria-hidden />
@@ -851,7 +860,7 @@ function ProfilePage({
             compact
             icon={ShieldOff}
             title="Nothing decided yet"
-            blurb="What this profile may read, and how a machine becomes a known one."
+            blurb="What this profile may read, how a device gets registered, and how many each person may keep."
             action={
               <Button variant="secondary" size="sm" onClick={() => setRestricting(true)}>
                 <Sliders size={14} strokeWidth={2} aria-hidden />
@@ -957,17 +966,10 @@ function ProfilePage({
             compact
             icon={Unlink}
             title="Nothing references this profile"
-            blurb="Safe to change or delete."
+            blurb="No policy rule names it, so renaming or deleting it changes nothing."
           />
         ) : (
-          <ul className="bfp2__uses">
-            {users.map((u) => (
-              <li key={u.policy.id}>
-                <strong>{u.policy.name}</strong>
-                <span>{u.rules.join(' · ')}</span>
-              </li>
-            ))}
-          </ul>
+          <UsedByList users={users} />
         )}
       </Drawer>
 
@@ -1313,7 +1315,7 @@ function RestrictionDrawer({
               the fieldset points at the heading that is already there, which is
               one label in the accessibility tree instead of two saying the same
               words. */}
-          <fieldset className="bfp2__modes bfp2__modes--stack" aria-labelledby="bfp2-reach">
+          <fieldset className="bfp2__modes" aria-labelledby="bfp2-reach">
             {REACHES.map((r) => (
               <button
                 key={r.id}

@@ -81,7 +81,19 @@
 }
 .bfp2__field input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
 
-.bfp2__modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; border: 0; padding: 0; margin: 0; }
+/* Stacked, not side by side — the same shape the zone kind picker settled on,
+   and for the same reason. Two cards across a 520px dialog leaves each about
+   230px, which wraps both sentences to four lines and turns a choice between
+   two things into a block of text you read rather than a pair you pick from.
+   Down the page each card has the full width, its sentence lands in one or two
+   lines, and the two are compared in the order they are offered.
+
+   No auto-fit any more: the column was there so a wider surface could put them
+   side by side, and every surface that shows this is a 520px dialog or drawer. */
+.bfp2__modes {
+  display: flex; flex-direction: column; gap: 8px;
+  border: 0; padding: 0; margin: 0;
+}
 .bfp2__modes legend {
   padding: 0 0 8px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
 }
@@ -460,9 +472,8 @@
   letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-secondary);
 }
 .bfp2__restform .bfp2__stephint { margin: 0; }
-/* Stacked, not side by side: the drawer is 520px and two cards in it would be
-   two columns of wrapped text. */
-.bfp2__modes--stack { grid-template-columns: minmax(0, 1fr); }
+/* `.bfp2__modes--stack` stood here — the drawer opting out of the side-by-side
+   columns. Stacking is the base now, so the modifier had nothing left to say. */
 
 /* `.bfp2__cat` and `.bfp2__cathead` — the five headed sections the profile page
    grouped its attributes into — stood here. Seven attributes arrived as four
@@ -572,17 +583,10 @@
    languages. */
 .bfp2__usecount { font-size: var(--fs-sm); color: var(--text-tertiary); }
 
-.bfp2__uses { margin: 0; padding: 0; list-style: none; }
-.bfp2__uses li {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-6);
-  padding: var(--space-5) var(--space-6);
-}
-.bfp2__uses li + li { border-top: 1px solid var(--border-subtle); }
-.bfp2__uses strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bfp2__uses span { font-size: var(--fs-sm); color: var(--text-tertiary); text-align: right; }
+/* The used-by drawer's own list stood here — a policy name on the left, its
+   rule names run together on the right. It is `.buse` in used-by.css now,
+   shared with zones and hooks, which asked the same question and had each
+   answered it in their own two-column row. */
 
 /* =============================================================================
    The two sections the profile page was missing: how the mode decides, and

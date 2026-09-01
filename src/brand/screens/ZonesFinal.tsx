@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   Check,
-  ChevronRight,
   Copy,
   Eye,
   Globe,
@@ -23,7 +22,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { Button, Drawer, Modal, StatusPill, TipDot } from '../kit'
+import { Button, Drawer, Modal, TipDot } from '../kit'
 import {
   ASN_DIRECTORY,
   emptyLocation,
@@ -39,6 +38,7 @@ import { EmptyState } from '../empty'
 import { classifyIp, describeZone, validateZone } from './zone-validation'
 import { parseEntries } from './zone-entries'
 import { policiesUsing, rulesUsing } from './usage'
+import { UsedByList } from './used-by'
 
 /* -----------------------------------------------------------------------------
    Zones · final.
@@ -158,6 +158,11 @@ export function ZonesFinal() {
               <h1>Zones</h1>
               <p>Named boundaries — IP networks and places — that your policy rules reference.</p>
             </div>
+            {/* Hidden while the page is empty, because the empty state below
+                already offers this and two brand buttons on one screen make a
+                reader work out whether they do the same thing. It comes back
+                the moment there is a list for it to sit above. */}
+            {store.zones.length > 0 && (
             <div className="bz7__headactions">
               {/* One way in now.
 
@@ -174,6 +179,7 @@ export function ZonesFinal() {
                 New zone
               </Button>
             </div>
+            )}
           </header>
 
           {store.zones.length === 0 ? (
@@ -267,7 +273,12 @@ function ZonesEmpty({ onCreate }: { onCreate: () => void }) {
     <EmptyState
       icon={Network}
       title="No zones yet"
-      blurb="A named boundary your policy rules can point at."
+      /* Named things, not a definition. "A named boundary your policy rules
+         can point at" is the page caption reworded — true of a zone, a
+         profile and a hook alike, and so of no use to somebody deciding
+         whether they want one. Three examples of an actual zone say it in
+         the same space. */
+      blurb="An office IP range, a country you operate in, a hosting provider nobody should sign in from — named once here, then reused by every rule that needs it."
       /* The one thing this screen has to teach, because getting it backwards is
          the model's sharpest edge. */
       action={
@@ -725,31 +736,12 @@ function ZoneDetail({
             compact
             icon={Unlink}
             title="Nothing references this zone"
-            blurb="Safe to change or delete."
+            blurb="No policy rule points at it, so renaming or deleting it changes nothing."
           />
         ) : (
-          <ul className="bz7__uses">
-            {users.map((u) => (
-              <li key={u.policy.id}>
-                <button
-                  type="button"
-                  className="bz7__usecard"
-                  onClick={() => store.go({ name: 'builder', policyId: u.policy.id })}
-                >
-                  <span className="bz7__usetop">
-                    <strong>{u.policy.name}</strong>
-                    <StatusPill status={u.policy.status} />
-                  </span>
-                  <span className="bz7__userules">
-                    {u.rules.map((r) => (
-                      <i key={r}>{r}</i>
-                    ))}
-                  </span>
-                  <ChevronRight size={15} strokeWidth={2} aria-hidden />
-                </button>
-              </li>
-            ))}
-          </ul>
+          /* This screen's own card, which is where the shared one came from —
+             its rule chips said the rule names and stopped there. */
+          <UsedByList users={users} />
         )}
       </Drawer>
     </>

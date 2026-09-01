@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, ArrowLeft, Globe, Link2, Network, Pencil, Plus, Trash2 } from 'lucide-react'
 
-import { Button, Drawer, Modal } from '../kit'
+import { Button, Drawer, Modal, TipDot } from '../kit'
 import { EmptyState } from '../empty'
 import type { Policy, Zone } from '../data'
 import { emptyLocation, ipSectionEmpty, locationEmpty } from '../data'
 import { useBrand } from '../store'
 import { policiesUsing, rulesUsing } from './usage'
+import { UsedByList } from './used-by'
 import { validateZone } from './zone-validation'
 import { AddressSection, Chips, PlaceSection, addressBits, placeBits } from './ZonesFinal'
 
@@ -109,19 +110,26 @@ export function ZonesV2() {
               <h1>Zones</h1>
               <p>Named boundaries — IP networks or places — that your policy rules reference.</p>
             </div>
-            <div className="bz7__headactions">
-              <Button variant="brand" onClick={() => setCreating(true)}>
-                <Plus size={15} strokeWidth={2.2} aria-hidden />
-                New zone
-              </Button>
-            </div>
+            {/* Withheld while the empty state is showing — it carries the
+                same action, and one of them is enough. */}
+            {store.zones.length > 0 && (
+              <div className="bz7__headactions">
+                <Button variant="brand" onClick={() => setCreating(true)}>
+                  <Plus size={15} strokeWidth={2.2} aria-hidden />
+                  New zone
+                </Button>
+              </div>
+            )}
           </header>
 
           {store.zones.length === 0 ? (
             <EmptyState
               icon={Network}
               title="No zones yet"
-              blurb="A named boundary your policy rules can point at."
+              /* v2 gets its own sentence. What makes a zone different here
+                 is that it is one kind or the other, and the first screen a
+                 new tenant sees is the right place to say so. */
+              blurb="A set of IP networks, or a set of places — each zone is one or the other. Name the boundary once, and every rule can point at it."
               action={
                 <Button variant="brand" onClick={() => setCreating(true)}>
                   <Plus size={15} strokeWidth={2.2} aria-hidden />
@@ -372,17 +380,10 @@ function ZoneDetailV2({
             compact
             icon={Link2}
             title="Nothing references this zone"
-            blurb="Safe to change or delete."
+            blurb="No policy rule points at it, so renaming or deleting it changes nothing."
           />
         ) : (
-          <ul className="bz7__uses">
-            {users.map((u) => (
-              <li key={u.policy.id}>
-                <strong>{u.policy.name}</strong>
-                <span>{u.rules.join(' · ')}</span>
-              </li>
-            ))}
-          </ul>
+          <UsedByList users={users} />
         )}
       </Drawer>
     </>
@@ -453,7 +454,19 @@ function NewZoneModal({
         </label>
 
         <fieldset className="bz8__kinds">
-          <legend>What it matches on</legend>
+          <legend>
+            What it matches on
+            {/* The one consequence of this choice, on a tip rather than in a box
+                under the cards. It was a paragraph, then a notice callout, and
+                both spent a permanent block of the dialog on a sentence that is
+                read once and never needed again — above a control whose two
+                cards already say what each kind holds. On the legend it is
+                beside the question it answers, and costs nothing until asked. */}
+            <TipDot
+              label="Can this be changed later?"
+              text="No. A zone is one kind or the other, and it cannot be converted — the entries would have nowhere to go. Pick the wrong one and it is quick to delete and remake."
+            />
+          </legend>
           {(Object.keys(KIND) as MatchOn[]).map((k) => {
             const m = KIND[k]
             return (
@@ -477,14 +490,6 @@ function NewZoneModal({
           })}
         </fieldset>
 
-        {/* Said before it is chosen rather than discovered afterwards. It is the
-            one thing about this dialog that is not obvious: the answer is not
-            revisitable, because changing it would mean discarding whatever the
-            zone had collected under the other kind. */}
-        <p className="bz8__note">
-          A zone is one or the other. Pick the wrong one and the zone is quick to delete and
-          remake — but it cannot be converted, because the entries would have nowhere to go.
-        </p>
       </div>
     </Modal>
   )

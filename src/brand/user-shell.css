@@ -14,7 +14,9 @@
    inside it resolved against `auto` and got nothing. The admin shell never
    had the problem because its main IS a grid area with a definite height.
    Same guarantee here, so an empty state fills the page on both sides. */
-.bus { min-height: 100vh; display: flex; flex-direction: column; background: var(--surface-sunken); }
+/* The page's own field, white, the same as the admin shell's. `--surface-page`
+   rather than #fff so dark still gets a dark page. */
+.bus { min-height: 100vh; display: flex; flex-direction: column; background: var(--surface-page); }
 
 .bus__top {
   position: sticky; top: 0; z-index: 40;

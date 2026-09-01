@@ -36,8 +36,16 @@
   --surface-overlay: #ffffff;
   --surface-inverse: #1e2c38;
 
-  --border-subtle: #e6e9ec;
-  --border-default: #dde1e6;
+  /* Darker than they were, because the page under them went white.
+
+     A card was white on #f8f9fa: the fill did the separating and the border only
+     tidied the edge, so #dde1e6 was enough. On a white page the fill separates
+     nothing and the hairline is the whole boundary — at #dde1e6 that is about
+     1.15:1 against the page, which reads as a wireframe rather than a card.
+     These are the one lever that reaches every bordered element in the product,
+     which is why the fix is here and not on twenty-five card rules. */
+  --border-subtle: #e4e8ec;
+  --border-default: #d3dae1;
   --border-strong: #adb5bd;
 
   --text-primary: #212529;

@@ -10,12 +10,12 @@ import { AuthMethods } from './AuthMethods'
    everything you could DO was the same code and only the place the detail
    opened differed.
 
-   v1 is the screen now, and the switch is gone with the decision. A comparison
-   control earns its place while the question is open; once it is answered it is
-   a way to put the rejected arrangement back on screen by accident.
-   `AuthMethodsV2.tsx` is still in the tree, unreferenced — kept because it is
-   the argument for the other arrangement written out, and deleting it would
-   leave only this paragraph saying it once existed.
+   v1 is the screen now, the switch went with the decision, and v2 is deleted.
+   It was kept unreferenced for a while on the argument that it was the case for
+   the other arrangement written out — but an unreferenced screen is not
+   documentation, it is a file that typechecks, gets linted, and quietly holds
+   exports the live screen then cannot tidy away. What it argued is in the
+   commit history and in this paragraph, which is where an argument belongs.
 
    THE POINTS OF VIEW are the part that stays. Not two screens: one screen that
    knows who is looking. The end-user page in the live product

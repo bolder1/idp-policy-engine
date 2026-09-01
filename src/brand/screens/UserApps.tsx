@@ -60,8 +60,8 @@ export function UserApps() {
           title={q ? 'No apps match that' : 'No apps yet'}
           blurb={
             q
-              ? 'Try part of the name.'
-              : 'Nothing has been shared with you yet.'
+              ? 'The search reads app names only — try part of one.'
+              : 'When your administrator gives you access to an app it appears here, and one click signs you in.'
           }
         />
       ) : (

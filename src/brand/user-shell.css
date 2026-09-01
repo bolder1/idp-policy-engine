@@ -7,7 +7,14 @@
    generous centred column, because there is no rail taking the left third.
    -------------------------------------------------------------------------- */
 
-.bus { min-height: 100vh; background: var(--surface-sunken); }
+/* A column, so the main area has a height rather than just a minimum.
+
+   It was a plain block: `.bus` guaranteed 100vh, `.bus__main` took
+   whatever its content came to, and a page asking for `min-height: 100%`
+   inside it resolved against `auto` and got nothing. The admin shell never
+   had the problem because its main IS a grid area with a definite height.
+   Same guarantee here, so an empty state fills the page on both sides. */
+.bus { min-height: 100vh; display: flex; flex-direction: column; background: var(--surface-sunken); }
 
 .bus__top {
   position: sticky; top: 0; z-index: 40;
@@ -50,8 +57,14 @@
 }
 .bus .bus__lang select:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
 
-.bus__main { padding: 32px 24px 64px; }
-.bus__main > .bpage { max-width: 1080px; margin: 0 auto; }
+/* A column too, so the page inside it is a flex item and can be told to
+   take the leftover height. `.bus` guarantees 100vh as a MINIMUM, and a
+   minimum is not a definite height — a percentage measured against it
+   resolves to auto, which is why the page could not fill this shell the
+   way it fills the admin one. Flex does not need the parent to be
+   definite; it just hands over what is left. */
+.bus__main { flex: 1; display: flex; flex-direction: column; padding: 32px 24px 64px; }
+.bus__main > .bpage { width: 100%; max-width: 1080px; margin: 0 auto; }
 
 /* --- The launcher ------------------------------------------------------------- */
 

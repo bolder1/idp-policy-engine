@@ -148,7 +148,16 @@
 .bshell.is-collapsed .bshell__chev,
 .bshell.is-collapsed .bshell__section { height: 1px; margin: 10px 12px; overflow: hidden; color: transparent; background: rgba(255, 255, 255, 0.1); }
 
-.bshell__main { grid-area: main; overflow-y: auto; min-width: 0; }
+/* A column, so a page can be told to take the height that is left rather
+   than all of it. Screens that carry a version switcher put it in here
+   ABOVE the page, and a page claiming 100% of this box then claimed the
+   switcher's height a second time and pushed a scrollbar onto a screen
+   with nothing to scroll. Nothing else changes: `.bzver` and `.bpage`
+   carry no margins between them to collapse. */
+.bshell__main {
+  grid-area: main; overflow-y: auto; min-width: 0;
+  display: flex; flex-direction: column;
+}
 
 .bshell__toast {
   position: fixed;

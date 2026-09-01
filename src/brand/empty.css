@@ -42,33 +42,82 @@
 .bempty__icon {
   display: block;
   width: max-content;
-  padding: 15px;
+  /* 14, not 15: the ring below adds a pixel a side, and 26 + 14 + 14 + 2 is
+     the 56 this circle is supposed to be. */
+  padding: 14px;
   margin: 0 auto 20px;
   border-radius: var(--radius-full);
   background: var(--surface-inset);
+  /* Ringed, because the fill alone cannot be relied on to show. In dark the
+     inset surface lands within a point of the panel behind it — measured at
+     rgb(25,33,43) on rgb(26,33,42) — so the circle vanished and left a bare
+     glyph floating on the page. A border states the shape whatever the two
+     fills happen to be doing. */
+  border: 1px solid var(--border-subtle);
   color: var(--text-muted);
 }
 .bempty__icon > svg { display: block; }
 
-.bempty__title {
+/* --- A page whose entire content is this ------------------------------------
+   Scoped with :has(), so the shape changes only where the empty state IS the
+   page — never where one is reporting on a section inside a panel, which is
+   what `:not(.is-compact)` keeps out.
+
+   The state used to be a short dashed box under the header with the rest of the
+   screen white below it, which reads as a component that failed to load rather
+   than as a page waiting to be filled. It takes the room instead, and its
+   content sits in the middle of that room.
+
+   `min-height: 100%` resolves because the scroll container it lives in is a
+   grid area with a definite height; `border-box` is global, so the page's own
+   padding is inside the 100% and nothing overflows into a scrollbar. */
+.bpage:has(> .bempty:not(.is-compact)) {
+  display: flex;
+  flex-direction: column;
+  /* Take what is LEFT, not all of it.
+
+     This was `min-height: 100%` first, and that is wrong twice over: it needs a
+     definite parent height, which the user shell — guaranteeing only a minimum
+     — does not have; and where it did resolve, it measured the whole main area
+     while sitting under a version switcher already occupying part of it, so the
+     page ran 37px past the bottom and put a scrollbar on a screen with nothing
+     to scroll. Both shells' main areas are flex columns now, and the page asks
+     for the remainder. */
+  flex: 1;
+}
+.bpage:has(> .bempty:not(.is-compact)) > .bempty {
+  flex: 1;
+  /* The grid already centres across; this centres down. */
+  align-content: center;
+}
+
+/* Two classes, not one, and that is load-bearing: the theme sets `.bpage h2` at
+   (0,1,1), which beat a bare `.bempty__title` at (0,1,0) and quietly held every
+   empty-state heading at the page's body-heading size. */
+.bempty .bempty__title {
   margin: 0;
-  font-size: var(--fs-xl);
+  font-size: var(--fs-2xl);
   font-weight: var(--fw-semibold);
   color: var(--text-primary);
   letter-spacing: -0.01em;
 }
 
-/* One line at a comfortable measure. The old paragraphs ran to four lines of
-   explanation on a screen whose whole job is to get you off it. */
+/* A sentence, at a size somebody will actually read it at.
+
+   It was 13px on a page holding nothing else — the smallest text in the product
+   used for the only explanation on the screen. It is 16px now, under a 20px
+   heading, and the measure widened with it so the extra size does not buy extra
+   lines: the line can afford to name the actual things this tab holds rather
+   than restating the heading in different words. */
 .bempty__blurb {
-  margin: 6px 0 0;
-  max-width: 46ch;
-  font-size: var(--fs-md);
+  margin: 8px 0 0;
+  max-width: 54ch;
+  font-size: var(--fs-lg);
   color: var(--text-tertiary);
   line-height: 1.6;
 }
 
-.bempty__action { margin-top: 20px; }
+.bempty__action { margin-top: 22px; }
 
 /* `.bempty__note` — a second, boxed paragraph below the action — stood here.
    Exactly one empty state used it, which made it the exception rather than the
@@ -97,10 +146,12 @@
   border: 0;
   background: none;
 }
-/* 44px: the same 26px mark in 9px of padding. */
-.bempty.is-compact .bempty__icon { padding: 9px; margin-bottom: 10px; }
-.bempty.is-compact .bempty__title { font-size: var(--fs-md); }
-.bempty.is-compact .bempty__blurb { font-size: var(--fs-xs); max-width: 42ch; }
+/* 44px: the same 26px mark in 8px of padding and the same 1px ring. */
+.bempty.is-compact .bempty__icon { padding: 8px; margin-bottom: 10px; }
+.bempty.is-compact .bempty__title { font-size: var(--fs-base); }
+/* 11px was small enough to read as a caption on something rather than as the
+   sentence explaining it. */
+.bempty.is-compact .bempty__blurb { font-size: var(--fs-sm); max-width: 46ch; }
 
 @media (max-width: 600px) {
   .bempty { padding: 44px 18px 48px; }

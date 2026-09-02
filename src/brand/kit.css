@@ -730,11 +730,6 @@ html[data-theme='dark'] {
 .applogo--img img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .applogo--mono { color: #fff; font-weight: var(--fw-semibold); letter-spacing: -0.02em; }
 
-.applogo__stack { display: inline-flex; align-items: center; gap: var(--space-4); }
-.applogo__row { display: inline-flex; }
-.applogo__row .applogo { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface-raised); }
-.applogo__row .applogo:first-child { margin-left: 0; }
-.applogo__count { font-size: var(--fs-sm); color: var(--text-secondary); }
 .applogo__none { font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* Two more pill families, for labels that are categories rather than states —

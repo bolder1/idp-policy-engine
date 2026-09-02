@@ -173,7 +173,7 @@ export function policiesAt(depth: Depth): Policy[] {
         .filter((p) => keep.includes(p.id))
         .map((p) => ({
           ...p,
-          appIds: p.appIds.filter((id) => appsAt('small').some((a) => a.id === id)),
+          appId: appsAt('small').some((a) => a.id === p.appId) ? p.appId : undefined,
           rules: p.rules
             // A Delegator does not write four-rule policies. They take the
             // first two the template gave them and leave.

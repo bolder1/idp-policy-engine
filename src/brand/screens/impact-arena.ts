@@ -274,9 +274,9 @@ export function badges(
   out.push({
     id: 'attached',
     label: 'Actually in force',
-    claim: 'At least one application is attached, so the rules are evaluated at all.',
-    earned: policy.allApps === true || policy.appIds.length > 0,
-    detail: 'No apps assigned — these rules are saved but never evaluated.',
+    claim: 'An application is attached, so the rules are evaluated at all.',
+    earned: policy.appId !== undefined || policy.isSystem === true,
+    detail: 'No application chosen — these rules are saved but never evaluated.',
   })
 
   if (movement) {

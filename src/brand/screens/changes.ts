@@ -120,11 +120,10 @@ export function describeChanges(
     if (factorKey(before) !== factorKey(r)) out.push(`Authentication settings changed on “${r.name}”`)
   })
 
-  const appsBefore = saved.allApps ? 'all' : [...saved.appIds].sort().join(',')
-  const appsAfter = draft.allApps ? 'all' : [...draft.appIds].sort().join(',')
-  if (appsBefore !== appsAfter) {
-    const n = draft.allApps ? null : draft.appIds.length
-    out.push(draft.allApps ? 'Now applies to all apps' : `Now applies to ${n} app${n === 1 ? '' : 's'}`)
+  /* Named, not counted. "Now applies to 1 app" was true and useless; which
+     application a policy moved to is the whole of what changed. */
+  if (saved.appId !== draft.appId) {
+    out.push(draft.appId ? `Now protects ${draft.appId}` : 'No longer attached to an application')
   }
 
   return out

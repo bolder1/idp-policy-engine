@@ -40,7 +40,7 @@ function policy(rules: Rule[], over: Partial<Policy> = {}): Policy {
     id: 'p',
     name: 'Test',
     type: 'App Access',
-    appIds: ['salesforce'],
+    appId: 'salesforce',
     status: 'active',
     lastModified: 'now',
     modifiedBy: 'test',
@@ -209,7 +209,7 @@ describe('badges', () => {
   const noon = 570
 
   it('withholds "actually in force" from a policy with no apps attached', () => {
-    const p = policy([rule()], { appIds: [] })
+    const p = policy([rule()], { appId: undefined })
     const b = badges(p, sweep(p, env, noon), null, 0)
     expect(b.find((x) => x.id === 'attached')?.earned).toBe(false)
   })

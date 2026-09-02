@@ -63,29 +63,7 @@ export function AppLogo({
   )
 }
 
-/** Overlapping stack with a count, as the policy table shows assigned apps. */
-export function AppLogoStack({
-  appIds,
-  names,
-  max = 3,
-  size = 20,
-}: {
-  appIds: string[]
-  names?: string[]
-  max?: number
-  size?: number
-}) {
-  if (appIds.length === 0) return <span className="applogo__none">No apps</span>
-  return (
-    <span className="applogo__stack" title={(names ?? appIds).join(', ')}>
-      <span className="applogo__row">
-        {appIds.slice(0, max).map((id) => (
-          <AppLogo key={id} appId={id} size={size} />
-        ))}
-      </span>
-      <span className="applogo__count">
-        {appIds.length} app{appIds.length === 1 ? '' : 's'}
-      </span>
-    </span>
-  )
-}
+/* `AppLogoStack` is gone with the model it drew.
+
+   It overlapped up to three marks and printed "3 apps" — the right cell for a
+   policy that covered three. A policy covers one, so the list names it. */

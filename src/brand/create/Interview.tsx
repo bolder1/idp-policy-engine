@@ -762,7 +762,7 @@ function blankShell() {
     id: 'interview-preview',
     name: 'Preview',
     type: 'App Access' as const,
-    appIds: [] as string[],
+    appId: undefined as string | undefined,
     status: 'inactive' as const,
     lastModified: '',
     modifiedBy: '',

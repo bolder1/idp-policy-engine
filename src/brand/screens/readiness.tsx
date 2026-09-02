@@ -57,7 +57,7 @@ export function Readiness({
   const movement = useMemo(() => (dirty ? compare(sweep(saved, env, 570), after) : null), [dirty, saved, env, after])
 
   const dead = draft.rules.map((r, i) => ({ r, i })).filter(({ r, i }) => r.enabled && after.reach[i] === 0)
-  const attached = draft.allApps === true || draft.appIds.length > 0
+  const app = draft.appId ? store.appById(draft.appId) : null
 
   const impact = draft.rules.length > 0 ? impactOf(draft, 0, store.groups) : null
 
@@ -113,16 +113,14 @@ export function Readiness({
       />
 
       <Row
-        ok={attached}
-        title={attached ? 'Attached to applications' : 'No applications attached'}
+        ok={app !== null}
+        title={app ? `Protects ${app.name}` : 'No application chosen'}
         detail={
-          attached
-            ? draft.allApps
-              ? 'Every app in the tenant, including ones added later.'
-              : `${draft.appIds.length} app${draft.appIds.length === 1 ? '' : 's'}.`
-            : 'These rules are saved but never evaluated.'
+          app
+            ? 'Every sign-in to it is checked against these rules.'
+            : 'These rules are saved but never evaluated — nothing reaches them.'
         }
-        action={{ label: 'Assign apps', run: () => onOpen('apps') }}
+        action={{ label: 'Choose the application', run: () => store.go({ name: 'policy-details', policyId: draft.id }) }}
       />
 
       {impact && (

@@ -2,9 +2,8 @@ import { AlertTriangle, Info, XCircle } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useId, useMemo, useState } from 'react'
 
-import { enforces, type Policy, type PolicyType, type Rule } from '../data'
-import { Badge, Button, Counter, DecisionChip, Field, Modal, StatusPill, Tabs } from '../kit'
-import { AppLogo } from '../logos/AppLogo'
+import type { Policy, Rule } from '../data'
+import { Badge, Button, DecisionChip, Field, Modal, StatusPill } from '../kit'
 import { useBrand, useNameLookup } from '../store'
 import { diagnose, type Diagnostic } from './diagnostics'
 
@@ -33,171 +32,13 @@ import './builder-dialogs.css'
 export { ruleSentence, type NameLookup, type RuleProse } from './predicate-prose'
 import { ruleSentence } from './predicate-prose'
 
-/* --- Assign apps ------------------------------------------------------------ */
+/* `AssignAppsDialog` is gone.
 
-type TypeFilter = 'All' | PolicyType
-const TYPE_FILTERS: TypeFilter[] = ['All', 'App Access', 'Session', 'Account Management']
-
-export function AssignAppsDialog({
-  open,
-  policy,
-  onClose,
-  onChange,
-}: {
-  open: boolean
-  policy: Policy
-  onClose: () => void
-  onChange: (appIds: string[], allApps: boolean) => void
-}) {
-  const store = useBrand()
-  const reduce = useReducedMotion()
-  const [filter, setFilter] = useState<TypeFilter>('All')
-
-  // A filter left over from the last time this was open is a filter the user
-  // cannot see the cause of.
-  useEffect(() => {
-    if (open) setFilter('All')
-  }, [open])
-
-  const allApps = policy.allApps ?? false
-  const selected = policy.appIds
-
-  /* An App carries no type of its own — type belongs to the policy. So the tabs
-     filter by the only type information that exists: which kinds of policy
-     already govern each app. "Session" answers "which apps does a session
-     policy touch today", which is the question the tab is worth asking. */
-  const typesByApp = useMemo(() => {
-    const m = new Map<string, Set<PolicyType>>()
-    for (const p of store.policies) {
-      for (const id of p.appIds) {
-        const set = m.get(id) ?? new Set<PolicyType>()
-        set.add(p.type)
-        m.set(id, set)
-      }
-    }
-    return m
-  }, [store.policies])
-
-  /* Attaching an app that another live policy already governs is how two
-     policies end up fighting over one sign-in. The current prototype attaches
-     silently; this says so on the row. */
-  const conflictsByApp = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const p of store.policies) {
-      // Only enforcing policies can fight over a sign-in. A monitor policy
-      // sharing an app is not a conflict — it is how you trial one safely.
-      if (p.id === policy.id || !enforces(p)) continue
-      for (const id of p.appIds) m.set(id, (m.get(id) ?? 0) + 1)
-    }
-    return m
-  }, [store.policies, policy.id])
-
-  const countFor = (f: TypeFilter) =>
-    f === 'All' ? store.apps.length : store.apps.filter((a) => typesByApp.get(a.id)?.has(f)).length
-
-  const list =
-    filter === 'All' ? store.apps : store.apps.filter((a) => typesByApp.get(a.id)?.has(filter))
-
-  const count = allApps ? store.apps.length : selected.length
-
-  const toggleApp = (id: string) => {
-    const next = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]
-    // Naming an app explicitly is a statement that the policy covers those apps
-    // and not everything, so it turns "all apps" off rather than fighting it.
-    onChange(next, false)
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={`Assign apps to ${policy.name}`}
-      width={620}
-      footer={
-        <>
-          <span className="bdlg-foot__note">
-            {reduce ? count : <Counter value={count} />} selected
-            {allApps && <em>every app, including ones added later</em>}
-          </span>
-          <Button variant="brand" onClick={onClose}>
-            Done
-          </Button>
-        </>
-      }
-    >
-      <div className="bdlg bdlg-apps">
-        <div className="bdlg-apps__bar">
-          <Tabs
-            name="App type"
-            value={filter}
-            onChange={setFilter}
-            options={TYPE_FILTERS.map((f) => ({ value: f, label: f, count: countFor(f) }))}
-          />
-        </div>
-
-        <label className={`bdlg-row bdlg-row--all ${allApps ? 'is-on' : ''}`}>
-          <input
-            type="checkbox"
-            checked={allApps}
-            onChange={() => onChange(selected, !allApps)}
-            aria-label="All apps"
-          />
-          <span className="bdlg-row__text">
-            All apps
-            <em>Every application in this tenant, and any added later.</em>
-          </span>
-          <span className="bdlg-row__meta">{store.apps.length}</span>
-        </label>
-
-        <motion.div
-          key={filter}
-          className="bdlg-apps__list"
-          initial={{ opacity: 0, y: reduce ? 0 : 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduce ? 0 : 0.16, ease: [0.2, 0, 0, 1] }}
-        >
-          {list.length === 0 && (
-            <p className="bdlg-empty">No app is governed by a {filter} policy yet.</p>
-          )}
-
-          {list.map((a) => {
-            const on = selected.includes(a.id)
-            const clashes = conflictsByApp.get(a.id) ?? 0
-            return (
-              <label
-                key={a.id}
-                className={`bdlg-row ${on ? 'is-on' : ''} ${allApps ? 'is-covered' : ''}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={on}
-                  onChange={() => toggleApp(a.id)}
-                  aria-label={a.name}
-                />
-                <AppLogo appId={a.id} name={a.name} size={22} />
-                <span className="bdlg-row__text">
-                  {a.name}
-                  {allApps ? (
-                    <em>Covered by All apps</em>
-                  ) : (
-                    clashes > 0 && (
-                      <em className="is-warn">
-                        Also governed by {clashes} other live polic{clashes === 1 ? 'y' : 'ies'}
-                      </em>
-                    )
-                  )}
-                </span>
-                <span className="bdlg-row__meta">{a.protocol}</span>
-              </label>
-            )
-          })}
-        </motion.div>
-      </div>
-    </Modal>
-  )
-}
-
-/* --- Review & Save ---------------------------------------------------------- */
+   It was a filtered, multi-select catalogue with a "select all" row, and a
+   policy protects one application — so it was a dialog for making a choice the
+   model no longer has. The application is chosen where the name and the
+   audience are, on the policy's own details page, which is also the only place
+   that ever needed to know how to render the app list. */
 
 const SEVERITY_ICON = { error: XCircle, warning: AlertTriangle, info: Info }
 
@@ -219,16 +60,11 @@ export function ReviewDialog({
   policy,
   onClose,
   onConfirm,
-  onAssignApps,
 }: {
   open: boolean
   policy: Policy
   onClose: () => void
   onConfirm: () => void
-  /* Optional: the assign control lives on the builder toolbar behind this
-     modal, so without a handler the warning's link falls back to closing —
-     which is the honest thing a "go and do that" link can do from here. */
-  onAssignApps?: () => void
 }) {
   const store = useBrand()
   const resolve = useNameLookup()
@@ -244,7 +80,7 @@ export function ReviewDialog({
   const errors = diagnostics.filter(
     (d) => d.severity === 'error' && policy.rules[d.ruleIndex]?.enabled !== false,
   )
-  const unassigned = policy.appIds.length === 0 && !policy.allApps
+  const unassigned = !policy.appId && !policy.isSystem
 
   return (
     <Modal
@@ -286,9 +122,19 @@ export function ReviewDialog({
             >
               <AlertTriangle size={15} aria-hidden />
               <span>
-                No apps assigned.{' '}
-                <button type="button" className="bdlg-warn__go" onClick={onAssignApps ?? onClose}>
-                  Assign apps →
+                No application chosen, so nothing reaches these rules.{' '}
+                {/* Straight to the page that owns it. This used to open a
+                    dialog behind this dialog, or — with no handler — just
+                    close, which is a "go and do that" link that does not. */}
+                <button
+                  type="button"
+                  className="bdlg-warn__go"
+                  onClick={() => {
+                    onClose()
+                    store.go({ name: 'policy-details', policyId: policy.id })
+                  }}
+                >
+                  Choose one in Edit details →
                 </button>
               </span>
             </motion.div>

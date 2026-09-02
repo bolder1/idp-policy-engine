@@ -47,7 +47,7 @@ export function CreatePolicy() {
   const [picked, setPicked] = useState<Scenario | null>(null)
   const [, setBlank] = useState(false)
   const [name, setName] = useState('')
-  const [appIds, setAppIds] = useState<string[]>([])
+  const [appId, setAppId] = useState<string | null>(null)
   /* Asked on the form rather than defaulted in the builder, and it starts
      empty rather than at "everyone". A policy that arrives governing the whole
      directory is a policy somebody has to remember to narrow, and nobody
@@ -71,7 +71,7 @@ export function CreatePolicy() {
   }
 
   function create() {
-    const policy = blankPolicy(name.trim() || 'Untitled policy', appIds)
+    const policy = blankPolicy(name.trim() || 'Untitled policy', appId ?? undefined)
     // Built here, so what the card promised is what the builder receives.
     if (picked) policy.rules = picked.rules.map((r) => r.build())
     /* The form's answer wins over the template's. A template states an audience
@@ -157,8 +157,8 @@ export function CreatePolicy() {
               setAudience={setAudience}
               name={name}
               setName={setName}
-              appIds={appIds}
-              setAppIds={setAppIds}
+              appId={appId}
+              setAppId={setAppId}
               onBack={() => setStep(1)}
               onCreate={create}
               onGuided={store.features.guidedSetup ? () => setInterview(true) : undefined}
@@ -175,7 +175,7 @@ export function CreatePolicy() {
             open={interview}
             onClose={() => setInterview(false)}
             onCreate={(rules, builtName, audience) => {
-              const policy = blankPolicy(builtName, [])
+              const policy = blankPolicy(builtName)
               policy.rules = rules
               policy.audience = audience
               store.addPolicy(policy)
@@ -601,8 +601,8 @@ function NameStep({
   picked,
   name,
   setName,
-  appIds,
-  setAppIds,
+  appId,
+  setAppId,
   audience,
   setAudience,
   onBack,
@@ -612,8 +612,8 @@ function NameStep({
   picked: Scenario | null
   name: string
   setName: (v: string) => void
-  appIds: string[]
-  setAppIds: (v: string[]) => void
+  appId: string | null
+  setAppId: (v: string | null) => void
   audience: Audience
   setAudience: (a: Audience) => void
   onBack: () => void
@@ -623,7 +623,6 @@ function NameStep({
   onGuided?: () => void
 }) {
   const store = useBrand()
-  const chosen = appIds[0] ?? null
   /* A required field, like the name. It is one of the three facts that make a
      policy a policy, and the two ways to get it wrong — govern nobody, or
      govern everyone by accident — are both worse than being asked. */
@@ -665,7 +664,7 @@ function NameStep({
               is already ticked in this list — the selection is visible where it
               is made, so repeating it was two places to keep in sync and one
               more thing to read. */}
-          <AppList chosen={chosen} onChange={(id) => setAppIds(id ? [id] : [])} />
+          <AppList chosen={appId} onChange={setAppId} />
         </div>
 
         {/* Who it governs, beside what it protects.
@@ -755,8 +754,8 @@ function NameStep({
             ? 'Give the policy a name to continue.'
             : noAudience
               ? 'Choose at least one group or person for this policy to govern.'
-              : chosen === null
-                ? 'Created switched off, with no app attached. You can add one from the builder.'
+              : appId === null
+                ? 'Created switched off, with no application attached. You can choose one from Edit details.'
                 : 'Created switched off. Nothing changes for users until you turn it on.'}
         </p>
         <div className="bbar__acts">

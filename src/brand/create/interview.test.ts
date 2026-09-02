@@ -27,7 +27,7 @@ const shell = (answers: Answers) => ({
   id: 'test',
   name: 'Test',
   type: 'App Access' as const,
-  appIds: ['a1'],
+  appId: 'a1',
   status: 'inactive' as const,
   lastModified: '',
   modifiedBy: '',

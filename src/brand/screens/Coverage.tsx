@@ -2,7 +2,7 @@ import { motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 
 import { AppLogo } from '../logos/AppLogo'
-import { enforces, type AccessDecision, type App, type Group, type Policy, type Rule } from '../data'
+import { coversEveryApp, enforces, type AccessDecision, type App, type Group, type Policy, type Rule } from '../data'
 import { useBrand } from '../store'
 
 /* -----------------------------------------------------------------------------
@@ -45,7 +45,7 @@ function match(p: Policy, app: App, group: Group): Cell | null {
      and stops there — counting it as cover would report a tenant as protected
      by a policy that has never refused anything. */
   if (!enforces(p)) return null
-  if (!p.allApps && !p.appIds.includes(app.id)) return null
+  if (!coversEveryApp(p) && p.appId !== app.id) return null
 
   // Every rule that could apply, not just the first. Which one wins depends on
   // conditions evaluated at sign-in, so the honest static answer is the range —

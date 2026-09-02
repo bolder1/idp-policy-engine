@@ -4,7 +4,7 @@ import { BookmarkPlus, Copy, Pencil, Trash2 } from 'lucide-react'
 
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
-import { AppLogoStack } from '../logos/AppLogo'
+import { AppLogo } from '../logos/AppLogo'
 import { Badge, Button, DecisionChip, InfoDot, StatusPill } from '../kit'
 import { enforces, type Policy, type PolicyType } from '../data'
 import { Peek } from './peek'
@@ -333,7 +333,7 @@ export function Policies() {
             <tr>
               {head('name', 'Policy name')}
               {head('type', 'Type')}
-              <th>Apps assigned</th>
+              <th>Application</th>
               {head('rules', 'Rules')}
               {store.features.exposure && head('exposure', 'Exposure')}
               <th>Status</th>
@@ -406,7 +406,7 @@ function PolicyRow({
   onMenu: (e: React.MouseEvent) => void
 }) {
   const store = useBrand()
-  const appNames = policy.appIds.map((id) => store.appById(id).name)
+  const app = policy.appId ? store.appById(policy.appId) : null
 
   return (
     <tr className={policy.isSystem ? 'is-system' : ''}>
@@ -422,11 +422,19 @@ function PolicyRow({
       <td>
         <Badge tone="info">{policy.type}</Badge>
       </td>
+      {/* The application, named. A stack of three marks and "3 apps" was the
+          right cell for a policy that covered three; a policy covers one, so
+          the cell says which one. */}
       <td>
-        {policy.allApps ? (
-          <span className="btable__allapps">All apps</span>
+        {policy.isSystem ? (
+          <span className="btable__allapps">Every application</span>
+        ) : app ? (
+          <span className="btable__app">
+            <AppLogo appId={app.id} size={20} />
+            {app.name}
+          </span>
         ) : (
-          <AppLogoStack appIds={policy.appIds} names={appNames} />
+          <span className="applogo__none">Not assigned</span>
         )}
       </td>
       <td>

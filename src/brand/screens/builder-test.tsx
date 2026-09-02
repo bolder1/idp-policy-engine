@@ -442,9 +442,9 @@ export function DecisionLogDialog({
   const [range, setRange] = useState<'24h' | '7d'>('24h')
 
   const appPool = useMemo(() => {
-    const named = policy.allApps ? store.apps : policy.appIds.map((id) => store.appById(id))
+    const named = policy.isSystem ? store.apps : policy.appId ? [store.appById(policy.appId)] : []
     return named.length > 0 ? named : store.apps.slice(0, 3)
-  }, [policy.allApps, policy.appIds, store])
+  }, [policy.isSystem, policy.appId, store])
 
   const all = useMemo(() => buildLog(policy, appPool), [policy, appPool])
 

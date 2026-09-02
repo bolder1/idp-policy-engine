@@ -27,7 +27,7 @@ import { blankRule, fallbackRule, type Audience, type Policy, type Rule } from '
 import { useBrand, useNameLookup } from '../store'
 import { AudienceDrawer } from './audience-drawer'
 import { predicateSummary, ruleSentence } from './predicate-prose'
-import { AssignAppsDialog, CopyRuleDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
+import { CopyRuleDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
 import { DecisionLogDialog } from './builder-test'
 import { describeChanges } from './changes'
 import { CommandBar, baseCommands } from './command-bar'
@@ -148,7 +148,7 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
   const [interview, setInterview] = useState(false)
   const [tour, setTour] = useState(false)
   const [learn, setLearn] = useState(false)
-  const [dialog, setDialog] = useState<null | 'log' | 'apps' | 'template' | 'gauntlet' | 'impact' | 'review' | 'copy'>(
+  const [dialog, setDialog] = useState<null | 'log' | 'template' | 'gauntlet' | 'impact' | 'review' | 'copy'>(
     open ?? null,
   )
 
@@ -712,16 +712,9 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
           setDialog(null)
           store.showToast(`${draft.name} saved`)
         }}
-        onAssignApps={() => setDialog('apps')}
       />
 
       <ImpactArenaDialog open={features.blastRadius && dialog === 'impact'} draft={draft} saved={saved} onClose={() => setDialog(null)} onJumpToRule={jump} />
-      <AssignAppsDialog
-        open={dialog === 'apps'}
-        policy={draft}
-        onClose={() => setDialog(null)}
-        onChange={(appIds, allApps) => patch({ appIds, allApps })}
-      />
       <CopyRuleDialog open={dialog === 'copy'} rule={rule} from={draft} onClose={() => setDialog(null)} />
       <SaveTemplateDialog
         open={dialog === 'template'}

@@ -37,7 +37,7 @@ export function ReviewStep({
   saved: Policy
   env: SimEnv
   onJump: (i: number) => void
-  onOpen: (d: 'gauntlet' | 'impact' | 'apps') => void
+  onOpen: (d: 'gauntlet' | 'impact') => void
   /** The status to publish into. Monitor is offered wherever it is the safer first move. */
   onPublish: (status: PolicyStatus) => void
 }) {
@@ -57,7 +57,7 @@ export function ReviewStep({
   const diagnostics = diagnose(draft, store.groups, store.hooks)
   const errors = diagnostics.filter((d) => d.severity === 'error' && draft.rules[d.ruleIndex]?.enabled !== false)
   const dead = draft.rules.map((r, i) => ({ r, i })).filter(({ r, i }) => r.enabled && after.reach[i] === 0)
-  const attached = draft.allApps === true || draft.appIds.length > 0
+  const app = draft.appId ? store.appById(draft.appId) : null
   const changes = dirty ? describeChanges(saved, draft) : []
 
   const resolve = useNameLookup()
@@ -100,14 +100,12 @@ export function ReviewStep({
     },
     {
       id: 'apps',
-      ok: attached,
-      title: attached ? 'Attached to applications' : 'No applications attached',
-      detail: attached
-        ? draft.allApps
-          ? 'Every app in the tenant, including ones added later.'
-          : `${draft.appIds.length} app${draft.appIds.length === 1 ? '' : 's'}.`
-        : 'These rules are saved but never evaluated.',
-      go: { label: 'Assign apps', run: () => onOpen('apps') },
+      ok: app !== null,
+      title: app ? `Protects ${app.name}` : 'No application chosen',
+      detail: app
+        ? 'Every sign-in to it is checked against these rules.'
+        : 'These rules are saved but never evaluated — nothing reaches them.',
+      go: { label: 'Choose the application', run: () => store.go({ name: 'policy-details', policyId: draft.id }) },
     },
   ]
 

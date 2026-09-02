@@ -49,8 +49,9 @@ export function PolicyBar({ policy }: { policy: Policy }) {
      people" is a number restating itself. */
   const showTotal = everyone || groupIds.length > 0
 
-  const appIds = policy.allApps ? store.apps.map((a) => a.id) : policy.appIds
-  const noApps = appIds.length === 0
+  /* The system policy is the one that has no application and covers all of
+     them — every other policy protects exactly one. */
+  const app = policy.appId ? store.appById(policy.appId) : null
 
   return (
     <header className="bpbar">
@@ -67,49 +68,24 @@ export function PolicyBar({ policy }: { policy: Policy }) {
       </div>
 
       <dl className="bpbar__facts">
-        <div className={`bpbar__fact ${noApps ? 'is-empty' : ''}`}>
+        <div className={`bpbar__fact ${!app && !policy.isSystem ? 'is-empty' : ''}`}>
           <dt>
             <AppWindow size={12} strokeWidth={1.9} aria-hidden />
-            {appIds.length === 1 ? 'Application' : 'Applications'}
+            Application
           </dt>
           <dd>
-            {noApps ? (
-              <em>None yet</em>
-            ) : appIds.length === 1 ? (
-              /* One application is short enough to simply say. The mark comes
-                 with it, because a logo is recognised before a word is read. */
+            {policy.isSystem ? (
+              <span className="bpbar__app">Every application</span>
+            ) : app ? (
+              /* Named, with its mark. A count answered a question nobody has —
+                 WHICH application is the question, and the answer used to be a
+                 click away in Edit details. */
               <span className="bpbar__app">
-                <AppLogo appId={appIds[0]} size={16} />
-                {store.appById(appIds[0]).name}
+                <AppLogo appId={app.id} size={16} />
+                {app.name}
               </span>
             ) : (
-              <Peek
-                className="bpbar__peek"
-                label={
-                  <>
-                    <span className="bpbar__marks" aria-hidden>
-                      {appIds.slice(0, 3).map((id) => (
-                        <AppLogo key={id} appId={id} size={16} />
-                      ))}
-                    </span>
-                    {policy.allApps ? 'All applications' : `${appIds.length} applications`}
-                  </>
-                }
-              >
-                <p className="brpk__head">{policy.allApps ? 'Every application in this tenant' : 'Covered by this policy'}</p>
-                <ul className="bpbar__plist">
-                  {appIds.map((id) => {
-                    const a = store.appById(id)
-                    return (
-                      <li key={id}>
-                        <AppLogo appId={id} size={18} />
-                        <strong>{a.name}</strong>
-                        <em>{a.protocol}</em>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </Peek>
+              <em>Not chosen — these rules never run</em>
             )}
           </dd>
         </div>

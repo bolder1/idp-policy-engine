@@ -229,11 +229,10 @@ export interface Rule {
 
 /* Who a policy governs.
 
-   `everyone` is a flag rather than a magic id in `groupIds`, for the same
-   reason `allApps` is a flag rather than every app id: a synthetic "All
-   Employees" row that lives in the same list as real groups is a row you can
-   tick alongside Finance, and "All AND Finance" reads narrower than it is. As a
-   flag the contradiction cannot be typed. */
+   `everyone` is a flag rather than a magic id in `groupIds`: a synthetic "All
+   Employees" row living in the same list as real groups is a row you can tick
+   alongside Finance, and "All AND Finance" reads narrower than it is. As a flag
+   the contradiction cannot be typed. */
 export interface Audience {
   everyone: boolean
   groupIds: string[]
@@ -245,6 +244,15 @@ export interface Audience {
 }
 
 export const EVERYONE: Audience = { everyone: true, groupIds: [], userIds: [] }
+
+/* The one policy that is not bound to an application.
+
+   `allApps` used to be a flag any policy could set, which let a tenant hold
+   several policies each claiming every app with nothing to say which won. It is
+   gone. The only thing that applies everywhere is the tenant's own default —
+   already marked as the system policy, so this is derived from that mark and
+   cannot drift from it. */
+export const coversEveryApp = (p: Policy): boolean => p.isSystem === true
 
 export const audienceOf = (groupIds: string[], userIds: string[] = []): Audience => ({
   everyone: false,
@@ -265,8 +273,19 @@ export interface Policy {
   id: string
   name: string
   type: PolicyType
-  appIds: string[]
-  allApps?: boolean
+  /* The one application this policy protects.
+
+     It was `appIds: string[]` with an `allApps` flag beside it, and neither is
+     a thing this product does. A policy is written against an application —
+     that is what makes "Finance Team – High Security" a sentence rather than a
+     folder — and one covering three of them could not be reasoned about: its
+     name described one, its audience described the union, and the coverage grid
+     drew it three times as if three separate decisions had been made.
+
+     Optional, for the two cases that genuinely have no application: a policy
+     before one is chosen, and the tenant's own default, which applies wherever
+     no app-specific policy does. */
+  appId?: string
   /** Who this policy governs. Every rule inherits it; no rule can be broader. */
   audience: Audience
   /* What happens to a sign-in that matched no rule — as a RULE.
@@ -686,8 +705,8 @@ export const policies: Policy[] = [
     id: 'global-default',
     name: 'Global Default Policy',
     type: 'App Access',
-    appIds: [],
-    allApps: true,
+    /* No application, and that is what makes it the default: it is where a
+       sign-in lands when no app-specific policy covers it. */
     status: 'always-on',
     lastModified: 'System',
     modifiedBy: 'System',
@@ -705,7 +724,7 @@ export const policies: Policy[] = [
     id: 'finance-high',
     name: 'Finance Team – High Security',
     type: 'App Access',
-    appIds: ['salesforce', 'workday', 'github'],
+    appId: 'workday',
     status: 'active',
     lastModified: '2 hours ago',
     modifiedBy: 'Mehak Garg',
@@ -770,7 +789,7 @@ export const policies: Policy[] = [
     id: 'zero-trust',
     name: 'Zero-Trust Baseline',
     type: 'App Access',
-    appIds: ['salesforce', 'm365', 'aws'],
+    appId: 'salesforce',
     status: 'active',
     lastModified: '4 hours ago',
     modifiedBy: 'Mehak Garg',
@@ -821,7 +840,7 @@ export const policies: Policy[] = [
     id: 'contractor-session',
     name: 'Contractor Session Limits',
     type: 'Session',
-    appIds: ['slack', 'jira'],
+    appId: 'slack',
     status: 'active',
     lastModified: 'Yesterday',
     modifiedBy: 'Jaspreet T.',
@@ -835,7 +854,6 @@ export const policies: Policy[] = [
     id: 'account-recovery',
     name: 'Account Recovery Verification',
     type: 'Account Management',
-    appIds: [],
     status: 'active',
     lastModified: '3 days ago',
     modifiedBy: 'Mehak Garg',
@@ -851,7 +869,7 @@ export const policies: Policy[] = [
     id: 'exec-stepup',
     name: 'Executive Step-up Authentication',
     type: 'App Access',
-    appIds: ['m365', 'aws', 'box', 'salesforce'],
+    appId: 'm365',
     status: 'active',
     lastModified: '5 days ago',
     modifiedBy: 'Mehak Garg',
@@ -880,7 +898,7 @@ export const policies: Policy[] = [
     id: 'default-workforce',
     name: 'Default Workforce Access',
     type: 'App Access',
-    appIds: ['m365', 'slack', 'zoom'],
+    appId: 'zoom',
     status: 'inactive',
     lastModified: '1 week ago',
     modifiedBy: 'System',
@@ -891,7 +909,7 @@ export const policies: Policy[] = [
     id: 'partner-portal',
     name: 'Partner Portal Access',
     type: 'App Access',
-    appIds: ['box'],
+    appId: 'box',
     status: 'inactive',
     lastModified: '2 weeks ago',
     modifiedBy: 'Jaspreet T.',
@@ -903,7 +921,7 @@ export const policies: Policy[] = [
     id: 'eng-vpn',
     name: 'Engineering VPN Policy',
     type: 'App Access',
-    appIds: ['github', 'aws', 'jira'],
+    appId: 'github',
     /* Seeded in monitor rather than inactive, so the state exists in the demo
        estate and not only in the type. Its first rule denies everything off the
        corporate ASN, which is precisely the kind of rule nobody should switch
@@ -922,7 +940,7 @@ export const policies: Policy[] = [
     id: 'idle-session',
     name: 'Idle Session Timeout',
     type: 'Session',
-    appIds: ['salesforce', 'workday', 'm365', 'slack', 'jira'],
+    appId: 'jira',
     status: 'active',
     lastModified: '3 weeks ago',
     modifiedBy: 'System',
@@ -1193,12 +1211,12 @@ export function fallbackRule(decision: AccessDecision = '1fa'): Rule {
   return rule({ name: FALLBACK_NAME, decision, matchEstimate: 0 })
 }
 
-export function blankPolicy(name: string, appIds: string[]): Policy {
+export function blankPolicy(name: string, appId?: string): Policy {
   return {
     id: `p${Date.now()}`,
     name,
     type: 'App Access',
-    appIds,
+    appId,
     status: 'inactive',
     lastModified: 'Just now',
     modifiedBy: 'You',

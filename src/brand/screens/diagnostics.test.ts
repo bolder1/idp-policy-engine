@@ -55,7 +55,7 @@ function policy(rules: Rule[], audience: Audience = EVERYONE): Policy {
     id: 'p',
     name: 'Test',
     type: 'App Access',
-    appIds: ['salesforce'],
+    appId: 'salesforce',
     audience,
     status: 'active',
     lastModified: 'now',

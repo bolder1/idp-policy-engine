@@ -30,7 +30,7 @@ export function PolicyDetails({ policyId }: { policyId: string }) {
   const saved = store.policyById(policyId)
 
   const [name, setName] = useState(saved?.name ?? '')
-  const [appIds, setAppIds] = useState<string[]>(saved?.appIds ?? [])
+  const [appId, setAppId] = useState<string | null>(saved?.appId ?? null)
   const [audience, setAudience] = useState<Audience>(
     saved?.audience ?? { everyone: false, groupIds: [], userIds: [] },
   )
@@ -46,7 +46,7 @@ export function PolicyDetails({ policyId }: { policyId: string }) {
   const noAudience = !audience.everyone && audience.groupIds.length === 0 && audience.userIds.length === 0
   const dirty =
     name !== saved.name ||
-    JSON.stringify(appIds) !== JSON.stringify(saved.appIds) ||
+    appId !== (saved.appId ?? null) ||
     JSON.stringify(audience) !== JSON.stringify(saved.audience)
 
   const back = () => store.go({ name: 'builder', policyId })
@@ -86,7 +86,7 @@ export function PolicyDetails({ policyId }: { policyId: string }) {
             <span className="bname2__label">
               Application <em>Optional</em>
             </span>
-            <AppList chosen={appIds[0] ?? null} onChange={(id) => setAppIds(id ? [id] : [])} />
+            <AppList chosen={appId} onChange={setAppId} />
           </div>
 
           <div className="bname2__field bname2__field--fill">
@@ -126,7 +126,7 @@ export function PolicyDetails({ policyId }: { policyId: string }) {
                  undo stack. These are policy facts, not rule edits, and mixing
                  them into the same history would make ⌘Z on the rules screen
                  quietly rename the policy. */
-              store.savePolicy({ ...saved, name: name.trim(), appIds, allApps: false, audience })
+              store.savePolicy({ ...saved, name: name.trim(), appId: appId ?? undefined, audience })
               store.showToast(`${name.trim()} updated`)
               store.go({ name: 'builder', policyId })
             }}

@@ -96,6 +96,10 @@
 .btable__link:hover { color: var(--brand-active); text-decoration: underline; text-underline-offset: 2px; }
 .btable__marks { display: inline-flex; align-items: center; gap: var(--space-3); }
 .btable__allapps { font-size: var(--fs-sm); color: var(--text-secondary); }
+/* The application, named. This cell held an overlapping stack of marks and a
+   count, which was the right drawing for a policy that covered three of them. */
+.btable__app { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.btable__app > .applogo { flex: none; }
 
 /* --- Exposure cell -----------------------------------------------------------
 

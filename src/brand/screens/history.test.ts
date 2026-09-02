@@ -33,7 +33,7 @@ const policy = (rules: Rule[]): Policy => ({
   id: 'p',
   name: 'Test',
   type: 'App Access',
-  appIds: ['salesforce'],
+  appId: 'salesforce',
   audience: EVERYONE,
   status: 'active',
   lastModified: 'now',

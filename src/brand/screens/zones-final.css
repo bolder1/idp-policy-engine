@@ -106,10 +106,14 @@
    the popup's section, which is a COLUMN: the same declaration grew it
    vertically into a tall blue block. It fills the width only where width is the
    axis. */
+/* The same box as `.bz7__chip` beside it — same radius, same padding, same
+   size — so the tint is the only difference between "6 networks" and "Any
+   network". A pill shape made it a different KIND of object sitting in a row of
+   chips, which is not what it is: it is the same cell saying the other thing. */
 .bz7__any {
   flex: none; align-self: center;
   display: inline-flex; align-items: center;
-  padding: 3px 10px; border-radius: var(--radius-full);
+  padding: 2px 8px; border-radius: var(--radius-sm);
   background: var(--fb-info-bg); border: 1px solid var(--fb-info-border);
   font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--fb-info-fg);
   white-space: nowrap;

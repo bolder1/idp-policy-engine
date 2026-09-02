@@ -269,17 +269,22 @@ export interface Policy {
   allApps?: boolean
   /** Who this policy governs. Every rule inherits it; no rule can be broader. */
   audience: Audience
-  /* What happens to a sign-in that matched no rule.
+  /* What happens to a sign-in that matched no rule — as a RULE.
 
-     This was hardcoded to `1fa` in the evaluator and drawn as an uneditable
-     terminal node — which made the single most consequential line in the whole
-     policy the one line nobody could change. A policy whose rules all deny and
-     whose unmatched traffic silently signs in on one factor is a policy with a
-     hole in exactly the place its author was least likely to look.
+     This was hardcoded to `1fa` in the evaluator, then a bare `AccessDecision`
+     edited from a three-item menu. Both were wrong about what it is. The last
+     row of a policy decides sign-ins, has an outcome, and is reached in order:
+     it IS a rule, whose condition happens to be "everything above missed".
 
-     It cannot be deleted: every ordered list needs a terminal, and an engine
-     that falls off the end of one has to do something. It can be changed. */
-  fallback?: AccessDecision
+     As a bare decision it was the one outcome in the whole builder that could
+     not carry a second factor, a first-factor choice, a method chain or a
+     remember-device window — so "everyone else gets in with a password" was
+     expressible and "…with a password and a second factor" was not.
+
+     Three things about it stay fixed: its name, its place at the bottom, and
+     the fact that it exists. Every ordered list needs a terminal, and an engine
+     that falls off the end of one has to do something. */
+  fallback?: Rule
   status: PolicyStatus
   lastModified: string
   modifiedBy: string
@@ -1175,6 +1180,19 @@ export function blankRule(name = 'New rule'): Rule {
   return rule({ name, decision: '2fa', matchEstimate: 1240 })
 }
 
+/** The one name the terminal rule is allowed to have. */
+export const FALLBACK_NAME = 'Nothing else matched'
+
+/* The terminal rule.
+
+   Its `when` is the always-true predicate and the builder never offers to edit
+   it — "everything above missed" is a position in the list, not a condition you
+   could write in a card, and drawing an empty WHEN section on it would invite
+   somebody to try. */
+export function fallbackRule(decision: AccessDecision = '1fa'): Rule {
+  return rule({ name: FALLBACK_NAME, decision, matchEstimate: 0 })
+}
+
 export function blankPolicy(name: string, appIds: string[]): Policy {
   return {
     id: `p${Date.now()}`,
@@ -1188,7 +1206,7 @@ export function blankPolicy(name: string, appIds: string[]): Policy {
        default — nobody — makes a policy that silently does nothing, which is
        the one failure an access console must never ship quietly. */
     audience: EVERYONE,
-    fallback: '1fa',
+    fallback: fallbackRule('1fa'),
     rules: [],
   }
 }

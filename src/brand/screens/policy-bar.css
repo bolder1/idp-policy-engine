@@ -73,6 +73,66 @@
 .bpbar__fact.is-empty dd em { color: var(--fb-negative-fg); }
 .bpbar__count { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
+/* --- A fact you can look inside -------------------------------------------------
+
+   Both facts are a short phrase; the list behind it opens on hover, in `Peek`'s
+   portalled panel. That is the whole reason the strip can stay one line tall
+   with five groups selected — chips grew it, and a policy that governs eight
+   groups is not rarer than one that governs two. */
+
+.bpbar__app { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; }
+
+.bpbar__peek {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  padding: 0; border: 0; background: none;
+  font: inherit; color: inherit; cursor: default;
+  text-decoration: underline dotted var(--border-strong);
+  text-underline-offset: 4px;
+}
+.bpbar__peek:hover,
+.bpbar__peek.is-open { text-decoration-color: var(--brand); }
+.bpbar__peek:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-xs); }
+
+/* Overlapping, because three marks read as one group of things rather than
+   three separate ones — and because the width has to be bounded whether the
+   policy covers two applications or ten. */
+.bpbar__marks { display: inline-flex; align-items: center; }
+.bpbar__marks > * + * { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface-sunken); }
+
+.bpbar__plist,
+.bpbar__alist {
+  list-style: none; margin: 0 0 var(--space-2); padding: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.bpbar__plist > li,
+.bpbar__alist > li {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
+}
+.bpbar__plist > li strong,
+.bpbar__alist > li strong {
+  flex: 1; min-width: 0;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bpbar__plist > li em,
+.bpbar__alist > li em {
+  flex: none; font-style: normal; font-size: var(--fs-xs); color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.bpbar__ai {
+  flex: none; display: grid; place-items: center; width: 18px; height: 18px;
+  border-radius: var(--radius-sm);
+  background: var(--fb-positive-bg); color: var(--fb-positive-fg);
+}
+/* Named individuals get initials rather than the group glyph — the two are
+   different kinds of thing and the panel has one row shape for both. */
+.bpbar__ai.is-person {
+  border-radius: var(--radius-full);
+  background: var(--fb-magenta-bg); color: var(--fb-magenta-fg);
+  font-size: 8px; font-weight: var(--fw-semibold); letter-spacing: 0.02em;
+}
+
 /* One button for all three facts. Three affordances — rename here, apps behind
    a dialog, audience in a drawer — was three places to remember for one idea:
    what this policy IS, as opposed to what its rules do. */

@@ -10,8 +10,9 @@ import {
   CopyPlus,
   FileDown,
   Info,
-  ListOrdered,
+  Home,
   MoreHorizontal,
+  PanelLeftOpen,
   Plus,
   ScrollText,
   Sparkles,
@@ -22,7 +23,7 @@ import {
 } from 'lucide-react'
 
 import { Button, DecisionChip, IconButton, MenuButton, Tip, Toggle, type MenuItem } from '../kit'
-import { blankRule, type Audience, type Policy, type Rule } from '../data'
+import { blankRule, fallbackRule, type Audience, type Policy, type Rule } from '../data'
 import { useBrand, useNameLookup } from '../store'
 import { AudienceDrawer } from './audience-drawer'
 import { predicateSummary, ruleSentence } from './predicate-prose'
@@ -131,6 +132,12 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
 
   const [hist, setHist] = useState<History>(() => historyOf(saved ?? ({} as Policy)))
   const [selected, setSelected] = useState(0)
+  /* The terminal rule is a row in the same list, so opening it is the same
+     gesture — but it is not IN `rules`, so it cannot be an index. A separate
+     flag rather than a `number | 'fallback'` selection, because every other
+     consumer of `selected` (jump, move, delete, diagnostics) is about the
+     ordered rules and would have to learn a sentinel it can do nothing with. */
+  const [onTerminal, setOnTerminal] = useState(false)
   const [stage, setStage] = useState<Stage>('rules')
   const [audienceOpen, setAudienceOpen] = useState(false)
   const [live, setLive] = useState('')
@@ -241,6 +248,9 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
   }
 
   const rules = draft.rules
+  /* Materialised rather than optional at the point of use: every policy has a
+     terminal, older seed literals just did not store one. */
+  const terminal = draft.fallback ?? fallbackRule()
   const dirty = JSON.stringify(saved) !== JSON.stringify(draft)
   const changes = dirty ? describeChanges(saved, draft) : []
   const diagnostics = diagnose(draft, store.groups, store.hooks, store.users)
@@ -310,23 +320,10 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
     setLive(`${rule.name} deleted`)
   }
 
-  /* One menu in the top bar, and it holds only what is true of the *policy*.
-
-     There were two — Tools and Actions — and Actions carried "Delete this rule"
-     next to "Save as template", which is a footgun and a category error in the
-     same row: one is scoped to the rule you happen to have selected, the other
-     to the whole policy. Rule-scoped actions moved onto the rule (the ⋯ beside
-     its name), which is both where they belong and where they stop needing a
-     "this rule" in their label to be unambiguous. */
-  /* Rule-scoped actions, on the rule. In the top bar they had to say "this
-     rule" to be unambiguous, and sat beside policy-wide ones that the same
-     gesture could not undo. */
-  const ruleItems: MenuItem[] = [
-    { id: 'add', label: 'Add a rule below', icon: Plus },
-    { id: 'duplicate', label: 'Duplicate', icon: Copy },
-    { id: 'copy', label: 'Copy to another policy…', icon: CopyPlus, hint: 'An independent copy' },
-    { id: 'delete', label: 'Delete', icon: Trash2, danger: true, divide: true },
-  ]
+  /* Rule-scoped actions live on the rule card — `RuleCard` builds its own set
+     beside the rule's name. They were in the top bar once, where every label
+     had to say "this rule" to be unambiguous and each sat beside policy-wide
+     ones the same gesture could not undo. */
 
   /* What used to be a "Policy" dropdown, spread across the bar as buttons.
 
@@ -435,11 +432,32 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
       </header>
       )}
 
-      <div className={`bf__work ${flowOpen ? 'is-flowopen' : ''}`} ref={work}>
+      <div className={`bf__work ${flowOpen ? 'is-flowopen' : ''} ${empty ? 'is-noruleyet' : ''}`} ref={work}>
         {/* Dismisses on a click anywhere off the panel. Only in the DOM while
             the panel is, so it can never swallow a click on the work. */}
         {flowOpen && floating && (
           <button type="button" className="bf__flowscrim" aria-label="Close the sequence" onClick={() => setFlowOpen(false)} />
+        )}
+
+        {/* Collapsed, the panel leaves a 40px stub rather than nothing.
+
+            A panel that vanishes without trace has to be re-found; a stub in
+            its own track keeps the way back exactly where the way out was, and
+            costs the playground forty pixels rather than three hundred. */}
+        {!flowOpen && !empty && (
+          <div className="bf__railstub">
+            <button
+              type="button"
+              aria-label="Show the rules panel"
+              title="Show the rules panel"
+              onClick={() => setFlowOpen(true)}
+            >
+              <PanelLeftOpen size={15} strokeWidth={1.8} aria-hidden />
+            </button>
+            <span className="bf__railstubn" aria-hidden>
+              {rules.length}
+            </span>
+          </div>
         )}
 
         {/* --- The sequence: a column here, a drawer when there is no room -- */}
@@ -450,10 +468,12 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
             diagnostics={diagnostics}
             shadowed={shadowed}
             onSelect={(i) => {
+              setOnTerminal(false)
               jump(i)
               if (floating) setFlowOpen(false)
             }}
             onInsert={(at) => {
+              setOnTerminal(false)
               addRule(at)
               if (floating) setFlowOpen(false)
             }}
@@ -461,7 +481,11 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
             onReorder={move}
             onHover={setHoverShadow}
             onClose={() => setFlowOpen(false)}
-            onFallback={(fallback) => patch({ fallback })}
+            fallbackOn={onTerminal}
+            onFallback={() => {
+              setOnTerminal(true)
+              if (floating) setFlowOpen(false)
+            }}
           />
         </div>
 
@@ -509,32 +533,17 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
                   not a step — it is the frame they are written inside — so it
                   lives in the policy bar above every builder now, with the name
                   and the applications it belongs beside. */}
-              {/* The stage is a playground for ONE rule now, not a list of all
-                  of them.
+              {/* No heading bar over the playground.
 
-                  An accordion asked the screen to be two things at once: the
-                  sequence AND the rule, with the rule's own room shrinking as
-                  the sequence grew. The sequence has its own panel; this has
-                  everything else. */}
-              {!empty && (
-              <div className="bf__ruleshead">
-                <button
-                  type="button"
-                  className="bf__flowbtn"
-                  aria-expanded={flowOpen}
-                  onClick={() => setFlowOpen((v) => !v)}
-                >
-                  <ListOrdered size={13} strokeWidth={1.9} aria-hidden />
-                  {flowOpen ? 'Hide rules' : 'Rules'}
-                  <span>{rules.length}</span>
-                </button>
-                <em>
-                  Rule {index + 1} of {rules.length} · evaluated top to bottom, first match wins
-                </em>
-                <MenuButton label="Rule actions" iconOnly icon={MoreHorizontal} size="sm" align="end" items={ruleItems} onSelect={onAction} />
-              </div>
-              )}
+                  It held three things that each belonged somewhere else: a
+                  title for the RULES PANEL, printed over the rule; a caption
+                  saying how evaluation works, which is a fact about the
+                  sequence and now sits under the panel's own title; and a rule
+                  menu duplicating the one on the rule card two rows below it.
 
+                  What is left is the collapse, and a control that hides a panel
+                  belongs to the panel — so it is in the panel's header, with a
+                  stub in its place once it is gone. */}
               {rules.length === 0 ? (
                 <div className="bf__blank">
                   <Sparkles size={22} strokeWidth={1.6} aria-hidden />
@@ -566,6 +575,13 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
                     </button>
                   </div>
                 </div>
+              ) : onTerminal ? (
+                <ol className="bf__rules">
+                  <TerminalCard
+                    rule={terminal}
+                    onPatch={(p) => patch({ fallback: { ...terminal, ...p } })}
+                  />
+                </ol>
               ) : (
                 rule && (
                   <ol className="bf__rules">
@@ -717,6 +733,63 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
         }}
       />
     </div>
+  )
+}
+
+/* -----------------------------------------------------------------------------
+   The terminal rule, as a card.
+
+   The same card as any other rule minus the three things that do not apply to
+   it. Not a variant of `RuleCard` behind four booleans — the differences are
+   structural rather than cosmetic, and a card whose header is four conditionals
+   is a card nobody can read:
+
+   · No name field. It has one name, and a rule you can rename is a rule you can
+     lose track of; every diagnostic and every trace says "Nothing else matched"
+     and has to keep saying it.
+   · No enable toggle, no ⋯. It cannot be turned off, deleted, duplicated or
+     moved — an ordered list has to end somewhere.
+   · No WHEN. Its condition is a POSITION, not a predicate. Drawing an empty
+     condition block on it would invite somebody to write one, and the one they
+     wrote would be silently ignored.
+
+   Everything else is the same, which is the point: the outcome is edited where
+   every other outcome is edited, and it can finally say the same things.
+   -------------------------------------------------------------------------- */
+
+function TerminalCard({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
+  const resolve = useNameLookup()
+
+  return (
+    <li className="bf__rule is-open is-terminal">
+      <div className="bf__rulehead">
+        <span className="bf__ruleno is-lock" aria-hidden>
+          <Home size={13} strokeWidth={1.9} />
+        </span>
+        <strong className="bf__rulefixed">{rule.name}</strong>
+        <DecisionChip decision={rule.decision} size="sm" />
+        <span className="bf__rulelast">Always last · cannot be deleted</span>
+      </div>
+
+      <div className="bf__rulebody">
+        <div className="bf__ruleinner">
+          <p className="bf__terminalwhen">
+            <span className="u-label">When it applies</span>
+            Every sign-in that reached the bottom of the list without matching a rule above it.
+          </p>
+
+          {/* `bare`, like the rule card's — the numbered pip belongs to a
+              five-step trail that no longer exists, and here it would number a
+              step in a card that has exactly one. */}
+          <ThenSection rule={rule} onPatch={onPatch} bare />
+
+          <p className="bf__ruleprose">
+            <span className="u-label">In words</span>
+            {ruleSentence(rule, resolve).then}
+          </p>
+        </div>
+      </div>
+    </li>
   )
 }
 

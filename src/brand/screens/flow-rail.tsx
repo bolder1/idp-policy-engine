@@ -1,9 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { LayoutGroup, motion, useReducedMotion } from 'motion/react'
-import { GripVertical, Home, KeyRound, MoreHorizontal, Plus, ShieldAlert, UserCheck, X } from 'lucide-react'
+import { GripVertical, Home, KeyRound, PanelLeftClose, Plus, ShieldAlert, UserCheck } from 'lucide-react'
 
 import type { AccessDecision, Policy } from '../data'
-import { MenuButton } from '../kit'
 import { ruleState } from './rule-form'
 import type { Diagnostic } from './diagnostics'
 import { predicateSummary } from './predicate-prose'
@@ -48,6 +47,7 @@ export function FlowRail({
   onHover,
   onClose,
   onFallback,
+  fallbackOn,
 }: {
   policy: Policy
   selected: number
@@ -61,13 +61,15 @@ export function FlowRail({
   onHover: (i: number | null) => void
   /** The panel floats over the work now, so it needs a way out that is not a pick. */
   onClose?: () => void
-  /** What an unmatched sign-in gets. Editable, never deletable. */
-  onFallback: (d: AccessDecision) => void
+  /** Open the terminal rule in the playground. Editable, never deletable. */
+  onFallback: () => void
+  /** Whether the terminal rule is the one currently open. */
+  fallbackOn?: boolean
 }) {
   const reduce = useReducedMotion()
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null)
   const rules = policy.rules
-  const fallback = policy.fallback ?? '1fa'
+  const fallback = policy.fallback?.decision ?? '1fa'
   const scroller = useRef<HTMLDivElement | null>(null)
 
   /* Keep the selected rule in view.
@@ -84,12 +86,25 @@ export function FlowRail({
 
   return (
     <section className="bf__flow" data-tour="flow" aria-label="Evaluation order — top to bottom, first match wins">
+      {/* The panel titles itself and says what the order MEANS, because this is
+          the only place either belongs. Both used to sit in a bar across the
+          top of the playground — a heading for the panel, printed over the
+          thing the panel is not. */}
       <header className="bf__flowhead">
-        <span className="u-label">Evaluation order</span>
+        <span className="bf__flowtitle">
+          <span className="u-label">Evaluation order</span>
+          <em>Top to bottom · first match wins</em>
+        </span>
         <span className="bf__flowcount">{rules.length}</span>
         {onClose && (
-          <button type="button" className="bf__flowclose" aria-label="Close the sequence" onClick={onClose}>
-            <X size={14} strokeWidth={2} />
+          <button
+            type="button"
+            className="bf__flowclose"
+            aria-label="Hide the rules panel"
+            title="Hide the rules panel"
+            onClick={onClose}
+          >
+            <PanelLeftClose size={15} strokeWidth={1.8} />
           </button>
         )}
       </header>
@@ -191,12 +206,19 @@ export function FlowRail({
 
           <Link label={rules.length > 0 ? 'no match' : undefined} onInsert={() => onInsert(rules.length)} always />
 
-          {/* The terminal. Permanent, because an ordered list has to end
-              somewhere and the engine has to do something when it gets there
-              — but no longer frozen. What happens to traffic that matched
-              nothing is a decision, and it was the one decision on this screen
-              nobody could make. */}
-          <div className="bf__node is-default">
+          {/* The terminal, and it opens like every other row.
+
+              It carried a ⋯ offering three decisions, which made it the one row
+              on this panel edited in a menu rather than in the playground — and
+              capped what it could say at those three. Click it and its outcome
+              opens where every other outcome does. What stays fixed is its
+              name, its place at the bottom, and that it cannot be deleted. */}
+          <button
+            type="button"
+            className={`bf__node is-default ${fallbackOn ? 'is-on' : ''}`}
+            aria-current={fallbackOn ? 'true' : undefined}
+            onClick={onFallback}
+          >
             <span className="bf__nodeidx is-lock" aria-hidden>
               <Home size={12} strokeWidth={1.8} />
             </span>
@@ -210,20 +232,7 @@ export function FlowRail({
               <strong>Nothing else matched</strong>
               <em>{FALLBACK_SUB[fallback]}</em>
             </span>
-            <MenuButton
-              label="Change what unmatched sign-ins get"
-              iconOnly
-              icon={MoreHorizontal}
-              size="sm"
-              align="end"
-              items={[
-                { id: '1fa', label: 'Allow on one factor' },
-                { id: '2fa', label: 'Allow, but require a second factor' },
-                { id: 'deny', label: 'Deny', danger: true },
-              ]}
-              onSelect={(id) => onFallback(id as AccessDecision)}
-            />
-          </div>
+          </button>
         </div>
       </div>
     </section>

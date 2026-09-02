@@ -93,10 +93,18 @@
   border-right: 1px solid var(--border-subtle);
 }
 .bf__flowhead {
-  flex: none; display: flex; align-items: center; gap: var(--space-4);
-  padding: var(--space-5) var(--space-5) var(--space-3);
+  flex: none; display: flex; align-items: flex-start; gap: var(--space-3);
+  padding: var(--space-5) var(--space-4) var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
 }
-.bf__flowhead .u-label { flex: 1; }
+.bf__flowtitle { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* The semantics, under the title that owns them. It was a caption across the
+   top of the playground, which put a fact about the sequence on the one surface
+   that is not the sequence. */
+.bf__flowtitle em {
+  font-style: normal; font-size: var(--fs-xs); color: var(--text-muted);
+}
+.bf__flowhead .bf__flowcount { margin-top: 1px; }
 .bf__flowcount {
   padding: 0 7px; border-radius: var(--radius-full);
   background: var(--surface-raised); border: 1px solid var(--border-subtle);
@@ -193,7 +201,16 @@
 .bf__node.is-lifted { opacity: 0.4; }
 .bf__node.is-over { box-shadow: inset 0 2px 0 var(--brand); }
 .bf__node.is-under { box-shadow: inset 0 -2px 0 var(--brand); }
-.bf__node.is-default { background: var(--surface-sunken); border-style: dashed; box-shadow: none; }
+.bf__node.is-default {
+  width: 100%;
+  background: var(--surface-sunken); border-style: dashed; box-shadow: none;
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.bf__node.is-default:hover { border-color: var(--border-strong); }
+/* Selected exactly like a rule, because it is one. `.is-on` above already says
+   this; it is restated only because `.is-default` follows it in source order
+   and would otherwise win the border back. */
+.bf__node.is-default.is-on { border-color: var(--brand); border-style: solid; box-shadow: var(--el-mid); }
 
 .bf__nodeidx {
   flex: none; display: inline-flex; align-items: center; gap: 1px;
@@ -583,6 +600,38 @@
   font-size: var(--fs-xs); white-space: nowrap;
 }
 .bf__conddupe { display: grid; place-items: center; width: 20px; height: 20px; color: var(--text-muted); }
+
+/* --- The terminal rule's card --------------------------------------------------
+
+   The same card as any other rule, minus a name field, an enable toggle, a ⋯
+   and a WHEN. What is left has to say WHY those are missing without a paragraph
+   of apology, so the index is a house glyph rather than a number and one quiet
+   line states the two rules the row lives under. */
+
+.bf__rule.is-terminal { border-style: dashed; }
+.bf__ruleno.is-lock {
+  background: var(--surface-inset); color: var(--text-tertiary);
+  border: 1px solid var(--border-subtle);
+}
+.bf__rulefixed {
+  flex: 1; min-width: 0;
+  font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bf__rulelast { flex: none; font-size: var(--fs-xs); color: var(--text-muted); }
+
+/* Stated, not drawn. An empty condition block here would invite somebody to
+   write a condition, and the one they wrote would be silently ignored — the
+   terminal's condition is a POSITION in the list, not a predicate. */
+.bf__terminalwhen {
+  display: flex; align-items: baseline; gap: var(--space-4);
+  max-width: 900px; margin: 0 0 var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-sunken);
+  border: 1px dashed var(--border-default); border-radius: var(--radius-lg);
+  font-size: var(--fs-md); color: var(--text-secondary);
+}
+.bf__terminalwhen .u-label { flex: none; }
 
 /* --- Adding ---------------------------------------------------------------------------- */
 
@@ -1194,9 +1243,19 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
   grid-template-columns: var(--rail-track, var(--rail-w)) minmax(0, 1fr);
   transition: grid-template-columns 200ms var(--ease-standard);
 }
-.bf.is-main .bf__work:not(.is-flowopen) { --rail-track: 0px; }
+.bf.is-main .bf__work:not(.is-flowopen) { --rail-track: 40px; }
+/* Nothing to collapse on an empty policy, so no stub and no track. */
+.bf.is-main .bf__work.is-noruleyet:not(.is-flowopen) { --rail-track: 0px; }
 @media (prefers-reduced-motion: reduce) { .bf.is-main .bf__work { transition: none; } }
+/* Placed explicitly, not auto-placed.
+
+   The stub and the panel are alternatives that share one track — with the
+   panel still mounted for the width transition, three items in a two-column
+   grid put the playground on a second row forty pixels wide. */
+.bf.is-main .bf__flowdock,
+.bf.is-main .bf__railstub { grid-area: 1 / 1; }
 .bf.is-main .bf__work > .bf__main {
+  grid-area: 1 / 2;
   display: flex; flex-direction: column;
   min-height: 0; min-width: 0;
 }
@@ -1242,29 +1301,29 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
 }
 
 .bf__flowclose {
-  display: grid; place-items: center; width: 24px; height: 24px;
-  margin-left: var(--space-2);
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px;
   border: none; background: none; border-radius: var(--radius-sm);
   color: var(--text-muted); cursor: pointer;
 }
 .bf__flowclose:hover { background: var(--surface-raised); color: var(--text-primary); }
 
-.bf__flowbtn {
-  display: inline-flex; align-items: center; gap: var(--space-3);
-  height: 26px; padding: 0 var(--space-3);
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  font-family: inherit; font-size: var(--fs-sm);
-  color: var(--text-secondary); cursor: pointer;
+/* The stub the panel leaves behind: its own grid track, so the playground's
+   left edge does not move under the button that reopens it. */
+.bf__railstub {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
+  padding: var(--space-5) 0;
+  background: var(--surface-sunken);
+  border-right: 1px solid var(--border-subtle);
 }
-.bf__flowbtn:hover { border-color: var(--border-strong); color: var(--text-primary); }
-.bf__flowbtn[aria-expanded='true'] { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-inverse); }
-.bf__flowbtn span {
-  padding: 0 5px; border-radius: var(--radius-full);
-  background: var(--surface-inset); color: var(--text-tertiary);
-  font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
+.bf__railstub button {
+  display: grid; place-items: center; width: 26px; height: 26px;
+  border: none; background: none; border-radius: var(--radius-sm);
+  color: var(--text-muted); cursor: pointer;
 }
-.bf__flowbtn[aria-expanded='true'] span { background: rgb(255 255 255 / 0.16); color: var(--text-inverse); }
+.bf__railstub button:hover { background: var(--surface-raised); color: var(--text-primary); }
+.bf__railstubn {
+  font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums;
+}
 
 @media (max-width: 880px) {
   .bf__pips .bgt__pip em, .bf__pips .bia__pip b { display: none; }
@@ -1282,24 +1341,6 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
   width: 20px; height: 20px; margin-top: 2px;
   border: 1px solid var(--border-strong); border-radius: var(--radius-full);
   font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary);
-}
-
-/* The playground's own header: the way in and out of the rules panel, which
-   rule you are on, and what can be done to it.
-
-   It is not a section heading — there is one rule below it and the panel beside
-   it says so — so it reads as a toolbar for the rule rather than a title. */
-.bf__ruleshead {
-  position: sticky; top: calc(var(--space-6) * -1); z-index: var(--z-sticky);
-  display: flex; align-items: center; gap: var(--space-4);
-  margin: calc(var(--space-6) * -1) calc(var(--space-7) * -1) var(--space-4);
-  padding: var(--space-4) var(--space-7);
-  background: var(--surface-page);
-  border-bottom: 1px solid var(--border-subtle);
-}
-.bf__ruleshead em {
-  flex: 1; min-width: 0; font-style: normal; font-size: var(--fs-sm); color: var(--text-muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 /* --- Audience chips ------------------------------------------------------------ */

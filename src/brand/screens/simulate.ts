@@ -224,7 +224,7 @@ export function evalCond(c: Condition, ctx: SimContext): { state: CondState; det
    policy literal keeps working, and `1fa` here is the behaviour those policies
    already had — so reading it is a no-op for them and a real answer for
    anything that has set it. */
-export const fallbackOf = (p: Policy): AccessDecision => p.fallback ?? '1fa'
+export const fallbackOf = (p: Policy): AccessDecision => p.fallback?.decision ?? '1fa'
 
 export interface RuleVerdict {
   match: boolean

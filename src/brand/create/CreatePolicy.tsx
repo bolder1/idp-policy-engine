@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Suspense, forwardRef, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowRight, Check, Plus, Search, Store, Upload, Users, Wand2, X } from 'lucide-react'
 
-import { Button } from '../kit'
+import { Button, DecisionChip } from '../kit'
 import { AppLogo } from '../logos/AppLogo'
 import { EVERYONE, blankPolicy, conditionType, reach, scenarios, type Audience, type Scenario } from '../data'
 import { useBrand } from '../store'
@@ -150,6 +150,7 @@ export function CreatePolicy() {
             <Gallery ref={templatesRef} onChoose={choose} onOpenMarket={() => setMarket(true)} />
           ) : (
             <NameStep
+              picked={picked}
               audience={audience}
               setAudience={setAudience}
               name={name}
@@ -595,6 +596,7 @@ function AppList({ chosen, onChange }: { chosen: string | null; onChange: (id: s
 }
 
 function NameStep({
+  picked,
   name,
   setName,
   appIds,
@@ -605,6 +607,7 @@ function NameStep({
   onCreate,
   onGuided,
 }: {
+  picked: Scenario | null
   name: string
   setName: (v: string) => void
   appIds: string[]
@@ -624,7 +627,7 @@ function NameStep({
   const empty = !audience.everyone && audience.groupIds.length === 0 && audience.userIds.length === 0
 
   return (
-    <section className="bname2">
+    <section className={`bname2 ${picked ? 'has-preview' : ''}`}>
       {/* Two labelled controls and nothing else.
 
           The step used to carry a page subtitle, a line of help under each
@@ -702,17 +705,56 @@ function NameStep({
         onApply={setAudience}
       />
 
-      {/* The "what you are about to get" panel is gone.
+      {/* The preview, conditionally.
 
-          It rendered the template's rules read-only beside the form, and for a
-          blank policy — which is most of them — it was a box saying "No rules
-          yet. You will add them in the builder once this policy is created."
-          That is a panel whose content is an apology for its own existence, and
-          it was taking the half of the page the form actually needed.
+          It used to render unconditionally, and for a blank policy — which is
+          most of them — its entire content was a box saying "No rules yet. You
+          will add them in the builder once this policy is created." A panel
+          apologising for its own emptiness was taking half the page from the
+          form that needed it.
 
-          The template's rules are still shown, on the step where you choose the
-          template, which is where they change what you decide. Here they cannot
-          — you have already chosen. */}
+          So it appears when there is something to show. From a template, the
+          rules you are about to get are worth reading before you commit to
+          them; from scratch there is nothing to read and the form gets the
+          whole width. Same page, two shapes. */}
+      {picked && (
+        <aside className="bname2__side">
+          <header className="bname2__sidehead">
+            <div>
+              <h2>{name.trim() || 'Untitled policy'}</h2>
+              <p>
+                From {picked.name} · {picked.rules.length} rule{picked.rules.length === 1 ? '' : 's'}
+              </p>
+            </div>
+            <span className="bname2__off">Created off</span>
+          </header>
+
+          <div className="bname2__scroll">
+            <ol className="bname2__rules">
+              {picked.rules.map((r, i) => (
+                <li key={r.name}>
+                  <span className="bprev__n">{i + 1}</span>
+                  <span className="bprev__body">
+                    <strong>{r.name}</strong>
+                    <span>IF {r.ifText}</span>
+                  </span>
+                  <DecisionChip decision={r.decision} size="sm" />
+                </li>
+              ))}
+              <li className="bname2__rules--default">
+                <span className="bprev__n" aria-hidden>
+                  ⌄
+                </span>
+                <span className="bprev__body">
+                  <strong>Everyone else</strong>
+                  <span>Nothing above matched</span>
+                </span>
+                <DecisionChip decision="1fa" size="sm" />
+              </li>
+            </ol>
+          </div>
+        </aside>
+      )}
 
       {/* Bottom bar rather than buttons inside the panel — the panel is a
           summary, and as this step grows the commit action should not drift

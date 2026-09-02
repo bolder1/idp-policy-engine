@@ -523,7 +523,7 @@
 .bname2__foot { margin-top: 10px; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
 
 @media (max-width: 1100px) {
-  .bname2 { grid-template-columns: minmax(0, 1fr); }
+  .bname2, .bname2.has-preview { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* --- Bottom bar ------------------------------------------------------------ */
@@ -826,24 +826,26 @@ html[data-theme='dark'] .bguided__sheen {
 
 /* Two columns of equal height, so their bottoms line up instead of ending
    wherever their content happens to stop. */
-/* One column, because the second one is gone.
+/* One page, two shapes.
 
-   The right half held a read-only preview of the policy about to be created —
-   and for a blank policy, which is most of them, its whole content was a box
-   saying "No rules yet, you will add them in the builder". A panel apologising
-   for its own emptiness was taking half the page from the form that needed it.
-   The form now has three fields (name, application, audience) and the room to
-   show them without the application list scrolling inside a 140px slot. */
+   The second column used to render unconditionally, and for a blank policy —
+   which is most of them — its whole content was a box saying "No rules yet, you
+   will add them in the builder". A panel apologising for its own emptiness was
+   taking half the page from the form that needed it.
+
+   So: from a template there are rules worth reading before you commit, and the
+   page is two columns. From scratch there is nothing to read, and the form
+   takes the width — which is what lets the application list be a list rather
+   than six rows scrolling inside a 140px slot. */
 .bname2 {
   flex: 1;
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  justify-items: center;
+  gap: 16px;
 }
-.bname2__form { width: 100%; max-width: 760px; }
-.bname2__form { min-height: 0; height: 100%; }
-.bname2__form { overflow-y: auto; }
+.bname2.has-preview { grid-template-columns: minmax(380px, 44%) minmax(0, 1fr); }
+.bname2__form, .bname2__side { min-height: 0; height: 100%; }
 
 .bname2__side {
   display: flex;
@@ -979,9 +981,34 @@ html[data-theme='dark'] .bguided__sheen {
 .bapps__mark { flex: none; width: 16px; display: grid; place-items: center; color: var(--brand); }
 .bapps__none { padding: 24px 12px; text-align: center; font-size: var(--fs-md); color: var(--text-tertiary); }
 
-/* The form column is now a flex column whose last field grows, so it stops
-   being a scroller itself — the list inside it is. */
+/* The form column is a flex column whose last field grows, so it stops being a
+   scroller itself — the list inside it is. */
 .bname2__form { overflow: visible; display: flex; flex-direction: column; }
+
+/* Without a preview the form takes the whole page — and a single column of
+   fields 1200px wide is a worse use of it than the panel was. So the form
+   itself becomes the two columns: the two short fields stack on the left at a
+   readable measure, and the application list, the only thing here with real
+   length, takes the right half and its full height.
+
+   With a preview the form is already the left column, so it stays as one. */
+.bname2:not(.has-preview) .bname2__form {
+  display: grid;
+  grid-template-columns: minmax(320px, 34%) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: start;
+  gap: 18px 24px;
+  overflow: hidden;
+}
+.bname2:not(.has-preview) .bname2__field--fill {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-height: 0;
+}
+@media (max-width: 1100px) {
+  .bname2:not(.has-preview) .bname2__form { display: flex; overflow-y: auto; }
+  .bname2:not(.has-preview) .bname2__field--fill { min-height: 320px; }
+}
 
 /* The name field, stated explicitly.
 

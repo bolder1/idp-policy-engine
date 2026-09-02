@@ -985,29 +985,38 @@ html[data-theme='dark'] .bguided__sheen {
    scroller itself — the list inside it is. */
 .bname2__form { overflow: visible; display: flex; flex-direction: column; }
 
-/* Without a preview the form takes the whole page — and a single column of
-   fields 1200px wide is a worse use of it than the panel was. So the form
-   itself becomes the two columns: the two short fields stack on the left at a
-   readable measure, and the application list, the only thing here with real
-   length, takes the right half and its full height.
+/* A policy's scope is two questions of the same shape — what does it protect,
+   and who does it govern — so they get the same shape of control, side by side,
+   under a name that spans them both.
 
-   With a preview the form is already the left column, so it stays as one. */
-.bname2:not(.has-preview) .bname2__form {
+   A single 1200px column of stacked fields was a worse use of the page than the
+   preview panel had been, and the audience-as-chips row that sat in it grew a
+   line every time somebody added a group, inside a form whose other fields are
+   fixed height. Two equal list columns settle both problems at once: neither
+   can push the other around, and both scale by scrolling rather than by
+   growing. */
+.bname2__form {
   display: grid;
-  grid-template-columns: minmax(320px, 34%) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   align-content: start;
   gap: 18px 24px;
   overflow: hidden;
 }
-.bname2:not(.has-preview) .bname2__field--fill {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  min-height: 0;
+.bname2__form > .bname2__field:first-child { grid-column: 1 / -1; max-width: 520px; }
+.bname2__field--fill { min-height: 0; }
+
+/* With a preview the form is already the left column of the page, so its own
+   two columns would be two narrow ones. It stacks instead, and scrolls. */
+.bname2.has-preview .bname2__form {
+  display: flex; flex-direction: column;
+  overflow-y: auto;
 }
+.bname2.has-preview .bname2__field--fill { min-height: 260px; }
+
 @media (max-width: 1100px) {
-  .bname2:not(.has-preview) .bname2__form { display: flex; overflow-y: auto; }
-  .bname2:not(.has-preview) .bname2__field--fill { min-height: 320px; }
+  .bname2__form { display: flex; flex-direction: column; overflow-y: auto; }
+  .bname2__field--fill { min-height: 300px; }
 }
 
 /* The name field, stated explicitly.
@@ -1131,3 +1140,78 @@ html[data-theme='dark'] .bguided__sheen {
   font-size: var(--fs-sm); color: var(--text-secondary);
 }
 .bname2__aud:hover .bname2__audedit { color: var(--brand); }
+
+
+/* --- The audience picker, inline -------------------------------------------
+
+   The same control as the application list beside it, because it answers the
+   same shape of question. Its own frame, its own search, one scroller. */
+
+.baudp {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.baudp__search {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 8px; padding-inline-start: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  color: var(--text-tertiary);
+}
+.baudp__search input {
+  flex: 1; height: 32px; padding: 0 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: var(--fs-md); color: var(--text-primary);
+}
+.baudp__search input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+
+.baudp__list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 6px; }
+.baudp__head { margin: var(--space-4) 0 var(--space-2); padding: 0 8px; color: var(--text-muted); }
+
+.baudp__row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 7px 8px; border: none; background: none; border-radius: var(--radius-sm);
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.baudp__row:hover { background: var(--surface-sunken); }
+.baudp__row:disabled { opacity: 0.45; cursor: default; }
+.baudp__row--all { border-bottom: 1px solid var(--border-subtle); border-radius: 0; margin-bottom: 4px; }
+
+.baudp__box {
+  flex: none; display: grid; place-items: center; width: 16px; height: 16px;
+  border: 1.5px solid var(--border-strong); border-radius: 4px;
+}
+.baudp__row.is-on .baudp__box { background: var(--brand); border-color: var(--brand); }
+.baudp__row.is-on .baudp__box::after {
+  content: ''; width: 8px; height: 4px;
+  border-left: 2px solid var(--text-on-brand); border-bottom: 2px solid var(--text-on-brand);
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+
+.baudp__gicon {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--fb-positive-bg); color: var(--fb-positive-fg);
+}
+.baudp__avatar {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--brand-subtle-bg); color: var(--brand);
+  font-size: 9px; font-weight: var(--fw-semibold);
+}
+.baudp__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.baudp__text strong { font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-body); }
+.baudp__text em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+
+.baudp__none { padding: 24px 12px; text-align: center; font-size: var(--fs-md); color: var(--text-tertiary); }
+.baudp__foot {
+  margin: 0; padding: 8px 14px;
+  border-top: 1px solid var(--border-subtle); background: var(--surface-sunken);
+  font-size: var(--fs-sm); color: var(--text-tertiary);
+}
+.baudp__foot b { color: var(--fb-negative-fg); font-weight: var(--fw-medium); }
+.baudp__foot em { font-style: normal; color: var(--text-muted); }

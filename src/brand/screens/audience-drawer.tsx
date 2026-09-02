@@ -311,3 +311,168 @@ export function AudienceBar({
     </span>
   )
 }
+
+/* -----------------------------------------------------------------------------
+   The same choice, inline.
+
+   The create form showed the audience as a row of chips with a Change button
+   that opened the drawer. Chips do not scale: three groups and two named people
+   already wrap to three lines, and the row grows every time somebody adds one —
+   in a form whose other fields are fixed height. It was also the odd one out,
+   the only field on that page you could not act on where you read it.
+
+   So the form gets a list, exactly like the application list beside it: a
+   search over both kinds, groups then people, everything togglable in place.
+   The drawer stays for the builder, where the audience is already set and
+   changing it is a deliberate visit rather than part of filling in a form.
+   -------------------------------------------------------------------------- */
+export function AudiencePicker({
+  audience,
+  groups,
+  users,
+  unlisted,
+  onChange,
+}: {
+  audience: Audience
+  groups: Group[]
+  users: User[]
+  unlisted: number
+  onChange: (a: Audience) => void
+}) {
+  const [q, setQ] = useState('')
+  const n = q.trim().toLowerCase()
+
+  const shownGroups = n ? groups.filter((g) => g.name.toLowerCase().includes(n)) : groups
+  const shownUsers = n
+    ? users.filter((u) =>
+        [u.name, u.email, groups.find((g) => g.id === u.groupId)?.name ?? ''].some((f) =>
+          f.toLowerCase().includes(n),
+        ),
+      )
+    : users
+
+  const toggleGroup = (id: string) =>
+    onChange({
+      ...audience,
+      everyone: false,
+      groupIds: audience.groupIds.includes(id)
+        ? audience.groupIds.filter((x) => x !== id)
+        : [...audience.groupIds, id],
+    })
+
+  const toggleUser = (id: string) =>
+    onChange({
+      ...audience,
+      everyone: false,
+      userIds: audience.userIds.includes(id)
+        ? audience.userIds.filter((x) => x !== id)
+        : [...audience.userIds, id],
+    })
+
+  const total = reach(audience, groups, users)
+
+  return (
+    <div className="baudp">
+      <div className="baudp__search">
+        <Search size={14} strokeWidth={1.9} aria-hidden />
+        <input
+          aria-label="Search groups and people"
+          placeholder={`Search ${groups.length} groups and ${users.length} people…`}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+      </div>
+
+      <div className="baudp__list" role="group" aria-label="Who this policy applies to">
+        {/* Everyone is a flag, not a row among the groups — ticking it beside
+            Finance would build "everyone AND Finance", which reads narrower
+            than it is. So it sits above the list and clears it. */}
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={audience.everyone}
+          className={`baudp__row baudp__row--all ${audience.everyone ? 'is-on' : ''}`}
+          onClick={() => onChange(audience.everyone ? { ...audience, everyone: false } : EVERYONE)}
+        >
+          <span className="baudp__box" aria-hidden />
+          <span className="baudp__gicon" aria-hidden>
+            <Users size={13} strokeWidth={1.8} />
+          </span>
+          <span className="baudp__text">
+            <strong>Everyone in the directory</strong>
+            <em>Including anyone added later</em>
+          </span>
+        </button>
+
+        {!n && <p className="baudp__head u-label">Groups</p>}
+        {shownGroups.map((g) => (
+          <button
+            key={g.id}
+            type="button"
+            role="checkbox"
+            aria-checked={audience.groupIds.includes(g.id)}
+            className={`baudp__row ${audience.groupIds.includes(g.id) ? 'is-on' : ''}`}
+            disabled={audience.everyone}
+            onClick={() => toggleGroup(g.id)}
+          >
+            <span className="baudp__box" aria-hidden />
+            <span className="baudp__gicon" aria-hidden>
+              <Users size={13} strokeWidth={1.8} />
+            </span>
+            <span className="baudp__text">
+              <strong>{g.name}</strong>
+              <em>{g.memberCount.toLocaleString()} members</em>
+            </span>
+            {g.memberCount === 0 && <Badge tone="neutral">Empty</Badge>}
+          </button>
+        ))}
+
+        {!n && <p className="baudp__head u-label">People</p>}
+        {shownUsers.map((u) => {
+          const covered = audience.groupIds.includes(u.groupId)
+          return (
+            <button
+              key={u.id}
+              type="button"
+              role="checkbox"
+              aria-checked={audience.userIds.includes(u.id)}
+              className={`baudp__row ${audience.userIds.includes(u.id) ? 'is-on' : ''}`}
+              disabled={audience.everyone}
+              onClick={() => toggleUser(u.id)}
+            >
+              <span className="baudp__box" aria-hidden />
+              <span className="baudp__avatar" aria-hidden>
+                {initials(u.name)}
+              </span>
+              <span className="baudp__text">
+                <strong>{u.name}</strong>
+                <em>{u.email}</em>
+              </span>
+              {/* Naming somebody already inside a chosen group is legal and
+                  sometimes deliberate — an exception you want to survive an
+                  edit to the group — so this informs rather than blocks. */}
+              {covered && <Badge tone="info">In {groups.find((g) => g.id === u.groupId)?.name}</Badge>}
+            </button>
+          )
+        })}
+
+        {shownGroups.length === 0 && shownUsers.length === 0 && (
+          <p className="baudp__none">Nothing matches “{q}”.</p>
+        )}
+      </div>
+
+      <p className="baudp__foot">
+        {audience.everyone ? (
+          <>Everyone — about {total.toLocaleString()} people</>
+        ) : total === 0 ? (
+          <b>Nobody selected — this policy would not apply to anyone</b>
+        ) : (
+          <>
+            About {total.toLocaleString()} people
+            {unlisted > 0 && <em> · {unlisted.toLocaleString()} more in the directory, searchable above</em>}
+          </>
+        )}
+      </p>
+    </div>
+  )
+}

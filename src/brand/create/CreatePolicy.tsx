@@ -1,14 +1,14 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Suspense, forwardRef, lazy, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowRight, Check, Plus, Search, Store, Upload, Users, Wand2, X } from 'lucide-react'
+import { ArrowDown, ArrowRight, Check, Plus, Search, Store, Upload, Wand2, X } from 'lucide-react'
 
 import { Button, DecisionChip } from '../kit'
 import { AppLogo } from '../logos/AppLogo'
-import { EVERYONE, blankPolicy, conditionType, reach, scenarios, type Audience, type Scenario } from '../data'
+import { EVERYONE, blankPolicy, conditionType, scenarios, type Audience, type Scenario } from '../data'
 import { useBrand } from '../store'
 import { leaves } from '../predicate'
 import { TemplateCard, TemplatePreview, type CardModel } from './TemplateCard'
-import { AudienceBar, AudienceDrawer } from '../screens/audience-drawer'
+import { AudiencePicker } from '../screens/audience-drawer'
 
 /* Mounted only while it is open — the gallery is the common path and does not
    need the interview's questions, composer and figures in its chunk. */
@@ -622,9 +622,6 @@ function NameStep({
 }) {
   const store = useBrand()
   const chosen = appIds[0] ?? null
-  const [picking, setPicking] = useState(false)
-  const total = reach(audience, store.groups, store.users)
-  const empty = !audience.everyone && audience.groupIds.length === 0 && audience.userIds.length === 0
 
   return (
     <section className={`bname2 ${picked ? 'has-preview' : ''}`}>
@@ -665,45 +662,32 @@ function NameStep({
           <AppList chosen={chosen} onChange={(id) => setAppIds(id ? [id] : [])} />
         </div>
 
-        {/* Who it governs, asked here rather than in the builder.
+        {/* Who it governs, beside what it protects.
 
-            It is one of the three facts that make a policy a policy — a name,
-            what it protects, and who it is for — and it was the only one the
-            create flow did not ask for, so every policy arrived governing
-            everyone and had to be narrowed afterwards by somebody who might not
-            realise it needed narrowing. Asking costs one row. */}
-        <div className="bname2__field">
+            It was a row of chips with a Change button that opened a drawer, and
+            chips do not scale — three groups and two named people already
+            wrapped to three lines, in a form whose other fields are fixed
+            height. It was also the only field on the page you could not act on
+            where you read it.
+
+            Now it is a list exactly like the application list beside it: a
+            search over both kinds, groups then people, togglable in place. The
+            two questions a policy asks about scope — what does it protect, and
+            who does it govern — are the same shape of question, so they are the
+            same shape of control, side by side. */}
+        <div className="bname2__field bname2__field--fill">
           <span className="bname2__label">
             Applies to <em>Groups and people</em>
           </span>
-          <button type="button" className={`bname2__aud ${empty ? 'is-empty' : ''}`} onClick={() => setPicking(true)}>
-            <span className="bname2__audbody">
-              {empty ? (
-                <em>Nobody yet — this policy would not apply to anyone</em>
-              ) : (
-                <>
-                  <AudienceBar audience={audience} groups={store.groups} users={store.users} max={5} />
-                  <em>{total.toLocaleString()} people</em>
-                </>
-              )}
-            </span>
-            <span className="bname2__audedit">
-              <Users size={12} strokeWidth={2} aria-hidden />
-              Change
-            </span>
-          </button>
+          <AudiencePicker
+            audience={audience}
+            groups={store.groups}
+            users={store.users}
+            unlisted={store.unlistedUsers}
+            onChange={setAudience}
+          />
         </div>
       </div>
-
-      <AudienceDrawer
-        open={picking}
-        audience={audience}
-        groups={store.groups}
-        users={store.users}
-        unlisted={store.unlistedUsers}
-        onClose={() => setPicking(false)}
-        onApply={setAudience}
-      />
 
       {/* The preview, conditionally.
 

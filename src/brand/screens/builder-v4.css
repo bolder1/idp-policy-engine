@@ -280,6 +280,21 @@
    one has to read as a caption under the name rather than as a second input
    competing with it. The border-bottom that used to close the head moved down
    here, so the two fields read as one block. */
+/* Closed, the rationale is a line. Open, it is the textarea it always was —
+   but it opened by default, which put 68px of empty invitation at the top of
+   every rule, above the work. */
+.bf__whyshut {
+  display: flex; align-items: center; gap: var(--space-3); width: 100%;
+  margin-bottom: var(--space-4); padding: var(--space-2) 0 var(--space-3) 34px;
+  border: none; border-bottom: 1px solid var(--border-subtle); background: none;
+  font-family: inherit; font-size: var(--fs-sm); color: var(--text-muted);
+  text-align: left; cursor: text;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bf__whyshut > svg { flex: none; margin-left: -22px; }
+.bf__whyshut.has-text { color: var(--text-secondary); }
+.bf__whyshut:hover { color: var(--text-primary); }
+
 .bf__rulewhy[hidden] { display: none; }
 .bf__rulewhy {
   display: block;
@@ -802,36 +817,98 @@
 /* `auto-fit` rather than a hard three, so the tiles drop to two-up and then
    one-up instead of shrinking until "One factor, nothing further asked" wraps
    to four lines inside a 140px box. */
-.bf__outs { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--space-4); }
-.bf__out {
-  display: flex; flex-direction: column; gap: var(--space-2);
-  padding: var(--space-5);
-  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
-  text-align: left; cursor: pointer; color: var(--text-muted);
-}
-.bf__out:hover { border-color: var(--border-strong); }
-.bf__out strong { font-size: var(--fs-base); color: var(--text-primary); }
-.bf__out em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
-.bf__out.is-on.is-allow { border-color: var(--fb-positive-dot); background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
-.bf__out.is-on.is-mfa { border-color: var(--fb-notice-dot); background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
-.bf__out.is-on.is-deny { border-color: var(--fb-negative-dot); background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bf__out.is-on strong { color: inherit; }
+/* --- The two outcomes ----------------------------------------------------------
 
-.bf__denynote {
-  margin: var(--space-5) 0 0; padding: var(--space-5);
-  background: var(--fb-negative-bg); border-radius: var(--radius-md);
-  font-size: var(--fs-md); color: var(--fb-negative-fg);
+   Stacked, not side by side, because each one now carries its own consequence
+   underneath it and two columns of unequal height read as a bug. The spine down
+   the left is the decision's own tint — the same three the flow rail and the
+   policy list use — so Allow-with-a-second-factor is amber here exactly where
+   it is amber there. */
+
+.bf__outs { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.bf__outrow {
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.bf__outrow:not(.is-on):hover { border-color: var(--border-strong); }
+.bf__outrow.is-on { border-color: var(--out-dot); box-shadow: inset 3px 0 0 0 var(--out-dot); }
+.bf__outrow.is-allow { --out-dot: var(--fb-positive-dot); --out-bg: var(--fb-positive-bg); --out-fg: var(--fb-positive-fg); }
+.bf__outrow.is-mfa { --out-dot: var(--fb-notice-dot); --out-bg: var(--fb-notice-bg); --out-fg: var(--fb-notice-fg); }
+.bf__outrow.is-deny { --out-dot: var(--fb-negative-dot); --out-bg: var(--fb-negative-bg); --out-fg: var(--fb-negative-fg); }
+
+.bf__outpick {
+  display: flex; align-items: center; gap: var(--space-4); width: 100%;
+  padding: var(--space-4) var(--space-5);
+  background: none; border: none; font-family: inherit; text-align: left; cursor: pointer;
+  color: var(--text-muted);
+}
+.bf__outrow.is-on .bf__outpick { background: var(--out-bg); color: var(--out-fg); }
+.bf__outpick > svg { flex: none; }
+
+/* The radio's dot, drawn rather than native — a native input cannot carry the
+   decision tint, and the tint is the thing that agrees with the other two
+   surfaces. */
+.bf__outdot {
+  flex: none; display: grid; place-items: center;
+  width: 16px; height: 16px; border-radius: var(--radius-full);
+  border: 1.5px solid var(--border-strong); background: var(--surface-raised);
+}
+.bf__outrow.is-on .bf__outdot { border-color: var(--out-dot); }
+.bf__outrow.is-on .bf__outdot::after {
+  content: ''; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--out-dot);
 }
 
-.bf__factors { overflow: hidden; margin-top: var(--space-5); }
+.bf__outname { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.bf__outname strong { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bf__outrow.is-on .bf__outname strong { color: inherit; }
+.bf__outname em { font-style: normal; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bf__outrow.is-on .bf__outname em { color: inherit; opacity: 0.85; }
+
+/* The option's consequence, inside the option. Indented past the dot so it is
+   plainly owned by the row above it rather than floating between the two. */
+.bf__factors { overflow: hidden; }
+.bf__outbody {
+  margin: 0;
+  padding: var(--space-5) var(--space-5) var(--space-5) calc(var(--space-5) + 16px + var(--space-4));
+  border-top: 1px solid var(--border-subtle);
+}
+.bf__denynote { font-size: var(--fs-md); color: var(--text-secondary); }
+
+.bf__outnote {
+  margin: var(--space-5) 0 0;
+  font-size: var(--fs-sm); color: var(--text-muted);
+}
+/* Sentence left, control right — the row grammar the rest of this console's
+   settings already use. It was three columns: a label naming the form field, a
+   control, and a sentence beside the control explaining it. The field name was
+   the column carrying nothing. */
 .bf__prop {
-  display: grid; grid-template-columns: 116px minmax(0, 1fr); align-items: center; gap: var(--space-5);
+  display: flex; align-items: center; gap: var(--space-5);
   padding: var(--space-3) 0;
+  border-top: 1px solid var(--border-subtle);
 }
-.bf__prop.is-sub { padding-left: var(--space-6); }
-.bf__prop.is-sub .bf__proplabel { color: var(--text-muted); }
-.bf__proplabel { font-size: var(--fs-sm); color: var(--text-tertiary); }
-.bf__propctl { min-width: 0; display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
+.bf__prop:first-child { border-top: none; }
+/* A row that exists only because of the one above it. */
+.bf__prop.is-sub { padding-left: var(--space-7); }
+.bf__proplabel {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 1px;
+  font-size: var(--fs-md); color: var(--text-body);
+}
+.bf__prop.is-sub .bf__proplabel { font-size: var(--fs-sm); color: var(--text-secondary); }
+/* The only place a second line survives: a switch cannot say what OFF means. */
+.bf__proplabel em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+.bf__propctl { flex: none; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4); flex-wrap: wrap; }
+/* The wide controls still want the room; only the switches sit at the edge. */
+.bf__propctl:has(> .bx-picker),
+.bf__propctl:has(> .bf__chain),
+.bf__propctl:has(> .bf__val--chips) { flex: 1; }
+.bf__propctl > .bx-picker,
+.bf__propctl > .bf__chain,
+.bf__propctl > .bf__val--chips { flex: 1; min-width: 0; }
 
 .bf__seg { display: flex; gap: 2px; padding: 2px; background: var(--surface-inset); border-radius: var(--radius-md); }
 .bf__seg button { padding: 4px 12px; border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer; }
@@ -864,6 +941,38 @@
   background: var(--fb-negative-bg); color: var(--fb-negative-fg); font-size: var(--fs-md);
 }
 .bf__factorwarn.is-warn { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+
+/* --- The two halves, one at a time ----------------------------------------------
+
+   WHEN and THEN were stacked in the only scroller on the screen. Measured, a
+   rule with two alternatives of three conditions each ran 1499px in a 699px
+   stage — so changing what a rule DOES meant scrolling past everything it
+   matches on. They are not read together; each pane's readback says what the
+   other one is. */
+
+.bf .bf__panes { display: flex; width: 100%; margin-bottom: var(--space-5); }
+.bf .bf__panes .bx-tabs__tab { flex: 1; min-width: 0; padding: var(--space-3) var(--space-5); }
+.bf .bf__panes .bx-tabs__label { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-md); }
+/* What the half you are NOT looking at currently says — and only that half.
+   Without it the switch is two words and you have to open the other side to
+   find out whether it is set; on the open side it restates the pane below it. */
+.bf .bf__panes .bx-tabs__sub { display: none; }
+.bf .bf__panes .bx-tabs__tab:not(.is-on) .bx-tabs__sub {
+  position: relative; z-index: 1;
+  display: block; margin-top: 1px; padding-left: 20px;
+  font-size: var(--fs-xs); color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bf .bf__panes .bx-tabs__sub .bx-dchip { vertical-align: -1px; }
+/* Not colour alone: the selected half is also the heavier one, which survives
+   forced-colors where the panel behind it does not. */
+.bf .bf__panes .bx-tabs__tab.is-on .bx-tabs__label { font-weight: var(--fw-semibold); }
+@media (forced-colors: active) {
+  .bf .bf__panes .bx-tabs__bg { forced-color-adjust: none; outline: 1px solid ButtonText; }
+}
+
+.bf__pane { min-width: 0; }
+.bf__pane:focus-visible { outline: none; }
 
 /* --- Checks ---------------------------------------------------------------------- */
 
@@ -1286,44 +1395,13 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
 .bf__rulebody { overflow: hidden; }
 .bf__ruleinner { padding: 0 var(--space-5) var(--space-5); }
 
-/* When and Then, stacked — and stacked on purpose.
+/* `.bf__rulegrid` is gone.
 
-   They were side by side above 1500px, and it did not work. The two halves have
-   nothing in common dimensionally: WHEN grows without limit as cards are added,
-   THEN is a fixed row of three tiles and a handful of controls, so one column
-   was always a ragged column of dead space beside the other. Worse, it broke
-   the only thing the pair is: a sentence. `if … then …` is a sequence, and
-   Figma's own conditional — the grammar this was asked to follow — stacks the
-   condition above the actions it guards for exactly that reason.
-
-   So: one column, always, with a gutter that draws the two halves as two
-   clauses of one statement. A rule reads top to bottom, the way it runs. */
-.bf__rulegrid { display: flex; flex-direction: column; }
-
-.bf__rulegrid > .bf__sec { position: relative; padding-left: 58px; }
-/* The clause marker, in the gutter rather than in the heading — the heading
-   says what the half is for, this says which half of the sentence it is. */
-.bf__rulegrid > .bf__sec::before {
-  content: 'WHEN';
-  position: absolute; left: 0; top: 3px;
-  width: 44px; text-align: right;
-  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-.bf__rulegrid > #sec-then::before { content: 'THEN'; }
-/* The line that makes them one statement rather than two sections. It stops
-   short of the last clause, because nothing follows THEN. */
-.bf__rulegrid > .bf__sec:not(:last-child)::after {
-  content: ''; position: absolute; left: 39px; top: 22px; bottom: -6px;
-  width: 1px; background: var(--border-subtle);
-}
-.bf__rulegrid > #sec-then { padding-top: var(--space-6); }
-
-@media (max-width: 700px) {
-  .bf__rulegrid > .bf__sec { padding-left: 0; }
-  .bf__rulegrid > .bf__sec::before { position: static; display: block; width: auto; text-align: left; margin-bottom: 2px; }
-  .bf__rulegrid > .bf__sec::after { display: none; }
-}
+   It stacked WHEN above THEN in one column with a gutter drawing them as two
+   clauses of one statement, which was right about the grammar and wrong about
+   the room: the sentence it drew was 1499px long in a 699px scroller. The two
+   halves are a switch now, and each pane reads its own half back at the top —
+   the clause marker's job, done by the thing it was labelling. */
 
 .bf__rulechecks {
   margin-top: var(--space-5);

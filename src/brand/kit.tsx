@@ -459,35 +459,95 @@ export function Chip({
   )
 }
 
+/* A tablist that is actually one.
+
+   This had `role="tablist"` and `aria-selected` and nothing else — no
+   tabIndex, no key handler, no ids, no `aria-controls`, and no panel anywhere
+   in the app carrying `role="tabpanel"`. Every tab was a tab stop where the
+   pattern allows exactly one, and the arrow keys did nothing. It had zero call
+   sites, so none of that had ever been noticed.
+
+   Now: roving tabindex, Arrow/Home/End moving selection and focus together, and
+   `aria-controls` pointing at a panel the caller labels back with `panelId`.
+
+   `sub` is a second line under the label — what the tab's own half currently
+   says, so the half you are not looking at still reports itself. */
 export function Tabs<T extends string>({
   value,
   options,
   onChange,
   name,
+  panelId,
+  className,
 }: {
   value: T
-  options: { value: T; label: string; count?: number }[]
+  options: { value: T; label: string; count?: number; sub?: ReactNode; icon?: LucideIcon }[]
   onChange: (v: T) => void
   name: string
+  /** The `id` of the element this tablist controls, if there is one. */
+  panelId?: string
+  className?: string
 }) {
+  const uid = useId()
+  const tabId = (v: T) => `${uid}-${v}`
+  const refs = useRef<Record<string, HTMLButtonElement | null>>({})
+
+  const step = (dir: 1 | -1 | 'first' | 'last') => {
+    const i = options.findIndex((o) => o.value === value)
+    const next =
+      dir === 'first' ? 0 : dir === 'last' ? options.length - 1 : (i + dir + options.length) % options.length
+    const target = options[next]
+    if (!target) return
+    onChange(target.value)
+    /* Selection and focus move together — the automatic-activation flavour of
+       the pattern, which is right here because switching panes is free. */
+    refs.current[target.value]?.focus()
+  }
+
   return (
-    <div className="bx-tabs" role="tablist" aria-label={name}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          role="tab"
-          type="button"
-          aria-selected={value === o.value}
-          className={`bx-tabs__tab ${value === o.value ? 'is-on' : ''}`}
-          onClick={() => onChange(o.value)}
-        >
-          {value === o.value && <motion.span layoutId={`tabs-${name}`} className="bx-tabs__bg" transition={{ type: 'spring', stiffness: 600, damping: 44 }} />}
-          <span className="bx-tabs__label">
-            {o.label}
-            {o.count !== undefined && <em>{o.count}</em>}
-          </span>
-        </button>
-      ))}
+    <div className={`bx-tabs ${className ?? ''}`} role="tablist" aria-label={name}>
+      {options.map((o) => {
+        const on = value === o.value
+        const Ico = o.icon
+        return (
+          <button
+            key={o.value}
+            ref={(el) => {
+              refs.current[o.value] = el
+            }}
+            id={tabId(o.value)}
+            role="tab"
+            type="button"
+            aria-selected={on}
+            aria-controls={panelId}
+            tabIndex={on ? 0 : -1}
+            className={`bx-tabs__tab ${on ? 'is-on' : ''}`}
+            onClick={() => onChange(o.value)}
+            onKeyDown={(e) => {
+              const map = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 } as const
+              const d = map[e.key as keyof typeof map]
+              if (d) {
+                e.preventDefault()
+                step(d)
+              } else if (e.key === 'Home') {
+                e.preventDefault()
+                step('first')
+              } else if (e.key === 'End') {
+                e.preventDefault()
+                step('last')
+              }
+            }}
+          >
+            {on && <motion.span layoutId={`tabs-${name}`} className="bx-tabs__bg" transition={{ type: 'spring', stiffness: 600, damping: 44 }} />}
+            <span className="bx-tabs__label">
+              {Ico && <Ico size={13} strokeWidth={1.9} aria-hidden />}
+              {o.label}
+              {o.count !== undefined && <em>{o.count}</em>}
+            </span>
+            {o.sub && <span className="bx-tabs__sub">{o.sub}</span>}
+          </button>
+        )
+      })}
     </div>
   )
 }

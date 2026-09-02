@@ -1,16 +1,19 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   AlertTriangle,
   ArrowLeft,
+  ArrowRight,
   BookOpen,
   ChevronDown,
   ClipboardCheck,
   Copy,
   CopyPlus,
   FileDown,
+  Filter,
   Info,
   Home,
+  MessageSquare,
   MoreHorizontal,
   PanelLeftOpen,
   Plus,
@@ -22,7 +25,7 @@ import {
   XCircle,
 } from 'lucide-react'
 
-import { Button, DecisionChip, IconButton, MenuButton, Tip, Toggle, type MenuItem } from '../kit'
+import { Button, DecisionChip, IconButton, MenuButton, Tabs, Tip, Toggle, type MenuItem } from '../kit'
 import { blankRule, fallbackRule, type Audience, type Policy, type Rule } from '../data'
 import { useBrand, useNameLookup } from '../store'
 import { AudienceDrawer } from './audience-drawer'
@@ -786,6 +789,46 @@ function TerminalCard({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule
   )
 }
 
+/** Which half of a rule the card is showing. */
+type Pane = 'when' | 'then'
+
+/* The rationale, closed until it is wanted.
+
+   Open, it is 68px at the top of every rule — above the pane switch, above the
+   work — for a field most rules never fill in. Closed it is one line that
+   still shows what was written, so a rule that HAS a rationale never hides it;
+   only the empty invitation folds away. */
+function RuleWhy({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLTextAreaElement | null>(null)
+
+  useEffect(() => {
+    if (open) box.current?.focus()
+  }, [open])
+
+  if (!open) {
+    return (
+      <button type="button" className={`bf__whyshut ${value ? 'has-text' : ''}`} onClick={() => setOpen(true)}>
+        <MessageSquare size={12} strokeWidth={1.9} aria-hidden />
+        {value || 'Why does this rule exist?'}
+      </button>
+    )
+  }
+
+  return (
+    <textarea
+      ref={box}
+      className="bf__rulewhy"
+      aria-label="Why this rule exists"
+      rows={2}
+      placeholder="Why does this rule exist? The next person will read this before changing it."
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={() => setOpen(false)}
+    />
+  )
+}
+
 /* -----------------------------------------------------------------------------
    One rule, one card.
 
@@ -821,9 +864,13 @@ function RuleCard({
   onJump: (i: number) => void
 }) {
   const reduce = useReducedMotion()
-  const resolve = useNameLookup()
   const el = useRef<HTMLLIElement | null>(null)
   const st = ruleState(diagnostics)
+  const paneId = useId()
+  /* Per rule, and it resets when you move to another one: which half you were
+     editing on rule 2 is not a claim about rule 5. `key` on the card does the
+     reset, because the card is already remounted per rule. */
+  const [pane, setPane] = useState<Pane>('when')
 
   /* Open a rule from the flow rail, the command palette or a diagnostic's "open
      rule N" and the card expands wherever it happens to be — which, with five
@@ -918,23 +965,55 @@ function RuleCard({
             transition={{ duration: reduce ? 0 : 0.22, ease: [0.2, 0, 0, 1] }}
           >
             <div className="bf__ruleinner">
-              {/* Borderless until focused, so an empty one is an invitation and
-                  a filled one reads as a caption rather than as a form field. */}
-              <textarea
-                className="bf__rulewhy"
-                aria-label="Why this rule exists"
-                rows={1}
-                placeholder="Why does this rule exist? The next person will read this before changing it."
-                value={rule.description ?? ''}
-                onChange={(e) => onPatch({ description: e.target.value })}
+              {/* The rationale, collapsed to its first line.
+
+                  It is rule-level, so it sits above the pane switch rather than
+                  inside either half — but as an always-open textarea it cost 68
+                  vertical pixels of every screen, at the top, above the work,
+                  on a field most rules never fill in. Closed it is a line; open
+                  it is the same textarea it always was. */}
+              <RuleWhy value={rule.description ?? ''} onChange={(v) => onPatch({ description: v })} />
+
+              {/* WHEN and THEN, one at a time.
+
+                  They were stacked in the only scroller on the screen, and they
+                  are not read together: measured, a rule with two alternatives
+                  of three conditions ran 1499px in a 699px stage, so changing
+                  the outcome of a rule meant scrolling past every condition to
+                  reach it. Nothing about a policy asks you to hold both halves
+                  in view — the readback at the top of each says what the other
+                  one is. */}
+              <Tabs
+                className="bf__panes"
+                name={`Rule ${index + 1} — which half to edit`}
+                panelId={paneId}
+                value={pane}
+                onChange={setPane}
+                options={[
+                  {
+                    value: 'when' as Pane,
+                    label: 'When it applies',
+                    icon: Filter,
+                    sub: predicateSummary(rule.when),
+                  },
+                  {
+                    value: 'then' as Pane,
+                    label: 'What happens',
+                    icon: ArrowRight,
+                    sub: <DecisionChip decision={rule.decision} size="sm" />,
+                  },
+                ]}
               />
 
-              {/* When and Then, together. Side by side once there is room —
-                  which is the honest version of what "All together" was a
-                  toggle for. */}
-              <div className="bf__rulegrid">
-                <WhenSection rule={rule} onPatch={onPatch} chrome />
-                <ThenSection rule={rule} onPatch={onPatch} bare />
+              <div id={paneId} role="tabpanel" tabIndex={-1} className="bf__pane" aria-label={pane === 'when' ? 'When it applies' : 'What happens'}>
+                {/* `chrome`/`bare` are off: the tab above already names the
+                    half, and a pane whose first line repeats its own tab is a
+                    heading for an audience of nobody. */}
+                {pane === 'when' ? (
+                  <WhenSection rule={rule} onPatch={onPatch} />
+                ) : (
+                  <ThenSection rule={rule} onPatch={onPatch} bare />
+                )}
               </div>
 
               {features.checkStep && diagnostics.length > 0 && (
@@ -961,10 +1040,6 @@ function RuleCard({
                 </div>
               )}
 
-              <p className="bf__ruleprose">
-                <span className="u-label">In words</span>
-                {ruleSentence(rule, resolve).then}
-              </p>
             </div>
           </motion.div>
         )}

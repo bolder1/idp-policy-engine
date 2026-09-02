@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from 'motion/react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
@@ -251,7 +250,7 @@ export function Section({
       {/* Hosted by the trail. The trail's chip is an abbreviation — "When" — so
           the panel still says the whole thing once, with the demoted sentence
           on the dot beside it. */}
-      {bare && (
+      {bare && title && (
         <div className="bf__secbar">
           <h2>
             {title}
@@ -1233,72 +1232,97 @@ export function ThenSection({
   if (rule.decision !== 'deny') lastAllow.current = rule.decision
 
   return (
-    <Section
-      id="then"
-      n={n}
-      bare={bare}
-      title="What happens"
-      hint="The decision, and the authentication it asks for. Evaluation stops here — nothing below this rule runs for anyone it matched."
-    >
+    <Section id="then" n={n} bare={bare}>
       <>
-        <div className="bf__outs">
-          {OUTCOMES.map((o) => {
-            const Ico = o.icon
+        {/* Two options, and each one owns its consequence.
+
+            They were two tiles side by side with the Allow configuration in a
+            flat list underneath, so nothing said the rows below belonged to the
+            left tile and not the right one — and Deny, which has no
+            configuration at all, got a tinted paragraph that looked like the
+            same kind of thing. Allow's settings are indented under Allow now,
+            Deny's one sentence sits where Allow's settings would be, and the
+            shape says what is true: Deny is Deny.
+
+            A radiogroup, not a pair of `aria-pressed` buttons — it is exactly
+            one choice out of two, and the role brings the roving tabindex and
+            the arrow keys the pair never had. */}
+        <div className="bf__outs" role="radiogroup" aria-label="What happens when this rule matches">
+          {OUTCOMES.map((o, i) => {
             const on = o.id === 'deny' ? rule.decision === 'deny' : allows(rule.decision)
-            /* Allow keeps the tint of the flavour it is actually on, so the
-               tile agrees with the rule's number in the flow rail and with its
-               chip in the list. */
+            const Ico = o.icon
+            /* Allow keeps the tint of the flavour it is actually on, so this row
+               agrees with the rule's number in the flow rail and with its chip
+               in the policy list. A radio dot has one colour; the spine down the
+               left of the row carries the other two. */
             const tone = o.id === 'deny' ? 'deny' : DEC_KEY[allows(rule.decision) ? rule.decision : '1fa']
             return (
-              <button
-                key={o.id}
-                type="button"
-                className={`bf__out is-${tone} ${on ? 'is-on' : ''}`}
-                aria-pressed={on}
-                onClick={() => onPatch({ decision: o.id === 'deny' ? 'deny' : (lastAllow.current ?? '1fa') })}
-              >
-                <Ico size={17} strokeWidth={1.9} aria-hidden />
-                <strong>{o.label}</strong>
-                <em>{o.sub}</em>
-              </button>
-            )
-          })}
-        </div>
-
-        <AnimatePresence initial={false}>
-          {rule.decision === 'deny' ? (
-            <motion.p key="deny" className="bf__denynote" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              Blocked users see an access-denied page. No prompt, no alternate path. The ML engine may escalate other
-              decisions on behavioural signals, but a Deny here is final.
-            </motion.p>
-          ) : (
-            <motion.div
-              key="factors"
-              className="bf__factors"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
-            >
-              {/* The second factor, as a switch rather than as a tile.
-
-                  Above First factor because it is the larger decision: this
-                  changes what the rule DOES, where First factor only changes
-                  how the thing it already does is performed. */}
-              <Prop label="Second factor">
-                <label className="bf__switchrow">
-                  <Toggle
-                    checked={rule.decision === '2fa'}
-                    onChange={(v) => onPatch({ decision: v ? '2fa' : '1fa' })}
-                    label="Require a second factor"
-                    size="sm"
-                  />
-                  <span>
-                    {rule.decision === '2fa'
-                      ? 'A second factor is required before access'
-                      : 'The first factor alone is enough'}
+              <div key={o.id} className={`bf__outrow is-${tone} ${on ? 'is-on' : ''}`}>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  tabIndex={on ? 0 : -1}
+                  className="bf__outpick"
+                  onClick={() => onPatch(pickOutcome(o.id, lastAllow.current))}
+                  onKeyDown={(e) => {
+                    const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
+                    if (!d) return
+                    e.preventDefault()
+                    onPatch(pickOutcome(OUTCOMES[(i + d + OUTCOMES.length) % OUTCOMES.length].id, lastAllow.current))
+                  }}
+                >
+                  <span className="bf__outdot" aria-hidden />
+                  <Ico size={16} strokeWidth={1.9} aria-hidden />
+                  <span className="bf__outname">
+                    <strong>{o.label}</strong>
+                    <em>{o.sub}</em>
                   </span>
-                </label>
+                </button>
+
+                {on && o.id === 'deny' && (
+                  <p className="bf__outbody bf__denynote">
+                    No prompt and no alternate path. The ML engine may escalate other decisions on behavioural
+                    signals, but a Deny here is final.
+                  </p>
+                )}
+
+                {on && o.id !== 'deny' && (
+                  <div className="bf__outbody bf__factors">
+                    {/* Pinned above the settings, never inside a disclosure. An
+                        unsatisfiable rule is an error, and an error you have to
+                        open something to see is worse than the flat list this
+                        replaces. */}
+                    {rule.decision === '2fa' && rule.secondFactor === 'specific' && (rule.secondFactorMethods ?? []).length === 0 && (
+                      <p className="bf__factorwarn">
+                        <XCircle size={13} strokeWidth={2} aria-hidden />
+                        Nothing is selected, so there is no method any user could complete. This rule cannot be
+                        satisfied.
+                      </p>
+                    )}
+                    {rule.allowDisable2fa && rule.decision === '2fa' && (
+                      <p className="bf__factorwarn is-warn">
+                        <AlertTriangle size={13} strokeWidth={2} aria-hidden />
+                        This rule requires a second factor and also lets users turn theirs off. Anyone who does is no
+                        longer covered by it.
+                      </p>
+                    )}
+
+              {/* One text per row, and it is the sentence rather than the
+                  field name.
+
+                  Every row used to be three columns — a label naming a form
+                  field ("Second factor"), a control, and a sentence beside the
+                  control saying what the control does. The label was the part
+                  carrying no information: "End users" tells you nothing that
+                  "Let users turn their second factor off" does not. */}
+              <Prop label="Require a second factor" sub={rule.decision === '2fa' ? undefined : 'The first factor alone is enough'}>
+                <Toggle
+                  checked={rule.decision === '2fa'}
+                  onChange={(v) => onPatch({ decision: v ? '2fa' : '1fa' })}
+                  label="Require a second factor"
+                  size="sm"
+                />
               </Prop>
 
               <Prop label="First factor">
@@ -1312,7 +1336,7 @@ export function ThenSection({
               </Prop>
 
               {rule.firstFactor === 'Specific' && (
-                <Prop label="Method" sub>
+                <Prop label="Which first-factor method" indent>
                   <select aria-label="First-factor method" value={rule.firstFactorMethod ?? METHODS[0]} onChange={(e) => onPatch({ firstFactorMethod: e.target.value })}>
                     {METHODS.map((m) => (
                       <option key={m}>{m}</option>
@@ -1322,7 +1346,7 @@ export function ThenSection({
               )}
 
               {rule.decision === '2fa' && (
-                <Prop label="Which" sub>
+                <Prop label="Second-factor method" indent>
                   <Picker
                     label="Second factor method"
                     width="fill"
@@ -1339,7 +1363,7 @@ export function ThenSection({
               )}
 
               {rule.decision === '2fa' && rule.secondFactor === 'specific' && (
-                <Prop label="Allowed" sub>
+                <Prop label="Methods a user may complete" indent>
                   <div className="bf__val bf__val--chips" role="group" aria-label="Allowed second-factor methods">
                     {METHODS.map((m) => {
                       const on = (rule.secondFactorMethods ?? []).includes(m)
@@ -1362,15 +1386,8 @@ export function ThenSection({
                 </Prop>
               )}
 
-              {rule.decision === '2fa' && rule.secondFactor === 'specific' && (rule.secondFactorMethods ?? []).length === 0 && (
-                <p className="bf__factorwarn">
-                  <XCircle size={13} strokeWidth={2} aria-hidden />
-                  Nothing is selected, so there is no method any user could complete. This rule cannot be satisfied.
-                </p>
-              )}
-
               {rule.decision === '2fa' && rule.secondFactor === 'chain' && (
-                <Prop label="In order" sub>
+                <Prop label="Every step, in this order" indent>
                   <div className="bf__chain">
                     {chain.map((step, si) => (
                       <span className="bf__chainstep" key={si}>
@@ -1407,7 +1424,7 @@ export function ThenSection({
               )}
 
               {rule.decision === '2fa' && rule.secondFactor === 'preferred' && (
-                <Prop label="Fallback" sub>
+                <Prop label="If the user has set no preference" indent>
                   <select aria-label="Fallback method" value={rule.preferredFallback ?? METHODS[0]} onChange={(e) => onPatch({ preferredFallback: e.target.value })}>
                     {METHODS.map((m) => (
                       <option key={m}>{m}</option>
@@ -1417,17 +1434,19 @@ export function ThenSection({
               )}
 
               {rule.decision === '2fa' && (
-                <Prop label="Remember device">
-                  <label className="bf__switchrow">
-                    <Toggle checked={rule.rememberMfa} onChange={(v) => onPatch({ rememberMfa: v })} label="Remember this device" size="sm" />
-                    <span>Skip the second factor on a device that already passed</span>
-                  </label>
+                <Prop label="Skip the second factor on a device that already passed">
+                  <Toggle
+                    checked={rule.rememberMfa}
+                    onChange={(v) => onPatch({ rememberMfa: v })}
+                    label="Skip the second factor on a device that already passed"
+                    size="sm"
+                  />
                 </Prop>
               )}
 
               {rule.decision === '2fa' && rule.rememberMfa && (
                 <>
-                  <Prop label="For" sub>
+                  <Prop label="Trust that device for" indent>
                     <span className="bf__val bf__val--range">
                       <input
                         type="number"
@@ -1440,49 +1459,80 @@ export function ThenSection({
                       <em>days</em>
                     </span>
                   </Prop>
-                  <Prop label="Override" sub>
-                    <label className="bf__switchrow">
-                      <Toggle
-                        checked={rule.forceMfaEachLogin ?? false}
-                        onChange={(v) => onPatch({ forceMfaEachLogin: v })}
-                        label="Force MFA on every login"
-                        size="sm"
-                      />
-                      <span>Prompt every time anyway, remembered device or not</span>
-                    </label>
+                  <Prop label="Prompt every time anyway, remembered or not" indent>
+                    <Toggle
+                      checked={rule.forceMfaEachLogin ?? false}
+                      onChange={(v) => onPatch({ forceMfaEachLogin: v })}
+                      label="Prompt every time anyway, remembered or not"
+                      size="sm"
+                    />
                   </Prop>
                 </>
               )}
 
               {rule.decision === '2fa' && (
-                <Prop label="End users">
-                  <label className="bf__switchrow">
-                    <Toggle checked={rule.allowDisable2fa} onChange={(v) => onPatch({ allowDisable2fa: v })} label="Allow users to disable 2FA" size="sm" />
-                    <span>Let users switch their own second factor off</span>
-                  </label>
+                <Prop label="Let users switch their own second factor off">
+                  <Toggle
+                    checked={rule.allowDisable2fa}
+                    onChange={(v) => onPatch({ allowDisable2fa: v })}
+                    label="Let users switch their own second factor off"
+                    size="sm"
+                  />
                 </Prop>
               )}
 
-              {rule.allowDisable2fa && rule.decision === '2fa' && (
-                <p className="bf__factorwarn is-warn">
-                  <AlertTriangle size={13} strokeWidth={2} aria-hidden />
-                  This rule requires a second factor and also lets users turn theirs off. Anyone who does is no longer
-                  covered by it.
-                </p>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Stated, not tucked into a tooltip on a heading that no longer
+            exists. It is the one thing about the outcome that is not visible
+            in the controls: the rule STOPS here. */}
+        <p className="bf__outnote">Evaluation stops here — nothing below this rule runs for anyone it matched.</p>
       </>
     </Section>
   )
 }
 
-/** A Figma-style property row: label at a fixed measure, control beside it. */
-function Prop({ label, sub, children }: { label: string; sub?: boolean; children: React.ReactNode }) {
+/* Choosing an outcome NORMALISES the settings that belong to the other one.
+
+   `decision` used to be patched alone, so a rule that had been Allow with a
+   remembered device kept `rememberMfa: true` after switching to Deny — which
+   PE120 reports as "Authentication settings on a Deny rule", correctly, and
+   which Deny has no control anywhere to clear. The warning was unfixable from
+   the screen, and it stuck to the rule for good. */
+function pickOutcome(id: AccessDecision, lastAllow: AccessDecision): Partial<Rule> {
+  if (id !== 'deny') return { decision: lastAllow ?? '1fa' }
+  return { decision: 'deny', rememberMfa: false, allowDisable2fa: false, secondFactor: 'any' }
+}
+
+/* A settings row: what it does on the left, the control that does it on the
+   right, and nothing in between.
+
+   `sub` used to mean "indented and muted" and the label was a field name. The
+   label is the sentence now, so the flag is just `indent` — it says this row
+   only exists because of the one above it. `sub` as a second line is for the
+   one case where the OFF state needs saying, which a switch cannot say alone. */
+function Prop({
+  label,
+  sub,
+  indent,
+  children,
+}: {
+  label: string
+  sub?: string
+  indent?: boolean
+  children: React.ReactNode
+}) {
   return (
-    <div className={`bf__prop ${sub ? 'is-sub' : ''}`}>
-      <span className="bf__proplabel">{label}</span>
+    <div className={`bf__prop ${indent ? 'is-sub' : ''}`}>
+      <span className="bf__proplabel">
+        {label}
+        {sub && <em>{sub}</em>}
+      </span>
       <div className="bf__propctl">{children}</div>
     </div>
   )

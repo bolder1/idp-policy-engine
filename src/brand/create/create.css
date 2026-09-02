@@ -1149,11 +1149,28 @@ html[data-theme='dark'] .bguided__sheen {
 
 .baudp {
   flex: 1; min-height: 0;
-  display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto;
+  display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   background: var(--surface-raised);
   border: 1px solid var(--border-default); border-radius: var(--radius-md);
   overflow: hidden;
 }
+/* Everyone is a property of the whole choice, not a row in the groups tab —
+   it applies to both tabs and it clears both. Dimming the lists rather than
+   hiding them keeps what you would fall back to visible. */
+.baudp__all {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+}
+.baudp__all > span { display: flex; flex-direction: column; gap: 1px; }
+.baudp__all strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.baudp__all em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+
+.baudp.is-all .baudp__search,
+.baudp.is-all .baudp__tabs,
+.baudp.is-all .baudp__list { opacity: 0.42; pointer-events: none; }
+
 .baudp__search {
   display: flex; align-items: center; gap: var(--space-3);
   padding: 8px; padding-inline-start: 14px;

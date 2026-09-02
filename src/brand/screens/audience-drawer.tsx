@@ -373,7 +373,27 @@ export function AudiencePicker({
   const total = reach(audience, groups, users)
 
   return (
-    <div className="baudp">
+    <div className={`baudp ${audience.everyone ? 'is-all' : ''}`}>
+      {/* Everyone is not a group, so it is not a row in the groups tab.
+
+          It is a property of the whole choice — it applies to both tabs and it
+          clears both — so it sits above them as a switch, the way the drawer
+          already states it. As a checkbox in the list it read as one option
+          among five, and ticking it beside Finance would have meant "everyone
+          AND Finance", which reads narrower than it is. */}
+      <label className="baudp__all">
+        <Toggle
+          checked={audience.everyone}
+          onChange={(v) => onChange(v ? EVERYONE : { ...audience, everyone: false })}
+          label="Everyone in the directory"
+          size="sm"
+        />
+        <span>
+          <strong>Everyone in the directory</strong>
+          <em>Every person the IdP knows about, including anyone added later</em>
+        </span>
+      </label>
+
       <div className="baudp__search">
         <Search size={14} strokeWidth={1.9} aria-hidden />
         <input
@@ -381,6 +401,7 @@ export function AudiencePicker({
           placeholder={`Search ${groups.length} groups and ${users.length} people…`}
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          disabled={audience.everyone}
         />
       </div>
 
@@ -419,26 +440,6 @@ export function AudiencePicker({
       </div>
 
       <div className="baudp__list" role="group" aria-label="Who this policy applies to">
-        {/* Everyone is a flag, not a row among the groups — ticking it beside
-            Finance would build "everyone AND Finance", which reads narrower
-            than it is. So it sits above the list and clears it. */}
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={audience.everyone}
-          className={`baudp__row baudp__row--all ${audience.everyone ? 'is-on' : ''}`}
-          onClick={() => onChange(audience.everyone ? { ...audience, everyone: false } : EVERYONE)}
-        >
-          <span className="baudp__box" aria-hidden />
-          <span className="baudp__gicon" aria-hidden>
-            <Users size={13} strokeWidth={1.8} />
-          </span>
-          <span className="baudp__text">
-            <strong>Everyone in the directory</strong>
-            <em>Including anyone added later</em>
-          </span>
-        </button>
-
         {tab === 'groups' &&
           shownGroups.map((g) => (
           <button

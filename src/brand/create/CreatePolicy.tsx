@@ -4,7 +4,7 @@ import { ArrowDown, ArrowRight, Check, Plus, Search, Store, Upload, Wand2, X } f
 
 import { Button, DecisionChip } from '../kit'
 import { AppLogo } from '../logos/AppLogo'
-import { EVERYONE, blankPolicy, conditionType, scenarios, type Audience, type Scenario } from '../data'
+import { blankPolicy, conditionType, scenarios, type Audience, type Scenario } from '../data'
 import { useBrand } from '../store'
 import { leaves } from '../predicate'
 import { TemplateCard, TemplatePreview, type CardModel } from './TemplateCard'
@@ -48,9 +48,11 @@ export function CreatePolicy() {
   const [, setBlank] = useState(false)
   const [name, setName] = useState('')
   const [appIds, setAppIds] = useState<string[]>([])
-  /* Asked on the form now rather than defaulted in the builder. A policy that
-     arrives governing everyone is a policy somebody has to remember to narrow. */
-  const [audience, setAudience] = useState<Audience>(EVERYONE)
+  /* Asked on the form rather than defaulted in the builder, and it starts
+     empty rather than at "everyone". A policy that arrives governing the whole
+     directory is a policy somebody has to remember to narrow, and nobody
+     remembers to narrow something that already looks finished. */
+  const [audience, setAudience] = useState<Audience>({ everyone: false, groupIds: [], userIds: [] })
   const [market, setMarket] = useState(false)
   const templatesRef = useRef<HTMLDivElement>(null)
 
@@ -622,6 +624,10 @@ function NameStep({
 }) {
   const store = useBrand()
   const chosen = appIds[0] ?? null
+  /* A required field, like the name. It is one of the three facts that make a
+     policy a policy, and the two ways to get it wrong — govern nobody, or
+     govern everyone by accident — are both worse than being asked. */
+  const noAudience = !audience.everyone && audience.groupIds.length === 0 && audience.userIds.length === 0
 
   return (
     <section className={`bname2 ${picked ? 'has-preview' : ''}`}>
@@ -747,9 +753,11 @@ function NameStep({
         <p className="bbar__note">
           {!name.trim()
             ? 'Give the policy a name to continue.'
-            : chosen === null
-              ? 'Created switched off, with no app attached. You can add one from the builder.'
-              : 'Created switched off. Nothing changes for users until you turn it on.'}
+            : noAudience
+              ? 'Choose at least one group or person for this policy to govern.'
+              : chosen === null
+                ? 'Created switched off, with no app attached. You can add one from the builder.'
+                : 'Created switched off. Nothing changes for users until you turn it on.'}
         </p>
         <div className="bbar__acts">
           <Button variant="ghost" onClick={onBack}>
@@ -775,7 +783,7 @@ function NameStep({
           </button>
           )}
 
-          <Button variant="brand" onClick={onCreate} disabled={!name.trim()}>
+          <Button variant="brand" onClick={onCreate} disabled={!name.trim() || noAudience}>
             Create policy
           </Button>
         </div>

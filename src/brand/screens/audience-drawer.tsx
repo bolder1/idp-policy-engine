@@ -373,27 +373,20 @@ export function AudiencePicker({
   const total = reach(audience, groups, users)
 
   return (
-    <div className={`baudp ${audience.everyone ? 'is-all' : ''}`}>
-      {/* Everyone is not a group, so it is not a row in the groups tab.
+    <div className="baudp">
+      {/* No "everyone" switch here.
 
-          It is a property of the whole choice — it applies to both tabs and it
-          clears both — so it sits above them as a switch, the way the drawer
-          already states it. As a checkbox in the list it read as one option
-          among five, and ticking it beside Finance would have meant "everyone
-          AND Finance", which reads narrower than it is. */}
-      <label className="baudp__all">
-        <Toggle
-          checked={audience.everyone}
-          onChange={(v) => onChange(v ? EVERYONE : { ...audience, everyone: false })}
-          label="Everyone in the directory"
-          size="sm"
-        />
-        <span>
-          <strong>Everyone in the directory</strong>
-          <em>Every person the IdP knows about, including anyone added later</em>
-        </span>
-      </label>
+          The create form asks who a policy governs, and the honest answer to
+          that question is a list of groups and people — the shipping product
+          binds an application to a user group and nothing else. A switch that
+          silently selected the whole directory sat above the list looking like
+          a shortcut and behaved like a default, which is how every policy
+          arrived governing everyone in the first place.
 
+          `Audience.everyone` still exists on the model, and the builder's own
+          drawer still offers it, because widening a policy to the whole
+          directory later is a deliberate act somebody should be able to
+          perform. It is just not something a form should offer by default. */}
       <div className="baudp__search">
         <Search size={14} strokeWidth={1.9} aria-hidden />
         <input
@@ -401,7 +394,6 @@ export function AudiencePicker({
           placeholder={`Search ${groups.length} groups and ${users.length} people…`}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          disabled={audience.everyone}
         />
       </div>
 
@@ -448,7 +440,6 @@ export function AudiencePicker({
             role="checkbox"
             aria-checked={audience.groupIds.includes(g.id)}
             className={`baudp__row ${audience.groupIds.includes(g.id) ? 'is-on' : ''}`}
-            disabled={audience.everyone}
             onClick={() => toggleGroup(g.id)}
           >
             <span className="baudp__box" aria-hidden />
@@ -473,7 +464,6 @@ export function AudiencePicker({
               role="checkbox"
               aria-checked={audience.userIds.includes(u.id)}
               className={`baudp__row ${audience.userIds.includes(u.id) ? 'is-on' : ''}`}
-              disabled={audience.everyone}
               onClick={() => toggleUser(u.id)}
             >
               <span className="baudp__box" aria-hidden />
@@ -515,10 +505,8 @@ export function AudiencePicker({
       </div>
 
       <p className="baudp__foot">
-        {audience.everyone ? (
-          <>Everyone — about {total.toLocaleString()} people</>
-        ) : total === 0 ? (
-          <b>Nobody selected — this policy would not apply to anyone</b>
+        {total === 0 ? (
+          <b>Choose at least one group or person</b>
         ) : (
           <>
             About {total.toLocaleString()} people

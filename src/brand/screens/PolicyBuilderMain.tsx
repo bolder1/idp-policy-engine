@@ -3,7 +3,6 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   AlertTriangle,
   ArrowLeft,
-  ArrowRight,
   BookOpen,
   ChevronDown,
   ClipboardCheck,
@@ -14,17 +13,15 @@ import {
   ListOrdered,
   MoreHorizontal,
   Plus,
-  Redo2,
   ScrollText,
   Sparkles,
   Trash2,
   GraduationCap,
-  Undo2,
   Wand2,
   XCircle,
 } from 'lucide-react'
 
-import { Button, DecisionChip, IconButton, MenuButton, Toggle, type MenuItem } from '../kit'
+import { Button, DecisionChip, IconButton, MenuButton, Tip, Toggle, type MenuItem } from '../kit'
 import { blankRule, type Audience, type Policy, type Rule } from '../data'
 import { useBrand, useNameLookup } from '../store'
 import { AudienceDrawer } from './audience-drawer'
@@ -396,16 +393,40 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
           {tools.map((t) => (
             <IconButton key={t.id} icon={t.icon} label={t.label} size="sm" tone="ghost" onClick={() => onAction(t.id)} />
           ))}
-          <span className="bf__sep" aria-hidden />
-          <IconButton icon={Undo2} label="Undo" size="sm" tone="ghost" disabled={!canUndo(hist)} onClick={() => setHist(undo)} />
-          <IconButton icon={Redo2} label="Redo" size="sm" tone="ghost" disabled={!canRedo(hist)} onClick={() => setHist(redo)} />
+          {/* No undo/redo buttons. They were disabled on arrival and stayed
+              that way through most of a session — two greyed arrows reporting
+              that nothing had happened yet — and the two things they do are
+              already reachable: ⌘Z / ⇧⌘Z stay bound, and the save bar names the
+              change and offers Discard, which is the undo anybody looking for
+              one is actually after. */}
           {/* One primary per view. In the review stage the primary is the
               Publish button at the end of the checks, so this one stands down
               rather than competing with it. In lite there is no review stage to
               send anyone to; v0 commits from Review & Save in the Policy menu. */}
+          {/* Named, not counted. The save bar this replaces said what had
+              changed rather than "unsaved changes", and a Discard that will not
+              say what it discards is a button nobody presses. */}
+          {dirty && (
+            <Tip text={changes.length > 1 ? `${changes[0]}, and ${changes.length - 1} more` : changes[0]}>
+              <Button variant="ghost" onClick={() => setHist(historyOf(saved))}>
+                Discard
+              </Button>
+            </Tip>
+          )}
+          {/* The primary, and the only one on the screen. It used to be
+              `secondary` because a docked save bar held a competing primary at
+              the bottom; that bar is gone, so the one way forward looks like
+              one. */}
           {features.publish && stage !== 'review' && (
-            <Button variant="secondary" onClick={() => setStage('review')}>
+            <Button variant="primary" onClick={() => setStage('review')}>
               {blockers > 0 ? `${blockers} to fix` : 'Review & publish'}
+            </Button>
+          )}
+          {/* Lite has no publish gate. v0 commits from Review & Save, which is
+              a v0 requirement rather than one of ours. */}
+          {!features.publish && !empty && stage === 'rules' && (
+            <Button variant="primary" onClick={() => setDialog('review')}>
+              Review &amp; save
             </Button>
           )}
           </>
@@ -577,56 +598,13 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
               context nobody chose, which is the part that was actively
               misleading. */}
 
-          {/* --- One bar, docked. Unsaved changes and the way forward. ------- */}
-          {/* No rules, nothing to say about them — and no "Check & review" for
-              a policy with nothing to check. The bar returns with the first
-              rule, or earlier if there is something unsaved to report. */}
-          {(!empty || dirty) && (
-          <footer className={`bf__stepnav ${dirty ? 'is-dirty' : ''}`}>
-            <span className="bf__stepwhere">
-              {dirty ? (
-                <>
-                  <b>{changes[0]}</b>
-                  {changes.length > 1 && <i>and {changes.length - 1} more</i>}
-                </>
-              ) : stage === 'review' ? (
-                'Read it back, then ship it'
-              ) : (
-                `${rules.length} rule${rules.length === 1 ? '' : 's'} · evaluated top to bottom, first match wins`
-              )}
-            </span>
+          {/* The docked save bar is gone.
 
-            {dirty && (
-              <Button variant="ghost" onClick={() => setHist(historyOf(saved))}>
-                Discard
-              </Button>
-            )}
-
-            {!empty && (stage === 'rules' ? (
-              features.reviewStep ? (
-                <Button
-                  variant="primary"
-                  iconRight={ArrowRight}
-                  disabled={rules.length === 0}
-                  onClick={() => setStage('review')}
-                >
-                  {blockers > 0 ? `${blockers} to fix` : 'Check & review'}
-                </Button>
-              ) : (
-                /* Lite has no publish gate. v0 commits from Review & Save in
-                   the Policy menu, which is a v0 requirement rather than one of
-                   ours, so the menu keeps it and this stands down. */
-                <Button variant="secondary" onClick={() => setDialog('review')}>
-                  Review &amp; save
-                </Button>
-              )
-            ) : (
-              <Button variant="secondary" icon={ArrowLeft} onClick={() => setStage('rules')}>
-                Keep editing
-              </Button>
-            ))}
-          </footer>
-          )}
+              It was a second toolbar at the other end of the screen, carrying
+              a primary that competed with the one in the top bar and a running
+              commentary on the rules that the rules were already showing. What
+              it genuinely held — Discard, and the way forward — is up in the
+              bar, where the rest of the policy's controls already are. */}
         </main>
       </div>
 

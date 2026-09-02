@@ -24,16 +24,15 @@ import {
   Trash2,
   GraduationCap,
   Undo2,
-  Users,
   Wand2,
   XCircle,
 } from 'lucide-react'
 
-import { Button, Counter, DecisionChip, IconButton, MenuButton, Tip, Toggle, type MenuItem } from '../kit'
+import { Button, DecisionChip, IconButton, MenuButton, Tip, Toggle, type MenuItem } from '../kit'
 import { Picker } from '../picker'
-import { blankRule, reach, type Audience, type Policy, type Rule } from '../data'
+import { blankRule, type Audience, type Policy, type Rule } from '../data'
 import { useBrand, useNameLookup } from '../store'
-import { AudienceBar, AudienceDrawer } from './audience-drawer'
+import { AudienceDrawer } from './audience-drawer'
 import { predicateSummary, ruleSentence } from './predicate-prose'
 import { AssignAppsDialog, CopyRuleDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
 import { DecisionLogDialog, TestPolicyDialog } from './builder-test'
@@ -248,8 +247,6 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
     (d) => d.severity === 'error' && (d.scope === 'policy' || rules[d.ruleIndex]?.enabled !== false),
   ).length
 
-  const a = draft.audience
-  const emptyAudience = !a.everyone && a.groupIds.length === 0 && a.userIds.length === 0
 
   /* One walk, feeding both the docked tester's verdict and the highlight on the
      card that carried the match. It is the same evaluator every other surface
@@ -348,7 +345,6 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
       {/* --- Top bar. One primary, one group of tools, one group of actions. --- */}
       <header className="bf__bar">
         <IconButton icon={ArrowLeft} label="Back to policies" tone="ghost" onClick={() => store.go({ name: 'policies' })} />
-        <input className="bf__name" aria-label="Policy name" value={draft.name} onChange={(e) => patch({ name: e.target.value })} />
 
         <div className="bf__baracts">
           {/* The blast-radius pip only exists once there is a blast radius. It
@@ -447,54 +443,14 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
             </div>
           ) : (
             <div className="bf__stage" ref={stageEl} data-tour="stage">
-              {/* --- Step one: who. -----------------------------------------
+              {/* The audience card is gone from here.
 
-                  This was a caption on a strip between the top bar and the
-                  work, and it read as metadata — the kind of line you scan past
-                  on the way to the thing you came to do. It is not metadata. It
-                  is the first decision the policy makes and the widest claim it
-                  makes, and on a new policy it is the first thing that should
-                  be answered.
-
-                  So it is a step, in the stage, above the rules, with the same
-                  card treatment they have. The sequence a person reads down the
-                  page — who, then the rules, then check and review — is the
-                  order the work actually happens in. */}
-              <section className={`bf__who ${emptyAudience ? 'is-empty' : ''}`} data-tour="audience">
-                <span className="bf__stepn" aria-hidden>
-                  1
-                </span>
-                <div className="bf__whobody">
-                  <h2>Who this policy applies to</h2>
-                  {emptyAudience ? (
-                    <p className="bf__wholine is-empty">
-                      No groups and no people are selected, so none of these rules can ever run.
-                    </p>
-                  ) : (
-                    <p className="bf__wholine">
-                      <AudienceBar audience={draft.audience} groups={store.groups} users={store.users} max={6} />
-                      <span className="bf__whocount">
-                        <Counter value={reach(draft.audience, store.groups, store.users)} /> people
-                      </span>
-                    </p>
-                  )}
-                  <p className="bf__whonote">
-                    Every rule below inherits this. No rule can reach further than the policy does.
-                  </p>
-                </div>
-                <Button
-                  variant={emptyAudience ? 'primary' : 'secondary'}
-                  icon={Users}
-                  onClick={() => setAudienceOpen(true)}
-                >
-                  {draft.audience.everyone ? 'Narrow this' : 'Change'}
-                </Button>
-              </section>
-
+                  It was numbered 1 with the rules numbered 2, which framed the
+                  policy's own scope as the first step of writing rules. It is
+                  not a step — it is the frame they are written inside — so it
+                  lives in the policy bar above every builder now, with the name
+                  and the applications it belongs beside. */}
               <div className="bf__ruleshead">
-                <span className="bf__stepn" aria-hidden>
-                  2
-                </span>
                 <h2>Rules</h2>
                 <em>{rules.length === 0 ? 'None yet' : 'Evaluated top to bottom — the first one that matches decides'}</em>
                 {/* The way into the sequence, at every width. It carries the

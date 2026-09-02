@@ -4,7 +4,7 @@ import { ArrowLeft, Play, Plus, Redo2, Undo2, X } from 'lucide-react'
 
 import { Button, IconButton, MenuButton, type MenuItem } from '../kit'
 import { Picker } from '../picker'
-import { blankRule, reach, type AccessDecision, type Policy, type Rule } from '../data'
+import { blankRule, type AccessDecision, type Policy, type Rule } from '../data'
 import { useBrand, useNameLookup } from '../store'
 import { AudienceDrawer } from './audience-drawer'
 import { AssignAppsDialog, CopyRuleDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
@@ -15,7 +15,6 @@ import { canRedo, canUndo, commit, historyKey, historyOf, redo, undo, type Histo
 import { LedgerRow, TerminalRow } from './ledger-row'
 import { bulkPatch, moveRule, traceOf } from './ledger-model'
 import { LedgerSheet } from './ledger-sheet'
-import { audienceSentence } from './predicate-prose'
 import { ReviewStep } from './review-step'
 import { DEFAULT_PREVIEW, previewContext, type PreviewState } from './rule-form'
 import { DEVICE_OPTIONS, PLACES, RISKS, SIM_USERS, type SimEnv } from './simulate'
@@ -221,10 +220,15 @@ export function PolicyBuilderLedger({ policyId, open }: { policyId: string; open
         {live}
       </p>
 
+      {/* The masthead used to carry the name, the audience and the
+          applications. All three moved to the policy bar above every builder —
+          what is left here is the work: undo, the policy menu, and the way out
+          to review. */}
       <header className="bf3__masthead">
         <div className="bf3__mastrow">
-          <IconButton icon={ArrowLeft} label="Back to policies" tone="ghost" size="sm" onClick={() => store.go({ name: 'policies' })} />
-          <input className="bf3__name" aria-label="Policy name" value={draft.name} onChange={(e) => patch({ name: e.target.value })} />
+          <span className="bf3__semantics">
+            Rules are evaluated top to bottom. The first one that matches decides the sign-in.
+          </span>
           <div className="bf3__mastacts">
             <IconButton icon={Undo2} label="Undo" size="sm" tone="ghost" disabled={!canUndo(hist)} onClick={() => setHist(undo)} />
             <IconButton icon={Redo2} label="Redo" size="sm" tone="ghost" disabled={!canRedo(hist)} onClick={() => setHist(redo)} />
@@ -236,26 +240,6 @@ export function PolicyBuilderLedger({ policyId, open }: { policyId: string; open
             )}
           </div>
         </div>
-
-        <div className="bf3__mastrow bf3__mastrow--aud">
-          <span className="bf3__audline">
-            Governs{' '}
-            <button type="button" className="bf3__audedit" onClick={() => setAudienceOpen(true)}>
-              {audienceSentence(draft.audience, store.groups, store.users)}
-            </button>{' '}
-            across{' '}
-            <button type="button" className="bf3__audedit" onClick={() => setDialog('apps')}>
-              {draft.allApps ? 'all applications' : `${draft.appIds.length} application${draft.appIds.length === 1 ? '' : 's'}`}
-            </button>
-          </span>
-          <span className="bf3__audcount">{reach(draft.audience, store.groups, store.users).toLocaleString()} people</span>
-        </div>
-
-        {/* Said once, in prose, where the grid can be read against it — rather
-            than in a tooltip on a control nobody hovers. */}
-        <p className="bf3__semantics">
-          Rules are evaluated top to bottom. The first one that matches decides the sign-in.
-        </p>
       </header>
 
       {stage === 'review' ? (

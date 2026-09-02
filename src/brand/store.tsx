@@ -42,6 +42,12 @@ export type BrandScreen =
      gauntlet for that policy, instead of in a builder where you still have to
      find the button. */
   | { name: 'builder'; policyId: string; open?: 'gauntlet' | 'impact' }
+  /* The policy's own three facts — name, applications, audience — on one page.
+
+     They used to be scattered across a top-bar input, a dialog and a card at
+     the top of the rules list, which made the frame the rules are written
+     inside look like the first step of writing them. */
+  | { name: 'policy-details'; policyId: string }
   | { name: 'templates' }
   | { name: 'zones' }
   | { name: 'fingerprint' }

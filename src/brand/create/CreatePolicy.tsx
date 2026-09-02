@@ -545,7 +545,7 @@ function Card({ s, onUse, onPreview }: { s: Scenario; onUse: () => void; onPrevi
    was. Collapsing was never the part doing that work. The list fills whatever
    height the column has and scrolls inside itself, so the page still does not.
    -------------------------------------------------------------------------- */
-function AppList({ chosen, onChange }: { chosen: string | null; onChange: (id: string | null) => void }) {
+export function AppList({ chosen, onChange }: { chosen: string | null; onChange: (id: string | null) => void }) {
   const store = useBrand()
   const [q, setQ] = useState('')
   const matches = store.apps.filter((a) => !q || a.name.toLowerCase().includes(q.toLowerCase()))

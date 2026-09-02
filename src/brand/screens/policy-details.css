@@ -1,0 +1,7 @@
+/* The details page reuses the create form's layout wholesale — same three
+   fields, same two columns — because it IS that form over a policy that already
+   exists. Somebody who filled it in last week and comes back to widen the
+   audience should meet the screen they filled in. */
+
+.bpd .bname2__form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.bpd .bname2__form > .bname2__field:first-child { grid-column: 1 / -1; max-width: 520px; }

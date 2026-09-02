@@ -2,6 +2,7 @@ import { Suspense, lazy, useState } from 'react'
 
 import { useBrand } from '../store'
 
+import { PolicyBar } from './policy-bar'
 import { PolicyBuilderMain } from './PolicyBuilderMain'
 
 /* The alternatives load on demand — Main is the default and ships with the
@@ -54,6 +55,7 @@ const VERSIONS: { id: V; label: string; blurb: string }[] = [
 export function BuilderPage({ policyId, open }: { policyId: string; open?: 'gauntlet' | 'impact' }) {
   const store = useBrand()
   const [v, setV] = useState<V>('main')
+  const policy = store.policyById(policyId)
 
   return (
     <>
@@ -79,6 +81,11 @@ export function BuilderPage({ policyId, open }: { policyId: string; open?: 'gaun
           </div>
         </div>
       )}
+
+      {/* Rendered here rather than by each shell, which is what makes the
+          three builders agree about what the policy IS. They only disagree
+          about how its rules are edited. */}
+      {policy && <PolicyBar policy={policy} />}
 
       {v === 'main' ? (
         <PolicyBuilderMain policyId={policyId} open={open} />

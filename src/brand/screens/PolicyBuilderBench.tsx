@@ -33,9 +33,9 @@ import {
 
 import { Button, IconButton, MenuButton, Tip, Toggle, type MenuItem } from '../kit'
 import { Picker } from '../picker'
-import { blankRule, reach, type AccessDecision, type Audience, type Policy, type Rule } from '../data'
+import { blankRule, type AccessDecision, type Audience, type Policy, type Rule } from '../data'
 import { useBrand, useNameLookup } from '../store'
-import { AudienceBar, AudienceDrawer } from './audience-drawer'
+import { AudienceDrawer } from './audience-drawer'
 import { ruleSentence, type NameLookup } from './predicate-prose'
 import { AssignAppsDialog, CopyRuleDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
 import { DecisionLogDialog, TestPolicyDialog } from './builder-test'
@@ -261,8 +261,6 @@ export function PolicyBuilderBench({ policyId, open }: { policyId: string; open?
     (d) => d.severity === 'error' && (d.scope === 'policy' || rules[d.ruleIndex]?.enabled !== false),
   ).length
 
-  const a = draft.audience
-  const emptyAudience = !a.everyone && a.groupIds.length === 0 && a.userIds.length === 0
 
   /* One walk, feeding both the docked tester's verdict and the highlight on the
      card that carried the match. It is the same evaluator every other surface
@@ -362,7 +360,6 @@ export function PolicyBuilderBench({ policyId, open }: { policyId: string; open?
       {/* --- Top bar. One primary, one group of tools, one group of actions. --- */}
       <header className="bf__bar">
         <IconButton icon={ArrowLeft} label="Back to policies" tone="ghost" onClick={() => store.go({ name: 'policies' })} />
-        <input className="bf__name" aria-label="Policy name" value={draft.name} onChange={(e) => patch({ name: e.target.value })} />
 
         <div className="bf__baracts">
           {/* The blast-radius pip only exists once there is a blast radius. It
@@ -431,10 +428,6 @@ export function PolicyBuilderBench({ policyId, open }: { policyId: string; open?
             onHover={setHoverShadow}
             onClose={() => setFlowOpen(false)}
             onFallback={(fallback) => patch({ fallback })}
-            audience={<AudienceBar audience={draft.audience} groups={store.groups} users={store.users} max={3} />}
-            reach={reach(draft.audience, store.groups, store.users)}
-            emptyAudience={emptyAudience}
-            onAudience={() => setAudienceOpen(true)}
           />
         </div>
 

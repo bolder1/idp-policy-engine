@@ -1245,3 +1245,14 @@ html[data-theme='dark'] .bguided__sheen {
 }
 .baudp__foot b { color: var(--fb-negative-fg); font-weight: var(--fw-medium); }
 .baudp__foot em { font-style: normal; color: var(--text-muted); }
+
+
+/* Both template-card metadata rows are hidden for now, on request.
+
+   Between them they put eight chips above the card's own name — five signal
+   chips and three tags — so a card led with its taxonomy rather than with what
+   it does. The markup stays: the data is real and the categories drive the
+   filters. This is a question of how loud they are on a card, not whether they
+   should exist, so it is a display rule rather than a deletion. */
+.bgcard__signals,
+.bgcard__tags { display: none; }

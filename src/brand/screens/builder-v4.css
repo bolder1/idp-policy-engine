@@ -49,30 +49,12 @@
   border-radius: 0;
 }
 
-.bf__stepn {
-  flex: none; display: grid; place-items: center;
-  width: 18px; height: 18px; margin-top: 1px;
-  border: 1px solid var(--border-strong); border-radius: var(--radius-full);
-  font-size: 10px; font-weight: var(--fw-semibold); color: var(--text-tertiary);
-}
-
-/* --- A rule's own checks ------------------------------------------------------- */
-
-.bf__when { max-width: 900px; }
-
-.bf__rulecheck {
-  display: flex; align-items: flex-start; gap: var(--space-3);
-  margin: 0; font-size: var(--fs-sm); color: var(--text-secondary);
-}
-.bf__rulecheck svg { flex: none; margin-top: 2px; }
-.bf__rulecheck strong { font-weight: var(--fw-medium); color: var(--text-primary); }
-.bf__rulecheck.is-error svg { color: var(--fb-negative-fg); }
-.bf__rulecheck.is-warning svg { color: var(--fb-notice-fg); }
-.bf__rulecheck.is-info svg { color: var(--fb-info-fg); }
-.bf__rulecheck button {
-  flex: none; margin-left: auto; background: none; border: none;
-  font-family: inherit; font-size: var(--fs-sm); color: var(--brand); cursor: pointer; white-space: nowrap;
-}
+/* Three more shadowed rules stood here: an 18px `.bf__stepn`, a
+   `max-width: 900px` on `.bf__when`, and a first copy of `.bf__rulecheck`. All
+   three were overridden further down at equal specificity, so all three were
+   read by everyone and obeyed by nothing. The 900px in particular was the
+   measure somebody would have reached for to make the condition rows narrower,
+   and it has not applied for a long time. */
 
 /* --- Width tiers ----------------------------------------------------------------
 
@@ -250,8 +232,20 @@
 
 /* Drag alone is not an option in an admin console, and rule order IS the
    policy — so the same move is reachable from the keyboard. */
-.bf__nodemove { position: absolute; right: var(--space-3); top: var(--space-3); display: none; gap: 2px; }
-.bf__node:hover .bf__nodemove, .bf__node:focus-within .bf__nodemove { display: flex; }
+/* `opacity`, never `display: none`.
+
+   These two buttons are the keyboard's only way to move a rule — the comment
+   on them in flow-rail.tsx says exactly that, and it was false: `display: none`
+   makes a button unfocusable, so `:focus-within` could only ever be triggered
+   by a mouse that had already revealed them. Tab reached nothing. The pattern
+   here is the one `.bsf__drop` already uses in setting-field.css: quiet until
+   the row is under the pointer, always in the tab order, and visible the
+   instant either button takes focus. */
+.bf__nodemove { position: absolute; right: var(--space-3); top: var(--space-3); display: flex; gap: 2px; opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard); }
+.bf__node:hover .bf__nodemove,
+.bf__node:focus-within .bf__nodemove,
+.bf__nodemove button:focus-visible { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .bf__nodemove { transition: none; } }
 .bf__nodemove button {
   width: 18px; height: 18px; border-radius: var(--radius-sm);
   background: var(--surface-raised); border: 1px solid var(--border-default);
@@ -328,22 +322,6 @@
 .bf .bf__ruleName:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
 .bf__ruleon { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); }
 
-/* --- Step navigation ---------------------------------------------------------------- */
-
-.bf__stepnav {
-  flex: none; display: flex; align-items: center; gap: var(--space-4);
-  padding: var(--space-4) var(--space-7);
-  background: var(--surface-raised); border-top: 1px solid var(--border-subtle);
-  transition: background var(--dur-normal) var(--ease-standard), border-color var(--dur-normal) var(--ease-standard);
-}
-/* Unsaved is a state of the bar, not a second bar on top of it. */
-.bf__stepnav.is-dirty { background: var(--fb-notice-bg); border-top-color: var(--fb-notice-border); }
-.bf__stepwhere {
-  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--space-3); justify-content: center;
-  font-size: var(--fs-xs); color: var(--text-muted);
-}
-.bf__stepwhere b { font-weight: var(--fw-medium); color: var(--fb-notice-fg); font-size: var(--fs-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bf__stepwhere i { font-style: normal; color: var(--fb-notice-fg); opacity: 0.8; }
 /* The whole screen, when the policy has no rules.
 
    Everything else in the builder is gated off at this point — nothing to grade,
@@ -441,6 +419,7 @@
 .bf__cards { margin: 0; padding: 0; list-style: none; }
 
 .bf__card {
+  container: cond / inline-size;
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -521,24 +500,29 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   box-shadow: inset 3px 0 0 0 var(--cond-dot, var(--border-default));
-  container-type: inline-size;
 }
-/* Driven by the row's own width, not the viewport, so the v5 inspector, the
-   two-column rule grid and any future drawer all get the same behaviour without
+/* Driven by the CARD's width, not the viewport — so a rule in a narrow pane, a
+   drawer, or any future host gets the same behaviour without any of them
    knowing about each other.
+
+   The container was declared on `.bf__cond` itself for a long time, and an
+   element is not its own container: `container-type` makes a box a container
+   for its DESCENDANTS, so `@container { .bf__cond { … } }` could never match and
+   none of this ran. Every narrow-row layout below is new behaviour, not
+   restored behaviour.
 
    560 rather than something smaller because of what the value slot holds: a
    fixed-list condition renders every option as a chip, and four chips in a
    150px column is four stacked lines pretending to be one field. Below this the
    value takes a line of its own and the chips lay out across it. */
-@container (max-width: 560px) {
+@container cond (max-width: 560px) {
   .bf__cond {
     grid-template-columns: 22px minmax(0, 1fr) auto auto;
     row-gap: var(--space-3);
   }
   .bf__cond > .bf__val { grid-column: 2 / -1; }
 }
-@container (max-width: 360px) {
+@container cond (max-width: 360px) {
   .bf__cond { grid-template-columns: 22px minmax(0, 1fr) auto; }
   .bf__cond > .bx-picker { grid-column: 2 / -1; }
 }
@@ -795,128 +779,13 @@
 }
 .bf__dupehint svg { flex: none; margin-top: 2px; }
 
-/* --- The rules, as cards ------------------------------------------------------------
+/* The 122 lines that stood here are gone, not moved.
 
-   Replaces the five-step trail and the "All together" toggle in one move. A
-   rule is one card; open, every part of it is on screen at the same time, which
-   is what the toggle existed to ask for. */
-
-.bf__rules { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-4); }
-
-.bf__rule {
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  overflow: visible;
-  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
-}
-.bf__rule.is-open { border-color: var(--border-default); box-shadow: var(--el-low); }
-.bf__rule.is-off { opacity: 0.62; }
-
-.bf__rule .bf__rulehead {
-  display: flex; align-items: center; gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  max-width: none;
-}
-.bf__ruleopen {
-  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--space-4);
-  background: none; border: none; font-family: inherit; text-align: left; cursor: pointer;
-  padding: var(--space-2) 0;
-}
-.bf__ruleopen strong { font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); white-space: nowrap; }
-.bf__ruleopen em {
-  flex: 1; min-width: 0; font-style: normal; font-size: var(--fs-sm); color: var(--text-muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bf__ruleopen:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
-
-/* Dot AND label, always. Colour is never the only carrier of state here. */
-.bf__rulestate {
-  flex: none; display: inline-flex; align-items: center; gap: var(--space-2);
-  font-size: var(--fs-xs); color: var(--text-tertiary); white-space: nowrap;
-}
-.bf__rulestate i { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--fb-neutral-dot); }
-.bf__rulestate.is-ready i { background: var(--fb-positive-dot); }
-.bf__rulestate.is-warn i { background: var(--fb-notice-dot); }
-.bf__rulestate.is-setup i { background: var(--fb-negative-dot); }
-.bf__rulestate.is-setup { color: var(--fb-negative-fg); }
-
-.bf__ruletoggle {
-  flex: none; display: grid; place-items: center; width: 26px; height: 26px;
-  border: none; background: none; border-radius: var(--radius-sm);
-  color: var(--text-muted); cursor: pointer;
-  transition: transform var(--dur-fast) var(--ease-standard);
-}
-.bf__ruletoggle:hover { background: var(--surface-sunken); color: var(--text-primary); }
-.bf__rule.is-open .bf__ruletoggle { transform: rotate(180deg); }
-
-.bf__rulebody { overflow: hidden; }
-.bf__ruleinner { padding: 0 var(--space-5) var(--space-5); }
-
-/* When and Then, stacked — and stacked on purpose.
-
-   They were side by side above 1500px, and it did not work. The two halves have
-   nothing in common dimensionally: WHEN grows without limit as cards are added,
-   THEN is a fixed row of three tiles and a handful of controls, so one column
-   was always a ragged column of dead space beside the other. Worse, it broke
-   the only thing the pair is: a sentence. `if … then …` is a sequence, and
-   Figma's own conditional — the grammar this was asked to follow — stacks the
-   condition above the actions it guards for exactly that reason.
-
-   So: one column, always, with a gutter that draws the two halves as two
-   clauses of one statement. A rule reads top to bottom, the way it runs. */
-.bf__rulegrid { display: flex; flex-direction: column; }
-
-.bf__rulegrid > .bf__sec { position: relative; padding-left: 58px; }
-/* The clause marker, in the gutter rather than in the heading — the heading
-   says what the half is for, this says which half of the sentence it is. */
-.bf__rulegrid > .bf__sec::before {
-  content: 'WHEN';
-  position: absolute; left: 0; top: 3px;
-  width: 44px; text-align: right;
-  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-.bf__rulegrid > #sec-then::before { content: 'THEN'; }
-/* The line that makes them one statement rather than two sections. It stops
-   short of the last clause, because nothing follows THEN. */
-.bf__rulegrid > .bf__sec:not(:last-child)::after {
-  content: ''; position: absolute; left: 39px; top: 22px; bottom: -6px;
-  width: 1px; background: var(--border-subtle);
-}
-.bf__rulegrid > #sec-then { padding-top: var(--space-6); }
-
-@media (max-width: 700px) {
-  .bf__rulegrid > .bf__sec { padding-left: 0; }
-  .bf__rulegrid > .bf__sec::before { position: static; display: block; width: auto; text-align: left; margin-bottom: 2px; }
-  .bf__rulegrid > .bf__sec::after { display: none; }
-}
-
-.bf__rulechecks {
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-subtle);
-  display: flex; flex-direction: column; gap: var(--space-3);
-}
-.bf__rulecheck {
-  display: flex; align-items: flex-start; gap: var(--space-3);
-  margin: 0; font-size: var(--fs-sm); color: var(--text-secondary);
-}
-.bf__rulecheck svg { flex: none; margin-top: 2px; }
-.bf__rulecheck strong { font-weight: var(--fw-medium); color: var(--text-primary); }
-.bf__rulecheck.is-error svg { color: var(--fb-negative-fg); }
-.bf__rulecheck.is-warning svg { color: var(--fb-notice-fg); }
-.bf__rulecheck.is-info svg { color: var(--fb-info-fg); }
-.bf__rulecheck button {
-  flex: none; margin-left: auto; background: none; border: none;
-  font-family: inherit; font-size: var(--fs-sm); color: var(--brand); cursor: pointer; white-space: nowrap;
-}
-
-.bf__ruleprose {
-  display: flex; align-items: baseline; gap: var(--space-3);
-  margin: var(--space-5) 0 0;
-  font-size: var(--fs-sm); color: var(--text-tertiary);
-}
+   They were a byte-identical copy of the rule-card block further down this file
+   — `.bf__rule`, `.bf__rulehead`, `.bf__rulebody`, `.bf__rulegrid` with its
+   WHEN/THEN gutter, `.bf__rulechecks`, `.bf__ruleprose` — and being first, this
+   copy lost every one of them on source order. Editing it changed nothing,
+   which is the worst thing a stylesheet can do to somebody reading it. */
 /* --- The review stage ------------------------------------------------------------------ */
 
 .bf__reviewstage { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-7) var(--space-8); }
@@ -1329,18 +1198,7 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
   .bf__pips .bgt__pip em, .bf__pips .bia__pip b { display: none; }
   .bf__pips .bgt__pip, .bf__pips .bia__pip { white-space: nowrap; }
   .bf.is-main .bf__stage { padding: var(--space-5) var(--space-5) var(--space-7); }
-  .bf__stepnav { padding: var(--space-4) var(--space-5); }
   .bf__bar { padding: 0 var(--space-4); }
-}
-
-/* The rail's step pip. Deliberately unlike a rule's index: 20px and outlined
-   where a rule's is 26px and filled with its decision colour, because the two
-   orderings are about different things and must not be confusable. */
-.bf__stepn {
-  flex: none; display: grid; place-items: center;
-  width: 20px; height: 20px; margin-top: 2px;
-  border: 1px solid var(--border-strong); border-radius: var(--radius-full);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary);
 }
 
 /* --- Audience chips ------------------------------------------------------------ */

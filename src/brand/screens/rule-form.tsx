@@ -1010,42 +1010,33 @@ function CatalogueButton({
   )
 }
 
-/** Five fully-valued inserts, so the fast path survives the two-click walk. */
-const COMMON: { id: string; label: string; typeId: string }[] = [
-  { id: 'offnet', label: 'Off the corporate network', typeId: 'zone' },
-  { id: 'unreg', label: 'Unregistered device', typeId: 'device-reg' },
-  { id: 'risk', label: 'High ML risk', typeId: 'ml-risk' },
-  { id: 'hours', label: 'Outside working hours', typeId: 'time' },
-  { id: 'contractor', label: 'Contractors', typeId: 'user-type' },
-]
+/* One flat list of attribute names, and nothing else.
 
+   It was a two-pane drill: a "Common" strip of five preset inserts, a left rail
+   of nine major components, and a right pane of types with a sentence of hint
+   under each. Three levels of furniture around a list of twenty-four names —
+   and the names were the only part anybody was looking for.
+
+   The components survive as STRUCTURE rather than as a second click: they order
+   the list and they tint each row, and the category name sits quietly on the
+   right for when a label alone is ambiguous. */
 function Catalogue({ onPick, onClose }: { onPick: (typeId: string) => void; onClose: () => void }) {
   const [q, setQ] = useState('')
-  const [group, setGroup] = useState<string>(CONDITION_GROUPS[0])
-  const el = useRef<HTMLDivElement | null>(null)
 
-  const inGroup = useMemo(
-    () => (g: string) => CONDITION_CATALOGUE.filter((c) => !METHOD_GROUPS.has(c.group) && c.group === g),
-    [],
-  )
-
-  const hits = useMemo(() => {
-    if (!q) return null
-    const n = q.toLowerCase()
-    return CONDITION_CATALOGUE.filter(
-      (c) =>
-        !METHOD_GROUPS.has(c.group) &&
-        (c.label.toLowerCase().includes(n) || c.hint.toLowerCase().includes(n) || c.id.includes(n)),
-    )
+  const items = useMemo(() => {
+    const rank = (g: string) => {
+      const i = (CONDITION_GROUPS as readonly string[]).indexOf(g)
+      return i === -1 ? CONDITION_GROUPS.length : i
+    }
+    const n = q.trim().toLowerCase()
+    return CONDITION_CATALOGUE.filter((c) => !METHOD_GROUPS.has(c.group))
+      .filter((c) => !n || c.label.toLowerCase().includes(n) || c.group.toLowerCase().includes(n) || c.id.includes(n))
+      .slice()
+      .sort((a, b) => rank(a.group) - rank(b.group))
   }, [q])
 
   return (
-    /* Slides rather than growing. It used to animate `height: 0 → auto`, which
-       is right for a panel that pushes content down and wrong for one that is
-       absolutely positioned over it — the animated inline height fights `top`
-       and `bottom` and the panel renders 2px tall. */
     <motion.div
-      ref={el}
       className="bf__cat"
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
@@ -1056,93 +1047,41 @@ function Catalogue({ onPick, onClose }: { onPick: (typeId: string) => void; onCl
         <Search size={14} strokeWidth={2} aria-hidden />
         <input
           autoFocus
-          aria-label="Search conditions"
-          placeholder="Search conditions…"
+          aria-label="Search attributes"
+          placeholder="Search attributes…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && onClose()}
         />
       </div>
 
-      {hits ? (
-        <div className="bf__catitems is-flat">
-          {hits.length === 0 ? (
-            <p className="bf__catempty">
-              No condition matches “{q}”.
-              <button type="button" onClick={() => setQ('')}>
-                Clear
+      <div className="bf__catitems">
+        {items.length === 0 ? (
+          <p className="bf__catempty">
+            Nothing matches “{q}”.
+            <button type="button" onClick={() => setQ('')}>
+              Clear
+            </button>
+          </p>
+        ) : (
+          items.map((c) => {
+            const Ico = GROUP_ICON[c.group] ?? ListFilter
+            return (
+              <button key={c.id} type="button" className="bf__catitem" onClick={() => onPick(c.id)}>
+                <span className={`bf__cationic is-${GROUP_TONE[c.group] ?? 'neutral'}`} aria-hidden>
+                  <Ico size={13} strokeWidth={1.8} />
+                </span>
+                <strong>{c.label}</strong>
+                <em>{GROUP_LABEL[c.group] ?? c.group}</em>
               </button>
-            </p>
-          ) : (
-            hits.map((c) => <CatalogueItem key={c.id} c={c} onPick={onPick} />)
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="bf__catcommon">
-            <span className="u-label">Common</span>
-            {COMMON.map((s) => (
-              <button key={s.id} type="button" onClick={() => onPick(s.typeId)}>
-                {s.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="bf__catsplit">
-            <ul className="bf__catgroups" role="tablist" aria-label="Condition categories">
-              {CONDITION_GROUPS.map((g) => {
-                const Ico = GROUP_ICON[g] ?? ListFilter
-                const n = inGroup(g).length
-                if (n === 0) return null
-                return (
-                  <li key={g}>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={group === g}
-                      className={group === g ? 'is-on' : ''}
-                      onClick={() => setGroup(g)}
-                      onMouseEnter={() => setGroup(g)}
-                    >
-                      <span className={`bf__cationic is-${GROUP_TONE[g] ?? 'neutral'}`} aria-hidden>
-                        <Ico size={13} strokeWidth={1.8} />
-                      </span>
-                      {GROUP_LABEL[g] ?? g}
-                      <em>{n}</em>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-
-            <div className="bf__catitems">
-              {inGroup(group).map((c) => (
-                <CatalogueItem key={c.id} c={c} onPick={onPick} />
-              ))}
-            </div>
-          </div>
-        </>
-      )}
+            )
+          })
+        )}
+      </div>
     </motion.div>
   )
 }
 
-const LIBRARY_KINDS = new Set(['zone', 'fingerprint', 'hook'])
-
-function CatalogueItem({ c, onPick }: { c: ConditionType; onPick: (typeId: string) => void }) {
-  return (
-    <button type="button" className="bf__catitem" onClick={() => onPick(c.id)}>
-      <span>
-        <strong>{c.label}</strong>
-        <em>{c.hint}</em>
-      </span>
-      {/* The statement that this is a major component whose contents live
-          elsewhere: you pick the condition here and the specific zone on the
-          row. */}
-      {LIBRARY_KINDS.has(c.valueKind) && <span className="bf__catlib">from your library</span>}
-    </button>
-  )
-}
 
 /* --- THEN: the outcome, and everything behind it -------------------------------- */
 

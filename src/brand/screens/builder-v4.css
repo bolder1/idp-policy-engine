@@ -243,30 +243,25 @@
   position: absolute; top: var(--verdict-h); right: 0; bottom: 0;
   z-index: var(--z-dropdown, 200);
   width: min(380px, 100%);
-  display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+  display: grid; grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   background: var(--surface-overlay, var(--surface-raised));
   border-left: 1px solid var(--border-default);
   border-radius: 0;
   box-shadow: var(--el-high, var(--el-mid));
 }
-.bf__catsplit { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
-.bf__catgroups {
-  display: flex; flex-wrap: wrap; gap: var(--space-2);
-  margin: 0; padding: var(--space-3) var(--space-5); list-style: none;
-  border-right: none; border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-sunken);
-}
-.bf__catgroups li { display: contents; }
-.bf__catgroups button {
-  display: inline-flex; align-items: center; gap: var(--space-2); width: auto;
-  padding: 3px var(--space-3); border-radius: var(--radius-full);
-  border: 1px solid transparent; background: none; font-family: inherit;
-  font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
-}
-.bf__catgroups button.is-on { background: var(--surface-raised); border-color: var(--border-default); color: var(--text-primary); box-shadow: none; }
-.bf__catgroups button em { margin-left: 0; }
 .bf__catitems { min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-3); }
+
+/* A row is a name. The category is a tint and a quiet word on the right, for
+   when a label alone is ambiguous — not a pane you have to walk through. */
+.bf__catitem {
+  display: flex; align-items: center; gap: var(--space-4); width: 100%;
+  padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm);
+  background: none; border: none; font-family: inherit; text-align: left; cursor: pointer;
+}
+.bf__catitem:hover { background: var(--surface-sunken); }
+.bf__catitem strong { flex: 1; min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bf__catitem em { flex: none; font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* --- Height tiers --------------------------------------------------------------
    The header tiers; it never scrolls and never grows. */
@@ -888,20 +883,6 @@
 .bf__catbar:focus-within { box-shadow: inset 0 0 0 1px var(--brand); }
 .bf__catbar input:focus-visible { outline: none; }
 
-.bf__catcommon {
-  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3);
-  padding: var(--space-3) var(--space-5);
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-sunken);
-}
-.bf__catcommon button {
-  padding: 3px var(--space-3);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-full);
-  font-family: inherit; font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
-}
-.bf__catcommon button:hover { border-color: var(--brand); color: var(--brand); }
-
 /* No scroller of its own.
 
    It had `max-height: 300px; overflow-y: auto` and nine rows that measure just
@@ -925,22 +906,6 @@
 /* The one scroller the catalogue keeps, because Device profiles holds eight
    types and Time holds one — the pane has to be able to hold the longest
    without the panel resizing every time the category changes. */
-.bf__catitem {
-  display: flex; align-items: center; gap: var(--space-4); width: 100%;
-  padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm);
-  background: none; border: none; font-family: inherit; text-align: left; cursor: pointer;
-}
-.bf__catitem:hover { background: var(--surface-sunken); }
-.bf__catitem span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.bf__catitem strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bf__catitem em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
-/* The statement that this is a major component whose contents live elsewhere. */
-.bf__catlib {
-  margin-left: auto; flex: none;
-  padding: 2px var(--space-3); border-radius: var(--radius-full);
-  background: var(--surface-inset); color: var(--text-muted);
-  font-size: var(--fs-xs); white-space: nowrap;
-}
 .bf__catempty { margin: 0; padding: var(--space-6); font-size: var(--fs-md); color: var(--text-muted); }
 .bf__catempty button {
   margin-left: var(--space-3); background: none; border: none;
@@ -959,7 +924,6 @@
   font-size: var(--fs-sm); color: var(--fb-info-fg);
 }
 .bf__dupehint svg { flex: none; margin-top: 2px; }
-
 
 /* --- The rules, as cards ------------------------------------------------------------
 
@@ -1592,7 +1556,6 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
   .bf__bar { padding: 0 var(--space-4); }
 }
 
-
 /* --- Step one: who ------------------------------------------------------------
 
    Was a caption on a strip above the work: small, grey, and read as metadata on
@@ -1677,7 +1640,6 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
 /* A name that no longer resolves renders as itself, never as somebody else. */
 .bf__audchip.is-gone { border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
 .bf__audmore { font-size: var(--fs-sm); color: var(--text-muted); }
-
 
 /* --- The rules, as cards ------------------------------------------------------------
 
@@ -1811,5 +1773,4 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
   font-size: var(--fs-md); color: var(--text-tertiary); cursor: pointer;
 }
 .bf__addrule button:hover { border-color: var(--brand); color: var(--brand); }
-
 

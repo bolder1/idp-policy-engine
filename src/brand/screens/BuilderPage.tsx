@@ -4,9 +4,13 @@ import { useBrand } from '../store'
 
 import { PolicyBuilderMain } from './PolicyBuilderMain'
 
-/* The bench is the alternative, not the default, so it loads on demand. */
+/* The alternatives load on demand — Main is the default and ships with the
+   entry chunk. */
 const PolicyBuilderBench = lazy(() =>
   import('./PolicyBuilderBench').then((m) => ({ default: m.PolicyBuilderBench })),
+)
+const PolicyBuilderLedger = lazy(() =>
+  import('./PolicyBuilderLedger').then((m) => ({ default: m.PolicyBuilderLedger })),
 )
 
 /* -----------------------------------------------------------------------------
@@ -26,15 +30,25 @@ const PolicyBuilderBench = lazy(() =>
      and the condition canvas owns the only unbounded scroll in the screen. The
      cost is that you see one rule at a time.
 
+   · **Ledger** stops optimising for one rule at all. Seven columns, one per
+     part of a rule's grammar, read down rather than across — because four of
+     the five things this product is still bad at are RELATIONS between rules
+     (compare two, render a finding about a pair, edit several at once, move one
+     a long way), and a relation cannot be drawn in a layout that can only show
+     one of its ends. The cost is that no single rule is ever fully visible;
+     structural edits happen in a sheet capped so it never covers the first
+     three columns.
+
    Both share the model, the evaluator, the linter, the composer and the
    dialogs, so a fix to any of those lands in both. Only the shell differs.
    -------------------------------------------------------------------------- */
 
-type V = 'main' | 'bench'
+type V = 'main' | 'bench' | 'ledger'
 
 const VERSIONS: { id: V; label: string; blurb: string }[] = [
   { id: 'main', label: 'Main', blurb: 'Rules as a list you expand in place — the sequence stays on screen' },
   { id: 'bench', label: 'v2 · bench', blurb: 'One rule at a time, under a verdict header that cannot be scrolled away' },
+  { id: 'ledger', label: 'v3 · ledger', blurb: 'The whole policy as one grid — read down columns, compare rules, retune in place' },
 ]
 
 export function BuilderPage({ policyId, open }: { policyId: string; open?: 'gauntlet' | 'impact' }) {
@@ -69,8 +83,12 @@ export function BuilderPage({ policyId, open }: { policyId: string; open?: 'gaun
       {v === 'main' ? (
         <PolicyBuilderMain policyId={policyId} open={open} />
       ) : (
-        <Suspense fallback={<p className="bzver__loading">Loading the bench…</p>}>
-          <PolicyBuilderBench policyId={policyId} open={open} />
+        <Suspense fallback={<p className="bzver__loading">Loading…</p>}>
+          {v === 'bench' ? (
+            <PolicyBuilderBench policyId={policyId} open={open} />
+          ) : (
+            <PolicyBuilderLedger policyId={policyId} open={open} />
+          )}
         </Suspense>
       )}
     </>

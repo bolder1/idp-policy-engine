@@ -119,6 +119,20 @@
 /* The row contexts, where filling the line is the point. */
 .bz7__op > .bz7__any, .bz7__tcell > .bz7__any { flex: 1; align-self: auto; min-height: 0; }
 
+/* And the section context, where it is not.
+
+   `align-self: stretch` is right in a row and wrong here: in the editing
+   column it drew a full-width blue bar where the entry list would be, which
+   reads as a banner about the page rather than as the state of one empty list.
+   Sized to its own words, left-aligned, sitting where the first row would. */
+.bz7__sec > .bz7__any {
+  align-self: flex-start;
+  margin-top: 2px;
+  min-height: 0;
+  padding: 2px 9px;
+  border-radius: var(--radius-full);
+}
+
 .bz7__cardfoot {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding-top: 10px; border-top: 1px solid var(--border-subtle);
@@ -157,7 +171,7 @@
    columns cannot drift apart. */
 .bz7__trow {
   display: grid;
-  grid-template-columns: minmax(160px, 1.2fr) minmax(0, 1.3fr) minmax(0, 1.3fr) 92px 34px;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(0, 1.3fr) minmax(0, 1.3fr) 92px 62px;
   align-items: center; gap: 12px;
   padding: 9px 16px; min-height: 46px;
   border-bottom: 1px solid var(--border-subtle);
@@ -191,7 +205,13 @@
 .bz7__issue svg { flex: none; margin-top: 1px; }
 .bz7__issue.is-error { background: var(--fb-negative-bg); border: 1px solid var(--fb-negative-border); color: var(--fb-negative-fg); }
 .bz7__issue.is-warning { background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border); color: var(--fb-notice-fg); }
-.bz7__issue.is-info { background: var(--fb-info-bg); border: 1px solid var(--fb-info-border); color: var(--fb-info-fg); }
+/* Violet, not blue.
+
+   Error is red and warning is amber, which is a temperature scale — and info
+   sitting at the cold end of it read as the fourth step of the same scale
+   rather than as a different KIND of remark. It is not a milder warning; it is
+   a statement about what the zone does. A hue off that scale says so. */
+.bz7__issue.is-info { background: var(--fb-accent-bg); border: 1px solid var(--fb-accent-border); color: var(--fb-accent-fg); }
 
 /* --- Used by ------------------------------------------------------------------
    Cards carrying the same furniture as the Policies list — name as a link,
@@ -262,15 +282,18 @@
 .bz7 .bz7__add input::placeholder { color: var(--text-muted); }
 .bz7 .bz7__add input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-subtle-bg); }
 
-/* Separated by a rule, not by a box. The field and the quick-add are what you
-   type into; the list is what is already there, and with the section's own
-   frame gone the two need a boundary of their own. */
+/* THE box, and the only one on the page.
+
+   What the zone already holds is an object; the controls above it are a way to
+   add to that object. A frame around the pair said they were one thing, and a
+   frame around each said they were two of the same kind. One frame, around the
+   contents. */
 .bz7__entries {
-  list-style: none; margin: 4px 0 0; padding: 8px 0 0;
-  border-top: 1px solid var(--border-subtle);
+  list-style: none; margin: 2px 0 0; padding: 2px 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
   display: flex; flex-direction: column; flex: 1; min-height: 96px; max-height: 210px; overflow-y: auto;
 }
-.bz7__entries:empty { border-top: none; padding-top: 0; }
 /* Not virtualised, and measured rather than assumed.
 
    The paste box above deliberately accepts as many networks as an estate has,
@@ -443,7 +466,7 @@
   /* Declared once. There were two of these, the first dead — and the columns
      hidden below are indexed off this template, so a stale one is a table that
      drops the wrong cells. */
-  .bz7__trow { grid-template-columns: minmax(0, 1fr) 70px 34px; }
+  .bz7__trow { grid-template-columns: minmax(0, 1fr) 70px 62px; }
   .bz7__trow > :nth-child(2), .bz7__trow > :nth-child(3) { display: none; }
   .bz7__head { flex-direction: column; gap: 12px; }}
 
@@ -515,18 +538,15 @@
    add — and on one that is finished it is still the thing you came back to
    change. Boxed so it reads as the working area of the page rather than more of
    the summary above it. */
-/* One surface, not a box inside a box.
+/* No card here at all.
 
-   This had a border and 16/18 of padding, and the section inside it had another
-   border, another 13/14, and a sunken fill — so the entries list sat three
-   frames deep, and the only thing the two frames separated was a tab bar from
-   the thing the tab bar switches. The card is the page's one surface now and
-   everything below the tabs is drawn on it. */
+   There were two frames — this one and the section inside it — and neither was
+   separating anything: the tab bar, the paste field and the quick-add are how
+   you PUT something in the zone, and a border around them says they are a thing
+   in their own right. They are not. The only object on this page is the list of
+   what the zone already holds, and that is the one thing now drawn as a box. */
 .bz7__build {
   display: flex; flex-direction: column; gap: 14px;
-  padding: 16px 18px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
 }
 
 /* Underlined rather than a pill group, matching the tab bars elsewhere in the
@@ -661,133 +681,39 @@
 .bz7__tname .bz7__open:hover {
   color: var(--brand-active); text-decoration: underline; text-underline-offset: 2px;
 }
+/* --- The dialogs ----------------------------------------------------------------- */
 
-/* -----------------------------------------------------------------------------
-   Zones · v2 — one zone, one kind.
+.bz7__form { display: flex; flex-direction: column; gap: 18px; }
 
-   Everything shared with v1 keeps its `bz7__` class, because it IS v1's: the
-   table shell, the row, the name cell, the inner-page header, the address and
-   place sections. Only what the second version adds is named here, which keeps
-   the diff between the two designs the size of the actual difference.
-   -------------------------------------------------------------------------- */
-
-/* Four columns, not five. v1 spends two on "IP networks" and "Locations" and
-   one of them says "Any …" on every row; declaring the kind turns that pair
-   into a Type and a Contains, and the kebab column goes with the row menu v2
-   does not carry. */
-/* 34px for the kebab, the same as v1's table and the device profile one. */
-.bz8__trow {
-  grid-template-columns: minmax(160px, 1.3fr) 118px minmax(0, 1.6fr) 92px 34px;
-}
-/* Over a column of kebabs, so it sits where they do. */
-.bz8__thactions { justify-self: end; }
-
-/* The type, as a chip. Tinted to match the mark in the name cell, so a row says
-   its kind twice in one colour rather than once in colour and once in grey. */
-.bz8__kind {
-  display: inline-flex; align-items: center;
-  padding: 2px 9px; border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  font-style: normal; font-size: var(--fs-xs); font-weight: var(--fw-medium);
-  white-space: nowrap;
-}
-.bz8__kind.is-blue {
-  background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg);
-}
-.bz8__kind.is-green {
-  background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg);
-}
-
-/* "Nothing yet", not "Any". A v1 zone with an empty half matches everything
-   through it, which is why that column reads "Any location". A v2 zone with an
-   empty list matches nothing at all — there is no second half left open — so
-   the same emptiness means the opposite thing and cannot borrow the same word. */
-.bz8__unset { font-style: normal; font-size: var(--fs-md); color: var(--text-muted); }
-
-/* --- The create dialog ---------------------------------------------------------- */
-
-.bz8__form { display: flex; flex-direction: column; gap: 18px; }
-
-.bz8__field { display: flex; flex-direction: column; gap: 6px; }
-.bz8__field > span:first-child {
+.bz7__field { display: flex; flex-direction: column; gap: 6px; }
+.bz7__field > span:first-child {
   font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary);
 }
-.bz8__field input {
+.bz7__field input {
   height: var(--ctl-height-md); padding: 0 11px;
   background: var(--surface-raised);
   border: 1px solid var(--border-default); border-radius: var(--radius-md);
   font-size: var(--fs-base); color: var(--text-primary); font-family: inherit;
 }
-.bz8__field input:focus-visible {
+.bz7__field input:focus-visible {
   outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg);
 }
-.bz8__hint { font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.5; }
-
-/* Stacked, not side by side. Two cards across a 520px dialog gives each of them
-   about 230px, which wraps both blurbs to four lines and makes the pair read as
-   a wall rather than a choice. */
-.bz8__kinds {
-  display: flex; flex-direction: column; gap: 8px;
-  margin: 0; padding: 0; border: 0;
-}
-/* A row, so the tip sits beside the question rather than under it. */
-.bz8__kinds legend {
-  display: flex; align-items: center; gap: 6px;
-  padding: 0; margin-bottom: 8px;
-  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary);
-}
-.bz8__kindcard {
-  display: flex; align-items: flex-start; gap: 11px;
-  padding: 12px 13px; text-align: left; cursor: pointer;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
-}
-.bz8__kindcard:hover { border-color: var(--border-strong); }
-/* Brand tint rather than a surface step — inside a Modal, --surface-raised is
-   the modal's own background, so a "raised" selected card is invisible. */
-.bz8__kindcard.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
-.bz8__kindcard:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-.bz8__kindico {
-  flex: none; display: grid; place-items: center; width: 30px; height: 30px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-inset); color: var(--text-secondary);
-}
-.bz8__kindcard.is-on .bz8__kindico { background: transparent; color: var(--brand-active); }
-.bz8__kindbody { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.bz8__kindbody strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bz8__kindbody em {
-  font-style: normal; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.45;
-}
-
-/* `.bz8__note` — a grey box for the consequence of the choice above it — stood
-   here. It is the kit's `Callout` now: a bespoke box that looked like the hint
-   under the name field also read like one, and this is the only sentence in the
-   dialog that is not advice. */
-
-@media (max-width: 900px) {
-  /* The kebab keeps its column: it is the only way to duplicate or delete
-     from the list, so it is the last thing to drop for width. */
-  .bz8__trow { grid-template-columns: minmax(0, 1fr) 100px 70px 34px; }
-  .bz8__trow > :nth-child(3) { display: none; }
-}
-
-/* The mark travels with the name it marks. `bz7__pagehead` is space-between and
-   v1 gives it two children; v2 adds a tile, and a third loose child would push
-   the name into the middle of the row. */
-.bz8__pagelead { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
-.bz8__pagelead .bz7__tile { margin-top: 2px; }
+/* Says WHY the primary is disabled, at the moment it is. */
+.bz7__foot { flex: 1; font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* --- Duplicating a zone -----------------------------------------------------
    "Duplicate" is the one row action whose scope a reader cannot get from the
    word: an empty zone with a familiar name, or the whole list? Said in the
    dialog, before the click that answers it. */
-.bz8__dupnote {
+.bz7__dupnote {
   display: flex; align-items: flex-start; gap: 9px;
   margin: 0; padding: 11px 13px;
-  background: var(--fb-info-bg);
-  border: 1px solid var(--fb-info-border); border-radius: var(--radius-md);
-  font-size: var(--fs-sm); line-height: 1.55; color: var(--fb-info-fg);
+  background: var(--fb-accent-bg);
+  border: 1px solid var(--fb-accent-border); border-radius: var(--radius-md);
+  font-size: var(--fs-sm); line-height: 1.55; color: var(--fb-accent-fg);
 }
-.bz8__dupnote svg { flex: none; margin-top: 2px; }
-.bz8__dupnote strong { font-weight: var(--fw-semibold); }
+.bz7__dupnote svg { flex: none; margin-top: 2px; }
+
+/* The named last column. */
+.bz7__thactions { justify-self: end; }
+@media (max-width: 900px) {

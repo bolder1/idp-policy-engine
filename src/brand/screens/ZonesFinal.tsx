@@ -1,12 +1,11 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
   Check,
   ChevronDown,
   Copy,
-  Eye,
   Globe,
   Info,
   Infinity as InfinityIcon,
@@ -40,7 +39,7 @@ import { EmptyState } from '../empty'
 import { classifyIp, describeZone, isValidAsn, validateZone } from './zone-validation'
 import { parseEntries } from './zone-entries'
 import { policiesUsing, rulesUsing } from './usage'
-import { UsedByList } from './used-by'
+import { UsedByList, UsedByPeek } from './used-by'
 
 /* -----------------------------------------------------------------------------
    Zones · final.
@@ -129,6 +128,37 @@ export function ZonesFinal() {
 
   /* The only way in. See NameOnlyModal. */
   const [naming, setNaming] = useState(false)
+  /* The zone a duplicate is pending on. Duplicating used to happen on the click
+     with a fabricated name, so doing it twice produced two zones called
+     "Office (copy)" and the only way to find out what a duplicate takes with it
+     was to make one. */
+  const [duping, setDuping] = useState<Zone | null>(null)
+
+  const duplicate = (z: Zone, name: string) => {
+    const copy: Zone = {
+      ...z,
+      /* Slugged from the NEW name, the way a created zone's id is. An id nested
+         inside the source's — `z-office-copy-4` — says the copy is a child of
+         the original, and it is not. */
+      id: `z-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'zone'}-${store.zones.length}`,
+      name: name.trim(),
+      /* Copied, not aliased. The shallow spread left both rows pointing at one
+         `ip` array and one `location` object. Nothing writes through the alias
+         today because every writer here replaces rather than mutates — a
+         property of the current code, not of the data. */
+      ip: [...z.ip],
+      asn: [...z.asn],
+      location: { ...z.location },
+      /* Everything made on this screen is custom: `blank()` says so, and a
+         duplicate inheriting a seeded zone's `blocked` classification would be
+         the one way to create one here. */
+      kind: 'custom',
+      usedIn: 0,
+    }
+    store.addZone(copy)
+    setDuping(null)
+    store.showToast(`${copy.name} created`)
+  }
 
   const createByName = (name: string) => {
     const id = `z-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${store.zones.length}`
@@ -242,16 +272,7 @@ export function ZonesFinal() {
                 zones={shown}
                 policies={store.policies}
                 onOpen={setOpenId}
-                onDuplicate={(z) => {
-                  const copy: Zone = {
-                    ...z,
-                    id: `z-${z.id}-copy-${store.zones.length}`,
-                    name: `${z.name} (copy)`,
-                    usedIn: 0,
-                  }
-                  store.addZone(copy)
-                  store.showToast(`${copy.name} created`)
-                }}
+                onDuplicate={setDuping}
                 onDelete={(z) => {
                   store.removeZone(z.id)
                   store.showToast(`${z.name} deleted`)
@@ -264,6 +285,7 @@ export function ZonesFinal() {
       )}
 
       <NameOnlyModal open={naming} onClose={() => setNaming(false)} onCreate={createByName} />
+      <DuplicateZoneModal zone={duping} onClose={() => setDuping(null)} onDuplicate={duplicate} />
     </div>
   )
 }
@@ -432,11 +454,15 @@ function ZoneTable({
         <span role="columnheader">IP networks</span>
         <span role="columnheader">Locations</span>
         <span role="columnheader">Used by</span>
-        <span role="columnheader" />
+        {/* Named, the way the policies table names it — an unlabelled
+          columnheader over the only route to Duplicate and Delete. */}
+      <span role="columnheader" className="bz7__thactions">
+        Actions
+      </span>
       </div>
       {zones.map((z) => {
         const meta = SHAPE[shapeOf(z)]
-        const uses = rulesUsing('zone', z.id, policies)
+        const users = policiesUsing('zone', z.id, policies)
         return (
           <div className="bz7__trow" role="row" key={z.id}>
             {/* Icon and name in ONE cell, not two.
@@ -464,8 +490,15 @@ function ZoneTable({
                 <Chips items={placeBits(z.location)} max={2} />
               )}
             </span>
-            <span role="cell" className={`bz7__tuses ${uses === 0 ? 'is-quiet' : ''}`}>
-              {uses === 0 ? '—' : `${uses} rule${uses === 1 ? '' : 's'}`}
+            {/* Policies, not rules, and the count opens.
+
+                A number states a size and hides the answer: WHICH policies is
+                the question, and finding out meant opening the zone, reading
+                its Used-by drawer and coming back. The device-profile table
+                already does it this way; this was the last one left counting
+                rules as plain text. */}
+            <span role="cell">
+              <UsedByPeek users={users} />
             </span>
 
             {/* The row's own actions. They were only reachable by opening the
@@ -496,8 +529,8 @@ function ZoneTable({
                     role="menu"
                   >
                     <button role="menuitem" onClick={() => choose(() => onOpen(z.id))}>
-                      <Eye size={14} strokeWidth={1.9} aria-hidden />
-                      View details
+                      <Pencil size={14} strokeWidth={1.9} aria-hidden />
+                      Edit
                     </button>
                     <button role="menuitem" onClick={() => choose(() => onDuplicate(z))}>
                       <Copy size={14} strokeWidth={1.9} aria-hidden />
@@ -571,8 +604,15 @@ function ZoneDetail({
   const users = policiesUsing('zone', zone.id, policies)
 
   const netCount = zone.ip.length + zone.asn.length
+  /* A radius is a location. Without this term a zone whose only content is a
+     circle on the map read "Locations 0" and opened on the empty networks tab —
+     and `locationEmpty`, which this same page's validator uses, has always
+     counted it. */
   const placeCount =
-    zone.location.countries.length + zone.location.states.length + zone.location.cities.length
+    zone.location.countries.length +
+    zone.location.states.length +
+    zone.location.cities.length +
+    (zone.location.radius ? 1 : 0)
 
   /* Which half is on screen. Always one of them, including on a zone that has
      just been named and holds nothing.
@@ -710,6 +750,14 @@ function ZoneDetail({
               </button>
             </div>
 
+            {/* The formats, above the field that takes them.
+
+                Only on the network tab: a location takes a country, and the
+                CIDR notation here would be a note about something that tab
+                cannot do. It is a `<details>`, so it costs one line once
+                somebody has read it. */}
+            {tab === 'net' && <AcceptsNote />}
+
             {tab === 'net' ? (
               <AddressSection draft={zone} onChange={onChange} />
             ) : (
@@ -772,6 +820,104 @@ const blank = (): Zone => ({
   usedIn: 0,
 })
 
+/* --- Duplicating -----------------------------------------------------------------
+
+   Duplicate used to happen on the click: a zone named `${name} (copy)` appeared
+   in the list and a toast said so. Two problems, both real. Doing it twice gave
+   two zones with the same name, which is a support ticket rather than a design
+   opinion. And the row action's scope — do I get an empty zone with a familiar
+   name, or the whole entry list? — was only answerable by doing it.
+
+   So it asks, with the obvious answer already typed: one Return still covers
+   the common case, and the sentence underneath says what is coming along. */
+function DuplicateZoneModal({
+  zone,
+  onClose,
+  onDuplicate,
+}: {
+  zone: Zone | null
+  onClose: () => void
+  onDuplicate: (from: Zone, name: string) => void
+}) {
+  const [name, setName] = useState('')
+
+  /* Seeded on the way in, so reopening on a different zone does not offer the
+     last one's name. */
+  useEffect(() => {
+    if (zone) setName(`${zone.name} copy`)
+  }, [zone])
+
+  if (!zone) return null
+
+  /* Both halves counted, because a v1 zone has both — and counted from the
+     entries, not from `addressBits`, which returns SUMMARY strings ("6
+     networks") and whose length is therefore 1 for any non-empty half.
+
+     The empty case does not say "it is empty, so the copy will be too": an
+     empty zone here matches everything, and so will its copy, which is the one
+     sentence somebody about to duplicate one needs to read. */
+  const nets = zone.ip.length + zone.asn.length
+  const l = zone.location
+  const places = l.countries.length + l.states.length + l.cities.length + (l.radius ? 1 : 0)
+  const parts = [
+    nets > 0 && `${nets} network ${nets === 1 ? 'entry' : 'entries'}`,
+    places > 0 && `${places} ${places === 1 ? 'place' : 'places'}`,
+  ].filter(Boolean) as string[]
+  /* "takes … with it" rather than "… come with it", so one entry and six read
+     the same way round. */
+  const what =
+    parts.length === 0
+      ? 'it draws no boundary at all, so the copy will match everything too'
+      : `the copy takes ${parts.join(' and ')} with it`
+
+  const clean = name.trim()
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Duplicate zone"
+      width={460}
+      footer={
+        <>
+          <span className="bz7__foot">{clean ? '' : 'Name the copy to continue.'}</span>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="brand" disabled={!clean} onClick={() => onDuplicate(zone, clean)}>
+            Duplicate zone
+          </Button>
+        </>
+      }
+    >
+      <div className="bz7__form">
+        <label className="bz7__field">
+          <span>Name</span>
+          <input
+            type="text"
+            value={name}
+            autoFocus
+            aria-label={`Name for the copy of ${zone.name}`}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && clean) onDuplicate(zone, clean)
+            }}
+          />
+        </label>
+
+        {/* Stated before the click rather than discovered after it. */}
+        <p className="bz7__dupnote">
+          <Copy size={14} strokeWidth={1.9} aria-hidden />
+          <span>
+            Everything inside this zone is copied: {what}. No policy rule points at the copy, so
+            nothing changes until you name it in one.
+          </span>
+        </p>
+      </div>
+    </Modal>
+  )
+}
+
 /* --- The other way in --------------------------------------------------------------
    "New zone 2": one field, then the inner page.
 
@@ -797,10 +943,17 @@ function NameOnlyModal({
 }) {
   const [name, setName] = useState('')
 
-  const close = () => {
-    setName('')
-    onClose()
-  }
+  /* Cleared when it OPENS, not when it closes.
+
+     The success path never called `close` — it flips `naming` off directly —
+     and the kit's Modal only unmounts its children, so this component's own
+     state survived. Create "Pune office", reopen New zone, and the field still
+     said "Pune office". */
+  useEffect(() => {
+    if (open) setName('')
+  }, [open])
+
+  const close = () => onClose()
 
   const go = () => {
     if (name.trim()) onCreate(name)

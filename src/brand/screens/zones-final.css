@@ -107,15 +107,13 @@
    vertically into a tall blue block. It fills the width only where width is the
    axis. */
 .bz7__any {
-  flex: none; align-self: stretch;
-  display: inline-flex; align-items: center; gap: 6px;
-  min-height: var(--ctl-height-sm);
-  padding: 3px 10px; border-radius: var(--radius-sm);
+  flex: none; align-self: center;
+  display: inline-flex; align-items: center;
+  padding: 3px 10px; border-radius: var(--radius-full);
   background: var(--fb-info-bg); border: 1px solid var(--fb-info-border);
   font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--fb-info-fg);
   white-space: nowrap;
 }
-.bz7__any svg { flex: none; }
 /* Sized to its own words everywhere, including the row.
 
    It used to take `flex: 1` in a table cell on the argument that filling the

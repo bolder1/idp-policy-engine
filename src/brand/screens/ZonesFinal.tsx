@@ -2,7 +2,6 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
-  Asterisk,
   ArrowLeft,
   Check,
   ChevronDown,
@@ -325,14 +324,10 @@ function ZonesEmpty({ onCreate }: { onCreate: () => void }) {
    so the card's colour is the linter's verdict rather than a second opinion. */
 export function AnyBand({ what }: { what: string }) {
   return (
-    <span className="bz7__any">
-      {/* The wildcard, not an infinity sign. `∞` says "endless", which is a
-          statement about quantity; this is a statement about MATCHING, and `*`
-          is the glyph every admin already reads that way — in a CIDR, a glob,
-          an ACL. */}
-      <Asterisk size={12} strokeWidth={2.4} aria-hidden />
-      Any {what}
-    </span>
+    /* Two words and a tint, no glyph. It went from an infinity sign to an
+       asterisk to nothing: the tint already separates it from the grey chips
+       beside it, and neither symbol added a syllable the words were missing. */
+    <span className="bz7__any">Any {what}</span>
   )
 }
 
@@ -1278,9 +1273,11 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
         </div>
       )}
 
-      {all.length === 0 ? (
-        <AnyBand what="network" />
-      ) : rows.length === 0 ? (
+      {/* No "Any network" pill here. The issue panel below this section already
+          says it — with the consequence attached, which the pill could not
+          carry — so the pill was the same statement twice, one row apart. It
+          stays on the list, where there is no issue panel to say it. */}
+      {all.length === 0 ? null : rows.length === 0 ? (
         <p className="bz7__gate">Nothing matches “{filter.trim()}”.</p>
       ) : (
         <ul className="bz7__entries is-scroll">
@@ -1478,9 +1475,8 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
         )}
       </div>
 
-      {chosen.length === 0 ? (
-        <AnyBand what="location" />
-      ) : (
+      {/* Same as the address section: the issue panel below says it. */}
+      {chosen.length > 0 && (
         <ul className="bz7__entries">
           {chosen.map((c) => (
             <li key={`${c.kind}-${c.v}`}>

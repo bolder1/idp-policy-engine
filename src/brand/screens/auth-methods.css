@@ -423,7 +423,6 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
 /* The settings list. The row brings its own dividers, so this only stacks. */
 .bm8__setlist { display: flex; flex-direction: column; }
 
-@media (prefers-reduced-motion: reduce) {}
 
 /* The category holding it. Brand-tinted rather than green: the enabled chip
    beside it is a count, and this is a choice somebody made. */

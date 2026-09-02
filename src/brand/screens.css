@@ -722,8 +722,6 @@
 
 /* --- Narrow --------------------------------------------------------------- */
 
-@media (max-width: 1400px) {
-    }
 @media (max-width: 1120px) {
   .bmaster { grid-template-columns: minmax(0, 1fr); }
   .bnew { grid-template-columns: minmax(0, 1fr); }

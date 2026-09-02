@@ -501,8 +501,6 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   .bz7__trow > :nth-child(2), .bz7__trow > :nth-child(3) { display: none; }
   .bz7__head { flex-direction: column; gap: 12px; }}
 
-@media (max-width: 720px) {
-    }
 
 /* The sentence standing in for a section that has not been unlocked yet. */
 .bz7__gate {
@@ -747,4 +745,3 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 
 /* The named last column. */
 .bz7__thactions { justify-self: end; }
-@media (max-width: 900px) {

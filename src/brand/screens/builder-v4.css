@@ -47,16 +47,16 @@
    hold the order and be hidden — and below 900 it becomes an overlay, where a
    320px column would be a third of the screen. */
 
-.bf__work {
+.bf.is-bench .bf__work {
   flex: 1; min-height: 0; position: relative;
   display: grid;
   grid-template-columns: var(--rail-w, 320px) minmax(0, 1fr);
   transition: grid-template-columns 200ms var(--ease-standard);
 }
-.bf__work.is-railshut { --rail-w: 0px; }
+.bf.is-bench .bf__work.is-railshut { --rail-w: 0px; }
 @media (prefers-reduced-motion: reduce) { .bf__work { transition: none; } }
 
-.bf__flowdock { position: relative; min-height: 0; overflow: hidden; }
+.bf.is-bench .bf__flowdock { position: relative; min-height: 0; overflow: hidden; }
 .bf__flow { height: 100%; min-height: 0; }
 
 .bf__flowscroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: var(--space-4) 76px; }
@@ -239,7 +239,7 @@
    the screen every time it opened. As an overlay pinned to the side of the pane
    it costs exactly zero vertical pixels, which is the largest single win in
    this layout. */
-.bf__cat {
+.bf.is-bench .bf__cat {
   position: absolute; top: var(--verdict-h); right: 0; bottom: 0;
   z-index: var(--z-dropdown, 200);
   width: min(380px, 100%);
@@ -287,8 +287,8 @@
 @media (max-width: 1439px) { .bf__work { --rail-w: 288px; } }
 
 @media (max-width: 899px) {
-  .bf__work, .bf__work.is-railshut { grid-template-columns: minmax(0, 1fr); }
-  .bf__flowdock {
+  .bf.is-bench .bf__work, .bf.is-bench .bf__work.is-railshut { grid-template-columns: minmax(0, 1fr); }
+  .bf.is-bench .bf__flowdock {
     position: absolute; z-index: var(--z-popover);
     left: 0; top: 0; bottom: 0;
     width: min(320px, 88vw);
@@ -296,9 +296,9 @@
     transition: transform 220ms var(--ease-standard), visibility 220ms;
     box-shadow: var(--el-high);
   }
-  .bf__flowdock[aria-hidden='true'] { visibility: hidden; }
-  .bf__work.is-flowopen .bf__flowdock { transform: translateX(0); visibility: visible; }
-  .bf__cat { width: 100%; }
+  .bf.is-bench .bf__flowdock[aria-hidden='true'] { visibility: hidden; }
+  .bf.is-bench .bf__work.is-flowopen .bf__flowdock { transform: translateX(0); visibility: visible; }
+  .bf.is-bench .bf__cat { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .bf__flowdock { transition: none; } }
 
@@ -834,7 +834,11 @@
 /* Static, deliberately. The catalogue is `position: absolute` and pins itself
    to the bench — a positioned wrapper here would make it resolve against a 31px
    button instead, which renders the panel about 2px tall. */
-.bf__addwrap { position: static; margin-top: var(--space-3); }
+.bf__addwrap { position: relative; margin-top: var(--space-3); }
+/* The bench's catalogue is `position: absolute` and pins itself to the pane. A
+   positioned wrapper here would make it resolve against a 31px button instead,
+   which renders the panel about two pixels tall. */
+.bf.is-bench .bf__addwrap { position: static; }
 .bf__addwrap.is-or { margin-top: var(--space-4); }
 
 .bf__add {
@@ -1503,3 +1507,309 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
   line-height: 1.5;
   text-align: right;
 }
+
+/* =============================================================================
+   MAIN's own regions.
+
+   The two shells share the model, the composer, the flow rail and every dialog;
+   what differs is where the rule lives. Main expands it in place inside a list,
+   the bench gives it a pane. Only the three selectors they genuinely disagree
+   about are scoped — the work row, the catalogue's positioning, and whether the
+   add-wrapper is a containing block. Everything below is additive: these
+   classes never appear in the bench's markup.
+   ========================================================================== */
+
+/* --- Work area ----------------------------------------------------------------
+
+   One column now. The sequence used to be a resizable grid column holding 380px
+   of every window forever — a third of a 1024 screen spent on a list you
+   consult, while the thing being edited was squeezed — and it could never be
+   one width for both jobs: wide enough to draw a diagram, narrow enough not to
+   starve the editor.
+
+   It floats over the work instead and closes once it has been used. That is
+   what it already did below 1120; the behaviour was right, it was only
+   conditional on the window being small. */
+
+.bf.is-main .bf__work { flex: 1; min-height: 0; position: relative; display: flex; }
+.bf.is-main .bf__work > .bf__main {
+  flex: 1;
+  display: flex; flex-direction: column;
+  min-height: 0; min-width: 0;
+}
+
+/* The dock the sequence lives in. Off-canvas until asked for, and taken out of
+   the tab order while it is away — a panel nobody can see must not be a place
+   the keyboard can wander into. */
+.bf.is-main .bf__flowdock {
+  position: absolute; z-index: var(--z-popover);
+  left: 0; top: 0; bottom: 0;
+  width: min(var(--flow-w, 340px), 88vw);
+  transform: translateX(-102%);
+  transition: transform 220ms var(--ease-standard), visibility 220ms;
+  box-shadow: var(--el-high);
+}
+.bf.is-main .bf__flowdock[aria-hidden='true'] { visibility: hidden; }
+.bf.is-main .bf__work.is-flowopen .bf.is-main .bf__flowdock { transform: translateX(0); visibility: visible; }
+@media (prefers-reduced-motion: reduce) { .bf.is-main .bf__flowdock { transition: none; } }
+
+.bf__flowscrim {
+  position: absolute; inset: 0; z-index: calc(var(--z-popover) - 1);
+  background: rgb(12 17 23 / 0.28);
+  border: none; cursor: pointer;
+}
+
+.bf__flowclose {
+  display: grid; place-items: center; width: 24px; height: 24px;
+  margin-left: var(--space-2);
+  border: none; background: none; border-radius: var(--radius-sm);
+  color: var(--text-muted); cursor: pointer;
+}
+.bf__flowclose:hover { background: var(--surface-raised); color: var(--text-primary); }
+
+.bf__flowbtn {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  height: 26px; padding: 0 var(--space-3);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font-family: inherit; font-size: var(--fs-sm);
+  color: var(--text-secondary); cursor: pointer;
+}
+.bf__flowbtn:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.bf__flowbtn[aria-expanded='true'] { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-inverse); }
+.bf__flowbtn span {
+  padding: 0 5px; border-radius: var(--radius-full);
+  background: var(--surface-inset); color: var(--text-tertiary);
+  font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
+}
+.bf__flowbtn[aria-expanded='true'] span { background: rgb(255 255 255 / 0.16); color: var(--text-inverse); }
+
+@media (max-width: 880px) {
+  .bf__pips .bgt__pip em, .bf__pips .bia__pip b { display: none; }
+  .bf__pips .bgt__pip, .bf__pips .bia__pip { white-space: nowrap; }
+  .bf.is-main .bf__stage { padding: var(--space-5) var(--space-5) var(--space-7); }
+  .bf__stepnav { padding: var(--space-4) var(--space-5); }
+  .bf__bar { padding: 0 var(--space-4); }
+}
+
+
+/* --- Step one: who ------------------------------------------------------------
+
+   Was a caption on a strip above the work: small, grey, and read as metadata on
+   the way to the thing you came to do. It is not metadata — it is the first
+   decision and the widest claim the policy makes, and on a new policy it is the
+   first thing that should be answered.
+
+   So it gets the same card treatment the rules have, sits above them, and
+   carries a step number. The page now reads in the order the work happens:
+   who, the rules, then check and review. */
+
+.bf__who {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+/* A policy that governs nobody cannot do anything, so it is an error and looks
+   like one. Everything else here is a legitimate answer and is not tinted. */
+.bf__who.is-empty { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+
+.bf__whobody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.bf__whobody h2 {
+  margin: 0;
+  font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bf__wholine {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3);
+  margin: 0;
+  font-size: var(--fs-md); color: var(--text-body);
+}
+.bf__wholine.is-empty { color: var(--fb-negative-fg); }
+.bf__whocount { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bf__whonote { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* The policy's own step numbers. Deliberately unlike a rule's index: 20px and
+   outlined where a rule's is 26px and filled with its decision colour, because
+   the two orderings are about different things and must not be confusable. */
+.bf__stepn {
+  flex: none; display: grid; place-items: center;
+  width: 20px; height: 20px; margin-top: 2px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-full);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary);
+}
+
+.bf__ruleshead {
+  display: flex; align-items: center; gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.bf__ruleshead .bf__stepn { margin-top: 0; }
+.bf__ruleshead h2 { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bf__ruleshead em {
+  flex: 1; min-width: 0; font-style: normal; font-size: var(--fs-sm); color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* --- Audience chips ------------------------------------------------------------ */
+
+.bf__aud { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); min-width: 0; }
+.bf__aud.is-all { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bf__aud.is-none { font-size: var(--fs-md); color: var(--fb-negative-fg); }
+
+.bf__audchip {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  height: 24px; padding: 0 var(--space-3);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-full);
+  font-size: var(--fs-sm); color: var(--text-body);
+  white-space: nowrap;
+}
+.bf__audchip em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* A person is a circle, because it is an avatar and not a pill. */
+.bf__audchip i {
+  display: grid; place-items: center; width: 17px; height: 17px;
+  margin-left: -2px;
+  border-radius: var(--radius-full);
+  background: var(--brand-subtle-bg); color: var(--brand);
+  font-style: normal; font-size: 9px; font-weight: var(--fw-semibold);
+}
+/* A name that no longer resolves renders as itself, never as somebody else. */
+.bf__audchip.is-gone { border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
+.bf__audmore { font-size: var(--fs-sm); color: var(--text-muted); }
+
+
+/* --- The rules, as cards ------------------------------------------------------------
+
+   Replaces the five-step trail and the "All together" toggle in one move. A
+   rule is one card; open, every part of it is on screen at the same time, which
+   is what the toggle existed to ask for. */
+
+.bf__rules { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-4); }
+
+.bf__rule {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: visible;
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.bf__rule.is-open { border-color: var(--border-default); box-shadow: var(--el-low); }
+.bf__rule.is-off { opacity: 0.62; }
+
+.bf__rule .bf__rulehead {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  max-width: none;
+}
+.bf__ruleopen {
+  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--space-4);
+  background: none; border: none; font-family: inherit; text-align: left; cursor: pointer;
+  padding: var(--space-2) 0;
+}
+.bf__ruleopen strong { font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); white-space: nowrap; }
+.bf__ruleopen em {
+  flex: 1; min-width: 0; font-style: normal; font-size: var(--fs-sm); color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bf__ruleopen:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+
+/* Dot AND label, always. Colour is never the only carrier of state here. */
+.bf__rulestate {
+  flex: none; display: inline-flex; align-items: center; gap: var(--space-2);
+  font-size: var(--fs-xs); color: var(--text-tertiary); white-space: nowrap;
+}
+.bf__rulestate i { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--fb-neutral-dot); }
+.bf__rulestate.is-ready i { background: var(--fb-positive-dot); }
+.bf__rulestate.is-warn i { background: var(--fb-notice-dot); }
+.bf__rulestate.is-setup i { background: var(--fb-negative-dot); }
+.bf__rulestate.is-setup { color: var(--fb-negative-fg); }
+
+.bf__ruletoggle {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px;
+  border: none; background: none; border-radius: var(--radius-sm);
+  color: var(--text-muted); cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.bf__ruletoggle:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bf__rule.is-open .bf__ruletoggle { transform: rotate(180deg); }
+
+.bf__rulebody { overflow: hidden; }
+.bf__ruleinner { padding: 0 var(--space-5) var(--space-5); }
+
+/* When and Then, stacked — and stacked on purpose.
+
+   They were side by side above 1500px, and it did not work. The two halves have
+   nothing in common dimensionally: WHEN grows without limit as cards are added,
+   THEN is a fixed row of three tiles and a handful of controls, so one column
+   was always a ragged column of dead space beside the other. Worse, it broke
+   the only thing the pair is: a sentence. `if … then …` is a sequence, and
+   Figma's own conditional — the grammar this was asked to follow — stacks the
+   condition above the actions it guards for exactly that reason.
+
+   So: one column, always, with a gutter that draws the two halves as two
+   clauses of one statement. A rule reads top to bottom, the way it runs. */
+.bf__rulegrid { display: flex; flex-direction: column; }
+
+.bf__rulegrid > .bf__sec { position: relative; padding-left: 58px; }
+/* The clause marker, in the gutter rather than in the heading — the heading
+   says what the half is for, this says which half of the sentence it is. */
+.bf__rulegrid > .bf__sec::before {
+  content: 'WHEN';
+  position: absolute; left: 0; top: 3px;
+  width: 44px; text-align: right;
+  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.bf__rulegrid > #sec-then::before { content: 'THEN'; }
+/* The line that makes them one statement rather than two sections. It stops
+   short of the last clause, because nothing follows THEN. */
+.bf__rulegrid > .bf__sec:not(:last-child)::after {
+  content: ''; position: absolute; left: 39px; top: 22px; bottom: -6px;
+  width: 1px; background: var(--border-subtle);
+}
+.bf__rulegrid > #sec-then { padding-top: var(--space-6); }
+
+@media (max-width: 700px) {
+  .bf__rulegrid > .bf__sec { padding-left: 0; }
+  .bf__rulegrid > .bf__sec::before { position: static; display: block; width: auto; text-align: left; margin-bottom: 2px; }
+  .bf__rulegrid > .bf__sec::after { display: none; }
+}
+
+.bf__rulechecks {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+.bf__rulecheck {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  margin: 0; font-size: var(--fs-sm); color: var(--text-secondary);
+}
+.bf__rulecheck svg { flex: none; margin-top: 2px; }
+.bf__rulecheck strong { font-weight: var(--fw-medium); color: var(--text-primary); }
+.bf__rulecheck.is-error svg { color: var(--fb-negative-fg); }
+.bf__rulecheck.is-warning svg { color: var(--fb-notice-fg); }
+.bf__rulecheck.is-info svg { color: var(--fb-info-fg); }
+.bf__rulecheck button {
+  flex: none; margin-left: auto; background: none; border: none;
+  font-family: inherit; font-size: var(--fs-sm); color: var(--brand); cursor: pointer; white-space: nowrap;
+}
+
+.bf__ruleprose {
+  display: flex; align-items: baseline; gap: var(--space-3);
+  margin: var(--space-5) 0 0;
+  font-size: var(--fs-sm); color: var(--text-tertiary);
+}
+
+.bf__addrule { display: flex; }
+.bf__addrule button {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  width: 100%; height: 40px; justify-content: center;
+  border: 1px dashed var(--border-default); border-radius: var(--radius-lg);
+  background: none; font-family: inherit;
+  font-size: var(--fs-md); color: var(--text-tertiary); cursor: pointer;
+}
+.bf__addrule button:hover { border-color: var(--brand); color: var(--brand); }
+
+

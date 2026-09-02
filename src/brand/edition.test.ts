@@ -3,10 +3,24 @@ import { describe, expect, it } from 'vitest'
 
 import policiesSrc from './screens/Policies.tsx?raw'
 import createSrc from './create/CreatePolicy.tsx?raw'
-import builderSrc from './screens/PolicyBuilderV4.tsx?raw'
+import mainSrc from './screens/PolicyBuilderMain.tsx?raw'
+import benchSrc from './screens/PolicyBuilderBench.tsx?raw'
 import { GAPS, featuresOf, gapsFor, type Features } from './edition'
 
-/* The lite edition is a promise about what is *absent*, and absence is the one
+const SHELLS: [string, string][] = [
+  ['main', mainSrc],
+  ['bench', benchSrc],
+]
+
+/* Both shells are asserted, separately.
+
+   A flag that gates a capability in one builder and not the other is a lite
+   edition that leaks depending on which design you happen to be looking at,
+   which is worse than one that leaks everywhere — it is a leak nobody can
+   reproduce. Where a check is about the shell's own structure rather than about
+   a flag, it names the shell it is about.
+
+   The lite edition is a promise about what is *absent*, and absence is the one
    thing nobody notices regressing. A feature that quietly comes back makes the
    comparison this whole exercise is for meaningless, so the gates are asserted
    at their call sites rather than trusted. */
@@ -46,14 +60,18 @@ describe('the two editions', () => {
     expect(createSrc).toContain('store.features.templateHero')
     expect(createSrc).toContain('store.features.guidedSetup')
     for (const flag of ['gauntlet', 'blastRadius', 'commands', 'guidedSetup', 'publish']) {
-      expect(`${flag}: ${builderSrc.includes(`features.${flag}`)}`).toBe(`${flag}: true`)
+      for (const [shell, src] of SHELLS) {
+        expect(`${shell} ${flag}: ${src.includes(`features.${flag}`)}`).toBe(`${shell} ${flag}: true`)
+      }
     }
   })
 
   it('binds the command shortcut to the same flag as the menu entry', () => {
     // A palette still reachable by ⌘K in an edition whose menu denies it exists
     // is worse than one that is simply present.
-    expect(builderSrc).toMatch(/features\.commands &&\s*\(e\.metaKey/)
+    for (const [shell, src] of SHELLS) {
+      expect(`${shell}: ${/features\.commands &&\s*\(e\.metaKey/.test(src)}`).toBe(`${shell}: true`)
+    }
   })
 
   /* Was "builds the trail from the edition instead of filtering at each use".
@@ -67,9 +85,11 @@ describe('the two editions', () => {
      `checkStep` gates the per-rule findings strip, `reviewStep` gates the review
      stage. An array with holes cannot be indexed wrongly if there is no array. */
   it('gates the check strip and the review stage on their own flags', () => {
-    expect(builderSrc).toContain('features.checkStep')
-    expect(builderSrc).toContain('features.reviewStep')
-    expect(builderSrc).not.toMatch(/const STEPS/)
+    for (const [, src] of SHELLS) {
+      expect(src).toContain('features.checkStep')
+      expect(src).toContain('features.reviewStep')
+      expect(src).not.toMatch(/const STEPS/)
+    }
   })
 })
 

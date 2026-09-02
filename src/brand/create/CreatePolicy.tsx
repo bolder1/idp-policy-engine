@@ -1,13 +1,14 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Suspense, forwardRef, lazy, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowRight, Check, Plus, Search, Store, Upload, Wand2, X } from 'lucide-react'
+import { ArrowDown, ArrowRight, Check, Plus, Search, Store, Upload, Users, Wand2, X } from 'lucide-react'
 
-import { Button, DecisionChip } from '../kit'
+import { Button } from '../kit'
 import { AppLogo } from '../logos/AppLogo'
-import { blankPolicy, conditionType, scenarios, type Scenario } from '../data'
+import { EVERYONE, blankPolicy, conditionType, reach, scenarios, type Audience, type Scenario } from '../data'
 import { useBrand } from '../store'
 import { leaves } from '../predicate'
 import { TemplateCard, TemplatePreview, type CardModel } from './TemplateCard'
+import { AudienceBar, AudienceDrawer } from '../screens/audience-drawer'
 
 /* Mounted only while it is open — the gallery is the common path and does not
    need the interview's questions, composer and figures in its chunk. */
@@ -44,9 +45,12 @@ export function CreatePolicy() {
   const [interview, setInterview] = useState(false)
   const [step, setStep] = useState<1 | 2>(1)
   const [picked, setPicked] = useState<Scenario | null>(null)
-  const [blank, setBlank] = useState(false)
+  const [, setBlank] = useState(false)
   const [name, setName] = useState('')
   const [appIds, setAppIds] = useState<string[]>([])
+  /* Asked on the form now rather than defaulted in the builder. A policy that
+     arrives governing everyone is a policy somebody has to remember to narrow. */
+  const [audience, setAudience] = useState<Audience>(EVERYONE)
   const [market, setMarket] = useState(false)
   const templatesRef = useRef<HTMLDivElement>(null)
 
@@ -66,12 +70,12 @@ export function CreatePolicy() {
 
   function create() {
     const policy = blankPolicy(name.trim() || 'Untitled policy', appIds)
-    // Built here, so what the card promised is what the builder receives —
-    // including who it is for, which is now the template's to state.
-    if (picked) {
-      policy.rules = picked.rules.map((r) => r.build())
-      policy.audience = picked.audience
-    }
+    // Built here, so what the card promised is what the builder receives.
+    if (picked) policy.rules = picked.rules.map((r) => r.build())
+    /* The form's answer wins over the template's. A template states an audience
+       because it has to build rules against something; the person filling in
+       this form has just been asked the question directly. */
+    policy.audience = audience
     store.addPolicy(policy)
     store.showToast(
       picked
@@ -91,8 +95,6 @@ export function CreatePolicy() {
           <button onClick={() => store.go({ name: 'policies' })}>Policies</button>
           <span aria-hidden>/</span>
           <span>New policy</span>
-          <span aria-hidden>/</span>
-          <span className="bcp__stepcrumb">Step {step} of 2</span>
         </nav>
 
         <div className="bcp__headrow">
@@ -148,8 +150,8 @@ export function CreatePolicy() {
             <Gallery ref={templatesRef} onChoose={choose} onOpenMarket={() => setMarket(true)} />
           ) : (
             <NameStep
-              picked={picked}
-              blank={blank}
+              audience={audience}
+              setAudience={setAudience}
               name={name}
               setName={setName}
               appIds={appIds}
@@ -593,29 +595,33 @@ function AppList({ chosen, onChange }: { chosen: string | null; onChange: (id: s
 }
 
 function NameStep({
-  picked,
-  blank,
   name,
   setName,
   appIds,
   setAppIds,
+  audience,
+  setAudience,
   onBack,
   onCreate,
   onGuided,
 }: {
-  picked: Scenario | null
-  blank: boolean
   name: string
   setName: (v: string) => void
   appIds: string[]
   setAppIds: (v: string[]) => void
+  audience: Audience
+  setAudience: (a: Audience) => void
   onBack: () => void
   onCreate: () => void
   /* Absent in lite: the guided build is withheld, and a button that opens
      nothing is worse than no button. */
   onGuided?: () => void
 }) {
+  const store = useBrand()
   const chosen = appIds[0] ?? null
+  const [picking, setPicking] = useState(false)
+  const total = reach(audience, store.groups, store.users)
+  const empty = !audience.everyone && audience.groupIds.length === 0 && audience.userIds.length === 0
 
   return (
     <section className="bname2">
@@ -655,60 +661,58 @@ function NameStep({
               more thing to read. */}
           <AppList chosen={chosen} onChange={(id) => setAppIds(id ? [id] : [])} />
         </div>
+
+        {/* Who it governs, asked here rather than in the builder.
+
+            It is one of the three facts that make a policy a policy — a name,
+            what it protects, and who it is for — and it was the only one the
+            create flow did not ask for, so every policy arrived governing
+            everyone and had to be narrowed afterwards by somebody who might not
+            realise it needed narrowing. Asking costs one row. */}
+        <div className="bname2__field">
+          <span className="bname2__label">
+            Applies to <em>Groups and people</em>
+          </span>
+          <button type="button" className={`bname2__aud ${empty ? 'is-empty' : ''}`} onClick={() => setPicking(true)}>
+            <span className="bname2__audbody">
+              {empty ? (
+                <em>Nobody yet — this policy would not apply to anyone</em>
+              ) : (
+                <>
+                  <AudienceBar audience={audience} groups={store.groups} users={store.users} max={5} />
+                  <em>{total.toLocaleString()} people</em>
+                </>
+              )}
+            </span>
+            <span className="bname2__audedit">
+              <Users size={12} strokeWidth={2} aria-hidden />
+              Change
+            </span>
+          </button>
+        </div>
       </div>
 
-      {/* What you are about to get. The prototype never showed this at the
-          moment of commit, which is how its preview and its result drifted. */}
-      {/* The right column is one panel with a fixed head and a scrolling body.
-          It is the only thing on this page whose length is unbounded — a
-          template can carry any number of rules — so it is the only thing that
-          gets to scroll, and it does so inside its own box rather than making
-          the page taller. */}
-      <aside className="bname2__side">
-        <header className="bname2__sidehead">
-          <div>
-            <h2>{name.trim() || 'Untitled policy'}</h2>
-            <p>
-              {blank
-                ? 'Blank — no rules yet'
-                : `From ${picked?.name} · ${picked?.rules.length} rule${picked?.rules.length === 1 ? '' : 's'}`}
-            </p>
-          </div>
-          <span className="bname2__off">Created off</span>
-        </header>
+      <AudienceDrawer
+        open={picking}
+        audience={audience}
+        groups={store.groups}
+        users={store.users}
+        unlisted={store.unlistedUsers}
+        onClose={() => setPicking(false)}
+        onApply={setAudience}
+      />
 
-        <div className="bname2__scroll">
-          {picked ? (
-            <ol className="bname2__rules">
-              {picked.rules.map((r, i) => (
-                <li key={r.name}>
-                  <span className="bprev__n">{i + 1}</span>
-                  <span className="bprev__body">
-                    <strong>{r.name}</strong>
-                    <span>IF {r.ifText}</span>
-                  </span>
-                  <DecisionChip decision={r.decision} size="sm" />
-                </li>
-              ))}
-              <li className="bname2__rules--default">
-                <span className="bprev__n" aria-hidden>
-                  ⌄
-                </span>
-                <span className="bprev__body">
-                  <strong>Everyone else</strong>
-                  <span>Nothing above matched</span>
-                </span>
-                <DecisionChip decision="1fa" size="sm" />
-              </li>
-            </ol>
-          ) : (
-            <div className="bname2__blank">
-              <strong>No rules yet</strong>
-              <span>You will add them in the builder once this policy is created.</span>
-            </div>
-          )}
-        </div>
-      </aside>
+      {/* The "what you are about to get" panel is gone.
+
+          It rendered the template's rules read-only beside the form, and for a
+          blank policy — which is most of them — it was a box saying "No rules
+          yet. You will add them in the builder once this policy is created."
+          That is a panel whose content is an apology for its own existence, and
+          it was taking the half of the page the form actually needed.
+
+          The template's rules are still shown, on the step where you choose the
+          template, which is where they change what you decide. Here they cannot
+          — you have already chosen. */}
 
       {/* Bottom bar rather than buttons inside the panel — the panel is a
           summary, and as this step grows the commit action should not drift

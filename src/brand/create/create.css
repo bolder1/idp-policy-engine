@@ -826,18 +826,23 @@ html[data-theme='dark'] .bguided__sheen {
 
 /* Two columns of equal height, so their bottoms line up instead of ending
    wherever their content happens to stop. */
+/* One column, because the second one is gone.
+
+   The right half held a read-only preview of the policy about to be created —
+   and for a blank policy, which is most of them, its whole content was a box
+   saying "No rules yet, you will add them in the builder". A panel apologising
+   for its own emptiness was taking half the page from the form that needed it.
+   The form now has three fields (name, application, audience) and the room to
+   show them without the application list scrolling inside a 140px slot. */
 .bname2 {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(340px, 36%) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
 }
-.bname2__form,
-.bname2__side {
-  min-height: 0;
-  height: 100%;
-}
+.bname2__form { width: 100%; max-width: 760px; }
+.bname2__form { min-height: 0; height: 100%; }
 .bname2__form { overflow-y: auto; }
 
 .bname2__side {
@@ -992,7 +997,15 @@ html[data-theme='dark'] .bguided__sheen {
    This block stays because the field wants more than the default — a stronger
    border, a brand hover, its own focus ring. It no longer needs to win a fight,
    only to state a preference. */
-.bname2 .bname2__field input[type='text'] {
+/* A DIRECT child, deliberately.
+
+   This was `.bname2__field input[type='text']`, which also caught the
+   application list's own search box — nested two levels down inside `.bapps`
+   and carrying its own icon and its own left padding. At (0,3,1) it beat that
+   box's rule, reset the padding to 10px, and dropped the placeholder straight
+   underneath the magnifier. The name field is a direct child; the search box is
+   not, so `>` separates them without a `:not()` or an extra class. */
+.bname2 .bname2__field > input[type='text'] {
   width: 100%;
   height: var(--ctl-height-md);
   padding: 0 10px;
@@ -1004,9 +1017,9 @@ html[data-theme='dark'] .bguided__sheen {
   transition: border-color var(--dur-fast) var(--ease-standard),
               box-shadow var(--dur-fast) var(--ease-standard);
 }
-.bname2 .bname2__field input[type='text']::placeholder { color: var(--text-muted); }
-.bname2 .bname2__field input[type='text']:hover { border-color: var(--brand); }
-.bname2 .bname2__field input[type='text']:focus-visible {
+.bname2 .bname2__field > input[type='text']::placeholder { color: var(--text-muted); }
+.bname2 .bname2__field > input[type='text']:hover { border-color: var(--brand); }
+.bname2 .bname2__field > input[type='text']:focus-visible {
   outline: none;
   border-color: var(--brand);
   box-shadow: var(--focus-ring);
@@ -1065,3 +1078,29 @@ html[data-theme='dark'] .bguided__sheen {
    description length — which is what keeps the Use buttons on one line. */
 .bgcard__body { flex: 1; min-height: 0; }
 .bgcard__foot { margin-top: auto; }
+
+
+/* --- Who it applies to, on the create form ---------------------------------
+
+   One of the three facts that make a policy a policy — a name, what it
+   protects, and who it is for — and it was the only one this form did not ask
+   for, so every policy arrived governing everyone and had to be narrowed later
+   by somebody who might not know it needed narrowing. */
+
+.bname2__aud {
+  display: flex; align-items: center; gap: var(--space-4);
+  width: 100%; min-height: 44px; padding: var(--space-3) var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.bname2__aud:hover { border-color: var(--brand); }
+.bname2__aud.is-empty { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.bname2__audbody { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.bname2__audbody > em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bname2__aud.is-empty em { color: var(--fb-negative-fg); font-size: var(--fs-md); }
+.bname2__audedit {
+  flex: none; display: inline-flex; align-items: center; gap: var(--space-2);
+  font-size: var(--fs-sm); color: var(--text-secondary);
+}
+.bname2__aud:hover .bname2__audedit { color: var(--brand); }

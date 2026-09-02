@@ -1,6 +1,5 @@
-import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { AnimatePresence } from 'motion/react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -9,14 +8,13 @@ import {
   ChevronDown,
   ClipboardCheck,
   Command,
-  Check,
   Copy,
   CopyPlus,
   FileDown,
   Grid3x3,
   Info,
+  ListOrdered,
   MoreHorizontal,
-  PanelLeft,
   Plus,
   Redo2,
   ScrollText,
@@ -26,17 +24,17 @@ import {
   Trash2,
   GraduationCap,
   Undo2,
-  X,
+  Users,
   Wand2,
   XCircle,
 } from 'lucide-react'
 
-import { Button, IconButton, MenuButton, Tip, Toggle, type MenuItem } from '../kit'
+import { Button, Counter, DecisionChip, IconButton, MenuButton, Tip, Toggle, type MenuItem } from '../kit'
 import { Picker } from '../picker'
-import { blankRule, reach, type AccessDecision, type Audience, type Policy, type Rule } from '../data'
+import { blankRule, reach, type Audience, type Policy, type Rule } from '../data'
 import { useBrand, useNameLookup } from '../store'
 import { AudienceBar, AudienceDrawer } from './audience-drawer'
-import { ruleSentence, type NameLookup } from './predicate-prose'
+import { predicateSummary, ruleSentence } from './predicate-prose'
 import { AssignAppsDialog, CopyRuleDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
 import { DecisionLogDialog, TestPolicyDialog } from './builder-test'
 import { describeChanges } from './changes'
@@ -51,7 +49,7 @@ import { tourSeen } from '../tour/tour-stops'
 const Interview = lazy(() => import('../create/Interview').then((m) => ({ default: m.Interview })))
 const Tour = lazy(() => import('../tour/Tour').then((m) => ({ default: m.Tour })))
 const LearnPanel = lazy(() => import('../tour/LearnPanel').then((m) => ({ default: m.LearnPanel })))
-import { FALLBACK_SUB, FlowRail } from './flow-rail'
+import { FlowRail } from './flow-rail'
 import { canRedo, canUndo, commit, historyKey, historyOf, redo, undo, type History } from './history'
 import { PolicyOverview } from './overview'
 import { ReviewStep } from './review-step'
@@ -61,13 +59,15 @@ import { ImpactArenaDialog, ImpactPip } from './impact-arena-dialog'
 import {
   DEC_KEY,
   DEFAULT_PREVIEW,
-  METHODS,
   PREVIEW_CAVEAT,
+  ThenSection,
   WhenSection,
   previewContext,
+  ruleState,
   type PreviewState,
 } from './rule-form'
 import { DEVICE_OPTIONS, PLACES, RISKS, SIM_USERS, evalRule, walk, type SimEnv } from './simulate'
+import type { Diagnostic } from './diagnostics'
 
 /* -----------------------------------------------------------------------------
    Policy builder v4 — the trail.
@@ -124,7 +124,7 @@ type Stage = 'rules' | 'review'
    conditional on the window being small. */
 const FLOW_W = 340
 
-export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: 'gauntlet' | 'impact' }) {
+export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?: 'gauntlet' | 'impact' }) {
   const store = useBrand()
   const saved = store.policyById(policyId)
 
@@ -132,13 +132,6 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
   const [selected, setSelected] = useState(0)
   const [stage, setStage] = useState<Stage>('rules')
   const [audienceOpen, setAudienceOpen] = useState(false)
-  /* Which card the condition catalogue is adding to, by id.
-
-     It lives here rather than inside the composer because the catalogue is an
-     overlay on the bench, outside the scrolling canvas — that is the whole
-     reason opening it costs zero vertical pixels — so the bench has to know
-     about it. */
-  const [catalogue, setCatalogue] = useState<string | null>(null)
   const [live, setLive] = useState('')
   const [pv, setPv] = useState<PreviewState>(DEFAULT_PREVIEW)
   const [hoverShadow, setHoverShadow] = useState<number | null>(null)
@@ -158,11 +151,6 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
   /* --- The flow's width, dragged. v1's grammar ---------------------------------
      Clamped against the room that actually exists, so the flow never claims a
      width the window cannot give it, and the trail always keeps TRAIL_MIN. */
-  /* The rail is the rule list, so it is open by default — it cannot be the only
-     place the order lives AND be hidden. `railOpen` collapses it on a wide
-     window; `flowOpen` slides it in as an overlay on a narrow one, where a
-     320px column would be a third of the screen. */
-  const [railOpen, setRailOpen] = useState(true)
   const [flowOpen, setFlowOpen] = useState(false)
 
   /* Escape closes it, because a panel that floats over the work has to be
@@ -239,7 +227,7 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
 
   if (!saved || !draft.id) {
     return (
-      <div className="bpage bf">
+      <div className="bpage bf is-main">
         <p style={{ padding: 24 }}>That policy no longer exists.</p>
       </div>
     )
@@ -256,7 +244,6 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
   const patchRuleAt = (at: number, p: Partial<Rule>) =>
     patch({ rules: rules.map((r, n) => (n === at ? { ...r, ...p } : r)) })
 
-  const mine = diagnostics.filter((d) => d.scope === 'rule' && d.ruleIndex === index)
   const blockers = diagnostics.filter(
     (d) => d.severity === 'error' && (d.scope === 'policy' || rules[d.ruleIndex]?.enabled !== false),
   ).length
@@ -291,7 +278,6 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
 
   const jump = (i: number) => {
     setSelected(i)
-    setCatalogue(null)
     setDialog(null)
     setCmd(false)
     setOverview(false)
@@ -354,7 +340,7 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
   }
 
   return (
-    <div className="bpage bf">
+    <div className="bpage bf is-main">
       <p className="u-sr-only" aria-live="polite">
         {live}
       </p>
@@ -378,16 +364,6 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
           {/* On the bar, not in a menu. The tour used to be reachable only from
               the Policy menu, which makes "show me that again" a search — and
               everything else explanatory had nowhere to live at all. */}
-          <IconButton
-            icon={PanelLeft}
-            label={railOpen ? 'Hide the sequence' : 'Show the sequence'}
-            size="sm"
-            tone="ghost"
-            onClick={() => {
-              setRailOpen((v) => !v)
-              setFlowOpen((v) => !v)
-            }}
-          />
           <IconButton icon={GraduationCap} label="Learn the builder" size="sm" tone="ghost" onClick={() => setLearn(true)} />
           <IconButton icon={Undo2} label="Undo" size="sm" tone="ghost" disabled={!canUndo(hist)} onClick={() => setHist(undo)} />
           <IconButton icon={Redo2} label="Redo" size="sm" tone="ghost" disabled={!canRedo(hist)} onClick={() => setHist(redo)} />
@@ -404,7 +380,7 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
         </div>
       </header>
 
-      <div className={`bf__work ${flowOpen ? 'is-flowopen' : ''} ${railOpen ? '' : 'is-railshut'}`} ref={work}>
+      <div className={`bf__work ${flowOpen ? 'is-flowopen' : ''}`} ref={work}>
         {/* Dismisses on a click anywhere off the panel. Only in the DOM while
             the panel is, so it can never swallow a click on the work. */}
         {flowOpen && (
@@ -431,29 +407,20 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
             onHover={setHoverShadow}
             onClose={() => setFlowOpen(false)}
             onFallback={(fallback) => patch({ fallback })}
-            audience={<AudienceBar audience={draft.audience} groups={store.groups} users={store.users} max={3} />}
-            reach={reach(draft.audience, store.groups, store.users)}
-            emptyAudience={emptyAudience}
-            onAudience={() => setAudienceOpen(true)}
           />
         </div>
 
-        {/* --- The bench ------------------------------------------------------
+        {/* --- Middle: the trail --------------------------------------------- */}
+        <main className="bf__main">
+          {/* --- The rules, or the review. Two scopes, drawn as two scopes. ---
 
-            One rule at a time, in a pane whose top is the outcome.
-
-            The accordion list this replaces put WHEN above THEN inside a shared
-            scroller, so the outcome — the thing an auditor reads first — was
-            pushed further down the page with every condition added. Of the
-            fourteen automation builders surveyed, not one does that; the two
-            that come close survive only by bounding the condition side, and
-            this model has unbounded alternatives.
-
-            So THEN stops being a section of the rule and becomes the chrome of
-            the rule: a fixed header that cannot scroll, cannot grow, and does
-            not move by a pixel no matter how large WHEN gets. The canvas
-            beneath it owns the only unbounded scroll in the builder. */}
-        <section className="bf__bench">
+              There was a five-step trail here — Who, When, Then, Check, Review
+              — and it is gone. Who is a property of the policy, so it is in the
+              header above. Check and Review are about the whole policy, so they
+              are one stage at the end. What is left is a rule, and a rule is
+              one card that shows its When and its Then together, which is what
+              "figma style when and then" means: a conditional is a thing that
+              contains its branches, not a wizard you walk. */}
           {stage === 'review' ? (
             <div className="bf__reviewstage" ref={stageEl}>
               <button type="button" className="bf__backrules" onClick={() => setStage('rules')}>
@@ -478,180 +445,226 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
                 }}
               />
             </div>
-          ) : !rule ? (
-            <div className="bf__blank">
-              <Sparkles size={22} strokeWidth={1.6} aria-hidden />
-              <h2>This policy has no rules</h2>
-              <p>Every sign-in falls through to “{FALLBACK_SUB[draft.fallback ?? '1fa']}” until there is one.</p>
-              <div className="bf__blankacts">
-                {features.guidedSetup && (
-                  <Button variant="primary" icon={Wand2} onClick={() => setInterview(true)}>
-                    Guided setup
-                  </Button>
-                )}
-                <Button icon={Plus} onClick={() => addRule()}>
-                  Add the first rule
-                </Button>
-              </div>
-            </div>
           ) : (
-            <>
-              <VerdictHeader
-                rule={rule}
-                index={index}
-                onPatch={(p) => patchRuleAt(index, p)}
-                onAction={onAction}
-                resolve={resolve}
+            <div className="bf__stage" ref={stageEl} data-tour="stage">
+              {/* --- Step one: who. -----------------------------------------
+
+                  This was a caption on a strip between the top bar and the
+                  work, and it read as metadata — the kind of line you scan past
+                  on the way to the thing you came to do. It is not metadata. It
+                  is the first decision the policy makes and the widest claim it
+                  makes, and on a new policy it is the first thing that should
+                  be answered.
+
+                  So it is a step, in the stage, above the rules, with the same
+                  card treatment they have. The sequence a person reads down the
+                  page — who, then the rules, then check and review — is the
+                  order the work actually happens in. */}
+              <section className={`bf__who ${emptyAudience ? 'is-empty' : ''}`} data-tour="audience">
+                <span className="bf__stepn" aria-hidden>
+                  1
+                </span>
+                <div className="bf__whobody">
+                  <h2>Who this policy applies to</h2>
+                  {emptyAudience ? (
+                    <p className="bf__wholine is-empty">
+                      No groups and no people are selected, so none of these rules can ever run.
+                    </p>
+                  ) : (
+                    <p className="bf__wholine">
+                      <AudienceBar audience={draft.audience} groups={store.groups} users={store.users} max={6} />
+                      <span className="bf__whocount">
+                        <Counter value={reach(draft.audience, store.groups, store.users)} /> people
+                      </span>
+                    </p>
+                  )}
+                  <p className="bf__whonote">
+                    Every rule below inherits this. No rule can reach further than the policy does.
+                  </p>
+                </div>
+                <Button
+                  variant={emptyAudience ? 'primary' : 'secondary'}
+                  icon={Users}
+                  onClick={() => setAudienceOpen(true)}
+                >
+                  {draft.audience.everyone ? 'Narrow this' : 'Change'}
+                </Button>
+              </section>
+
+              <div className="bf__ruleshead">
+                <span className="bf__stepn" aria-hidden>
+                  2
+                </span>
+                <h2>Rules</h2>
+                <em>{rules.length === 0 ? 'None yet' : 'Evaluated top to bottom — the first one that matches decides'}</em>
+                {/* The way into the sequence, at every width. It carries the
+                    count so the rail's one permanently-useful fact is on screen
+                    even while the rail is not. */}
+                <button
+                  type="button"
+                  className="bf__flowbtn"
+                  aria-expanded={flowOpen}
+                  onClick={() => setFlowOpen((v) => !v)}
+                >
+                  <ListOrdered size={13} strokeWidth={1.9} aria-hidden />
+                  Order
+                  <span>{rules.length}</span>
+                </button>
+              </div>
+
+              {rules.length === 0 ? (
+                <div className="bf__blank">
+                  <Sparkles size={22} strokeWidth={1.6} aria-hidden />
+                  <h2>This policy has no rules</h2>
+                  <p>Every sign-in falls through to the engine default until there is one.</p>
+                  <div className="bf__blankacts">
+                    {features.guidedSetup && (
+                      <Button variant="primary" icon={Wand2} onClick={() => setInterview(true)}>
+                        Guided setup
+                      </Button>
+                    )}
+                    <Button icon={Plus} onClick={() => addRule()}>
+                      Add the first rule
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <ol className="bf__rules">
+                  {rules.map((r, i) => (
+                    <RuleCard
+                      key={r.id}
+                      rule={r}
+                      index={i}
+                      open={i === index}
+                      ctx={ctx}
+                      hit={i === index ? hitCard : null}
+                      diagnostics={diagnostics.filter((d) => d.ruleIndex === i)}
+                      features={features}
+                      onOpen={() => jump(i)}
+                      onPatch={(p) => patchRuleAt(i, p)}
+                      onAction={(a) => {
+                        setSelected(i)
+                        onAction(a)
+                      }}
+                      onJump={jump}
+                    />
+                  ))}
+                  <li className="bf__addrule">
+                    <button type="button" onClick={() => addRule()}>
+                      <Plus size={13} strokeWidth={2.4} aria-hidden />
+                      Add a rule
+                    </button>
+                  </li>
+                </ol>
+              )}
+            </div>
+          )}
+
+          {/* --- The tester, docked. -------------------------------------------
+
+              This used to be one of three panels taking turns behind an icon in
+              the top right. It is not optional: it is the only writer of the
+              preview context every condition is evaluated against, so hiding it
+              behind a toggle froze the whole builder's answer to "would this
+              match" on a default nobody chose, with nothing on screen saying
+              so. Always on, one line, at the bottom of the work. */}
+          {rules.length > 0 && stage === 'rules' && (
+            <footer className="bf__try" data-tour="try">
+              <span className="u-label">Try it</span>
+              <Picker
+                label="Person"
+                value={pv.userId}
+                options={SIM_USERS.map((u) => ({ value: u.id, label: u.name, meta: u.groupName }))}
+                onChange={(userId) => setPv({ ...pv, userId })}
+              />
+              <em>from</em>
+              <Picker
+                label="Where from"
+                value={pv.place}
+                options={PLACES.map((p) => ({ value: p, label: p }))}
+                onChange={(place) => setPv({ ...pv, place })}
+              />
+              <em>on</em>
+              <Picker
+                label="Device"
+                value={pv.device}
+                options={DEVICE_OPTIONS.map((d) => ({ value: d, label: d }))}
+                onChange={(device) => setPv({ ...pv, device })}
+              />
+              <Picker
+                label="Risk"
+                value={pv.risk}
+                options={RISKS.map((r) => ({ value: r, label: `${r} risk` }))}
+                onChange={(risk) => setPv({ ...pv, risk })}
               />
 
-              <div className="bf__canvas" ref={stageEl} data-tour="stage" tabIndex={0} role="region" aria-label="Conditions">
-                <WhenSection
-                  rule={rule}
-                  ctx={ctx}
-                  onPatch={(p) => patchRuleAt(index, p)}
-                  hit={trace.hitIndex === index ? hitCard : null}
-                  onCatalogue={setCatalogue}
-                  catalogue={catalogue}
-                />
-              </div>
-
-              {/* Pinned. A finding about the rule you are editing is not
-                  something to scroll for — and it is the Check step's content,
-                  so lite, which withholds that step, does not get the bar. */}
-              {features.checkStep && (
-              <footer className="bf__checksbar">
-                {mine.length === 0 ? (
-                  <p className="bf__checkclear">
-                    <Check size={12} strokeWidth={2.6} aria-hidden />
-                    Nothing to fix on this rule
-                  </p>
+              <span className={`bf__tryout is-${DEC_KEY[trace.decision]}`}>
+                {trace.outOfAudience ? (
+                  <>Not governed — this policy does not apply to {ctx.user.name}</>
+                ) : trace.hitIndex === null ? (
+                  <>No rule matched · falls through to the default</>
                 ) : (
-                  mine.slice(0, 4).map((d) => (
-                    <p key={d.id} className={`bf__rulecheck is-${d.severity}`}>
-                      {d.severity === 'error' ? (
-                        <XCircle size={12} strokeWidth={2} aria-hidden />
-                      ) : d.severity === 'warning' ? (
-                        <AlertTriangle size={12} strokeWidth={2} aria-hidden />
-                      ) : (
-                        <Info size={12} strokeWidth={2} aria-hidden />
-                      )}
-                      <span>
-                        <strong>{d.title}</strong> {d.detail}
-                      </span>
-                      {d.relatedIndex !== undefined && (
-                        <button type="button" onClick={() => jump(d.relatedIndex!)}>
-                          Rule {d.relatedIndex + 1}
-                        </button>
-                      )}
-                    </p>
-                  ))
+                  <>
+                    Rule {trace.hitIndex + 1} · {rules[trace.hitIndex].name}
+                  </>
                 )}
-              </footer>
+              </span>
+
+              <Tip text={PREVIEW_CAVEAT} placement="top">
+                <span className="bf__trynote" aria-label="How this is calculated">
+                  ?
+                </span>
+              </Tip>
+            </footer>
+          )}
+
+          {/* --- One bar, docked. Unsaved changes and the way forward. ------- */}
+          <footer className={`bf__stepnav ${dirty ? 'is-dirty' : ''}`}>
+            <span className="bf__stepwhere">
+              {dirty ? (
+                <>
+                  <b>{changes[0]}</b>
+                  {changes.length > 1 && <i>and {changes.length - 1} more</i>}
+                </>
+              ) : stage === 'review' ? (
+                'Read it back, then ship it'
+              ) : (
+                `${rules.length} rule${rules.length === 1 ? '' : 's'} · evaluated top to bottom, first match wins`
               )}
-            </>
-          )}
-        </section>
-
-      </div>
-
-      {/* --- The tester. ------------------------------------------------------
-
-          One line, always on, under everything. It is not optional polish: it
-          is the only writer of the preview context every condition in the
-          builder is evaluated against, so hiding it behind a toggle froze the
-          whole screen's answer to "would this match" on a default nobody chose,
-          with nothing saying so. */}
-      {rules.length > 0 && stage === 'rules' && (
-        <footer className="bf__try" data-tour="try">
-          <span className="u-label">Try it</span>
-          <Picker
-            label="Person"
-            value={pv.userId}
-            options={SIM_USERS.map((u) => ({ value: u.id, label: u.name, meta: u.groupName }))}
-            onChange={(userId) => setPv({ ...pv, userId })}
-          />
-          <em>from</em>
-          <Picker
-            label="Where from"
-            value={pv.place}
-            options={PLACES.map((p) => ({ value: p, label: p }))}
-            onChange={(place) => setPv({ ...pv, place })}
-          />
-          <em>on</em>
-          <Picker
-            label="Device"
-            value={pv.device}
-            options={DEVICE_OPTIONS.map((d) => ({ value: d, label: d }))}
-            onChange={(device) => setPv({ ...pv, device })}
-          />
-          <Picker
-            label="Risk"
-            value={pv.risk}
-            options={RISKS.map((r) => ({ value: r, label: `${r} risk` }))}
-            onChange={(risk) => setPv({ ...pv, risk })}
-          />
-
-          <span className={`bf__tryout is-${DEC_KEY[trace.decision]}`}>
-            {trace.outOfAudience ? (
-              <>Not governed — this policy does not apply to {ctx.user.name}</>
-            ) : trace.hitIndex === null ? (
-              <>Nothing matched — {FALLBACK_SUB[draft.fallback ?? '1fa']}</>
-            ) : (
-              <>
-                Rule {trace.hitIndex + 1} · {rules[trace.hitIndex].name}
-              </>
-            )}
-          </span>
-
-          <Tip text={PREVIEW_CAVEAT} placement="top">
-            <span className="bf__trynote" aria-label="How this is calculated">
-              ?
             </span>
-          </Tip>
-        </footer>
-      )}
 
-      <footer className={`bf__stepnav ${dirty ? 'is-dirty' : ''}`}>
-        <span className="bf__stepwhere">
-          {dirty ? (
-            <>
-              <b>{changes[0]}</b>
-              {changes.length > 1 && <i>and {changes.length - 1} more</i>}
-            </>
-          ) : stage === 'review' ? (
-            'Read it back, then ship it'
-          ) : (
-            `${rules.length} rule${rules.length === 1 ? '' : 's'} · first match wins`
-          )}
-        </span>
+            {dirty && (
+              <Button variant="ghost" onClick={() => setHist(historyOf(saved))}>
+                Discard
+              </Button>
+            )}
 
-        {dirty && (
-          <Button variant="ghost" onClick={() => setHist(historyOf(saved))}>
-            Discard
-          </Button>
-        )}
-
-        {stage === 'rules' ? (
-          features.reviewStep ? (
-            <Button
-              variant="primary"
-              iconRight={ArrowRight}
-              disabled={rules.length === 0}
-              onClick={() => setStage('review')}
-            >
-              {blockers > 0 ? `${blockers} to fix` : 'Check & review'}
-            </Button>
-          ) : (
-            <Button variant="secondary" onClick={() => setDialog('review')}>
-              Review &amp; save
-            </Button>
-          )
-        ) : (
-          <Button variant="secondary" icon={ArrowLeft} onClick={() => setStage('rules')}>
-            Keep editing
-          </Button>
-        )}
-      </footer>
+            {stage === 'rules' ? (
+              features.reviewStep ? (
+                <Button
+                  variant="primary"
+                  iconRight={ArrowRight}
+                  disabled={rules.length === 0}
+                  onClick={() => setStage('review')}
+                >
+                  {blockers > 0 ? `${blockers} to fix` : 'Check & review'}
+                </Button>
+              ) : (
+                /* Lite has no publish gate. v0 commits from Review & Save in
+                   the Policy menu, which is a v0 requirement rather than one of
+                   ours, so the menu keeps it and this stands down. */
+                <Button variant="secondary" onClick={() => setDialog('review')}>
+                  Review &amp; save
+                </Button>
+              )
+            ) : (
+              <Button variant="secondary" icon={ArrowLeft} onClick={() => setStage('rules')}>
+                Keep editing
+              </Button>
+            )}
+          </footer>
+        </main>
+      </div>
 
       <AudienceDrawer
         open={audienceOpen}
@@ -767,81 +780,108 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
 }
 
 /* -----------------------------------------------------------------------------
-   The verdict — the outcome as the bench's chrome.
+   One rule, one card.
 
-   `ThenSection` was about 316px: three outcome tiles over five stacked property
-   rows, which is a form. A form beneath an unbounded condition block is a form
-   nobody sees. Compressed to three fixed rows it becomes affordable to pin, and
-   pinning it is the only arrangement where "the more work you do, the further
-   away the outcome gets" cannot be true.
+   Collapsed it is a row you can scan: order, name, what it decides, what it
+   matches on, and whether anything is wrong with it. Open it is the whole rule
+   — When and Then side by side on a wide window — with the linter's findings
+   about it in a strip at the bottom.
 
-   Row A  the decision, as one three-segment control
-   Row B  the settings, as chips that never wrap
-   Row C  the whole rule as one line of prose
-
-   The height is fixed and tiered by viewport height. It never scrolls. The
-   moment it can scroll it has stopped being the fix.
+   This is what replaced the five-step trail and the "All together" toggle. The
+   toggle existed to answer "show me this whole rule at once"; the answer is now
+   structural rather than a mode, because a rule IS one card and every part of
+   it is on screen at the same time.
    -------------------------------------------------------------------------- */
-
-const VERDICTS: { id: AccessDecision; label: string; sub: string }[] = [
-  { id: 'deny', label: 'Deny', sub: 'The sign-in is refused outright' },
-  { id: '1fa', label: 'Allow', sub: 'The first factor alone is enough' },
-  { id: '2fa', label: 'Allow + 2nd factor', sub: 'A second factor before access' },
-]
-
-function VerdictHeader({
+function RuleCard({
   rule,
   index,
+  open,
+  ctx,
+  hit,
+  diagnostics,
+  features,
+  onOpen,
   onPatch,
   onAction,
-  resolve,
+  onJump,
 }: {
   rule: Rule
   index: number
+  open: boolean
+  ctx: ReturnType<typeof previewContext>
+  hit: number | null
+  diagnostics: Diagnostic[]
+  features: { checkStep: boolean }
+  onOpen: () => void
   onPatch: (p: Partial<Rule>) => void
   onAction: (id: string) => void
-  resolve: NameLookup
+  onJump: (i: number) => void
 }) {
-  const sentence = ruleSentence(rule, resolve)
-  const line = `${VERDICTS.find((v) => v.id === rule.decision)?.label} — when ${sentence.iff}`
+  const reduce = useReducedMotion()
+  const resolve = useNameLookup()
+  const el = useRef<HTMLLIElement | null>(null)
+  const st = ruleState(diagnostics)
+
+  /* Open a rule from the flow rail, the command palette or a diagnostic's "open
+     rule N" and the card expands wherever it happens to be — which, with five
+     rules and one of them tall, is regularly off-screen in both directions.
+
+     `block: 'nearest'` rather than 'start': a card already fully visible must
+     not be yanked to the top, because the commonest way to open one is to click
+     its own header and having the page jump under the cursor is worse than not
+     scrolling at all. The delay lets the accordion lay out first, so the browser
+     measures the open height rather than the closed one. */
+  useEffect(() => {
+    if (!open || !el.current) return
+    const t = window.setTimeout(
+      () => el.current?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' }),
+      reduce ? 0 : 240,
+    )
+    return () => window.clearTimeout(t)
+  }, [open, reduce])
+  const errors = diagnostics.filter((d) => d.severity === 'error').length
+
+  const ruleItems: MenuItem[] = [
+    { id: 'add', label: 'Add a rule below', icon: Plus },
+    { id: 'duplicate', label: 'Duplicate', icon: Copy },
+    { id: 'copy', label: 'Copy to another policy…', icon: CopyPlus, hint: 'An independent copy' },
+    { id: 'delete', label: 'Delete', icon: Trash2, danger: true, divide: true },
+  ]
 
   return (
-    <header className="bf__verdict">
-      <div className="bf__vseg">
+    <li ref={el} className={`bf__rule ${open ? 'is-open' : ''} ${rule.enabled ? '' : 'is-off'}`}>
+      <div className="bf__rulehead">
         <span className={`bf__ruleno is-${DEC_KEY[rule.decision]}`}>{index + 1}</span>
 
-        {/* One control over one field.
+        {open ? (
+          <input
+            className="bf__ruleName"
+            aria-label="Rule name"
+            value={rule.name}
+            onChange={(e) => onPatch({ name: e.target.value })}
+          />
+        ) : (
+          <button type="button" className="bf__ruleopen" onClick={onOpen}>
+            <strong>{rule.name}</strong>
+            <em>{predicateSummary(rule.when)}</em>
+          </button>
+        )}
 
-            The two outcome tiles and the "require a second factor" switch were
-            two controls writing to `decision`, and you could only discover that
-            the settings belonged to both by picking one of them. Three explicit
-            positions, and the chips below appear and disappear as you move
-            between them. */}
-        <div className="bf__vsegctl" role="radiogroup" aria-label="What happens">
-          {VERDICTS.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              role="radio"
-              aria-checked={rule.decision === v.id}
-              title={v.sub}
-              className={`is-${DEC_KEY[v.id]} ${rule.decision === v.id ? 'is-on' : ''}`}
-              onClick={() => onPatch({ decision: v.id })}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
+        <DecisionChip decision={rule.decision} size="sm" />
 
-        <input
-          className="bf__ruleName"
-          aria-label="Rule name"
-          value={rule.name}
-          onChange={(e) => onPatch({ name: e.target.value })}
-        />
+        {/* Dot and label, never colour alone. */}
+        <span className={`bf__rulestate is-${st}`}>
+          <i aria-hidden />
+          {st === 'ready' ? 'Ready' : st === 'warn' ? 'Worth a look' : `${errors || 'Needs'} to fix`}
+        </span>
 
         <label className="bf__ruleon">
-          <Toggle checked={rule.enabled} onChange={(v) => onPatch({ enabled: v })} label={`Enable ${rule.name}`} size="sm" />
+          <Toggle
+            checked={rule.enabled}
+            onChange={(v) => onPatch({ enabled: v })}
+            label={`Enable ${rule.name}`}
+            size="sm"
+          />
         </label>
 
         <MenuButton
@@ -850,294 +890,82 @@ function VerdictHeader({
           icon={MoreHorizontal}
           size="sm"
           align="end"
-          items={[
-            { id: 'add', label: 'Add a rule below', icon: Plus },
-            { id: 'duplicate', label: 'Duplicate', icon: Copy },
-            { id: 'copy', label: 'Copy to another policy…', icon: CopyPlus },
-            { id: 'delete', label: 'Delete', icon: Trash2, danger: true, divide: true },
-          ]}
+          items={ruleItems}
           onSelect={onAction}
         />
+
+        <button
+          type="button"
+          className="bf__ruletoggle"
+          aria-expanded={open}
+          aria-label={open ? `Collapse ${rule.name}` : `Open ${rule.name}`}
+          onClick={onOpen}
+        >
+          <ChevronDown size={14} strokeWidth={2} aria-hidden />
+        </button>
       </div>
 
-      <FactorChips rule={rule} onPatch={onPatch} />
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            className="bf__rulebody"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: reduce ? 0 : 0.22, ease: [0.2, 0, 0, 1] }}
+          >
+            <div className="bf__ruleinner">
+              {/* Borderless until focused, so an empty one is an invitation and
+                  a filled one reads as a caption rather than as a form field. */}
+              <textarea
+                className="bf__rulewhy"
+                aria-label="Why this rule exists"
+                rows={1}
+                placeholder="Why does this rule exist? The next person will read this before changing it."
+                value={rule.description ?? ''}
+                onChange={(e) => onPatch({ description: e.target.value })}
+              />
 
-      <p className="bf__vline" title={`${line}. ${sentence.then}`}>
-        {line}
-      </p>
-    </header>
-  )
-}
-
-/* The five property rows, as chips.
-
-   Off states are ghost chips rather than omissions, so the shape of the outcome
-   is constant and nobody has to remember that a setting exists. Depth goes
-   sideways into a popover, never downward into the header — that is what keeps
-   the height provably fixed at every width. */
-function FactorChips({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
-  if (rule.decision === 'deny') {
-    return (
-      <div className="bf__vprops">
-        <span className="bf__pchip is-ghost">No prompt, no alternate path</span>
-      </div>
-    )
-  }
-
-  const second =
-    rule.secondFactor === 'specific'
-      ? (rule.secondFactorMethods ?? []).join(' or ') || 'nothing chosen'
-      : rule.secondFactor === 'chain'
-        ? `${(rule.methodChain ?? []).length}-step chain`
-        : rule.secondFactor === 'preferred'
-          ? 'their preferred'
-          : 'any enabled'
-
-  const noMethods = rule.secondFactor === 'specific' && (rule.secondFactorMethods ?? []).length === 0
-
-  return (
-    <div className="bf__vprops">
-      <Chip label="First factor" value={rule.firstFactor === 'Specific' ? (rule.firstFactorMethod ?? 'Specific') : rule.firstFactor}>
-        <div className="bf__seg">
-          {(['Password', 'Any', 'Specific'] as const).map((f) => (
-            <button key={f} type="button" className={rule.firstFactor === f ? 'is-on' : ''} onClick={() => onPatch({ firstFactor: f })}>
-              {f}
-            </button>
-          ))}
-        </div>
-        {rule.firstFactor === 'Specific' && (
-          <Picker
-            label="First-factor method"
-            width="fill"
-            value={rule.firstFactorMethod ?? METHODS[0]}
-            options={METHODS.map((m) => ({ value: m, label: m }))}
-            onChange={(firstFactorMethod) => onPatch({ firstFactorMethod })}
-          />
-        )}
-      </Chip>
-
-      {rule.decision === '2fa' && (
-        <>
-          <Chip label="Second factor" value={second} tone={noMethods ? 'negative' : undefined}>
-            <Picker
-              label="Second factor mode"
-              width="fill"
-              value={rule.secondFactor}
-              options={[
-                { value: 'any', label: 'Any enabled method' },
-                { value: 'specific', label: 'Specific method(s)' },
-                { value: 'chain', label: 'Method chain', meta: 'Every step, in order' },
-                { value: 'preferred', label: 'The user’s preferred method' },
-              ]}
-              onChange={(v) => onPatch({ secondFactor: v as Rule['secondFactor'] })}
-            />
-            {rule.secondFactor === 'specific' && (
-              <div className="bf__val bf__val--chips" role="group" aria-label="Allowed second-factor methods">
-                {METHODS.map((m) => {
-                  const on = (rule.secondFactorMethods ?? []).includes(m)
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      className={`bf__vchip ${on ? 'is-on' : ''}`}
-                      aria-pressed={on}
-                      onClick={() => {
-                        const cur = rule.secondFactorMethods ?? []
-                        onPatch({ secondFactorMethods: on ? cur.filter((x) => x !== m) : [...cur, m] })
-                      }}
-                    >
-                      {m}
-                    </button>
-                  )
-                })}
+              {/* When and Then, together. Side by side once there is room —
+                  which is the honest version of what "All together" was a
+                  toggle for. */}
+              <div className="bf__rulegrid">
+                <WhenSection rule={rule} ctx={ctx} onPatch={onPatch} chrome hit={hit} />
+                <ThenSection rule={rule} onPatch={onPatch} bare />
               </div>
-            )}
-            {rule.secondFactor === 'chain' && <ChainEditor rule={rule} onPatch={onPatch} />}
-            {rule.secondFactor === 'preferred' && (
-              <Picker
-                label="Fallback method"
-                width="fill"
-                value={rule.preferredFallback ?? METHODS[0]}
-                options={METHODS.map((m) => ({ value: m, label: m }))}
-                onChange={(preferredFallback) => onPatch({ preferredFallback })}
-              />
-            )}
-          </Chip>
 
-          <Chip
-            label="Remembered"
-            value={rule.rememberMfa ? `${rule.rememberDays ?? 30} days` : 'no'}
-            ghost={!rule.rememberMfa}
-          >
-            <label className="bf__switchrow">
-              <Toggle checked={rule.rememberMfa} onChange={(v) => onPatch({ rememberMfa: v })} label="Remember this device" size="sm" />
-              <span>Skip the second factor on a device that already passed</span>
-            </label>
-            {rule.rememberMfa && (
-              <span className="bf__val bf__val--range">
-                <input
-                  type="number"
-                  min={1}
-                  max={365}
-                  aria-label="Days to remember"
-                  value={rule.rememberDays ?? 30}
-                  onChange={(e) => onPatch({ rememberDays: Number(e.target.value) || 30 })}
-                />
-                <em>days</em>
-              </span>
-            )}
-          </Chip>
+              {features.checkStep && diagnostics.length > 0 && (
+                <div className="bf__rulechecks">
+                  {diagnostics.map((d) => (
+                    <p key={d.id} className={`bf__rulecheck is-${d.severity}`}>
+                      {d.severity === 'error' ? (
+                        <XCircle size={13} strokeWidth={2} aria-hidden />
+                      ) : d.severity === 'warning' ? (
+                        <AlertTriangle size={13} strokeWidth={2} aria-hidden />
+                      ) : (
+                        <Info size={13} strokeWidth={2} aria-hidden />
+                      )}
+                      <span>
+                        <strong>{d.title}</strong> {d.detail}
+                      </span>
+                      {d.relatedIndex !== undefined && (
+                        <button type="button" onClick={() => onJump(d.relatedIndex!)}>
+                          Open rule {d.relatedIndex + 1}
+                        </button>
+                      )}
+                    </p>
+                  ))}
+                </div>
+              )}
 
-          <Chip
-            label="Every login"
-            value={rule.forceMfaEachLogin ? 'yes' : 'no'}
-            ghost={!rule.forceMfaEachLogin}
-          >
-            <label className="bf__switchrow">
-              <Toggle
-                checked={rule.forceMfaEachLogin ?? false}
-                onChange={(v) => onPatch({ forceMfaEachLogin: v })}
-                label="Force MFA on every login"
-                size="sm"
-              />
-              <span>Prompt every time anyway, remembered device or not</span>
-            </label>
-          </Chip>
-
-          <Chip
-            label="Users may disable"
-            value={rule.allowDisable2fa ? 'yes' : 'no'}
-            ghost={!rule.allowDisable2fa}
-            tone={rule.allowDisable2fa ? 'notice' : undefined}
-          >
-            <label className="bf__switchrow">
-              <Toggle checked={rule.allowDisable2fa} onChange={(v) => onPatch({ allowDisable2fa: v })} label="Allow users to disable 2FA" size="sm" />
-              <span>Let users switch their own second factor off</span>
-            </label>
-          </Chip>
-        </>
-      )}
-    </div>
-  )
-}
-
-/* A chip that opens one property. The popover is portalled for the same reason
-   the Picker's is: the header is a fixed-height grid row, and anything that
-   opened inside it would either be clipped or make it grow. */
-function Chip({
-  label,
-  value,
-  ghost,
-  tone,
-  children,
-}: {
-  label: string
-  value: string
-  ghost?: boolean
-  tone?: 'negative' | 'notice'
-  children: React.ReactNode
-}) {
-  const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
-  const anchor = useRef<HTMLButtonElement | null>(null)
-  const pop = useRef<HTMLDivElement | null>(null)
-  const id = useId()
-
-  useEffect(() => {
-    if (!open) {
-      setPos(null)
-      return
-    }
-    const place = () => {
-      const a = anchor.current?.getBoundingClientRect()
-      if (!a) return
-      const w = pop.current?.getBoundingClientRect().width ?? 280
-      setPos({ top: a.bottom + 5, left: Math.max(8, Math.min(a.left, window.innerWidth - w - 8)) })
-    }
-    place()
-    window.addEventListener('scroll', place, true)
-    window.addEventListener('resize', place)
-    const onDown = (e: MouseEvent) => {
-      const t = e.target as Node
-      if (!anchor.current?.contains(t) && !pop.current?.contains(t)) setOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('scroll', place, true)
-      window.removeEventListener('resize', place)
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
-
-  return (
-    <>
-      <button
-        ref={anchor}
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? id : undefined}
-        className={`bf__pchip ${ghost ? 'is-ghost' : ''} ${tone ? `is-${tone}` : ''} ${open ? 'is-open' : ''}`}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <em>{label}</em>
-        {value}
-        <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
-      </button>
-
-      {open &&
-        createPortal(
-          <div
-            ref={pop}
-            id={id}
-            role="dialog"
-            aria-label={label}
-            className="bf__pchippop"
-            style={{ top: pos?.top ?? 0, left: pos?.left ?? 0, visibility: pos ? 'visible' : 'hidden' }}
-          >
-            <h4 className="u-label">{label}</h4>
-            {children}
-          </div>,
-          document.body,
+              <p className="bf__ruleprose">
+                <span className="u-label">In words</span>
+                {ruleSentence(rule, resolve).then}
+              </p>
+            </div>
+          </motion.div>
         )}
-    </>
-  )
-}
-
-function ChainEditor({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
-  const chain = rule.methodChain ?? ['TOTP Authenticator']
-  return (
-    <div className="bf__chain">
-      {chain.map((step, si) => (
-        <span className="bf__chainstep" key={si}>
-          <b>{si + 1}</b>
-          <Picker
-            label={`Chain step ${si + 1}`}
-            width="fill"
-            value={step}
-            options={['Password', ...METHODS].map((m) => ({ value: m, label: m }))}
-            onChange={(v) => {
-              const next = [...chain]
-              next[si] = v
-              onPatch({ methodChain: next })
-            }}
-          />
-          <button
-            type="button"
-            disabled={chain.length === 1}
-            aria-label={`Remove step ${si + 1}`}
-            onClick={() => onPatch({ methodChain: chain.filter((_, n) => n !== si) })}
-          >
-            <X size={12} strokeWidth={2.2} />
-          </button>
-        </span>
-      ))}
-      <button type="button" className="bf__chainadd" onClick={() => onPatch({ methodChain: [...chain, 'miniOrange Push'] })}>
-        <Plus size={12} strokeWidth={2.4} /> Add step
-      </button>
-    </div>
+      </AnimatePresence>
+    </li>
   )
 }

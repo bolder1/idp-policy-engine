@@ -1,7 +1,8 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from 'vitest'
 
-import builder from '../screens/PolicyBuilderV4.tsx?raw'
+import mainShell from '../screens/PolicyBuilderMain.tsx?raw'
+import benchShell from '../screens/PolicyBuilderBench.tsx?raw'
 import flow from '../screens/flow-rail.tsx?raw'
 import tourSource from './Tour.tsx?raw'
 import learnSource from './LearnPanel.tsx?raw'
@@ -17,12 +18,24 @@ const FIGURE_IDS = new Set<FigureId>(['anatomy', 'order', 'checks', 'test', 'shi
    bug is filed. These assertions are the only thing standing between that and a
    walkthrough that quietly points at nothing. */
 
-const markup = builder + flow
+/* Checked per shell, not over the union.
+
+   There are two builders now and the tour runs in whichever one is showing, so
+   an anchor that exists only in one of them is a tour that points at nothing
+   half the time. Concatenating them would hide exactly that. The flow rail is
+   shared, so it joins both. */
+const SHELLS: [string, string][] = [
+  ['main', mainShell + flow],
+  ['bench', benchShell + flow],
+]
+const builder = mainShell + benchShell
 
 describe('the builder tour', () => {
-  it('has an anchor in the builder for every stop that names one', () => {
-    const missing = STOPS.filter((s) => s.anchor).filter((s) => !markup.includes(`data-tour="${s.anchor}"`))
-    expect(missing.map((s) => `${s.id} → ${s.anchor}`)).toEqual([])
+  it('has an anchor in every builder for every stop that names one', () => {
+    for (const [shell, markup] of SHELLS) {
+      const missing = STOPS.filter((s) => s.anchor).filter((s) => !markup.includes(`data-tour="${s.anchor}"`))
+      expect(missing.map((s) => `${shell}: ${s.id} → ${s.anchor}`)).toEqual([])
+    }
   })
 
   it('opens on a stop with no anchor, so the first card is centred', () => {

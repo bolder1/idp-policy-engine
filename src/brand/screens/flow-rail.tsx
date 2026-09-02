@@ -73,10 +73,10 @@ export function FlowRail({
      thing you came to do. This is where it actually belongs: the rail is the
      program, read top to bottom, and the audience is the gate every sign-in
      passes before rule 1 gets to look at it. */
-  audience: ReactNode
-  reach: number
-  emptyAudience: boolean
-  onAudience: () => void
+  audience?: ReactNode
+  reach?: number
+  emptyAudience?: boolean
+  onAudience?: () => void
 }) {
   const reduce = useReducedMotion()
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null)
@@ -110,6 +110,11 @@ export function FlowRail({
 
       <div className="bf__flowscroll" ref={scroller} tabIndex={0} role="region" aria-label="Evaluation order">
         <div className="bf__flowstage">
+          {/* The bench draws the audience here, because the rail is its only
+              list and the audience is the gate a sign-in passes before rule 1
+              gets to look at it. Main draws it as a numbered card at the top of
+              its own rule list instead, so it does not pass these. */}
+          {onAudience && (
           <button
             type="button"
             className={`bf__flowaud ${emptyAudience ? 'is-empty' : ''}`}
@@ -126,15 +131,17 @@ export function FlowRail({
               ) : (
                 <span className="bf__flowaudchips">
                   {audience}
-                  <em>{reach.toLocaleString()} people</em>
+                  <em>{(reach ?? 0).toLocaleString()} people</em>
                 </span>
               )}
             </span>
             <Pencil size={12} strokeWidth={1.9} aria-hidden />
           </button>
+          )}
 
           <p className="bf__flowstart">
-            <span aria-hidden />and then signs in
+            <span aria-hidden />
+            {onAudience ? 'and then signs in' : 'A user attempts to sign in'}
           </p>
 
           <LayoutGroup>

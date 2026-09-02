@@ -26,7 +26,7 @@ import {
 import { Counter, MenuButton, Tip, TipDot, Toggle, type MenuItem } from '../kit'
 import { Picker } from '../picker'
 import { cardLetter, ckey, duplicatedAcrossCards, leaves } from '../predicate'
-import type { NameLookup } from './predicate-prose'
+import { predicateParts, type NameLookup } from './predicate-prose'
 import {
   CONDITION_CATALOGUE,
   CONDITION_GROUPS,
@@ -301,6 +301,7 @@ export function WhenSection({
   ctx,
   onPatch,
   hit,
+  chrome,
   catalogue,
   onCatalogue,
 }: {
@@ -309,21 +310,33 @@ export function WhenSection({
   onPatch: (p: Partial<Rule>) => void
   /** Which card the docked tester says is carrying the match, if any. */
   hit?: number | null
-  /* The catalogue's open state is the BENCH's, not this component's.
+  /* Whether to draw the section heading and the readback around the cards.
 
-     It is an overlay pinned to the side of the pane rather than a panel that
-     expands inline, which is the single change that makes opening it cost zero
-     vertical pixels — the old inline panel added about 380px and pushed
-     everything below it off the screen. An overlay has to be rendered outside
-     the scrolling canvas, so the canvas's owner holds the state. */
-  catalogue: string | null
-  onCatalogue: (cardId: string | null) => void
+     Main wants them: its rule card holds WHEN and THEN as two labelled
+     sections, and the readback is the only place that rule reads as a sentence.
+     The bench does not: its canvas IS the when block, and the verdict header
+     pinned above it already carries the sentence — repeating it there would
+     spend the scarce thing (room in the only scroller) on something already
+     free. */
+  chrome?: boolean
+  /* The catalogue's open state, hoisted.
+
+     The bench renders the catalogue as an overlay pinned to the side of the
+     pane rather than a panel that expands inline, which is what makes opening
+     it cost zero vertical pixels — the inline panel added about 380px and
+     pushed everything below it off the screen. An overlay has to be rendered
+     outside the scroller it overlays, so the bench holds the state. Main's
+     panel is inline, so it keeps its own. */
+  catalogue?: string | null
+  onCatalogue?: (cardId: string | null) => void
 }) {
   const store = useBrand()
   const resolve = useNameLookup()
   const [justAdded, setJustAdded] = useState<string | null>(null)
-  const adding = catalogue
-  const setAdding = onCatalogue
+  const [ownAdding, setOwnAdding] = useState<string | null>(null)
+  const hoisted = onCatalogue !== undefined
+  const adding = hoisted ? (catalogue ?? null) : ownAdding
+  const setAdding = hoisted ? onCatalogue! : setOwnAdding
 
   const cards = rule.when.cards
   const setCards = (next: ConditionCard[]) => onPatch({ when: { cards: next } })
@@ -403,13 +416,16 @@ export function WhenSection({
 
   const dupes = duplicatedAcrossCards(rule.when)
 
-  /* No section header and no readback here any more. The canvas IS the when
-     block — it is the only thing in the pane that scrolls — and the verdict
-     header pinned above it already carries the rule as a sentence. Repeating
-     either would spend the scarce thing (vertical room in the scroller) on the
-     thing that is already free (a fixed header). */
-  return (
+  const body = (
     <div className="bf__when">
+      {chrome && (
+        /* The rule read back, always visible and always live — the one place
+           the whole predicate is a sentence rather than a set of controls. */
+        <p className="bf__whenread">
+          <span className="u-label">This rule matches when</span>
+          <Readback rule={rule} resolve={resolve} />
+        </p>
+      )}
 
         {cards.length === 0 ? (
           <div className="bf__whenempty">
@@ -485,6 +501,18 @@ export function WhenSection({
           </p>
         )}
     </div>
+  )
+
+  if (!chrome) return body
+  return (
+    <Section
+      id="if"
+      bare
+      title="When it applies"
+      hint="Conditions in one box must all be true. Extra boxes are alternatives — any one of them is enough."
+    >
+      {body}
+    </Section>
   )
 }
 
@@ -919,12 +947,38 @@ function ValueControl({
   )
 }
 
-/* `Readback` lived here — the predicate rendered as elements so the brackets
-   and the `or` carried the structure visually. The verdict header above the
-   canvas now carries the whole rule as one line, built from the same
-   `ruleSentence`, so a second rendering inside the scroller would spend the
-   scarce thing on something already free. `predicateParts` stays exported for
-   any surface that wants the structured form back. */
+/* --- The readback ---------------------------------------------------------------
+
+   The predicate as elements rather than as a string, so the brackets and the
+   `or` carry the structure visually. It is fed by `predicateParts`, which is
+   the same renderer `predicateSentence` uses — the review dialog promises the
+   reader that the sentence and the rule cannot disagree, and two
+   implementations would be one chance for that to be false. */
+function Readback({ rule, resolve }: { rule: Rule; resolve: NameLookup }) {
+  const parts = predicateParts(rule.when, resolve)
+  if (parts.length === 0) return <em className="bf__readany">any sign-in that reaches it</em>
+
+  return (
+    <span className="bf__readexpr">
+      {parts.map((k, i) => (
+        <Fragment key={k.id}>
+          {i > 0 && <b className="bf__reador">or</b>}
+          <span className="bf__readcard">
+            {parts.length > 1 && <i aria-hidden>(</i>}
+            {k.label && <u>{k.label}:</u>}
+            {k.clauses.map((cl, j) => (
+              <Fragment key={cl.id}>
+                {j > 0 && <b className="bf__readand">and</b>}
+                <span data-node-id={cl.id}>{cl.text}</span>
+              </Fragment>
+            ))}
+            {parts.length > 1 && <i aria-hidden>)</i>}
+          </span>
+        </Fragment>
+      ))}
+    </span>
+  )
+}
 
 /* --- The catalogue -------------------------------------------------------------- */
 

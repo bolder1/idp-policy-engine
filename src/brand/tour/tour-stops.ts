@@ -22,7 +22,7 @@
    paragraph is two stops, or it is documentation.
    -------------------------------------------------------------------------- */
 
-export type HeroId = 'welcome' | 'order' | 'trail' | 'conditions' | 'answer' | 'publish'
+export type HeroId = 'welcome' | 'order' | 'trail' | 'conditions' | 'publish'
 
 export interface Stop {
   id: HeroId
@@ -42,7 +42,7 @@ export const STOPS: Stop[] = [
   {
     id: 'welcome',
     heading: 'This is where a policy gets written',
-    body: 'Six stops and about a minute — leave whenever you like, and pick it up again from the Policy menu.',
+    body: 'Five stops and about a minute — leave whenever you like, and start it again from the mortarboard in the toolbar.',
   },
   {
     id: 'order',
@@ -61,12 +61,6 @@ export const STOPS: Stop[] = [
     anchor: 'stage',
     heading: 'A box is an AND, a second box is an OR',
     body: 'Everything inside one box must be true, and any one box is enough — which is the whole grammar, and why there is no operator here to get wrong.',
-  },
-  {
-    id: 'answer',
-    anchor: 'try',
-    heading: 'Ask what it would do',
-    body: 'Pick somebody and a situation, and the box that decides it lights up — before anything is saved.',
   },
   {
     id: 'publish',

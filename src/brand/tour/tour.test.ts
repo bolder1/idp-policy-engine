@@ -2,8 +2,8 @@
 import { describe, expect, it } from 'vitest'
 
 import mainShell from '../screens/PolicyBuilderMain.tsx?raw'
-import benchShell from '../screens/PolicyBuilderBench.tsx?raw'
 import flow from '../screens/flow-rail.tsx?raw'
+import policyBar from '../screens/policy-bar.tsx?raw'
 import tourSource from './Tour.tsx?raw'
 import learnSource from './LearnPanel.tsx?raw'
 import figureSource from './TutorialFigure.tsx?raw'
@@ -18,17 +18,14 @@ const FIGURE_IDS = new Set<FigureId>(['anatomy', 'order', 'checks', 'test', 'shi
    bug is filed. These assertions are the only thing standing between that and a
    walkthrough that quietly points at nothing. */
 
-/* Checked per shell, not over the union.
-
-   There are two builders now and the tour runs in whichever one is showing, so
-   an anchor that exists only in one of them is a tour that points at nothing
-   half the time. Concatenating them would hide exactly that. The flow rail is
-   shared, so it joins both. */
-const SHELLS: [string, string][] = [
-  ['main', mainShell + flow],
-  ['bench', benchShell + flow],
-]
-const builder = mainShell + benchShell
+/* Checked per shell, not over the union — there is one builder now, and this
+   ran over two when there were two: an anchor that exists in only one of them
+   is a tour that points at nothing half the time, and concatenating would hide
+   exactly that. The rail and the policy bar are part of the screen the tour
+   runs over, so they join it. */
+const SHELL = mainShell + flow + policyBar
+const SHELLS: [string, string][] = [['main', SHELL]]
+const builder = SHELL
 
 describe('the builder tour', () => {
   it('has an anchor in every builder for every stop that names one', () => {
@@ -73,8 +70,10 @@ describe('the builder tour', () => {
      away by somebody working on their hundredth. */
   it('is reachable again after it has been taken, from the bar and not only a menu', () => {
     expect(builder).toContain('label="Learn the builder"')
-    expect(builder).toContain("id: 'learn'")
     expect(builder).toContain('onStartTour')
+    // And nowhere else: the menu it used to hide in is gone, and putting it
+    // back in one would undo the fix this test exists to hold.
+    expect(builder).not.toContain("id: 'learn'")
     // And the panel offers it as a re-run rather than pretending it is new.
     expect(learnSource).toContain('Take it again')
     expect(learnSource).toContain('tourSeen')

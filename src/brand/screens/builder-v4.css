@@ -1,20 +1,20 @@
 /* ---------------------------------------------------------------------------
-   Policy builder v4 — the trail. Prefix `bf`.
+   The policy builder. Prefix `bf`.
 
-   The flow on the left, brought over from v1: a dot-grid stage where the
-   sequence is drawn rather than listed, resizable from the corridor beside it.
-   The trail in the middle: one step at a time, or the whole rule at once. And a
-   panel that arrives from the right only when it is asked for, taking width
-   from the trail rather than sitting on top of it.
+   Two panes over one policy: the sequence on the left as a dot-grid stage where
+   the rules are drawn rather than listed, and the rule you are editing on the
+   right with everything the sequence is not using.
 
-   The page cap is opted out of here. `.bpage` caps every screen at 1560px,
-   which is right for a table and wrong for a workspace — at 1920 it left 296px
-   of window empty.
+   `.bpage`'s page chrome is opted out of here, and it takes `.bpage.bf` to do
+   it: console-theme.css restates `.bpage` at the same specificity and is loaded
+   last, so `.bf` alone loses on source order. Both parts of it are wrong for
+   this screen — the 1560px cap is right for a table and left 296px of a 1920
+   window empty, and the 32/32/56 inset frames a workspace as a document.
 
    Every colour is a token.
    --------------------------------------------------------------------------- */
 
-.bf {
+.bpage.bf {
   display: flex; flex-direction: column;
   height: 100%; min-height: 0; padding: 0; overflow: hidden;
   max-width: none;
@@ -29,35 +29,10 @@
   background: var(--surface-raised); border-bottom: 1px solid var(--border-subtle);
 }
 .bf__pips { display: flex; align-items: center; gap: var(--space-3); }
-.bf .bf__name {
-  min-width: 160px; max-width: 380px; height: 32px; padding: 0 var(--space-4);
-  font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary);
-  background: none; border: 1px solid transparent; border-radius: var(--radius-sm);
-}
-.bf .bf__name:hover { border-color: var(--border-default); }
-.bf .bf__name:focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--focus-ring); }
-
 .bf__baracts { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); }
 .bf__sep { width: 1px; height: 20px; margin: 0 var(--space-2); background: var(--border-subtle); }
 
-/* --- Work row ------------------------------------------------------------------
-
-   Two columns: the rail is the program, the bench is the rule. The rail is open
-   by default and collapsible — it is the only rule list now, so it cannot both
-   hold the order and be hidden — and below 900 it becomes an overlay, where a
-   320px column would be a third of the screen. */
-
-.bf.is-bench .bf__work {
-  flex: 1; min-height: 0; position: relative;
-  display: grid;
-  grid-template-columns: var(--rail-w, 320px) minmax(0, 1fr);
-  transition: grid-template-columns 200ms var(--ease-standard);
-}
-.bf.is-bench .bf__work.is-railshut { --rail-w: 0px; }
-@media (prefers-reduced-motion: reduce) { .bf__work { transition: none; } }
-
-.bf.is-bench .bf__flowdock { position: relative; min-height: 0; overflow: hidden; }
-.bf__flow { height: 100%; min-height: 0; }
+/* --- The rules panel's scroller ----------------------------------------------- */
 
 .bf__flowscroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: var(--space-4) 76px; }
 .bf__flowscroll:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
@@ -74,27 +49,6 @@
   border-radius: 0;
 }
 
-/* --- Step one: who, as the rail's first node ------------------------------------
-
-   It was a strip above the work and it read as metadata. This is where it
-   belongs: the rail is the program read top to bottom, and the audience is the
-   gate a sign-in passes before rule 1 gets to look at it. */
-.bf__flowaud {
-  display: flex; align-items: flex-start; gap: var(--space-3);
-  width: 100%; padding: var(--space-4);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
-  font-family: inherit; text-align: left; cursor: pointer;
-}
-.bf__flowaud:hover { border-color: var(--brand); }
-.bf__flowaud.is-empty { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
-.bf__flowaud > svg { flex: none; margin-top: 3px; color: var(--text-muted); }
-.bf__flowaudbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-.bf__flowaudbody strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bf__flowaudbody em.is-empty { font-style: normal; font-size: var(--fs-sm); color: var(--fb-negative-fg); }
-.bf__flowaudchips { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
-.bf__flowaudchips em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-
 .bf__stepn {
   flex: none; display: grid; place-items: center;
   width: 18px; height: 18px; margin-top: 1px;
@@ -102,123 +56,10 @@
   font-size: 10px; font-weight: var(--fw-semibold); color: var(--text-tertiary);
 }
 
-/* --- The bench -----------------------------------------------------------------
+/* --- A rule's own checks ------------------------------------------------------- */
 
-   Three rows: a fixed verdict, the only unbounded scroll in the builder, and a
-   pinned checks bar. The verdict's height is a variable that tiers by viewport
-   height and NEVER by content — the moment it can grow it has stopped being the
-   fix. */
-
-.bf__bench {
-  --verdict-h: 118px;
-  position: relative; min-width: 0; min-height: 0;
-  display: grid; grid-template-rows: var(--verdict-h) minmax(0, 1fr) auto;
-  background: var(--surface-raised);
-}
-.bf__bench:has(.bf__reviewstage), .bf__bench:has(.bf__blank) { grid-template-rows: minmax(0, 1fr); }
-
-.bf__verdict {
-  height: var(--verdict-h);
-  display: grid; grid-template-rows: var(--ctl-height-md) 28px 18px;
-  align-content: center; row-gap: var(--space-3);
-  padding: var(--space-4) var(--space-6);
-  border-bottom: 1px solid var(--border-subtle);
-  overflow-anchor: none;
-}
-
-.bf__vseg { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-
-/* One control over one field. The two outcome tiles and the second-factor
-   switch were two controls writing to `decision`, and you could only find that
-   out by picking one of them. */
-.bf__vsegctl {
-  flex: none; display: flex; gap: 2px; padding: 2px;
-  background: var(--surface-inset); border-radius: var(--radius-md);
-}
-.bf__vsegctl button {
-  padding: 0 var(--space-4); height: 28px;
-  border: none; background: none; border-radius: var(--radius-sm);
-  font-family: inherit; font-size: var(--fs-sm); color: var(--text-secondary);
-  white-space: nowrap; cursor: pointer;
-}
-.bf__vsegctl button:hover { color: var(--text-primary); }
-.bf__vsegctl button.is-on { background: var(--surface-raised); box-shadow: var(--el-low); font-weight: var(--fw-medium); }
-.bf__vsegctl button.is-on.is-allow { color: var(--fb-positive-fg); }
-.bf__vsegctl button.is-on.is-mfa { color: var(--fb-notice-fg); }
-.bf__vsegctl button.is-on.is-deny { color: var(--fb-negative-fg); }
-
-/* --- The settings, as chips that never wrap ------------------------------------
-
-   Five stacked label/control rows became five chips. Depth goes sideways into a
-   popover, never downward into the header — which is what keeps the height
-   provably constant at every width. Off states are ghost chips rather than
-   omissions, so the shape of the outcome does not change as you set it. */
-.bf__vprops {
-  display: flex; align-items: center; gap: var(--space-2);
-  height: 28px; flex-wrap: nowrap; overflow: hidden;
-}
-.bf__pchip {
-  flex: none; display: inline-flex; align-items: center; gap: var(--space-2);
-  height: 26px; max-width: 260px; padding: 0 var(--space-3);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-full);
-  font-family: inherit; font-size: var(--fs-sm); color: var(--text-body);
-  white-space: nowrap; overflow: hidden; cursor: pointer;
-}
-.bf__pchip em { font-style: normal; color: var(--text-muted); }
-.bf__pchip svg { flex: none; color: var(--text-muted); }
-.bf__pchip:hover { border-color: var(--border-strong); }
-.bf__pchip.is-open { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
-.bf__pchip.is-ghost { background: none; border-style: dashed; color: var(--text-muted); }
-.bf__pchip.is-negative { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bf__pchip.is-notice { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
-
-.bf__pchippop {
-  position: fixed; z-index: var(--z-popover);
-  width: 300px; max-width: calc(100vw - 16px);
-  display: flex; flex-direction: column; gap: var(--space-4);
-  padding: var(--space-5);
-  background: var(--surface-overlay, var(--surface-raised));
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
-  box-shadow: var(--el-high, var(--el-mid));
-}
-.bf__pchippop h4 { margin: 0; color: var(--text-muted); }
-
-/* The whole rule, on the scroll edge, so it summarises everything below the
-   fold. Verbatim the string the rail tile shows — reading and editing cost
-   nothing to translate between. */
-.bf__vline {
-  height: 18px; min-width: 0;
-  margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-
-/* --- The canvas: the only unbounded region in the layout ----------------------- */
-
-.bf__canvas {
-  min-height: 0; overflow-y: auto; overscroll-behavior: contain;
-  padding: var(--space-6) var(--space-6) var(--space-8);
-  scroll-padding-block-start: var(--space-5);
-  scroll-behavior: smooth;
-}
-.bf__canvas:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-@media (prefers-reduced-motion: reduce) { .bf__canvas { scroll-behavior: auto; } }
 .bf__when { max-width: 900px; }
 
-/* --- The checks, pinned -------------------------------------------------------- */
-
-.bf__checksbar {
-  flex: none; max-height: 132px; overflow-y: auto;
-  display: flex; flex-direction: column; gap: var(--space-2);
-  padding: var(--space-3) var(--space-6);
-  border-top: 1px solid var(--border-subtle);
-  background: var(--surface-raised);
-  overflow-anchor: none;
-}
-.bf__checkclear {
-  display: flex; align-items: center; gap: var(--space-3);
-  margin: 0; font-size: var(--fs-sm); color: var(--fb-positive-fg);
-}
 .bf__rulecheck {
   display: flex; align-items: flex-start; gap: var(--space-3);
   margin: 0; font-size: var(--fs-sm); color: var(--text-secondary);
@@ -233,23 +74,6 @@
   font-family: inherit; font-size: var(--fs-sm); color: var(--brand); cursor: pointer; white-space: nowrap;
 }
 
-/* --- The catalogue, as an overlay ----------------------------------------------
-
-   It was an inline panel about 380px tall that pushed everything below it off
-   the screen every time it opened. As an overlay pinned to the side of the pane
-   it costs exactly zero vertical pixels, which is the largest single win in
-   this layout. */
-.bf.is-bench .bf__cat {
-  position: absolute; top: var(--verdict-h); right: 0; bottom: 0;
-  z-index: var(--z-dropdown, 200);
-  width: min(380px, 100%);
-  display: grid; grid-template-rows: auto minmax(0, 1fr);
-  overflow: hidden;
-  background: var(--surface-overlay, var(--surface-raised));
-  border-left: 1px solid var(--border-default);
-  border-radius: 0;
-  box-shadow: var(--el-high, var(--el-mid));
-}
 .bf__catitems { min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-3); }
 
 /* A row is a name. The category is a tint and a quiet word on the right, for
@@ -263,38 +87,12 @@
 .bf__catitem strong { flex: 1; min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bf__catitem em { flex: none; font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
 
-/* --- Height tiers --------------------------------------------------------------
-   The header tiers; it never scrolls and never grows. */
+/* --- Width tiers ----------------------------------------------------------------
 
-@media (max-height: 839px) {
-  .bf__bench { --verdict-h: 96px; }
-  .bf__verdict { grid-template-rows: var(--ctl-height-md) 28px; }
-  .bf__vline { display: none; }
-}
-@media (max-height: 719px) {
-  .bf__bench { --verdict-h: 62px; }
-  .bf__verdict { grid-template-rows: var(--ctl-height-md); padding-block: var(--space-3); }
-  .bf__vprops { display: none; }
-}
-
-/* --- Width tiers ---------------------------------------------------------------- */
+   The rules panel narrows before it collapses: 320px is right beside a wide
+   playground and is width the playground wants back before that. */
 
 @media (max-width: 1439px) { .bf__work { --rail-w: 288px; } }
-
-@media (max-width: 899px) {
-  .bf.is-bench .bf__work, .bf.is-bench .bf__work.is-railshut { grid-template-columns: minmax(0, 1fr); }
-  .bf.is-bench .bf__flowdock {
-    position: absolute; z-index: var(--z-popover);
-    left: 0; top: 0; bottom: 0;
-    width: min(320px, 88vw);
-    transform: translateX(-102%);
-    transition: transform 220ms var(--ease-standard), visibility 220ms;
-    box-shadow: var(--el-high);
-  }
-  .bf.is-bench .bf__flowdock[aria-hidden='true'] { visibility: hidden; }
-  .bf.is-bench .bf__work.is-flowopen .bf__flowdock { transform: translateX(0); visibility: visible; }
-  .bf.is-bench .bf__cat { width: 100%; }
-}
 @media (prefers-reduced-motion: reduce) { .bf__flowdock { transition: none; } }
 
 /* --- The flow (v1's left side) -------------------------------------------------- */
@@ -472,8 +270,6 @@
 }
 @media (prefers-reduced-motion: reduce) { .bf__stage { scroll-behavior: auto; } }
 .bf__reviewstage { scroll-padding-block: var(--space-5) 80px; scroll-behavior: smooth; }
-.bf__panel { max-width: 1080px; }
-
 .bf__rulehead[hidden] { display: none; }
 .bf__rulehead {
   display: flex; align-items: center; gap: var(--space-4);
@@ -544,38 +340,35 @@
 }
 .bf__stepwhere b { font-weight: var(--fw-medium); color: var(--fb-notice-fg); font-size: var(--fs-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bf__stepwhere i { font-style: normal; color: var(--fb-notice-fg); opacity: 0.8; }
+/* The whole screen, when the policy has no rules.
 
-/* --- The form sheet, still hosted by v5 ----------------------------------------------- */
-
-.bf__form { min-height: 0; overflow-y: auto; background: var(--surface-page); }
-.bf__sheet { max-width: 720px; margin: 0 auto; padding: 0 var(--space-8) 140px; }
-
-.bf__sticky {
-  position: sticky; top: 0; z-index: var(--z-sticky);
-  display: flex; align-items: center; gap: var(--space-4);
-  margin: 0 calc(var(--space-8) * -1); padding: var(--space-4) var(--space-8);
-  background: var(--surface-page);
-  border-bottom: 1px solid var(--border-subtle);
-}
-.bf__stickyn {
-  display: grid; place-items: center; width: 22px; height: 22px;
-  border-radius: var(--radius-sm); font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-}
-.bf__stickyn.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
-.bf__stickyn.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
-.bf__stickyn.is-deny { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bf__sticky > strong {
-  flex: 1; min-width: 0; font-size: var(--fs-base); color: var(--text-primary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bf__stickyswitch { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); }
-
+   Everything else in the builder is gated off at this point — nothing to grade,
+   nothing to undo, nothing to trace, nothing to publish — so this is not a
+   placeholder sitting inside a working screen. It IS the screen, and it gets
+   the room to say what a rule is rather than only that there aren't any. */
 .bf__blank {
-  max-width: 460px; margin: 12vh auto 0; text-align: center; color: var(--text-secondary);
+  max-width: 520px; margin: 10vh auto 0; text-align: center; color: var(--text-secondary);
 }
-.bf__blank h2 { margin: var(--space-5) 0 var(--space-3); font-size: var(--fs-xl); color: var(--text-primary); }
-.bf__blank p { margin: 0 0 var(--space-6); font-size: var(--fs-md); }
+.bf__blank > svg { color: var(--text-muted); }
+.bf__blank h2 { margin: var(--space-5) 0 var(--space-4); font-size: var(--fs-2xl, var(--fs-xl)); color: var(--text-primary); }
+.bf__blank p { margin: 0 0 var(--space-7); font-size: var(--fs-md); line-height: 1.6; }
 .bf__blankacts { display: flex; justify-content: center; gap: var(--space-4); }
+
+/* The other two ways in, on their own row and quieter than the first.
+
+   Standing them beside "Add the first rule" made three buttons of roughly equal
+   weight, which turns one obvious next step into a choice between three. */
+.bf__blankmore {
+  display: flex; justify-content: center; flex-wrap: wrap; gap: var(--space-5);
+  margin-top: var(--space-6); padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+.bf__blankmore button {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  background: none; border: none; padding: 0;
+  font-family: inherit; font-size: var(--fs-sm); color: var(--text-tertiary); cursor: pointer;
+}
+.bf__blankmore button:hover { color: var(--brand); }
 
 /* --- Sections ------------------------------------------------------------------ */
 
@@ -590,21 +383,11 @@
 .bf__sec.is-bare { padding: 0; border-bottom: none; }
 .bf__secbar { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-5); }
 .bf__secbar h2 { flex: 1; min-width: 0; margin: 0; display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bf__secbar .bf__ifviews { flex: none; }
 .bf__secn {
   flex: none; display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px;
   border-radius: var(--radius-full); background: var(--surface-inset);
   font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary);
 }
-
-.bf__input {
-  width: 100%; height: var(--ctl-height-md); padding: 0 var(--space-5);
-  background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: var(--radius-md);
-  font-size: var(--fs-base); color: var(--text-primary);
-}
-.bf__input--big { height: var(--ctl-height-lg); font-size: var(--fs-lg); font-weight: var(--fw-medium); }
-.bf__input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
-
 /* --- WHEN: the composer -------------------------------------------------------------
 
    Two levels, and the levels are drawn rather than declared. A card is a box
@@ -662,7 +445,6 @@
 }
 /* The card the docked tester says is carrying the match. Never colour alone —
    the header carries the word "Matches" beside it. */
-.bf__card.is-hit { border-color: var(--fb-positive-border); box-shadow: var(--el-low); }
 
 .bf__cardhead {
   display: flex; align-items: center; gap: var(--space-3);
@@ -683,13 +465,6 @@
 .bf .bf__cardname:hover { border-color: var(--border-subtle); }
 .bf .bf__cardname:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
 .bf__cardcount { flex: none; font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
-.bf__cardhit {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 2px var(--space-3); border-radius: var(--radius-full);
-  background: var(--fb-positive-bg); color: var(--fb-positive-fg);
-  font-size: var(--fs-xs); font-weight: var(--fw-medium);
-}
-
 .bf__cardconds { margin: 0; padding: 0; list-style: none; }
 
 /* Punctuation, not a control. No border, no background, no hover, no cursor —
@@ -774,8 +549,6 @@
 
 /* Pass and fail against the docked tester. A thin left edge only — the row is
    still an editor, and painting it green would make it look like a result. */
-.bf__cond.is-pass { --cond-dot: var(--fb-positive-dot); }
-.bf__cond.is-fail { opacity: 0.72; }
 
 .bf__condicon {
   flex: none; display: grid; place-items: center; width: 22px; height: 22px;
@@ -826,14 +599,7 @@
 
 /* --- Adding ---------------------------------------------------------------------------- */
 
-/* Static, deliberately. The catalogue is `position: absolute` and pins itself
-   to the bench — a positioned wrapper here would make it resolve against a 31px
-   button instead, which renders the panel about 2px tall. */
 .bf__addwrap { position: relative; margin-top: var(--space-3); }
-/* The bench's catalogue is `position: absolute` and pins itself to the pane. A
-   positioned wrapper here would make it resolve against a 31px button instead,
-   which renders the panel about two pixels tall. */
-.bf.is-bench .bf__addwrap { position: static; }
 .bf__addwrap.is-or { margin-top: var(--space-4); }
 
 .bf__add {
@@ -867,9 +633,6 @@
    level, so the list of things you could check grew every time somebody saved
    one — and "Network Zone" as a concept never appeared at all. */
 
-/* The catalogue's own contents. Its frame — position, width, the two scroll
-   regions — is defined with the bench layout above, because it is an overlay
-   on the pane rather than a panel inside the card that opened it. */
 .bf__catbar {
   display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-3) var(--space-5);
@@ -1047,48 +810,6 @@
   margin: var(--space-5) 0 0;
   font-size: var(--fs-sm); color: var(--text-tertiary);
 }
-
-.bf__addrule { display: flex; }
-.bf__addrule button {
-  display: inline-flex; align-items: center; gap: var(--space-3);
-  width: 100%; height: 40px; justify-content: center;
-  border: 1px dashed var(--border-default); border-radius: var(--radius-lg);
-  background: none; font-family: inherit;
-  font-size: var(--fs-md); color: var(--text-tertiary); cursor: pointer;
-}
-.bf__addrule button:hover { border-color: var(--brand); color: var(--brand); }
-
-/* --- The docked tester ---------------------------------------------------------------
-
-   Was one of three panels taking turns behind an icon. It is the only writer of
-   the preview context every condition is evaluated against, so hiding it froze
-   the whole builder's answer to "would this match" on a default nobody chose,
-   with nothing on screen saying so. One line, always on. */
-
-.bf__try {
-  flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3);
-  padding: var(--space-3) var(--space-7);
-  background: var(--surface-sunken);
-  border-top: 1px solid var(--border-subtle);
-  font-size: var(--fs-sm); color: var(--text-tertiary);
-}
-.bf__try em { font-style: normal; color: var(--text-muted); }
-.bf__tryout {
-  margin-left: auto;
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  padding: 3px var(--space-4); border-radius: var(--radius-full);
-  font-size: var(--fs-sm); font-weight: var(--fw-medium);
-  background: var(--fb-neutral-bg); color: var(--fb-neutral-fg);
-}
-.bf__tryout.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
-.bf__tryout.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
-.bf__tryout.is-deny { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bf__trynote {
-  display: grid; place-items: center; width: 16px; height: 16px;
-  border-radius: var(--radius-full); background: var(--surface-inset);
-  font-size: 10px; color: var(--text-muted); cursor: help;
-}
-
 /* --- The review stage ------------------------------------------------------------------ */
 
 .bf__reviewstage { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-7) var(--space-8); }
@@ -1216,15 +937,6 @@
 .bf__diags li.is-warning { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
 .bf__diags li.is-info { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); }
 .bf__diaggo { align-self: flex-start; margin-top: var(--space-2); font-size: var(--fs-xs); color: inherit; text-decoration: underline; }
-
-.bf__rowacts { display: flex; gap: var(--space-6); padding: var(--space-6) 0; }
-.bf__rowacts button {
-  display: inline-flex; align-items: center; gap: var(--space-3);
-  font-size: var(--fs-md); color: var(--text-secondary); cursor: pointer;
-}
-.bf__rowacts button:hover { color: var(--text-primary); }
-.bf__rowacts button.is-danger:hover { color: var(--fb-negative-fg); }
-
 /* --- Review, the last stop on the trail ------------------------------------------------
 
    Not a modal. A dialog behind Publish puts the summary of a policy on the far
@@ -1299,57 +1011,6 @@
   padding-top: var(--space-6); border-top: 1px solid var(--border-subtle);
 }
 .bf__revfootacts { flex: 1; display: flex; gap: var(--space-3); }
-
-/* --- Live preview -------------------------------------------------------------------- */
-
-.bf__preview { padding: var(--space-5); }
-.bf__preview > .u-label { display: block; margin-bottom: var(--space-4); }
-
-.bf__pvusers { display: flex; gap: var(--space-3); }
-.bf__pvusers button {
-  width: 30px; height: 30px; border-radius: var(--radius-full);
-  border: 1px solid var(--border-default); background: var(--surface-sunken);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary); cursor: pointer;
-}
-.bf__pvusers button.is-on { background: var(--text-primary); border-color: var(--text-primary); color: var(--surface-raised); }
-
-.bf__pvwho { margin: var(--space-4) 0 var(--space-5); display: flex; flex-direction: column; gap: 1px; }
-.bf__pvwho strong { font-size: var(--fs-md); color: var(--text-primary); }
-.bf__pvwho em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
-
-.bf__pvaxis { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: var(--space-4); margin-bottom: var(--space-3); }
-.bf__pvaxis > span:first-child { font-size: var(--fs-xs); color: var(--text-muted); }
-.bf__pvselect { position: relative; display: block; }
-.bf__pvselect select {
-  width: 100%; height: 28px; padding: 0 24px 0 var(--space-4);
-  background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
-  font-size: var(--fs-sm); color: var(--text-body); font-family: inherit; appearance: none;
-}
-.bf__pvselect svg { position: absolute; right: 7px; top: 8px; color: var(--text-muted); pointer-events: none; }
-
-.bf__pvverdict {
-  display: flex; flex-direction: column; gap: var(--space-3);
-  margin: var(--space-5) 0; padding: var(--space-5);
-  border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); background: var(--surface-sunken);
-}
-.bf__pvverdict.is-allow { border-color: var(--fb-positive-border); background: var(--fb-positive-bg); }
-.bf__pvverdict.is-mfa { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
-.bf__pvverdict.is-deny { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
-.bf__pvverdict p { margin: 0; font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.5; }
-.bf__pvverdict button { font-size: var(--fs-xs); color: var(--text-link); text-decoration: underline; }
-
-.bf__pvtrace { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
-.bf__pvtrace li { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); }
-.bf__pvtrace li button { font-size: var(--fs-xs); color: inherit; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bf__pvtrace li button:hover { color: var(--text-primary); }
-.bf__pvtrace li span { flex: none; display: grid; place-items: center; width: 14px; color: var(--text-muted); }
-.bf__pvtrace li.is-hit { color: var(--fb-positive-fg); font-weight: var(--fw-medium); }
-.bf__pvtrace li.is-hit span { color: var(--fb-positive-dot); }
-.bf__pvtrace li.is-unreached, .bf__pvtrace li.is-off { opacity: 0.5; }
-.bf__pvtrace li.is-current button { text-decoration: underline; }
-
-.bf__pvnote { margin: var(--space-5) 0 0; font-size: 10px; line-height: 1.5; color: var(--text-muted); }
-
 /* --- Policy overview -----------------------------------------------------------
 
    The read-only reading surface. Prefix `bov`. Deliberately plainer than the
@@ -1424,31 +1085,9 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
   font-size: var(--fs-md); color: var(--text-tertiary);
 }
 .bov__foot { flex: 1; font-size: var(--fs-xs); color: var(--text-tertiary); }
-
-/* The rail's tabs, borrowed from v5 so both hosts present the same two panels
-   the same way. */
-.bf__rail .bm__railtabs { border-top: 1px solid var(--border-subtle); }
-
 /* A rule that wins nothing in the whole sweep is a finding, not a statistic —
    it is either unreachable or written against a signal nobody produces. */
 .bf__impact div.is-empty strong { color: var(--fb-negative-fg); }
-
-/* The rationale field. Sits under the rule name, sized so two lines are the
-   comfortable answer and more is possible — a rule whose reason takes a
-   paragraph is a rule worth splitting, and the box should say so by feeling
-   tight rather than by refusing the text. */
-.bf__why {
-  height: auto;
-  margin-top: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  font-family: inherit;
-  font-size: var(--fs-md);
-  line-height: 1.5;
-  color: var(--text-body);
-  resize: vertical;
-}
-.bf__why::placeholder { color: var(--text-muted); }
-
 /* The rationale in the read-end-to-end surface. Quieter than the predicate
    above it — the predicate is what the engine does, this is what a person
    meant, and the two should not compete for the same glance. */
@@ -1473,49 +1112,70 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
 }
 
 /* =============================================================================
-   MAIN's own regions.
+   The shell: the rules panel, the playground, and what sits between them.
 
-   The two shells share the model, the composer, the flow rail and every dialog;
-   what differs is where the rule lives. Main expands it in place inside a list,
-   the bench gives it a pane. Only the three selectors they genuinely disagree
-   about are scoped — the work row, the catalogue's positioning, and whether the
-   add-wrapper is a containing block. Everything below is additive: these
-   classes never appear in the bench's markup.
+   `.is-main` is still on the root. There were three shells over one model and
+   the other two are gone, but the scope stays until something else needs the
+   name — unscoping it is a rename of forty selectors that buys nothing.
    ========================================================================== */
 
 /* --- Work area ----------------------------------------------------------------
 
-   One column now. The sequence used to be a resizable grid column holding 380px
-   of every window forever — a third of a 1024 screen spent on a list you
-   consult, while the thing being edited was squeezed — and it could never be
-   one width for both jobs: wide enough to draw a diagram, narrow enough not to
-   starve the editor.
+   Two panes: the rules on the left, the playground on the right.
 
-   It floats over the work instead and closes once it has been used. That is
-   what it already did below 1120; the behaviour was right, it was only
-   conditional on the window being small. */
+   The playground is where the work happens, so it gets everything the rules
+   panel is not using — and the rules panel collapses, because half the time you
+   are inside one rule and the sequence is a thing you glance at rather than a
+   thing you need. Below 900 it stops being a column at all and floats over the
+   playground, where a 320px track would be a third of the screen. */
 
-.bf.is-main .bf__work { flex: 1; min-height: 0; position: relative; display: flex; }
+.bf.is-main .bf__work {
+  --rail-w: 320px;
+  flex: 1; min-height: 0; position: relative;
+  display: grid;
+  grid-template-columns: var(--rail-track, var(--rail-w)) minmax(0, 1fr);
+  transition: grid-template-columns 200ms var(--ease-standard);
+}
+.bf.is-main .bf__work:not(.is-flowopen) { --rail-track: 0px; }
+@media (prefers-reduced-motion: reduce) { .bf.is-main .bf__work { transition: none; } }
 .bf.is-main .bf__work > .bf__main {
-  flex: 1;
   display: flex; flex-direction: column;
   min-height: 0; min-width: 0;
 }
 
-/* The dock the sequence lives in. Off-canvas until asked for, and taken out of
-   the tab order while it is away — a panel nobody can see must not be a place
-   the keyboard can wander into. */
+/* The dock the sequence lives in.
+
+   Wide, it is the left track of the grid: the collapse animates the track to
+   0px and `overflow: hidden` clips the panel as it closes, so the playground
+   takes the room back rather than the two of them sliding past each other.
+   Either way it is taken out of the tab order while it is away — a panel nobody
+   can see must not be a place the keyboard can wander into. */
 .bf.is-main .bf__flowdock {
-  position: absolute; z-index: var(--z-popover);
-  left: 0; top: 0; bottom: 0;
-  width: min(var(--flow-w, 340px), 88vw);
-  transform: translateX(-102%);
-  transition: transform 220ms var(--ease-standard), visibility 220ms;
-  box-shadow: var(--el-high);
+  position: relative; min-height: 0; min-width: 0; overflow: hidden;
+  background: var(--surface-sunken);
 }
+/* The panel keeps its own width while the track closes around it, so the list
+   inside slides out of view intact instead of reflowing to nothing on the way. */
+.bf.is-main .bf__flowdock > * { width: var(--rail-w); }
 .bf.is-main .bf__flowdock[aria-hidden='true'] { visibility: hidden; }
-.bf.is-main .bf__work.is-flowopen .bf.is-main .bf__flowdock { transform: translateX(0); visibility: visible; }
 @media (prefers-reduced-motion: reduce) { .bf.is-main .bf__flowdock { transition: none; } }
+
+/* Below 900 there is no room for a third column, so it goes back to being a
+   drawer: over the work, above the scrim, gone once it has been used. */
+@media (max-width: 900px) {
+  .bf.is-main .bf__work { display: flex; }
+  .bf.is-main .bf__work > .bf__main { flex: 1; }
+  .bf.is-main .bf__flowdock {
+    position: absolute; z-index: var(--z-popover);
+    left: 0; top: 0; bottom: 0;
+    width: min(var(--flow-w, 340px), 88vw);
+    transform: translateX(-102%);
+    transition: transform 220ms var(--ease-standard), visibility 220ms;
+    box-shadow: var(--el-high);
+  }
+  .bf.is-main .bf__flowdock > * { width: 100%; }
+  .bf.is-main .bf__work.is-flowopen .bf__flowdock { transform: translateX(0); visibility: visible; }
+}
 
 .bf__flowscrim {
   position: absolute; inset: 0; z-index: calc(var(--z-popover) - 1);
@@ -1556,46 +1216,9 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
   .bf__bar { padding: 0 var(--space-4); }
 }
 
-/* --- Step one: who ------------------------------------------------------------
-
-   Was a caption on a strip above the work: small, grey, and read as metadata on
-   the way to the thing you came to do. It is not metadata — it is the first
-   decision and the widest claim the policy makes, and on a new policy it is the
-   first thing that should be answered.
-
-   So it gets the same card treatment the rules have, sits above them, and
-   carries a step number. The page now reads in the order the work happens:
-   who, the rules, then check and review. */
-
-.bf__who {
-  display: flex; align-items: flex-start; gap: var(--space-4);
-  padding: var(--space-5);
-  margin-bottom: var(--space-5);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-}
-/* A policy that governs nobody cannot do anything, so it is an error and looks
-   like one. Everything else here is a legitimate answer and is not tinted. */
-.bf__who.is-empty { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
-
-.bf__whobody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
-.bf__whobody h2 {
-  margin: 0;
-  font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-.bf__wholine {
-  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3);
-  margin: 0;
-  font-size: var(--fs-md); color: var(--text-body);
-}
-.bf__wholine.is-empty { color: var(--fb-negative-fg); }
-.bf__whocount { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.bf__whonote { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
-
-/* The policy's own step numbers. Deliberately unlike a rule's index: 20px and
-   outlined where a rule's is 26px and filled with its decision colour, because
-   the two orderings are about different things and must not be confusable. */
+/* The rail's step pip. Deliberately unlike a rule's index: 20px and outlined
+   where a rule's is 26px and filled with its decision colour, because the two
+   orderings are about different things and must not be confusable. */
 .bf__stepn {
   flex: none; display: grid; place-items: center;
   width: 20px; height: 20px; margin-top: 2px;
@@ -1603,12 +1226,19 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
   font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary);
 }
 
+/* The playground's own header: the way in and out of the rules panel, which
+   rule you are on, and what can be done to it.
+
+   It is not a section heading — there is one rule below it and the panel beside
+   it says so — so it reads as a toolbar for the rule rather than a title. */
 .bf__ruleshead {
+  position: sticky; top: calc(var(--space-6) * -1); z-index: var(--z-sticky);
   display: flex; align-items: center; gap: var(--space-4);
-  margin-bottom: var(--space-4);
+  margin: calc(var(--space-6) * -1) calc(var(--space-7) * -1) var(--space-4);
+  padding: var(--space-4) var(--space-7);
+  background: var(--surface-page);
+  border-bottom: 1px solid var(--border-subtle);
 }
-.bf__ruleshead .bf__stepn { margin-top: 0; }
-.bf__ruleshead h2 { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bf__ruleshead em {
   flex: 1; min-width: 0; font-style: normal; font-size: var(--fs-sm); color: var(--text-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1763,14 +1393,3 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
   margin: var(--space-5) 0 0;
   font-size: var(--fs-sm); color: var(--text-tertiary);
 }
-
-.bf__addrule { display: flex; }
-.bf__addrule button {
-  display: inline-flex; align-items: center; gap: var(--space-3);
-  width: 100%; height: 40px; justify-content: center;
-  border: 1px dashed var(--border-default); border-radius: var(--radius-lg);
-  background: none; font-family: inherit;
-  font-size: var(--fs-md); color: var(--text-tertiary); cursor: pointer;
-}
-.bf__addrule button:hover { border-color: var(--brand); color: var(--brand); }
-

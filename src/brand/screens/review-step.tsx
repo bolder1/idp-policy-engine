@@ -37,7 +37,7 @@ export function ReviewStep({
   saved: Policy
   env: SimEnv
   onJump: (i: number) => void
-  onOpen: (d: 'gauntlet' | 'impact' | 'apps' | 'test') => void
+  onOpen: (d: 'gauntlet' | 'impact' | 'apps') => void
   /** The status to publish into. Monitor is offered wherever it is the safer first move. */
   onPublish: (status: PolicyStatus) => void
 }) {

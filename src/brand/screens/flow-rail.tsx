@@ -1,6 +1,6 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { LayoutGroup, motion, useReducedMotion } from 'motion/react'
-import { GripVertical, Home, KeyRound, MoreHorizontal, Pencil, Plus, ShieldAlert, UserCheck, X } from 'lucide-react'
+import { GripVertical, Home, KeyRound, MoreHorizontal, Plus, ShieldAlert, UserCheck, X } from 'lucide-react'
 
 import type { AccessDecision, Policy } from '../data'
 import { MenuButton } from '../kit'
@@ -48,10 +48,6 @@ export function FlowRail({
   onHover,
   onClose,
   onFallback,
-  audience,
-  reach,
-  emptyAudience,
-  onAudience,
 }: {
   policy: Policy
   selected: number
@@ -67,16 +63,6 @@ export function FlowRail({
   onClose?: () => void
   /** What an unmatched sign-in gets. Editable, never deletable. */
   onFallback: (d: AccessDecision) => void
-  /* Who the policy governs, drawn as the first node.
-
-     It was a strip above the work, and it read as metadata on the way to the
-     thing you came to do. This is where it actually belongs: the rail is the
-     program, read top to bottom, and the audience is the gate every sign-in
-     passes before rule 1 gets to look at it. */
-  audience?: ReactNode
-  reach?: number
-  emptyAudience?: boolean
-  onAudience?: () => void
 }) {
   const reduce = useReducedMotion()
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null)
@@ -110,38 +96,12 @@ export function FlowRail({
 
       <div className="bf__flowscroll" ref={scroller} tabIndex={0} role="region" aria-label="Evaluation order">
         <div className="bf__flowstage">
-          {/* The bench draws the audience here, because the rail is its only
-              list and the audience is the gate a sign-in passes before rule 1
-              gets to look at it. Main draws it as a numbered card at the top of
-              its own rule list instead, so it does not pass these. */}
-          {onAudience && (
-          <button
-            type="button"
-            className={`bf__flowaud ${emptyAudience ? 'is-empty' : ''}`}
-            onClick={onAudience}
-            data-tour="audience"
-          >
-            <span className="bf__stepn" aria-hidden>
-              1
-            </span>
-            <span className="bf__flowaudbody">
-              <strong>Who this applies to</strong>
-              {emptyAudience ? (
-                <em className="is-empty">Nobody — these rules cannot run</em>
-              ) : (
-                <span className="bf__flowaudchips">
-                  {audience}
-                  <em>{(reach ?? 0).toLocaleString()} people</em>
-                </span>
-              )}
-            </span>
-            <Pencil size={12} strokeWidth={1.9} aria-hidden />
-          </button>
-          )}
-
+          {/* The audience is not drawn here. It is a property of the policy,
+              not the first node of its program, and it has one home: the strip
+              above the builder, beside the name and the applications. */}
           <p className="bf__flowstart">
             <span aria-hidden />
-            {onAudience ? 'and then signs in' : 'A user attempts to sign in'}
+            A user attempts to sign in
           </p>
 
           <LayoutGroup>

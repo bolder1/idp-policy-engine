@@ -4,26 +4,19 @@ import { describe, expect, it } from 'vitest'
 import policiesSrc from './screens/Policies.tsx?raw'
 import createSrc from './create/CreatePolicy.tsx?raw'
 import mainSrc from './screens/PolicyBuilderMain.tsx?raw'
-import benchSrc from './screens/PolicyBuilderBench.tsx?raw'
 import { GAPS, featuresOf, gapsFor, type Features } from './edition'
 
-const SHELLS: [string, string][] = [
-  ['main', mainSrc],
-  ['bench', benchSrc],
-]
-
-/* Both shells are asserted, separately.
-
-   A flag that gates a capability in one builder and not the other is a lite
-   edition that leaks depending on which design you happen to be looking at,
-   which is worse than one that leaks everywhere — it is a leak nobody can
-   reproduce. Where a check is about the shell's own structure rather than about
-   a flag, it names the shell it is about.
+/* There is one shell now. This used to run over two — a flag gating a
+   capability in one builder and not the other is a lite edition that leaks
+   depending on which design you happen to be looking at, which is worse than
+   one that leaks everywhere because it is a leak nobody can reproduce — and the
+   loop is kept for the day there is a second surface again.
 
    The lite edition is a promise about what is *absent*, and absence is the one
    thing nobody notices regressing. A feature that quietly comes back makes the
    comparison this whole exercise is for meaningless, so the gates are asserted
    at their call sites rather than trusted. */
+const SHELLS: [string, string][] = [['main', mainSrc]]
 
 const LITE = featuresOf('lite')
 const FULL = featuresOf('full')

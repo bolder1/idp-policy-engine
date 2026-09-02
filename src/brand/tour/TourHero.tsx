@@ -184,55 +184,6 @@ function Conditions({ reduce }: FigureProps) {
   )
 }
 
-/* 5 — a persona changes and the verdict flips with it. */
-function Answer({ reduce }: FigureProps) {
-  return (
-    <>
-      {[0, 1, 2].map((i) => (
-        <motion.circle
-          key={i}
-          cx={64 + i * 34}
-          cy="38"
-          r="14"
-          fill={i === 1 ? 'var(--surface-inverse)' : 'var(--surface-sunken)'}
-          stroke="var(--border-default)"
-          initial={false}
-          animate={reduce ? { opacity: 1 } : { opacity: [0.55, 0.55, i === 1 ? 1 : 0.55] }}
-          transition={reduce ? { duration: 0 } : { ...LOOP, duration: 2 }}
-        />
-      ))}
-
-      <rect x="46" y="70" width="228" height="20" rx="6" fill="var(--surface-sunken)" />
-      <text x="58" y="84" fontSize="9.5" fill="var(--text-tertiary)">
-        Office Network · Known device · Low risk
-      </text>
-
-      <motion.g
-        initial={false}
-        animate={reduce ? { opacity: 1 } : { opacity: [1, 1, 0, 0] }}
-        transition={reduce ? { duration: 0 } : { ...LOOP, duration: 2.4, times: [0, 0.42, 0.5, 1] }}
-      >
-        <rect x="46" y="100" width="228" height="32" rx="8" fill="var(--fb-positive-bg)" stroke="var(--fb-positive-border)" />
-        <circle cx="64" cy="116" r="5" fill="var(--fb-positive-dot)" />
-        <text x="78" y="120" fontSize="10.5" fill="var(--fb-positive-fg)">
-          Allow — rule 4 decides it
-        </text>
-      </motion.g>
-      <motion.g
-        initial={false}
-        animate={reduce ? { opacity: 0 } : { opacity: [0, 0, 1, 1] }}
-        transition={reduce ? { duration: 0 } : { ...LOOP, duration: 2.4, times: [0, 0.42, 0.5, 1] }}
-      >
-        <rect x="46" y="100" width="228" height="32" rx="8" fill="var(--fb-notice-bg)" stroke="var(--fb-notice-border)" />
-        <circle cx="64" cy="116" r="5" fill="var(--fb-notice-dot)" />
-        <text x="78" y="120" fontSize="10.5" fill="var(--fb-notice-fg)">
-          MFA — rule 2 decides it
-        </text>
-      </motion.g>
-    </>
-  )
-}
-
 /* 6 — the dial fills, two cards come back as breaches. Not a trophy: the grade
    this figure lands on is the grade a simple policy usually gets. */
 function Publish({ reduce }: FigureProps) {
@@ -290,6 +241,5 @@ const FIGURES: Record<HeroId, (p: FigureProps) => React.ReactElement> = {
   order: Order,
   trail: Trail,
   conditions: Conditions,
-  answer: Answer,
   publish: Publish,
 }

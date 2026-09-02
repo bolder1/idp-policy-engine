@@ -7,11 +7,9 @@ import {
   BookOpen,
   ChevronDown,
   ClipboardCheck,
-  Command,
   Copy,
   CopyPlus,
   FileDown,
-  Grid3x3,
   Info,
   ListOrdered,
   MoreHorizontal,
@@ -19,8 +17,6 @@ import {
   Redo2,
   ScrollText,
   Sparkles,
-  Swords,
-  Target,
   Trash2,
   GraduationCap,
   Undo2,
@@ -28,14 +24,13 @@ import {
   XCircle,
 } from 'lucide-react'
 
-import { Button, DecisionChip, IconButton, MenuButton, Tip, Toggle, type MenuItem } from '../kit'
-import { Picker } from '../picker'
+import { Button, DecisionChip, IconButton, MenuButton, Toggle, type MenuItem } from '../kit'
 import { blankRule, type Audience, type Policy, type Rule } from '../data'
 import { useBrand, useNameLookup } from '../store'
 import { AudienceDrawer } from './audience-drawer'
 import { predicateSummary, ruleSentence } from './predicate-prose'
 import { AssignAppsDialog, CopyRuleDialog, ReviewDialog, SaveTemplateDialog } from './builder-dialogs'
-import { DecisionLogDialog, TestPolicyDialog } from './builder-test'
+import { DecisionLogDialog } from './builder-test'
 import { describeChanges } from './changes'
 import { CommandBar, baseCommands } from './command-bar'
 import { diagnose, shadowedBy } from './diagnostics'
@@ -55,17 +50,8 @@ import { ReviewStep } from './review-step'
 import { applyFix } from './gauntlet'
 import { GauntletDialog, GauntletPip } from './gauntlet-dialog'
 import { ImpactArenaDialog, ImpactPip } from './impact-arena-dialog'
-import {
-  DEC_KEY,
-  DEFAULT_PREVIEW,
-  PREVIEW_CAVEAT,
-  ThenSection,
-  WhenSection,
-  previewContext,
-  ruleState,
-  type PreviewState,
-} from './rule-form'
-import { DEVICE_OPTIONS, PLACES, RISKS, SIM_USERS, evalRule, walk, type SimEnv } from './simulate'
+import { DEC_KEY, ThenSection, WhenSection, ruleState } from './rule-form'
+import type { SimEnv } from './simulate'
 import type { Diagnostic } from './diagnostics'
 
 /* -----------------------------------------------------------------------------
@@ -123,6 +109,25 @@ type Stage = 'rules' | 'review'
    conditional on the window being small. */
 const FLOW_W = 340
 
+/* Below this the rules panel stops being a column and floats over the
+   playground. 320px of a 900px window is a third of it spent on a list you
+   consult, while the thing being edited is the reason you are here. */
+const RAIL_FLOATS = '(max-width: 900px)'
+
+function useFloatingRail() {
+  const [floating, setFloating] = useState(
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(RAIL_FLOATS).matches,
+  )
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+    const mq = window.matchMedia(RAIL_FLOATS)
+    const on = () => setFloating(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return floating
+}
+
 export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?: 'gauntlet' | 'impact' }) {
   const store = useBrand()
   const saved = store.policyById(policyId)
@@ -132,7 +137,6 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
   const [stage, setStage] = useState<Stage>('rules')
   const [audienceOpen, setAudienceOpen] = useState(false)
   const [live, setLive] = useState('')
-  const [pv, setPv] = useState<PreviewState>(DEFAULT_PREVIEW)
   const [hoverShadow, setHoverShadow] = useState<number | null>(null)
   const [cmd, setCmd] = useState(false)
   const [overview, setOverview] = useState(false)
@@ -140,7 +144,7 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
   const [interview, setInterview] = useState(false)
   const [tour, setTour] = useState(false)
   const [learn, setLearn] = useState(false)
-  const [dialog, setDialog] = useState<null | 'log' | 'test' | 'apps' | 'template' | 'gauntlet' | 'impact' | 'review' | 'copy'>(
+  const [dialog, setDialog] = useState<null | 'log' | 'apps' | 'template' | 'gauntlet' | 'impact' | 'review' | 'copy'>(
     open ?? null,
   )
 
@@ -150,7 +154,15 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
   /* --- The flow's width, dragged. v1's grammar ---------------------------------
      Clamped against the room that actually exists, so the flow never claims a
      width the window cannot give it, and the trail always keeps TRAIL_MIN. */
-  const [flowOpen, setFlowOpen] = useState(false)
+  /* Open by default and collapsible, the way a side panel behaves rather than
+     the way a drawer does: it holds the sequence, which is half of what this
+     screen is about, so hiding it is a choice rather than the resting state.
+
+     Narrow, it is a drawer again — over the playground, with a scrim, closing
+     as soon as it has been used. Docked it does none of those things, because a
+     column that vanishes every time you pick a rule is not a column. */
+  const floating = useFloatingRail()
+  const [flowOpen, setFlowOpen] = useState(!floating)
 
   /* Escape closes it, because a panel that floats over the work has to be
      dismissible without aiming at anything. */
@@ -220,7 +232,6 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
     [store],
   )
 
-  const ctx = useMemo(() => previewContext(pv), [pv])
   const resolve = useNameLookup()
   const draft = hist.present
 
@@ -239,6 +250,17 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
   const index = Math.min(selected, Math.max(0, rules.length - 1))
   const rule: Rule | undefined = rules[index]
 
+  /* A policy with no rules has nothing to grade, nothing to undo, nothing to
+     trace and nothing to publish, so it shows none of those.
+
+     Every one of them was answering a question about rules that do not exist —
+     and the gauntlet was doing worse than nothing, dealing thirteen sign-ins at
+     an empty policy and reporting an F, which is a grade for a race nobody
+     entered. The bar earns its controls back the moment there is a first rule. */
+  const empty = rules.length === 0
+
+  const mine = diagnostics.filter((d) => d.scope === 'rule' && d.ruleIndex === index)
+
   const patch = (p: Partial<Policy>) => setHist((h) => commit(h, { ...h.present, ...p }))
   const patchRuleAt = (at: number, p: Partial<Rule>) =>
     patch({ rules: rules.map((r, n) => (n === at ? { ...r, ...p } : r)) })
@@ -248,11 +270,6 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
   ).length
 
 
-  /* One walk, feeding both the docked tester's verdict and the highlight on the
-     card that carried the match. It is the same evaluator every other surface
-     answers through, so the builder cannot disagree with the test dialog. */
-  const trace = walk(draft, ctx, env)
-  const hitCard = trace.hitIndex === index ? (evalRule(rules[index], ctx, env).card ?? null) : null
   const shadowed = hoverShadow === null ? [] : shadowedBy(draft, hoverShadow)
 
   const addRule = (at = rules.length) => {
@@ -304,24 +321,35 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
      to the whole policy. Rule-scoped actions moved onto the rule (the ⋯ beside
      its name), which is both where they belong and where they stop needing a
      "this rule" in their label to be unambiguous. */
-  const policyItems: MenuItem[] = [
-    { id: 'test', label: 'Test a sign-in', icon: Sparkles, hint: 'One person, end to end' },
-    ...(features.gauntlet
-      ? [{ id: 'gauntlet', label: 'Policy gauntlet', icon: Swords, hint: '13 attempts against these rules' }]
-      : []),
-    ...(features.blastRadius ? [{ id: 'impact', label: 'Blast radius', icon: Target, hint: 'What publishing moves' }] : []),
-    { id: 'log', label: 'Decision log', icon: ScrollText, hint: 'What the engine actually did' },
+  /* Rule-scoped actions, on the rule. In the top bar they had to say "this
+     rule" to be unambiguous, and sat beside policy-wide ones that the same
+     gesture could not undo. */
+  const ruleItems: MenuItem[] = [
+    { id: 'add', label: 'Add a rule below', icon: Plus },
+    { id: 'duplicate', label: 'Duplicate', icon: Copy },
+    { id: 'copy', label: 'Copy to another policy…', icon: CopyPlus, hint: 'An independent copy' },
+    { id: 'delete', label: 'Delete', icon: Trash2, danger: true, divide: true },
+  ]
+
+  /* What used to be a "Policy" dropdown, spread across the bar as buttons.
+
+     A menu of four items is a click to find out there were four items, and the
+     four it held are the whole of what this screen can do to the policy rather
+     than to a rule — which makes them the bar, not a thing the bar points at.
+
+     Three of its old rows left with it. "Test a sign-in" and the docked tester
+     both ran hypothetical sign-ins against unsaved rules, which is the gauntlet
+     with one row; "Assign apps" now belongs to Edit details, where the rest of
+     the policy's identity lives; "All commands" was a palette over a menu over
+     a bar, three ways to reach the same six things. */
+  const tools: { id: string; label: string; icon: typeof ScrollText }[] = [
+    { id: 'log', label: 'Decision log', icon: ScrollText },
     { id: 'overview', label: 'Read it end to end', icon: BookOpen },
-    { id: 'apps', label: `Assign apps (${draft.allApps ? 'all' : draft.appIds.length})`, icon: Grid3x3, divide: true },
     { id: 'template', label: 'Save as template', icon: FileDown },
     /* v0 §8. Restored whenever the Review step is withheld: taking the publish
        gate away must not also take away the only way to read a policy back and
        commit it, which is a v0 requirement rather than one of ours. */
-    ...(features.reviewStep
-      ? []
-      : [{ id: 'review', label: 'Review & Save', icon: ClipboardCheck, hint: 'Read it back, then commit' }]),
-    ...(features.commands ? [{ id: 'cmd', label: 'All commands', icon: Command, kbd: '⌘K' }] : []),
-    { id: 'learn', label: 'Learn the builder', icon: GraduationCap, hint: 'The tour, and five guides', divide: true },
+    ...(features.reviewStep ? [] : [{ id: 'review', label: 'Review & Save', icon: ClipboardCheck }]),
   ]
 
   const onAction = (id: string) => {
@@ -343,10 +371,14 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
       </p>
 
       {/* --- Top bar. One primary, one group of tools, one group of actions. --- */}
+      {/* No bar at all on an empty policy. Everything it held was answering a
+          question about rules that do not exist, and the back button — the one
+          thing that still meant something — moved up to the heading. */}
+      {!empty && (
       <header className="bf__bar">
-        <IconButton icon={ArrowLeft} label="Back to policies" tone="ghost" onClick={() => store.go({ name: 'policies' })} />
-
         <div className="bf__baracts">
+          {!empty && (
+          <>
           {/* The blast-radius pip only exists once there is a blast radius. It
               used to sit here permanently reading "no change", which is a
               control occupying the bar to report nothing — and it made the one
@@ -361,29 +393,35 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
               the Policy menu, which makes "show me that again" a search — and
               everything else explanatory had nowhere to live at all. */}
           <IconButton icon={GraduationCap} label="Learn the builder" size="sm" tone="ghost" onClick={() => setLearn(true)} />
+          {tools.map((t) => (
+            <IconButton key={t.id} icon={t.icon} label={t.label} size="sm" tone="ghost" onClick={() => onAction(t.id)} />
+          ))}
+          <span className="bf__sep" aria-hidden />
           <IconButton icon={Undo2} label="Undo" size="sm" tone="ghost" disabled={!canUndo(hist)} onClick={() => setHist(undo)} />
           <IconButton icon={Redo2} label="Redo" size="sm" tone="ghost" disabled={!canRedo(hist)} onClick={() => setHist(redo)} />
-          <MenuButton label="Policy" items={policyItems} onSelect={onAction} />
           {/* One primary per view. In the review stage the primary is the
               Publish button at the end of the checks, so this one stands down
               rather than competing with it. In lite there is no review stage to
               send anyone to; v0 commits from Review & Save in the Policy menu. */}
           {features.publish && stage !== 'review' && (
-            <Button variant="secondary" disabled={rules.length === 0} onClick={() => setStage('review')}>
+            <Button variant="secondary" onClick={() => setStage('review')}>
               {blockers > 0 ? `${blockers} to fix` : 'Review & publish'}
             </Button>
           )}
+          </>
+          )}
         </div>
       </header>
+      )}
 
       <div className={`bf__work ${flowOpen ? 'is-flowopen' : ''}`} ref={work}>
         {/* Dismisses on a click anywhere off the panel. Only in the DOM while
             the panel is, so it can never swallow a click on the work. */}
-        {flowOpen && (
+        {flowOpen && floating && (
           <button type="button" className="bf__flowscrim" aria-label="Close the sequence" onClick={() => setFlowOpen(false)} />
         )}
 
-        {/* --- The sequence, floating ---------------------------------------- */}
+        {/* --- The sequence: a column here, a drawer when there is no room -- */}
         <div className="bf__flowdock" style={{ ['--flow-w' as string]: `${FLOW_W}px` }} aria-hidden={!flowOpen}>
           <FlowRail
             policy={draft}
@@ -392,11 +430,11 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
             shadowed={shadowed}
             onSelect={(i) => {
               jump(i)
-              setFlowOpen(false)
+              if (floating) setFlowOpen(false)
             }}
             onInsert={(at) => {
               addRule(at)
-              setFlowOpen(false)
+              if (floating) setFlowOpen(false)
             }}
             onMove={move}
             onReorder={move}
@@ -450,12 +488,15 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
                   not a step — it is the frame they are written inside — so it
                   lives in the policy bar above every builder now, with the name
                   and the applications it belongs beside. */}
+              {/* The stage is a playground for ONE rule now, not a list of all
+                  of them.
+
+                  An accordion asked the screen to be two things at once: the
+                  sequence AND the rule, with the rule's own room shrinking as
+                  the sequence grew. The sequence has its own panel; this has
+                  everything else. */}
+              {!empty && (
               <div className="bf__ruleshead">
-                <h2>Rules</h2>
-                <em>{rules.length === 0 ? 'None yet' : 'Evaluated top to bottom — the first one that matches decides'}</em>
-                {/* The way into the sequence, at every width. It carries the
-                    count so the rail's one permanently-useful fact is on screen
-                    even while the rail is not. */}
                 <button
                   type="button"
                   className="bf__flowbtn"
@@ -463,118 +504,84 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
                   onClick={() => setFlowOpen((v) => !v)}
                 >
                   <ListOrdered size={13} strokeWidth={1.9} aria-hidden />
-                  Order
+                  {flowOpen ? 'Hide rules' : 'Rules'}
                   <span>{rules.length}</span>
                 </button>
+                <em>
+                  Rule {index + 1} of {rules.length} · evaluated top to bottom, first match wins
+                </em>
+                <MenuButton label="Rule actions" iconOnly icon={MoreHorizontal} size="sm" align="end" items={ruleItems} onSelect={onAction} />
               </div>
+              )}
 
               {rules.length === 0 ? (
                 <div className="bf__blank">
                   <Sparkles size={22} strokeWidth={1.6} aria-hidden />
-                  <h2>This policy has no rules</h2>
-                  <p>Every sign-in falls through to the engine default until there is one.</p>
+                  <h2>No rules yet</h2>
+                  <p>
+                    A rule is a condition and an outcome: when this is true, do that. Sign-ins fall down
+                    the list and the first rule that matches decides — until there is one, every sign-in
+                    goes straight to the last row.
+                  </p>
                   <div className="bf__blankacts">
-                    {features.guidedSetup && (
-                      <Button variant="primary" icon={Wand2} onClick={() => setInterview(true)}>
-                        Guided setup
-                      </Button>
-                    )}
-                    <Button icon={Plus} onClick={() => addRule()}>
+                    {/* The named action is the primary, alone on its row. Guided setup and
+                        the tour are the two other ways in — worth offering, and not worth
+                        standing beside the thing somebody came here to do. */}
+                    <Button variant="primary" icon={Plus} onClick={() => addRule()}>
                       Add the first rule
                     </Button>
                   </div>
+
+                  <div className="bf__blankmore">
+                    {features.guidedSetup && (
+                      <button type="button" onClick={() => setInterview(true)}>
+                        <Wand2 size={13} strokeWidth={1.9} aria-hidden />
+                        Answer five questions instead
+                      </button>
+                    )}
+                    <button type="button" onClick={() => setLearn(true)}>
+                      <GraduationCap size={13} strokeWidth={1.9} aria-hidden />
+                      Learn the builder
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <ol className="bf__rules">
-                  {rules.map((r, i) => (
+                rule && (
+                  <ol className="bf__rules">
                     <RuleCard
-                      key={r.id}
-                      rule={r}
-                      index={i}
-                      open={i === index}
-                      ctx={ctx}
-                      hit={i === index ? hitCard : null}
-                      diagnostics={diagnostics.filter((d) => d.ruleIndex === i)}
+                      key={rule.id}
+                      rule={rule}
+                      index={index}
+                      open
+                      diagnostics={mine}
                       features={features}
-                      onOpen={() => jump(i)}
-                      onPatch={(p) => patchRuleAt(i, p)}
-                      onAction={(a) => {
-                        setSelected(i)
-                        onAction(a)
-                      }}
+                      onOpen={() => {}}
+                      onPatch={(p) => patchRuleAt(index, p)}
+                      onAction={onAction}
                       onJump={jump}
                     />
-                  ))}
-                  <li className="bf__addrule">
-                    <button type="button" onClick={() => addRule()}>
-                      <Plus size={13} strokeWidth={2.4} aria-hidden />
-                      Add a rule
-                    </button>
-                  </li>
-                </ol>
+                  </ol>
+                )
               )}
             </div>
           )}
 
-          {/* --- The tester, docked. -------------------------------------------
+          {/* The docked tester is gone, and so is "Test a sign-in".
 
-              This used to be one of three panels taking turns behind an icon in
-              the top right. It is not optional: it is the only writer of the
-              preview context every condition is evaluated against, so hiding it
-              behind a toggle froze the whole builder's answer to "would this
-              match" on a default nobody chose, with nothing on screen saying
-              so. Always on, one line, at the bottom of the work. */}
-          {rules.length > 0 && stage === 'rules' && (
-            <footer className="bf__try" data-tour="try">
-              <span className="u-label">Try it</span>
-              <Picker
-                label="Person"
-                value={pv.userId}
-                options={SIM_USERS.map((u) => ({ value: u.id, label: u.name, meta: u.groupName }))}
-                onChange={(userId) => setPv({ ...pv, userId })}
-              />
-              <em>from</em>
-              <Picker
-                label="Where from"
-                value={pv.place}
-                options={PLACES.map((p) => ({ value: p, label: p }))}
-                onChange={(place) => setPv({ ...pv, place })}
-              />
-              <em>on</em>
-              <Picker
-                label="Device"
-                value={pv.device}
-                options={DEVICE_OPTIONS.map((d) => ({ value: d, label: d }))}
-                onChange={(device) => setPv({ ...pv, device })}
-              />
-              <Picker
-                label="Risk"
-                value={pv.risk}
-                options={RISKS.map((r) => ({ value: r, label: `${r} risk` }))}
-                onChange={(risk) => setPv({ ...pv, risk })}
-              />
-
-              <span className={`bf__tryout is-${DEC_KEY[trace.decision]}`}>
-                {trace.outOfAudience ? (
-                  <>Not governed — this policy does not apply to {ctx.user.name}</>
-                ) : trace.hitIndex === null ? (
-                  <>No rule matched · falls through to the default</>
-                ) : (
-                  <>
-                    Rule {trace.hitIndex + 1} · {rules[trace.hitIndex].name}
-                  </>
-                )}
-              </span>
-
-              <Tip text={PREVIEW_CAVEAT} placement="top">
-                <span className="bf__trynote" aria-label="How this is calculated">
-                  ?
-                </span>
-              </Tip>
-            </footer>
-          )}
+              Both ran one hypothetical sign-in against unsaved rules and read
+              the answer back, which is what the gauntlet does thirteen times
+              with cases somebody thought about — and the strip did it in a row
+              of four dropdowns nailed across the bottom of the playground, so
+              the cost was paid on every screen whether or not anybody was
+              asking. The condition rows no longer light up green or grey for a
+              context nobody chose, which is the part that was actively
+              misleading. */}
 
           {/* --- One bar, docked. Unsaved changes and the way forward. ------- */}
+          {/* No rules, nothing to say about them — and no "Check & review" for
+              a policy with nothing to check. The bar returns with the first
+              rule, or earlier if there is something unsaved to report. */}
+          {(!empty || dirty) && (
           <footer className={`bf__stepnav ${dirty ? 'is-dirty' : ''}`}>
             <span className="bf__stepwhere">
               {dirty ? (
@@ -595,7 +602,7 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
               </Button>
             )}
 
-            {stage === 'rules' ? (
+            {!empty && (stage === 'rules' ? (
               features.reviewStep ? (
                 <Button
                   variant="primary"
@@ -617,8 +624,9 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
               <Button variant="secondary" icon={ArrowLeft} onClick={() => setStage('rules')}>
                 Keep editing
               </Button>
-            )}
+            ))}
           </footer>
+          )}
         </main>
       </div>
 
@@ -688,7 +696,6 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
       </AnimatePresence>
 
       <DecisionLogDialog open={dialog === 'log'} policy={draft} onClose={() => setDialog(null)} />
-      <TestPolicyDialog open={dialog === 'test'} policy={draft} onClose={() => setDialog(null)} />
       <GauntletDialog
         open={features.gauntlet && dialog === 'gauntlet'}
         policy={draft}
@@ -752,8 +759,6 @@ function RuleCard({
   rule,
   index,
   open,
-  ctx,
-  hit,
   diagnostics,
   features,
   onOpen,
@@ -764,8 +769,6 @@ function RuleCard({
   rule: Rule
   index: number
   open: boolean
-  ctx: ReturnType<typeof previewContext>
-  hit: number | null
   diagnostics: Diagnostic[]
   features: { checkStep: boolean }
   onOpen: () => void
@@ -886,7 +889,7 @@ function RuleCard({
                   which is the honest version of what "All together" was a
                   toggle for. */}
               <div className="bf__rulegrid">
-                <WhenSection rule={rule} ctx={ctx} onPatch={onPatch} chrome hit={hit} />
+                <WhenSection rule={rule} onPatch={onPatch} chrome />
                 <ThenSection rule={rule} onPatch={onPatch} bare />
               </div>
 

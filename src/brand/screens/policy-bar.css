@@ -20,6 +20,13 @@
 }
 
 .bpbar__id { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.bpbar__back {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px;
+  margin-left: calc(var(--space-3) * -1);
+  border: none; background: none; border-radius: var(--radius-sm);
+  color: var(--text-secondary); cursor: pointer;
+}
+.bpbar__back:hover { background: var(--surface-sunken); color: var(--text-primary); }
 .bpbar__id h1 {
   margin: 0; min-width: 0;
   font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: var(--text-primary);

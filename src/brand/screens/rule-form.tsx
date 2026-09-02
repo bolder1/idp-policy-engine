@@ -25,7 +25,7 @@ import {
 
 import { Counter, MenuButton, Tip, TipDot, Toggle, type MenuItem } from '../kit'
 import { Picker } from '../picker'
-import { cardLetter, ckey, duplicatedAcrossCards, leaves } from '../predicate'
+import { cardLetter, ckey, duplicatedAcrossCards } from '../predicate'
 import { predicateParts, type NameLookup } from './predicate-prose'
 import {
   CONDITION_CATALOGUE,
@@ -45,12 +45,7 @@ import { modeLabel } from '../fingerprint'
 import { ruleSentence } from './builder-dialogs'
 import { impactOf, type Diagnostic } from './diagnostics'
 import { SITUATIONS, sweep } from './impact-arena'
-import {
-  SIM_USERS,
-  evalCond,
-  type SimContext,
-  type SimEnv,
-} from './simulate'
+import { SIM_USERS, type SimContext, type SimEnv } from './simulate'
 
 /* -----------------------------------------------------------------------------
    The rule form, and the live preview that answers it.
@@ -298,18 +293,13 @@ type CardPatch = (cardId: string, next: ConditionCard | null) => void
 
 export function WhenSection({
   rule,
-  ctx,
   onPatch,
-  hit,
   chrome,
   catalogue,
   onCatalogue,
 }: {
   rule: Rule
-  ctx: SimContext
   onPatch: (p: Partial<Rule>) => void
-  /** Which card the docked tester says is carrying the match, if any. */
-  hit?: number | null
   /* Whether to draw the section heading and the readback around the cards.
 
      Main wants them: its rule card holds WHEN and THEN as two labelled
@@ -406,14 +396,6 @@ export function WhenSection({
     setCards(cards.flatMap((k) => (k.id === above.id ? [merged] : k.id === mine.id ? [] : [k])))
   }
 
-  /* Every condition's verdict against the docked tester's context, so a card
-     can say whether it is carrying the match. `unknown` is not a pass. */
-  const verdicts = useMemo(() => {
-    const m = new Map<string, ReturnType<typeof evalCond>>()
-    for (const c of leaves(rule.when)) m.set(c.id, evalCond(c, ctx))
-    return m
-  }, [rule.when, ctx])
-
   const dupes = duplicatedAcrossCards(rule.when)
 
   const body = (
@@ -455,8 +437,6 @@ export function WhenSection({
                   index={ci}
                   total={cards.length}
                   cards={cards}
-                  hit={hit === ci}
-                  verdicts={verdicts}
                   dupes={dupes}
                   resolve={resolve}
                   store={store}
@@ -523,8 +503,6 @@ function CardBlock({
   index,
   total,
   cards,
-  hit,
-  verdicts,
   dupes,
   resolve,
   store,
@@ -541,8 +519,6 @@ function CardBlock({
   index: number
   total: number
   cards: ConditionCard[]
-  hit: boolean
-  verdicts: Map<string, { state: string; detail: string }>
   dupes: string[]
   resolve: NameLookup
   store: ReturnType<typeof useBrand>
@@ -566,7 +542,7 @@ function CardBlock({
   ]
 
   return (
-    <li className={`bf__card ${hit ? 'is-hit' : ''}`}>
+    <li className="bf__card">
       <div className="bf__cardhead">
         {/* Lettered, never numbered. Cards have no evaluation order — rules do —
             and a number here would imply one. */}
@@ -581,12 +557,6 @@ function CardBlock({
           onChange={(e) => onPatch(k.id, { ...k, label: e.target.value || undefined })}
         />
         <em className="bf__cardcount">{AND_HINT}</em>
-        {hit && (
-          <span className="bf__cardhit">
-            <Check size={11} strokeWidth={3} aria-hidden />
-            Matches
-          </span>
-        )}
         <MenuButton
           label={`Alternative ${cardLetter(index)} actions`}
           iconOnly
@@ -624,7 +594,6 @@ function CardBlock({
               cards={cards}
               store={store}
               resolve={resolve}
-              verdict={verdicts.get(c.id)}
               duplicated={dupes.includes(ckey(c))}
               autoOpen={justAdded === c.id}
               onPatch={(p) => patchOne(c.id, p)}
@@ -653,7 +622,6 @@ function ConditionRow({
   cards,
   store,
   resolve,
-  verdict,
   duplicated,
   autoOpen,
   onPatch,
@@ -668,7 +636,6 @@ function ConditionRow({
   cards: ConditionCard[]
   store: ReturnType<typeof useBrand>
   resolve: NameLookup
-  verdict?: { state: string; detail: string }
   duplicated: boolean
   autoOpen: boolean
   onPatch: (p: Partial<Condition>) => void
@@ -718,7 +685,7 @@ function ConditionRow({
   ]
 
   return (
-    <li className={`bf__cond ${unset ? 'is-unset' : ''} is-${GROUP_TONE[t.group] ?? 'neutral'} ${verdictClass(verdict)}`}>
+    <li className={`bf__cond ${unset ? 'is-unset' : ''} is-${GROUP_TONE[t.group] ?? 'neutral'}`}>
       <span className="bf__condicon" aria-hidden>
         <Ico size={13} strokeWidth={1.9} />
       </span>
@@ -780,9 +747,6 @@ function ConditionRow({
     </li>
   )
 }
-
-const verdictClass = (v?: { state: string }) =>
-  v?.state === 'pass' ? 'is-pass' : v?.state === 'fail' ? 'is-fail' : ''
 
 /* --- The value ------------------------------------------------------------------ */
 

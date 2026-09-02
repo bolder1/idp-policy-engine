@@ -1,4 +1,4 @@
-import { Grid3x3, Pencil, Users } from 'lucide-react'
+import { ArrowLeft, Grid3x3, Pencil, Users } from 'lucide-react'
 
 import { StatusPill } from '../kit'
 import { reach, type Policy } from '../data'
@@ -29,6 +29,12 @@ export function PolicyBar({ policy }: { policy: Policy }) {
   return (
     <header className="bpbar">
       <div className="bpbar__id">
+        {/* With the heading, not in a toolbar of its own. The shells' top bar
+            is about the rules; leaving `back` there meant a bar that existed
+            for one arrow on any policy that had none. */}
+        <button type="button" className="bpbar__back" aria-label="Back to policies" onClick={() => store.go({ name: 'policies' })}>
+          <ArrowLeft size={16} strokeWidth={1.9} aria-hidden />
+        </button>
         <h1>{policy.name}</h1>
         <StatusPill status={policy.status} />
         <span className="bpbar__type">{policy.type}</span>
@@ -45,7 +51,7 @@ export function PolicyBar({ policy }: { policy: Policy }) {
           </dd>
         </div>
 
-        <div className={`bpbar__fact ${empty ? 'is-empty' : ''}`}>
+        <div className={`bpbar__fact ${empty ? 'is-empty' : ''}`} data-tour="audience">
           <dt>
             <Users size={12} strokeWidth={1.9} aria-hidden />
             Governs

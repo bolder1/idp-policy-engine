@@ -116,8 +116,15 @@
   white-space: nowrap;
 }
 .bz7__any svg { flex: none; }
-/* The row contexts, where filling the line is the point. */
-.bz7__op > .bz7__any, .bz7__tcell > .bz7__any { flex: 1; align-self: auto; min-height: 0; }
+/* Sized to its own words everywhere, including the row.
+
+   It used to take `flex: 1` in a table cell on the argument that filling the
+   line made it the loudest thing there — but the cell beside it holds content-
+   sized chips ("6 networks", "Corporate (private range)"), so a full-width bar
+   did not read as emphasis, it read as a different kind of object. The tint
+   already does the work the width was doing. */
+.bz7__op > .bz7__any,
+.bz7__tcell > .bz7__any { align-self: center; min-height: 0; }
 
 /* And the section context, where it is not.
 
@@ -281,6 +288,28 @@
    rather than as a value somebody typed. */
 .bz7 .bz7__add input::placeholder { color: var(--text-muted); }
 .bz7 .bz7__add input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-subtle-bg); }
+
+/* The search field, where the LABEL is the box.
+
+   The icon was a sibling of the input and the border was on the input, so the
+   magnifier sat outside the field it belongs to — and the "Any location" state
+   sat below the whole row, an orphan pill under a search box. The frame moves
+   up to the label and the input goes borderless inside it, which puts both
+   where they were always meant to be. Only the place field: the address row is
+   an input and an Add button, and it wants two separate boxes. */
+label.bz7__add {
+  gap: 0;
+  padding: 0 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+}
+label.bz7__add:focus-within { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-subtle-bg); }
+label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
+.bz7 label.bz7__add input {
+  border: none; background: none; padding: 0;
+}
+.bz7 label.bz7__add input:focus-visible { border: none; box-shadow: none; }
+
 
 /* THE box, and the only one on the page.
 

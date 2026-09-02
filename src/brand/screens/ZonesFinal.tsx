@@ -2,13 +2,13 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
+  Asterisk,
   ArrowLeft,
   Check,
   ChevronDown,
   Copy,
   Globe,
   Info,
-  Infinity as InfinityIcon,
   LayoutGrid,
   Layers,
   Link2,
@@ -326,7 +326,11 @@ function ZonesEmpty({ onCreate }: { onCreate: () => void }) {
 export function AnyBand({ what }: { what: string }) {
   return (
     <span className="bz7__any">
-      <InfinityIcon size={13} strokeWidth={2} aria-hidden />
+      {/* The wildcard, not an infinity sign. `∞` says "endless", which is a
+          statement about quantity; this is a statement about MATCHING, and `*`
+          is the glyph every admin already reads that way — in a CIDR, a glob,
+          an ACL. */}
+      <Asterisk size={12} strokeWidth={2.4} aria-hidden />
       Any {what}
     </span>
   )
@@ -1398,6 +1402,10 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
     <section className="bz7__sec">
       {/* Same as the address section: the tab already says "Locations 0". */}
       <div className="bz7__combo">
+        {/* The label is the field: the icon used to be a sibling of the input
+            with the border on the input, so the magnifier sat outside the box
+            it belongs to. The "Any location" state stays below, where it is the
+            list's state rather than the field's value. */}
         <label className="bz7__add">
           <Search size={14} strokeWidth={1.9} aria-hidden />
           <input

@@ -551,34 +551,8 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
 }
 .bm8__bar .bm8__search { flex: 0 1 300px; min-width: 0; }
 
-/* The second filter axis: can this method be phished.
-
-   Grey at rest, brand while it is running — the console's rule for a control
-   that is either on or off. The count lives inside the pill so the bar does not
-   change length as the other filter moves, and a zero is an answer rather than
-   a reason to disappear. */
-.bm8__resist {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: var(--ctl-height-sm); padding: 0 10px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-pill);
-  font-family: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium);
-  color: var(--text-secondary);
-  cursor: pointer; white-space: nowrap;
-  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
-}
-.bm8__resist > em {
-  font-style: normal; font-size: var(--fs-xs); color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.bm8__resist:hover { border-color: var(--border-strong); }
-.bm8__resist:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-.bm8__resist.is-on {
-  background: var(--brand-subtle-bg);
-  border-color: var(--brand-subtle-border);
-  color: var(--brand-active);
-}
-.bm8__resist.is-on > em { color: inherit; }
+/* The phishing-resistant pill that stood here is gone: it is a row in the
+   filter menu now, not a second control beside it. */
 
 @media (max-width: 720px) {
   .bm8__bar { align-items: stretch; }

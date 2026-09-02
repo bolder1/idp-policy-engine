@@ -399,9 +399,13 @@ export function WhenSection({
 
   const body = (
     <div className="bf__when">
-      {chrome && (
+      {chrome && cards.length > 0 && (
         /* The rule read back, always visible and always live — the one place
-           the whole predicate is a sentence rather than a set of controls. */
+           the whole predicate is a sentence rather than a set of controls.
+
+           Not on an empty rule: "This rule matches when any sign-in that
+           reaches it" above an empty-state that says the same thing in more
+           words is the sentence arriving before there is anything to say. */
         <p className="bf__whenread">
           <span className="u-label">This rule matches when</span>
           <Readback rule={rule} resolve={resolve} />
@@ -482,17 +486,11 @@ export function WhenSection({
     </div>
   )
 
-  if (!chrome) return body
-  return (
-    <Section
-      id="if"
-      bare
-      title="When it applies"
-      hint="Conditions in one box must all be true. Extra boxes are alternatives — any one of them is enough."
-    >
-      {body}
-    </Section>
-  )
+  /* The readback is not chrome. It is the only place the whole predicate reads
+     as a sentence rather than as a set of controls, and it survives the heading
+     that used to be bundled with it — the tab above names the half now, and a
+     pane repeating its own tab is a heading for nobody. */
+  return body
 }
 
 /* --- One alternative ------------------------------------------------------------ */
@@ -575,18 +573,16 @@ function CardBlock({
         />
       </div>
 
+      {/* The word `and` used to be a 26px row between every pair. It says what
+          the card header already says once — "All of these must be true" — and
+          it said it n-1 more times, at 26px each, in the only scroller on the
+          screen. A card of six conditions spent 130px repeating itself.
+
+          The spine down the left of the list carries it now: one mark for one
+          fact, drawn rather than spelled, and the header keeps the words. */}
       <ol className="bf__cardconds">
-        {k.conditions.map((c, i) => (
+        {k.conditions.map((c) => (
           <Fragment key={c.id}>
-            {i > 0 && (
-              /* Punctuation, not an operator anybody chose. No border, no
-                 background, no hover, no cursor — and rendered at EVERY
-                 position, because it is never editable at any of them, so
-                 uniform rendering is the honest one. */
-              <li className="bf__and" aria-hidden>
-                and
-              </li>
-            )}
             <ConditionRow
               c={c}
               cardId={k.id}

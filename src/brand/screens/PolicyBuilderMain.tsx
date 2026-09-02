@@ -1006,11 +1006,11 @@ function RuleCard({
               />
 
               <div id={paneId} role="tabpanel" tabIndex={-1} className="bf__pane" aria-label={pane === 'when' ? 'When it applies' : 'What happens'}>
-                {/* `chrome`/`bare` are off: the tab above already names the
-                    half, and a pane whose first line repeats its own tab is a
-                    heading for an audience of nobody. */}
+                {/* The tab above names the half, so neither pane draws a
+                    heading — but WHEN keeps its readback, which is the only
+                    place the whole predicate reads as a sentence. */}
                 {pane === 'when' ? (
-                  <WhenSection rule={rule} onPatch={onPatch} />
+                  <WhenSection rule={rule} onPatch={onPatch} chrome />
                 ) : (
                   <ThenSection rule={rule} onPatch={onPatch} bare />
                 )}

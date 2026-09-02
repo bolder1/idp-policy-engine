@@ -40,78 +40,267 @@
 .bf__baracts { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); }
 .bf__sep { width: 1px; height: 20px; margin: 0 var(--space-2); background: var(--border-subtle); }
 
-/* --- Work area ----------------------------------------------------------------
+/* --- Work row ------------------------------------------------------------------
 
-   One column now. The sequence used to be a resizable grid column holding 380px
-   of every window forever — a third of a 1024 screen spent on a list you
-   consult, while the thing being edited was squeezed — and it could never be
-   one width for both jobs: wide enough to draw a diagram, narrow enough not to
-   starve the editor.
+   Two columns: the rail is the program, the bench is the rule. The rail is open
+   by default and collapsible — it is the only rule list now, so it cannot both
+   hold the order and be hidden — and below 900 it becomes an overlay, where a
+   320px column would be a third of the screen. */
 
-   It floats over the work instead and closes once it has been used. That is
-   what it already did below 1120; the behaviour was right, it was only
-   conditional on the window being small. */
+.bf__work {
+  flex: 1; min-height: 0; position: relative;
+  display: grid;
+  grid-template-columns: var(--rail-w, 320px) minmax(0, 1fr);
+  transition: grid-template-columns 200ms var(--ease-standard);
+}
+.bf__work.is-railshut { --rail-w: 0px; }
+@media (prefers-reduced-motion: reduce) { .bf__work { transition: none; } }
 
-.bf__work { flex: 1; min-height: 0; position: relative; display: flex; }
-.bf__work > .bf__main {
-  flex: 1;
-  display: flex; flex-direction: column;
-  min-height: 0; min-width: 0;
+.bf__flowdock { position: relative; min-height: 0; overflow: hidden; }
+.bf__flow { height: 100%; min-height: 0; }
+
+.bf__flowscroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: var(--space-4) 76px; }
+.bf__flowscroll:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+/* The terminal is sticky, so "nothing else matched → is refused" is visible at
+   one rule and at twenty. It is the security default; it must not be something
+   you scroll to find. */
+.bf__node.is-default {
+  position: sticky; bottom: 0; z-index: var(--z-sticky);
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border-subtle);
+  margin: 0 calc(var(--space-5) * -1) calc(var(--space-5) * -1);
+  padding: var(--space-4) var(--space-5);
+  border-radius: 0;
 }
 
-/* The dock the sequence lives in. Off-canvas until asked for, and taken out of
-   the tab order while it is away — a panel nobody can see must not be a place
-   the keyboard can wander into. */
-.bf__flowdock {
-  position: absolute; z-index: var(--z-popover);
-  left: 0; top: 0; bottom: 0;
-  width: min(var(--flow-w, 340px), 88vw);
-  transform: translateX(-102%);
-  transition: transform 220ms var(--ease-standard), visibility 220ms;
-  box-shadow: var(--el-high);
-}
-.bf__flowdock[aria-hidden='true'] { visibility: hidden; }
-.bf__work.is-flowopen .bf__flowdock { transform: translateX(0); visibility: visible; }
-@media (prefers-reduced-motion: reduce) { .bf__flowdock { transition: none; } }
+/* --- Step one: who, as the rail's first node ------------------------------------
 
-.bf__flowscrim {
-  position: absolute; inset: 0; z-index: calc(var(--z-popover) - 1);
-  background: rgb(12 17 23 / 0.28);
-  border: none; cursor: pointer;
-}
-
-.bf__flowclose {
-  display: grid; place-items: center; width: 24px; height: 24px;
-  margin-left: var(--space-2);
-  border: none; background: none; border-radius: var(--radius-sm);
-  color: var(--text-muted); cursor: pointer;
-}
-.bf__flowclose:hover { background: var(--surface-raised); color: var(--text-primary); }
-
-.bf__flowbtn {
-  display: inline-flex; align-items: center; gap: var(--space-3);
-  height: 26px; padding: 0 var(--space-3);
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+   It was a strip above the work and it read as metadata. This is where it
+   belongs: the rail is the program read top to bottom, and the audience is the
+   gate a sign-in passes before rule 1 gets to look at it. */
+.bf__flowaud {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  width: 100%; padding: var(--space-4);
   background: var(--surface-raised);
-  font-family: inherit; font-size: var(--fs-sm);
-  color: var(--text-secondary); cursor: pointer;
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  font-family: inherit; text-align: left; cursor: pointer;
 }
-.bf__flowbtn:hover { border-color: var(--border-strong); color: var(--text-primary); }
-.bf__flowbtn[aria-expanded='true'] { background: var(--surface-inverse); border-color: var(--surface-inverse); color: var(--text-inverse); }
-.bf__flowbtn span {
-  padding: 0 5px; border-radius: var(--radius-full);
-  background: var(--surface-inset); color: var(--text-tertiary);
-  font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
-}
-.bf__flowbtn[aria-expanded='true'] span { background: rgb(255 255 255 / 0.16); color: var(--text-inverse); }
+.bf__flowaud:hover { border-color: var(--brand); }
+.bf__flowaud.is-empty { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
+.bf__flowaud > svg { flex: none; margin-top: 3px; color: var(--text-muted); }
+.bf__flowaudbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.bf__flowaudbody strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bf__flowaudbody em.is-empty { font-style: normal; font-size: var(--fs-sm); color: var(--fb-negative-fg); }
+.bf__flowaudchips { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.bf__flowaudchips em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
-@media (max-width: 880px) {
-  .bf__pips .bgt__pip em, .bf__pips .bia__pip b { display: none; }
-  .bf__pips .bgt__pip, .bf__pips .bia__pip { white-space: nowrap; }
-  .bf__stage { padding: var(--space-5) var(--space-5) var(--space-7); }
-  .bf__stepnav { padding: var(--space-4) var(--space-5); }
-  .bf__bar { padding: 0 var(--space-4); }
+.bf__stepn {
+  flex: none; display: grid; place-items: center;
+  width: 18px; height: 18px; margin-top: 1px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-full);
+  font-size: 10px; font-weight: var(--fw-semibold); color: var(--text-tertiary);
 }
+
+/* --- The bench -----------------------------------------------------------------
+
+   Three rows: a fixed verdict, the only unbounded scroll in the builder, and a
+   pinned checks bar. The verdict's height is a variable that tiers by viewport
+   height and NEVER by content — the moment it can grow it has stopped being the
+   fix. */
+
+.bf__bench {
+  --verdict-h: 118px;
+  position: relative; min-width: 0; min-height: 0;
+  display: grid; grid-template-rows: var(--verdict-h) minmax(0, 1fr) auto;
+  background: var(--surface-raised);
+}
+.bf__bench:has(.bf__reviewstage), .bf__bench:has(.bf__blank) { grid-template-rows: minmax(0, 1fr); }
+
+.bf__verdict {
+  height: var(--verdict-h);
+  display: grid; grid-template-rows: var(--ctl-height-md) 28px 18px;
+  align-content: center; row-gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-anchor: none;
+}
+
+.bf__vseg { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+
+/* One control over one field. The two outcome tiles and the second-factor
+   switch were two controls writing to `decision`, and you could only find that
+   out by picking one of them. */
+.bf__vsegctl {
+  flex: none; display: flex; gap: 2px; padding: 2px;
+  background: var(--surface-inset); border-radius: var(--radius-md);
+}
+.bf__vsegctl button {
+  padding: 0 var(--space-4); height: 28px;
+  border: none; background: none; border-radius: var(--radius-sm);
+  font-family: inherit; font-size: var(--fs-sm); color: var(--text-secondary);
+  white-space: nowrap; cursor: pointer;
+}
+.bf__vsegctl button:hover { color: var(--text-primary); }
+.bf__vsegctl button.is-on { background: var(--surface-raised); box-shadow: var(--el-low); font-weight: var(--fw-medium); }
+.bf__vsegctl button.is-on.is-allow { color: var(--fb-positive-fg); }
+.bf__vsegctl button.is-on.is-mfa { color: var(--fb-notice-fg); }
+.bf__vsegctl button.is-on.is-deny { color: var(--fb-negative-fg); }
+
+/* --- The settings, as chips that never wrap ------------------------------------
+
+   Five stacked label/control rows became five chips. Depth goes sideways into a
+   popover, never downward into the header — which is what keeps the height
+   provably constant at every width. Off states are ghost chips rather than
+   omissions, so the shape of the outcome does not change as you set it. */
+.bf__vprops {
+  display: flex; align-items: center; gap: var(--space-2);
+  height: 28px; flex-wrap: nowrap; overflow: hidden;
+}
+.bf__pchip {
+  flex: none; display: inline-flex; align-items: center; gap: var(--space-2);
+  height: 26px; max-width: 260px; padding: 0 var(--space-3);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-full);
+  font-family: inherit; font-size: var(--fs-sm); color: var(--text-body);
+  white-space: nowrap; overflow: hidden; cursor: pointer;
+}
+.bf__pchip em { font-style: normal; color: var(--text-muted); }
+.bf__pchip svg { flex: none; color: var(--text-muted); }
+.bf__pchip:hover { border-color: var(--border-strong); }
+.bf__pchip.is-open { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bf__pchip.is-ghost { background: none; border-style: dashed; color: var(--text-muted); }
+.bf__pchip.is-negative { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bf__pchip.is-notice { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+
+.bf__pchippop {
+  position: fixed; z-index: var(--z-popover);
+  width: 300px; max-width: calc(100vw - 16px);
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface-overlay, var(--surface-raised));
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  box-shadow: var(--el-high, var(--el-mid));
+}
+.bf__pchippop h4 { margin: 0; color: var(--text-muted); }
+
+/* The whole rule, on the scroll edge, so it summarises everything below the
+   fold. Verbatim the string the rail tile shows — reading and editing cost
+   nothing to translate between. */
+.bf__vline {
+  height: 18px; min-width: 0;
+  margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* --- The canvas: the only unbounded region in the layout ----------------------- */
+
+.bf__canvas {
+  min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: var(--space-6) var(--space-6) var(--space-8);
+  scroll-padding-block-start: var(--space-5);
+  scroll-behavior: smooth;
+}
+.bf__canvas:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) { .bf__canvas { scroll-behavior: auto; } }
+.bf__when { max-width: 900px; }
+
+/* --- The checks, pinned -------------------------------------------------------- */
+
+.bf__checksbar {
+  flex: none; max-height: 132px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  overflow-anchor: none;
+}
+.bf__checkclear {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin: 0; font-size: var(--fs-sm); color: var(--fb-positive-fg);
+}
+.bf__rulecheck {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  margin: 0; font-size: var(--fs-sm); color: var(--text-secondary);
+}
+.bf__rulecheck svg { flex: none; margin-top: 2px; }
+.bf__rulecheck strong { font-weight: var(--fw-medium); color: var(--text-primary); }
+.bf__rulecheck.is-error svg { color: var(--fb-negative-fg); }
+.bf__rulecheck.is-warning svg { color: var(--fb-notice-fg); }
+.bf__rulecheck.is-info svg { color: var(--fb-info-fg); }
+.bf__rulecheck button {
+  flex: none; margin-left: auto; background: none; border: none;
+  font-family: inherit; font-size: var(--fs-sm); color: var(--brand); cursor: pointer; white-space: nowrap;
+}
+
+/* --- The catalogue, as an overlay ----------------------------------------------
+
+   It was an inline panel about 380px tall that pushed everything below it off
+   the screen every time it opened. As an overlay pinned to the side of the pane
+   it costs exactly zero vertical pixels, which is the largest single win in
+   this layout. */
+.bf__cat {
+  position: absolute; top: var(--verdict-h); right: 0; bottom: 0;
+  z-index: var(--z-dropdown, 200);
+  width: min(380px, 100%);
+  display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--surface-overlay, var(--surface-raised));
+  border-left: 1px solid var(--border-default);
+  border-radius: 0;
+  box-shadow: var(--el-high, var(--el-mid));
+}
+.bf__catsplit { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+.bf__catgroups {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  margin: 0; padding: var(--space-3) var(--space-5); list-style: none;
+  border-right: none; border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+.bf__catgroups li { display: contents; }
+.bf__catgroups button {
+  display: inline-flex; align-items: center; gap: var(--space-2); width: auto;
+  padding: 3px var(--space-3); border-radius: var(--radius-full);
+  border: 1px solid transparent; background: none; font-family: inherit;
+  font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
+}
+.bf__catgroups button.is-on { background: var(--surface-raised); border-color: var(--border-default); color: var(--text-primary); box-shadow: none; }
+.bf__catgroups button em { margin-left: 0; }
+.bf__catitems { min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-3); }
+
+/* --- Height tiers --------------------------------------------------------------
+   The header tiers; it never scrolls and never grows. */
+
+@media (max-height: 839px) {
+  .bf__bench { --verdict-h: 96px; }
+  .bf__verdict { grid-template-rows: var(--ctl-height-md) 28px; }
+  .bf__vline { display: none; }
+}
+@media (max-height: 719px) {
+  .bf__bench { --verdict-h: 62px; }
+  .bf__verdict { grid-template-rows: var(--ctl-height-md); padding-block: var(--space-3); }
+  .bf__vprops { display: none; }
+}
+
+/* --- Width tiers ---------------------------------------------------------------- */
+
+@media (max-width: 1439px) { .bf__work { --rail-w: 288px; } }
+
+@media (max-width: 899px) {
+  .bf__work, .bf__work.is-railshut { grid-template-columns: minmax(0, 1fr); }
+  .bf__flowdock {
+    position: absolute; z-index: var(--z-popover);
+    left: 0; top: 0; bottom: 0;
+    width: min(320px, 88vw);
+    transform: translateX(-102%);
+    transition: transform 220ms var(--ease-standard), visibility 220ms;
+    box-shadow: var(--el-high);
+  }
+  .bf__flowdock[aria-hidden='true'] { visibility: hidden; }
+  .bf__work.is-flowopen .bf__flowdock { transform: translateX(0); visibility: visible; }
+  .bf__cat { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .bf__flowdock { transition: none; } }
 
 /* --- The flow (v1's left side) -------------------------------------------------- */
 
@@ -421,91 +610,6 @@
 .bf__input--big { height: var(--ctl-height-lg); font-size: var(--fs-lg); font-weight: var(--fw-medium); }
 .bf__input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
 
-/* --- Step one: who ------------------------------------------------------------
-
-   Was a caption on a strip above the work: small, grey, and read as metadata on
-   the way to the thing you came to do. It is not metadata — it is the first
-   decision and the widest claim the policy makes, and on a new policy it is the
-   first thing that should be answered.
-
-   So it gets the same card treatment the rules have, sits above them, and
-   carries a step number. The page now reads in the order the work happens:
-   who, the rules, then check and review. */
-
-.bf__who {
-  display: flex; align-items: flex-start; gap: var(--space-4);
-  padding: var(--space-5);
-  margin-bottom: var(--space-5);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-}
-/* A policy that governs nobody cannot do anything, so it is an error and looks
-   like one. Everything else here is a legitimate answer and is not tinted. */
-.bf__who.is-empty { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
-
-.bf__whobody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
-.bf__whobody h2 {
-  margin: 0;
-  font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-.bf__wholine {
-  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3);
-  margin: 0;
-  font-size: var(--fs-md); color: var(--text-body);
-}
-.bf__wholine.is-empty { color: var(--fb-negative-fg); }
-.bf__whocount { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.bf__whonote { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
-
-/* The policy's own step numbers. Deliberately unlike a rule's index: 20px and
-   outlined where a rule's is 26px and filled with its decision colour, because
-   the two orderings are about different things and must not be confusable. */
-.bf__stepn {
-  flex: none; display: grid; place-items: center;
-  width: 20px; height: 20px; margin-top: 2px;
-  border: 1px solid var(--border-strong); border-radius: var(--radius-full);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary);
-}
-
-.bf__ruleshead {
-  display: flex; align-items: center; gap: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-.bf__ruleshead .bf__stepn { margin-top: 0; }
-.bf__ruleshead h2 { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bf__ruleshead em {
-  flex: 1; min-width: 0; font-style: normal; font-size: var(--fs-sm); color: var(--text-muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
-/* --- Audience chips ------------------------------------------------------------ */
-
-.bf__aud { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); min-width: 0; }
-.bf__aud.is-all { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bf__aud.is-none { font-size: var(--fs-md); color: var(--fb-negative-fg); }
-
-.bf__audchip {
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  height: 24px; padding: 0 var(--space-3);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-full);
-  font-size: var(--fs-sm); color: var(--text-body);
-  white-space: nowrap;
-}
-.bf__audchip em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-/* A person is a circle, because it is an avatar and not a pill. */
-.bf__audchip i {
-  display: grid; place-items: center; width: 17px; height: 17px;
-  margin-left: -2px;
-  border-radius: var(--radius-full);
-  background: var(--brand-subtle-bg); color: var(--brand);
-  font-style: normal; font-size: 9px; font-weight: var(--fw-semibold);
-}
-/* A name that no longer resolves renders as itself, never as somebody else. */
-.bf__audchip.is-gone { border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
-.bf__audmore { font-size: var(--fs-sm); color: var(--text-muted); }
-
 /* --- WHEN: the composer -------------------------------------------------------------
 
    Two levels, and the levels are drawn rather than declared. A card is a box
@@ -727,7 +831,10 @@
 
 /* --- Adding ---------------------------------------------------------------------------- */
 
-.bf__addwrap { position: relative; margin-top: var(--space-3); }
+/* Static, deliberately. The catalogue is `position: absolute` and pins itself
+   to the bench — a positioned wrapper here would make it resolve against a 31px
+   button instead, which renders the panel about 2px tall. */
+.bf__addwrap { position: static; margin-top: var(--space-3); }
 .bf__addwrap.is-or { margin-top: var(--space-4); }
 
 .bf__add {
@@ -761,12 +868,9 @@
    level, so the list of things you could check grew every time somebody saved
    one — and "Network Zone" as a concept never appeared at all. */
 
-.bf__cat {
-  overflow: hidden; margin-top: var(--space-3);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-lg);
-  box-shadow: var(--el-mid);
-}
+/* The catalogue's own contents. Its frame — position, width, the two scroll
+   regions — is defined with the bench layout above, because it is an overlay
+   on the pane rather than a panel inside the card that opened it. */
 .bf__catbar {
   display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-3) var(--space-5);
@@ -794,7 +898,6 @@
 }
 .bf__catcommon button:hover { border-color: var(--brand); color: var(--brand); }
 
-.bf__catsplit { display: grid; grid-template-columns: 190px minmax(0, 1fr); align-items: stretch; }
 /* No scroller of its own.
 
    It had `max-height: 300px; overflow-y: auto` and nine rows that measure just
@@ -802,22 +905,6 @@
    is itself inside the stage's scroller. Three nested scrollers, two of them
    for nothing. The list of major components is a fixed nine; it is allowed to
    be as tall as nine things. */
-.bf__catgroups {
-  margin: 0; padding: var(--space-3); list-style: none;
-  border-right: 1px solid var(--border-subtle);
-  background: var(--surface-sunken);
-}
-.bf__catgroups button {
-  display: flex; align-items: center; gap: var(--space-3); width: 100%;
-  padding: var(--space-3); border-radius: var(--radius-sm);
-  background: none; border: none; font-family: inherit;
-  font-size: var(--fs-md); color: var(--text-secondary); text-align: left; cursor: pointer;
-}
-.bf__catgroups button.is-on { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
-.bf__catgroups button em {
-  margin-left: auto; font-style: normal; font-size: var(--fs-xs);
-  color: var(--text-muted); font-variant-numeric: tabular-nums;
-}
 .bf__cationic {
   flex: none; display: grid; place-items: center; width: 22px; height: 22px;
   border-radius: var(--radius-sm);
@@ -834,8 +921,6 @@
 /* The one scroller the catalogue keeps, because Device profiles holds eight
    types and Time holds one — the pane has to be able to hold the longest
    without the panel resizing every time the category changes. */
-.bf__catitems { padding: var(--space-3); max-height: 320px; min-height: 220px; overflow-y: auto; overscroll-behavior: contain; }
-.bf__catitems.is-flat { min-height: 0; }
 .bf__catitem {
   display: flex; align-items: center; gap: var(--space-4); width: 100%;
   padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm);

@@ -1,6 +1,6 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { LayoutGroup, motion, useReducedMotion } from 'motion/react'
-import { GripVertical, Home, KeyRound, MoreHorizontal, Plus, ShieldAlert, UserCheck, X } from 'lucide-react'
+import { GripVertical, Home, KeyRound, MoreHorizontal, Pencil, Plus, ShieldAlert, UserCheck, X } from 'lucide-react'
 
 import type { AccessDecision, Policy } from '../data'
 import { MenuButton } from '../kit'
@@ -30,7 +30,7 @@ const TILE = { deny: ShieldAlert, '2fa': KeyRound, '1fa': UserCheck } as const
 const TONE = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' } as const
 
 /** Said as a consequence, not as a setting — this row is read far more than set. */
-const FALLBACK_SUB: Record<AccessDecision, string> = {
+export const FALLBACK_SUB: Record<AccessDecision, string> = {
   '1fa': 'signs in on one factor',
   '2fa': 'is asked for a second factor',
   deny: 'is refused',
@@ -48,6 +48,10 @@ export function FlowRail({
   onHover,
   onClose,
   onFallback,
+  audience,
+  reach,
+  emptyAudience,
+  onAudience,
 }: {
   policy: Policy
   selected: number
@@ -63,11 +67,34 @@ export function FlowRail({
   onClose?: () => void
   /** What an unmatched sign-in gets. Editable, never deletable. */
   onFallback: (d: AccessDecision) => void
+  /* Who the policy governs, drawn as the first node.
+
+     It was a strip above the work, and it read as metadata on the way to the
+     thing you came to do. This is where it actually belongs: the rail is the
+     program, read top to bottom, and the audience is the gate every sign-in
+     passes before rule 1 gets to look at it. */
+  audience: ReactNode
+  reach: number
+  emptyAudience: boolean
+  onAudience: () => void
 }) {
   const reduce = useReducedMotion()
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null)
   const rules = policy.rules
   const fallback = policy.fallback ?? '1fa'
+  const scroller = useRef<HTMLDivElement | null>(null)
+
+  /* Keep the selected rule in view.
+
+     The rail is the only rule list now, and selection can move from anywhere —
+     a diagnostic's "open rule 4", the command palette, adding a rule at a
+     position. With twenty rules the tile you just selected is regularly off
+     screen, and a list that does not follow its own selection stops being a
+     list of where you are. `nearest`, so a tile already visible is not yanked. */
+  useEffect(() => {
+    const el = scroller.current?.querySelector<HTMLElement>('.bf__node.is-on')
+    el?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' })
+  }, [selected, reduce])
 
   return (
     <section className="bf__flow" data-tour="flow" aria-label="Evaluation order — top to bottom, first match wins">
@@ -81,10 +108,33 @@ export function FlowRail({
         )}
       </header>
 
-      <div className="bf__flowscroll">
+      <div className="bf__flowscroll" ref={scroller} tabIndex={0} role="region" aria-label="Evaluation order">
         <div className="bf__flowstage">
+          <button
+            type="button"
+            className={`bf__flowaud ${emptyAudience ? 'is-empty' : ''}`}
+            onClick={onAudience}
+            data-tour="audience"
+          >
+            <span className="bf__stepn" aria-hidden>
+              1
+            </span>
+            <span className="bf__flowaudbody">
+              <strong>Who this applies to</strong>
+              {emptyAudience ? (
+                <em className="is-empty">Nobody — these rules cannot run</em>
+              ) : (
+                <span className="bf__flowaudchips">
+                  {audience}
+                  <em>{reach.toLocaleString()} people</em>
+                </span>
+              )}
+            </span>
+            <Pencil size={12} strokeWidth={1.9} aria-hidden />
+          </button>
+
           <p className="bf__flowstart">
-            <span aria-hidden />A user attempts to sign in
+            <span aria-hidden />and then signs in
           </p>
 
           <LayoutGroup>

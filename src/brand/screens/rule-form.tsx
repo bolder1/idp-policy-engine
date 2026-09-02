@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Check,
@@ -26,7 +26,7 @@ import {
 import { Counter, MenuButton, Tip, TipDot, Toggle, type MenuItem } from '../kit'
 import { Picker } from '../picker'
 import { cardLetter, ckey, duplicatedAcrossCards, leaves } from '../predicate'
-import { predicateParts, type NameLookup } from './predicate-prose'
+import type { NameLookup } from './predicate-prose'
 import {
   CONDITION_CATALOGUE,
   CONDITION_GROUPS,
@@ -130,8 +130,8 @@ export const OUTCOMES: { id: AccessDecision; label: string; sub: string; icon: L
 export const allows = (d: AccessDecision) => d !== 'deny'
 export const DEC_KEY: Record<AccessDecision, string> = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' }
 
-/** The console's first-factor catalogue, in its order — same list v1 uses. */
-const METHODS = [
+/** The console's first-factor catalogue, in its order. */
+export const METHODS = [
   'miniOrange Push',
   'TOTP Authenticator',
   'WebAuthn / FIDO2',
@@ -300,22 +300,30 @@ export function WhenSection({
   rule,
   ctx,
   onPatch,
-  bare,
-  n = 2,
   hit,
+  catalogue,
+  onCatalogue,
 }: {
   rule: Rule
   ctx: SimContext
   onPatch: (p: Partial<Rule>) => void
-  bare?: boolean
-  n?: number
   /** Which card the docked tester says is carrying the match, if any. */
   hit?: number | null
+  /* The catalogue's open state is the BENCH's, not this component's.
+
+     It is an overlay pinned to the side of the pane rather than a panel that
+     expands inline, which is the single change that makes opening it cost zero
+     vertical pixels — the old inline panel added about 380px and pushed
+     everything below it off the screen. An overlay has to be rendered outside
+     the scrolling canvas, so the canvas's owner holds the state. */
+  catalogue: string | null
+  onCatalogue: (cardId: string | null) => void
 }) {
   const store = useBrand()
   const resolve = useNameLookup()
-  const [adding, setAdding] = useState<string | null>(null)
   const [justAdded, setJustAdded] = useState<string | null>(null)
+  const adding = catalogue
+  const setAdding = onCatalogue
 
   const cards = rule.when.cards
   const setCards = (next: ConditionCard[]) => onPatch({ when: { cards: next } })
@@ -395,21 +403,13 @@ export function WhenSection({
 
   const dupes = duplicatedAcrossCards(rule.when)
 
+  /* No section header and no readback here any more. The canvas IS the when
+     block — it is the only thing in the pane that scrolls — and the verdict
+     header pinned above it already carries the rule as a sentence. Repeating
+     either would spend the scarce thing (vertical room in the scroller) on the
+     thing that is already free (a fixed header). */
   return (
-    <Section
-      id="if"
-      n={n}
-      bare={bare}
-      title="When it applies"
-      hint="Conditions in one box must all be true. Extra boxes are alternatives — any one of them is enough."
-    >
-      <div className="bf__when">
-        {/* The rule read back, always visible and always live. The one place
-            the whole predicate is a sentence rather than a set of controls. */}
-        <p className="bf__whenread">
-          <span className="u-label">This rule matches when</span>
-          <Readback rule={rule} resolve={resolve} />
-        </p>
+    <div className="bf__when">
 
         {cards.length === 0 ? (
           <div className="bf__whenempty">
@@ -484,8 +484,7 @@ export function WhenSection({
             </span>
           </p>
         )}
-      </div>
-    </Section>
+    </div>
   )
 }
 
@@ -920,37 +919,12 @@ function ValueControl({
   )
 }
 
-/* --- The readback --------------------------------------------------------------- */
-
-/* The same sentence `predicateSentence` produces, rendered as elements so the
-   brackets and the `or` can carry the structure visually. One renderer feeds
-   both — the review dialog promises in-product that the sentence and the rule
-   cannot disagree, and two implementations is one chance for that to be false. */
-function Readback({ rule, resolve }: { rule: Rule; resolve: NameLookup }) {
-  const parts = predicateParts(rule.when, resolve)
-  if (parts.length === 0) return <em className="bf__readany">any sign-in that reaches it</em>
-
-  return (
-    <span className="bf__readexpr">
-      {parts.map((k, i) => (
-        <Fragment key={k.id}>
-          {i > 0 && <b className="bf__reador">or</b>}
-          <span className="bf__readcard">
-            {parts.length > 1 && <i aria-hidden>(</i>}
-            {k.label && <u>{k.label}:</u>}
-            {k.clauses.map((cl, j) => (
-              <Fragment key={cl.id}>
-                {j > 0 && <b className="bf__readand">and</b>}
-                <span data-node-id={cl.id}>{cl.text}</span>
-              </Fragment>
-            ))}
-            {parts.length > 1 && <i aria-hidden>)</i>}
-          </span>
-        </Fragment>
-      ))}
-    </span>
-  )
-}
+/* `Readback` lived here — the predicate rendered as elements so the brackets
+   and the `or` carried the structure visually. The verdict header above the
+   canvas now carries the whole rule as one line, built from the same
+   `ruleSentence`, so a second rendering inside the scroller would spend the
+   scarce thing on something already free. `predicateParts` stays exported for
+   any surface that wants the structured form back. */
 
 /* --- The catalogue -------------------------------------------------------------- */
 
@@ -996,15 +970,6 @@ function Catalogue({ onPick, onClose }: { onPick: (typeId: string) => void; onCl
   const [group, setGroup] = useState<string>(CONDITION_GROUPS[0])
   const el = useRef<HTMLDivElement | null>(null)
 
-  /* It opens inline under the card that summoned it and is about 380px tall, so
-     pressed from anywhere below the fold it expands entirely off-screen — the
-     button appears to do nothing. Waits for the open animation so it scrolls to
-     the real height rather than to zero. */
-  useEffect(() => {
-    const t = window.setTimeout(() => el.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 220)
-    return () => window.clearTimeout(t)
-  }, [])
-
   const inGroup = useMemo(
     () => (g: string) => CONDITION_CATALOGUE.filter((c) => !METHOD_GROUPS.has(c.group) && c.group === g),
     [],
@@ -1021,12 +986,16 @@ function Catalogue({ onPick, onClose }: { onPick: (typeId: string) => void; onCl
   }, [q])
 
   return (
+    /* Slides rather than growing. It used to animate `height: 0 → auto`, which
+       is right for a panel that pushes content down and wrong for one that is
+       absolutely positioned over it — the animated inline height fights `top`
+       and `bottom` and the panel renders 2px tall. */
     <motion.div
       ref={el}
       className="bf__cat"
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: 'auto' }}
-      exit={{ opacity: 0, height: 0 }}
+      initial={{ opacity: 0, x: 16 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 16 }}
       transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
     >
       <div className="bf__catbar">

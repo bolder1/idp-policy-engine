@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   AlertTriangle,
@@ -112,15 +112,17 @@ import type { Diagnostic } from './diagnostics'
    whole policy. */
 type Stage = 'rules' | 'review'
 
-/* The flow is wider than a list rail needs to be, because it is a diagram: v1's
-   canvas earned that width and this is the same drawing. Draggable from there,
-   and never at the trail's expense. */
-const FLOW_DEFAULT = 380
-const FLOW_MIN = 280
-const FLOW_MAX = 620
-const TRAIL_MIN = 560
-const clampFlow = (want: number, avail: number) =>
-  Math.min(FLOW_MAX, Math.max(FLOW_MIN, Math.min(want, Math.max(FLOW_MIN, avail - TRAIL_MIN))))
+/* The sequence is a panel you summon, not a column you live beside.
+
+   It was a resizable grid column taking 380px of every window forever — a third
+   of a 1024 screen spent on a list you consult, while the thing you are
+   actually editing was squeezed. And it could only ever be one width for both
+   jobs: wide enough to draw a diagram, narrow enough not to starve the editor.
+
+   Now it floats over the work and closes when it has been used, which is what
+   it was already doing below 1120 — that behaviour was right, it was just
+   conditional on the window being small. */
+const FLOW_W = 340
 
 export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: 'gauntlet' | 'impact' }) {
   const store = useBrand()
@@ -149,69 +151,18 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
   /* --- The flow's width, dragged. v1's grammar ---------------------------------
      Clamped against the room that actually exists, so the flow never claims a
      width the window cannot give it, and the trail always keeps TRAIL_MIN. */
-  const [flowW, setFlowW] = useState(FLOW_DEFAULT)
-  const [avail, setAvail] = useState(1200)
-
-  /* Below this the three columns stop fitting: the flow was taking a third of a
-     1024px window to be a rail. It becomes a drawer instead — the sequence is
-     something you consult and pick from, not something you need in view while
-     filling in a field. */
-  const [narrow, setNarrow] = useState(false)
   const [flowOpen, setFlowOpen] = useState(false)
+
+  /* Escape closes it, because a panel that floats over the work has to be
+     dismissible without aiming at anything. */
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1120px)')
-    const sync = () => {
-      setNarrow(mq.matches)
-      if (!mq.matches) setFlowOpen(false)
+    if (!flowOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFlowOpen(false)
     }
-    sync()
-    mq.addEventListener('change', sync)
-    return () => mq.removeEventListener('change', sync)
-  }, [])
-
-  useEffect(() => {
-    const measure = () => setAvail(work.current?.getBoundingClientRect().width ?? window.innerWidth)
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [])
-
-  /* One AbortController owns every listener and the body styles, so a cancelled
-     pointer or an unmount tears the whole thing down. Without pointercancel an
-     interrupted drag leaves the page stuck in col-resize for the session. */
-  const resizing = useRef<AbortController | null>(null)
-  const endResize = useCallback(() => {
-    resizing.current?.abort()
-    resizing.current = null
-    document.body.style.cursor = ''
-    document.body.style.userSelect = ''
-  }, [])
-  useEffect(() => () => endResize(), [endResize])
-
-  const startResize = useCallback(
-    (e: React.PointerEvent) => {
-      e.preventDefault()
-      endResize()
-      const ac = new AbortController()
-      resizing.current = ac
-      const startX = e.clientX
-      const startW = flowW
-      /* Measured at pointer-down, not at mount: a ceiling taken on mount goes
-         stale the moment the nav collapses or the window resizes, and silently
-         caps the drag short of the width being asked for. */
-      const room = work.current?.getBoundingClientRect().width ?? avail
-      setAvail(room)
-      const opts = { signal: ac.signal }
-      window.addEventListener('pointermove', (ev: PointerEvent) => setFlowW(clampFlow(startW + (ev.clientX - startX), room)), opts)
-      window.addEventListener('pointerup', endResize, opts)
-      window.addEventListener('pointercancel', endResize, opts)
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-    },
-    [flowW, avail, endResize],
-  )
-
-  const effectiveFlowW = clampFlow(flowW, avail)
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [flowOpen])
 
   useEffect(() => {
     if (open) setDialog(open)
@@ -296,6 +247,9 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
   const blockers = diagnostics.filter(
     (d) => d.severity === 'error' && (d.scope === 'policy' || rules[d.ruleIndex]?.enabled !== false),
   ).length
+
+  const a = draft.audience
+  const emptyAudience = !a.everyone && a.groupIds.length === 0 && a.userIds.length === 0
 
   /* One walk, feeding both the docked tester's verdict and the highlight on the
      card that carried the match. It is the same evaluator every other surface
@@ -426,77 +380,34 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
         </div>
       </header>
 
-      {/* --- Who this policy governs. -----------------------------------------
-
-          Not a step. A step implies you set it and move on; this is a standing
-          fact every rule inherits, and the single biggest claim the policy
-          makes — so it sits where it is always readable rather than behind a
-          chip you have to remember to revisit. */}
-      <div className="bf__pol" data-tour="audience">
-        <span className="u-label">Applies to</span>
-        <AudienceBar audience={draft.audience} groups={store.groups} users={store.users} />
-        <Counter value={reach(draft.audience, store.groups, store.users)} /> people
-        <button type="button" className="bf__poledit" onClick={() => setAudienceOpen(true)}>
-          <Users size={12} strokeWidth={2} aria-hidden />
-          Edit
-        </button>
-        {narrow && (
-          <button type="button" className="bf__flowbtn" aria-expanded={flowOpen} onClick={() => setFlowOpen((v) => !v)}>
-            <ListOrdered size={13} strokeWidth={1.9} aria-hidden />
-            <span>{rules.length}</span>
-          </button>
+      <div className={`bf__work ${flowOpen ? 'is-flowopen' : ''}`} ref={work}>
+        {/* Dismisses on a click anywhere off the panel. Only in the DOM while
+            the panel is, so it can never swallow a click on the work. */}
+        {flowOpen && (
+          <button type="button" className="bf__flowscrim" aria-label="Close the sequence" onClick={() => setFlowOpen(false)} />
         )}
-      </div>
 
-      <div
-        className={`bf__work ${narrow ? 'is-narrow' : ''} ${flowOpen ? 'is-flowopen' : ''}`}
-        ref={work}
-        style={{ ['--flow-w' as string]: `${effectiveFlowW}px` }}
-      >
-        {/* The drawer's backdrop. Only rendered while the drawer is, so it can
-            never swallow a click on a wide window. */}
-        {narrow && flowOpen && <button type="button" className="bf__flowscrim" aria-label="Close the sequence" onClick={() => setFlowOpen(false)} />}
-
-        {/* --- Left: v1's flow ---------------------------------------------- */}
-        <FlowRail
-          policy={draft}
-          selected={index}
-          diagnostics={diagnostics}
-          shadowed={shadowed}
-          onSelect={(i) => {
-            jump(i)
-            setFlowOpen(false)
-          }}
-          onInsert={(at) => {
-            addRule(at)
-            setFlowOpen(false)
-          }}
-          onMove={move}
-          onReorder={move}
-          onHover={setHoverShadow}
-        />
-
-        {/* --- Drag to adjust. v1's grammar: an invisible corridor, a pill that
-            surfaces when the pointer is near, double-click to reset, arrow keys
-            for anyone who is not holding a mouse. ------------------------------ */}
-        <div
-          className="bf__split"
-          hidden={narrow}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize the flow"
-          aria-valuenow={effectiveFlowW}
-          aria-valuemin={FLOW_MIN}
-          aria-valuemax={FLOW_MAX}
-          tabIndex={0}
-          onPointerDown={startResize}
-          onDoubleClick={() => setFlowW(FLOW_DEFAULT)}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowRight') setFlowW((w) => Math.min(FLOW_MAX, w + 24))
-            if (e.key === 'ArrowLeft') setFlowW((w) => Math.max(FLOW_MIN, w - 24))
-          }}
-        >
-          <span className="bf__splitpill" aria-hidden />
+        {/* --- The sequence, floating ---------------------------------------- */}
+        <div className="bf__flowdock" style={{ ['--flow-w' as string]: `${FLOW_W}px` }} aria-hidden={!flowOpen}>
+          <FlowRail
+            policy={draft}
+            selected={index}
+            diagnostics={diagnostics}
+            shadowed={shadowed}
+            onSelect={(i) => {
+              jump(i)
+              setFlowOpen(false)
+            }}
+            onInsert={(at) => {
+              addRule(at)
+              setFlowOpen(false)
+            }}
+            onMove={move}
+            onReorder={move}
+            onHover={setHoverShadow}
+            onClose={() => setFlowOpen(false)}
+            onFallback={(fallback) => patch({ fallback })}
+          />
         </div>
 
         {/* --- Middle: the trail --------------------------------------------- */}
@@ -536,6 +447,71 @@ export function PolicyBuilderV4({ policyId, open }: { policyId: string; open?: '
             </div>
           ) : (
             <div className="bf__stage" ref={stageEl} data-tour="stage">
+              {/* --- Step one: who. -----------------------------------------
+
+                  This was a caption on a strip between the top bar and the
+                  work, and it read as metadata — the kind of line you scan past
+                  on the way to the thing you came to do. It is not metadata. It
+                  is the first decision the policy makes and the widest claim it
+                  makes, and on a new policy it is the first thing that should
+                  be answered.
+
+                  So it is a step, in the stage, above the rules, with the same
+                  card treatment they have. The sequence a person reads down the
+                  page — who, then the rules, then check and review — is the
+                  order the work actually happens in. */}
+              <section className={`bf__who ${emptyAudience ? 'is-empty' : ''}`} data-tour="audience">
+                <span className="bf__stepn" aria-hidden>
+                  1
+                </span>
+                <div className="bf__whobody">
+                  <h2>Who this policy applies to</h2>
+                  {emptyAudience ? (
+                    <p className="bf__wholine is-empty">
+                      No groups and no people are selected, so none of these rules can ever run.
+                    </p>
+                  ) : (
+                    <p className="bf__wholine">
+                      <AudienceBar audience={draft.audience} groups={store.groups} users={store.users} max={6} />
+                      <span className="bf__whocount">
+                        <Counter value={reach(draft.audience, store.groups, store.users)} /> people
+                      </span>
+                    </p>
+                  )}
+                  <p className="bf__whonote">
+                    Every rule below inherits this. No rule can reach further than the policy does.
+                  </p>
+                </div>
+                <Button
+                  variant={emptyAudience ? 'primary' : 'secondary'}
+                  icon={Users}
+                  onClick={() => setAudienceOpen(true)}
+                >
+                  {draft.audience.everyone ? 'Narrow this' : 'Change'}
+                </Button>
+              </section>
+
+              <div className="bf__ruleshead">
+                <span className="bf__stepn" aria-hidden>
+                  2
+                </span>
+                <h2>Rules</h2>
+                <em>{rules.length === 0 ? 'None yet' : 'Evaluated top to bottom — the first one that matches decides'}</em>
+                {/* The way into the sequence, at every width. It carries the
+                    count so the rail's one permanently-useful fact is on screen
+                    even while the rail is not. */}
+                <button
+                  type="button"
+                  className="bf__flowbtn"
+                  aria-expanded={flowOpen}
+                  onClick={() => setFlowOpen((v) => !v)}
+                >
+                  <ListOrdered size={13} strokeWidth={1.9} aria-hidden />
+                  Order
+                  <span>{rules.length}</span>
+                </button>
+              </div>
+
               {rules.length === 0 ? (
                 <div className="bf__blank">
                   <Sparkles size={22} strokeWidth={1.6} aria-hidden />
@@ -843,7 +819,26 @@ function RuleCard({
 }) {
   const reduce = useReducedMotion()
   const resolve = useNameLookup()
+  const el = useRef<HTMLLIElement | null>(null)
   const st = ruleState(diagnostics)
+
+  /* Open a rule from the flow rail, the command palette or a diagnostic's "open
+     rule N" and the card expands wherever it happens to be — which, with five
+     rules and one of them tall, is regularly off-screen in both directions.
+
+     `block: 'nearest'` rather than 'start': a card already fully visible must
+     not be yanked to the top, because the commonest way to open one is to click
+     its own header and having the page jump under the cursor is worse than not
+     scrolling at all. The delay lets the accordion lay out first, so the browser
+     measures the open height rather than the closed one. */
+  useEffect(() => {
+    if (!open || !el.current) return
+    const t = window.setTimeout(
+      () => el.current?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' }),
+      reduce ? 0 : 240,
+    )
+    return () => window.clearTimeout(t)
+  }, [open, reduce])
   const errors = diagnostics.filter((d) => d.severity === 'error').length
 
   const ruleItems: MenuItem[] = [
@@ -854,7 +849,7 @@ function RuleCard({
   ]
 
   return (
-    <li className={`bf__rule ${open ? 'is-open' : ''} ${rule.enabled ? '' : 'is-off'}`}>
+    <li ref={el} className={`bf__rule ${open ? 'is-open' : ''} ${rule.enabled ? '' : 'is-off'}`}>
       <div className="bf__rulehead">
         <span className={`bf__ruleno is-${DEC_KEY[rule.decision]}`}>{index + 1}</span>
 

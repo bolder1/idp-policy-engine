@@ -1,13 +1,10 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { Fragment, useCallback, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Check,
-  ChevronDown,
-  Circle,
   Clock,
   Copy,
-  CopyPlus,
   Fingerprint,
   Gauge,
   Globe,
@@ -19,8 +16,6 @@ import {
   Plus,
   Search,
   ShieldAlert,
-  ShieldCheck,
-  Trash2,
   Users,
   Webhook,
   X,
@@ -28,7 +23,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { Counter, DecisionChip, MenuButton, Tip, TipDot, Toggle, type MenuItem } from '../kit'
+import { Counter, MenuButton, Tip, TipDot, Toggle, type MenuItem } from '../kit'
 import { Picker } from '../picker'
 import { cardLetter, ckey, duplicatedAcrossCards, leaves } from '../predicate'
 import { predicateParts, type NameLookup } from './predicate-prose'
@@ -51,13 +46,8 @@ import { ruleSentence } from './builder-dialogs'
 import { impactOf, type Diagnostic } from './diagnostics'
 import { SITUATIONS, sweep } from './impact-arena'
 import {
-  AUTH_STATES,
-  DEVICE_OPTIONS,
-  PLACES,
-  RISKS,
   SIM_USERS,
   evalCond,
-  walk,
   type SimContext,
   type SimEnv,
 } from './simulate'
@@ -116,11 +106,28 @@ const GROUP_TONE: Record<string, string> = {
 
 const METHOD_GROUPS = new Set(['Phishing-Resistant', 'Standard MFA', 'Fallback & Recovery'])
 
+/* Two outcomes, not three.
+
+   "Require MFA" was never a third thing that can happen to a sign-in. It is
+   Allow with a condition attached — the person still gets in, they are just
+   asked for more on the way — and standing it beside Deny as a peer made the
+   one genuinely binary decision in the product look like a three-way choice.
+   It also hid a rule: Allow and Require MFA shared every control beneath them,
+   which you could only discover by picking one.
+
+   So: Allow or Deny, and the second factor is a switch inside Allow.
+
+   The MODEL keeps all three values. `2fa` is still a distinct decision — it is
+   what the flow rail tints, what the gauntlet grades and what the review counts
+   — and collapsing it would throw that away to tidy a form. Only the
+   presentation changes. */
 export const OUTCOMES: { id: AccessDecision; label: string; sub: string; icon: LucideIcon }[] = [
-  { id: '1fa', label: 'Allow', sub: 'One factor, nothing further asked', icon: Users },
-  { id: '2fa', label: 'Require MFA', sub: 'A second factor before access', icon: ShieldCheck },
+  { id: '1fa', label: 'Allow', sub: 'The sign-in goes through', icon: Users },
   { id: 'deny', label: 'Deny', sub: 'The sign-in is refused outright', icon: ShieldAlert },
 ]
+
+/** Allow covers both allow-flavours; the second-factor switch chooses between them. */
+export const allows = (d: AccessDecision) => d !== 'deny'
 export const DEC_KEY: Record<AccessDecision, string> = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' }
 
 /** The console's first-factor catalogue, in its order — same list v1 uses. */
@@ -160,18 +167,14 @@ export function ruleState(diags: Diagnostic[]): RuleState {
    There is nothing left for it to do: a card is all-AND by construction, cards
    are alternatives by construction, and neither is a setting. */
 
-/* A new condition opens on a usable value rather than an empty one — a blank
-   value is a rule that can never fire, and diagnose() rightly calls that an
-   error, so seeding is the difference between adding a condition and adding a
-   defect. Same rule V0 follows. */
-export function seedValues(t: ConditionType, zoneId?: string, postureId?: string, hookId?: string): string[] {
-  if (t.valueKind === 'zone') return zoneId ? [zoneId] : []
-  if (t.valueKind === 'fingerprint') return postureId ? [postureId] : []
-  if (t.valueKind === 'hook') return hookId ? [hookId] : []
-  if (t.valueKind === 'time') return ['09:00', '17:00']
-  if (t.options?.length) return [t.options[0]]
-  return ['']
-}
+/* `seedValues` lived here. It filled a new condition with the first zone, the
+   first profile or the first option in its list, so a freshly added row would
+   not trip the linter's blank-value error.
+
+   That is backwards: it made "add a condition" mean "add a condition that
+   already says something", and it is why the old picker felt like it was
+   choosing a zone rather than choosing what to check. A new row now inserts
+   unset, shows "Needs a value" in neutral, and opens its own value control. */
 
 export interface PreviewState {
   userId: string
@@ -202,107 +205,12 @@ export function previewContext(pv: PreviewState): SimContext {
   }
 }
 
-/* --- The whole form ------------------------------------------------------------ */
-
-export function RuleForm({
-  policy,
-  index,
-  ctx,
-  env,
-  diagnostics,
-  onPatch,
-  onJump,
-  onDuplicate,
-  onCopyTo,
-  onDelete,
-  sticky = true,
-}: {
-  policy: Policy
-  index: number
-  ctx: SimContext
-  env: SimEnv
-  diagnostics: Diagnostic[]
-  onPatch: (p: Partial<Rule>) => void
-  onJump: (i: number) => void
-  onDuplicate?: () => void
-  /** Gap 3 — copy this rule into another policy of the same type. */
-  onCopyTo?: () => void
-  onDelete?: () => void
-  /** Hosts that already show the rule's identity above the form turn this off. */
-  sticky?: boolean
-}) {
-  const rule = policy.rules[index]
-  if (!rule) return null
-
-  return (
-    <div className="bf__sheet">
-      {sticky && (
-        /* A long form scrolls the rule's own name off screen, and the one
-           question you must never have to scroll up to answer is "which rule am
-           I editing". */
-        <div className="bf__sticky">
-          <span className={`bf__stickyn is-${DEC_KEY[rule.decision]}`}>{index + 1}</span>
-          <strong>{rule.name}</strong>
-          <DecisionChip decision={rule.decision} size="sm" />
-          <label className="bf__stickyswitch">
-            <Toggle checked={rule.enabled} onChange={(v) => onPatch({ enabled: v })} label={`Enable ${rule.name}`} size="sm" />
-            <span>{rule.enabled ? 'On' : 'Off'}</span>
-          </label>
-        </div>
-      )}
-
-      <Section id="identity" n={1} title="Name this rule">
-        <input
-          className="bf__input bf__input--big"
-          aria-label="Rule name"
-          value={rule.name}
-          onChange={(e) => onPatch({ name: e.target.value })}
-        />
-        {/* Second field, deliberately quieter than the first and never
-            required. The name is what every other surface renders; this is what
-            the person who inherits the policy reads before deciding whether
-            they are allowed to remove it. Placeholder asks for the reason
-            rather than a restatement, because "blocks off-network finance
-            access" under a rule called "Off-network finance access" is the
-            failure mode this field has in every product that ships it. */}
-        <textarea
-          className="bf__input bf__why"
-          aria-label="Why this rule exists"
-          rows={2}
-          placeholder="Why does this rule exist? A regulator, an incident, a request — whatever the next person needs to know before changing it."
-          value={rule.description ?? ''}
-          onChange={(e) => onPatch({ description: e.target.value })}
-        />
-      </Section>
-
-      <WhenSection rule={rule} ctx={ctx} onPatch={onPatch} />
-
-      <ThenSection rule={rule} onPatch={onPatch} />
-
-      <ChecksSection policy={policy} index={index} env={env} diagnostics={diagnostics} onJump={onJump} />
-
-      {(onDuplicate || onCopyTo || onDelete) && (
-        <div className="bf__rowacts">
-          {onDuplicate && (
-            <button type="button" onClick={onDuplicate}>
-              <Copy size={13} strokeWidth={1.9} aria-hidden /> Duplicate this rule
-            </button>
-          )}
-          {onCopyTo && (
-            <button type="button" onClick={onCopyTo}>
-              <CopyPlus size={13} strokeWidth={1.9} aria-hidden /> Copy to another policy
-            </button>
-          )}
-          {onDelete && (
-            <button type="button" className="is-danger" onClick={onDelete}>
-              <Trash2 size={13} strokeWidth={1.9} aria-hidden /> Delete this rule
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
+/* `RuleForm` lived here: the whole rule as one long scrolling form with a
+   sticky identity header and its own section numbering. It existed for v5,
+   which hosted the same form in three different layouts, and v5 is gone. The
+   builder composes the sections itself — a rule holds WhenSection and
+   ThenSection directly — so a component whose only job was to stack them in a
+   fixed order is one more place for the two to drift apart. */
 
 /* --- A form section -----------------------------------------------------------
 
@@ -1086,6 +994,16 @@ const COMMON: { id: string; label: string; typeId: string }[] = [
 function Catalogue({ onPick, onClose }: { onPick: (typeId: string) => void; onClose: () => void }) {
   const [q, setQ] = useState('')
   const [group, setGroup] = useState<string>(CONDITION_GROUPS[0])
+  const el = useRef<HTMLDivElement | null>(null)
+
+  /* It opens inline under the card that summoned it and is about 380px tall, so
+     pressed from anywhere below the fold it expands entirely off-screen — the
+     button appears to do nothing. Waits for the open animation so it scrolls to
+     the real height rather than to zero. */
+  useEffect(() => {
+    const t = window.setTimeout(() => el.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 220)
+    return () => window.clearTimeout(t)
+  }, [])
 
   const inGroup = useMemo(
     () => (g: string) => CONDITION_CATALOGUE.filter((c) => !METHOD_GROUPS.has(c.group) && c.group === g),
@@ -1104,6 +1022,7 @@ function Catalogue({ onPick, onClose }: { onPick: (typeId: string) => void; onCl
 
   return (
     <motion.div
+      ref={el}
       className="bf__cat"
       initial={{ opacity: 0, height: 0 }}
       animate={{ opacity: 1, height: 'auto' }}
@@ -1217,6 +1136,11 @@ export function ThenSection({
 }) {
   const chain = rule.methodChain ?? ['TOTP Authenticator']
 
+  /* Which allow-flavour this rule was last on, so Deny -> Allow restores "second
+     factor required" instead of silently downgrading the rule to one factor. */
+  const lastAllow = useRef<AccessDecision>(rule.decision === 'deny' ? '1fa' : rule.decision)
+  if (rule.decision !== 'deny') lastAllow.current = rule.decision
+
   return (
     <Section
       id="then"
@@ -1229,13 +1153,18 @@ export function ThenSection({
         <div className="bf__outs">
           {OUTCOMES.map((o) => {
             const Ico = o.icon
+            const on = o.id === 'deny' ? rule.decision === 'deny' : allows(rule.decision)
+            /* Allow keeps the tint of the flavour it is actually on, so the
+               tile agrees with the rule's number in the flow rail and with its
+               chip in the list. */
+            const tone = o.id === 'deny' ? 'deny' : DEC_KEY[allows(rule.decision) ? rule.decision : '1fa']
             return (
               <button
                 key={o.id}
                 type="button"
-                className={`bf__out is-${DEC_KEY[o.id]} ${rule.decision === o.id ? 'is-on' : ''}`}
-                aria-pressed={rule.decision === o.id}
-                onClick={() => onPatch({ decision: o.id })}
+                className={`bf__out is-${tone} ${on ? 'is-on' : ''}`}
+                aria-pressed={on}
+                onClick={() => onPatch({ decision: o.id === 'deny' ? 'deny' : (lastAllow.current ?? '1fa') })}
               >
                 <Ico size={17} strokeWidth={1.9} aria-hidden />
                 <strong>{o.label}</strong>
@@ -1260,6 +1189,27 @@ export function ThenSection({
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
             >
+              {/* The second factor, as a switch rather than as a tile.
+
+                  Above First factor because it is the larger decision: this
+                  changes what the rule DOES, where First factor only changes
+                  how the thing it already does is performed. */}
+              <Prop label="Second factor">
+                <label className="bf__switchrow">
+                  <Toggle
+                    checked={rule.decision === '2fa'}
+                    onChange={(v) => onPatch({ decision: v ? '2fa' : '1fa' })}
+                    label="Require a second factor"
+                    size="sm"
+                  />
+                  <span>
+                    {rule.decision === '2fa'
+                      ? 'A second factor is required before access'
+                      : 'The first factor alone is enough'}
+                  </span>
+                </label>
+              </Prop>
+
               <Prop label="First factor">
                 <div className="bf__seg">
                   {(['Password', 'Any', 'Specific'] as const).map((f) => (
@@ -1281,13 +1231,19 @@ export function ThenSection({
               )}
 
               {rule.decision === '2fa' && (
-                <Prop label="Second factor">
-                  <select aria-label="Second factor" value={rule.secondFactor} onChange={(e) => onPatch({ secondFactor: e.target.value as Rule['secondFactor'] })}>
-                    <option value="any">Any enabled method</option>
-                    <option value="specific">Specific method(s)</option>
-                    <option value="chain">Method chain</option>
-                    <option value="preferred">The user’s preferred method</option>
-                  </select>
+                <Prop label="Which" sub>
+                  <Picker
+                    label="Second factor method"
+                    width="fill"
+                    value={rule.secondFactor}
+                    options={[
+                      { value: 'any', label: 'Any enabled method' },
+                      { value: 'specific', label: 'Specific method(s)' },
+                      { value: 'chain', label: 'Method chain', meta: 'Every step, in order' },
+                      { value: 'preferred', label: 'The user’s preferred method' },
+                    ]}
+                    onChange={(v) => onPatch({ secondFactor: v as Rule['secondFactor'] })}
+                  />
                 </Prop>
               )}
 
@@ -1369,14 +1325,16 @@ export function ThenSection({
                 </Prop>
               )}
 
-              <Prop label="Remember device">
-                <label className="bf__switchrow">
-                  <Toggle checked={rule.rememberMfa} onChange={(v) => onPatch({ rememberMfa: v })} label="Remember this device" size="sm" />
-                  <span>Skip the second factor on a device that already passed</span>
-                </label>
-              </Prop>
+              {rule.decision === '2fa' && (
+                <Prop label="Remember device">
+                  <label className="bf__switchrow">
+                    <Toggle checked={rule.rememberMfa} onChange={(v) => onPatch({ rememberMfa: v })} label="Remember this device" size="sm" />
+                    <span>Skip the second factor on a device that already passed</span>
+                  </label>
+                </Prop>
+              )}
 
-              {rule.rememberMfa && (
+              {rule.decision === '2fa' && rule.rememberMfa && (
                 <>
                   <Prop label="For" sub>
                     <span className="bf__val bf__val--range">
@@ -1405,12 +1363,14 @@ export function ThenSection({
                 </>
               )}
 
-              <Prop label="End users">
-                <label className="bf__switchrow">
-                  <Toggle checked={rule.allowDisable2fa} onChange={(v) => onPatch({ allowDisable2fa: v })} label="Allow users to disable 2FA" size="sm" />
-                  <span>Let users switch their own second factor off</span>
-                </label>
-              </Prop>
+              {rule.decision === '2fa' && (
+                <Prop label="End users">
+                  <label className="bf__switchrow">
+                    <Toggle checked={rule.allowDisable2fa} onChange={(v) => onPatch({ allowDisable2fa: v })} label="Allow users to disable 2FA" size="sm" />
+                    <span>Let users switch their own second factor off</span>
+                  </label>
+                </Prop>
+              )}
 
               {rule.allowDisable2fa && rule.decision === '2fa' && (
                 <p className="bf__factorwarn is-warn">
@@ -1569,133 +1529,14 @@ export function ChecksSection({
   )
 }
 
-/* --- The preview rail ------------------------------------------------------------ */
+/* `PreviewPanel` and `PvAxis` lived here: the standing "what would this do"
+   panel that used to take turns with two others behind an icon in the top
+   right. The tester is docked under the work now — always on, one line, and
+   still the only writer of the preview context every condition is evaluated
+   against — so the panel form of it had no remaining host.
 
-/** Stated wherever the preview is shown, never as a caption under it. */
+   `PREVIEW_CAVEAT` stays: the docked tester carries the same footnote, and it
+   is the sentence that keeps the whole simulation honest. */
+
 export const PREVIEW_CAVEAT =
   'Heuristic, not the engine — the context here maps to condition values through a fixed table. The order and the first-match stop are real.'
-
-export function PreviewPanel({
-  policy,
-  index,
-  pv,
-  onPv,
-  ctx,
-  env,
-  onJump,
-  hideHeading,
-}: {
-  policy: Policy
-  index: number
-  pv: { userId: string; place: string; device: string; authState: string; risk: string }
-  onPv: (v: typeof pv) => void
-  ctx: SimContext
-  env: SimEnv
-  onJump: (i: number) => void
-  /** The card host draws its own title, so the panel does not repeat it. */
-  hideHeading?: boolean
-}) {
-  const trace = useMemo(() => walk(policy, ctx, env), [policy, ctx, env])
-  const winner = trace.hitIndex
-  const isThisRule = winner === index
-
-  const set = useCallback((k: keyof typeof pv, v: string) => onPv({ ...pv, [k]: v }), [pv, onPv])
-
-  return (
-    <div className="bf__preview">
-      {!hideHeading && (
-        <h3 className="u-label">
-          Live preview
-          {/* The caveat is the honest part and it is not a caption. It stays one
-              gesture away rather than sitting under the panel as prose. */}
-          <TipDot label="How this preview is calculated" text={PREVIEW_CAVEAT} />
-        </h3>
-      )}
-
-      <div className="bf__pvusers">
-        {SIM_USERS.map((u) => (
-          <button
-            key={u.id}
-            type="button"
-            className={u.id === pv.userId ? 'is-on' : ''}
-            aria-pressed={u.id === pv.userId}
-            onClick={() => set('userId', u.id)}
-            title={`${u.name} · ${u.groupName}`}
-          >
-            {u.name.split(' ').map((p) => p[0]).join('')}
-          </button>
-        ))}
-      </div>
-      <p className="bf__pvwho">
-        <strong>{ctx.user.name}</strong>
-        <em>
-          {ctx.user.groupName} · {ctx.user.userType}
-        </em>
-      </p>
-
-      <PvAxis label="From" value={pv.place} options={PLACES} onChange={(v) => set('place', v)} />
-      <PvAxis label="Device" value={pv.device} options={DEVICE_OPTIONS} onChange={(v) => set('device', v)} />
-      <PvAxis label="State" value={pv.authState} options={AUTH_STATES} onChange={(v) => set('authState', v)} />
-      <PvAxis label="Risk" value={pv.risk} options={RISKS} onChange={(v) => set('risk', v)} />
-
-      <div className={`bf__pvverdict is-${DEC_KEY[trace.decision]}`}>
-        <DecisionChip decision={trace.decision} size="sm" />
-        <p>
-          {winner === null ? (
-            <>No rule matches — the engine default lets this sign-in through.</>
-          ) : isThisRule ? (
-            <>
-              <strong>This rule decides it.</strong> Evaluation stops here.
-            </>
-          ) : (
-            <>
-              <button type="button" onClick={() => onJump(winner)}>
-                Rule {winner + 1} · {policy.rules[winner].name}
-              </button>{' '}
-              matches first, so this rule is never reached for {ctx.user.name.split(' ')[0]}.
-            </>
-          )}
-        </p>
-      </div>
-
-      <ol className="bf__pvtrace">
-        {trace.steps.map((s) => (
-          <li key={s.rule.id} className={`is-${s.kind} ${s.index === index ? 'is-current' : ''}`}>
-            <span aria-hidden>
-              {s.kind === 'hit' ? <Check size={10} strokeWidth={3} /> : s.kind === 'miss' ? <X size={10} strokeWidth={2.6} /> : <Circle size={7} strokeWidth={3} />}
-            </span>
-            <button type="button" onClick={() => onJump(s.index)}>
-              {s.index + 1} · {s.rule.name}
-            </button>
-          </li>
-        ))}
-      </ol>
-    </div>
-  )
-}
-
-function PvAxis({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  value: string
-  options: string[]
-  onChange: (v: string) => void
-}) {
-  return (
-    <label className="bf__pvaxis">
-      <span>{label}</span>
-      <span className="bf__pvselect">
-        <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}>
-          {options.map((o) => (
-            <option key={o}>{o}</option>
-          ))}
-        </select>
-        <ChevronDown size={12} strokeWidth={2.2} aria-hidden />
-      </span>
-    </label>
-  )
-}

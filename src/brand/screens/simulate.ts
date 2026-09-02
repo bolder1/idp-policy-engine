@@ -220,6 +220,12 @@ export function evalCond(c: Condition, ctx: SimContext): { state: CondState; det
   }
 }
 
+/* What an unmatched sign-in gets. Optional on the model so every existing
+   policy literal keeps working, and `1fa` here is the behaviour those policies
+   already had — so reading it is a no-op for them and a real answer for
+   anything that has set it. */
+export const fallbackOf = (p: Policy): AccessDecision => p.fallback ?? '1fa'
+
 export interface RuleVerdict {
   match: boolean
   reason: string
@@ -310,7 +316,7 @@ export function walk(policy: Policy, ctx: SimContext, env: SimEnv): TraceResult 
      produced a trace where five rules each explained separately that they were
      not for this person. The policy either governs somebody or it does not. */
   if (!inAudience(policy, ctx)) {
-    return { steps, hitIndex: null, decision: '1fa', outOfAudience: true }
+    return { steps, hitIndex: null, decision: fallbackOf(policy), outOfAudience: true }
   }
 
   for (let i = 0; i < policy.rules.length; i++) {
@@ -330,7 +336,12 @@ export function walk(policy: Policy, ctx: SimContext, env: SimEnv): TraceResult 
 
   // No hit falls through to the engine default, which lets the sign-in proceed
   // on the first factor alone. There is no 'allow' decision in the model.
-  return { steps, hitIndex, decision: hitIndex === null ? '1fa' : policy.rules[hitIndex].decision, outOfAudience: false }
+  return {
+    steps,
+    hitIndex,
+    decision: hitIndex === null ? fallbackOf(policy) : policy.rules[hitIndex].decision,
+    outOfAudience: false,
+  }
 }
 
 /** The decision only — used by the situation sweep, which runs thousands of
@@ -345,14 +356,14 @@ export function decide(
      the audience is counted as "the engine looked and let them through", which
      inflates the fell-through lane on every scoped policy and corrupts the
      blast-radius numbers the review stage is built on. */
-  if (!inAudience(policy, ctx)) return { decision: '1fa', hitIndex: null, outOfAudience: true }
+  if (!inAudience(policy, ctx)) return { decision: fallbackOf(policy), hitIndex: null, outOfAudience: true }
 
   for (let i = 0; i < policy.rules.length; i++) {
     const rule = policy.rules[i]
     if (!rule.enabled) continue
     if (evalRule(rule, ctx, env).match) return { decision: rule.decision, hitIndex: i, outOfAudience: false }
   }
-  return { decision: '1fa', hitIndex: null, outOfAudience: false }
+  return { decision: fallbackOf(policy), hitIndex: null, outOfAudience: false }
 }
 
 /** A stand-in environment for callers with no store — tests, mostly. */

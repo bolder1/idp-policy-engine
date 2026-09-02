@@ -1,8 +1,9 @@
 import { Fragment, useState } from 'react'
 import { LayoutGroup, motion, useReducedMotion } from 'motion/react'
-import { GripVertical, Home, KeyRound, Plus, ShieldAlert, UserCheck } from 'lucide-react'
+import { GripVertical, Home, KeyRound, MoreHorizontal, Plus, ShieldAlert, UserCheck, X } from 'lucide-react'
 
-import type { Policy } from '../data'
+import type { AccessDecision, Policy } from '../data'
+import { MenuButton } from '../kit'
 import { ruleState } from './rule-form'
 import type { Diagnostic } from './diagnostics'
 import { predicateSummary } from './predicate-prose'
@@ -28,6 +29,13 @@ import { predicateSummary } from './predicate-prose'
 const TILE = { deny: ShieldAlert, '2fa': KeyRound, '1fa': UserCheck } as const
 const TONE = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' } as const
 
+/** Said as a consequence, not as a setting — this row is read far more than set. */
+const FALLBACK_SUB: Record<AccessDecision, string> = {
+  '1fa': 'signs in on one factor',
+  '2fa': 'is asked for a second factor',
+  deny: 'is refused',
+}
+
 export function FlowRail({
   policy,
   selected,
@@ -38,6 +46,8 @@ export function FlowRail({
   onMove,
   onReorder,
   onHover,
+  onClose,
+  onFallback,
 }: {
   policy: Policy
   selected: number
@@ -49,16 +59,26 @@ export function FlowRail({
   onMove: (from: number, to: number) => void
   onReorder: (from: number, to: number) => void
   onHover: (i: number | null) => void
+  /** The panel floats over the work now, so it needs a way out that is not a pick. */
+  onClose?: () => void
+  /** What an unmatched sign-in gets. Editable, never deletable. */
+  onFallback: (d: AccessDecision) => void
 }) {
   const reduce = useReducedMotion()
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null)
   const rules = policy.rules
+  const fallback = policy.fallback ?? '1fa'
 
   return (
     <section className="bf__flow" data-tour="flow" aria-label="Evaluation order — top to bottom, first match wins">
       <header className="bf__flowhead">
         <span className="u-label">Evaluation order</span>
         <span className="bf__flowcount">{rules.length}</span>
+        {onClose && (
+          <button type="button" className="bf__flowclose" aria-label="Close the sequence" onClick={onClose}>
+            <X size={14} strokeWidth={2} />
+          </button>
+        )}
       </header>
 
       <div className="bf__flowscroll">
@@ -154,17 +174,38 @@ export function FlowRail({
 
           <Link label={rules.length > 0 ? 'no match' : undefined} onInsert={() => onInsert(rules.length)} always />
 
+          {/* The terminal. Permanent, because an ordered list has to end
+              somewhere and the engine has to do something when it gets there
+              — but no longer frozen. What happens to traffic that matched
+              nothing is a decision, and it was the one decision on this screen
+              nobody could make. */}
           <div className="bf__node is-default">
             <span className="bf__nodeidx is-lock" aria-hidden>
               <Home size={12} strokeWidth={1.8} />
             </span>
-            <span className="bf__nodetile is-allow" aria-hidden>
-              <UserCheck size={15} strokeWidth={1.8} />
+            <span className={`bf__nodetile is-${TONE[fallback]}`} aria-hidden>
+              {(() => {
+                const Ico = TILE[fallback]
+                return <Ico size={15} strokeWidth={1.8} />
+              })()}
             </span>
             <span className="bf__nodeselect as-static">
-              <strong>Default rule</strong>
-              <em>Anything unmatched signs in on one factor</em>
+              <strong>Nothing else matched</strong>
+              <em>{FALLBACK_SUB[fallback]}</em>
             </span>
+            <MenuButton
+              label="Change what unmatched sign-ins get"
+              iconOnly
+              icon={MoreHorizontal}
+              size="sm"
+              align="end"
+              items={[
+                { id: '1fa', label: 'Allow on one factor' },
+                { id: '2fa', label: 'Allow, but require a second factor' },
+                { id: 'deny', label: 'Deny', danger: true },
+              ]}
+              onSelect={(id) => onFallback(id as AccessDecision)}
+            />
           </div>
         </div>
       </div>

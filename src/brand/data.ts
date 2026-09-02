@@ -269,6 +269,17 @@ export interface Policy {
   allApps?: boolean
   /** Who this policy governs. Every rule inherits it; no rule can be broader. */
   audience: Audience
+  /* What happens to a sign-in that matched no rule.
+
+     This was hardcoded to `1fa` in the evaluator and drawn as an uneditable
+     terminal node — which made the single most consequential line in the whole
+     policy the one line nobody could change. A policy whose rules all deny and
+     whose unmatched traffic silently signs in on one factor is a policy with a
+     hole in exactly the place its author was least likely to look.
+
+     It cannot be deleted: every ordered list needs a terminal, and an engine
+     that falls off the end of one has to do something. It can be changed. */
+  fallback?: AccessDecision
   status: PolicyStatus
   lastModified: string
   modifiedBy: string
@@ -1177,6 +1188,7 @@ export function blankPolicy(name: string, appIds: string[]): Policy {
        default — nobody — makes a policy that silently does nothing, which is
        the one failure an access console must never ship quietly. */
     audience: EVERYONE,
+    fallback: '1fa',
     rules: [],
   }
 }

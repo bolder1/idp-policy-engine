@@ -797,7 +797,7 @@ export const policies: Policy[] = [
     rules: [
       rule({
         name: 'Block anonymised sources',
-        description: 'No legitimate sign-in to these apps has ever arrived from a Tor exit or a hosting ASN. Written after the March access review; delete only if a customer is genuinely behind one of these networks.',
+        description: 'No legitimate sign-in to this app has ever arrived from a Tor exit or a hosting ASN. Written after the March access review; delete only if a customer is genuinely behind one of these networks.',
         when: when(card(cond('zone', 'in zone', ['anon']))),
         decision: 'deny',
         matchEstimate: 31,
@@ -857,7 +857,7 @@ export const policies: Policy[] = [
     status: 'active',
     lastModified: '3 days ago',
     modifiedBy: 'Mehak Garg',
-    configIssue: 'No applications assigned — this policy cannot take effect until at least one app is attached.',
+    configIssue: 'No application assigned — this policy cannot take effect until one is attached.',
     audience: EVERYONE,
     rules: [
       rule({ name: 'First login enforcement',when: when(card(cond('auth-state', 'is', ['First time login']))), decision: '2fa', matchEstimate: 42 }),
@@ -1247,27 +1247,38 @@ export interface LogEntry {
   chain: { rule: string; outcome: string }[]
 }
 
+/* Every row's app is the app its matched rule's policy protects.
+
+   That was free when a policy could cover five applications; under one app per
+   policy it is a constraint, and the seed broke it in three places — two
+   Salesforce sign-ins and a GitHub one all matching rules that belong to
+   "Finance Team – High Security", which protects Workday. A log that shows a
+   rule firing on an application its policy does not cover is a log that teaches
+   the reader the wrong model of the engine.
+
+   Only "Default Rule" is free to appear anywhere: it is the system policy's,
+   and that is the one policy with no application. */
 export const decisionLog: LogEntry[] = [
   {
-    time: '11:48:02', user: 'priya@mo.com', app: 'Salesforce', matchedRule: 'Off-network finance access', decision: 'Challenge',
+    time: '11:48:02', user: 'priya@mo.com', app: 'Workday', matchedRule: 'Off-network finance access', decision: 'Challenge',
     conditions: [{ label: 'Group is Finance', matched: true }, { label: 'Outside Office Network', matched: true }],
     ip: '115.160.205.254', device: 'MO-LT-0510', place: 'Pune, IN', factor: 'Push', latency: '142ms', risk: 'Low · ML Engine: No escalation',
     chain: [{ rule: 'Rule 1 · Block compromised devices', outcome: 'skipped (no match)' }, { rule: 'Rule 2 · Off-network finance access', outcome: 'matched — evaluation stopped' }],
   },
   {
-    time: '11:47:51', user: 'arun@mo.com', app: 'Workday', matchedRule: 'Default Rule', decision: 'Allow',
+    time: '11:47:51', user: 'arun@mo.com', app: 'Zoom', matchedRule: 'Default Rule', decision: 'Allow',
     conditions: [{ label: 'No rule matched', matched: false }],
     ip: '10.4.2.19', device: 'MO-LT-0233', place: 'Pune, IN', factor: 'Password', latency: '88ms', risk: 'Low',
     chain: [{ rule: 'Rules 1–4', outcome: 'skipped (no match)' }, { rule: 'Default Rule', outcome: 'applied' }],
   },
   {
-    time: '11:47:30', user: 'contractor@ext.com', app: 'GitHub Enterprise', matchedRule: 'Block compromised devices', decision: 'Deny',
+    time: '11:47:30', user: 'contractor@ext.com', app: 'Workday', matchedRule: 'Block compromised devices', decision: 'Deny',
     conditions: [{ label: 'Not recognised by Corporate managed', matched: true }],
     ip: '185.220.101.12', device: 'unknown', place: 'Unknown (Tor exit)', factor: '—', latency: '61ms', risk: 'High · ML Engine: escalated',
     chain: [{ rule: 'Rule 1 · Block compromised devices', outcome: 'matched — evaluation stopped' }],
   },
   {
-    time: '11:46:12', user: 'mehak@mo.com', app: 'Salesforce', matchedRule: 'Off-network finance access', decision: 'Challenge',
+    time: '11:46:12', user: 'mehak@mo.com', app: 'Workday', matchedRule: 'Off-network finance access', decision: 'Challenge',
     conditions: [{ label: 'Group is Finance', matched: true }, { label: 'Outside Office Network', matched: true }],
     ip: '49.36.12.8', device: 'MO-LT-0119', place: 'Bengaluru, IN', factor: 'OTP', latency: '210ms', risk: 'Medium',
     chain: [{ rule: 'Rule 1', outcome: 'skipped (no match)' }, { rule: 'Rule 2', outcome: 'matched — evaluation stopped' }],

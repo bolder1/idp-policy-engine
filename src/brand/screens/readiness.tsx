@@ -43,7 +43,7 @@ export function Readiness({
   saved: Policy
   env: SimEnv
   blockers: number
-  onOpen: (d: 'gauntlet' | 'impact' | 'apps' | 'test') => void
+  onOpen: (d: 'gauntlet' | 'impact') => void
   onJump: (i: number) => void
 }) {
   const store = useBrand()
@@ -123,13 +123,16 @@ export function Readiness({
         action={{ label: 'Choose the application', run: () => store.go({ name: 'policy-details', policyId: draft.id }) }}
       />
 
+      {/* The single-user test went with the docked tester: both dealt one
+          hypothetical sign-in at unsaved rules, which is the gauntlet with one
+          row and cases nobody thought about. */}
       {impact && (
         <p className="bm__readyfoot">
-          Rule 1 reaches an audience of {impact.audience.toLocaleString()}. Run the{' '}
-          <button type="button" onClick={() => onOpen('test')}>
-            single-user test
+          Rule 1 reaches an audience of {impact.audience.toLocaleString()}.{' '}
+          <button type="button" onClick={() => onOpen('gauntlet')}>
+            Run the gauntlet
           </button>{' '}
-          to check one person end to end.
+          to deal thirteen sign-ins at these rules.
         </p>
       )}
     </div>

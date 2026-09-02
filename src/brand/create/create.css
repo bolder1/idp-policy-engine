@@ -517,7 +517,6 @@
 
 
 .bname2__rules li { display: flex; align-items: center; gap: 9px; padding: 9px 11px; background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); }
-.bname2__none { margin-top: 6px; font-size: var(--fs-sm); color: var(--fb-notice-fg); line-height: 1.5; }
 .bname2__acts { display: flex; gap: 8px; margin-top: 18px; }
 .bname2__acts .bx-btn { flex: 1; }
 .bname2__foot { margin-top: 10px; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
@@ -609,7 +608,6 @@ html[data-theme='dark'] .bguided__sheen {
 
 /* --- App transfer ---------------------------------------------------------- */
 
-.bname2__applogo { display: inline-flex; flex: none; }
 
 /* Protects — one row, because there is one app. */
 

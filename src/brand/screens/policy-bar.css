@@ -75,10 +75,12 @@
 
 /* --- A fact you can look inside -------------------------------------------------
 
-   Both facts are a short phrase; the list behind it opens on hover, in `Peek`'s
-   portalled panel. That is the whole reason the strip can stay one line tall
-   with five groups selected — chips grew it, and a policy that governs eight
-   groups is not rarer than one that governs two. */
+   The audience is a short phrase with its list behind it, opening on hover in
+   `Peek`'s portalled panel. That is the whole reason the strip stays one line
+   tall with five groups selected — chips grew it, and a policy governing eight
+   groups is not rarer than one governing two.
+
+   The application needs none of this: there is one, and it is named. */
 
 .bpbar__app { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; }
 
@@ -92,12 +94,6 @@
 .bpbar__peek:hover,
 .bpbar__peek.is-open { text-decoration-color: var(--brand); }
 .bpbar__peek:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-xs); }
-
-/* Overlapping, because three marks read as one group of things rather than
-   three separate ones — and because the width has to be bounded whether the
-   policy covers two applications or ten. */
-.bpbar__marks { display: inline-flex; align-items: center; }
-.bpbar__marks > * + * { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface-sunken); }
 
 .bpbar__plist,
 .bpbar__alist {

@@ -928,8 +928,6 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
      reported: what went in, and what did not. */
   const [note, setNote] = useState<string | null>(null)
 
-  const total = draft.ip.length + draft.asn.length
-
   /* One entry open for editing, by value — the list is keyed by value and
      values are unique within a zone, so there is nothing else to key on. */
   const [editing, setEditing] = useState<string | null>(null)
@@ -1032,14 +1030,10 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
 
   return (
     <section className="bz7__sec">
-      <header>
-        <h4>
-          <Network size={13} strokeWidth={2} aria-hidden />
-          IP addresses and networks
-        </h4>
-        <span>{total === 0 ? 'Any network' : `${total} ${total === 1 ? 'entry' : 'entries'}`}</span>
-      </header>
-
+      {/* No header. The tab above carries the same words and the same count one
+          row up — "IP networks 6" then "IP ADDRESSES AND NETWORKS · 6 entries"
+          was one label printed twice, and the box drawn around it made the
+          repetition look deliberate. */}
       <div className="bz7__add">
         <input
           type="text"
@@ -1249,14 +1243,7 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
 
   return (
     <section className="bz7__sec">
-      <header>
-        <h4>
-          <Globe size={13} strokeWidth={2} aria-hidden />
-          Locations
-        </h4>
-        <span>{chosen.length === 0 ? 'Any location' : `${chosen.length} selected`}</span>
-      </header>
-
+      {/* Same as the address section: the tab already says "Locations 0". */}
       <div className="bz7__combo">
         <label className="bz7__add">
           <Search size={14} strokeWidth={1.9} aria-hidden />

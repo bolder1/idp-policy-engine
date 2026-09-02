@@ -208,23 +208,12 @@
 
 /* --surface-sunken and not --surface-raised: inside a Modal, raised IS the
    modal's own background, so a raised section is invisible in both themes. */
+/* No frame and no fill of its own — it is the contents of the card above it,
+   not a panel sitting on one. */
 .bz7__sec {
-  display: flex; flex-direction: column; gap: 9px;
-  padding: 13px 14px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);}
-.bz7__sec > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.bz7__sec h4 {
-  display: flex; align-items: center; gap: 6px; margin: 0;
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
+  display: flex; flex-direction: column; gap: 12px;
+  min-width: 0;
 }
-.bz7__sec > header > span { font-size: var(--fs-xs); color: var(--text-muted); }
-
-/* Left and right, with the conjunction between them. Read top-to-bottom, the
-   second condition looks like a consequence of the first; side by side it looks
-   like what it is. */
-.bz7__sec { min-width: 0; }
 
 /* Quick add. Chips rather than buttons in a row: they are values, and a value
    you can click once is the whole point of them being here. */
@@ -273,7 +262,15 @@
 .bz7 .bz7__add input::placeholder { color: var(--text-muted); }
 .bz7 .bz7__add input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-subtle-bg); }
 
-.bz7__entries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; flex: 1; min-height: 96px; max-height: 210px; overflow-y: auto; }
+/* Separated by a rule, not by a box. The field and the quick-add are what you
+   type into; the list is what is already there, and with the section's own
+   frame gone the two need a boundary of their own. */
+.bz7__entries {
+  list-style: none; margin: 4px 0 0; padding: 8px 0 0;
+  border-top: 1px solid var(--border-subtle);
+  display: flex; flex-direction: column; flex: 1; min-height: 96px; max-height: 210px; overflow-y: auto;
+}
+.bz7__entries:empty { border-top: none; padding-top: 0; }
 /* Not virtualised, and measured rather than assumed.
 
    The paste box above deliberately accepts as many networks as an estate has,
@@ -518,6 +515,13 @@
    add — and on one that is finished it is still the thing you came back to
    change. Boxed so it reads as the working area of the page rather than more of
    the summary above it. */
+/* One surface, not a box inside a box.
+
+   This had a border and 16/18 of padding, and the section inside it had another
+   border, another 13/14, and a sunken fill — so the entries list sat three
+   frames deep, and the only thing the two frames separated was a tab bar from
+   the thing the tab bar switches. The card is the page's one surface now and
+   everything below the tabs is drawn on it. */
 .bz7__build {
   display: flex; flex-direction: column; gap: 14px;
   padding: 16px 18px;

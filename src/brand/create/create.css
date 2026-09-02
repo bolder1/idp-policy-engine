@@ -1149,7 +1149,7 @@ html[data-theme='dark'] .bguided__sheen {
 
 .baudp {
   flex: 1; min-height: 0;
-  display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto;
   background: var(--surface-raised);
   border: 1px solid var(--border-default); border-radius: var(--radius-md);
   overflow: hidden;
@@ -1170,7 +1170,32 @@ html[data-theme='dark'] .bguided__sheen {
 .baudp__search input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
 
 .baudp__list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 6px; }
-.baudp__head { margin: var(--space-4) 0 var(--space-2); padding: 0 8px; color: var(--text-muted); }
+
+/* Two tabs rather than two headings in one scroller. Five groups above
+   twenty-four people meant the groups — what almost every policy is actually
+   scoped by — were four rows at the top of a list you scrolled past for the
+   rest of the session. */
+.baudp__tabs {
+  display: flex; gap: var(--space-5);
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+.baudp__tabs button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 0; margin-bottom: -1px;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  font-family: inherit; font-size: var(--fs-md); color: var(--text-secondary); cursor: pointer;
+}
+.baudp__tabs button.is-on { color: var(--text-primary); border-bottom-color: var(--brand); }
+.baudp__tabs em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* The count of what you have chosen, not of what exists — so a tab you are not
+   looking at can still tell you it holds a selection. */
+.baudp__tabs b {
+  padding: 0 5px; border-radius: var(--radius-full);
+  background: var(--brand); color: var(--text-on-brand);
+  font-size: 10px; font-weight: var(--fw-semibold);
+}
 
 .baudp__row {
   display: flex; align-items: center; gap: 10px; width: 100%;
@@ -1208,6 +1233,11 @@ html[data-theme='dark'] .bguided__sheen {
 .baudp__text em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
 
 .baudp__none { padding: 24px 12px; text-align: center; font-size: var(--fs-md); color: var(--text-tertiary); }
+.baudp__none button {
+  display: block; margin: 6px auto 0;
+  background: none; border: none; font-family: inherit;
+  font-size: var(--fs-md); color: var(--brand); cursor: pointer;
+}
 .baudp__foot {
   margin: 0; padding: 8px 14px;
   border-top: 1px solid var(--border-subtle); background: var(--surface-sunken);

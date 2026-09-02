@@ -340,6 +340,7 @@ export function AudiencePicker({
   onChange: (a: Audience) => void
 }) {
   const [q, setQ] = useState('')
+  const [tab, setTab] = useState<'groups' | 'people'>('groups')
   const n = q.trim().toLowerCase()
 
   const shownGroups = n ? groups.filter((g) => g.name.toLowerCase().includes(n)) : groups
@@ -383,6 +384,40 @@ export function AudiencePicker({
         />
       </div>
 
+      {/* Two tabs rather than two headings in one scroller.
+
+          Five groups above twenty-four people meant the groups — the thing
+          almost every policy is actually scoped by — were four rows at the top
+          of a list you then scrolled past for the rest of the session. A tab
+          keeps each list at the top of its own space, and the counts on the
+          tabs mean nothing is hidden by the split. Search still crosses both:
+          typing narrows the tab you are on and the badge tells you the other
+          one has matches too. */}
+      <div className="baudp__tabs" role="tablist" aria-label="Groups or people">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'groups'}
+          className={tab === 'groups' ? 'is-on' : ''}
+          onClick={() => setTab('groups')}
+        >
+          Groups
+          <em>{n ? shownGroups.length : groups.length}</em>
+          {audience.groupIds.length > 0 && <b>{audience.groupIds.length}</b>}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'people'}
+          className={tab === 'people' ? 'is-on' : ''}
+          onClick={() => setTab('people')}
+        >
+          People
+          <em>{n ? shownUsers.length : users.length}</em>
+          {audience.userIds.length > 0 && <b>{audience.userIds.length}</b>}
+        </button>
+      </div>
+
       <div className="baudp__list" role="group" aria-label="Who this policy applies to">
         {/* Everyone is a flag, not a row among the groups — ticking it beside
             Finance would build "everyone AND Finance", which reads narrower
@@ -404,8 +439,8 @@ export function AudiencePicker({
           </span>
         </button>
 
-        {!n && <p className="baudp__head u-label">Groups</p>}
-        {shownGroups.map((g) => (
+        {tab === 'groups' &&
+          shownGroups.map((g) => (
           <button
             key={g.id}
             type="button"
@@ -425,10 +460,10 @@ export function AudiencePicker({
             </span>
             {g.memberCount === 0 && <Badge tone="neutral">Empty</Badge>}
           </button>
-        ))}
+          ))}
 
-        {!n && <p className="baudp__head u-label">People</p>}
-        {shownUsers.map((u) => {
+        {tab === 'people' &&
+          shownUsers.map((u) => {
           const covered = audience.groupIds.includes(u.groupId)
           return (
             <button
@@ -453,11 +488,28 @@ export function AudiencePicker({
                   edit to the group — so this informs rather than blocks. */}
               {covered && <Badge tone="info">In {groups.find((g) => g.id === u.groupId)?.name}</Badge>}
             </button>
-          )
-        })}
+            )
+          })}
 
-        {shownGroups.length === 0 && shownUsers.length === 0 && (
-          <p className="baudp__none">Nothing matches “{q}”.</p>
+        {tab === 'groups' && shownGroups.length === 0 && (
+          <p className="baudp__none">
+            No group matches “{q}”.
+            {shownUsers.length > 0 && (
+              <button type="button" onClick={() => setTab('people')}>
+                {shownUsers.length} {shownUsers.length === 1 ? 'person' : 'people'} do
+              </button>
+            )}
+          </p>
+        )}
+        {tab === 'people' && shownUsers.length === 0 && (
+          <p className="baudp__none">
+            Nobody matches “{q}”.
+            {shownGroups.length > 0 && (
+              <button type="button" onClick={() => setTab('groups')}>
+                {shownGroups.length} {shownGroups.length === 1 ? 'group' : 'groups'} do
+              </button>
+            )}
+          </p>
         )}
       </div>
 

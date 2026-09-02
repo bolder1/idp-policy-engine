@@ -55,7 +55,7 @@ interface NavItem {
   icon: LucideIcon
   screen?: BrandScreen
   badge?: string
-  children?: { label: string; screen?: BrandScreen }[]
+  children?: { label: string; screen?: BrandScreen; tag?: string }[]
 }
 
 /* The tree, its order and its sub-menus are the console's. Items without a
@@ -79,14 +79,18 @@ const NAV: { section?: string; items: NavItem[] }[] = [
         screen: { name: 'policies' },
         children: [
           { label: 'All Policies', screen: { name: 'policies' } },
-          { label: 'Templates', screen: { name: 'templates' } },
+          /* Two of these are honestly unfinished, and the rail says so rather
+             than letting somebody find out by opening them. A quiet tag, not
+             the brand-filled badge "New" gets: one is an announcement and the
+             other is a caveat, and they must not read alike. */
+          { label: 'Templates', screen: { name: 'templates' }, tag: 'WIP' },
           { label: 'Zones', screen: { name: 'zones' } },
           /* The page calls itself "Device fingerprint"; so does the screen id
              and every sentence on it. The rail was the only place still saying
              "Device Restrictions". */
           { label: 'Device profiles', screen: { name: 'fingerprint' } },
           { label: 'Authentication methods', screen: { name: 'methods' } },
-          { label: 'External Hooks', screen: { name: 'hooks' } },
+          { label: 'External Hooks', screen: { name: 'hooks' }, tag: 'WIP' },
         ],
       },
       {
@@ -328,9 +332,16 @@ export function Shell({ children }: { children: ReactNode }) {
                                   className={`bshell__subitem ${on ? 'is-active' : ''} ${c.screen ? '' : 'is-inert'}`}
                                   onClick={() => c.screen && go(c.screen)}
                                   aria-current={on ? 'page' : undefined}
-                                  title={c.screen ? undefined : 'Outside the scope of this revamp'}
+                                  title={
+                                    c.tag
+                                      ? 'Work in progress — this page is not finished'
+                                      : c.screen
+                                        ? undefined
+                                        : 'Outside the scope of this revamp'
+                                  }
                                 >
                                   {c.label}
+                                  {c.tag && <span className="bshell__wip">{c.tag}</span>}
                                 </button>
                               )
                             })}

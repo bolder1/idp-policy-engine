@@ -13,8 +13,8 @@
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   align-items: center;
-  gap: var(--space-2) var(--space-5);
-  padding: var(--space-4) var(--space-7);
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-7) var(--space-4);
   background: var(--surface-raised);
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -34,24 +34,40 @@
 }
 .bpbar__type { flex: none; font-size: var(--fs-xs); color: var(--text-muted); }
 
+/* Two facts, drawn as two facts.
+
+   They used to run together on one line — a caps label, a value, another caps
+   label, another value — so "1 application" and "Governs" sat the same distance
+   apart as "Governs" and its own chips, and nothing said which half of the
+   sentence you were reading. Stacked in cells with a rule between them, the
+   label is above the thing it labels and the boundary is drawn rather than
+   inferred from a gap. */
 .bpbar__facts {
   grid-column: 1;
-  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3) var(--space-6);
+  display: flex; align-items: stretch; flex-wrap: wrap;
   margin: 0; min-width: 0;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  overflow: hidden;
 }
-.bpbar__fact { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.bpbar__fact {
+  display: flex; flex-direction: column; gap: 1px; min-width: 0;
+  padding: var(--space-2) var(--space-5);
+}
+.bpbar__fact + .bpbar__fact { border-left: 1px solid var(--border-subtle); }
 .bpbar__fact dt {
   display: inline-flex; align-items: center; gap: var(--space-2);
   flex: none;
-  font-size: var(--fs-xs); letter-spacing: 0.04em; text-transform: uppercase;
+  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--text-muted);
 }
+.bpbar__fact dt > svg { opacity: 0.8; }
 .bpbar__fact dd {
   margin: 0; min-width: 0;
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3);
-  font-size: var(--fs-sm); color: var(--text-body);
+  font-size: var(--fs-md); color: var(--text-primary);
 }
-.bpbar__fact dd em { font-style: normal; color: var(--text-muted); }
+.bpbar__fact dd em { font-style: normal; font-size: var(--fs-sm); color: var(--text-muted); }
 /* A policy that governs nobody cannot do anything, and it is the one fact here
    that is worth interrupting for. */
 .bpbar__fact.is-empty dd em { color: var(--fb-negative-fg); }

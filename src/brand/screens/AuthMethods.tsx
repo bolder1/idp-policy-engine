@@ -168,6 +168,7 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
      `use` says what a method is; `alsoRecovery` says what it can also do, and a
      row can honestly appear under both. */
   const [use, setUse] = useState<UseFilter>('all')
+  const [resistant, setResistant] = useState(false)
 
   const [tab, setTab] = useState<Tab>('methods')
   /* The open category, by channel. Null closes the slide-over. */
@@ -352,6 +353,8 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
             defaultMethod={defaultMethod}
             use={use}
             onUse={setUse}
+            resistant={resistant}
+            onResistant={setResistant}
             isUser={isUser}
             policies={store.policies}
             onToggle={setEnabled}
@@ -413,16 +416,29 @@ const PRIMARY_ORDER = ['password', 'passkey-primary', 'magic-link']
    read rather than pick from: the descriptions were three times the height of
    the choices and pushed the last option off the fold. The names say enough —
    "Primary sign-in methods" is not a term that needs defining to somebody
-   already on this screen. */
+   already on this screen.
+
+   "Other" is not one of them. It named this group by what it is not, next to
+   two options that name themselves by what they are — and every method in it
+   is a real, deliberate way to sign in, not a remainder. */
 const USES: { id: UseFilter; label: string }[] = [
   { id: 'all', label: 'All methods' },
   { id: 'primary', label: 'Primary sign-in methods' },
-  { id: 'second', label: 'Other sign-in methods' },
+  { id: 'second', label: 'Alternate sign-in methods' },
   { id: 'recovery', label: 'Recovery methods' },
 ]
 
 const matchesUse = (m: AuthMethod, f: UseFilter) =>
   f === 'all' ? true : f === 'recovery' ? Boolean(m.alsoRecovery) : m.use === f
+
+/* Phishing resistance is a second axis, not a fifth option in the first menu.
+
+   What a method is FOR (primary, alternate, recovery) and whether it can be
+   phished are independent — there are phishing-resistant primaries and
+   phishing-resistant second factors — so folding this into `USES` would make
+   "which of my primaries are phishing-resistant" a question the filter cannot
+   ask. It is a toggle beside the menu instead, and the two AND together. */
+const isResistant = (m: AuthMethod) => m.tier === 'Phishing-resistant'
 
 
 const GROUPS: { id: 'connect' | 'policy' | 'advanced'; label: string; blurb: string }[] = [
@@ -601,6 +617,8 @@ function CategoryList({
   defaultMethod,
   use,
   onUse,
+  resistant,
+  onResistant,
   isUser,
   policies,
   onToggle,
@@ -617,6 +635,8 @@ function CategoryList({
   defaultMethod: string | null
   use: UseFilter
   onUse: (u: UseFilter) => void
+  resistant: boolean
+  onResistant: (v: boolean) => void
   isUser: boolean
   /* The primaries are rows rather than a card, so this list renders methods as
      well as families and needs everything a method row does. */
@@ -639,7 +659,11 @@ function CategoryList({
          describe what opening it will actually show. A count that survives the
          filter is a count you cannot act on. */
       const inside = methods.filter(
-        (m) => m.use === 'second' && m.channel === f.channel && matchesUse(m, use),
+        (m) =>
+          m.use === 'second' &&
+          m.channel === f.channel &&
+          matchesUse(m, use) &&
+          (!resistant || isResistant(m)),
       )
       const live = inside.filter((m) => !methodBlocker(m))
       /* Transactions are bought as a pool and a family can spend from one pool
@@ -669,9 +693,13 @@ function CategoryList({
              nothing and reads as "we do not have that". */
           methods.some((m) => m.channel === r.f.channel && m.name.toLowerCase().includes(needle)),
       )
-  }, [methods, q, use])
+  }, [methods, q, use, resistant])
 
-  const countOf = (f: UseFilter) => methods.filter((m) => matchesUse(m, f)).length
+  /* Counted under the resistance toggle too, so the trigger never promises rows
+     the list will not show. */
+  const countOf = (f: UseFilter) =>
+    methods.filter((m) => matchesUse(m, f) && (!resistant || isResistant(m))).length
+  const resistantCount = methods.filter((m) => isResistant(m) && matchesUse(m, use)).length
   /* Recovery is a tenant policy, and the primaries are not in a person's
      catalogue at all — so neither is offered as a filter over their own
      methods. A filter that can only ever return nothing is a dead option. */
@@ -683,7 +711,7 @@ function CategoryList({
      exclude them. */
   const needle = q.trim().toLowerCase()
   const primaries = methods
-    .filter((m) => m.use === 'primary' && matchesUse(m, use))
+    .filter((m) => m.use === 'primary' && matchesUse(m, use) && (!resistant || isResistant(m)))
     .filter(
       (m) => !needle || m.name.toLowerCase().includes(needle) || m.description.toLowerCase().includes(needle),
     )
@@ -771,6 +799,25 @@ function CategoryList({
           }))}
           onSelect={(id) => onUse(id as UseFilter)}
         />
+
+        {/* A toggle, not a fifth menu row, because it ANDs with the menu rather
+            than replacing it — "primary AND phishing-resistant" is the question
+            somebody hardening a tenant actually has, and a single-select cannot
+            express it.
+
+            Pressed rather than checked: it is a filter on the list beside it,
+            the same shape the rest of this console gives a filter that is
+            either on or off. */}
+        <button
+          type="button"
+          className={`bm8__resist ${resistant ? 'is-on' : ''}`}
+          aria-pressed={resistant}
+          onClick={() => onResistant(!resistant)}
+        >
+          <ShieldCheck size={13} strokeWidth={2} aria-hidden />
+          Phishing-resistant
+          <em>{resistantCount}</em>
+        </button>
       </div>
 
       <div className="bm8__list">

@@ -140,13 +140,57 @@
 .bshell__subitem:hover { background: rgba(0, 0, 0, 0.22); }
 .bshell__subitem.is-active { color: var(--brand); }
 
+/* Not the badge. "New" is an invitation and is filled with the brand; this is a
+   caveat, so it is outlined and grey — the difference has to be legible at a
+   glance, or the rail is advertising the two unfinished pages. */
+.bshell__subitem:has(.bshell__wip) { display: flex; align-items: center; gap: 8px; }
+.bshell__wip {
+  flex: none; margin-left: auto;
+  padding: 0 5px;
+  border: 1px solid rgba(255, 255, 255, 0.22); border-radius: var(--radius-pill);
+  font-size: 9px; font-weight: var(--fw-semibold); letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.55);
+}
 /* --- Collapsed ------------------------------------------------------------ */
 
-.bshell.is-collapsed .bshell__item { justify-content: center; padding: 10px 6px 10px 2px; gap: 0; }
+/* One rule used to squash the label, the badge, the chevron AND the section
+   caption into a 1px grey bar — which is right for the caption and wrong for
+   the other three: they are inline children of a flex row, so each one became a
+   grey dash floating beside its icon. Six icons, six dashes, none of them
+   meaning anything. The three that belong to a row are hidden; only the caption
+   becomes a rule, because a rail of nothing but icons still has to say where
+   one group ends and the next begins. */
+.bshell.is-collapsed .bshell__item {
+  justify-content: center;
+  /* Symmetric around the 4.8px active edge, so an icon does not shift when its
+     row becomes the current one. */
+  padding: 10px 10px 10px calc(10px - 4.8px);
+  gap: 0;
+}
 .bshell.is-collapsed .bshell__item-label,
 .bshell.is-collapsed .bshell__badge,
-.bshell.is-collapsed .bshell__chev,
-.bshell.is-collapsed .bshell__section { height: 1px; margin: 10px 12px; overflow: hidden; color: transparent; background: rgba(255, 255, 255, 0.1); }
+.bshell.is-collapsed .bshell__wip,
+.bshell.is-collapsed .bshell__chev { display: none; }
+
+.bshell.is-collapsed .bshell__section {
+  height: 1px; margin: 10px 12px; overflow: hidden;
+  color: transparent; background: rgba(255, 255, 255, 0.1);
+}
+
+/* A sub-menu cannot render into 64px of rail. `toggle()` opens the rail when a
+   parent is clicked while collapsed, so this only covers the case it cannot: a
+   menu left open when something else collapses the rail — the builder does it
+   on arrival — which showed as a block of dark, empty rows under one icon. */
+.bshell.is-collapsed .bshell__sub { display: none; }
+
+/* An icon with no label needs its own dot. Without it, the one row carrying a
+   badge — "Devices · New" — loses the only thing that made it worth noticing. */
+.bshell.is-collapsed .bshell__item:has(.bshell__badge)::after {
+  content: '';
+  position: absolute; top: 8px; right: 10px;
+  width: 6px; height: 6px; border-radius: var(--radius-full);
+  background: var(--brand);
+}
 
 /* A column, so a page can be told to take the height that is left rather
    than all of it. Screens that carry a version switcher put it in here

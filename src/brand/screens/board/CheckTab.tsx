@@ -24,6 +24,14 @@ import { Section, Seg } from './Section'
    -------------------------------------------------------------------------- */
 
 const OUTCOME_ORDER: Record<Outcome, number> = { breach: 0, lockout: 1, friction: 2, held: 3 }
+
+/* Lower the first letter only, and only if the word is not a name.
+
+   The trace reasons are written as sentences — "Closest was card A: Network
+   Zone not in zone Office Network" — and they get spliced mid-sentence after a
+   dash. `toLowerCase()` on the whole string flattened every proper noun in
+   them. */
+const uncapitalise = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s)
 /* One shared empty object, so "no overrides" is referentially stable and the
    deck is not re-dealt on every render. */
 const NO_OVERRIDES: Record<string, never> = {}
@@ -129,7 +137,11 @@ export function CheckTab({
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <Button variant="brand" icon={Play} onClick={rehearse}>
+          {/* Neutral, not brand. "Review & publish" is the brand button on
+              this screen and it is the one irreversible thing here; a second
+              filled orange button beside it makes a rehearsal look like the
+              same weight of decision as shipping. */}
+          <Button variant="neutral" icon={Play} onClick={rehearse}>
             {trace ? 'Run it again' : 'Rehearse it'}
           </Button>
           {trace && (
@@ -160,7 +172,13 @@ export function CheckTab({
                   <p>
                     {hitRule ? (
                       <>
-                        Decided by rule {r.hitIndex! + 1}, <b>{hitRule.name}</b> — {r.steps[r.hitIndex!].reason.toLowerCase()}.
+                        {/* Lowercased wholesale, this read "closest was card a" —
+                            `cardName` produces "card A", and case-folding a
+                            whole sentence to splice it after a dash destroys
+                            any proper noun in it. Only the first letter moves,
+                            and only when the rest of the word is not already
+                            capitalised. */}
+                        Decided by rule {r.hitIndex! + 1}, <b>{hitRule.name}</b> — {uncapitalise(r.steps[r.hitIndex!].reason)}.
                       </>
                     ) : (
                       <>No rule matched, so the default at the bottom decided.</>
@@ -219,6 +237,7 @@ export function CheckTab({
               onToggle={() => setOpenRound((v) => (v === round.challenge.id ? null : round.challenge.id))}
               draft={draft}
               env={env}
+              overrides={overrides}
               overridden={round.challenge.id in overrides}
               onOverride={(want) => store.setGauntletOverride(draft.id, round.challenge.id, want)}
               onJump={(i) => {
@@ -302,6 +321,7 @@ function RoundRow({
   onToggle,
   draft,
   env,
+  overrides,
   overridden,
   onOverride,
   onJump,
@@ -312,6 +332,8 @@ function RoundRow({
   onToggle: () => void
   draft: Policy
   env: SimEnv
+  /** The tenant's overruled expectations, so the preview grades the same deck. */
+  overrides: Record<string, Round['want']>
   overridden: boolean
   onOverride: (want: Round['want'] | null) => void
   onJump: (i: number) => void
@@ -328,9 +350,16 @@ function RoundRow({
     const before = sweep(draft, env, 570)
     const afterFix = sweep(fixed, env, 570)
     const mv = compare(before, afterFix)
-    const g = runGauntlet(fixed, env)
+    /* With the tenant's overrides, exactly as the headline grade is.
+
+       Without them the preview graded a different deck from the one the pip
+       reports: a tenant that has overruled an expectation would be told
+       "Break-in test → B" and then watch applying the fix produce an A, or the
+       reverse. A preview whose number does not match what applying it does is
+       worse than no preview, because it is the number people act on. */
+    const g = runGauntlet(fixed, env, overrides)
     return { mv, grade: g.grade, breaches: g.breaches }
-  }, [fix, draft, env])
+  }, [fix, draft, env, overrides])
 
   const c = round.challenge
   return (

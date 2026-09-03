@@ -1550,3 +1550,54 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px;
   color: var(--text-primary); white-space: nowrap;
 }
+
+/* --- The sheet: whole-policy questions, over the board ----------------------
+
+   Docked to the bottom of the stage and stopping short of the inspector, so
+   the panel keeps showing whichever rule is selected while you read a finding
+   that names it. Half the stage's height: enough for the situation field and
+   the round list, not so much that the chain it is talking about disappears. */
+.bb__sheet {
+  position: absolute; z-index: 6;
+  left: var(--space-3); bottom: var(--space-3);
+  right: calc(var(--bb-insp) + var(--space-3) * 2);
+  height: min(58%, 520px);
+  display: flex; flex-direction: column; min-height: 0;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--el-high);
+  overflow: hidden;
+}
+/* With the panel hidden the sheet takes the width it left behind. */
+.bb.is-insp-closed .bb__sheet { right: var(--space-3); }
+.bb__sheet:focus-visible { outline: none; box-shadow: var(--el-high), inset 0 0 0 2px var(--focus-ring); }
+
+.bb__sheethead {
+  flex: none;
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) 0 var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bb__sheettabs { flex: 1; display: flex; gap: var(--space-2); }
+.bb__sheettabs > button {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 var(--space-3);
+  border: none; border-bottom: 2px solid transparent; background: none;
+  font-family: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  color: var(--text-tertiary); cursor: pointer;
+  transition: color 0.14s var(--ease-standard), border-color 0.14s var(--ease-standard);
+}
+.bb__sheettabs > button:hover { color: var(--text-primary); }
+.bb__sheettabs > button.is-on { color: var(--text-primary); border-bottom-color: var(--brand); }
+.bb__sheettabs > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+
+.bb__sheetbody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+/* The sheet is as wide as the stage on a narrow screen, where the inspector
+   has already gone full-width underneath it. */
+@media (max-width: 900px) {
+  .bb__sheet { right: var(--space-3); height: 62%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bb__sheettabs > button { transition: none; }
+}

@@ -26,6 +26,11 @@ import { Section, Seg } from './Section'
    And the guarantees — assertions about the field that can be lost.
    -------------------------------------------------------------------------- */
 
+/* The field's row length. Named because the arrow keys have to step by it —
+   ArrowDown is "one row", and a row is only a row if the grid and the handler
+   agree on how long it is. */
+const COLS = 36
+
 const ctxOf = (s: Situation, nowMinutes: number): SimContext => ({
   user: SIM_USERS.find((u) => u.id === s.userId)!,
   place: s.place,
@@ -56,11 +61,23 @@ export function ImpactTab({
   const [who, setWho] = useState<string | null>(null)
   const [where, setWhere] = useState<string | null>(null)
   const [picked, setPicked] = useState<number | null>(null)
+  /* Where the keyboard is in the field, independent of what is picked: you
+     move through the dots to find one, and pressing Enter is what reads it. */
+  const [cursor, setCursor] = useState(0)
 
   const after = useMemo(() => sweep(draft, env, clock), [draft, env, clock])
   const before = useMemo(() => (dirty ? sweep(saved, env, clock) : null), [dirty, saved, env, clock])
   const movement = useMemo(() => (before ? compare(before, after) : null), [before, after])
-  const errorCount = diagnostics.filter((d) => d.severity === 'error').length
+  /* The same errors the publish gate counts, and it was not.
+
+     A rule that is switched off cannot break anything — the gate has always
+     skipped its findings — but the "No broken rules" guarantee counted them,
+     so a policy you could publish was shown a lost guarantee saying it had
+     broken rules. Two answers to one question, on two surfaces, from the same
+     linter. */
+  const errorCount = diagnostics.filter(
+    (d) => d.severity === 'error' && (d.ruleIndex === -1 || draft.rules[d.ruleIndex]?.enabled),
+  ).length
   const marks = useMemo(() => badges(draft, after, movement, errorCount), [draft, after, movement, errorCount])
 
   const total = after.total
@@ -183,7 +200,24 @@ export function ImpactTab({
             ))}
           </div>
 
-          <div className="bb__field" style={{ '--cols': 36 } as CSSProperties} role="group" aria-label={`${total} modelled situations`}>
+          <div
+            className="bb__field"
+            style={{ '--cols': COLS } as CSSProperties}
+            role="group"
+            aria-label={`${total} modelled situations — arrow keys to move, Enter to read one`}
+            onKeyDown={(e) => {
+              const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: COLS, ArrowUp: -COLS, Home: -cursor, End: total - 1 - cursor }[
+                e.key as 'ArrowRight'
+              ]
+              if (step === undefined) return
+              e.preventDefault()
+              const next = Math.min(Math.max(cursor + step, 0), total - 1)
+              setCursor(next)
+              /* Focus follows the cursor so the reading order and the visible
+                 ring stay the same thing. */
+              e.currentTarget.querySelector<HTMLElement>(`[data-dot="${next}"]`)?.focus()
+            }}
+          >
             {SITUATIONS.map((s) => {
               const d = after.decisions[s.index]
               const b = before?.decisions[s.index]
@@ -194,9 +228,20 @@ export function ImpactTab({
                 <button
                   key={s.index}
                   type="button"
+                  /* One tab stop for 1,440 dots.
+
+                     Every dot used to be focusable, so Tab through this
+                     section took 1,440 presses and everything below it — the
+                     cohorts, the per-rule list, the guarantees — was
+                     effectively unreachable by keyboard. A roving tabindex is
+                     the standard answer: the field is one stop, and the arrow
+                     keys move within it. */
+                  tabIndex={s.index === cursor ? 0 : -1}
+                  data-dot={s.index}
                   className={`bb__dot is-${TONE[d]} ${changed ? 'is-changed' : ''} ${visible(s) ? '' : 'is-dim'} ${picked === s.index ? 'is-picked' : ''}`}
                   title={title}
                   aria-label={title}
+                  onFocus={() => setCursor(s.index)}
                   onClick={() => setPicked((v) => (v === s.index ? null : s.index))}
                 />
               )

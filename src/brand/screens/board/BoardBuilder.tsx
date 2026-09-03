@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Copy, Keyboard, ListOrdered, PanelRightClose, PanelRightOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Activity, Check, Copy, Keyboard, ListChecks, ListOrdered, PanelRightClose, PanelRightOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
 import { Button, Modal } from '../../kit'
 import { fallbackRule, reidRule, blankRule, type Policy, type Rule } from '../../data'
 import { useBrand, useNameLookup } from '../../store'
 import { ReviewDialog } from '../builder-dialogs'
 import { CommandBar, type Cmd } from '../command-bar'
+import { BoardSheet } from './BoardSheet'
 import { diagnose, shadowedBy } from '../diagnostics'
+import { runGauntlet } from '../gauntlet'
+import { compare, sweep } from '../impact-arena'
 import { canRedo, canUndo, commit, historyKey, historyOf, redo, undo, type History } from '../history'
 import { walk, type SimEnv } from '../simulate'
 import { Board } from './Board'
 import { Inspector } from './Inspector'
-import type { Selection, Trace } from './model'
+import type { Selection, Tab, Trace } from './model'
 
 import './board.css'
 
@@ -45,6 +48,10 @@ const SHORTCUTS: [string, string][] = [
   ['?', 'This list'],
 ]
 
+/* Referentially stable "no overrides", so the deck is not re-dealt on every
+   render for a tenant that has overruled nothing. */
+const NO_OVERRIDES: Record<string, never> = {}
+
 export function BoardBuilder({ policyId }: { policyId: string }) {
   const store = useBrand()
   const { registerLeaveGuard } = store
@@ -65,6 +72,7 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
   const [review, setReview] = useState(false)
   const [cmd, setCmd] = useState(false)
   const [keys, setKeys] = useState(false)
+  const [sheet, setSheet] = useState<Tab | null>(null)
   const [inspOpen, setInspOpen] = useState(true)
   /* The inspector's width, dragged rather than fixed.
 
@@ -292,12 +300,25 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  /* The deck and the before/after sweep were computed here for the three pips.
-     They went with them — both are whole-policy questions, and running a
-     thirteen-card gauntlet and two 1,440-situation sweeps on every keystroke to
-     feed a toolbar nobody is looking at is not a cost worth carrying while
-     those questions have no home. `runGauntlet`, `sweep` and `compare` are
-     untouched and still tested. */
+  /* The deck and the before/after sweep, back with the pips they feed.
+
+     Memoised on the draft, so the cost is one deal and two sweeps per edit
+     rather than per keystroke — the editor patches a rule on change, not on
+     keypress, and `overrides` comes through a stable empty object when the
+     tenant has set none.
+
+     The deck is not dealt at a policy with no enabled rules. Every attempt
+     falls straight to the default, so the grade measures the default and
+     nothing else: a new policy opened with one blank rule was being handed an
+     F and told five hostile sign-ins got through, which is true of the empty
+     policy and says nothing about the one being written. No rules, no grade. */
+  const overrides = store.gauntletOverrides[draft.id] ?? NO_OVERRIDES
+  const gradable = draft.rules.some((r) => r.enabled)
+  const test = useMemo(() => (gradable ? runGauntlet(draft, env, overrides) : null), [gradable, draft, env, overrides])
+  const movement = useMemo(
+    () => (dirty && saved ? compare(sweep(saved, env, 570), sweep(draft, env, 570)) : null),
+    [dirty, saved, draft, env],
+  )
   const blockers = diagnostics.filter((d) => d.severity === 'error' && (d.ruleIndex === -1 || draft.rules[d.ruleIndex]?.enabled)).length
 
   const selAt = selection.kind === 'rule' ? draft.rules.findIndex((r) => r.id === selection.id) : -1
@@ -397,15 +418,37 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
         </div>
 
         <div className="bb__float bb__float--tr" role="toolbar" aria-label="Publishing">
-          {/* Try a sign-in, Break-in test and What changes stood here, each
-              opening a tab in the inspector. The inspector is one pane now —
-              the rule you clicked — so they have nowhere to open, and the three
-              of them were answering questions about the whole policy from a
-              toolbar above one rule.
-
-              CheckTab.tsx and ImpactTab.tsx are untouched and still build; when
-              those questions get a home of their own, the pips come back with
-              it. */}
+          {/* The pips are back, with the sheet that gives them somewhere to
+              open — and with what made them worth having in the first place:
+              each carries its own answer, so the toolbar reports the state of
+              the policy without being opened. A pip that only opens a panel is
+              a menu item; a pip reading "F · 5 through" is a finding. */}
+          {features.gauntlet && (
+            <button type="button" className={`bb__pip ${sheet === 'check' ? 'is-on' : ''}`} title={test ? test.gradeReason : 'No rules are switched on, so there is nothing to grade'} onClick={() => setSheet('check')}>
+              <ListChecks size={13} strokeWidth={2} aria-hidden />
+              Check
+              {test ? (
+                <>
+                  <span className={`bb__grade is-${test.grade}`}>{test.grade}</span>
+                  {test.breaches > 0 && <span className="bb__n">{test.breaches} through</span>}
+                </>
+              ) : (
+                <span className="bb__n">—</span>
+              )}
+            </button>
+          )}
+          {features.blastRadius && (
+            <button
+              type="button"
+              className={`bb__pip ${sheet === 'impact' ? 'is-on' : ''} ${movement && movement.looser > 0 ? 'is-looser' : ''}`}
+              title={movement ? `${movement.stricter} stricter · ${movement.looser} looser, of 1,440 modelled situations` : 'Nothing unsaved to compare'}
+              onClick={() => setSheet('impact')}
+            >
+              <Activity size={13} strokeWidth={2} aria-hidden />
+              What changes
+              <span className="bb__n">{movement ? movement.changed.toLocaleString() : '—'}</span>
+            </button>
+          )}
           <span className="bb__float__sep" />
           {dirty && (
             <Button variant="ghost" size="sm" onClick={discard}>
@@ -510,6 +553,24 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
           ))}
         </dl>
       </Modal>
+
+      <BoardSheet
+        tab={sheet}
+        onTab={setSheet}
+        onClose={() => setSheet(null)}
+        draft={draft}
+        saved={saved}
+        dirty={dirty}
+        env={env}
+        diagnostics={diagnostics}
+        trace={trace}
+        onTrace={setTrace}
+        onSelect={setSelection}
+        onApplyRules={(rules, note) => {
+          commitDraft({ ...draft, rules })
+          store.showToast(note)
+        }}
+      />
 
       <ReviewDialog open={review} policy={draft} onClose={() => setReview(false)} onConfirm={publish} />
 

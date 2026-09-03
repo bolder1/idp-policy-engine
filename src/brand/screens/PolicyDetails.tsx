@@ -25,7 +25,7 @@ import './policy-details.css'
    the same three fields.
    -------------------------------------------------------------------------- */
 
-export function PolicyDetails({ policyId }: { policyId: string }) {
+export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string; from?: 'builder' | 'board' }) {
   const store = useBrand()
   const saved = store.policyById(policyId)
 
@@ -49,7 +49,7 @@ export function PolicyDetails({ policyId }: { policyId: string }) {
     appId !== (saved.appId ?? null) ||
     JSON.stringify(audience) !== JSON.stringify(saved.audience)
 
-  const back = () => store.go({ name: 'builder', policyId })
+  const back = () => store.go({ name: from, policyId })
 
   return (
     <div className="bpage bcp bcp--fit bpd">
@@ -128,7 +128,7 @@ export function PolicyDetails({ policyId }: { policyId: string }) {
                  quietly rename the policy. */
               store.savePolicy({ ...saved, name: name.trim(), appId: appId ?? undefined, audience })
               store.showToast(`${name.trim()} updated`)
-              store.go({ name: 'builder', policyId })
+              store.go({ name: from, policyId })
             }}
           >
             Save details

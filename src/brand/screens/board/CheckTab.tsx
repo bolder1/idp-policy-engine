@@ -276,18 +276,23 @@ export function CheckTab({
 
 /* --- Pieces ------------------------------------------------------------------ */
 
+/* Each row is one choice — one person, one origin, one device — so the row is
+   the radiogroup and the chips in it are its radios. They were `aria-pressed`
+   buttons, which described five independent toggles per row. */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="bb__ctxrow">
-      <span>{label}</span>
-      <span className="bb__chips">{children}</span>
+      <span id={`bb-ctx-${label.toLowerCase()}`}>{label}</span>
+      <span className="bb__chips" role="radiogroup" aria-labelledby={`bb-ctx-${label.toLowerCase()}`}>
+        {children}
+      </span>
     </div>
   )
 }
 
 function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <button type="button" className={`bb__chip ${on ? 'is-on' : ''}`} aria-pressed={on} onClick={onClick}>
+    <button type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1} className={`bb__chip ${on ? 'is-on' : ''}`} onClick={onClick}>
       {children}
     </button>
   )

@@ -188,7 +188,12 @@ export function PolicyBar({ policy }: { policy: Policy }) {
             here, apps behind a dialog, audience in a drawer — was three places
             to remember for one idea: what this policy IS, as opposed to what
             its rules do. */}
-        <button type="button" className="bpbar__edit" onClick={() => store.go({ name: 'policy-details', policyId: policy.id })}>
+        {/* Carries the builder you are in, so Back returns you to it. */}
+        <button
+          type="button"
+          className="bpbar__edit"
+          onClick={() => store.go({ name: 'policy-details', policyId: policy.id, from: store.screen.name === 'board' ? 'board' : 'builder' })}
+        >
           <Pencil size={12} strokeWidth={2} aria-hidden />
           Edit details
         </button>

@@ -75,7 +75,7 @@ function Screen() {
     case 'board':
       return <BoardPage policyId={screen.policyId} />
     case 'policy-details':
-      return <PolicyDetails policyId={screen.policyId} />
+      return <PolicyDetails policyId={screen.policyId} from={screen.from} />
     case 'templates':
       return <Templates />
     case 'zones':

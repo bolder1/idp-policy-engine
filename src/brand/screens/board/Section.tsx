@@ -82,11 +82,34 @@ export function Seg<T extends string>({
   block?: boolean
 }) {
   return (
-    <div className={`bb__seg ${block ? 'bb__seg--block' : ''}`} role="group" aria-label={label}>
-      {options.map((o) => {
+    /* A radiogroup, not a group of toggles.
+
+       `aria-pressed` says "this button is currently pressed", which is true of
+       each option independently — so a three-option segment announced three
+       separate on/off states and gave no hint that choosing one unchooses the
+       others. It is exactly one choice out of several, which is what
+       radiogroup means, and the role brings the roving tabindex and the arrow
+       keys with it. */
+    <div className={`bb__seg ${block ? 'bb__seg--block' : ''}`} role="radiogroup" aria-label={label}>
+      {options.map((o, i) => {
         const Ico = o.icon
+        const on = o.value === value
         return (
-          <button key={o.value} type="button" className={o.value === value ? 'is-on' : ''} aria-pressed={o.value === value} onClick={() => onChange(o.value)}>
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            tabIndex={on ? 0 : -1}
+            className={on ? 'is-on' : ''}
+            onKeyDown={(e) => {
+              const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
+              if (!d) return
+              e.preventDefault()
+              onChange(options[(i + d + options.length) % options.length].value)
+            }}
+            onClick={() => onChange(o.value)}
+          >
             {Ico && <Ico size={12} strokeWidth={2} aria-hidden />}
             {o.label}
           </button>

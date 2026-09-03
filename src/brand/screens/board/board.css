@@ -274,7 +274,7 @@ button.bb__idx svg { display: none; }
 .bb__row > dt {
   padding-top: 5px;
   font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-tertiary);
 }
 .bb__row > dd { margin: 0; min-width: 0; }
 
@@ -297,7 +297,7 @@ button.bb__idx svg { display: none; }
 .bb__or {
   align-self: flex-start; margin-left: 8px;
   font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-tertiary);
 }
 .bb__and { font-size: var(--fs-xs); color: var(--text-muted); padding: 0 1px; }
 .bb__any { font-size: var(--fs-sm); color: var(--text-tertiary); padding-top: 4px; }
@@ -343,7 +343,7 @@ button.bb__idx svg { display: none; }
   font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.1;
 }
 .bb__step b { font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__step em { font-style: normal; font-size: 10px; color: var(--text-muted); }
+.bb__step em { font-style: normal; font-size: 10px; color: var(--text-tertiary); }
 .bb__step.is-end { border-color: var(--fb-positive-border); background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
 .bb__step.is-end b { color: inherit; }
 .bb__step.is-stop { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
@@ -612,7 +612,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__decide > button:hover { border-color: var(--border-strong); transform: translateY(-1px); }
 .bb__decide > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 .bb__decide > button strong { font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bb__decide > button em { font-style: normal; font-size: 10px; color: var(--text-muted); line-height: 1.3; }
+.bb__decide > button em { font-style: normal; font-size: 10px; color: var(--text-tertiary); line-height: 1.3; }
 .bb__decide > button svg { color: var(--text-tertiary); }
 .bb__decide > button.is-on { background: var(--tone-bg); border-color: var(--tone-border); }
 .bb__decide > button.is-on strong, .bb__decide > button.is-on svg { color: var(--tone-fg); }
@@ -686,7 +686,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__althead input::placeholder { color: var(--text-muted); font-weight: var(--fw-regular); }
 .bb__altdiv {
   display: flex; align-items: center; gap: var(--space-3);
-  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);
+  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary);
 }
 .bb__altdiv::before, .bb__altdiv::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
 
@@ -705,7 +705,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__condname { min-width: 0; display: flex; flex-direction: column; }
 .bb__condname b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bb__condname em { font-style: normal; font-size: 10px; color: var(--text-muted); }
+.bb__condname em { font-style: normal; font-size: 10px; color: var(--text-tertiary); }
 .bb__condval { padding-left: 30px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .bb__condval input[type='text'], .bb__condval input:not([type]) { flex: 1; min-width: 120px; }
 .bb__condval input[type='time'], .bb__condval input[type='number'] {
@@ -759,7 +759,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__catgroups > button:hover { background: var(--surface-sunken); }
 .bb__catgroups > button.is-on { background: var(--text-primary); color: var(--surface-raised); }
 .bb__catlist { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-2); }
-.bb__catsec { margin: var(--space-2) var(--space-2) 2px; font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.bb__catsec { margin: var(--space-2) var(--space-2) 2px; font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
 .bb__catitem {
   display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--space-3); align-items: center;
   width: 100%; padding: 6px var(--space-2); border: none; border-radius: var(--radius-sm); background: none;
@@ -767,7 +767,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__catitem:hover, .bb__catitem.is-cursor { background: var(--surface-sunken); }
 .bb__catitem b { display: block; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__catitem em { display: block; font-style: normal; font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bb__catitem em { display: block; font-style: normal; font-size: 11px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bb__catempty { padding: var(--space-5); font-size: var(--fs-sm); color: var(--text-muted); text-align: center; }
 
 /* --- Checks & reach inside the Rule tab ------------------------------------- */
@@ -800,20 +800,20 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__libitem:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 .bb__libitem > .bb__idx { width: 30px; height: 30px; cursor: inherit; }
 .bb__libitem b { display: block; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__libitem em { display: block; font-style: normal; font-size: 11px; color: var(--text-muted); line-height: 1.35; }
+.bb__libitem em { display: block; font-style: normal; font-size: 11px; color: var(--text-tertiary); line-height: 1.35; }
 .bb__libitem > svg { color: var(--text-muted); }
 .bb__libitem.is-blank { border-style: dashed; }
 
 .bb__facts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 .bb__fact { padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-sunken); }
 .bb__fact b { display: block; font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.bb__fact em { font-style: normal; font-size: 11px; color: var(--text-muted); }
+.bb__fact em { font-style: normal; font-size: 11px; color: var(--text-tertiary); }
 
 /* --- Check tab -------------------------------------------------------------- */
 
 .bb__ctx { display: grid; gap: var(--space-3); }
 .bb__ctxrow { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
-.bb__ctxrow > span { padding-top: 6px; font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.bb__ctxrow > span { padding-top: 6px; font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
 .bb__ctxrow .bb__chips { gap: 4px; }
 .bb__ctxrow .bb__chip { height: 24px; padding: 0 8px; font-size: 11px; }
 
@@ -856,7 +856,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__round.is-lockout i { background: var(--fb-negative-dot, #d01243); }
 .bb__round.is-friction i { background: var(--fb-notice-dot, #b07a00); }
 .bb__round b { display: block; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__round em { display: block; font-style: normal; font-size: 11px; color: var(--text-muted); }
+.bb__round em { display: block; font-style: normal; font-size: 11px; color: var(--text-tertiary); }
 .bb__round .bb__outcome { font-size: 11px; font-weight: var(--fw-medium); color: var(--text-secondary); white-space: nowrap; }
 .bb__round.is-breach .bb__outcome { color: var(--fb-negative-fg); }
 .bb__round.is-lockout .bb__outcome { color: var(--fb-negative-fg); }
@@ -889,7 +889,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__readyrow.is-bad > svg { color: var(--fb-negative-fg); }
 .bb__readyrow.is-warn > svg { color: var(--fb-notice-fg); }
 .bb__readyrow b { display: block; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__readyrow em { display: block; font-style: normal; font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+.bb__readyrow em { display: block; font-style: normal; font-size: 11px; color: var(--text-tertiary); line-height: 1.4; }
 
 /* --- Impact tab ------------------------------------------------------------- */
 
@@ -916,7 +916,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__lane.is-allow .bb__lanebar.is-after > i { background: var(--fb-positive-dot, #128f43); }
 .bb__lane.is-mfa .bb__lanebar.is-after > i { background: var(--fb-notice-dot, #b07a00); }
 .bb__lane.is-deny .bb__lanebar.is-after > i { background: var(--fb-negative-dot, #d01243); }
-.bb__lanelegend { display: flex; gap: var(--space-4); font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.bb__lanelegend { display: flex; gap: var(--space-4); font-size: 10px; color: var(--text-tertiary); margin-top: 2px; }
 .bb__lanelegend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; background: var(--border-strong); opacity: 0.55; margin-right: 4px; vertical-align: middle; }
 .bb__lanelegend i.is-after { background: var(--text-primary); opacity: 1; }
 
@@ -949,7 +949,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__dot.is-picked { transform: scale(1.6); z-index: 1; box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 3.5px var(--brand); }
 .bb__dot:hover { transform: scale(1.5); z-index: 1; }
 .bb__dot:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-.bb__fieldkey { display: flex; gap: var(--space-4); flex-wrap: wrap; font-size: 10px; color: var(--text-muted); }
+.bb__fieldkey { display: flex; gap: var(--space-4); flex-wrap: wrap; font-size: 10px; color: var(--text-tertiary); }
 .bb__fieldkey i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; background: var(--dot, var(--border-default)); }
 .bb__fieldkey i.is-changed { background: transparent; box-shadow: inset 0 0 0 1.5px var(--surface-raised), 0 0 0 1px var(--text-primary); }
 
@@ -983,7 +983,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__badge > span { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
 .bb__badge.is-lost > span { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
 .bb__badge b { display: block; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__badge em { display: block; font-style: normal; font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+.bb__badge em { display: block; font-style: normal; font-size: 11px; color: var(--text-tertiary); line-height: 1.4; }
 .bb__badge.is-lost em { color: var(--fb-negative-fg); }
 
 /* --- Save bar sits over the stage, not the inspector -------------------------- */
@@ -1600,4 +1600,75 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 }
 @media (prefers-reduced-motion: reduce) {
   .bb__sheettabs > button { transition: none; }
+}
+
+/* --- Hit targets, and motion ------------------------------------------------
+
+   The icon buttons on this surface are 20–26px because they sit inside dense
+   rows — a card head, a condition row, a floating toolbar — and a 32px box
+   would push those rows apart. So the BOX stays its size and the TARGET grows
+   under it: a transparent pseudo-element centred on the control, 32px square,
+   which is what a pointer and a stylus actually hit.
+
+   `position: relative` on the hosts is what makes the pseudo-element land in
+   the right place; none of them set it before. */
+.bb__act,
+.bb__ifact,
+.bb__secact,
+.bb__link__add,
+button.bb__idx { position: relative; }
+
+.bb__act::after,
+.bb__ifact::after,
+.bb__secact::after,
+.bb__link__add::after,
+button.bb__idx::after {
+  content: '';
+  position: absolute; left: 50%; top: 50%;
+  width: max(32px, 100%); height: max(32px, 100%);
+  transform: translate(-50%, -50%);
+}
+
+/* Everything that moves, in one place.
+
+   The three blocks that existed covered six selectors out of thirty-odd
+   declared transitions, so most of the board still animated for somebody who
+   had asked it not to. This is deliberately blunt: a reduced-motion request is
+   not a request for a subset. */
+@media (prefers-reduced-motion: reduce) {
+  .bb *,
+  .bb *::before,
+  .bb *::after,
+  .bb__sheet,
+  .bb__sheet * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --- Narrow screens: the toolbar wraps, and the sheet gets the bottom -------
+
+   Two collisions that only appear once the Check and What-changes pips are
+   back in the top-right group, and once the sheet has somewhere to open. */
+
+/* The toolbar is a row of readings, not a fixed-width bar. Given less room
+   than it wants it wrapped off the left edge of the stage and took the first
+   pip with it — "Check F 5 through" clipped to "eck F 5 through". It wraps
+   downward now and stays inside the stage it floats over. */
+.bb__float--tr {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: calc(100% - var(--space-5) * 2);
+}
+
+@media (max-width: 900px) {
+  /* Below 900 the panel already floats across the bottom, and so does the
+     sheet — they were stacked on the same band, with the sheet simply drawn
+     over a panel that was still focusable underneath it. Only one of them can
+     have the bottom, and while you are reading a whole-policy answer it is the
+     sheet. The panel comes back the moment the sheet closes. */
+  .bb:has(.bb__sheet) .bb__insp { display: none; }
+  .bb__sheet { top: var(--space-3); height: auto; }
 }

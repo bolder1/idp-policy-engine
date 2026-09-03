@@ -55,7 +55,17 @@ export type BrandScreen =
      They used to be scattered across a top-bar input, a dialog and a card at
      the top of the rules list, which made the frame the rules are written
      inside look like the first step of writing them. */
-  | { name: 'policy-details'; policyId: string }
+  | {
+      name: 'policy-details'
+      policyId: string
+      /* Which builder to go back to.
+
+         The screen sent everybody to the trail, so opening "Edit details" from
+         the board was a one-way door: you came back to a different editor than
+         the one you left, with the draft you had been holding gone. Defaults
+         to the trail for callers that predate the board. */
+      from?: 'builder' | 'board'
+    }
   | { name: 'templates' }
   | { name: 'zones' }
   | { name: 'fingerprint' }

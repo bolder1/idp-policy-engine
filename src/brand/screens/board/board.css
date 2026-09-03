@@ -219,14 +219,24 @@
   transition: background-color 0.15s ease, transform 0.15s ease;
 }
 .bb__idx:hover { transform: scale(1.06); }
-.bb__idx svg { display: none; }
-.bb__card:hover .bb__idx span, .bb__idx:focus-visible span { display: none; }
-.bb__card:hover .bb__idx svg, .bb__idx:focus-visible svg { display: block; }
+/* Scoped to the grip, which is the only `.bb__idx` that is a button.
+
+   Unscoped, this hid the glyph in every badge wearing the class — and several
+   are nothing but a glyph: the Library's "Blank rule" `+`, the terminal card's
+   house, the Impact list's fallthrough row. They rendered as empty coloured
+   squares. Scoping it to `.bb__card` fixed the Library and not the terminal
+   card, which is inside one; the honest boundary is the element you can
+   actually drag, and that is the button. The swap — number at rest, grip on
+   hover — belongs to it alone. */
+button.bb__idx svg { display: none; }
+.bb__card:hover button.bb__idx span, button.bb__idx:focus-visible span { display: none; }
+.bb__card:hover button.bb__idx svg, button.bb__idx:focus-visible svg { display: block; }
 .bb__idx:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 .bb__idx.is-home { cursor: default; }
 .bb__idx.is-home:hover { transform: none; }
-.bb__card:hover .bb__idx.is-home span { display: block; }
-.bb__card:hover .bb__idx.is-home svg { display: none; }
+/* The two rules that used to sit here undid the global hide for the terminal
+   card's badge, and they undid it backwards — forcing its glyph off on hover.
+   With the hide scoped to the grip button they have nothing left to correct. */
 
 .bb__title { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .bb__title strong {

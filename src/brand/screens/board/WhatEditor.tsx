@@ -76,11 +76,31 @@ export function WhatEditor({
   return (
     <div>
       <div className="bb__decide" role="radiogroup" aria-label="What happens when this rule matches">
-        {TILES.map((t) => {
+        {TILES.map((t, i) => {
           const on = rule.decision === t.id
           const Ico = t.icon
           return (
-            <button key={t.id} type="button" role="radio" aria-checked={on} className={`is-${TONE[t.id]} ${on ? 'is-on' : ''}`} onClick={() => pick(t.id)}>
+            <button
+              key={t.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              /* A roving tabindex, which `role="radiogroup"` promises and this
+                 did not deliver: all three tiles were in the tab order and none
+                 answered an arrow key, so the control announced itself as a
+                 radio group and then behaved like three unrelated buttons. One
+                 stop for the group, arrows to move within it — the same pattern
+                 the trail's outcome picker already uses. */
+              tabIndex={on ? 0 : -1}
+              className={`is-${TONE[t.id]} ${on ? 'is-on' : ''}`}
+              onClick={() => pick(t.id)}
+              onKeyDown={(e) => {
+                const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
+                if (!d) return
+                e.preventDefault()
+                pick(TILES[(i + d + TILES.length) % TILES.length].id)
+              }}
+            >
               <Ico size={16} strokeWidth={1.9} aria-hidden />
               <strong>{t.label}</strong>
             </button>

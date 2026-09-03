@@ -389,8 +389,15 @@ export function Board({
   }, [trace?.runId])
 
   const hit = trace?.result.hitIndex ?? null
-  const landedOn = trace && revealed >= trace.result.steps.length ? (hit === null ? 'terminal' : hit) : null
   const inAudience = trace ? !trace.result.outOfAudience : true
+  /* `inAudience` in the condition, and it was missing.
+
+     Out of audience means no rule ran at all, and `hitIndex` is null for that
+     reason — but null was also the value that means "fell through to the
+     default", so the token settled on the default card while the board's own
+     message beside it said the policy does not govern this person and nothing
+     ran. The animation contradicted the sentence explaining it. */
+  const landedOn = trace && inAudience && revealed >= trace.result.steps.length ? (hit === null ? 'terminal' : hit) : null
 
   const stepKind = (i: number) => {
     if (!trace || !inAudience) return null

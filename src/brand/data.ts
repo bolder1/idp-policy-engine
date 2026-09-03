@@ -670,6 +670,24 @@ export function card(...conditions: Condition[]): ConditionCard {
   return { id: nextCardId(), conditions }
 }
 
+/* A group with nothing in it yet.
+
+   `card()` throws on empty for a good reason: an empty card matches
+   everything, and one arriving from a composer would quietly turn a rule into
+   a catch-all. But "Add group" has to produce something before it can produce
+   a condition — the alternative is what the editor used to do, which was open
+   the attribute picker and build the group around whatever you chose, so
+   "add a group" and "add a condition" were the same gesture with different
+   labels.
+
+   So the empty state is allowed, deliberately and only here. It is not
+   silent: `diagnose` reports it as PE320 the moment it exists, and the publish
+   gate blocks on it. An empty group names itself rather than being impossible
+   to make. */
+export function emptyGroup(): ConditionCard {
+  return { id: nextCardId(), conditions: [], grouped: true }
+}
+
 /** A named alternative — the label the author gave this card. */
 export function namedCard(label: string, ...conditions: Condition[]): ConditionCard {
   return { ...card(...conditions), label }

@@ -1,16 +1,18 @@
 import { Fragment, useEffect, useState } from 'react'
-import { ChevronDown, Plus, Split, X } from 'lucide-react'
+import { ChevronDown, Copy, Plus, Split, X } from 'lucide-react'
 
 import { Picker } from '../../picker'
 import { modeLabel } from '../../fingerprint'
-import { cardLetter, ckey, duplicatedAcrossCards } from '../../predicate'
+import { cardJoin, cardLetter, ckey, duplicatedAcrossCards, topJoin } from '../../predicate'
 import {
   card,
   cond,
   conditionType,
+  emptyGroup,
   type Condition,
   type ConditionCard,
   type ConditionType,
+  type Joiner,
   type Rule,
 } from '../../data'
 import { useBrand, useNameLookup } from '../../store'
@@ -67,13 +69,46 @@ export function WhenEditor({
     // Keyed on the nonce, not the rect: the same button pressed twice opens twice.
   }, [openAt?.nonce])
 
-  const setCards = (next: ConditionCard[]) => onPatch({ when: { cards: next } })
+  /* `...rule.when`, not a fresh object.
 
-  /* Removing the last condition removes the group — the invariant the linter
-     is built on. An empty group would match everything and silently turn the
-     rule into a catch-all. */
+     This wrote `{ cards: next }`, which dropped `when.join` — so the moment
+     you edited any condition, a predicate whose groups were joined by AND
+     silently reverted to OR. Every edit here goes through this one function,
+     so the whole editor had the bug. */
+  const setCards = (next: ConditionCard[]) => onPatch({ when: { ...rule.when, cards: next } })
+
+  /* --- The operators ---------------------------------------------------------
+
+     One joiner per level, and pressing any pill at a level flips that level.
+
+     This is the model's own shape rather than a UI convention: a level holds
+     ONE joiner, so mixed precedence inside a run cannot be expressed and
+     nobody has to guess whether `A and B or C` binds the and or the or first.
+     It is also why the pills at a level all read the same word — they are one
+     setting shown between each pair, not one setting per gap. */
+  const flipCardJoin = (id: string) =>
+    setCards(cards.map((k) => (k.id === id ? { ...k, join: cardJoin(k) === 'and' ? 'or' : 'and' } : k)))
+
+  const flipTopJoin = () => onPatch({ when: { ...rule.when, join: topJoin(rule.when) === 'or' ? 'and' : 'or' } })
+
+  /* A GROUP survives losing its last condition; a loose run does not.
+
+     Deleting the last condition used to delete the frame with it, so a group
+     you had just made vanished under you the moment you cleared it out to
+     start again — and there was no way back except Add group. A group is a
+     thing the author made on purpose, so it stays until they remove it, and
+     says it is empty while it is. A loose card is not something anybody made;
+     it is where ungrouped conditions live, so an empty one has nothing to
+     represent and goes. */
   const patchCard = (id: string, nextCard: ConditionCard | null) =>
-    setCards(cards.flatMap((k) => (k.id !== id ? [k] : nextCard && nextCard.conditions.length > 0 ? [nextCard] : [])))
+    setCards(
+      cards.flatMap((k) => {
+        if (k.id !== id) return [k]
+        if (!nextCard) return []
+        if (nextCard.conditions.length > 0) return [nextCard]
+        return nextCard.grouped ? [nextCard] : []
+      }),
+    )
 
   const add = (typeId: string) => {
     const t = conditionType(typeId)
@@ -129,9 +164,15 @@ export function WhenEditor({
     const head = k.conditions.slice(0, at)
     const tail = k.conditions.slice(at)
     if (!head.length || !tail.length) return
-    setCards([...cards.slice(0, idx), { ...k, conditions: head }, { ...card(...tail), grouped: k.grouped }, ...cards.slice(idx + 1)])
+    /* `join` travels with the halves. Splitting an OR-run into two produced
+       two AND-runs without it, which is a different rule. */
+    setCards([...cards.slice(0, idx), { ...k, conditions: head }, { ...card(...tail), grouped: k.grouped, join: k.join }, ...cards.slice(idx + 1)])
   }
 
+  /* The inverse of split, and it needs to exist for the same reason: without
+     it, moving a condition into its own group is a one-way door. It keeps the
+     absorbing group's joiner — two runs being merged cannot both keep theirs,
+     and the one you are merging INTO is the one whose shape survives. */
   const mergeUp = (i: number) => {
     if (i < 1 || i >= cards.length) return
     const prev = cards[i - 1]
@@ -146,6 +187,15 @@ export function WhenEditor({
   const dupes = duplicatedAcrossCards(rule.when)
   const parts = predicateParts(rule.when, resolve)
   const openCatalogue = (cardId: string | 'new') => () => setAdding({ cardId })
+
+  /* An empty frame, and nothing else.
+
+     "Add group" used to open the attribute picker and build the group around
+     whatever you chose, which made it the same gesture as "Add condition" with
+     a different label — and it dropped you into choosing an attribute when
+     what you had asked for was a bracket. Now the bracket appears, empty, with
+     its own adder inside it and its own operator; the next move is yours. */
+  const addGroup = () => setCards([...cards, emptyGroup()])
 
   return (
     <div>
@@ -172,13 +222,7 @@ export function WhenEditor({
                   finding the split icon on a row, and going back meant deleting
                   a condition and retyping it into the other group. Both
                   directions are one click on the operator now. */}
-              {i > 0 && (
-                <Junction
-                  kind="or"
-                  title="Either group can match. Click to require both instead."
-                  onFlip={() => mergeUp(i)}
-                />
-              )}
+              {i > 0 && <Junction join={topJoin(rule.when)} scope="top" onFlip={flipTopJoin} />}
 
               {/* Framed only once a group actually exists.
 
@@ -195,13 +239,7 @@ export function WhenEditor({
               <div className={k.grouped ? 'bb__ifgroup' : 'bb__ifplain'}>
                 {k.conditions.map((c, j) => (
                   <Fragment key={c.id}>
-                    {j > 0 && (
-                      <Junction
-                        kind="and"
-                        title="Both must be true. Click to make them alternatives instead."
-                        onFlip={() => splitAt(k.id, j)}
-                      />
-                    )}
+                    {j > 0 && <Junction join={cardJoin(k)} scope="group" onFlip={() => flipCardJoin(k.id)} />}
                     <ConditionRow
                       c={c}
                       showIf={i === 0 && j === 0}
@@ -214,6 +252,11 @@ export function WhenEditor({
                       resolve={resolve}
                       onChange={(nextC) => patchCard(k.id, { ...k, conditions: k.conditions.map((x) => (x.id === c.id ? nextC : x)) })}
                       onRemove={() => patchCard(k.id, { ...k, conditions: k.conditions.filter((x) => x.id !== c.id) })}
+                      onDuplicate={() => patchCard(k.id, { ...k, conditions: k.conditions.flatMap((x) => (x.id === c.id ? [x, cond(x.typeId, x.operator, [...x.values])] : [x])) })}
+                      /* Splitting is a deliberate restructure now, on the row
+                         that moves, rather than a side effect of pressing an
+                         operator. */
+                      onSplit={k.conditions.length > 1 ? () => splitAt(k.id, j) : undefined}
                     />
                   </Fragment>
                 ))}
@@ -223,6 +266,17 @@ export function WhenEditor({
                     at the foot of the block already adds to it, and two buttons
                     saying "Add condition" a centimetre apart is a choice nobody
                     can make correctly. */}
+                {/* A group with nothing in it says so, rather than rendering as
+                    an empty frame somebody has to guess the purpose of. The
+                    linter reports the same fact as PE320 at the same moment, so
+                    this is the friendly half of a finding that also blocks
+                    publishing. */}
+                {k.grouped && k.conditions.length === 0 && (
+                  <p className="bb__ifempty">
+                    Nothing in this group yet — it matches everything until you add a condition.
+                  </p>
+                )}
+
                 {k.grouped && (
                 <div className="bb__ifgroupfoot">
                   <button type="button" className="bb__ifadd" onClick={openCatalogue(k.id)}>
@@ -232,17 +286,25 @@ export function WhenEditor({
                   {/* Only once there is more than one group. Ungrouped, this
                       would delete every condition on the rule from a control
                       sitting beside "Add condition". */}
-                  {k.grouped && (
+                  {i > 0 && k.conditions.length > 0 && (
                     <button
                       type="button"
-                      className="bb__ifdrop"
-                      aria-label={`Remove group ${cardLetter(i)}`}
-                      title="Remove this group"
-                      onClick={() => patchCard(k.id, null)}
+                      className="bb__ifadd"
+                      title="Fold these conditions into the group above"
+                      onClick={() => mergeUp(i)}
                     >
-                      <X size={11} strokeWidth={2.2} aria-hidden />
+                      Merge up
                     </button>
                   )}
+                  <button
+                    type="button"
+                    className="bb__ifdrop"
+                    aria-label={`Remove group ${cardLetter(i)}`}
+                    title="Remove this group"
+                    onClick={() => patchCard(k.id, null)}
+                  >
+                    <X size={11} strokeWidth={2.2} aria-hidden />
+                  </button>
                 </div>
                 )}
               </div>
@@ -261,7 +323,7 @@ export function WhenEditor({
               <Plus size={11} strokeWidth={2.4} aria-hidden />
               Add condition
             </button>
-            <button type="button" className="bb__ifaddgroup" onClick={openCatalogue('group')}>
+            <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
               <Plus size={11} strokeWidth={2.4} aria-hidden />
               Add group
             </button>
@@ -286,18 +348,37 @@ export function WhenEditor({
             <ChevronDown size={13} strokeWidth={2} aria-hidden />
             Reads as
           </summary>
+          {/* The words come from the predicate, not from the shape it used to
+              have. This printed a hardcoded `or` between groups and joined each
+              group's clauses with `and`, which was right only while those were
+              the only joiners the model could hold. `predicateParts` reports
+              each group's own joiner now. */}
           <p className="bb__readback">
             This rule matches when{' '}
-            {parts.map((p, i) => (
-              <Fragment key={i}>
+            {parts.map((part, i) => (
+              <Fragment key={part.id}>
                 {i > 0 && (
                   <>
                     {' '}
-                    <b>or</b>{' '}
+                    <b>{topJoin(rule.when)}</b>{' '}
                   </>
                 )}
-                {p.label && cards.length > 1 ? <b>{p.label}: </b> : null}
-                {p.clauses.map((c) => c.text).join(' and ')}
+                {part.label && cards.length > 1 ? <b>{part.label}: </b> : null}
+                {/* An empty group is not nothing — it matches everything, which
+                    is precisely what makes it dangerous. Printing its clauses
+                    gave "… or ." and left a dangling joiner; dropping it
+                    altogether would have been worse, because the sentence would
+                    then describe a narrower rule than the one that would run.
+                    So it says the thing it does. */}
+                {part.clauses.length === 0 ? (
+                  <em>anything</em>
+                ) : (
+                  <>
+                    {part.clauses.length > 1 && cards.length > 1 ? '(' : ''}
+                    {part.clauses.map((c) => c.text).join(part.join === 'or' ? ' or ' : ' and ')}
+                    {part.clauses.length > 1 && cards.length > 1 ? ')' : ''}
+                  </>
+                )}
               </Fragment>
             ))}
             .
@@ -315,17 +396,37 @@ export function WhenEditor({
   )
 }
 
-/* --- The operator between two things ------------------------------------------
+/* --- The operator at a level --------------------------------------------------
 
-   A pill you press. Inside a group it reads AND and pressing it makes those
-   conditions alternatives; between groups it reads OR and pressing it requires
-   both. The word says what is true now; the title says what pressing it does. */
+   A pill you press. It reads the joiner the level currently holds, and pressing
+   it flips that level — every pill at the level reads the same word, because
+   there is one joiner per level rather than one per gap.
 
-function Junction({ kind, title, onFlip }: { kind: 'and' | 'or'; title: string; onFlip: () => void }) {
+   It used to restructure instead: the AND pill split the run at that point and
+   the OR pill merged the previous group in. That gave two operators without a
+   model that could hold them, at the cost of pressing AND between the second
+   and third of four conditions turning `A and B and C and D` into
+   `(A and B) or (C and D)` — regrouping everything after the press. The model
+   carries a joiner per level now, so the operator changes the operator, and
+   restructuring moved to the row that actually moves. */
+
+const SAYS: Record<Joiner, { top: string; group: string }> = {
+  and: { top: 'Every group must match.', group: 'All of these must be true.' },
+  or: { top: 'Any one group is enough.', group: 'Any one of these is enough.' },
+}
+
+function Junction({ join, scope, onFlip }: { join: Joiner; scope: 'top' | 'group'; onFlip: () => void }) {
+  const other: Joiner = join === 'and' ? 'or' : 'and'
   return (
-    <div className={`bb__ifjoin is-${kind}`}>
-      <button type="button" className={`bb__ifkw is-${kind} is-flip`} title={title} onClick={onFlip}>
-        {kind}
+    <div className={`bb__ifjoin is-${join}`}>
+      <button
+        type="button"
+        className={`bb__ifkw is-${join} is-flip`}
+        aria-label={`${SAYS[join][scope]} Switch to ${other.toUpperCase()}.`}
+        title={`${SAYS[join][scope]} Click for ${other.toUpperCase()}.`}
+        onClick={onFlip}
+      >
+        {join}
       </button>
     </div>
   )
@@ -342,6 +443,8 @@ function ConditionRow({
   resolve,
   onChange,
   onRemove,
+  onDuplicate,
+  onSplit,
 }: {
   c: Condition
   /** Only the very first row of the first group wears the `if`. */
@@ -352,6 +455,9 @@ function ConditionRow({
   resolve: ReturnType<typeof useNameLookup>
   onChange: (c: Condition) => void
   onRemove: () => void
+  onDuplicate: () => void
+  /** Absent when the row is the only condition in its run — nothing to split. */
+  onSplit?: () => void
 }) {
   const t = conditionType(c.typeId)
   const Ico = groupIcon(t.group)
@@ -386,7 +492,15 @@ function ConditionRow({
           junctions between rows, where the same two moves are one press each
           and are visible without hovering first. */}
       <span className="bb__ifacts">
-        <button type="button" className="bb__ifact" aria-label={`Remove ${t.label}`} onClick={onRemove}>
+        {onSplit && (
+          <button type="button" className="bb__ifact" aria-label={`Move ${t.label} into its own group`} title="Move into its own group" onClick={onSplit}>
+            <Split size={11} strokeWidth={2} />
+          </button>
+        )}
+        <button type="button" className="bb__ifact" aria-label={`Duplicate ${t.label}`} title="Duplicate" onClick={onDuplicate}>
+          <Copy size={11} strokeWidth={2} />
+        </button>
+        <button type="button" className="bb__ifact" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
           <X size={11} strokeWidth={2.2} />
         </button>
       </span>
@@ -449,7 +563,12 @@ function ValueControl({
     return (
       <>
         {values.filter(Boolean).map((id) => (
-          <IfChip key={id} onClick={() => onChange(values.filter((x) => x !== id))} title="Remove">
+          <IfChip
+            key={id}
+            onClick={() => onChange(values.filter((x) => x !== id))}
+            title="Remove"
+            ariaLabel={`Remove ${resolve(type.valueKind as 'group' | 'user', id) ?? id}`}
+          >
             {resolve(type.valueKind as 'group' | 'user', id) ?? id}
             <X size={9} strokeWidth={2.6} aria-hidden />
           </IfChip>
@@ -475,7 +594,7 @@ function ValueControl({
     return (
       <>
         {picked.map((o) => (
-          <IfChip key={o} onClick={() => onChange(values.filter((x) => x !== o))} title="Remove">
+          <IfChip key={o} onClick={() => onChange(values.filter((x) => x !== o))} title="Remove" ariaLabel={`Remove ${o}`}>
             {o}
             <X size={9} strokeWidth={2.6} aria-hidden />
           </IfChip>

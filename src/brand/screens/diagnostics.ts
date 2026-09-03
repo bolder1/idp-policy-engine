@@ -237,11 +237,15 @@ export function diagnose(
     }
 
     /* --- An empty card -------------------------------------------------------
-       Should be unreachable: removing the last condition removes the card, and
-       `card()` refuses to build one. The check exists because that invariant
-       lives in code rather than in the type, and the failure is silent and
-       total — an empty card matches everything, so the rule becomes a catch-all
-       and every rule below it stops running. */
+       Reachable on purpose now. "Add group" produces the frame before it
+       produces a condition, so an empty group is the state you are in for as
+       long as it takes to fill it — and this is what names it while you are.
+       `emptyGroup()` in data.ts is the only thing allowed to build one;
+       `card()` still refuses.
+
+       It stays an error rather than a warning because the failure is silent and
+       total: an empty card matches every sign-in, so the rule becomes a
+       catch-all and every rule below it stops running. */
     const hollowCards = r.when.cards.filter((k) => k.conditions.length === 0)
     for (const k of hollowCards) {
       out.push({
@@ -250,8 +254,11 @@ export function diagnose(
         severity: 'error',
         scope: 'rule',
         ruleIndex: i,
-        title: 'An alternative has no conditions',
-        detail: 'An empty alternative matches every sign-in, which silently turns this rule into a catch-all. Delete it, or give it a condition.',
+        /* "Group" when the author made one, "alternative" when it is just
+           where loose conditions live — the same two words the editor uses, so
+           a finding names the thing you can see. */
+        title: k.grouped ? 'A group has no conditions' : 'An alternative has no conditions',
+        detail: `An empty ${k.grouped ? 'group' : 'alternative'} matches every sign-in, which silently turns this rule into a catch-all. Delete it, or give it a condition.`,
       })
     }
 

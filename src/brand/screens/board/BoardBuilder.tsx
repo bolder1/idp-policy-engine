@@ -123,7 +123,14 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
         setHist(action === 'redo' ? redo : undo)
         return
       }
-      if (e.key === 'Escape' && !typing) {
+      /* Not past a dialog.
+
+         This is a window listener, so it saw the Escape that closed the
+         condition picker as well — the picker shut AND the rule deselected, so
+         backing out of choosing an attribute threw away the whole panel you
+         were working in. Anything modal owns Escape while it is open; the
+         board only gets it when nothing is over the board. */
+      if (e.key === 'Escape' && !typing && !document.querySelector('[role="dialog"], .bx-scrim')) {
         if (trace) setTrace(null)
         else setSelection({ kind: 'none' })
       }

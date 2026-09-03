@@ -84,6 +84,12 @@ export function conditionSentence(c: Condition, resolve?: NameLookup): string {
    than the operator chip the editor draws. The default stays `and`, so a card
    written before joiners existed reads exactly as it did. */
 export function cardSentence(conditions: Condition[], resolve?: NameLookup, join: 'and' | 'or' = 'and'): string {
+  /* An empty card is reachable now — "Add group" makes the frame before it
+     makes a condition — and it matches everything, which is the whole reason
+     the linter calls it an error. Joining nothing gave an empty string, so the
+     sentence read "(…) or ()" and described a narrower rule than the one that
+     would actually run. */
+  if (conditions.length === 0) return 'anything'
   return conditions.map((c) => conditionSentence(c, resolve)).join(join === 'or' ? ' or ' : ' and ')
 }
 

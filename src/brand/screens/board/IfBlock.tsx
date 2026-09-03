@@ -2,6 +2,7 @@ import { Fragment, type MouseEvent, type ReactNode } from 'react'
 import { ArrowRight, CornerDownRight, Split } from 'lucide-react'
 
 import { conditionType, type Condition, type Rule } from '../../data'
+import { cardJoin, topJoin } from '../../predicate'
 import type { NameLookup } from '../predicate-prose'
 import { DECISION_NAME, TONE, journeyOf } from './model'
 import { GROUP_TONE, groupIcon } from './tones'
@@ -35,6 +36,7 @@ export function IfChip({
   muted,
   unset,
   title,
+  ariaLabel,
   onClick,
   children,
 }: {
@@ -43,13 +45,20 @@ export function IfChip({
   muted?: boolean
   unset?: boolean
   title?: string
+  /* Required in spirit whenever `onClick` deletes something.
+
+     A value chip's text is the value, so a chip that removes "Engineering" on
+     press announced itself as "Engineering" — the name of the thing, with no
+     hint that pressing it destroys it. The visible text stays the value; the
+     accessible name says what the button does to it. */
+  ariaLabel?: string
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void
   children: ReactNode
 }) {
   const cls = `bb__ifchip ${tone ? `is-tone-${tone}` : ''} ${muted ? 'is-muted' : ''} ${unset ? 'is-unset' : ''}`
   if (onClick)
     return (
-      <button type="button" className={cls} title={title} onClick={onClick}>
+      <button type="button" className={cls} title={title} aria-label={ariaLabel} onClick={onClick}>
         {icon && <i aria-hidden>{icon}</i>}
         {children}
       </button>
@@ -156,6 +165,7 @@ export function ElseRow({ next, onJump }: { next: NextRule; onJump?: (i: number)
 
 export function IfBlock({ rule, next, resolve, token, terminal }: { rule: Rule; next: NextRule; resolve: NameLookup; token?: ReactNode; terminal?: boolean }) {
   const cards = rule.when.cards
+  const top = topJoin(rule.when)
   if (terminal)
     return (
       <div className="bb__if">
@@ -181,7 +191,18 @@ export function IfBlock({ rule, next, resolve, token, terminal }: { rule: Rule; 
           <IfChip muted>any sign-in reaches it</IfChip>
         </div>
       ) : (
-        cards.map((k, i) => (
+        cards.map((k, i) => {
+          /* Read, not assumed.
+
+             These were the literals 'or' between cards and 'and' inside one,
+             which was correct only while those were the only joiners the model
+             could hold. Once the editor could flip either, the card on the
+             stage went on printing the old words — so the same rule read
+             `A and B or C` here and `A or B and C` in the panel beside it.
+             A card that disagrees with the editor about the rule it is showing
+             is worse than a card that shows less. */
+          const join = cardJoin(k)
+          return (
           <div key={k.id} className="bb__ifgroup" title={k.label}>
             {k.conditions.map((c, j) => (
               <div key={c.id} className="bb__ifrow">
@@ -192,16 +213,17 @@ export function IfBlock({ rule, next, resolve, token, terminal }: { rule: Rule; 
                         <Split size={12} strokeWidth={2} />
                       </span>
                     )}
-                    <IfKw tone={i === 0 ? undefined : 'or'}>{i === 0 ? 'if' : 'or'}</IfKw>
+                    <IfKw tone={i === 0 ? undefined : top}>{i === 0 ? 'if' : top}</IfKw>
                   </>
                 ) : (
-                  <IfKw tone="and">and</IfKw>
+                  <IfKw tone={join}>{join}</IfKw>
                 )}
                 <CondReadout c={c} resolve={resolve} />
               </div>
             ))}
           </div>
-        ))
+          )
+        })
       )}
       <ActionRow rule={rule} token={token} />
       <ElseRow next={next} />

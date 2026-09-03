@@ -1478,3 +1478,20 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 @media (prefers-reduced-motion: reduce) {
   .bb__card.is-selected { transform: none; }
 }
+
+/* A group that holds nothing yet.
+
+   "Add group" now produces the frame and stops, so the frame has to account
+   for itself while it is empty — and say the one thing about an empty group
+   that matters, which is that it constrains nothing. The linter reports the
+   same fact as PE320 at the same moment; this is the half of it that sits
+   where the problem is. */
+.bb__ifempty {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--fb-notice-bg);
+  color: var(--fb-notice-fg);
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+}

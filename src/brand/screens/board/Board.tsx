@@ -493,7 +493,7 @@ export function Board({
                       rule={r}
                       index={ri}
                       next={nextOf(ri)}
-                      selected={selection.kind === 'rule' && selection.index === ri}
+                      selected={selection.kind === 'rule' && selection.id === r.id}
                       state={ruleState(diagsFor(ri))}
                       traceKind={stepKind(ri)}
                       traceReason={trace?.result.steps[ri]?.reason ?? null}
@@ -503,7 +503,7 @@ export function Board({
                       resolve={resolve}
                       canUp={ri > 0}
                       canDown={ri < policy.rules.length - 1}
-                      onSelect={() => onSelect({ kind: 'rule', index: ri })}
+                      onSelect={() => onSelect({ kind: 'rule', id: r.id })}
                       onToggle={(on) => onToggle(ri, on)}
                       onMove={(dir) => onMove(ri, ri + dir)}
                       onDuplicate={() => onDuplicate(ri)}

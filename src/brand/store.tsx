@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type ReactNode,
@@ -116,6 +117,23 @@ interface BrandStore {
 
   screen: BrandScreen
   go: (s: BrandScreen) => void
+  /* A screen holding unsaved work can ask to be consulted before it is left.
+
+     The board keeps its draft in local state, so navigating away unmounts the
+     component and the draft goes with it — silently, which is the part that
+     matters. The guard returns true when it is safe to leave. A screen that
+     registers one must clear it on unmount.
+
+     It hangs off `go` rather than off one button because there are many ways
+     out of a builder: the layout switch, "Edit details", the back arrow and
+     every item in the nav rail. Guarding the navigation guards all of them. */
+  registerLeaveGuard: (fn: (() => boolean) | null) => void
+  /** Where `go` was heading when a guard stopped it, or null. */
+  pendingNav: BrandScreen | null
+  /** Leave anyway — the guard is dropped and the navigation completes. */
+  confirmNav: () => void
+  /** Stay. The pending destination is forgotten. */
+  cancelNav: () => void
 
   appById: (id: string) => App
   groupById: (id: string) => Group
@@ -195,6 +213,36 @@ export function BrandProvider({ children }: { children: ReactNode }) {
      the same draft/commit treatment policies already had. */
   const [zones, setZones] = useState<Zone[]>(() => zonesAt('medium'))
   const [screen, setScreen] = useState<BrandScreen>({ name: 'policies' })
+  /* A ref, not state: the guard is read during navigation and must not cause a
+     render when a screen registers or clears one. */
+  const leaveGuard = useRef<(() => boolean) | null>(null)
+  const [pendingNav, setPendingNav] = useState<BrandScreen | null>(null)
+
+  const go = useCallback((s: BrandScreen) => {
+    if (leaveGuard.current && !leaveGuard.current()) {
+      setPendingNav(s)
+      return
+    }
+    setScreen(s)
+  }, [])
+
+  const registerLeaveGuard = useCallback((fn: (() => boolean) | null) => {
+    leaveGuard.current = fn
+  }, [])
+
+  const confirmNav = useCallback(() => {
+    setPendingNav((s) => {
+      if (s) {
+        /* Dropped before navigating, or the guard the unmounting screen
+           registered would answer for the next one. */
+        leaveGuard.current = null
+        setScreen(s)
+      }
+      return null
+    })
+  }, [])
+
+  const cancelNav = useCallback(() => setPendingNav(null), [])
   const [toast, setToast] = useState<string | null>(null)
   const [gauntletOverrides, setOverrides] = useState<Record<string, Record<string, AccessDecision>>>({})
   const [methodSets, setMethodSets] = useState<MethodSet[]>(() => methodSetsAt('medium'))
@@ -266,7 +314,11 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       policies,
 
       screen,
-      go: setScreen,
+      go,
+      registerLeaveGuard,
+      pendingNav,
+      confirmNav,
+      cancelNav,
 
       appById: (id) => apps.find((a) => a.id === id) ?? apps[0],
       groupById: (id) => groups.find((g) => g.id === id) ?? groups[0],
@@ -359,7 +411,16 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
       showToast,
     }),
-    [policies, zones, fingerprints, hooks, apps, groups, directory, edition, persona, setPersona, role, setRole, methodSets, methods, screen, showToast, gauntletOverrides],
+    /* `pendingNav` belongs here and its absence was a silent dead end: `go`
+       held the navigation via the guard ref, but the memoised store kept
+       handing out `pendingNav: null`, so the dialog that is supposed to offer
+       the choice never rendered. Pressing Trail with unsaved work did nothing
+       at all — no move, no prompt, no explanation.
+
+       The three callbacks are `useCallback`-stable, so listing them costs
+       nothing and stops the next reader wondering whether they were left out
+       on purpose. */
+    [policies, zones, fingerprints, hooks, apps, groups, directory, edition, persona, setPersona, role, setRole, methodSets, methods, screen, go, registerLeaveGuard, pendingNav, confirmNav, cancelNav, showToast, gauntletOverrides],
   )
 
   return (

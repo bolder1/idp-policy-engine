@@ -68,7 +68,7 @@ export function ImpactTab({
   const visible = (s: Situation) => (!who || s.userId === who) && (!where || s.place === where)
 
   const jump = (i: number) => {
-    onSelect({ kind: 'rule', index: i })
+    onSelect({ kind: 'rule', id: draft.rules[i].id })
     onTab('rule')
   }
 

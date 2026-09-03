@@ -44,7 +44,12 @@ export function Inspector({
   onInsert: (rule: Rule, at: number) => void
   onClose: () => void
 }) {
-  const key = `${selection.kind}:${selection.kind === 'rule' ? draft.rules[selection.index]?.id : ''}`
+  /* Resolved once. `at` is -1 when the selected rule is gone — undone, deleted
+     from the palette, discarded — and every branch below reads that as "nothing
+     selected", which is the honest answer and already the library's case. */
+  const at = selection.kind === 'rule' ? draft.rules.findIndex((r) => r.id === selection.id) : -1
+  const rule = at >= 0 ? draft.rules[at] : undefined
+  const key = `${selection.kind}:${rule?.id ?? ''}`
   /* Focus mode. The panel is 400px because a condition row needs a mark, an
      operator and a value side by side; a rule with two groups of four outgrows
      that, and the answer to "this is cramped" should not be "drag the handle
@@ -52,14 +57,8 @@ export function Inspector({
   const [focus, setFocus] = useState(false)
 
   const body = (inFocus: boolean) =>
-    selection.kind === 'rule' && draft.rules[selection.index] ? (
-      <RulePane
-        rule={draft.rules[selection.index]}
-        index={selection.index}
-        draft={draft}
-        focus={inFocus}
-        onPatch={(p) => onPatchRule(selection.index, p)}
-      />
+    rule ? (
+      <RulePane rule={rule} index={at} draft={draft} focus={inFocus} onPatch={(p) => onPatchRule(at, p)} />
     ) : selection.kind === 'fallback' ? (
       /* `?? fallbackRule()` rather than a truthiness gate: the default
          is drawn on the stage whether or not the policy has ever
@@ -71,8 +70,7 @@ export function Inspector({
       <Library policy={draft} onInsert={onInsert} onPatchFallback={onPatchFallback} />
     )
 
-  const what =
-    selection.kind === 'rule' ? `Rule ${selection.index + 1}` : selection.kind === 'fallback' ? 'The default' : 'Policy'
+  const what = rule ? `Rule ${at + 1}` : selection.kind === 'fallback' ? 'The default' : 'Policy'
 
   return (
     <aside className="bb__insp" aria-label="Inspector">

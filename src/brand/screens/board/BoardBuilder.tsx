@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PanelRightClose, PanelRightOpen, Redo2, Undo2 } from 'lucide-react'
+import { Check, Copy, Keyboard, ListOrdered, PanelRightClose, PanelRightOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
-import { Button } from '../../kit'
+import { Button, Modal } from '../../kit'
 import { fallbackRule, reidRule, blankRule, type Policy, type Rule } from '../../data'
 import { useBrand, useNameLookup } from '../../store'
 import { ReviewDialog } from '../builder-dialogs'
+import { CommandBar, type Cmd } from '../command-bar'
 import { diagnose, shadowedBy } from '../diagnostics'
 import { canRedo, canUndo, commit, historyKey, historyOf, redo, undo, type History } from '../history'
 import { walk, type SimEnv } from '../simulate'
@@ -23,8 +24,37 @@ import './board.css'
    either of them changes anything.
    -------------------------------------------------------------------------- */
 
+/* The bindings, in one place, so the sheet and the handler cannot drift.
+
+   Written as data rather than as markup because it is documentation of
+   behaviour that lives elsewhere: if a binding changes in the handler and not
+   here, the sheet lies — and a lying shortcut sheet is worse than none.
+   Keeping the two adjacent is the cheapest guard short of generating one from
+   the other. */
+const SHORTCUTS: [string, string][] = [
+  ['↑ ↓', 'Select the previous or next rule'],
+  ['⌥↑ ⌥↓', 'Move the selected rule up or down'],
+  ['⌘D', 'Duplicate the selected rule'],
+  ['Del', 'Delete the selected rule'],
+  ['E', 'Switch the selected rule on or off'],
+  ['⌘K', 'Command palette'],
+  ['⌘↵', 'Review and publish'],
+  ['⌘\\', 'Show or hide the panel'],
+  ['⌘Z ⇧⌘Z', 'Undo, redo'],
+  ['Esc', 'Clear the rehearsal, then the selection'],
+  ['?', 'This list'],
+]
+
 export function BoardBuilder({ policyId }: { policyId: string }) {
   const store = useBrand()
+  const { registerLeaveGuard } = store
+  /* The edition, which this surface ignored entirely.
+
+     The trail gates eleven things on it; the board gated none, so Lite showed
+     the palette, the publish gate and the whole Check/Impact apparatus that
+     Lite exists to withhold — a demo of the paid tier, reachable from the Lite
+     tenant by pressing one button on the policy bar. */
+  const features = store.features
   const saved = store.policyById(policyId)
   const resolve = useNameLookup()
 
@@ -33,6 +63,8 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
   const [trace, setTrace] = useState<Trace | null>(null)
   const [hover, setHover] = useState<number | null>(null)
   const [review, setReview] = useState(false)
+  const [cmd, setCmd] = useState(false)
+  const [keys, setKeys] = useState(false)
   const [inspOpen, setInspOpen] = useState(true)
   /* The inspector's width, dragged rather than fixed.
 
@@ -105,6 +137,21 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
   const shadowed = useMemo(() => (hover === null ? [] : shadowedBy(draft, hover)), [draft, hover])
   const dirty = !!saved && JSON.stringify({ r: saved.rules, f: saved.fallback }) !== JSON.stringify({ r: draft.rules, f: draft.fallback })
 
+  /* The draft lives in this component, so leaving the board destroys it.
+
+     That was silent: the layout switch on the policy bar, "Edit details", the
+     back arrow and every nav-rail item all called `store.go` straight through,
+     and an unsaved policy went with the unmount. The guard says "safe to leave
+     when clean"; `go` holds the navigation and hands it back as
+     `store.pendingNav` when it is not, and the dialog below decides.
+
+     Cleared on unmount, or the guard would keep answering for whatever screen
+     came next. */
+  useEffect(() => {
+    registerLeaveGuard(() => !dirty)
+    return () => registerLeaveGuard(null)
+  }, [dirty, registerLeaveGuard])
+
   /* A rehearsal shown while you edit would go stale. Re-walked on every draft,
      silently — same run, updated verdicts — so the cards say what the rules
      now do without replaying the cascade. */
@@ -112,32 +159,138 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
     setTrace((t) => (t ? { ...t, result: walk(draft, t.ctx, env) } : t))
   }, [draft, env])
 
-  /* Keys: undo/redo, and Escape clears the rehearsal first, the selection second. */
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null
-      const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
-      const action = historyKey(e)
-      if (action && !typing) {
-        e.preventDefault()
-        setHist(action === 'redo' ? redo : undo)
-        return
-      }
-      /* Not past a dialog.
+  /* --- Keys -------------------------------------------------------------------
 
-         This is a window listener, so it saw the Escape that closed the
-         condition picker as well — the picker shut AND the rule deselected, so
-         backing out of choosing an attribute threw away the whole panel you
-         were working in. Anything modal owns Escape while it is open; the
-         board only gets it when nothing is over the board. */
-      if (e.key === 'Escape' && !typing && !document.querySelector('[role="dialog"], .bx-scrim')) {
-        if (trace) setTrace(null)
-        else setSelection({ kind: 'none' })
+     The board had two bindings — undo/redo and Escape — and the trail next to
+     it had a command palette. Everything else was a round trip to the mouse:
+     selecting the next rule, moving one, duplicating, deleting, publishing.
+
+     Every binding here acts on the SELECTED rule, so each one needs the
+     selection resolved from its id first; `at` is -1 when nothing is selected
+     or the selected rule has gone, and every branch bails on that rather than
+     acting on rule 0 by accident.
+
+     Nothing fires while a dialog is open or a field has focus. `typing` covers
+     the fields; the dialog check is the same one Escape uses, and it matters
+     most for the single-letter bindings — `e` and `?` would otherwise be
+     unusable characters anywhere on the board. */
+  /* The handler in a ref, and one listener for the life of the board.
+
+     The dependency array here was `[trace]` while the handler read two keys'
+     worth of state. That was survivable when it did undo/redo and Escape;
+     with eleven bindings acting on the selected rule it is not — the closure
+     froze `draft`, `selection` and every mutator at the render `trace` last
+     changed on, so ⌘D would duplicate against a stale rule list and the
+     arrow keys saw a selection that had moved on.
+
+     Listing every dependency would re-register the listener on each render,
+     because the mutators are rebuilt each time. A ref rewritten during render
+     is the usual way out: the listener is stable, and what it calls is always
+     the current closure. */
+  const keyHandler = useRef<(e: KeyboardEvent) => void>(() => {})
+  keyHandler.current = (e: KeyboardEvent) => {
+    const t = e.target as HTMLElement | null
+    const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+    const modal = !!document.querySelector('[role="dialog"], .bx-scrim')
+    const action = historyKey(e)
+    if (action && !typing) {
+      e.preventDefault()
+      setHist(action === 'redo' ? redo : undo)
+      return
+    }
+
+    if (typing || modal) return
+
+    const cmd = e.metaKey || e.ctrlKey
+    const rules = draft.rules
+    const at = selection.kind === 'rule' ? rules.findIndex((r) => r.id === selection.id) : -1
+    const pick = (i: number) => {
+      const r = rules[i]
+      if (r) {
+        setSelection({ kind: 'rule', id: r.id })
+        setInspOpen(true)
       }
     }
+
+    /* ⌘K — the palette the trail has had all along. */
+    if (features.commands && cmd && e.key.toLowerCase() === 'k') {
+      e.preventDefault()
+      setCmd((v) => !v)
+      return
+    }
+    /* ⌘↵ — straight to the gate, which is where a finished edit is going. */
+    if (cmd && e.key === 'Enter') {
+      e.preventDefault()
+      if (dirty) setReview(true)
+      return
+    }
+    /* ⌘ — the panel is a lot of the screen, and reading the chain is a
+       thing people do between edits. */
+    if (cmd && e.key === '\\') {
+      e.preventDefault()
+      setInspOpen((v) => !v)
+      return
+    }
+    if (cmd && e.key.toLowerCase() === 'd') {
+      if (at < 0) return
+      e.preventDefault()
+      duplicate(at)
+      return
+    }
+
+    /* ⌥↑ / ⌥↓ move the rule; bare ↑ / ↓ move the selection. Same axis, and
+       the modifier is the difference between reading the chain and editing
+       it — which is the distinction every list editor draws this way. */
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      const dir = e.key === 'ArrowUp' ? -1 : 1
+      if (e.altKey) {
+        if (at < 0) return
+        e.preventDefault()
+        move(at, at + dir)
+      } else {
+        e.preventDefault()
+        /* From nothing, ↓ takes the first rule and ↑ the last, so the
+           keyboard has a way in that does not require a click first. */
+        pick(at < 0 ? (dir === 1 ? 0 : rules.length - 1) : Math.min(Math.max(at + dir, 0), rules.length - 1))
+      }
+      return
+    }
+
+    if ((e.key === 'Delete' || e.key === 'Backspace') && at >= 0) {
+      e.preventDefault()
+      remove(at)
+      return
+    }
+    /* Unmodified `e`, because it is a toggle you reach for repeatedly while
+       narrowing down which rule is doing something. */
+    if (e.key.toLowerCase() === 'e' && at >= 0 && !cmd) {
+      e.preventDefault()
+      patchRule(at, { enabled: !rules[at].enabled })
+      return
+    }
+    if (e.key === '?') {
+      e.preventDefault()
+      setKeys((v) => !v)
+      return
+    }
+    /* Not past a dialog.
+
+       This is a window listener, so it saw the Escape that closed the
+       condition picker as well — the picker shut AND the rule deselected, so
+       backing out of choosing an attribute threw away the whole panel you
+       were working in. Anything modal owns Escape while it is open; the
+       board only gets it when nothing is over the board. */
+    if (e.key === 'Escape' && !typing && !document.querySelector('[role="dialog"], .bx-scrim')) {
+      if (trace) setTrace(null)
+      else setSelection({ kind: 'none' })
+    }
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keyHandler.current(e)
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [trace])
+  }, [])
 
   /* The deck and the before/after sweep were computed here for the three pips.
      They went with them — both are whole-policy questions, and running a
@@ -146,6 +299,24 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
      those questions have no home. `runGauntlet`, `sweep` and `compare` are
      untouched and still tested. */
   const blockers = diagnostics.filter((d) => d.severity === 'error' && (d.ruleIndex === -1 || draft.rules[d.ruleIndex]?.enabled)).length
+
+  const selAt = selection.kind === 'rule' ? draft.rules.findIndex((r) => r.id === selection.id) : -1
+  const selName = selAt >= 0 ? draft.rules[selAt].name : ''
+  const boardCommands: Cmd[] = [
+    { id: 'add', label: 'Add a rule', icon: Plus },
+    ...(selAt >= 0
+      ? ([
+          { id: 'dup', label: `Duplicate rule ${selAt + 1} · ${selName}`, kbd: '⌘D', icon: Copy },
+          { id: 'del', label: `Delete rule ${selAt + 1} · ${selName}`, kbd: 'Del', icon: Trash2, danger: true },
+        ] as Cmd[])
+      : []),
+    ...(dirty ? ([{ id: 'publish', label: 'Review and publish', kbd: '⌘↵', icon: Check }] as Cmd[]) : []),
+    ...(canUndo(hist) ? ([{ id: 'undo', label: 'Undo', kbd: '⌘Z', icon: Undo2 }] as Cmd[]) : []),
+    ...(canRedo(hist) ? ([{ id: 'redo', label: 'Redo', kbd: '⇧⌘Z', icon: Redo2 }] as Cmd[]) : []),
+    { id: 'panel', label: inspOpen ? 'Hide the panel' : 'Show the panel', kbd: '⌘\\', icon: PanelRightClose },
+    { id: 'keys', label: 'Keyboard shortcuts', kbd: '?', icon: Keyboard },
+    ...draft.rules.map((r, i) => ({ id: `rule:${i}`, label: `Go to rule ${i + 1} · ${r.name}`, icon: ListOrdered }) as Cmd),
+  ]
 
   if (!saved) return <div className="bpage">This policy no longer exists.</div>
 
@@ -158,22 +329,25 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
     const rules = [...draft.rules]
     rules.splice(at, 0, rule)
     commitDraft({ ...draft, rules })
-    setSelection({ kind: 'rule', index: at })
+    setSelection({ kind: 'rule', id: rule.id })
   }
+
+  /* No selection fix-up. The selection names the rule, so moving the rule
+     moves the selection with it — this used to re-point the index at the
+     destination slot, which was right for the dragged rule and wrong for
+     every other selection the move shifted. */
   const move = (from: number, to: number) => {
     if (to < 0 || to >= draft.rules.length || from === to) return
     const rules = [...draft.rules]
     const [r] = rules.splice(from, 1)
     rules.splice(to, 0, r)
     commitDraft({ ...draft, rules })
-    if (selection.kind === 'rule' && selection.index === from) setSelection({ kind: 'rule', index: to })
   }
+
   const remove = (i: number) => {
+    const gone = draft.rules[i]
     commitDraft({ ...draft, rules: draft.rules.filter((_, j) => j !== i) })
-    if (selection.kind === 'rule') {
-      if (selection.index === i) setSelection({ kind: 'none' })
-      else if (selection.index > i) setSelection({ kind: 'rule', index: selection.index - 1 })
-    }
+    if (selection.kind === 'rule' && selection.id === gone?.id) setSelection({ kind: 'none' })
   }
   const duplicate = (i: number) => insert(reidRule({ ...draft.rules[i], name: `${draft.rules[i].name} (copy)` }), i + 1)
 
@@ -238,8 +412,11 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
               Discard
             </Button>
           )}
+          {/* The same two labels the trail uses, chosen the same way. Lite has
+              no publish gate, so the button says what it actually does there
+              rather than promising a review step that does not exist. */}
           <Button variant="brand" size="sm" disabled={!dirty} title={blockers > 0 ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first` : undefined} onClick={() => setReview(true)}>
-            Review &amp; publish
+            {features.publish ? 'Review & publish' : 'Review & Save'}
           </Button>
           <span className="bb__float__sep" />
           <button type="button" className="bb__act" aria-label={inspOpen ? 'Hide the inspector' : 'Show the inspector'} aria-pressed={inspOpen} onClick={() => setInspOpen((v) => !v)}>
@@ -281,7 +458,89 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
         onClose={() => setInspOpen(false)}
       />
 
+      {/* The palette, over the board's own verbs.
+
+          `CommandBar` is reused; `buildCommands` is not. The trail's list
+          offers the gauntlet dialog, the decision log, "Assign applications"
+          and "Save as template" — four things this surface does not have, and a
+          palette that lists actions the screen cannot perform is worse than no
+          palette. Same component, own commands. */}
+      {features.commands && cmd && (
+        <CommandBar
+          commands={boardCommands}
+          onClose={() => setCmd(false)}
+          onRun={(id) => {
+            setCmd(false)
+            if (id === 'add') insert(blankRule(), draft.rules.length)
+            else if (id === 'undo') setHist(undo)
+            else if (id === 'redo') setHist(redo)
+            else if (id === 'publish') setReview(true)
+            else if (id === 'panel') setInspOpen((v) => !v)
+            else if (id === 'keys') setKeys(true)
+            else if (id === 'dup' && selAt >= 0) duplicate(selAt)
+            else if (id === 'del' && selAt >= 0) remove(selAt)
+            else if (id.startsWith('rule:')) {
+              const r = draft.rules[Number(id.slice(5))]
+              if (r) {
+                setSelection({ kind: 'rule', id: r.id })
+                setInspOpen(true)
+              }
+            }
+          }}
+        />
+      )}
+
+      {/* Every binding on one card, opened by the key it documents.
+
+          Discoverability is the whole point: none of these is guessable, and a
+          shortcut nobody knows about is a shortcut nobody has. `?` is the
+          convention, and it is listed here too so the sheet explains how it
+          was reached. */}
+      <Modal open={keys} onClose={() => setKeys(false)} title="Keyboard" width={460}>
+        <dl className="bb__keys">
+          {SHORTCUTS.map(([k, what]) => (
+            <div key={k}>
+              <dt>
+                {k.split(' ').map((part) => (
+                  <kbd key={part}>{part}</kbd>
+                ))}
+              </dt>
+              <dd>{what}</dd>
+            </div>
+          ))}
+        </dl>
+      </Modal>
+
       <ReviewDialog open={review} policy={draft} onClose={() => setReview(false)} onConfirm={publish} />
+
+      {/* Named, and it says what leaving costs.
+
+          Not a `confirm()`: the count comes from the same diff that drives the
+          Discard button, so the number in the sentence is the number of rules
+          that would go. "Keep editing" is the default action because it is the
+          recoverable one — discarding a draft cannot be undone once the
+          component is gone. */}
+      <Modal
+        open={!!store.pendingNav}
+        onClose={store.cancelNav}
+        title="Leave without publishing?"
+        width={460}
+        footer={
+          <>
+            <Button variant="ghost" onClick={store.cancelNav}>
+              Keep editing
+            </Button>
+            <Button variant="danger" onClick={store.confirmNav}>
+              Discard and leave
+            </Button>
+          </>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
+          This draft has changes that are not published. Leaving the builder discards them — there is nothing to come
+          back to.
+        </p>
+      </Modal>
     </div>
   )
 }

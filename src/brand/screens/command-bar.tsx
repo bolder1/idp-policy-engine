@@ -23,6 +23,12 @@ export interface Cmd {
   label: string
   hint?: string
   icon?: LucideIcon
+  /* The key that runs this without the palette.
+
+     A palette is where people look things up; it is also the cheapest place to
+     teach the shortcut that makes the palette unnecessary next time. Optional,
+     and absent on every command that has no binding. */
+  kbd?: string
 }
 
 /** The actions every host has. `extra` carries anything host-specific, and the
@@ -139,6 +145,7 @@ export function CommandBar({
                     {c.label}
                     {c.hint && <em>{c.hint}</em>}
                   </span>
+                  {c.kbd && <kbd className="bm__cmdkbd">{c.kbd}</kbd>}
                 </button>
               </li>
             )

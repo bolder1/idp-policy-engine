@@ -160,7 +160,22 @@ const NAV: { section?: string; items: NavItem[] }[] = [
   },
 ]
 
-const POLICY_SCREENS = ['policies', 'builder', 'templates', 'zones', 'fingerprint', 'methods']
+/* Every screen that lives under Policies.
+
+   `board`, `policy-details` and `hooks` were missing, and three things key off
+   this list: the parent's `is-active` class, its `aria-current`, and the
+   submenu that auto-opens. So on the board the rail showed no location at all
+   — no highlight, nothing announced as the current page — while being the
+   widest thing on the screen. */
+const POLICY_SCREENS = ['policies', 'builder', 'board', 'policy-details', 'templates', 'zones', 'fingerprint', 'hooks', 'methods']
+
+/* The two builders, which want the rail out of the way.
+
+   Landing on a builder used to auto-open the Policies submenu, which expands
+   the rail and takes ~171px off a canvas whose whole job is to show a chain of
+   cards. The submenu is one click away and the builder is a place you come to
+   work, not to navigate. */
+const BUILDER_SCREENS = ['builder', 'board']
 
 function isActive(current: BrandScreen, item: NavItem): boolean {
   if (item.label === 'Policies') return POLICY_SCREENS.includes(current.name)
@@ -191,15 +206,21 @@ export function Shell({ children }: { children: ReactNode }) {
   // Landing on a policy screen from anywhere else opens the menu that holds it,
   // so the rail always shows where you are.
   useEffect(() => {
-    if (POLICY_SCREENS.includes(screen.name)) setOpen('Policies')
+    if (POLICY_SCREENS.includes(screen.name) && !BUILDER_SCREENS.includes(screen.name)) setOpen('Policies')
   }, [screen.name])
 
-  /* The builder is where the rules are actually written — three columns of
-     editing surface — so it gets the rail's 235px on arrival and hands them
-     back on the way out. Anything the admin does to the rail in between wins,
-     and is not undone when they leave. */
+  /* A builder is where the rules are actually written — an editing surface
+     that wants every pixel — so it gets the rail's 235px on arrival and hands
+     them back on the way out. Anything the admin does to the rail in between
+     wins, and is not undone when they leave.
+
+     `BUILDER_SCREENS`, not `'builder'`. This named one of the two builders, so
+     the trail ran at a 64px rail and the board at 235px: switching Trail →
+     Board handed 171px of a canvas whose entire job is showing a chain of
+     cards back to a navigation menu, and switching back took it away again.
+     The board is the surface with the stronger claim to the space of the two. */
   useEffect(() => {
-    if (screen.name === 'builder') {
+    if (BUILDER_SCREENS.includes(screen.name)) {
       setCollapsed((c) => {
         if (!c) autoCollapsed.current = true
         return true

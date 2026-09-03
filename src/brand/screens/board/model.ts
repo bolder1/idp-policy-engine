@@ -9,7 +9,20 @@ import type { SimContext, TraceResult } from '../simulate'
    -------------------------------------------------------------------------- */
 
 /** What the inspector is looking at. The start node selects the policy. */
-export type Selection = { kind: 'none' } | { kind: 'rule'; index: number } | { kind: 'fallback' }
+/* What the inspector is looking at.
+
+   By id, not by index, and that difference is two bugs rather than a
+   preference. A position is only meaningful against one particular ordering of
+   one particular list, and both of those move underneath it: reordering rules
+   left the selection pointing at whatever had taken that slot — so dragging
+   rule 1 to the bottom swapped the panel onto rule 2 without anybody asking —
+   and undo could shorten the list past the stored index, leaving the header
+   naming a rule that no longer existed.
+
+   An id needs no arithmetic. It survives reordering because it travels with
+   the rule, and when the rule goes the id resolves to nothing, which is
+   already the "show the library" case. */
+export type Selection = { kind: 'none' } | { kind: 'rule'; id: string } | { kind: 'fallback' }
 
 export type Tab = 'rule' | 'check' | 'impact'
 

@@ -94,6 +94,7 @@ export function RuleCard({
   cardRef: (el: HTMLDivElement | null) => void
 }) {
   const tone = TONE[rule.decision]
+  const titleId = `bb-rule-${rule.id}-title`
   const kindClass = traceKind === 'hit' ? 'is-hit' : traceKind === 'miss' ? 'is-miss' : traceKind === 'unreached' || traceKind === 'off' ? 'is-unreached' : ''
 
   return (
@@ -110,17 +111,25 @@ export function RuleCard({
          be reset to a stale offset on the next re-render, which is the classic
          "card snaps back mid-drag". `layout` is off for the same reason —
          Motion must not own this transform while the pointer does. */
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      aria-label={`Rule ${index + 1}: ${rule.name}`}
+      /* Not a button, and not focusable.
+
+         It was `role="button" tabIndex={0}` with an Enter/Space handler, which
+         cost more than it bought. A role of button makes every descendant
+         presentational, so the six real controls inside — move up, move down,
+         duplicate, delete, the on/off switch and the grip — were announced as
+         nothing at all; and the Enter/Space handler ran on events that had
+         bubbled up from those controls, so pressing Delete with the keyboard
+         selected the card instead of deleting the rule. Six controls were
+         unreachable to make one gesture reachable.
+
+         The clickable surface stays — a pointer can still select a rule by
+         hitting anywhere on it — but the keyboard path is the title button in
+         the head, which is a real button, in the tab order, and announces the
+         rule it opens. `aria-labelledby` keeps the group named for anyone
+         arrowing through the region. */
+      role="group"
+      aria-labelledby={titleId}
       onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onSelect()
-        }
-      }}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       data-index={index}
@@ -128,11 +137,10 @@ export function RuleCard({
       <div className="bb__cardhead">
         {/* The index is the grip. It is the one thing on the card that says
             "this is a position", so it is the thing you drag to change it. */}
-        <span
+        <button
+          type="button"
           className="bb__idx"
-          role="button"
-          tabIndex={0}
-          aria-label={`Drag to reorder rule ${index + 1}, or use the arrows`}
+          aria-label={`Reorder rule ${index + 1} — drag, or use the arrow keys`}
           onPointerDown={(e) => {
             e.stopPropagation()
             onGrip(e)
@@ -150,10 +158,27 @@ export function RuleCard({
         >
           <span>{index + 1}</span>
           <GripVertical size={14} strokeWidth={2} aria-hidden />
-        </span>
+        </button>
 
+        {/* The title is the keyboard path to the rule.
+
+            One real button, in the tab order, whose accessible name is the rule
+            it opens — replacing the whole-card `role="button"` that hid every
+            other control on the card. `aria-expanded` because pressing it opens
+            the panel that edits this rule. */}
         <div className="bb__title">
-          <strong>{rule.name || 'Untitled rule'}</strong>
+          <button
+            type="button"
+            id={titleId}
+            className="bb__titlebtn"
+            aria-expanded={selected}
+            onClick={(e) => {
+              e.stopPropagation()
+              onSelect()
+            }}
+          >
+            <strong>{rule.name || 'Untitled rule'}</strong>
+          </button>
           {rule.description ? <em>{rule.description}</em> : null}
         </div>
 
@@ -230,17 +255,14 @@ export function TerminalCard({
       layout
       transition={{ type: 'spring', stiffness: 520, damping: 40 }}
       className={`bb__card is-terminal is-${tone} ${selected ? 'is-selected' : ''} ${reached === true ? 'is-hit' : reached === false ? 'is-unreached' : ''}`}
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      aria-label="Nothing else matched — the default"
+      /* The same shape as every other card: a group named by its title
+         button. It has no inner controls to hide, so the old whole-card button
+         cost nothing here — but `aria-pressed` is a toggle's attribute and
+         this is not a toggle, and two kinds of card that behave differently
+         under the keyboard is one kind too many. */
+      role="group"
+      aria-labelledby="bb-terminal-title"
       onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onSelect()
-        }
-      }}
     >
       <div className="bb__cardhead">
         <span className="bb__idx is-home" aria-hidden>
@@ -249,7 +271,18 @@ export function TerminalCard({
           </span>
         </span>
         <div className="bb__title">
-          <strong>Nothing else matched</strong>
+          <button
+            type="button"
+            id="bb-terminal-title"
+            className="bb__titlebtn"
+            aria-expanded={selected}
+            onClick={(e) => {
+              e.stopPropagation()
+              onSelect()
+            }}
+          >
+            <strong>Nothing else matched</strong>
+          </button>
           <em>Every sign-in that no rule above caught</em>
         </div>
         <div className="bb__cardmeta">

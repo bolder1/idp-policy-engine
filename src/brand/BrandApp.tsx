@@ -32,6 +32,7 @@ const ZonesPage = lazy(() => import('./screens/ZonesPage').then((m) => ({ defaul
 const AuthMethodsPage = lazy(() => import('./screens/AuthMethodsPage').then((m) => ({ default: m.AuthMethodsPage })))
 const CreatePolicy = lazy(() => import('./create/CreatePolicy').then((m) => ({ default: m.CreatePolicy })))
 const BuilderPage = lazy(() => import('./screens/BuilderPage').then((m) => ({ default: m.BuilderPage })))
+const BoardPage = lazy(() => import('./screens/board/BoardPage').then((m) => ({ default: m.BoardPage })))
 const PolicyDetails = lazy(() => import('./screens/PolicyDetails').then((m) => ({ default: m.PolicyDetails })))
 
 /* Same specifiers as the lazy() calls above — Vite dedupes them to one chunk
@@ -44,6 +45,7 @@ const warm = () => {
   void import('./screens/AuthMethodsPage')
   void import('./create/CreatePolicy')
   void import('./screens/BuilderPage')
+  void import('./screens/board/BoardPage')
 }
 
 function usePrefetchScreens() {
@@ -70,6 +72,8 @@ function Screen() {
       return <Policies />
     case 'builder':
       return <BuilderPage policyId={screen.policyId} open={screen.open} />
+    case 'board':
+      return <BoardPage policyId={screen.policyId} />
     case 'policy-details':
       return <PolicyDetails policyId={screen.policyId} />
     case 'templates':

@@ -8,7 +8,7 @@ import {
   type Rule,
   type User,
 } from '../data'
-import { ckey, isSingleCard, leaves, matchesEverything, sig } from '../predicate'
+import { cardJoin, ckey, isSingleAndRun, leaves, matchesEverything, sig, topJoin } from '../predicate'
 import { SLOW_TIMEOUT_MS, seedHooks, type Hook } from '../hooks'
 
 /* -----------------------------------------------------------------------------
@@ -85,8 +85,12 @@ const isCatchAll = (r: Rule) => r.enabled && matchesEverything(r.when)
    every check below that needed "an unbroken run of ANDs" gets it for free
    instead of having to prove it, and none of them has to bail out on the mixed
    case — which is exactly the case grouping exists to enable. */
-const allAnd = (r: Rule) => isSingleCard(r.when)
-const allOr = (r: Rule) => r.when.cards.length > 1 && r.when.cards.every((k) => k.conditions.length === 1)
+const allAnd = (r: Rule) => isSingleAndRun(r.when)
+/* A pure OR-run reaches the same shape two ways now: several single-condition
+   cards joined by OR, or one card whose own conditions are joined by OR. */
+const allOr = (r: Rule) =>
+  (topJoin(r.when) === 'or' && r.when.cards.length > 1 && r.when.cards.every((k) => k.conditions.length === 1)) ||
+  (r.when.cards.length === 1 && cardJoin(r.when.cards[0]) === 'or' && r.when.cards[0].conditions.length > 1)
 
 /** The predicate, normalised. Audience is no longer part of it — it is the policy's. */
 const signature = (r: Rule) => sig(r.when)

@@ -42,6 +42,13 @@ export type BrandScreen =
      gauntlet for that policy, instead of in a builder where you still have to
      find the button. */
   | { name: 'builder'; policyId: string; open?: 'gauntlet' | 'impact' }
+  /* Builder v2 — the board. The same policy, store and evaluator under a
+     different shape: a chain of cards on a stage, an inspector beside it.
+     See docs/builder-board.md.
+
+     No `open` here. It named an inspector tab, and the inspector has no tabs
+     any more — it is one pane, showing whatever is selected on the board. */
+  | { name: 'board'; policyId: string }
   /* The policy's own three facts — name, applications, audience — on one page.
 
      They used to be scattered across a top-bar input, a dialog and a card at

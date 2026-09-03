@@ -1003,7 +1003,7 @@ function CatalogueButton({
 
 const ALL = '__all'
 
-function ConditionPicker({
+export function ConditionPicker({
   open,
   title,
   onClose,

@@ -143,10 +143,29 @@ export interface Condition {
    Never empty: removing the last condition removes the card. That invariant is
    what makes `cards.length === 1` a sound test for "this rule is one unbroken
    run of ANDs", which is the sentence the whole linter is built on. */
+/* How a run of things is joined. Two levels carry one, and both default to
+   what the model meant before they existed — a card is an AND-run, and cards
+   are alternatives — so every seeded rule keeps its exact meaning and nothing
+   written against the old shape has to change. */
+export type Joiner = 'and' | 'or'
+
 export interface ConditionCard {
   id: string
   /** The author's name for this alternative — "Corp laptops". Optional. */
   label?: string
+  /** How THIS card's own conditions are joined. Defaults to 'and'. */
+  join?: Joiner
+  /* Whether the AUTHOR made this a group, as opposed to it merely being a
+     second alternative the model happens to hold.
+
+     Presentation only — nothing in the evaluator, the linter or the simulator
+     reads it, and a rule means exactly the same thing with it set or unset.
+     It exists because the two states look identical in the model and are not
+     the same thing to the person who wrote the rule: conditions typed one after
+     another are independent, and a group is a bracket somebody asked for. Drawn
+     without this, adding a group put a frame around the conditions that were
+     already there, which is precisely the thing they had not done. */
+  grouped?: boolean
   conditions: Condition[]
 }
 
@@ -158,6 +177,8 @@ export interface ConditionCard {
    test the codebase used to make. See predicate.ts for the reasoning. */
 export interface Predicate {
   cards: ConditionCard[]
+  /** How the cards are joined to each other. Defaults to 'or'. */
+  join?: Joiner
 }
 
 // --- Rules -------------------------------------------------------------------
@@ -678,6 +699,7 @@ export function reidRule(r: Rule): Rule {
     ...r,
     id: `r${ruleSeq}`,
     when: {
+      join: r.when.join,
       cards: r.when.cards.map((k) => ({
         ...k,
         id: nextCardId(),

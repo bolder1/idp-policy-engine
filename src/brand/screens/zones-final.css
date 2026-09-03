@@ -319,12 +319,25 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
    add to that object. A frame around the pair said they were one thing, and a
    frame around each said they were two of the same kind. One frame, around the
    contents. */
+/* One card per entry, and no frame around the set.
+
+   It was a single bordered, scrolling box with hairline-separated rows. Two
+   things were wrong with that. The box was a fixed 210px whether it held one
+   entry or twenty, so a zone with two addresses drew a mostly-empty panel; and
+   the rows inside it read as text in a table rather than as the objects they
+   are — you add them one at a time, you edit and delete them one at a time,
+   and nothing about them is tabular.
+
+   Each entry is its own card now. The list is just the stack. */
 .bz7__entries {
-  list-style: none; margin: 2px 0 0; padding: 2px 12px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  display: flex; flex-direction: column; flex: 1; min-height: 96px; max-height: 210px; overflow-y: auto;
+  list-style: none; margin: 2px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
 }
+/* The scroller comes back only when the list is long enough to take over the
+   page — the same threshold that earns the filter, so the two arrive together
+   and a long zone still has both. Padding on the right so a card's focus ring
+   is not clipped by the scrollbar. */
+.bz7__entries.is-scroll { max-height: 420px; overflow-y: auto; padding-right: 4px; }
 /* Not virtualised, and measured rather than assumed.
 
    The paste box above deliberately accepts as many networks as an estate has,
@@ -341,11 +354,28 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
    every entry. That is where the cost actually was. */
 .bz7__entries li {
   display: flex; align-items: center; gap: 10px;
-  padding: 5px 0; border-bottom: 1px solid var(--border-subtle);
+  padding: 4px 8px 4px 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  transition: border-color var(--dur-fast) var(--ease-standard);
 }
-.bz7__entries li:last-child { border-bottom: none; }
+.bz7__entries li:hover { border-color: var(--border-default); }
 .bz7__entries code { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-primary); }
-.bz7__entries em { margin-left: auto; font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+/* The kind, as a pill.
+
+   `ipv4-cidr` in muted grey at the right edge read as a column heading that had
+   slipped down a row — it is not a label for the value, it is a fact about it,
+   and a fact about a thing belongs in a badge on the thing. Sunken rather than
+   tinted: there are four or five of these on screen at once and colouring them
+   would make the list look like it were reporting status. */
+.bz7__entries em {
+  margin-left: auto; flex: none;
+  padding: 2px 8px; border-radius: var(--radius-full);
+  background: var(--surface-inset); border: 1px solid var(--border-subtle);
+  font-style: normal; font-size: 10px; font-weight: var(--fw-medium);
+  font-family: var(--font-mono); letter-spacing: 0.01em;
+  color: var(--text-secondary); white-space: nowrap;
+}
 .bz7__entries button {
   flex: none; display: grid; place-items: center; width: 22px; height: 22px;
   border-radius: var(--radius-sm); background: none; cursor: pointer; color: var(--text-muted);
@@ -371,93 +401,6 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 .bz7__editin[aria-invalid='true'] { border-color: var(--fb-negative-border); }
 .bz7__editerr {
   flex: none; font-size: var(--fs-xs); color: var(--fb-negative-fg); white-space: nowrap;
-}
-
-/* --- What you can add ---------------------------------------------------------
-   A foldable note under the page heading, in the info tint.
-
-   Five shapes preceded it, each tried because the last was in the way: a `?` on
-   the section heading, a panel of bordered chips (which looked like the Quick
-   add buttons two rows below), a two-column legend costing 130px, one dense
-   inline row, and the same note wedged inside the address section. The tell was
-   that it kept being in the way — the block was in the wrong PLACE, not the
-   wrong style. It is reference for the page, so it lives under the page's own
-   heading.
-
-   Closed, it is one line. Open, it can afford to be comfortable — larger type
-   than a hint and real space between the examples — because the reader chose to
-   open it and nothing else is competing for that room. Info and not notice:
-   notice is this product's "careful" ramp and none of this is a warning. */
-.bz7__accepts {
-  margin: 0 0 4px;
-  background: var(--fb-info-bg);
-  border: 1px solid var(--fb-info-border); border-radius: var(--radius-md);
-  color: var(--fb-info-fg);
-}
-
-.bz7__accepts > summary {
-  display: flex; align-items: center; gap: 8px;
-  padding: 9px 13px; cursor: pointer;
-  font-size: var(--fs-sm);
-  list-style: none;
-}
-/* Safari draws its own marker; the chevron at the end is ours. */
-.bz7__accepts > summary::-webkit-details-marker { display: none; }
-.bz7__accepts > summary::marker { content: ''; }
-.bz7__accepts > summary strong { flex: none; font-weight: var(--fw-semibold); }
-/* The shapes, so the closed line already answers "do I need to open this" —
-   and clearly the subordinate half of that line, or the summary reads as two
-   titles competing. */
-.bz7__accepts > summary em {
-  flex: 1; min-width: 0; font-style: normal;
-  font-size: var(--fs-xs); opacity: 0.72;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bz7__accepts > summary > svg:first-child { flex: none; }
-.bz7__accepts > summary > svg:last-child {
-  flex: none; opacity: 0.7; transition: transform var(--dur-fast) var(--ease-standard);
-}
-.bz7__accepts[open] > summary > svg:last-child { transform: rotate(180deg); }
-.bz7__accepts > summary:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); border-radius: var(--radius-md); }
-
-/* The open half. Bigger than a hint, because opening it was a decision. */
-.bz7__acceptsbody {
-  padding: 2px 13px 13px 35px;
-  border-top: 1px solid var(--fb-info-border);
-  margin-top: 0; padding-top: 11px;
-}
-/* Three tiers, and they were one.
-
-   Everything in here inherits --fb-info-fg, so hierarchy cannot come from hue —
-   it has to come from weight, size and opacity. Flat, the sample and its gloss
-   read as equals and the eye has nowhere to land first; the sample is the thing
-   being looked up and the gloss only names it.
-
-     the example   monospace, medium weight, full strength. What you came for.
-     the gloss     a size down and dimmed. What it is called.
-     the sentence  ruled off, dimmest. How to type several at once — true, and
-                   not what anybody opened this for. */
-.bz7__accepts ul {
-  list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 9px 24px;
-}
-.bz7__accepts li { display: flex; align-items: baseline; gap: 8px; }
-.bz7__accepts code {
-  flex: none;
-  font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: var(--fw-medium);
-}
-/* Dimmed on the gloss itself, not on the row: opacity is inherited
-   multiplicatively, so dimming the <li> would take the sample down with it and
-   no value above 1 on the child brings it back. */
-.bz7__accepts li em {
-  min-width: 0; font-style: normal;
-  font-size: var(--fs-xs); opacity: 0.72;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bz7__accepts p {
-  margin: 12px 0 0; padding-top: 10px;
-  border-top: 1px solid var(--fb-info-border);
-  font-size: var(--fs-xs); line-height: 1.55; opacity: 0.72;
 }
 
 /* --- The place search ----------------------------------------------------------------- */
@@ -745,3 +688,132 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 
 /* The named last column. */
 .bz7__thactions { justify-self: end; }
+
+/* --- Two columns: the work, and what only describes it ------------------------
+
+   Left is everything you touch. Right is everything you read. The split exists
+   because the formats reference and the validator's warnings were both in the
+   flow — one above the field, one under the list — so filling a zone in meant
+   scrolling past prose to reach a text box, and the warning about what the
+   zone currently matches fell under the fold exactly when the list got long
+   enough to deserve one.
+
+   340px because the reference is four `code` samples with a gloss each, and at
+   300 the gloss wraps under the sample and stops reading as one line. */
+.bz7__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 28px;
+  align-items: start;
+}
+.bz7__work { min-width: 0; display: flex; flex-direction: column; }
+.bz7__aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* One column under the width where 340px of aside starts eating the list it is
+   describing. The aside goes BELOW rather than above: it is reference, and
+   reference above the work is the arrangement this layout replaced. */
+@media (max-width: 1080px) {
+  .bz7__cols { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+}
+
+/* --- A panel in the aside -----------------------------------------------------
+
+   Info and not notice: notice is this product's "careful" ramp and none of
+   this is a warning. The validator's own issues sit underneath in their real
+   colours, so this one has to stay quieter than an error without going grey —
+   grey would read as disabled next to them. */
+.bz7__side {
+  padding: 14px 16px;
+  background: var(--fb-info-bg);
+  border: 1px solid var(--fb-info-border);
+  border-radius: var(--radius-md);
+  color: var(--fb-info-fg);
+}
+.bz7__sidehead {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 10px;
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: inherit;
+}
+.bz7__sidehead svg { flex: none; }
+.bz7__sidelist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+/* Stacked, not side by side. In a 340px column a sample and its gloss on one
+   line wrap mid-phrase, and a wrapped gloss under a monospace sample reads as
+   a second sample. */
+.bz7__sidelist li { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bz7__sidelist code {
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: inherit; overflow-wrap: anywhere;
+}
+/* The gloss is its own element rather than a bare text node, so it can be
+   dimmed without dimming the sample above it — opacity on the row would take
+   both, since a child cannot be more opaque than its parent. */
+.bz7__sidelist em { font-style: normal; font-size: var(--fs-xs); opacity: 0.72; }
+.bz7__sidep {
+  margin: 12px 0 0; padding-top: 10px;
+  border-top: 1px solid var(--fb-info-border);
+  font-size: var(--fs-xs); line-height: 1.55; opacity: 0.78;
+}
+.bz7__sidep + .bz7__sidep { margin-top: 8px; padding-top: 8px; }
+
+/* --- Adding another row -------------------------------------------------------
+
+   Dashed and full width, the way an "add another" reads in every field array
+   worth copying: it is the end of the list rather than a control beside it.
+   Quiet on purpose — the page has one primary decision and it is not this. */
+.bz7__addrow {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%; margin-top: 8px; padding: 8px;
+  border: 1px dashed var(--border-default); border-radius: var(--radius-md);
+  background: none; cursor: pointer;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary);
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bz7__addrow:hover { border-style: solid; border-color: var(--brand); background: var(--brand-subtle-bg); color: var(--brand-active); }
+.bz7__addrow:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bz7__addrow svg { flex: none; }
+
+/* --- A row you can click anywhere on ------------------------------------------
+
+   The value and its kind became one button so that clicking the thing you can
+   see is wrong actually opens the editor. The pencil moved inside it: it is
+   the affordance, not a second target, and two adjacent hit areas that do the
+   same thing is how a row ends up with a dead zone between them. */
+/* `.bz7__entries` in front of every one of these, and it is load-bearing.
+
+   `.bz7__entries button` above sets a 22px square grid — it was written when
+   every button in a row was an icon. That selector is (0,1,1); a bare
+   `.bz7__entryopen` is (0,1,0), so the square won and this button rendered
+   22px wide with the value overflowing it and the delete control sitting on
+   top of the kind label. */
+.bz7__entries .bz7__entryopen {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 10px;
+  width: auto; height: auto; padding: 3px 4px; margin-left: -4px;
+  border: 0; border-radius: var(--radius-sm);
+  background: none; cursor: pointer; text-align: left;
+}
+.bz7__entries .bz7__entryopen:hover { background: var(--surface-inset); }
+.bz7__entries .bz7__entryopen:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+/* Revealed on hover and on keyboard focus, both — a control that only exists
+   under a pointer is not a control for anybody navigating by Tab. */
+.bz7__entrypen {
+  flex: none; display: grid; place-items: center;
+  color: var(--text-muted); opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bz7__entryopen:hover .bz7__entrypen,
+.bz7__entryopen:focus-visible .bz7__entrypen { opacity: 1; }
+
+/* A place has no editor behind it — it is chosen from a catalogue, so remove
+   and pick again IS the edit. It gets the row's layout without the button. */
+.bz7__entrystatic { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+
+/* The empty state owns the whole pane rather than sitting on top of a list
+   that is not there, so the section stops being a flex column of one thing. */
+.bz7__sec--empty { min-height: 260px; justify-content: center; }
+/* The action slot holds the primary button and the quick-add chips under it.
+   Column, because a brand button beside a dashed chip on one line reads as two
+   controls of equal weight and they are not. */
+.bz7__sec--empty .bempty__action {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+}

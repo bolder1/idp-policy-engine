@@ -1,5 +1,5 @@
 import { conditionType, type AccessDecision, type Condition, type Policy, type Rule } from '../data'
-import { blame, cardName, credit, leaves } from '../predicate'
+import { blame, cardJoin, cardName, credit, leaves, predicatePasses, topJoin } from '../predicate'
 
 /* -----------------------------------------------------------------------------
    The simulation core.
@@ -254,18 +254,26 @@ export function evalRule(rule: Rule, ctx: SimContext, env: SimEnv): RuleVerdict 
   for (const c of leaves(p)) results.set(c.id, evalCond(c, ctx))
   const passed = (c: Condition) => results.get(c.id)?.state === 'pass'
 
-  const won = credit(p, passed)
+  /* Asked of the whole predicate. `credit` names the card that carried it,
+     but with the cards joined by AND one passing card is not a match — every
+     card has to hold, and returning on the first would report a match the
+     engine would not make. */
+  const won = predicatePasses(p, passed) ? credit(p, passed) : null
   if (won) {
     const n = won.card.conditions.length
+    const oneRun = p.cards.length === 1
     /* "All N conditions met" is only true when there is one card. With
        alternatives it is false — the other card's conditions were NOT met —
        and a trace that overstates what it checked is a trace nobody believes
        the second time. */
     return {
       match: true,
-      reason:
-        p.cards.length === 1
-          ? `All ${n} condition${n === 1 ? '' : 's'} met`
+      reason: oneRun
+        ? cardJoin(won.card) === 'or'
+          ? `One of ${n} condition${n === 1 ? '' : 's'} met`
+          : `All ${n} condition${n === 1 ? '' : 's'} met`
+        : topJoin(p) === 'and'
+          ? `All ${p.cards.length} groups met`
           : `Matched ${cardName(won.card, won.index)}`,
       card: won.index,
     }

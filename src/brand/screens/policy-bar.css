@@ -13,8 +13,11 @@
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   align-items: center;
-  gap: var(--space-3) var(--space-5);
-  padding: var(--space-3) var(--space-7) var(--space-4);
+  gap: var(--space-4) var(--space-5);
+  /* 6px above an 18px heading was the heading touching the strip above it.
+     Even top and bottom now, and the bar is still shorter than it was — the
+     facts went from two lines to one, which paid for the padding. */
+  padding: var(--space-6) var(--space-7);
   background: var(--surface-raised);
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -34,32 +37,56 @@
 }
 .bpbar__type { flex: none; font-size: var(--fs-xs); color: var(--text-muted); }
 
-/* Two facts, drawn as two facts.
+/* Two facts, with nothing drawn around them.
 
-   They used to run together on one line — a caps label, a value, another caps
-   label, another value — so "1 application" and "Governs" sat the same distance
-   apart as "Governs" and its own chips, and nothing said which half of the
-   sentence you were reading. Stacked in cells with a rule between them, the
-   label is above the thing it labels and the boundary is drawn rather than
-   inferred from a gap. */
+   They were a tinted, bordered box, and the box was doing three jobs badly.
+
+   It stretched. Sitting in the grid's 1fr column it ran 1216px wide around
+   272px of content, so most of what it drew was empty fill reaching across the
+   bar towards the Edit button.
+
+   It misaligned. The 12px it inset its contents by put the first label at
+   x=97 — level with neither the bar's content edge at 84, where the back
+   arrow's glyph starts, nor the policy name at 114. The box hid that, because
+   a box has an edge of its own to look aligned to.
+
+   And it was a box inside a box: the bar is already a raised strip with its
+   own bottom rule, so a second container inside it ranked these two facts as
+   something separate from the policy they describe. They are not separate.
+   They are its subtitle, so they are set as one — label beside value, on one
+   line, aligned under the name. */
 .bpbar__facts {
   grid-column: 1;
-  display: flex; align-items: stretch; flex-wrap: wrap;
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
   margin: 0; min-width: 0;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-  overflow: hidden;
+  /* Under the name, not under the arrow hanging to its left. The back button
+     is 28px wide and sits 6px out into the padding, then an 8px gap — so the
+     name starts 30px in, and this starts with it. */
+  padding-left: calc(28px + var(--space-4) - var(--space-3));
 }
 .bpbar__fact {
-  display: flex; flex-direction: column; gap: 1px; min-width: 0;
-  padding: var(--space-2) var(--space-5);
+  display: flex; align-items: center; gap: var(--space-4); min-width: 0;
 }
-.bpbar__fact + .bpbar__fact { border-left: 1px solid var(--border-subtle); }
+/* A hairline, not a wall.
+
+   The rule between the facts is the one part of the box worth keeping, and on
+   one line it costs almost nothing — it is the height of the text beside it
+   rather than the 45px wall it was inside a stacked cell. It has to be here.
+   Read without it, "Application Salesforce Governs 1 group" spaces every word
+   alike and leaves the reader to work out where one fact ends. */
+.bpbar__fact + .bpbar__fact {
+  border-left: 1px solid var(--border-default);
+  padding-left: var(--space-6);
+}
 .bpbar__fact dt {
   display: inline-flex; align-items: center; gap: var(--space-2);
   flex: none;
   font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--text-muted);
+  /* Tertiary, not muted. The tint the label used to sit on was the DARKER
+     surface in dark theme, so taking it away lightened the ground under a
+     10px label and dropped it to 2.8:1. Tertiary is 4.7:1 on both themes. */
+  color: var(--text-tertiary);
 }
 .bpbar__fact dt > svg { opacity: 0.8; }
 .bpbar__fact dd {
@@ -132,8 +159,25 @@
 /* One button for all three facts. Three affordances — rename here, apps behind
    a dialog, audience in a drawer — was three places to remember for one idea:
    what this policy IS, as opposed to what its rules do. */
-.bpbar__edit {
+/* The bar's actions, in the second column: which builder, and the details. */
+.bpbar__acts {
   grid-column: 2; grid-row: 1 / span 2;
+  display: flex; align-items: center; gap: var(--space-3);
+}
+.bpbar__view {
+  display: inline-flex; padding: 2px; border-radius: var(--radius-md);
+  background: var(--surface-inset, #eef1f4);
+}
+.bpbar__view > button {
+  height: 26px; padding: 0 10px; border: none; border-radius: 4px; background: none;
+  font-family: inherit; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary); cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.bpbar__view > button:hover { color: var(--text-primary); }
+.bpbar__view > button.is-on { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
+.bpbar__view > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+.bpbar__edit {
   display: inline-flex; align-items: center; gap: var(--space-2);
   height: var(--ctl-height-sm); padding: 0 var(--space-4);
   border: 1px solid var(--border-default); border-radius: var(--radius-md);
@@ -143,6 +187,8 @@
 .bpbar__edit:hover { border-color: var(--brand); color: var(--brand); }
 
 @media (max-width: 900px) {
-  .bpbar { padding: var(--space-3) var(--space-5); }
-  .bpbar__facts { gap: var(--space-2) var(--space-4); }
+  .bpbar { padding: var(--space-5); }
+  /* The gap this used to set was left over from a flex row that had none: it
+     pushed the cells apart while their divider stayed welded to the cell edge,
+     so below 900px the rule floated 8px adrift of what it divided. */
 }

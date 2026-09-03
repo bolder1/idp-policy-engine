@@ -160,14 +160,39 @@ export function PolicyBar({ policy }: { policy: Policy }) {
         </div>
       </dl>
 
-      {/* One button for all three facts. Three separate affordances — rename
-          here, apps behind a dialog, audience in a drawer — was three places to
-          remember for one idea: what this policy IS, as opposed to what its
-          rules do. */}
-      <button type="button" className="bpbar__edit" onClick={() => store.go({ name: 'policy-details', policyId: policy.id })}>
-        <Pencil size={12} strokeWidth={2} aria-hidden />
-        Edit details
-      </button>
+      <div className="bpbar__acts">
+        {/* Two builders over one policy — the trail and the board. The switch
+            lives on this bar because the bar is the one thing both share, and
+            a layout choice belongs beside the policy rather than inside either
+            layout's own toolbar. */}
+        <div className="bpbar__view" role="group" aria-label="Builder layout">
+          <button
+            type="button"
+            className={store.screen.name === 'builder' ? 'is-on' : ''}
+            aria-pressed={store.screen.name === 'builder'}
+            onClick={() => store.go({ name: 'builder', policyId: policy.id })}
+          >
+            Trail
+          </button>
+          <button
+            type="button"
+            className={store.screen.name === 'board' ? 'is-on' : ''}
+            aria-pressed={store.screen.name === 'board'}
+            onClick={() => store.go({ name: 'board', policyId: policy.id })}
+          >
+            Board
+          </button>
+        </div>
+
+        {/* One button for all three facts. Three separate affordances — rename
+            here, apps behind a dialog, audience in a drawer — was three places
+            to remember for one idea: what this policy IS, as opposed to what
+            its rules do. */}
+        <button type="button" className="bpbar__edit" onClick={() => store.go({ name: 'policy-details', policyId: policy.id })}>
+          <Pencil size={12} strokeWidth={2} aria-hidden />
+          Edit details
+        </button>
+      </div>
     </header>
   )
 }

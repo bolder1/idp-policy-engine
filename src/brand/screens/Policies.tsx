@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useState } from 'react'
-import { BookmarkPlus, Copy, Pencil, Trash2 } from 'lucide-react'
+import { BookmarkPlus, Copy, Pencil, Trash2, Waypoints } from 'lucide-react'
 
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
@@ -508,6 +508,13 @@ function PolicyRow({
                 <button role="menuitem" onClick={() => store.go({ name: 'builder', policyId: policy.id })}>
                   <Pencil size={14} strokeWidth={1.9} aria-hidden />
                   Edit policy
+                </button>
+                {/* The second builder over the same policy — a chain of cards
+                    on a stage with an inspector beside it. Both edit the same
+                    draft; this is a different shape for the same work. */}
+                <button role="menuitem" onClick={() => store.go({ name: 'board', policyId: policy.id })}>
+                  <Waypoints size={14} strokeWidth={1.9} aria-hidden />
+                  Open in board
                 </button>
                 <button role="menuitem" onClick={() => store.showToast(`${policy.name} saved as a template`)}>
                   <BookmarkPlus size={14} strokeWidth={1.9} aria-hidden />

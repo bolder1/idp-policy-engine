@@ -6,6 +6,7 @@ import {
   type Audience,
   type Condition,
   type Group,
+  type ConditionCard,
   type Predicate,
   type Rule,
   type User,
@@ -77,11 +78,16 @@ export function conditionSentence(c: Condition, resolve?: NameLookup): string {
   return `${t.label} ${c.operator} ${value}`
 }
 
-/* One alternative. Its conditions are all required, so they are joined by a
-   lowercase `and` — punctuation, not an operator anybody chose. */
-export function cardSentence(conditions: Condition[], resolve?: NameLookup): string {
-  return conditions.map((c) => conditionSentence(c, resolve)).join(' and ')
+/* One alternative, joined by whichever operator the author chose for it.
+
+   Lowercase, because in a sentence it is punctuation between clauses rather
+   than the operator chip the editor draws. The default stays `and`, so a card
+   written before joiners existed reads exactly as it did. */
+export function cardSentence(conditions: Condition[], resolve?: NameLookup, join: 'and' | 'or' = 'and'): string {
+  return conditions.map((c) => conditionSentence(c, resolve)).join(join === 'or' ? ' or ' : ' and ')
 }
+
+const joinOf = (k: ConditionCard) => k.join ?? 'and'
 
 /* The whole predicate.
 
@@ -94,13 +100,13 @@ export function predicateSentence(p: Predicate, resolve?: NameLookup): string {
   if (p.cards.length === 0) return 'any sign-in that reaches this rule'
 
   const parts = p.cards.map((k) => {
-    const body = cardSentence(k.conditions, resolve)
+    const body = cardSentence(k.conditions, resolve, joinOf(k))
     const named = k.label?.trim()
     return named ? `${named}: ${body}` : body
   })
 
   if (parts.length === 1) return parts[0]
-  return parts.map((s) => `(${s})`).join(' or ')
+  return parts.map((s) => `(${s})`).join(p.join === 'and' ? ' and ' : ' or ')
 }
 
 /* The same predicate as structured pieces, for surfaces that want to render the
@@ -110,6 +116,8 @@ export interface ProseCard {
   id: string
   letter: string
   label?: string
+  /** How this card's own clauses are joined. */
+  join: 'and' | 'or'
   clauses: { id: string; text: string }[]
 }
 
@@ -118,6 +126,7 @@ export function predicateParts(p: Predicate, resolve?: NameLookup): ProseCard[] 
     id: k.id,
     letter: cardLetter(i),
     label: k.label?.trim() || undefined,
+    join: joinOf(k),
     clauses: k.conditions.map((c) => ({ id: c.id, text: conditionSentence(c, resolve) })),
   }))
 }
@@ -182,5 +191,5 @@ export function predicateSummary(p: Predicate): string {
   if (p.cards.length === 0) return 'Always matches'
   const n = p.cards.reduce((t, k) => t + k.conditions.length, 0)
   if (p.cards.length === 1) return `${n} condition${n === 1 ? '' : 's'}`
-  return `${p.cards.length} alternatives · ${n} conditions`
+  return `${p.cards.length} ${p.join === 'and' ? 'groups' : 'alternatives'} · ${n} conditions`
 }

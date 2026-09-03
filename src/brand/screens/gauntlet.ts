@@ -1,5 +1,5 @@
 import { blankRule, card, cond, when, type AccessDecision, type Policy, type Rule } from '../data'
-import { ckey, sig } from '../predicate'
+import { ckey, isSingleAndRun, sig } from '../predicate'
 import { SIM_USERS, decide, inAudience, walk, type SimEnv, type SimUser, type TraceResult } from './simulate'
 
 /* -----------------------------------------------------------------------------
@@ -445,8 +445,11 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
      a rule with alternatives is not made unreachable by a broader rule above it
      in the same way and re-aiming it would change more than the card asks. */
   const want = new Set(spec.conditions.map((c) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}`))
+  /* And an AND-run specifically: a single card whose conditions are joined by
+     OR covers none of them jointly, so re-aiming it would not do what the fix
+     spec asks. */
   const covers = (r: Rule) =>
-    r.when.cards.length === 1 &&
+    isSingleAndRun(r.when) &&
     [...want].every((k) => r.when.cards[0].conditions.some((c) => ckey(c) === k))
   const exact = policy.rules.findIndex((r) => sig(r.when) === specKey(spec.conditions))
   const twinIndex = exact !== -1 ? exact : policy.rules.findIndex(covers)

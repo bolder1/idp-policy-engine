@@ -1,10 +1,9 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
   Check,
-  ChevronDown,
   Copy,
   Globe,
   Info,
@@ -749,36 +748,54 @@ function ZoneDetail({
               </button>
             </div>
 
-            {/* The formats, above the field that takes them.
+            {/* Two columns: the work on the left, everything that only
+                describes the work on the right.
 
-                Only on the network tab: a location takes a country, and the
-                CIDR notation here would be a note about something that tab
-                cannot do. It is a `<details>`, so it costs one line once
-                somebody has read it. */}
-            {tab === 'net' && <AcceptsNote />}
+                It used to be one column, and the reading order was the
+                problem. The formats reference and the validator's warnings
+                both sat in the flow — above the field and below the list —
+                so filling the zone in meant scrolling past prose to reach a
+                text box, and the warning about what the zone currently
+                matches was under the fold exactly when the list was long
+                enough to be worth warning about.
 
-            {tab === 'net' ? (
-              <AddressSection draft={zone} onChange={onChange} />
-            ) : (
-              <PlaceSection draft={zone} onChange={onChange} />
-            )}
+                Neither of them is a step. They are the things you glance at
+                WHILE typing, which is what a column beside the work is for,
+                and it is the shape the rest of this console already uses on
+                its configuration pages. */}
+            <div className="bz7__cols">
+              <div className="bz7__work">
+                {tab === 'net' ? (
+                  <AddressSection draft={zone} onChange={onChange} />
+                ) : (
+                  <PlaceSection draft={zone} onChange={onChange} />
+                )}
+              </div>
+
+              <aside className="bz7__aside">
+                {/* Per tab, because the two halves accept different things: a
+                    location takes a country, so CIDR notation next to it would
+                    document something that tab cannot do. */}
+                {tab === 'net' ? <AcceptsNote /> : <PlacesNote />}
+
+                {/* The validator, beside the thing it is judging rather than
+                    under it. Still only the issues the section does not
+                    already say for itself. */}
+                {issues.length > 0 && (
+                  <div className="bz7__issues">
+                    {issues.map((i) => (
+                      <p key={i.id} className={`bz7__issue is-${i.level}`}>
+                        <AlertTriangle size={14} strokeWidth={1.9} aria-hidden />
+                        <span>
+                          <strong>{i.title}.</strong> {i.detail}
+                        </span>
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </aside>
+            </div>
       </section>
-
-      {/* Only the issues the empty state does not already carry. "Matches
-          everything" is the empty state, so repeating it underneath was the
-          same sentence twice on one screen. */}
-      {issues.length > 0 && (
-        <div className="bz7__issues">
-          {issues.map((i) => (
-            <p key={i.id} className={`bz7__issue is-${i.level}`}>
-              <AlertTriangle size={14} strokeWidth={1.9} aria-hidden />
-              <span>
-                <strong>{i.title}.</strong> {i.detail}
-              </span>
-            </p>
-          ))}
-        </div>
-      )}
 
       <Drawer
         open={showUses}
@@ -1033,52 +1050,109 @@ const QUICK: { label: string; value: string; hint: string }[] = [
    is what a reader is deciding when they glance at it. */
 export function AcceptsNote() {
   return (
-    <details className="bz7__accepts">
-      <summary>
+    /* Open, not a `<details>`.
+
+       It was foldable for as long as it sat in the flow above the field,
+       where an expanded reference pushed the work down the page and every
+       version of it was tried and found to be in the way. In a column of its
+       own nothing is behind it, so the disclosure was costing a click to
+       reveal four lines that were already paid for in layout. */
+    <div className="bz7__side">
+      <h3 className="bz7__sidehead">
         <Info size={14} strokeWidth={2} aria-hidden />
-        <strong>What you can add</strong>
-        <em>addresses, CIDR blocks, ranges and network operators</em>
-        <ChevronDown size={14} strokeWidth={2} aria-hidden />
-      </summary>
-      <div className="bz7__acceptsbody">
-        {/* The gloss is its own element rather than a bare text node, so it
-            can be dimmed without dimming the sample beside it — opacity on the
-            row would take both, since a child cannot be more opaque than its
-            parent. */}
-        <ul>
-          <li>
-            <code>10.0.0.1</code>
-            <em>a single address, v4 or v6</em>
-          </li>
-          <li>
-            <code>192.168.0.0/24</code>
-            <em>a CIDR block</em>
-          </li>
-          <li>
-            <code>192.168.0.1-192.168.0.254</code>
-            <em>a range</em>
-          </li>
-          <li>
-            <code>AS15169</code>
-            <em>a network operator</em>
-          </li>
-        </ul>
-        <p>
-          One per line, or separated by commas or spaces. Anything that does not parse stays in the
-          box so you can fix it.
-        </p>
-      </div>
-    </details>
+        What you can add
+      </h3>
+      {/* The gloss is its own element rather than a bare text node, so it
+          can be dimmed without dimming the sample beside it — opacity on the
+          row would take both, since a child cannot be more opaque than its
+          parent. */}
+      <ul className="bz7__sidelist">
+        <li>
+          <code>10.0.0.1</code>
+          <em>a single address, v4 or v6</em>
+        </li>
+        <li>
+          <code>192.168.0.0/24</code>
+          <em>a CIDR block</em>
+        </li>
+        <li>
+          <code>192.168.0.1-192.168.0.254</code>
+          <em>a range</em>
+        </li>
+        <li>
+          <code>AS15169</code>
+          <em>a network operator</em>
+        </li>
+      </ul>
+      <p className="bz7__sidep">
+        One row per entry. Paste a whole list into a row and it splits on commas, spaces and line
+        breaks; anything that does not parse stays in the row so you can fix it.
+      </p>
+    </div>
+  )
+}
+
+/* The same panel for the other half.
+
+   Not a courtesy symmetry — the two tabs take genuinely different input and
+   the location one has the rule that surprises people: a country swallows the
+   states and cities inside it, and adding one after the other quietly removes
+   the narrower entry. That is worth saying next to the field rather than
+   discovering when a row disappears. */
+export function PlacesNote() {
+  return (
+    <div className="bz7__side">
+      <h3 className="bz7__sidehead">
+        <Info size={14} strokeWidth={2} aria-hidden />
+        What you can add
+      </h3>
+      <ul className="bz7__sidelist">
+        <li>
+          <code>India</code>
+          <em>a country</em>
+        </li>
+        <li>
+          <code>Maharashtra</code>
+          <em>a state or region</em>
+        </li>
+        <li>
+          <code>Pune</code>
+          <em>a city</em>
+        </li>
+      </ul>
+      <p className="bz7__sidep">
+        A country covers every state and city inside it. Add one and the narrower entries it
+        already contains are removed, because leaving them would read as a tighter zone than this
+        is.
+      </p>
+      <p className="bz7__sidep">
+        Matched on the address the sign-in arrives from, so a VPN reports where it exits.
+      </p>
+    </div>
   )
 }
 
 export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
-  const [text, setText] = useState('')
   const [filter, setFilter] = useState('')
   /* Says what the last paste did. A paste of four hundred lines that silently
      drops sixty is the worst version of this field, so both numbers are
      reported: what went in, and what did not. */
   const [note, setNote] = useState<string | null>(null)
+
+  /* The rows being typed, and the reason this is a list rather than one box.
+
+     There was a single paste box above the list: type or paste, press Add, and
+     the entries appended below. It worked, and it read as an import tool. What
+     you were building was a list, and the control for building it sat
+     somewhere else on the page — so the first-run screen was a lone text field
+     with nothing to say that a zone is a set of entries at all.
+
+     A row per entry says it. Add opens one, filling it in commits it, and the
+     row you are typing sits in the list it is joining rather than above it.
+     Bulk paste survives intact — a row still splits on commas, spaces and line
+     breaks — so the four-hundred-line case costs exactly what it did before. */
+  const [drafts, setDrafts] = useState<{ key: number; text: string; err: string | null }[]>([])
+  const nextKey = useRef(0)
 
   /* One entry open for editing, by value — the list is keyed by value and
      values are unique within a zone, so there is nothing else to key on. */
@@ -1134,36 +1208,72 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
     setEditErr(null)
   }
 
-  const add = () => {
-    const { ip, asn, bad } = parseEntries(text, draft.ip, draft.asn)
-    if (ip.length === draft.ip.length && asn.length === draft.asn.length && bad.length === 0) return
+  const addRow = () => {
+    nextKey.current += 1
+    setDrafts((d) => [...d, { key: nextKey.current, text: '', err: null }])
+  }
+
+  const setRow = (key: number, patch: Partial<{ text: string; err: string | null }>) =>
+    setDrafts((d) => d.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+
+  const dropRow = (key: number) => setDrafts((d) => d.filter((r) => r.key !== key))
+
+  /* `again` is Enter: commit and open the next row, because entering six
+     addresses should be six lines of typing rather than six trips to a button.
+     Everything else — the tick, clicking away — commits and stops. */
+  const commitRow = (key: number, again: boolean) => {
+    const row = drafts.find((r) => r.key === key)
+    if (!row) return
+    const raw = row.text.trim()
+    if (!raw) {
+      dropRow(key)
+      return
+    }
+
+    const { ip, asn, bad } = parseEntries(raw, draft.ip, draft.asn)
+    const added = ip.length - draft.ip.length + (asn.length - draft.asn.length)
+
+    /* Parsed, but every entry was already in the zone. Dropping the row
+       silently would look like it had been swallowed. */
+    if (added === 0 && bad.length === 0) {
+      setRow(key, { err: 'Already in this zone.' })
+      return
+    }
 
     /* No ceiling. There was a 500 cap here and it was ours, not the field's —
        a zone is a list of networks and the number of networks an estate has is
        not something this form gets to decide. What is left is the reporting:
        a paste says how much of it landed, because a list arriving from
        somewhere else is one nobody counted first. */
-    onChange({ ...draft, ip, asn })
+    if (added > 0) onChange({ ...draft, ip, asn })
 
-    const added = ip.length - draft.ip.length + (asn.length - draft.asn.length)
+    if (bad.length > 0) {
+      /* Whatever did not parse stays in its own row so it can be corrected
+         rather than silently swallowed. */
+      setRow(key, {
+        text: bad.join(' '),
+        err:
+          bad.length === 1
+            ? 'Not an address, CIDR block, range or ASN.'
+            : `${bad.length} entries could not be read.`,
+      })
+    } else {
+      dropRow(key)
+      if (again) addRow()
+    }
+
     setNote(
-      [
-        added > 0 ? added + ' added' : null,
-        bad.length > 0 ? bad.length + ' could not be read' : null,
-      ]
+      [added > 0 ? added + ' added' : null, bad.length > 0 ? bad.length + ' could not be read' : null]
         .filter(Boolean)
-        .join(' \u00b7 ') || null,
+        .join(' · ') || null,
     )
-    /* Whatever did not parse stays in the box so it can be corrected rather
-       than silently swallowed. */
-    setText(bad.join(' '))
   }
 
-  /* Memoized because this list has no ceiling — the paste box deliberately
-     accepts as many networks as an estate has, and classifyIp is a run of
-     regexes per entry. Unmemoized it re-classified the whole list on every
-     keystroke into the paste box and the filter, which are exactly the two
-     fields receiving keystrokes while the list is long. */
+  /* Memoized because this list has no ceiling — a row deliberately accepts as
+     many networks as an estate has, and classifyIp is a run of regexes per
+     entry. Unmemoized it re-classified the whole list on every keystroke into
+     a row and into the filter, which are exactly the two fields receiving
+     keystrokes while the list is long. */
   const all = useMemo(
     () => [
       ...draft.ip.map((v) => ({ v, kind: classifyIp(v) as string, asn: false })),
@@ -1180,70 +1290,67 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
     [all, needle],
   )
 
+  /* Quick add.
+
+     Two of the three most-typed entries on this form are the machine you are
+     sitting at and the network it is on — an admin allow-listing the office
+     does it from the office. One click each beats typing an address you have to
+     go and look up first, which is also why it survives into the empty state:
+     the fastest possible first entry should not require knowing anything. */
+  const quick = (
+    <div className="bz7__quick">
+      <span>Quick add</span>
+      {QUICK.map((q) => {
+        const already = draft.ip.includes(q.value)
+        return (
+          <button
+            key={q.value}
+            type="button"
+            className={`bz7__quickbtn ${already ? 'is-in' : ''}`}
+            disabled={already}
+            title={q.hint}
+            onClick={() => onChange({ ...draft, ip: [...draft.ip, q.value] })}
+          >
+            {already ? <Check size={12} strokeWidth={2.6} aria-hidden /> : <Plus size={12} strokeWidth={2.4} aria-hidden />}
+            {q.label}
+            <code>{q.value}</code>
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  /* Nothing stored and nothing being typed — the one state where the page has
+     to say what a zone IS, because the list that would otherwise say it is the
+     thing that is missing. It also has to say what an empty section MEANS,
+     which is the trap this whole screen is built around: empty matches any. */
+  if (all.length === 0 && drafts.length === 0) {
+    return (
+      <section className="bz7__sec bz7__sec--empty">
+        <EmptyState
+          compact
+          icon={Network}
+          title="No IP networks yet"
+          blurb="Add the addresses, blocks, ranges or operators this zone should match. Left empty, this half matches any network."
+          action={
+            <>
+              <Button variant="brand" icon={Plus} onClick={addRow}>
+                Add IP
+              </Button>
+              {quick}
+            </>
+          }
+        />
+      </section>
+    )
+  }
+
   return (
     <section className="bz7__sec">
       {/* No header. The tab above carries the same words and the same count one
           row up — "IP networks 6" then "IP ADDRESSES AND NETWORKS · 6 entries"
           was one label printed twice, and the box drawn around it made the
           repetition look deliberate. */}
-      <div className="bz7__add">
-        <input
-          type="text"
-          value={text}
-          /* Three examples, no sentence. The banner above lists every accepted
-             format in full, so the placeholder only has to show the SHAPE — and
-             at sixty characters the old one was longer than the field on a
-             narrow panel and clipped mid-word. */
-          placeholder="10.0.0.1, 192.168.0.0/24, AS15169"
-          aria-label="Add IP addresses or networks"
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              add()
-            }
-          }}
-        />
-        <Button variant="secondary" size="sm" onClick={add} disabled={!text.trim()}>
-          Add
-        </Button>
-      </div>
-
-      {/* Quick add, pinned under the field.
-
-          Two of the three most-typed entries on this form are the machine you
-          are sitting at and the network it is on — an admin allow-listing the
-          office does it from the office. One click each beats typing an address
-          you have to go and look up first. */}
-      <div className="bz7__quick">
-        <span>Quick add</span>
-        {QUICK.map((q) => {
-          const already = draft.ip.includes(q.value)
-          return (
-            <button
-              key={q.value}
-              type="button"
-              className={`bz7__quickbtn ${already ? 'is-in' : ''}`}
-              disabled={already}
-              title={q.hint}
-              onClick={() => onChange({ ...draft, ip: [...draft.ip, q.value] })}
-            >
-              {already ? <Check size={12} strokeWidth={2.6} aria-hidden /> : <Plus size={12} strokeWidth={2.4} aria-hidden />}
-              {q.label}
-              <code>{q.value}</code>
-            </button>
-          )
-        })}
-      </div>
-
-      {note && (
-        <p className="bz7__note" role="status">
-          {note}
-          <button type="button" onClick={() => setNote(null)} aria-label="Dismiss">
-            <X size={12} strokeWidth={2.2} />
-          </button>
-        </p>
-      )}
 
       {/* Both only earn their place once the list is long enough to lose
           something in. Eight is about where a column stops being scannable. */}
@@ -1264,6 +1371,7 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
             className="bz7__clear"
             onClick={() => {
               onChange({ ...draft, ip: [], asn: [] })
+              setDrafts([])
               setFilter('')
               setNote(null)
             }}
@@ -1273,14 +1381,14 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
         </div>
       )}
 
-      {/* No "Any network" pill here. The issue panel below this section already
+      {/* No "Any network" pill here. The issue panel beside this section already
           says it — with the consequence attached, which the pill could not
-          carry — so the pill was the same statement twice, one row apart. It
-          stays on the list, where there is no issue panel to say it. */}
-      {all.length === 0 ? null : rows.length === 0 ? (
+          carry — so the pill was the same statement twice. It stays on the zone
+          list, where there is no issue panel to say it. */}
+      {rows.length === 0 && all.length > 0 && drafts.length === 0 ? (
         <p className="bz7__gate">Nothing matches “{filter.trim()}”.</p>
       ) : (
-        <ul className="bz7__entries is-scroll">
+        <ul className={`bz7__entries ${all.length > 8 ? 'is-scroll' : ''}`}>
           {rows.map((r) =>
             editing === r.v ? (
               <li key={r.v} className="is-editing">
@@ -1326,11 +1434,25 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
                 </button>
               </li>
             ) : (
+              /* The whole row opens the editor, not only the pencil.
+
+                 Clicking a value you can see is wrong and having nothing happen
+                 is the small failure this list kept producing. The pencil stays
+                 as the affordance — a row that is editable only by guessing is
+                 not editable — but it is now decoration on a button that
+                 already covers the value and its kind. */
               <li key={r.v}>
-                <code>{r.v}</code>
-                <em>{r.kind}</em>
-                <button type="button" aria-label={`Edit ${r.v}`} onClick={() => startEdit(r.v)}>
-                  <Pencil size={12} strokeWidth={2} />
+                <button
+                  type="button"
+                  className="bz7__entryopen"
+                  aria-label={`Edit ${r.v}`}
+                  onClick={() => startEdit(r.v)}
+                >
+                  <code>{r.v}</code>
+                  <em>{r.kind}</em>
+                  <span className="bz7__entrypen" aria-hidden>
+                    <Pencil size={12} strokeWidth={2} />
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1349,7 +1471,78 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
               </li>
             ),
           )}
+
+          {/* The rows still being typed, inside the list rather than above it.
+              Deliberately not filtered: a row you are halfway through writing
+              vanishing because it does not match the filter is the worst thing
+              this list could do to you. */}
+          {drafts.map((d) => (
+            <li key={`draft-${d.key}`} className="is-editing">
+              <input
+                type="text"
+                className="bz7__editin"
+                value={d.text}
+                autoFocus
+                placeholder="10.0.0.1, 192.168.0.0/24, AS15169"
+                aria-label="New IP address or network"
+                aria-invalid={d.err ? true : undefined}
+                onChange={(e) => setRow(d.key, { text: e.target.value, err: null })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    commitRow(d.key, true)
+                  }
+                  if (e.key === 'Escape') {
+                    e.preventDefault()
+                    dropRow(d.key)
+                  }
+                }}
+                /* Committed on the way out as well. A row left filled in and
+                   abandoned is an entry somebody believes they added. */
+                onBlur={() => commitRow(d.key, false)}
+              />
+              {d.err && <span className="bz7__editerr">{d.err}</span>}
+              <button type="button" aria-label="Save" onClick={() => commitRow(d.key, false)}>
+                <Check size={13} strokeWidth={2.4} />
+              </button>
+              <button
+                type="button"
+                className="bz7__entrydel"
+                aria-label="Discard this row"
+                /* Discarding must not blur the input on the way.
+
+                   Without this the mousedown blurred the field, the blur ran
+                   `commitRow` and SAVED the entry, and the commit unmounted
+                   this button before mouseup — so the click never landed and
+                   the control labelled "discard" was a second Save. It only
+                   looked correct on a row holding something unparseable,
+                   because that commit leaves the row on screen. */
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => dropRow(d.key)}
+              >
+                <X size={13} strokeWidth={2} />
+              </button>
+            </li>
+          ))}
         </ul>
+      )}
+
+      {/* Dashed and quiet, not brand. There is one primary decision on this
+          page and it is not "another row". */}
+      <button type="button" className="bz7__addrow" onClick={addRow}>
+        <Plus size={13} strokeWidth={2.4} aria-hidden />
+        Add IP
+      </button>
+
+      {quick}
+
+      {note && (
+        <p className="bz7__note" role="status">
+          {note}
+          <button type="button" onClick={() => setNote(null)} aria-label="Dismiss">
+            <X size={12} strokeWidth={2.2} />
+          </button>
+        </p>
       )}
     </section>
   )
@@ -1363,6 +1556,12 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
 export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
   const [q, setQ] = useState('')
   const [cursor, setCursor] = useState(0)
+  /* Whether the search row is on screen. The same shape as the address tab's
+     draft rows, with one row instead of many — a place is chosen from a
+     catalogue rather than typed, so the row is a picker and picking commits
+     it. It stays open afterwards, which is what makes adding four countries
+     four keystrokes and four Returns. */
+  const [adding, setAdding] = useState(false)
   const hits = useMemo(() => searchPlaces(q), [q])
   const l = draft.location
 
@@ -1384,6 +1583,7 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
     put(next)
     setQ('')
     setCursor(0)
+    setAdding(true)
   }
 
   const remove = (kind: keyof Pick<ZoneLocation, 'countries' | 'states' | 'cities'>, v: string) =>
@@ -1395,9 +1595,62 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
     ...l.cities.map((v) => ({ kind: 'cities' as const, v, label: 'City' })),
   ]
 
+  /* Nothing chosen and the search row not open. Same first-run shape as the
+     address tab, and the same warning in it, because an empty location section
+     is the other half of the zone that matches everything. */
+  if (chosen.length === 0 && !l.radius && !adding) {
+    return (
+      <section className="bz7__sec bz7__sec--empty">
+        <EmptyState
+          compact
+          icon={Globe}
+          title="No locations yet"
+          blurb="Add the countries, states or cities this zone should match. Left empty, this half matches any location."
+          action={
+            <Button variant="brand" icon={Plus} onClick={() => setAdding(true)}>
+              Add location
+            </Button>
+          }
+        />
+      </section>
+    )
+  }
+
   return (
     <section className="bz7__sec">
-      {/* Same as the address section: the tab already says "Locations 0". */}
+      {/* Chosen places first, then the row that adds the next one — the same
+          order as the address tab, where the list is the thing being built and
+          the open row is the one joining it. */}
+      {chosen.length > 0 && (
+        <ul className="bz7__entries">
+          {chosen.map((c) => (
+            <li key={`${c.kind}-${c.v}`}>
+              {/* No editor behind this one, and none invented: a country is
+                  chosen from a catalogue, so changing it means choosing a
+                  different one. Remove and pick again IS the edit. */}
+              <span className="bz7__entrystatic">
+                <code>{c.v}</code>
+                <em>{c.label.toLowerCase()}</em>
+              </span>
+              <button
+                type="button"
+                className="bz7__entrydel"
+                aria-label={`Remove ${c.v}`}
+                onClick={() => remove(c.kind, c.v)}
+              >
+                <X size={13} strokeWidth={2} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!adding ? (
+        <button type="button" className="bz7__addrow" onClick={() => setAdding(true)}>
+          <Plus size={13} strokeWidth={2.4} aria-hidden />
+          Add location
+        </button>
+      ) : (
       <div className="bz7__combo">
         {/* The label is the field: the icon used to be a sibling of the input
             with the border on the input, so the magnifier sat outside the box
@@ -1408,6 +1661,12 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
           <input
             type="text"
             value={q}
+            /* The button that revealed this row is unmounted by the same
+               render, so without this focus fell to `<body>` and everything
+               typed after the click went nowhere. `adding` starts false and
+               the combo only mounts when it flips, so this fires exactly on
+               the reveal and never on load or on a tab switch. */
+            autoFocus
             placeholder="Search any country, state or city…"
             aria-label="Search places"
             autoComplete="off"
@@ -1416,6 +1675,16 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
               setCursor(0)
             }}
             onKeyDown={(e) => {
+              /* Escape closes the row. `adding` had no path back to false, so
+                 opening the search once removed the dashed button and the
+                 first-run empty state for the life of the mount. */
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setQ('')
+                setCursor(0)
+                setAdding(false)
+                return
+              }
               if (!hits.length) return
               if (e.key === 'ArrowDown') {
                 e.preventDefault()
@@ -1474,20 +1743,6 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
           </ul>
         )}
       </div>
-
-      {/* Same as the address section: the issue panel below says it. */}
-      {chosen.length > 0 && (
-        <ul className="bz7__entries">
-          {chosen.map((c) => (
-            <li key={`${c.kind}-${c.v}`}>
-              <code>{c.v}</code>
-              <em>{c.label.toLowerCase()}</em>
-              <button type="button" aria-label={`Remove ${c.v}`} onClick={() => remove(c.kind, c.v)}>
-                <X size={13} strokeWidth={2} />
-              </button>
-            </li>
-          ))}
-        </ul>
       )}
     </section>
   )

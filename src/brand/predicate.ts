@@ -1,4 +1,4 @@
-import type { Condition, ConditionCard, Predicate } from './data'
+import type { Condition, ConditionCard, Joiner, Predicate } from './data'
 
 /* -----------------------------------------------------------------------------
    The predicate — a rule's WHEN, and everything that reads it.
@@ -26,6 +26,21 @@ import type { Condition, ConditionCard, Predicate } from './data'
    predicates.
    -------------------------------------------------------------------------- */
 
+/* The joiner at each level, defaulted.
+
+   Read through these two rather than off the field, so "absent" means the
+   model's original semantics everywhere at once instead of at each call site. */
+export const cardJoin = (k: ConditionCard): Joiner => k.join ?? 'and'
+export const topJoin = (p: Predicate): Joiner => p.join ?? 'or'
+
+/** Does this card hold, given a test for one condition? */
+export const cardPasses = (k: ConditionCard, passed: (c: Condition) => boolean) =>
+  cardJoin(k) === 'or' ? k.conditions.some(passed) : k.conditions.every(passed)
+
+/** Does the whole predicate hold? An empty predicate matches everything. */
+export const predicatePasses = (p: Predicate, passed: (c: Condition) => boolean) =>
+  p.cards.length === 0 ? true : topJoin(p) === 'or' ? p.cards.some((k) => cardPasses(k, passed)) : p.cards.every((k) => cardPasses(k, passed))
+
 /** Identity of one condition, order-insensitive across its values. */
 export const ckey = (c: Condition) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}`
 
@@ -41,9 +56,9 @@ export const ckey = (c: Condition) => `${c.typeId}|${c.operator}|${[...c.values]
    that: `a∧b ∨ c` and `a ∨ b∧c` share leaves and differ here. */
 export function sig(p: Predicate): string {
   return p.cards
-    .map((k) => k.conditions.map(ckey).sort().join('∧'))
+    .map((k) => k.conditions.map(ckey).sort().join(cardJoin(k) === 'and' ? '∧' : '∨'))
     .sort()
-    .join('∨')
+    .join(topJoin(p) === 'or' ? '∨' : '∧')
 }
 
 /** Every condition in the predicate, cards flattened away. */
@@ -60,11 +75,21 @@ export const leafCount = (p: Predicate) => leaves(p).length
    every rule below it unreachable. The invariant says that card cannot exist;
    this is what keeps a broken invariant from turning into a silent outage. */
 export function matchesEverything(p: Predicate): boolean {
-  return p.cards.length === 0 || p.cards.some((k) => k.conditions.length === 0)
+  if (p.cards.length === 0) return true
+  const hollow = (k: ConditionCard) => k.conditions.length === 0
+  /* Joined by OR one always-true card is enough; joined by AND they all have
+     to be, or the others still constrain it. */
+  return topJoin(p) === 'or' ? p.cards.some(hollow) : p.cards.every(hollow)
 }
 
-/** True when the predicate is a single AND-run — the shape the linter can reason about hardest. */
+/** True when the predicate is a single card, whatever that card joins with. */
 export const isSingleCard = (p: Predicate) => p.cards.length === 1
+
+/* True when the predicate is one unbroken run of ANDs — the shape every
+   interesting linter check is built on. It used to be spelled `cards.length
+   === 1`, which was sound only while a card could not be an OR-run. It can be
+   now, so the check has to say so. */
+export const isSingleAndRun = (p: Predicate) => p.cards.length === 1 && cardJoin(p.cards[0]) === 'and'
 
 /** Cards holding a condition whose ckey appears in more than one card. */
 export function duplicatedAcrossCards(p: Predicate): string[] {
@@ -152,6 +177,7 @@ export function blame(
 
   for (let index = 0; index < p.cards.length; index++) {
     const card = p.cards[index]
+    if (cardPasses(card, passed)) continue
     const failing = card.conditions.filter((c) => !passed(c))
     if (failing.length === 0 || failing.length >= fewest) continue
     fewest = failing.length
@@ -164,7 +190,7 @@ export function blame(
 /** The card that carried the match. */
 export function credit(p: Predicate, passed: (c: Condition) => boolean): { card: ConditionCard; index: number } | null {
   for (let i = 0; i < p.cards.length; i++) {
-    if (p.cards[i].conditions.every(passed)) return { card: p.cards[i], index: i }
+    if (cardPasses(p.cards[i], passed)) return { card: p.cards[i], index: i }
   }
   return null
 }

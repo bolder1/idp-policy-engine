@@ -76,6 +76,18 @@ export const DEVICE_FACTS: Record<string, DeviceFacts> = {
   'Changed fingerprint': { recognised: false, mdm: 'Not enrolled', registration: 'Registered', trustDays: 61 },
 }
 
+/* What a risk verdict is worth, out of the box.
+
+   Still the shipped numbers, and still the fallback — but no longer the only
+   answer. The tenant's risk-signal profile derives its own scale from which
+   signals it collects and how heavily it weighs them, and hands it to the
+   evaluator on the context. A profile nobody has edited derives exactly these
+   three numbers, which is what keeps every seeded policy grading as it did.
+
+   This is the only numeric seam in risk evaluation: `device-risk` is the one
+   condition that compares a threshold against a number rather than against a
+   band name. Which is precisely why the profile had to own it — a weighting
+   screen that could not reach this would be configuration nothing reads. */
 export const RISK_SCORE: Record<string, number> = { Low: 12, Medium: 48, High: 86 }
 
 export interface SimContext {
@@ -92,6 +104,17 @@ export interface SimEnv {
   zoneName: (id: string) => string
   fingerprintName: (id: string) => string
   groupName: (id: string) => string
+  /* What the three risk verdicts are worth in this tenant, from the risk-signal
+     profile. Optional, and absent means the shipped scale.
+
+     On the ENV rather than on the context, and that is the whole reason this
+     wiring is one line instead of seven. A context is built at seven call sites
+     — the board's rehearsal, the Check tab, the trail's preview, the gauntlet's
+     thirteen cards, the impact sweep's 1,440 situations — and each would have
+     had to learn about a tenant setting it has no other business knowing. The
+     env is already threaded to every one of them, because it is where the
+     lookups a rule needs but a situation does not already live. */
+  riskScale?: Record<string, number>
 }
 
 // --- Evaluation --------------------------------------------------------------
@@ -124,7 +147,7 @@ export function condPhrase(c: Condition, env: SimEnv): string {
    pass: a signal this sim cannot derive is reported as unmet, because claiming
    a match on a fact we never had is the one failure mode that would make the
    whole trace untrustworthy. */
-export function evalCond(c: Condition, ctx: SimContext): { state: CondState; detail: string } {
+export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: CondState; detail: string } {
   const t = conditionType(c.typeId)
   const vals = c.values.filter((v) => v.trim() !== '')
   if (vals.length === 0) return { state: 'unknown', detail: 'the condition has no value set' }
@@ -181,7 +204,7 @@ export function evalCond(c: Condition, ctx: SimContext): { state: CondState; det
     case 'device-risk': {
       const limit = Number(vals[0])
       if (!Number.isFinite(limit)) return unknown('the risk threshold is not a number')
-      const score = RISK_SCORE[ctx.risk]
+      const score = (env?.riskScale ?? RISK_SCORE)[ctx.risk]
       const hit = c.operator === 'above' ? score > limit : score < limit
       return { state: hit ? 'pass' : 'fail', detail: `${ctx.risk} risk scores ${score}` }
     }
@@ -251,7 +274,7 @@ export function evalRule(rule: Rule, ctx: SimContext, env: SimEnv): RuleVerdict 
   }
 
   const results = new Map<string, { state: CondState; detail: string }>()
-  for (const c of leaves(p)) results.set(c.id, evalCond(c, ctx))
+  for (const c of leaves(p)) results.set(c.id, evalCond(c, ctx, env))
   const passed = (c: Condition) => results.get(c.id)?.state === 'pass'
 
   /* Asked of the whole predicate. `credit` names the card that carried it,

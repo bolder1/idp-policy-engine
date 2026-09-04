@@ -27,6 +27,7 @@ import { BrandProvider, useBrand } from './store'
 
 const Templates = lazy(() => import('./screens/Library').then((m) => ({ default: m.Templates })))
 const FingerprintPage = lazy(() => import('./screens/FingerprintPage').then((m) => ({ default: m.FingerprintPage })))
+const RiskSignals = lazy(() => import('./screens/RiskSignals').then((m) => ({ default: m.RiskSignals })))
 const Hooks = lazy(() => import('./screens/Hooks').then((m) => ({ default: m.Hooks })))
 const ZonesPage = lazy(() => import('./screens/ZonesPage').then((m) => ({ default: m.ZonesPage })))
 const AuthMethodsPage = lazy(() => import('./screens/AuthMethodsPage').then((m) => ({ default: m.AuthMethodsPage })))
@@ -82,6 +83,8 @@ function Screen() {
       return <ZonesPage />
     case 'fingerprint':
       return <FingerprintPage />
+    case 'risk-signals':
+      return <RiskSignals />
     case 'hooks':
       return <Hooks />
     case 'methods':

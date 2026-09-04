@@ -67,6 +67,7 @@ export function ImpactArenaDialog({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
       fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
       groupName: (id) => store.groupById(id).name,
+      riskScale: store.riskScale,
     }),
     [store],
   )
@@ -377,6 +378,7 @@ export function ImpactPip({ draft, saved, onOpen }: { draft: Policy; saved: Poli
       zoneName: (id) => store.zoneById(id)?.name ?? id,
       fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
       groupName: (id) => store.groupById(id).name,
+      riskScale: store.riskScale,
     }),
     [store],
   )

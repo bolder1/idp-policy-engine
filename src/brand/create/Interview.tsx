@@ -124,6 +124,7 @@ export function Interview({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
       fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
       groupName: (id) => store.groupById(id).name,
+      riskScale: store.riskScale,
     }),
     [store],
   )

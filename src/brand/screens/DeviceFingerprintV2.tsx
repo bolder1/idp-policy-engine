@@ -41,6 +41,7 @@ import {
 } from 'lucide-react'
 
 import { Button, Drawer, MenuButton, Modal, NumberStepper, TipDot, Toggle } from '../kit'
+import { TierPick } from '../tier-pick'
 import {
   CATEGORIES,
   RISK_ATTRIBUTES,
@@ -58,7 +59,6 @@ import {
   type AttrConfigValue,
   type AttrRuleValue,
   type FingerprintProfile,
-  type Priority,
   type ProfileMode,
   type ProfileReach,
   type Registration,
@@ -1175,7 +1175,11 @@ function ProfilePage({
                           configuration, and neither gets the other's. */}
                       <div className="bfp2__attctl">
                         {profile.mode === 'risk' ? (
-                          <WeightPick attr={a} profile={profile} onChange={setWeight} />
+                          <TierPick
+                  value={tierOf(profile.weights[a.id] ?? a.weight)}
+                  label={`${a.name} weight`}
+                  onChange={(t) => setWeight(a.id, TIER_WEIGHT[t])}
+                />
                         ) : a.config ? (
                           <AttrControl attr={a} profile={profile} onChange={setConfig} />
                         ) : (
@@ -1485,62 +1489,19 @@ function FormRow({
 /* The sheet's four stops, and the master's own value as the starting point.
    Printed as the number rather than a word, because the number is what the
    score adds up — "High" beside an invisible sum is the console's mistake. */
-const TIERS: Priority[] = ['High', 'Medium', 'Low']
 
-function WeightPick({
-  attr,
-  profile,
-  onChange,
-}: {
-  attr: Attribute
-  profile: FingerprintProfile
-  onChange: (id: string, w: number) => void
-}) {
-  /* Three words, not four numbers.
+/* `WeightPick` moved to `tier-pick.tsx` as `TierPick`, unchanged in behaviour.
 
-     It offered the sheet's raw weights — 5, 10, 20, 30 — which asked a person
-     to hold a scale in their head to answer a question they think about in
-     words. The score is still the sum of numbers; choosing between them is not
-     where the arithmetic belongs.
+   A second screen — the risk signal profile — sets exactly this: how much one
+   thing pushes a score, in three words. Two copies of a three-pill radiogroup
+   drift in ordering, hue and accessible name, so there is one, and the two
+   arguments that shaped it (three pills rather than a dropdown, three hues
+   rather than three shades) travelled with it.
 
-     Seeded from the master's own weight, so a profile that has never been
-     touched still scores exactly as the sheet does. */
-  const tier = tierOf(profile.weights[attr.id] ?? attr.weight)
-  return (
-    /* Three pills, not a dropdown.
-
-       A select is the right control for a list you have to go and look at. This
-       is three words, all of which fit on the row — so the dropdown was hiding
-       two thirds of a decision behind a click, and showing the third in the
-       grey of a form field. On a screen whose entire per-attribute question is
-       this one, the answer should be readable without opening anything.
-
-       No caption either. It read "Weight Low" on every one of fourteen rows,
-       which is the same word repeated down a column beside the only control on
-       the row. The group keeps its accessible name, which is where the word was
-       doing work.
-
-       Hot to cool — red, amber, green — and only on the chosen one. Read as
-       "how hard does this one push the score", not as approval: red is the
-       attribute that moves it most. A hue you can name from a single row beats
-       three shades of one colour here, because you see one of these per row and
-       fourteen rows apart, never side by side. */
-    <div className="bfp2__tiers" role="radiogroup" aria-label={`${attr.name} weight`}>
-      {TIERS.map((t) => (
-        <button
-          key={t}
-          type="button"
-          role="radio"
-          aria-checked={tier === t}
-          className={`bfp2__tier is-${t.toLowerCase()} ${tier === t ? 'is-on' : ''}`}
-          onClick={() => onChange(attr.id, TIER_WEIGHT[t])}
-        >
-          {t}
-        </button>
-      ))}
-    </div>
-  )
-}
+   The conversion stays here. This screen stores weights as numbers because the
+   master sheet does, so it converts at its own edge with `tierOf` on the way in
+   and `TIER_WEIGHT` on the way out — which is where a storage format belongs,
+   not inside a control shared with a screen that stores tiers directly. */
 
 /* --- Device restriction, in a slide-over ----------------------------------------
 

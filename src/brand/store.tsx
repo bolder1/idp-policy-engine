@@ -24,6 +24,7 @@ import {
   type Zone,
 } from './data'
 import { type FingerprintProfile } from './fingerprint'
+import { EMPTY_RISK_PROFILE, riskScale, type RiskProfile } from './risk-signals'
 import { type Hook } from './hooks'
 import { appsAt, fingerprintsAt, groupsAt, hooksAt, methodSetsAt, methodsAt, policiesAt, usersAt, zonesAt } from './fixtures'
 import type { AuthMethod } from './methods'
@@ -69,6 +70,10 @@ export type BrandScreen =
   | { name: 'templates' }
   | { name: 'zones' }
   | { name: 'fingerprint' }
+  /* The tenant's one risk-signal weighting. Sits beside the device profiles
+     because they are the two halves of what a device is worth: whether it is
+     the same one as last time, and whether anything about it is suspicious. */
+  | { name: 'risk-signals' }
   | { name: 'hooks' }
   | { name: 'methods' }
   | { name: 'create' }
@@ -163,6 +168,18 @@ interface BrandStore {
   addFingerprint: (p: FingerprintProfile) => void
   updateFingerprint: (p: FingerprintProfile) => void
   removeFingerprint: (id: string) => void
+
+  /* One risk-signal weighting for the whole tenant, and the scale it produces.
+
+     `riskScale` is the reason this is on the store rather than in the screen's
+     own state: it replaces `RISK_SCORE`, which the evaluator reads on every
+     rehearsal, every deck card and all 1,440 swept situations. A weighting
+     nothing could read would be a second one of those — the device profiles
+     already carry a risk mode whose `scoreOf` has no product callers at all. */
+  riskProfile: RiskProfile
+  setRiskProfile: (p: RiskProfile) => void
+  /** Derived: what Low, Medium and High are worth under the current profile. */
+  riskScale: Record<string, number>
   policyById: (id: string) => Policy | undefined
 
   /* Gauntlet expectations the tenant has overruled, per policy.
@@ -260,6 +277,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
      name them, so the linter and the simulator have to be able to resolve
      one without the Device Fingerprint page being mounted. */
   const [fingerprints, setFingerprints] = useState<FingerprintProfile[]>(() => fingerprintsAt('medium'))
+  const [riskProfile, setRiskProfile] = useState<RiskProfile>(EMPTY_RISK_PROFILE)
   const [hooks, setHooks] = useState<Hook[]>(() => hooksAt('medium'))
   const [methods, setMethods] = useState<AuthMethod[]>(() => methodsAt('medium'))
   const [apps, setApps] = useState<App[]>(() => appsAt('medium'))
@@ -345,6 +363,9 @@ export function BrandProvider({ children }: { children: ReactNode }) {
          which is a louder and more accurate signal than a rule that silently
          rewrote itself while nobody was looking. */
       removeHook: (id) => setHooks((all) => all.filter((h) => h.id !== id)),
+      riskProfile,
+      setRiskProfile,
+      riskScale: riskScale(riskProfile),
       addFingerprint: (p) => setFingerprints((all) => [...all, p]),
       updateFingerprint: (p) => setFingerprints((all) => all.map((x) => (x.id === p.id ? p : x))),
       /* Deleting a profile does not unlink the rules naming it — the linter
@@ -430,7 +451,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
        The three callbacks are `useCallback`-stable, so listing them costs
        nothing and stops the next reader wondering whether they were left out
        on purpose. */
-    [policies, zones, fingerprints, hooks, apps, groups, directory, edition, persona, setPersona, role, setRole, methodSets, methods, screen, go, registerLeaveGuard, pendingNav, confirmNav, cancelNav, showToast, gauntletOverrides],
+    [policies, zones, fingerprints, riskProfile, hooks, apps, groups, directory, edition, persona, setPersona, role, setRole, methodSets, methods, screen, go, registerLeaveGuard, pendingNav, confirmNav, cancelNav, showToast, gauntletOverrides],
   )
 
   return (

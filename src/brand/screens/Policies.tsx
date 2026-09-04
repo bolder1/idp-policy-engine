@@ -111,14 +111,15 @@ export function Policies() {
      memo below lists `env` as a dependency, every policy was re-scored each
      time. Naming the real inputs means the deck recomputes when a zone,
      fingerprint or group actually changes, and not otherwise. */
-  const { zones, fingerprints, groups } = store
+  const { zones, fingerprints, groups, riskScale } = store
   const env = useMemo<SimEnv>(
     () => ({
       zoneName: (id) => zones.find((z) => z.id === id)?.name ?? id,
       fingerprintName: (id) => fingerprints.find((p) => p.id === id)?.name ?? id,
       groupName: (id) => (groups.find((g) => g.id === id) ?? groups[0]).name,
+      riskScale,
     }),
-    [zones, fingerprints, groups],
+    [zones, fingerprints, groups, riskScale],
   )
 
   /* Two exclusions, both to stop the column asserting things it cannot know.

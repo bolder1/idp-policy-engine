@@ -811,3 +811,68 @@ html[data-theme='dark'] {
 
 @media (prefers-reduced-motion: reduce) {
   .bx-step, .bx-step__hint { transition: none; }}
+
+/* --- The weight, as three words ------------------------------------------------
+
+   Lifted out of the device-fingerprint screen when a second screen needed the
+   same control. Both arguments that shaped it are worth keeping, because both
+   were re-opened once already:
+
+   Three pills, not a dropdown. A select is the right control for a list you
+   have to go and look at. This is three words, all of which fit on the row — so
+   the dropdown was hiding two thirds of a decision behind a click and rendering
+   the third in form-field grey, on the one control a risk profile exists to set.
+
+   One shared border and internal hairlines, so the three read as one control
+   with a position rather than as three chips that happen to be adjacent. Only
+   the chosen one is coloured — three lit pills would be a legend, not a
+   setting. */
+.bx-tiers {
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-raised); overflow: hidden;
+}
+.bx-tier {
+  padding: 0 10px; height: 26px;
+  background: none; cursor: pointer;
+  border-left: 1px solid var(--border-subtle);
+  font-family: inherit; font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  color: var(--text-tertiary); white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bx-tier:first-child { border-left: 0; }
+.bx-tier:hover:not(.is-on) { background: var(--surface-inset); color: var(--text-secondary); }
+.bx-tier:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+
+/* Three hues, hot to cool: red, amber, green.
+
+   It was one hue at three intensities, on the argument that a weight is not
+   good or bad and a traffic light would say it was. The counter-argument won,
+   and it is about reading rather than semantics: three shades of one blue are
+   only ordered if you can see all three at once, and on these screens you see
+   one per row, many rows apart. A hue you can name from a single row tells you
+   where that signal sits without scanning the column for something to compare
+   it to.
+
+   Read as "how hard does this one push", not as approval: red is the signal
+   that moves the score most, green the one that barely moves it. */
+.bx-tier.is-high.is-on {
+  background: var(--fb-negative-bg); color: var(--fb-negative-fg);
+  box-shadow: inset 0 0 0 1px var(--fb-negative-border);
+}
+.bx-tier.is-medium.is-on {
+  background: var(--fb-notice-bg); color: var(--fb-notice-fg);
+  box-shadow: inset 0 0 0 1px var(--fb-notice-border);
+}
+.bx-tier.is-low.is-on {
+  background: var(--fb-positive-bg); color: var(--fb-positive-fg);
+  box-shadow: inset 0 0 0 1px var(--fb-positive-border);
+}
+.bx-tier.is-on { font-weight: var(--fw-semibold); }
+/* Absent, not disabled: a signal a platform cannot collect has no weight to
+   set, and a greyed control invites somebody to work out why. */
+.bx-tiers--none { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; }
+
+@media (max-width: 720px) {
+  .bx-tier { padding: 0 8px; }
+}

@@ -89,6 +89,10 @@ const NAV: { section?: string; items: NavItem[] }[] = [
              and every sentence on it. The rail was the only place still saying
              "Device Restrictions". */
           { label: 'Device profiles', screen: { name: 'fingerprint' } },
+          /* Directly after the device profiles, because they are the two halves
+             of one question: whether this is the same device, and whether
+             anything about it is suspicious. */
+          { label: 'Risk signal profile', screen: { name: 'risk-signals' } },
           { label: 'Authentication methods', screen: { name: 'methods' } },
           { label: 'External Hooks', screen: { name: 'hooks' }, tag: 'WIP' },
         ],

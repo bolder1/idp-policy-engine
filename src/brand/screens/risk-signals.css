@@ -1,0 +1,129 @@
+/* -----------------------------------------------------------------------------
+   The risk signal profile.
+
+   A settings table with two weight columns and a switch. Everything here is on
+   the shared tokens; the tier control itself lives in kit.css as `.bx-tiers`,
+   because the device profile screen sets the same thing.
+   -------------------------------------------------------------------------- */
+
+/* --- The scale, which is the page's output rather than its summary ---------- */
+.brs__scale {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-5);
+  flex-wrap: wrap;
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+.brs__scale__what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.brs__scale__what b { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.brs__scale__what em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.brs__scale__what strong { font-weight: var(--fw-medium); color: var(--text-secondary); }
+
+.brs__bands { display: flex; align-items: stretch; gap: var(--space-2); margin: 0; }
+.brs__band {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 76px; padding: 6px var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.brs__band dt { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.brs__band dd {
+  margin: 0;
+  font-size: var(--fs-lg); font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+/* The same hot-to-cool ladder the tier pills use, so a band and the weights
+   that produced it are read on one scale rather than two. */
+.brs__band.is-high dd { color: var(--fb-negative-fg); }
+.brs__band.is-medium dd { color: var(--fb-notice-fg); }
+.brs__band.is-low dd { color: var(--fb-positive-fg); }
+
+/* --- What this page does not cover ----------------------------------------- */
+.brs__gap {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--fb-info-border); border-radius: var(--radius-md);
+  background: var(--fb-info-bg);
+  font-size: var(--fs-xs); line-height: 1.5; color: var(--fb-info-fg);
+}
+.brs__gap svg { flex: none; margin-top: 1px; }
+
+/* --- Search ---------------------------------------------------------------- */
+.brs__search {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  height: 32px; padding: 0 var(--space-3);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-tertiary);
+  min-width: 240px;
+}
+.brs__search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--focus-ring); }
+.brs__search input {
+  flex: 1; min-width: 0;
+  border: 0; background: none; outline: none;
+  font-family: inherit; font-size: var(--fs-sm); color: var(--text-primary);
+}
+.brs__search input::-webkit-search-cancel-button { cursor: pointer; }
+
+/* --- The table ------------------------------------------------------------- */
+.brs__cat { margin: 0 0 var(--space-6); }
+.brs__cat__head {
+  display: flex; align-items: baseline; gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.brs__cat__head em { font-style: normal; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-tertiary); }
+
+.brs__table {
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+/* One grid for every row, so the two weight columns line up down the whole
+   table rather than per row. `minmax(0, 1fr)` on the name is what lets a long
+   purpose wrap instead of pushing the columns out of alignment. */
+.brs__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px 190px 64px;
+  align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+.brs__row:first-child { border-top: 0; }
+.brs__row--head {
+  padding-top: var(--space-2); padding-bottom: var(--space-2);
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-tertiary);
+}
+/* Dimmed, not hidden. A signal you switched off is a decision you made, and it
+   has to stay legible enough to change your mind about. */
+.brs__row.is-off .brs__sig,
+.brs__row.is-off .brs__col { opacity: 0.5; }
+
+.brs__sig { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.brs__sig b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
+.brs__sig em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.4; }
+/* Only while searching: the category heading is off screen once a query has
+   flattened the list, so the row says where it came from. */
+.brs__where { font-style: normal; font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+.brs__col { display: flex; align-items: center; }
+.brs__col--on { justify-content: flex-end; }
+
+.brs__none { font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* Below the two-column width the weights stack under the name rather than
+   shrinking into something unreadable. */
+@media (max-width: 900px) {
+  .brs__row { grid-template-columns: minmax(0, 1fr) 64px; row-gap: var(--space-3); }
+  .brs__row--head { display: none; }
+  .brs__col { grid-column: 1 / -1; gap: var(--space-2); }
+  .brs__col--on { grid-column: 2; grid-row: 1; justify-content: flex-end; }
+  .brs__col::before {
+    content: attr(data-label);
+    font-size: var(--fs-xs); color: var(--text-tertiary); min-width: 62px;
+  }
+}

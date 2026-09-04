@@ -1,17 +1,9 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 import { Maximize2, Minus, Plus } from 'lucide-react'
 
 import { fallbackRule, type Policy } from '../../data'
+import { useCanvasView } from '../canvas-view'
 import type { Diagnostic } from '../diagnostics'
 import type { NameLookup } from '../predicate-prose'
 import { ruleState } from '../rule-form'
@@ -31,18 +23,6 @@ const ZMIN = 0.5
 const ZMAX = 1.4
 const STEP = 220 // ms between rule lights in a rehearsal
 
-/* Read once. Every glide checks it, and a canvas that animates when somebody
-   has asked it not to is worse than one that never animated. */
-const REDUCED =
-  typeof window !== 'undefined' && window.matchMedia
-    ? window.matchMedia('(prefers-reduced-motion: reduce)')
-    : ({ matches: false } as MediaQueryList)
-
-interface View {
-  x: number
-  y: number
-  z: number
-}
 
 export function Board({
   policy,
@@ -99,254 +79,48 @@ export function Board({
   const world = useRef<HTMLDivElement | null>(null)
   const cards = useRef<(HTMLDivElement | null)[]>([])
 
-  /* --- The view, in a ref rather than in state --------------------------------
+  /* The viewport, which is no longer this file's business.
 
-     This is the whole reason the canvas used to judder, and it is worth being
-     precise about. `view` was React state, so a pan wrote it on every
-     `pointermove` and a wheel wrote it on every tick. Each write re-rendered
-     Board, which re-rendered every RuleCard, and every card carries `layout` —
-     so Motion measured and re-projected the entire chain, twice a frame, while
-     the only thing that had actually changed was one CSS transform on one
-     element. At eight rules that is a few hundred layout reads per second to
-     move a background.
+     Every rule that used to live here — the view in a ref rather than state,
+     the single batched paint, the cubic-ease glide, the per-event wheel clamp,
+     the mount fit that never animates — moved to `useCanvasView` when the
+     condition canvas needed the same viewport. The comments explaining WHY
+     each is the way it is went with the code; what stays here is the part that
+     is about a CHAIN rather than about a canvas.
 
-     Nothing about the view is React's business: no component branches on it,
-     and the only readers are one transform, three custom properties the dot
-     grid follows, and a percentage. So it lives in a ref and is written
-     straight to the DOM, one batched write per animation frame. React
-     re-renders on rules, selection and drag slots — the things that really
-     change what is on screen — and not on motion.
-
-     The inline styles below still read the ref during render, which keeps this
-     self-healing: a re-render for any other reason repaints the current view
-     rather than reverting to a stale one. */
-  const viewRef = useRef<View>({ x: 80, y: 24, z: 1 })
-  const zoomLabel = useRef<HTMLSpanElement | null>(null)
-  const frame = useRef(0)
-  const glideFrame = useRef(0)
-  const [panning, setPanning] = useState(false)
-  const pan = useRef<{ px: number; py: number; x: number; y: number } | null>(null)
-
-  const clampView = (v: View): View => ({ ...v, z: Math.min(ZMAX, Math.max(ZMIN, v.z)) })
-
-  const paint = useCallback(() => {
-    frame.current = 0
-    const w = world.current
-    const s = stage.current
-    if (!w || !s) return
-    const v = viewRef.current
-    /* translate3d, not translate: it keeps the world on its own compositor
-       layer, so a pan is a layer move rather than a repaint of eight cards. */
-    w.style.transform = `translate3d(${v.x}px, ${v.y}px, 0) scale(${v.z})`
-    s.style.setProperty('--bb-x', `${v.x}px`)
-    s.style.setProperty('--bb-y', `${v.y}px`)
-    s.style.setProperty('--bb-z', `${v.z}`)
-    if (zoomLabel.current) zoomLabel.current.textContent = `${Math.round(v.z * 100)}%`
-  }, [])
-
-  const apply = useCallback(
-    (next: (v: View) => View) => {
-      cancelAnimationFrame(glideFrame.current)
-      viewRef.current = clampView(next(viewRef.current))
-      if (!frame.current) frame.current = requestAnimationFrame(paint)
+     Three of those: the world is measured by `offsetWidth` because the chain is
+     ordinary flow layout and a bounding rect would return the width at the
+     current zoom; the panel is measured from the DOM at the moment Fit runs,
+     because a prop would re-render every card on each frame of a grip drag;
+     and the fit is width-only, because a chain of eight rules fitted to the
+     height of a laptop screen is eight unreadable cards. */
+  const {
+    viewRef,
+    zoomLabel,
+    panning,
+    fit,
+    zoomBy,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+  } = useCanvasView(stage, world, {
+    bounds: () => ({ w: world.current?.offsetWidth ?? 0, h: world.current?.offsetHeight ?? 0 }),
+    reserve: () => {
+      const s = stage.current
+      const panel = s?.parentElement?.querySelector('.bb__insp') as HTMLElement | null
+      const open = panel && !s?.parentElement?.classList.contains('is-insp-closed')
+      return { right: open ? panel!.offsetWidth + 24 : 0, bottom: 0 }
     },
-    [paint],
-  )
-
-  /* Zoom buttons and Fit move the view rather than jumping it.
-
-     A jump from 77% to 100% gives no sense of which way the canvas went, and
-     was the other half of what read as jitter — the content simply appeared
-     somewhere else. Cubic ease-out, no spring: a spring overshoots, and an
-     overshoot on a whole canvas reads as a wobble rather than as life. */
-  const glide = useCallback(
-    (to: Partial<View>, ms = 240) => {
-      cancelAnimationFrame(glideFrame.current)
-      const from = { ...viewRef.current }
-      const target = clampView({ ...from, ...to })
-      if (REDUCED.matches || ms === 0) {
-        viewRef.current = target
-        paint()
-        return
-      }
-      const t0 = performance.now()
-      const tick = (t: number) => {
-        const p = Math.min(1, (t - t0) / ms)
-        const e = 1 - Math.pow(1 - p, 3)
-        viewRef.current = {
-          x: from.x + (target.x - from.x) * e,
-          y: from.y + (target.y - from.y) * e,
-          z: from.z + (target.z - from.z) * e,
-        }
-        paint()
-        if (p < 1) glideFrame.current = requestAnimationFrame(tick)
-      }
-      glideFrame.current = requestAnimationFrame(tick)
-    },
-    [paint],
-  )
-
-  useEffect(
-    () => () => {
-      cancelAnimationFrame(frame.current)
-      cancelAnimationFrame(glideFrame.current)
-    },
-    [],
-  )
-
-  /* --- Fit ----------------------------------------------------------------- */
-  const fitTo = useCallback((ms: number, reserve = 0) => {
-    const s = stage.current
-    const w = world.current
-    if (!s || !w) return
-    /* Measured from the DOM at the moment Fit runs, not passed in as a prop.
-
-       The panel floats over the stage now, so the usable width is the stage
-       minus whatever the panel is covering — and that width changes on every
-       frame of a grip drag. A prop would re-render the board and every card
-       each of those frames, which is the cost this file spent the day removing.
-       Reading it here costs one layout query, once, on a button press. */
-    const panel = s.parentElement?.querySelector('.bb__insp') as HTMLElement | null
-    const covered = panel && !s.parentElement?.classList.contains('is-insp-closed') ? panel.offsetWidth + 24 : reserve
-    const sw = s.clientWidth - covered
-    /* The world is scaled, so `offsetWidth` is the only honest width — a
-       bounding rect here would return the width AT the current zoom and Fit
-       would converge on whatever it already was. */
-    const ww = w.offsetWidth
-    if (!ww) return
-    /* Fit the WIDTH, never the height. A chain of eight rules fitted to the
-       height of a laptop screen is eight unreadable cards; fitted to the width
-       it is readable cards you pan down through, which is what a chain is. */
-    const z = Math.min(1, Math.max(ZMIN, (sw - 40) / ww))
-    glide({ x: Math.max(0, (sw - ww * z) / 2), y: 0, z }, ms)
-  }, [glide])
-
-  const fit = useCallback(() => fitTo(280), [fitTo])
-
-  useLayoutEffect(() => {
-    // Once, on mount, and instantly — an opening animation on the first paint
-    // is a canvas that arrives late rather than one that arrives.
-    const id = requestAnimationFrame(() => fitTo(0, reserveOnOpen))
-    return () => cancelAnimationFrame(id)
-    // Mount only. `reserveOnOpen` is the panel's width and the grip can change
-    // it, but this effect is the opening frame and must not re-run for that.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  /* Keep whatever just took focus inside the stage.
-
-     The stage is `overflow: clip` so the browser can no longer scroll a
-     focused card into view — which is what it used to do, taking every
-     floating toolbar out of the viewport permanently. That leaves the job
-     here, where it can be done to the VIEW rather than to a scroll offset, so
-     Fit and the zoom controls still describe what is on screen afterwards.
-
-     Only the axis that is actually out of range moves, and only far enough to
-     clear the edge plus a margin — a keyboard walk down the chain should feel
-     like the page keeping up, not like the canvas re-centring on every Tab.
-     Anything already visible is left exactly where it is. */
-  useEffect(() => {
-    const s = stage.current
-    if (!s) return
-    const onFocusIn = (e: FocusEvent) => {
-      const el = e.target as HTMLElement | null
-      if (!el || !s.contains(el)) return
-      const r = el.getBoundingClientRect()
-      const box = s.getBoundingClientRect()
-      const pad = 24
-      let dx = 0
-      let dy = 0
-      if (r.top < box.top + pad) dy = box.top + pad - r.top
-      else if (r.bottom > box.bottom - pad) dy = box.bottom - pad - r.bottom
-      if (r.left < box.left + pad) dx = box.left + pad - r.left
-      else if (r.right > box.right - pad) dx = box.right - pad - r.right
-      if (!dx && !dy) return
-      const v = viewRef.current
-      glide({ x: v.x + dx, y: v.y + dy }, 180)
-    }
-    s.addEventListener('focusin', onFocusIn)
-    return () => s.removeEventListener('focusin', onFocusIn)
-  }, [glide])
-
-  /* --- Pan ----------------------------------------------------------------- */
-  const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return
-    const t = e.target as HTMLElement
+    axis: 'width',
     /* Only the stage and the world's own padding pan. A card, a button, an
        input — anything interactive — keeps the gesture for itself. */
-    if (t !== stage.current && t !== world.current && !t.classList.contains('bb__chain')) return
-    const v = viewRef.current
-    pan.current = { px: e.clientX, py: e.clientY, x: v.x, y: v.y }
-    setPanning(true)
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-  }
-  const onPanMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const p = pan.current
-    if (!p) return
-    apply((v) => ({ ...v, x: p.x + (e.clientX - p.px), y: p.y + (e.clientY - p.py) }))
-  }
-  const onUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const p = pan.current
-    if (!p) return
-    pan.current = null
-    setPanning(false)
-    try {
-      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-    } catch {
-      /* already released */
-    }
-    /* A click on the empty stage, not a drag, clears the selection — the
-       inspector goes back to the policy. Measured as "did not move". */
-    const moved = Math.hypot(e.clientX - p.px, e.clientY - p.py) > 3
-    if (!moved) onSelect({ kind: 'none' })
-  }
-
-  /* --- Zoom, about the cursor. Non-passive so the page does not scroll. ---- */
-  useEffect(() => {
-    const s = stage.current
-    if (!s) return
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      if (e.ctrlKey || e.metaKey) {
-        const r = s.getBoundingClientRect()
-        const px = e.clientX - r.left
-        const py = e.clientY - r.top
-        apply((v) => {
-          /* Exponential, and clamped per event.
-
-             It was `1 - deltaY * 0.0018` applied straight. A trackpad pinch
-             emits deltas in the hundreds, so one event could ask for a factor
-             near zero or a negative scale, and the canvas snapped. `exp` keeps
-             zooming in and out symmetrical — the same gesture reversed lands
-             back where it started — and the clamp caps any single event at
-             ±12%, which is the difference between a smooth ramp and a jump. */
-          const k = Math.min(1.12, Math.max(0.89, Math.exp(-e.deltaY * 0.0018)))
-          const z = Math.min(ZMAX, Math.max(ZMIN, v.z * k))
-          const kk = z / v.z
-          return { x: px - (px - v.x) * kk, y: py - (py - v.y) * kk, z }
-        })
-      } else {
-        /* Shift turns a vertical wheel into a horizontal pan, which is what
-           every canvas does and what a mouse with one wheel needs. */
-        const dx = e.shiftKey ? e.deltaY : e.deltaX
-        const dy = e.shiftKey ? 0 : e.deltaY
-        apply((v) => ({ ...v, x: v.x - dx, y: v.y - dy }))
-      }
-    }
-    s.addEventListener('wheel', onWheel, { passive: false })
-    return () => s.removeEventListener('wheel', onWheel)
-  }, [apply])
-
-  const zoomBy = (k: number) => {
-    const s = stage.current
-    if (!s) return
-    const px = s.clientWidth / 2
-    const py = s.clientHeight / 2
-    const v = viewRef.current
-    const z = Math.min(ZMAX, Math.max(ZMIN, v.z * k))
-    const kk = z / v.z
-    glide({ x: px - (px - v.x) * kk, y: py - (py - v.y) * kk, z }, 200)
-  }
+    isPannableTarget: (t: HTMLElement) => t === stage.current || t === world.current || t.classList.contains('bb__chain'),
+    onBackgroundClick: () => onSelect({ kind: 'none' }),
+    zMin: ZMIN,
+    zMax: ZMAX,
+    cssPrefix: 'bb',
+    reserveOnOpen,
+  })
 
   /* --- Reorder by dragging the index ------------------------------------------ */
   /* State holds only the SLOT the card would land in — the thing that changes
@@ -493,10 +267,10 @@ export function Board({
       ref={stage}
       className={`bb__stage ${panning ? 'is-panning' : ''}`}
       style={{ '--bb-x': `${viewRef.current.x}px`, '--bb-y': `${viewRef.current.y}px`, '--bb-z': viewRef.current.z } as CSSProperties}
-      onPointerDown={onDown}
-      onPointerMove={onPanMove}
-      onPointerUp={onUp}
-      onPointerCancel={onUp}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
       tabIndex={-1}
       aria-label="The policy's rules, in the order they are evaluated"
     >

@@ -233,6 +233,41 @@ export function Board({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /* Keep whatever just took focus inside the stage.
+
+     The stage is `overflow: clip` so the browser can no longer scroll a
+     focused card into view — which is what it used to do, taking every
+     floating toolbar out of the viewport permanently. That leaves the job
+     here, where it can be done to the VIEW rather than to a scroll offset, so
+     Fit and the zoom controls still describe what is on screen afterwards.
+
+     Only the axis that is actually out of range moves, and only far enough to
+     clear the edge plus a margin — a keyboard walk down the chain should feel
+     like the page keeping up, not like the canvas re-centring on every Tab.
+     Anything already visible is left exactly where it is. */
+  useEffect(() => {
+    const s = stage.current
+    if (!s) return
+    const onFocusIn = (e: FocusEvent) => {
+      const el = e.target as HTMLElement | null
+      if (!el || !s.contains(el)) return
+      const r = el.getBoundingClientRect()
+      const box = s.getBoundingClientRect()
+      const pad = 24
+      let dx = 0
+      let dy = 0
+      if (r.top < box.top + pad) dy = box.top + pad - r.top
+      else if (r.bottom > box.bottom - pad) dy = box.bottom - pad - r.bottom
+      if (r.left < box.left + pad) dx = box.left + pad - r.left
+      else if (r.right > box.right - pad) dx = box.right - pad - r.right
+      if (!dx && !dy) return
+      const v = viewRef.current
+      glide({ x: v.x + dx, y: v.y + dy }, 180)
+    }
+    s.addEventListener('focusin', onFocusIn)
+    return () => s.removeEventListener('focusin', onFocusIn)
+  }, [glide])
+
   /* --- Pan ----------------------------------------------------------------- */
   const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return

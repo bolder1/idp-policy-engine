@@ -40,7 +40,25 @@
      the grid — it floats on top. The stage is the whole region again. */
   position: absolute; inset: 0;
   min-width: 0; min-height: 0;
-  overflow: hidden;
+  /* `clip`, not `hidden`, and the difference is the whole bug.
+
+     `hidden` still makes a scroll container. The world is offset by a
+     transform, which contributes to the stage's scrollable overflow, so the
+     moment focus moved to a card below the fold the browser scrolled the stage
+     itself to reveal it — measured at 129% on a six-rule policy, one Tab took
+     `scrollTop` from 0 to 1816. Nothing could undo it: the three float
+     toolbars are absolutely positioned INSIDE the stage, so they went with it
+     (Undo/Redo from 154px to -1662px, off the top and unreachable); the wheel
+     handler calls preventDefault unconditionally so it cannot be scrolled
+     back; and Fit only writes the view transform, which knows nothing about
+     scrollTop. Every control on the board — undo, publish, zoom, the fold
+     switch — was gone for the rest of the session.
+
+     `clip` paints identically and is not scrollable at all, so the browser has
+     nowhere to put the offset and the bug cannot happen. Keeping a focused
+     card visible is then a real job rather than a side effect, and Board does
+     it by panning the view. */
+  overflow: clip;
   background-color: var(--bb-stage);
   background-image: radial-gradient(circle, var(--bb-dot) 1px, transparent 1.4px);
   background-size: calc(22px * var(--bb-z, 1)) calc(22px * var(--bb-z, 1));

@@ -254,13 +254,20 @@ export function RuleCard({
           content arrives in the same frame as the class, so unmounting the
           folded half would make the first press of the chevron jump and every
           press after it glide. Mounted, hidden by `overflow` and taken out of
-          the tab order by `inert`, both directions animate identically. */}
-      <div className="bb__fold bb__fold--sum" aria-hidden={expanded} {...(expanded ? { inert: '' as unknown as boolean } : {})}>
+          the tab order by `inert`, both directions animate identically.
+
+          `inert={expanded}` — a real boolean. Written as `inert: ''` first,
+          which React 19 reports as "an empty string for a boolean attribute"
+          and treats as FALSE, so the folded half kept every one of its buttons
+          in the tab order: Tab walked into a zero-height region and focus went
+          somewhere invisible. The cast that silenced the type error was the
+          tell that the value was wrong. */}
+      <div className="bb__fold bb__fold--sum" aria-hidden={expanded} inert={expanded}>
         <div>
           <CardSummary rule={rule} />
         </div>
       </div>
-      <div className="bb__fold bb__fold--body" id={`bb-rule-${rule.id}-body`} {...(expanded ? {} : { inert: '' as unknown as boolean })}>
+      <div className="bb__fold bb__fold--body" id={`bb-rule-${rule.id}-body`} inert={!expanded}>
         <div>
           <div className="bb__cardbody">
             <IfBlock
@@ -386,12 +393,12 @@ export function TerminalCard({
           </button>
         </div>
       </div>
-      <div className="bb__fold bb__fold--sum" aria-hidden={expanded} {...(expanded ? { inert: '' as unknown as boolean } : {})}>
+      <div className="bb__fold bb__fold--sum" aria-hidden={expanded} inert={expanded}>
         <div>
           <CardSummary rule={rule} />
         </div>
       </div>
-      <div className="bb__fold bb__fold--body" id="bb-terminal-body" {...(expanded ? {} : { inert: '' as unknown as boolean })}>
+      <div className="bb__fold bb__fold--body" id="bb-terminal-body" inert={!expanded}>
         <div>
           <div className="bb__cardbody">
             <IfBlock

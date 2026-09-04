@@ -4,7 +4,6 @@ import { Maximize2, Plus, X } from 'lucide-react'
 
 import { Modal, Toggle } from '../../kit'
 import { fallbackRule, type Policy, type Rule } from '../../data'
-import { Library } from './Library'
 import { TONE, type Selection } from './model'
 import { WhatEditor } from './WhatEditor'
 import { WhenEditor } from './WhenEditor'
@@ -34,19 +33,17 @@ export function Inspector({
   selection,
   onPatchRule,
   onPatchFallback,
-  onInsert,
   onClose,
 }: {
   draft: Policy
   selection: Selection
   onPatchRule: (i: number, p: Partial<Rule>) => void
   onPatchFallback: (p: Partial<Rule>) => void
-  onInsert: (rule: Rule, at: number) => void
   onClose: () => void
 }) {
-  /* Resolved once. `at` is -1 when the selected rule is gone — undone, deleted
-     from the palette, discarded — and every branch below reads that as "nothing
-     selected", which is the honest answer and already the library's case. */
+  /* Resolved once. `at` is -1 when the selected rule is gone — undone, deleted,
+     discarded — but the board no longer mounts this component in that case, so
+     the -1 is a guard rather than a state anybody sees. */
   const at = selection.kind === 'rule' ? draft.rules.findIndex((r) => r.id === selection.id) : -1
   const rule = at >= 0 ? draft.rules[at] : undefined
   const key = `${selection.kind}:${rule?.id ?? ''}`
@@ -59,18 +56,16 @@ export function Inspector({
   const body = (inFocus: boolean) =>
     rule ? (
       <RulePane rule={rule} index={at} draft={draft} focus={inFocus} onPatch={(p) => onPatchRule(at, p)} />
-    ) : selection.kind === 'fallback' ? (
-      /* `?? fallbackRule()` rather than a truthiness gate: the default
-         is drawn on the stage whether or not the policy has ever
-         stored one, so selecting it has to open its panel too. Gating
-         on `draft.fallback` sent every un-edited policy to the library
-         instead, which read as the click having missed. */
-      <FallbackPane rule={draft.fallback ?? fallbackRule()} onPatch={onPatchFallback} />
     ) : (
-      <Library policy={draft} onInsert={onInsert} onPatchFallback={onPatchFallback} />
+      /* `?? fallbackRule()` rather than a truthiness gate: the default is drawn
+         on the stage whether or not the policy has ever stored one, so
+         selecting it has to open its panel too. Gating on `draft.fallback` sent
+         every un-edited policy somewhere else, which read as the click having
+         missed. */
+      <FallbackPane rule={draft.fallback ?? fallbackRule()} onPatch={onPatchFallback} />
     )
 
-  const what = rule ? `Rule ${at + 1}` : selection.kind === 'fallback' ? 'The default' : 'Policy'
+  const what = rule ? `Rule ${at + 1}` : 'The default'
 
   return (
     <aside className="bb__insp" aria-label="Inspector">

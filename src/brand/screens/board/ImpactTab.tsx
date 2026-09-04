@@ -7,7 +7,7 @@ import type { AccessDecision, Policy } from '../../data'
 import type { Diagnostic } from '../diagnostics'
 import { LANES, SITUATIONS, badges, compare, sweep, type Lane, type Situation } from '../impact-arena'
 import { SIM_USERS, PLACES, walk, type SimContext, type SimEnv } from '../simulate'
-import { CLOCKS, DECISION_SHORT, TONE, shortAuth, shortDevice, shortPlace, type Selection, type Tab } from './model'
+import { CLOCKS, DECISION_SHORT, TONE, shortAuth, shortDevice, shortPlace, type Selection } from './model'
 import { Section, Seg } from './Section'
 
 /* -----------------------------------------------------------------------------
@@ -47,7 +47,7 @@ export function ImpactTab({
   env,
   diagnostics,
   onSelect,
-  onTab,
+  onClose,
 }: {
   draft: Policy
   saved: Policy
@@ -55,7 +55,8 @@ export function ImpactTab({
   env: SimEnv
   diagnostics: Diagnostic[]
   onSelect: (s: Selection) => void
-  onTab: (t: Tab) => void
+  /** Jumping to a rule closes the sheet — the panel behind it is where the rule is. */
+  onClose: () => void
 }) {
   const [clock, setClock] = useState(570)
   const [who, setWho] = useState<string | null>(null)
@@ -86,7 +87,7 @@ export function ImpactTab({
 
   const jump = (i: number) => {
     onSelect({ kind: 'rule', id: draft.rules[i].id })
-    onTab('rule')
+    onClose()
   }
 
   const pickedS = picked === null ? null : SITUATIONS[picked]

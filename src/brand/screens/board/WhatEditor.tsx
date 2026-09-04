@@ -1,30 +1,37 @@
 import { useRef } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
-import { AlertTriangle, Check, KeyRound, Plus, ShieldAlert, Smartphone, UserCheck, X, XCircle } from 'lucide-react'
+import { AlertTriangle, Check, KeyRound, Plus, ShieldAlert, UserCheck, X, XCircle } from 'lucide-react'
 
 import { Toggle } from '../../kit'
 import { Picker } from '../../picker'
 import type { AccessDecision, Rule } from '../../data'
 import { METHODS } from '../rule-form'
-import { DECISION_NAME, TONE, journeyOf } from './model'
+import { DECISION_NAME, TONE } from './model'
 import { Prop, Seg } from './Section'
 
 /* -----------------------------------------------------------------------------
-   WHAT — the decision, and the journey it produces.
+   WHAT — the decision, and the settings that shape it.
 
    Three tiles, one row, each named for what the PERSON experiences rather than
-   how many factors the engine counts. Beneath the chosen one, the journey is
-   drawn as the steps they will walk — change a method and it redraws — and the
-   settings that shape it sit under that as property rows.
+   how many factors the engine counts. Under them, the settings that shape the
+   outcome, as property rows.
+
+   The journey used to be drawn here too — the steps the person walks, from the
+   same `journeyOf` the card reads. It has gone, and the reason is that the card
+   never stopped drawing it. Every rule on the stage carries its journey, and
+   the panel only ever opens BESIDE the stage, so the two were on screen at once
+   showing the same four lines from the same function. The panel is 400px of
+   scarce column and the editing is what it is for; a second copy of a picture
+   already visible six inches to the left was the cheapest thing in it to lose.
+   `journeyOf` stays where it was — IfBlock is the one caller now.
    -------------------------------------------------------------------------- */
 
 /* No captions.
 
    "A password is enough", "Ask for a second step", "Refuse outright" restated
    the three labels above them in more words, on a control where the labels are
-   already the plainest thing on the screen and the journey drawn underneath
-   shows the actual consequence step by step. Three lines of prose to say what
-   one word and a diagram already said. */
+   already the plainest thing on the screen and the card beside it shows the
+   actual consequence step by step. Three lines of prose to say what one word
+   and a diagram already said. */
 const TILES: { id: AccessDecision; label: string; icon: typeof UserCheck }[] = [
   { id: '1fa', label: 'Let in', icon: UserCheck },
   { id: '2fa', label: 'Let in, then verify', icon: KeyRound },
@@ -52,17 +59,15 @@ export function WhatEditor({
      These three controls used to show a value the rule did not have —
      `methodChain ?? ['TOTP Authenticator']`, `firstFactorMethod ?? METHODS[0]`,
      `preferredFallback ?? METHODS[0]`. None of them was ever patched onto the
-     rule, so the journey drawn immediately above (and the card on the stage,
-     which reads the same `journeyOf`) said "Empty chain" and "A chosen method"
-     while the control beneath it named a specific method. Two halves of one
-     panel, disagreeing about one rule.
+     rule, so the journey on the card beside this panel said "Empty chain" and
+     "A chosen method" while the control here named a specific method. Two
+     readings of one rule, disagreeing on screen at the same time.
 
      Showing nothing is the honest version: the chain renders as just "Add a
      step", and the pickers fall through to their own "Choose…" placeholder.
      What is on screen is then what would be saved. */
   const chain = rule.methodChain ?? []
   const methods = rule.secondFactorMethods ?? []
-  const journey = journeyOf(rule)
 
   /* Deny normalises the settings that belong to Allow, so a rule switched to
      Deny does not keep a remembered-device window nobody can see or clear. */
@@ -107,23 +112,6 @@ export function WhatEditor({
           )
         })}
       </div>
-
-      {/* The journey. Same function as the card, so they cannot disagree. */}
-      <motion.ol className="bb__journeybig" layout aria-label="The sign-in journey this rule produces">
-        <AnimatePresence initial={false}>
-          {journey.map((s, i) => (
-            <motion.li key={s.id} className={`bb__jstep is-${s.kind}`} layout initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 6 }} transition={{ duration: 0.16 }}>
-              <span className="bb__jdot" aria-hidden>
-                {s.kind === 'end' ? <Check size={12} strokeWidth={2.6} /> : s.kind === 'stop' ? <X size={12} strokeWidth={2.6} /> : s.kind === 'second' ? <Smartphone size={11} strokeWidth={2} /> : <span style={{ fontSize: 10, fontWeight: 600 }}>{i + 1}</span>}
-              </span>
-              <span className="bb__jtext">
-                <b>{s.label}</b>
-                {s.sub && <em>{s.sub}</em>}
-              </span>
-            </motion.li>
-          ))}
-        </AnimatePresence>
-      </motion.ol>
 
       {rule.decision === 'deny' ? (
         <p className="bb__secnote">No prompt and no alternate path. A Deny here is final — the ML engine may escalate other decisions, never soften this one.</p>

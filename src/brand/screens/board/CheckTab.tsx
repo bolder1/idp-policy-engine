@@ -46,6 +46,7 @@ export function CheckTab({
   onTrace,
   onSelect,
   onTab,
+  onClose,
   onApplyRules,
 }: {
   draft: Policy
@@ -57,6 +58,8 @@ export function CheckTab({
   onTrace: (t: Trace | null) => void
   onSelect: (s: Selection) => void
   onTab: (t: Tab) => void
+  /** Jumping to a rule closes the sheet — the panel behind it is where the rule is. */
+  onClose: () => void
   onApplyRules: (rules: Rule[], note: string) => void
 }) {
   const store = useBrand()
@@ -190,7 +193,7 @@ export function CheckTab({
                       variant="neutral"
                       onClick={() => {
                         onSelect({ kind: 'rule', id: draft.rules[r.hitIndex!].id })
-                        onTab('rule')
+                        onClose()
                       }}
                     >
                       Open that rule
@@ -242,7 +245,7 @@ export function CheckTab({
               onOverride={(want) => store.setGauntletOverride(draft.id, round.challenge.id, want)}
               onJump={(i) => {
                 onSelect({ kind: 'rule', id: draft.rules[i].id })
-                onTab('rule')
+                onClose()
               }}
               onApply={(fix) => onApplyRules(applyFix(draft.rules, fix), fix.headline)}
             />
@@ -256,7 +259,7 @@ export function CheckTab({
             ok={errors.length === 0}
             title={errors.length === 0 ? 'No broken rules' : `${errors.length} error${errors.length === 1 ? '' : 's'} to fix`}
             detail={errors.length === 0 ? 'Nothing the linter can prove wrong.' : errors[0].title}
-            action={errors.length > 0 && errors[0].ruleIndex >= 0 ? { label: `Open rule ${errors[0].ruleIndex + 1}`, run: () => { onSelect({ kind: 'rule', id: draft.rules[errors[0].ruleIndex].id }); onTab('rule') } } : undefined}
+            action={errors.length > 0 && errors[0].ruleIndex >= 0 ? { label: `Open rule ${errors[0].ruleIndex + 1}`, run: () => { onSelect({ kind: 'rule', id: draft.rules[errors[0].ruleIndex].id }); onClose() } } : undefined}
           />
           <ReadyRow ok={test.breaches === 0} warn={test.breaches === 0 && test.lockouts > 0} title={test.breaches === 0 ? 'Break-in test: nothing got through' : `Break-in test: ${test.breaches} got through`} detail={test.gradeReason} />
           <ReadyRow
@@ -267,7 +270,7 @@ export function CheckTab({
             action={movement && movement.looser > 0 ? { label: 'See what changes', run: () => onTab('impact') } : undefined}
           />
           <ReadyRow ok={!!app || !!draft.isSystem} title={app ? `Protecting ${app.name}` : draft.isSystem ? 'The tenant default' : 'No application attached'} detail={app || draft.isSystem ? 'The rules are evaluated on every sign-in to it.' : 'These rules are saved but never evaluated.'} />
-          {dead.length > 0 && <ReadyRow ok={false} warn title={`${dead.length} rule${dead.length === 1 ? '' : 's'} never win`} detail={`${dead.map(({ rule, i }) => `Rule ${i + 1} · ${rule.name}`).join(', ')} decide no modelled situation. Either unreachable, or reading a signal the model does not carry.`} action={{ label: `Open rule ${dead[0].i + 1}`, run: () => { onSelect({ kind: 'rule', id: dead[0].rule.id }); onTab('rule') } }} />}
+          {dead.length > 0 && <ReadyRow ok={false} warn title={`${dead.length} rule${dead.length === 1 ? '' : 's'} never win`} detail={`${dead.map(({ rule, i }) => `Rule ${i + 1} · ${rule.name}`).join(', ')} decide no modelled situation. Either unreachable, or reading a signal the model does not carry.`} action={{ label: `Open rule ${dead[0].i + 1}`, run: () => { onSelect({ kind: 'rule', id: dead[0].rule.id }); onClose() } }} />}
         </div>
       </Section>
     </>

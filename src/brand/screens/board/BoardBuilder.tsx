@@ -42,7 +42,7 @@ const SHORTCUTS: [string, string][] = [
   ['E', 'Switch the selected rule on or off'],
   ['⌘K', 'Command palette'],
   ['⌘↵', 'Review and publish'],
-  ['⌘\\', 'Show or hide the panel'],
+  ['⌘\\', 'Show or hide the panel, while a card is selected'],
   ['⌘Z ⇧⌘Z', 'Undo, redo'],
   ['Esc', 'Clear the rehearsal, then the selection'],
   ['?', 'This list'],
@@ -82,6 +82,35 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
      The number was never going to suit both regions at once, so it stops being
      a constant and becomes a handle. */
   const [inspW, setInspW] = useState(400)
+  /* How much of itself every card shows, and the per-card exceptions.
+
+     Two pieces of state rather than one, because they answer different
+     questions. `density` is the chain-wide default — "show me the order" or
+     "show me the rules" — and it is what the toolbar switch sets. `folds` holds
+     the cards somebody has since opened or closed by hand, keyed by rule id so
+     an override survives a reorder, a rename and an undo.
+
+     Flipping the switch CLEARS the overrides, deliberately. The alternative is
+     a chain where "Detailed" leaves three rules folded because of clicks made
+     several minutes ago, and no way to say "all of them" except by finding and
+     unfolding each one. A chain-wide control that cannot actually reach the
+     whole chain is not worth having. */
+  const [density, setDensity] = useState<'outline' | 'detailed'>('detailed')
+  const [folds, setFolds] = useState<Record<string, boolean>>({})
+  const expandedOf = (ruleId: string) => folds[ruleId] ?? density === 'detailed'
+  const toggleExpand = (ruleId: string) => setFolds((f) => ({ ...f, [ruleId]: !expandedOf(ruleId) }))
+  const setChainDensity = (d: 'outline' | 'detailed') => {
+    setDensity(d)
+    setFolds({})
+  }
+  /* On only while the grip is held.
+
+     The panel's width is written straight to the DOM during a drag, and the
+     three things that offset by it — both right-hand toolbars and the sheet —
+     are transitioned so they glide when the panel opens. That transition is
+     wrong mid-drag: it makes them trail the edge you are dragging by a quarter
+     of a second. The class turns it off for exactly as long as the drag lasts. */
+  const [gripping, setGripping] = useState(false)
   const shell = useRef<HTMLDivElement | null>(null)
   const drag = useRef<{ x: number; w: number; at: number } | null>(null)
 
@@ -100,6 +129,7 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
   const onGrab = useCallback(
     (e: React.PointerEvent) => {
       drag.current = { x: e.clientX, w: inspW, at: inspW }
+      setGripping(true)
       e.currentTarget.setPointerCapture(e.pointerId)
     },
     [inspW],
@@ -121,6 +151,7 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
   const onDrop = useCallback((e: React.PointerEvent) => {
     const d = drag.current
     drag.current = null
+    setGripping(false)
     e.currentTarget.releasePointerCapture(e.pointerId)
     if (d) setInspW(d.at)
   }, [])
@@ -233,10 +264,15 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
       return
     }
     /* ⌘ — the panel is a lot of the screen, and reading the chain is a
-       thing people do between edits. */
+       thing people do between edits.
+
+       Only while something is selected. With nothing selected there is no
+       panel, so an unguarded toggle would flip a piece of state nothing on
+       screen reflects — and then the NEXT card you clicked would open to a
+       collapsed panel for no reason you could trace back to a keystroke. */
     if (cmd && e.key === '\\') {
       e.preventDefault()
-      setInspOpen((v) => !v)
+      if (at >= 0 || selection.kind === 'fallback') setInspOpen((v) => !v)
       return
     }
     if (cmd && e.key.toLowerCase() === 'd') {
@@ -323,6 +359,39 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
 
   const selAt = selection.kind === 'rule' ? draft.rules.findIndex((r) => r.id === selection.id) : -1
   const selName = selAt >= 0 ? draft.rules[selAt].name : ''
+
+  /* Whether there is anything for the panel to be about.
+
+     Not `selection.kind !== 'none'`, and the difference is a real state rather
+     than a nicety: a selection names a rule by id, and the rule it names can
+     stop existing while the selection still holds the id — undo shortens the
+     list, a delete lands, a discard rolls the draft back. `selAt` is -1 for all
+     of those, and the panel has nothing to draw.
+
+     The panel used to answer that case with the rule library, which is why it
+     could always be open. The library has moved out, so the honest answer is
+     now the empty one: no subject, no panel. */
+  const hasSubject = selection.kind === 'fallback' || selAt >= 0
+
+  /* One way in, for both doors.
+
+     Board's own handler has forced the panel open on any selection since the
+     day a click behind a collapsed panel selected something nobody could then
+     edit. The sheet selects rules too — that is what "Open rule 3" on a finding
+     does — and it was handed `setSelection` bare, so the same click through the
+     sheet lit the card and opened nothing. Harmless while the panel was always
+     up; now that it is not, it is a dead end with nothing on screen to explain
+     it. Two callers, one handler. */
+  const select = (s: Selection) => {
+    setSelection(s)
+    if (s.kind !== 'none') setInspOpen(true)
+  }
+  /* The panel is on screen only when it has something to say AND has not been
+     collapsed. Everything that has to step aside for it — the two floating
+     toolbars, the sheet, Fit — keys off `is-insp-closed`, so the two ways of
+     not being there resolve to one class and the layout cannot tell them
+     apart. It should not have to: both mean the stage has the width back. */
+  const panelShown = hasSubject && inspOpen
   const boardCommands: Cmd[] = [
     { id: 'add', label: 'Add a rule', icon: Plus },
     ...(selAt >= 0
@@ -334,7 +403,7 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
     ...(dirty ? ([{ id: 'publish', label: 'Review and publish', kbd: '⌘↵', icon: Check }] as Cmd[]) : []),
     ...(canUndo(hist) ? ([{ id: 'undo', label: 'Undo', kbd: '⌘Z', icon: Undo2 }] as Cmd[]) : []),
     ...(canRedo(hist) ? ([{ id: 'redo', label: 'Redo', kbd: '⇧⌘Z', icon: Redo2 }] as Cmd[]) : []),
-    { id: 'panel', label: inspOpen ? 'Hide the panel' : 'Show the panel', kbd: '⌘\\', icon: PanelRightClose },
+    ...(hasSubject ? ([{ id: 'panel', label: inspOpen ? 'Hide the panel' : 'Show the panel', kbd: '⌘\\', icon: PanelRightClose }] as Cmd[]) : []),
     { id: 'keys', label: 'Keyboard shortcuts', kbd: '?', icon: Keyboard },
     ...draft.rules.map((r, i) => ({ id: `rule:${i}`, label: `Go to rule ${i + 1} · ${r.name}`, icon: ListOrdered }) as Cmd),
   ]
@@ -385,7 +454,7 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
   }
 
   return (
-    <div ref={shell} className={`bb ${inspOpen ? '' : 'is-insp-closed'}`} style={{ '--bb-insp': `${inspW}px` } as React.CSSProperties}>
+    <div ref={shell} className={`bb ${panelShown ? '' : 'is-insp-closed'} ${gripping ? 'is-gripping' : ''}`} style={{ '--bb-insp': `${inspW}px` } as React.CSSProperties}>
       <Board
         policy={draft}
         selection={selection}
@@ -393,14 +462,10 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
         shadowed={shadowed}
         trace={trace}
         resolve={resolve}
-        onSelect={(s) => {
-          setSelection(s)
-          /* Clicking a card opens the panel, always. The inspector is the only
-             place a rule can be edited, so a click that selects a card behind a
-             collapsed panel selected nothing a person could act on. Collapsing
-             stays available; it just does not survive the next click. */
-          if (s.kind !== 'none') setInspOpen(true)
-        }}
+        onSelect={select}
+        reserveOnOpen={inspW + 24}
+        expandedOf={expandedOf}
+        onToggleExpand={toggleExpand}
         onInsert={(at) => insert(blankRule(), at)}
         onMove={move}
         onToggle={(i, on) => patchRule(i, { enabled: on })}
@@ -408,6 +473,39 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
         onDelete={remove}
         onHover={setHover}
       >
+        {/* The chain-wide fold, bottom-left.
+
+            Its own corner rather than a fifth item beside undo/redo: it does
+            not change the policy, it changes how much of the policy is on
+            screen — the same family as the zoom controls opposite it, and the
+            slot the stylesheet has always had for a left-hand pair.
+
+            A radiogroup, not a toggle button. There are two named states and
+            both are worth naming: "Outline" is a claim about what you get, and
+            a single button reading "Outline" cannot say whether that is what
+            you are in or what you would switch to. */}
+        <div className="bb__float bb__float--bl bb__density" role="radiogroup" aria-label="How much of each rule to show">
+          {(['outline', 'detailed'] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              role="radio"
+              aria-checked={density === d}
+              tabIndex={density === d ? 0 : -1}
+              className={density === d ? 'is-on' : ''}
+              title={d === 'outline' ? 'Names and outcomes only' : 'Every condition, on every card'}
+              onClick={() => setChainDensity(d)}
+              onKeyDown={(e) => {
+                if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+                e.preventDefault()
+                setChainDensity(d === 'outline' ? 'detailed' : 'outline')
+              }}
+            >
+              {d === 'outline' ? 'Outline' : 'Detailed'}
+            </button>
+          ))}
+        </div>
+
         <div className="bb__float bb__float--tl" role="toolbar" aria-label="History and view">
           <button type="button" className="bb__act" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo(hist)} onClick={() => setHist(undo)}>
             <Undo2 size={14} strokeWidth={2} />
@@ -461,14 +559,24 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
           <Button variant="brand" size="sm" disabled={!dirty} title={blockers > 0 ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first` : undefined} onClick={() => setReview(true)}>
             {features.publish ? 'Review & publish' : 'Review & Save'}
           </Button>
-          <span className="bb__float__sep" />
-          <button type="button" className="bb__act" aria-label={inspOpen ? 'Hide the inspector' : 'Show the inspector'} aria-pressed={inspOpen} onClick={() => setInspOpen((v) => !v)}>
-            {inspOpen ? <PanelRightClose size={14} strokeWidth={2} /> : <PanelRightOpen size={14} strokeWidth={2} />}
-          </button>
+          {/* Absent, not disabled, when nothing is selected.
+
+              There is no panel to show or hide until a card is chosen, and a
+              greyed-out button in a toolbar invites somebody to work out why —
+              the same argument the pinned default makes for leaving its own
+              controls off the card rather than dimming them. */}
+          {hasSubject && (
+            <>
+              <span className="bb__float__sep" />
+              <button type="button" className="bb__act" aria-label={inspOpen ? 'Hide the inspector' : 'Show the inspector'} aria-pressed={inspOpen} onClick={() => setInspOpen((v) => !v)}>
+                {inspOpen ? <PanelRightClose size={14} strokeWidth={2} /> : <PanelRightOpen size={14} strokeWidth={2} />}
+              </button>
+            </>
+          )}
         </div>
       </Board>
 
-      {inspOpen && (
+      {panelShown && (
         <div
           className="bb__grip"
           role="separator"
@@ -492,14 +600,22 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
         />
       )}
 
-      <Inspector
-        draft={draft}
-        selection={selection}
-        onPatchRule={patchRule}
-        onPatchFallback={patchFallback}
-        onInsert={insert}
-        onClose={() => setInspOpen(false)}
-      />
+      {/* Mounted only when it has a subject.
+
+          Not hidden with CSS — unmounted. The panel holds the editors for one
+          rule, and an editor for a rule nobody is looking at is a form that
+          keeps its own state about something that may since have been deleted.
+          Unmounting also means `fitTo` finds no `.bb__insp` to measure, so the
+          stage takes the full width back without anybody telling it to. */}
+      {panelShown && (
+        <Inspector
+          draft={draft}
+          selection={selection}
+          onPatchRule={patchRule}
+          onPatchFallback={patchFallback}
+          onClose={() => setInspOpen(false)}
+        />
+      )}
 
       {/* The palette, over the board's own verbs.
 
@@ -524,10 +640,7 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
             else if (id === 'del' && selAt >= 0) remove(selAt)
             else if (id.startsWith('rule:')) {
               const r = draft.rules[Number(id.slice(5))]
-              if (r) {
-                setSelection({ kind: 'rule', id: r.id })
-                setInspOpen(true)
-              }
+              if (r) select({ kind: 'rule', id: r.id })
             }
           }}
         />
@@ -565,7 +678,7 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
         diagnostics={diagnostics}
         trace={trace}
         onTrace={setTrace}
-        onSelect={setSelection}
+        onSelect={select}
         onApplyRules={(rules, note) => {
           commitDraft({ ...draft, rules })
           store.showToast(note)

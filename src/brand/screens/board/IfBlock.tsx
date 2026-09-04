@@ -136,7 +136,25 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
           {journey.map((s, i) => (
             <Fragment key={s.id}>
               {i > 0 && <ArrowRight size={10} strokeWidth={2} aria-hidden />}
-              <span>{s.label}</span>
+              {/* The second line of a step, which this used to drop on the floor.
+
+                  `journeyOf` has always returned a `sub` for five of its steps —
+                  "No prompt, no way round", "every step, in order", "on this
+                  device", "else TOTP", "cannot be completed" — and this map read
+                  `label` only. That was survivable while the inspector drew the
+                  same journey underneath the decision tiles, because its copy
+                  rendered both halves. The inspector's copy has gone, so this is
+                  the only renderer left, and a step whose sub is dropped here is
+                  a sentence the product no longer says anywhere.
+
+                  The costly one is "cannot be completed". A rule asking for a
+                  specific second factor with no method chosen reads as "Nothing
+                  chosen" without it — which sounds like an empty field rather
+                  than what it is, a rule that can never fire. */}
+              <span>
+                {s.label}
+                {s.sub && <em className="bb__ifjsub">{s.sub}</em>}
+              </span>
             </Fragment>
           ))}
           </span>

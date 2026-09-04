@@ -24,7 +24,15 @@ import type { SimContext, TraceResult } from '../simulate'
    already the "show the library" case. */
 export type Selection = { kind: 'none' } | { kind: 'rule'; id: string } | { kind: 'fallback' }
 
-export type Tab = 'rule' | 'check' | 'impact'
+/* The sheet's two tabs.
+
+   `'rule'` used to be a third. It meant "show the rule pane in the sheet", from
+   before the inspector was a pane of its own — and it outlived that: five call
+   sites still asked for it, and `BoardSheet` has only ever rendered check and
+   impact, so each one flipped the sheet to Impact with NEITHER tab marked
+   selected. The panel is where a rule is read now, and jumping to one closes
+   the sheet rather than switching it. */
+export type Tab = 'check' | 'impact'
 
 /* One rehearsed sign-in, and where it landed.
 
@@ -59,12 +67,19 @@ export const TONE: Record<AccessDecision, 'allow' | 'mfa' | 'deny'> = { '1fa': '
 
 /* The journey a rule produces, as steps a person walks.
 
-   Drawn on the card and in the inspector from the same function, so the two
-   cannot disagree about what a rule does to somebody. */
+   One renderer now: the card, via IfBlock. The inspector drew this too, from
+   this same function, and the two were on screen together every time the panel
+   was open — the panel only opens beside the stage. The panel's copy went, and
+   the card's is the one that was always visible.
+
+   Worth saying because the sameness used to be the point of this comment: with
+   two renderers, `sub` could be dropped by one of them and still reach the
+   screen from the other, which is exactly what had happened. There is nowhere
+   to fall back to now, so every field here has to be drawn where it is read. */
 export interface JourneyStep {
   id: string
   label: string
-  /** A second line — "or TOTP", "for 30 days". */
+  /** The qualification on a step — "or TOTP", "for 30 days", "cannot be completed". */
   sub?: string
   kind: 'first' | 'second' | 'remember' | 'end' | 'stop'
 }

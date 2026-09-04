@@ -165,10 +165,11 @@ export function BoardSheet({
                 onTrace={onTrace}
                 onSelect={onSelect}
                 onTab={onTab}
+                onClose={onClose}
                 onApplyRules={onApplyRules}
               />
             ) : (
-              <ImpactTab draft={draft} saved={saved} dirty={dirty} env={env} diagnostics={diagnostics} onSelect={onSelect} onTab={onTab} />
+              <ImpactTab draft={draft} saved={saved} dirty={dirty} env={env} diagnostics={diagnostics} onSelect={onSelect} onClose={onClose} />
             )}
           </div>
         </motion.section>

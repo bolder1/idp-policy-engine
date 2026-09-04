@@ -269,6 +269,42 @@ button.bb__idx svg { display: none; }
 
 .bb__cardbody { padding: 0 var(--space-5) var(--space-5); display: grid; gap: var(--space-4); }
 
+/* --- The fold --------------------------------------------------------------
+
+   `grid-template-rows: 0fr → 1fr` on a grid whose single child has
+   `overflow: hidden`. It animates to the content's natural height without
+   anybody measuring it, which is the whole reason it is here rather than a
+   Motion height animation: the cards sit in ordinary flow inside `.bb__chain`,
+   so a height that transitions in CSS moves every card below it continuously,
+   for free, with no projection and nothing for the chain's own `layout`
+   animation to fight. Motion would have to measure, write a transform, and
+   then argue with the wrapper that is already animating this card's place.
+
+   `min-height: 0` on the inner child is not optional — a grid item's default
+   `min-height: auto` refuses to shrink below its content and the row would
+   never reach 0fr. */
+.bb__fold { display: grid; transition: grid-template-rows 0.26s var(--ease-standard); }
+.bb__fold > * { overflow: hidden; min-height: 0; }
+.bb__fold--body { grid-template-rows: 0fr; }
+.bb__card.is-open .bb__fold--body { grid-template-rows: 1fr; }
+.bb__fold--sum { grid-template-rows: 1fr; }
+.bb__card.is-open .bb__fold--sum { grid-template-rows: 0fr; }
+
+/* The chevron turns to point the way the fold will go. */
+.bb__fold__btn svg { transition: transform 0.26s var(--ease-standard); }
+.bb__card.is-open .bb__fold__btn svg { transform: rotate(180deg); }
+
+/* The folded card's one line. Same grammar as the block it replaces — the
+   branch mark, what is tested, an arrow, what is decided — so folding changes
+   how much the card says and not how it reads. */
+.bb__cardsum {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: 0 var(--space-5) var(--space-4) var(--space-4);
+  color: var(--text-tertiary);
+}
+.bb__cardsum svg { color: var(--text-muted); flex: none; }
+.bb__cardsum__n { font-size: var(--fs-sm); color: var(--text-secondary); }
+
 /* A labelled row inside the card: WHEN / THEN. */
 .bb__row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
 .bb__row > dt {
@@ -423,10 +459,38 @@ button.bb__idx svg { display: none; }
    that must never be behind the thing they are editing. Transitioned on the
    same curve as the panel, so opening it moves them together rather than
    snapping them out of the way. */
-.bb__float--tr, .bb__float--br { transition: right 0.24s var(--ease-standard); }
+.bb:not(.is-gripping) .bb__float--tr,
+.bb:not(.is-gripping) .bb__float--br,
+/* The sheet moves with the panel too, and never did.
+
+   It offsets by --bb-insp exactly as the toolbars do, but without their
+   transition — so once the panel became selection-only, clicking a finding in
+   Check mounted a 400px panel and the sheet it was drawn in jumped that much
+   narrower in one frame, under the cursor that had just clicked.
+
+   Guarded on `is-gripping` rather than declared outright, because --bb-insp is
+   written to the DOM on every frame of a grip drag: an unguarded transition
+   makes all three trail the panel edge by a quarter-second the whole way
+   across. The class is on only while a drag is live, so the drag is exact and
+   the open/close is smooth. */
+.bb:not(.is-gripping) .bb__sheet { transition: right 0.24s var(--ease-standard); }
 .bb:not(.is-insp-closed) .bb__float--tr,
 .bb:not(.is-insp-closed) .bb__float--br { right: calc(var(--bb-insp) + var(--space-6)); }
 .bb__float--bl { left: var(--space-5); bottom: var(--space-5); }
+/* The chain-wide fold. A segmented pair, sized like the other float controls
+   so the two bottom corners read as one family. */
+.bb__density { padding: 3px; gap: 2px; }
+.bb__density > button {
+  height: 26px; padding: 0 var(--space-3);
+  border: none; border-radius: var(--radius-md);
+  background: transparent; color: var(--text-secondary);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.bb__density > button:hover { color: var(--text-primary); background: var(--surface-sunken); }
+.bb__density > button.is-on { background: var(--brand); color: #fff; }
+.bb__density > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 .bb__float__sep { width: 1px; height: 18px; background: var(--border-subtle); margin: 0 2px; }
 .bb__zoom { min-width: 44px; text-align: center; font-size: var(--fs-xs); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 
@@ -476,14 +540,22 @@ button.bb__idx svg { display: none; }
   background: var(--surface-raised);
   box-shadow: var(--el-high);
   overflow: hidden;
-  transition: transform 0.24s var(--ease-standard), opacity 0.18s var(--ease-standard);
 }
-/* Slides out rather than vanishing, so it is obvious where it went and that it
-   is coming back from the same place. */
-.bb.is-insp-closed .bb__insp {
-  transform: translateX(calc(100% + var(--space-4)));
-  opacity: 0; pointer-events: none;
-}
+/* The slide-out has gone, and it is not coming back as an AnimatePresence.
+
+   It used to translate and fade under `.bb.is-insp-closed`. That class and the
+   panel's mount are now driven by the same boolean, so the rule was never
+   matched by an element that existed — the panel simply stops being rendered.
+
+   Wrapping the panel in a presence shell would restore the animation and buy a
+   worse bug: Inspector.tsx already records that an interrupted exit here can
+   strand the old panel at 2% opacity and never mount the next one, and the
+   interruption is a fast click on a second card, which is the common gesture.
+   A 240ms slide is not worth a panel that can get stuck.
+
+   Unmounting fixed something the old rule never did, too: `pointer-events:
+   none` does not stop the keyboard, so tabbing off the stage used to land in
+   the off-screen panel's inputs. There is nothing to tab into now. */
 
 /* The panel's own bar: what is selected, and the two ways to change how you
    are looking at it. */
@@ -620,27 +692,6 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__decide > button.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); }
 .bb__decide > button.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); }
 .bb__decide > button.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); }
-
-/* The journey, drawn large in the inspector. */
-.bb__journeybig {
-  display: flex; flex-direction: column; gap: 0;
-  margin: var(--space-3) 0 var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--surface-sunken);
-}
-.bb__jstep { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: var(--space-3); align-items: start; position: relative; padding: 3px 0; }
-.bb__jstep + .bb__jstep::before { content: ''; position: absolute; left: 10px; top: -10px; height: 14px; width: 2px; background: var(--border-default); }
-.bb__jdot {
-  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--surface-raised); border: 1px solid var(--border-default); color: var(--text-tertiary);
-}
-.bb__jstep.is-end .bb__jdot { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
-.bb__jstep.is-stop .bb__jdot { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
-.bb__jstep.is-remember .bb__jdot { border-style: dashed; }
-.bb__jtext { display: flex; flex-direction: column; padding-top: 2px; }
-.bb__jtext b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__jtext em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* Method chips — a chip per method, on/off. */
 .bb__chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -787,27 +838,6 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__reachline { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--text-secondary); }
 .bb__reachline b { font-weight: var(--fw-semibold); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 
-/* --- The library (nothing selected) ----------------------------------------- */
-
-.bb__lib { display: grid; gap: var(--space-2); }
-.bb__libitem {
-  display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center;
-  padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
-  background: var(--surface-raised); text-align: left; font-family: inherit; cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-}
-.bb__libitem:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--el-low); }
-.bb__libitem:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-.bb__libitem > .bb__idx { width: 30px; height: 30px; cursor: inherit; }
-.bb__libitem b { display: block; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__libitem em { display: block; font-style: normal; font-size: 11px; color: var(--text-tertiary); line-height: 1.35; }
-.bb__libitem > svg { color: var(--text-muted); }
-.bb__libitem.is-blank { border-style: dashed; }
-
-.bb__facts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
-.bb__fact { padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-sunken); }
-.bb__fact b { display: block; font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.bb__fact em { font-style: normal; font-size: 11px; color: var(--text-tertiary); }
 
 /* --- Check tab -------------------------------------------------------------- */
 
@@ -1001,7 +1031,9 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 
 @media (prefers-reduced-motion: reduce) {
   .bb__start .bb__pulse::after { animation: none; }
-  .bb__card, .bb__link::before, .bb__dot, .bb__libitem, .bb__decide > button { transition: none; }
+  .bb__card, .bb__link::before, .bb__dot, .bb__decide > button { transition: none; }
+  /* The fold still folds — it just arrives. */
+  .bb__fold, .bb__fold__btn svg { transition: none; }
   .bb__condrow.is-new { animation: none; }
 }
 
@@ -1172,6 +1204,14 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 
 .bb__ifjourney { display: inline-flex; align-items: center; gap: 4px; color: var(--if-muted); font-size: 11px; min-width: 0; flex-wrap: wrap; }
 .bb__ifjourney svg { opacity: 0.6; }
+/* A step's second line, inline rather than stacked.
+
+   The inspector drew the journey as a column and could afford a line under each
+   label. The card draws it as one running line, so the sub joins its step with
+   a separator instead — dimmer than the label it qualifies, because it is the
+   qualification and not the step. */
+.bb__ifjsub { font-style: normal; opacity: 0.75; margin-left: 4px; }
+.bb__ifjsub::before { content: '· '; }
 .bb__ifaction .bb__token { margin-right: 2px; }
 
 /* Row actions: shown when the row is hovered or holds focus. */

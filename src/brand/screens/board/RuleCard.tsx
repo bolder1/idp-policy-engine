@@ -1,49 +1,65 @@
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { motion } from 'motion/react'
-import { ArrowDown, ArrowUp, Copy, GripVertical, Home, Lock, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, ChevronDown, Copy, GripVertical, Home, Lock, Split, Trash2 } from 'lucide-react'
 
 import { Toggle } from '../../kit'
-import { conditionType, type Condition, type Rule } from '../../data'
+import { type Rule } from '../../data'
 import type { NameLookup } from '../predicate-prose'
 import type { StepKind } from '../simulate'
 import type { RuleState } from '../rule-form'
-import { TONE } from './model'
-import { IfBlock, type NextRule } from './IfBlock'
-import { GROUP_TONE, groupIcon } from './tones'
+import { DECISION_NAME, TONE } from './model'
+import { IfBlock, IfChip, type NextRule } from './IfBlock'
 
 /* -----------------------------------------------------------------------------
-   A card on the chain — one rule, read whole.
+   A card on the chain — one rule, read whole, or read short.
 
    Zapier's card shows an app mark, a number and a name, and hides what the
-   step does behind a click. A rule cannot afford that: what it checks and what
-   it decides ARE the rule, and a chain of five names says nothing about which
-   sign-in falls where. So the card reads its WHEN as brackets and its THEN as
-   the journey the person will walk, at a size you can scan at 70% zoom.
-   -------------------------------------------------------------------------- */
+   step does behind a click. A rule cannot afford that by default: what it
+   checks and what it decides ARE the rule, and a chain of five names says
+   nothing about which sign-in falls where. So the card reads its WHEN as
+   brackets and its THEN as the journey the person will walk, at a size you can
+   scan at 70% zoom.
+
+   But "read whole" stops paying at about six rules. A policy of eight, each
+   with four conditions, is a column taller than any screen — and the question
+   you have at that point is usually the ORDER, not the contents: which rule
+   catches this before that one. Reading the order should not mean scrolling
+   past everything you are not asking about.
+
+   So the body folds. Collapsed, the card keeps its number, its name, its state
+   and its switch, and trades the brackets for one line saying how many
+   conditions there are and what they decide — enough to keep the chain
+   readable as a chain. Expanded, it is the card it always was.
+
+   The fold is CSS, not Motion, and that is deliberate: `grid-template-rows`
+   from `0fr` to `1fr` animates height without measuring anything, so the
+   siblings below simply reflow — no projection, no snapshot, nothing for the
+   chain's own `layout` animation to fight. See the note on `.bb__fold`. */
 
 const STATE_LABEL: Record<RuleState, string> = { ready: 'Ready', setup: 'Needs setup', warn: 'Check' }
 
-/** One condition, as a chip. Shared by the card and the inspector's readback. */
-export function CondChip({ c, resolve }: { c: Condition; resolve: NameLookup }) {
-  const t = conditionType(c.typeId)
-  const Ico = groupIcon(t.group)
-  const unset = c.values.filter(Boolean).length === 0
-  const value = unset
-    ? 'no value'
-    : t.valueKind === 'zone' || t.valueKind === 'fingerprint' || t.valueKind === 'hook' || t.valueKind === 'group' || t.valueKind === 'user'
-      ? c.values.map((v) => resolve(t.valueKind as 'zone', v) ?? v).join(', ')
-      : t.valueKind === 'time'
-        ? `${c.values[0] ?? '09:00'}–${c.values[1] ?? '17:00'}`
-        : c.values.join(', ')
+/* The card in one line, for when the body is folded away.
+
+   It says the two things the brackets would have said and the head does not:
+   how much test there is, and what the test decides. A count rather than the
+   conditions themselves, because the point of folding is to stop reading them
+   — and "3 conditions" is still enough to tell a broad rule from a narrow one
+   while you are scanning for order.
+
+   "any sign-in" rather than "0 conditions" for the empty case: a rule with no
+   conditions does not test less, it tests nothing, and it catches everything
+   that reaches it. That is the fact worth putting on a folded card. */
+function CardSummary({ rule }: { rule: Rule }) {
+  const n = rule.when.cards.reduce((sum, k) => sum + k.conditions.length, 0)
   return (
-    <span className={`bb__cond is-tone-${GROUP_TONE[t.group] ?? 'neutral'} ${unset ? 'is-unset' : ''}`} title={`${t.label} ${c.operator} ${value}`}>
-      <i aria-hidden>
-        <Ico size={10} strokeWidth={2} />
-      </i>
-      {t.label}
-      <em>{c.operator}</em>
-      <b>{value}</b>
-    </span>
+    <div className="bb__cardsum">
+      <span className="bb__ifbranch" aria-hidden>
+        <Split size={11} strokeWidth={2} />
+      </span>
+      <span className="bb__cardsum__n">{n === 0 ? 'any sign-in' : `${n} condition${n === 1 ? '' : 's'}`}</span>
+      <ArrowRight size={11} strokeWidth={2} aria-hidden />
+      <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>
+    </div>
   )
 }
 
@@ -58,10 +74,12 @@ export function RuleCard({
   landed,
   shadowed,
   dragging,
+  expanded,
   resolve,
   canUp,
   canDown,
   onSelect,
+  onToggleExpand,
   onToggle,
   onMove,
   onDuplicate,
@@ -81,10 +99,13 @@ export function RuleCard({
   landed: boolean
   shadowed: boolean
   dragging: boolean
+  /** Whether the WHEN/THEN body is unfolded. Owned by the host, not the card. */
+  expanded: boolean
   resolve: NameLookup
   canUp: boolean
   canDown: boolean
   onSelect: () => void
+  onToggleExpand: () => void
   onToggle: (on: boolean) => void
   onMove: (dir: -1 | 1) => void
   onDuplicate: () => void
@@ -105,7 +126,7 @@ export function RuleCard({
          the first — each measured a position the other was mid-way through
          changing, which is the small shiver a reorder used to end on. One
          element animates the move, and it is the one that moves. */
-      className={`bb__card is-${tone} ${selected ? 'is-selected' : ''} ${rule.enabled ? '' : 'is-off'} ${shadowed ? 'is-shadowed' : ''} ${dragging ? 'is-dragging' : ''} ${kindClass}`}
+      className={`bb__card is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${rule.enabled ? '' : 'is-off'} ${shadowed ? 'is-shadowed' : ''} ${dragging ? 'is-dragging' : ''} ${kindClass}`}
       /* No style prop while dragging, deliberately. Board writes this element's
          transform directly on every pointer move; a `style` React manages would
          be reset to a stale offset on the next re-render, which is the classic
@@ -184,6 +205,25 @@ export function RuleCard({
 
         <div className="bb__cardmeta" onClick={(e) => e.stopPropagation()}>
           <span className={`bb__state ${rule.enabled ? `is-${state}` : 'is-off'}`}>{rule.enabled ? STATE_LABEL[state] : 'Off'}</span>
+          {/* The fold, on the card rather than only on the toolbar.
+
+              The toolbar switch sets the whole chain, which is the right
+              control for "show me the order" and the wrong one for "show me
+              THIS one" — the common move is to fold everything and then open
+              the two rules you are comparing. So the card carries its own, and
+              the host remembers it as an override of whatever the toolbar last
+              said. `aria-expanded` names the region it opens. */}
+          <button
+            type="button"
+            className="bb__act bb__fold__btn"
+            aria-expanded={expanded}
+            aria-controls={`bb-rule-${rule.id}-body`}
+            aria-label={expanded ? `Hide what rule ${index + 1} checks` : `Show what rule ${index + 1} checks`}
+            title={expanded ? 'Fold' : 'Unfold'}
+            onClick={onToggleExpand}
+          >
+            <ChevronDown size={13} strokeWidth={2} />
+          </button>
           <span className="bb__acts">
             <button type="button" className="bb__act" aria-label="Move up" disabled={!canUp} onClick={() => onMove(-1)}>
               <ArrowUp size={13} strokeWidth={2} />
@@ -202,19 +242,41 @@ export function RuleCard({
         </div>
       </div>
 
-      <div className="bb__cardbody">
-        <IfBlock
-          rule={rule}
-          next={next}
-          resolve={resolve}
-          token={
-            landed ? (
-              <motion.span layoutId="bb-token" className="bb__token" aria-hidden transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
-                ●
-              </motion.span>
-            ) : undefined
-          }
-        />
+      {/* Two folds, opposite ways round.
+
+          The summary shrinks as the body grows, so the card never shows both
+          readings of itself at once and never jumps: one grid row goes 1fr→0fr
+          while the other goes 0fr→1fr, on the same curve, and the height
+          between them is continuous.
+
+          Both stay MOUNTED at zero height rather than being conditionally
+          rendered. `grid-template-rows` has nothing to animate from if the
+          content arrives in the same frame as the class, so unmounting the
+          folded half would make the first press of the chevron jump and every
+          press after it glide. Mounted, hidden by `overflow` and taken out of
+          the tab order by `inert`, both directions animate identically. */}
+      <div className="bb__fold bb__fold--sum" aria-hidden={expanded} {...(expanded ? { inert: '' as unknown as boolean } : {})}>
+        <div>
+          <CardSummary rule={rule} />
+        </div>
+      </div>
+      <div className="bb__fold bb__fold--body" id={`bb-rule-${rule.id}-body`} {...(expanded ? {} : { inert: '' as unknown as boolean })}>
+        <div>
+          <div className="bb__cardbody">
+            <IfBlock
+              rule={rule}
+              next={next}
+              resolve={resolve}
+              token={
+                landed ? (
+                  <motion.span layoutId="bb-token" className="bb__token" aria-hidden transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
+                    ●
+                  </motion.span>
+                ) : undefined
+              }
+            />
+          </div>
+        </div>
       </div>
 
       {traceKind && traceKind !== 'unreached' && traceReason && (
@@ -236,7 +298,9 @@ export function TerminalCard({
   selected,
   landed,
   reached,
+  expanded,
   onSelect,
+  onToggleExpand,
   cardRef,
 }: {
   rule: Rule
@@ -245,7 +309,9 @@ export function TerminalCard({
   landed: boolean
   /** Whether the rehearsal fell through to here. Null when nothing is running. */
   reached: boolean | null
+  expanded: boolean
   onSelect: () => void
+  onToggleExpand: () => void
   cardRef: (el: HTMLDivElement | null) => void
 }) {
   const tone = TONE[rule.decision]
@@ -254,7 +320,7 @@ export function TerminalCard({
       ref={cardRef}
       layout
       transition={{ type: 'spring', stiffness: 520, damping: 40 }}
-      className={`bb__card is-terminal is-${tone} ${selected ? 'is-selected' : ''} ${reached === true ? 'is-hit' : reached === false ? 'is-unreached' : ''}`}
+      className={`bb__card is-terminal is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${reached === true ? 'is-hit' : reached === false ? 'is-unreached' : ''}`}
       /* The same shape as every other card: a group named by its title
          button. It has no inner controls to hide, so the old whole-card button
          cost nothing here — but `aria-pressed` is a toggle's attribute and
@@ -296,22 +362,53 @@ export function TerminalCard({
             <Lock size={10} strokeWidth={2.2} aria-hidden />
             Locked
           </span>
+          {/* A view control, so it is allowed here.
+
+              The argument for this card carrying no buttons is about the
+              POLICY: move, duplicate, delete and the switch would all promise
+              a change the default cannot make. Folding changes nothing about
+              the rule, only how much of it is drawn — and a chain set to
+              Outline with one card still at full height reads as a card that
+              did not hear the instruction. */}
+          <button
+            type="button"
+            className="bb__act bb__fold__btn"
+            aria-expanded={expanded}
+            aria-controls="bb-terminal-body"
+            aria-label={expanded ? 'Hide what the default does' : 'Show what the default does'}
+            title={expanded ? 'Fold' : 'Unfold'}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleExpand()
+            }}
+          >
+            <ChevronDown size={13} strokeWidth={2} />
+          </button>
         </div>
       </div>
-      <div className="bb__cardbody">
-        <IfBlock
-          terminal
-          rule={rule}
-          next={null}
-          resolve={resolve}
-          token={
-            landed ? (
-              <motion.span layoutId="bb-token" className="bb__token" aria-hidden transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
-                ●
-              </motion.span>
-            ) : undefined
-          }
-        />
+      <div className="bb__fold bb__fold--sum" aria-hidden={expanded} {...(expanded ? { inert: '' as unknown as boolean } : {})}>
+        <div>
+          <CardSummary rule={rule} />
+        </div>
+      </div>
+      <div className="bb__fold bb__fold--body" id="bb-terminal-body" {...(expanded ? {} : { inert: '' as unknown as boolean })}>
+        <div>
+          <div className="bb__cardbody">
+            <IfBlock
+              terminal
+              rule={rule}
+              next={null}
+              resolve={resolve}
+              token={
+                landed ? (
+                  <motion.span layoutId="bb-token" className="bb__token" aria-hidden transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
+                    ●
+                  </motion.span>
+                ) : undefined
+              }
+            />
+          </div>
+        </div>
       </div>
     </motion.div>
   )

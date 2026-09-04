@@ -58,6 +58,9 @@ export function Board({
   onDuplicate,
   onDelete,
   onHover,
+  reserveOnOpen,
+  expandedOf,
+  onToggleExpand,
   children,
 }: {
   policy: Policy
@@ -74,6 +77,21 @@ export function Board({
   onDuplicate: (i: number) => void
   onDelete: (i: number) => void
   onHover: (i: number | null) => void
+  /** Whether this rule's body is unfolded. Held by the host so it survives reorder. */
+  expandedOf: (ruleId: string) => boolean
+  onToggleExpand: (ruleId: string) => void
+  /* Width to hold back on the OPENING Fit, for a panel that is not there yet.
+
+     The board opens with nothing selected, so there is no panel at first paint
+     and a measured Fit centres the chain across the whole stage. The first
+     thing anybody does is click a card — which mounts 400px of panel over the
+     right-hand end of the chain that was just centred without it, and leaves it
+     there until somebody finds the Fit button. Every board, every policy.
+
+     So the opening Fit reserves the width the panel is about to take. The Fit
+     BUTTON never does: it fits what is actually on screen, which is the right
+     answer for a deliberate press. */
+  reserveOnOpen: number
   /** Floating chrome the host wants over the stage — pips, the save bar. */
   children?: ReactNode
 }) {
@@ -177,7 +195,7 @@ export function Board({
   )
 
   /* --- Fit ----------------------------------------------------------------- */
-  const fitTo = useCallback((ms: number) => {
+  const fitTo = useCallback((ms: number, reserve = 0) => {
     const s = stage.current
     const w = world.current
     if (!s || !w) return
@@ -189,7 +207,7 @@ export function Board({
        each of those frames, which is the cost this file spent the day removing.
        Reading it here costs one layout query, once, on a button press. */
     const panel = s.parentElement?.querySelector('.bb__insp') as HTMLElement | null
-    const covered = panel && !s.parentElement?.classList.contains('is-insp-closed') ? panel.offsetWidth + 24 : 0
+    const covered = panel && !s.parentElement?.classList.contains('is-insp-closed') ? panel.offsetWidth + 24 : reserve
     const sw = s.clientWidth - covered
     /* The world is scaled, so `offsetWidth` is the only honest width — a
        bounding rect here would return the width AT the current zoom and Fit
@@ -208,9 +226,12 @@ export function Board({
   useLayoutEffect(() => {
     // Once, on mount, and instantly — an opening animation on the first paint
     // is a canvas that arrives late rather than one that arrives.
-    const id = requestAnimationFrame(() => fitTo(0))
+    const id = requestAnimationFrame(() => fitTo(0, reserveOnOpen))
     return () => cancelAnimationFrame(id)
-  }, [fitTo])
+    // Mount only. `reserveOnOpen` is the panel's width and the grip can change
+    // it, but this effect is the opening frame and must not re-run for that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* --- Pan ----------------------------------------------------------------- */
   const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -507,6 +528,8 @@ export function Board({
                       landed={landedOn === ri}
                       shadowed={shadowed.includes(ri)}
                       dragging={isDragged}
+                      expanded={expandedOf(r.id)}
+                      onToggleExpand={() => onToggleExpand(r.id)}
                       resolve={resolve}
                       canUp={ri > 0}
                       canDown={ri < policy.rules.length - 1}
@@ -532,6 +555,15 @@ export function Board({
               resolve={resolve}
               selected={selection.kind === 'fallback'}
               landed={landedOn === 'terminal'}
+              /* Keyed on the literal, not on the rule's id.
+
+                 `terminal` falls back to `fallbackRule()` when the policy has
+                 never stored one, and that call mints a fresh id on every
+                 render — a fold remembered against it would be forgotten each
+                 frame. 'fallback' is what the selection already calls this
+                 card, so the two agree. */
+              expanded={expandedOf('fallback')}
+              onToggleExpand={() => onToggleExpand('fallback')}
               reached={trace && inAudience && revealed >= trace.result.steps.length ? hit === null : trace && inAudience ? false : null}
               onSelect={() => onSelect({ kind: 'fallback' })}
               cardRef={() => {}}

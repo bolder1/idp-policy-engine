@@ -56,7 +56,23 @@ export const ckey = (c: Condition) => `${c.typeId}|${c.operator}|${[...c.values]
    that: `a∧b ∨ c` and `a ∨ b∧c` share leaves and differ here. */
 export function sig(p: Predicate): string {
   return p.cards
-    .map((k) => k.conditions.map(ckey).sort().join(cardJoin(k) === 'and' ? '∧' : '∨'))
+    .map((k) => {
+      const inner = k.conditions.map(ckey).sort().join(cardJoin(k) === 'and' ? '∧' : '∨')
+      /* Bracketed whenever a card holds more than one leaf, unconditionally.
+
+         Without the brackets the nesting characters do not actually nest, and
+         the promise three paragraphs up — that this distinguishes a pure
+         REGROUPING — was false in the case most likely to occur. One OR-card
+         holding A and B flattens to `A∨B`; two default cards holding A and B
+         join with the trunk's `∨` and produce `A∨B` as well. Same string, two
+         different rules, because the card's joiner happened to equal the
+         trunk's and nothing marked where one card stopped.
+
+         Bracketing only when the card's joiner DIFFERS from the trunk's fixes
+         the AND pair and leaves that case exactly as broken. A bracket per
+         multi-leaf card costs two characters and makes the nesting real. */
+      return k.conditions.length > 1 ? `(${inner})` : inner
+    })
     .sort()
     .join(topJoin(p) === 'or' ? '∨' : '∧')
 }
@@ -198,5 +214,11 @@ export function credit(p: Predicate, passed: (c: Condition) => boolean): { card:
 /** Card A, card B — cards are lettered because they have no evaluation order. Rules are numbered; the two must not be confusable. */
 export const cardLetter = (i: number) => String.fromCharCode(65 + (i % 26)) + (i >= 26 ? String(Math.floor(i / 26)) : '')
 
-/** Name a card the way the UI does: its label if the author gave it one, otherwise its letter. */
-export const cardName = (card: ConditionCard, i: number) => card.label?.trim() || `card ${cardLetter(i)}`
+/* Name a card the way the UI does: its label if the author gave it one,
+   otherwise its letter.
+
+   "branch", not "card". The gauntlet deals a deck of CARDS — thirteen hostile
+   sign-ins — and the Check sheet sits directly beside the rule being edited,
+   so one word named two different things on adjacent surfaces. The type stays
+   `ConditionCard`; only what the product says out loud changes. */
+export const cardName = (card: ConditionCard, i: number) => card.label?.trim() || `branch ${cardLetter(i)}`

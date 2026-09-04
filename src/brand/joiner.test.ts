@@ -46,6 +46,34 @@ describe('the defaults are the old semantics', () => {
     const asAnd: Predicate = { ...when(card(A, B), card(C)), join: 'and' }
     expect(sig(asAnd)).not.toBe(sig(when(card(A, B), card(C))))
   })
+
+  /* The case the nesting characters were supposed to catch and did not.
+
+     `sig` promises to tell a pure regrouping apart — same leaves, different
+     cards — because the stale-estimate check in diagnostics and the twin
+     lookup in the gauntlet both ask it that question. It joined an or-run with
+     `∨` and joined the cards with `∨` as well, so one or-card holding A and B
+     signed as `A∨B`, and two default cards holding A and B signed as `A∨B`
+     too. Two different rules, one string.
+
+     It survived because the AND pair below it — the shape everybody reaches
+     for first — was distinguishable, so the promise looked kept. */
+  it('tells one or-card apart from two cards holding the same leaves', () => {
+    const oneOrCard: Predicate = { join: 'or', cards: [{ ...card(A, B), join: 'or' }] }
+    const twoCards = when(card(A), card(B))
+    expect(sig(oneOrCard)).not.toBe(sig(twoCards))
+  })
+
+  it('tells one and-card apart from two cards holding the same leaves', () => {
+    expect(sig(when(card(A, B)))).not.toBe(sig(when(card(A), card(B))))
+  })
+
+  /* Regrouping is one drag on a canvas, so this is the difference between the
+     save bar saying "unsaved changes" and the change list being able to name
+     what changed. */
+  it('signs a three-leaf run differently from the same leaves split in two', () => {
+    expect(sig(when(card(A, B, C)))).not.toBe(sig(when(card(A, B), card(C))))
+  })
 })
 
 describe('a card joins its own conditions', () => {

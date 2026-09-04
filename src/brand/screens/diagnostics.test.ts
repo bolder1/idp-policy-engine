@@ -145,6 +145,35 @@ describe('contradictory conditions', () => {
     expect(ids(p)).toContain('contradiction')
   })
 
+  /* The check's own comment used to say "inside one card is the whole test",
+     and it was right until a card could be an or-run. In one, the pair is not
+     a contradiction at all: "is India OR is not India" matches everything,
+     which is the opposite of unsatisfiable — so an error here blocked
+     publishing a rule the author had every right to write, with no edit that
+     would clear it short of deleting a condition they meant. */
+  it('stays quiet on an opposed pair inside an or-card — that matches everything, not nothing', () => {
+    const p = policy([
+      rule({
+        when: {
+          cards: [{ ...card(cond('country', 'is', ['India']), cond('country', 'is not', ['India'])), join: 'or' }],
+        },
+      }),
+    ])
+    expect(ids(p)).not.toContain('contradiction')
+  })
+
+  /* Identity by `ckey`, which sorts the values, rather than by stringifying
+     them in the order they were typed. Same two countries, other order, same
+     condition — and the duplicate went unreported. */
+  it('reports a repeat whose values were typed in the other order', () => {
+    const p = policy([
+      rule({
+        when: when(card(cond('country', 'is', ['India', 'Germany']), cond('country', 'is', ['Germany', 'India']))),
+      }),
+    ])
+    expect(ids(p)).toContain('duplicate')
+  })
+
   it('reports an exact repeat as info, not an error — it is redundant, not broken', () => {
     const p = policy([
       rule({ when: when(card(cond('country', 'is', ['India']), cond('country', 'is', ['India']))) }),

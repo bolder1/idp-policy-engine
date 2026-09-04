@@ -24,7 +24,7 @@ import {
 
 import { Counter, MenuButton, Modal, Tip, TipDot, Toggle, type MenuItem } from '../kit'
 import { Picker } from '../picker'
-import { cardLetter, ckey, duplicatedAcrossCards } from '../predicate'
+import { cardJoin, cardLetter, ckey, duplicatedAcrossCards, topJoin } from '../predicate'
 import { predicateParts, type NameLookup } from './predicate-prose'
 import {
   CONDITION_CATALOGUE,
@@ -158,8 +158,15 @@ export function ruleState(diags: Diagnostic[]): RuleState {
 
    That control rewrote EVERY joiner in the rule at once, so flipping it on a
    grouped predicate would silently flatten the brackets somebody had authored.
-   There is nothing left for it to do: a card is all-AND by construction, cards
-   are alternatives by construction, and neither is a setting. */
+
+   Its replacement is per level, not per rule: `ConditionCard.join` and
+   `Predicate.join` both exist and both are settings, changed on the board's
+   editor one level at a time. The sentence that stood here — "a card is
+   all-AND by construction, cards are alternatives by construction, and neither
+   is a setting" — was true when it was written and became false when those two
+   fields landed, and this section went on printing "and", "OR" and "All of
+   these must be true" regardless of what the rule actually held. It reads what
+   the rule holds now. */
 
 /* `seedValues` lived here. It filled a new condition with the first zone, the
    first profile or the first option in its list, so a freshly added row would
@@ -285,7 +292,11 @@ export function Section({
    that opens a new box. Nobody has to be told what they mean.
    -------------------------------------------------------------------------- */
 
+/* One per joiner. This was a lone constant printed under every card, from
+   before a card could be an or-run — so a card the author had switched to OR
+   still told them every condition in it had to be true. */
 const AND_HINT = 'All of these must be true'
+const OR_HINT = 'Any one of these is enough'
 
 /** A card, addressed by id — never by index, because cards move. */
 type CardPatch = (cardId: string, next: ConditionCard | null) => void
@@ -328,14 +339,41 @@ export function WhenSection({
   const setAdding = hoisted ? onCatalogue! : setOwnAdding
 
   const cards = rule.when.cards
-  const setCards = (next: ConditionCard[]) => onPatch({ when: { cards: next } })
+  /* `...rule.when`, not a fresh object.
 
-  /* Removing the last condition removes the card. That invariant is what makes
-     "one card is one unbroken run of ANDs" true, and the linter is built on it —
-     an empty card would match everything and silently turn the rule into a
-     catch-all. */
+     This wrote `{ cards: next }`, which drops `when.join` — so the moment
+     anybody touched a condition here, a predicate whose cards were joined by
+     AND silently reverted to OR. Every edit in this section goes through this
+     one function, so the whole section had it, and it was silent: no diff, no
+     warning, and an undo entry that names the edit you meant rather than the
+     joiner you lost.
+
+     The board's editor carries the identical line with the identical fix and a
+     note saying so. This one was missed, which is the argument for the two
+     builders eventually sharing a writer rather than each keeping their own. */
+  const setCards = (next: ConditionCard[]) => onPatch({ when: { ...rule.when, cards: next } })
+
+  /* Removing the last condition removes the card — unless somebody made the
+     card on purpose.
+
+     "An empty card matches everything" is why this rule exists, and it still
+     holds. But a GROUP is a bracket an author asked for, and deleting it the
+     instant it is cleared out means emptying a group to refill it makes the
+     group vanish under you, with no way back but Add group. The board's editor
+     draws that distinction; this one did not, so a group authored there
+     disappeared on the first edit made here.
+
+     A loose run is not something anybody made — it is where ungrouped
+     conditions live — so an empty one still has nothing to represent and goes. */
   const patchCard: CardPatch = (cardId, next) =>
-    setCards(cards.flatMap((k) => (k.id !== cardId ? [k] : next && next.conditions.length > 0 ? [next] : [])))
+    setCards(
+      cards.flatMap((k) => {
+        if (k.id !== cardId) return [k]
+        if (!next) return []
+        if (next.conditions.length > 0) return [next]
+        return next.grouped ? [next] : []
+      }),
+    )
 
   const addCondition = (cardId: string, typeId: string) => {
     const t = conditionType(typeId)
@@ -428,11 +466,13 @@ export function WhenSection({
             {cards.map((k, ci) => (
               <Fragment key={k.id}>
                 {ci > 0 && (
-                  /* Not a control. The relationship between two alternatives is
-                     fixed by the shape, so making it look clickable would be a
-                     promise the model cannot keep. */
+                  /* Not a control here — the board's editor is where a joiner
+                     is changed — but it must SAY the joiner the rule actually
+                     holds. It printed "OR" unconditionally, from before the
+                     trunk had a joiner at all, so a predicate whose
+                     alternatives are ANDed described itself as alternatives. */
                   <li className="bf__or" aria-hidden>
-                    <span>OR</span>
+                    <span>{topJoin(rule.when).toUpperCase()}</span>
                   </li>
                 )}
                 <CardBlock
@@ -533,9 +573,9 @@ function CardBlock({
     set(k.conditions.map((c) => (c.id === id ? { ...c, ...p } : c)))
 
   const menu: MenuItem[] = [
-    { id: 'name', label: k.label ? 'Rename this alternative' : 'Name this alternative' },
-    { id: 'merge', label: 'Merge into the alternative above', disabled: index === 0, divide: true },
-    { id: 'delete', label: 'Delete this alternative', disabled: total === 1 },
+    { id: 'name', label: k.label ? 'Rename this branch' : 'Name this branch' },
+    { id: 'merge', label: 'Merge into the branch above', disabled: index === 0, divide: true },
+    { id: 'delete', label: 'Delete this branch', disabled: total === 1 },
   ]
 
   return (
@@ -548,14 +588,14 @@ function CardBlock({
         </span>
         <input
           className="bf__cardname"
-          aria-label={`Name for alternative ${cardLetter(index)}`}
-          placeholder={total > 1 ? 'Name this alternative (optional)' : ''}
+          aria-label={`Name for branch ${cardLetter(index)}`}
+          placeholder={total > 1 ? 'Name this branch (optional)' : ''}
           value={k.label ?? ''}
           onChange={(e) => onPatch(k.id, { ...k, label: e.target.value || undefined })}
         />
-        <em className="bf__cardcount">{AND_HINT}</em>
+        <em className="bf__cardcount">{cardJoin(k) === 'and' ? AND_HINT : OR_HINT}</em>
         <MenuButton
-          label={`Alternative ${cardLetter(index)} actions`}
+          label={`Branch ${cardLetter(index)} actions`}
           iconOnly
           icon={MoreHorizontal}
           size="sm"
@@ -565,7 +605,7 @@ function CardBlock({
             if (id === 'delete') return onPatch(k.id, null)
             if (id === 'name') {
               const el = document.querySelector<HTMLInputElement>(
-                `[aria-label="Name for alternative ${cardLetter(index)}"]`,
+                `[aria-label="Name for branch ${cardLetter(index)}"]`,
               )
               el?.focus()
             }
@@ -669,13 +709,13 @@ function ConditionRow({
     { id: 'dup', label: 'Duplicate' },
     {
       id: 'split',
-      label: 'Split into a new alternative',
-      hint: 'These are required together. Split only if this should be an alternative.',
+      label: 'Split into a new branch',
+      hint: 'These are required together. Split only if this should be a separate branch.',
       disabled: !canSplit,
     },
     ...cards
       .filter((k) => k.id !== cardId)
-      .map((k, i) => ({ id: `move:${k.id}`, label: `Move to ${k.label?.trim() || `alternative ${cardLetter(i)}`}` })),
+      .map((k, i) => ({ id: `move:${k.id}`, label: `Move to ${k.label?.trim() || `branch ${cardLetter(i)}`}` })),
     { id: 'remove', label: 'Remove', divide: true },
   ]
 
@@ -718,8 +758,8 @@ function ConditionRow({
       <span className="bf__condstate">
         {unset && <span className="bf__condbadge">Needs a value</span>}
         {!unset && duplicated && (
-          <Tip text="This exact condition also appears in another alternative." placement="top">
-            <span className="bf__conddupe" aria-label="Repeated in another alternative">
+          <Tip text="This exact condition also appears in another branch." placement="top">
+            <span className="bf__conddupe" aria-label="Repeated in another branch">
               <Copy size={11} strokeWidth={2} aria-hidden />
             </span>
           </Tip>
@@ -779,8 +819,13 @@ function ValueControl({
               .filter((h) => h.mode === 'sync')
               .map((h) => ({ value: h.id, label: h.name, meta: `${h.timeoutMs}ms` }))
 
+    /* 'fingerprint', not 'fingerprints'. The BrandScreen union spells it
+       singular, so "Manage device profiles →" navigated to a screen name that
+       matches nothing and the console rendered blank. The board's copy of this
+       same ternary has it right — which is the drift two renderers of one thing
+       produce, and the reason they are being merged. */
     const screen =
-      type.valueKind === 'zone' ? 'zones' : type.valueKind === 'fingerprint' ? 'fingerprints' : 'hooks'
+      type.valueKind === 'zone' ? 'zones' : type.valueKind === 'fingerprint' ? 'fingerprint' : 'hooks'
     const footer =
       type.valueKind === 'zone'
         ? 'Manage zones →'
@@ -921,13 +966,13 @@ function Readback({ rule, resolve }: { rule: Rule; resolve: NameLookup }) {
     <span className="bf__readexpr">
       {parts.map((k, i) => (
         <Fragment key={k.id}>
-          {i > 0 && <b className="bf__reador">or</b>}
+          {i > 0 && <b className="bf__reador">{topJoin(rule.when)}</b>}
           <span className="bf__readcard">
             {parts.length > 1 && <i aria-hidden>(</i>}
             {k.label && <u>{k.label}:</u>}
             {k.clauses.map((cl, j) => (
               <Fragment key={cl.id}>
-                {j > 0 && <b className="bf__readand">and</b>}
+                {j > 0 && <b className="bf__readand">{k.join}</b>}
                 <span data-node-id={cl.id}>{cl.text}</span>
               </Fragment>
             ))}

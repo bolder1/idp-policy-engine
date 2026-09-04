@@ -716,12 +716,26 @@ export function reidRule(r: Rule): Rule {
   return {
     ...r,
     id: `r${ruleSeq}`,
+    /* Copied, not shared.
+
+       This re-id'd the rule, its cards and its conditions and then handed both
+       copies the same `values`, `secondFactorMethods` and `methodChain` arrays
+       — a spread is one level deep. Nothing ever mutated one of those in place,
+       so nothing broke, and the safety was a property of every current caller
+       rather than of this function.
+
+       That stops being good enough the moment a rule outlives the policy it
+       came from. `duplicate` and `copyRuleInto` re-id and immediately hand the
+       result to a setter; a saved rule is held for the session and inserted
+       into many policies, so a single shared array would reach all of them. */
+    secondFactorMethods: r.secondFactorMethods ? [...r.secondFactorMethods] : undefined,
+    methodChain: r.methodChain ? [...r.methodChain] : undefined,
     when: {
       join: r.when.join,
       cards: r.when.cards.map((k) => ({
         ...k,
         id: nextCardId(),
-        conditions: k.conditions.map((c) => ({ ...c, id: nextCondId() })),
+        conditions: k.conditions.map((c) => ({ ...c, id: nextCondId(), values: [...c.values] })),
       })),
     },
   }

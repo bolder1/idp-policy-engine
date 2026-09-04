@@ -479,7 +479,7 @@ function ConditionRow({
 
       <IfChip tone={tone} icon={<Ico size={9} strokeWidth={2.2} />} title={dupe ? `${t.label} — also in another way in` : GROUP_LABEL[t.group] ?? t.group}>
         {t.label}
-        {dupe && <span className="bb__ifdupe" aria-label="Also in another alternative">·2</span>}
+        {dupe && <span className="bb__ifdupe" aria-label="Also in another branch">·2</span>}
       </IfChip>
 
       <span className="bb__ifop">

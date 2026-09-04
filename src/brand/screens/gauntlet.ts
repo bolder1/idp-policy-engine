@@ -397,12 +397,21 @@ export interface ProposedFix {
 
 /* Identity of a predicate. Points at `sig`, the one canonical form, so a twin
    is recognised by the same rule the linter and the change list use. A card
-   spec here is one AND-run, which is exactly one card. */
+   spec here is one AND-run, which is exactly one card.
+
+   It said that and did not do it. This built its own string — the same leaf
+   format, sorted the same way, joined with `␟` — while `sig` joins an AND-run
+   with `∧`. So `sig(r.when) === specKey(spec.conditions)` could only ever hold
+   for a spec of exactly ONE condition, where neither separator appears; every
+   multi-condition fix missed its own twin and fell through to proposing an
+   insert. A broader rule inserted above a narrower one is a shadow, which the
+   linter then refuses to publish — so the bug surfaced as an unpublishable
+   suggestion rather than as a wrong answer, which is why it survived.
+
+   Built through the real constructors now, so there is one canonical form and
+   this cannot drift from it again. */
 const specKey = (conditions: { typeId: string; operator: string; values: string[] }[]) =>
-  conditions
-    .map((c) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}`)
-    .sort()
-    .join('␟')
+  sig(when(card(...conditions.map((c) => cond(c.typeId, c.operator, [...c.values])))))
 
 export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
   const spec = round.challenge.fix

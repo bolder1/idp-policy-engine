@@ -257,8 +257,8 @@ export function diagnose(
         /* "Group" when the author made one, "alternative" when it is just
            where loose conditions live — the same two words the editor uses, so
            a finding names the thing you can see. */
-        title: k.grouped ? 'A group has no conditions' : 'An alternative has no conditions',
-        detail: `An empty ${k.grouped ? 'group' : 'alternative'} matches every sign-in, which silently turns this rule into a catch-all. Delete it, or give it a condition.`,
+        title: k.grouped ? 'A group has no conditions' : 'A branch has no conditions',
+        detail: `An empty ${k.grouped ? 'group' : 'branch'} matches every sign-in, which silently turns this rule into a catch-all. Delete it, or give it a condition.`,
       })
     }
 
@@ -399,14 +399,23 @@ export function diagnose(
     }
 
     /* --- Contradictory conditions -------------------------------------------
-       Same field asserted and denied on the same value, inside one card.
+       Same field asserted and denied on the same value, inside one AND card.
 
-       "Inside one card" is the whole test, and it is free. The old model had to
-       walk the joiners between two positions and prove every one of them was an
-       AND before it could claim both conditions were required; a card IS that
-       proof. Two conditions in different cards are alternatives and contradict
-       nothing. */
+       "Inside one card" used to be the whole test, and the comment here said
+       so: a card WAS an unbroken run of ANDs by construction, which is exactly
+       the proof that both conditions are required. `ConditionCard.join` ended
+       that. In an or-card the two are alternatives, and "X is a OR X is not a"
+       is not a contradiction — it matches everything, which is the opposite of
+       unsatisfiable.
+
+       Ungated, this raised a blocking ERROR on a rule that is perfectly
+       publishable, and the author had no way to satisfy it except to delete a
+       condition they meant. The joiner is the test now.
+
+       Two conditions in different cards are alternatives and contradict
+       nothing, which is unchanged. */
     for (const k of r.when.cards) {
+      const requiresBoth = cardJoin(k) === 'and'
       for (let a = 0; a < k.conditions.length; a++) {
         for (let b = a + 1; b < k.conditions.length; b++) {
           const ca = k.conditions[a]
@@ -416,7 +425,7 @@ export function diagnose(
           const overlap = ca.values.filter((v) => cb.values.includes(v))
           const opposed = NEGATIONS[cb.operator] === ca.operator || NEGATIONS[ca.operator] === cb.operator
 
-          if (opposed && overlap.length > 0) {
+          if (requiresBoth && opposed && overlap.length > 0) {
             out.push({
               id: `contradiction-${r.id}-${ca.id}-${cb.id}`,
               code: 'PE111',
@@ -424,9 +433,17 @@ export function diagnose(
               severity: 'error',
               ruleIndex: i,
               title: 'These conditions cancel out',
-              detail: `${conditionType(ca.typeId).label} is required to be both “${ca.operator} ${overlap.join(', ')}” and “${cb.operator} ${overlap.join(', ')}” in the same alternative. Nothing can satisfy both.`,
+              detail: `${conditionType(ca.typeId).label} is required to be both “${ca.operator} ${overlap.join(', ')}” and “${cb.operator} ${overlap.join(', ')}” in the same branch. Nothing can satisfy both.`,
             })
-          } else if (ca.operator === cb.operator && JSON.stringify(ca.values) === JSON.stringify(cb.values)) {
+            /* `ckey`, not `JSON.stringify(values)`. The stringify is
+               order-sensitive, so the same two values typed in the other order
+               read as two different conditions and the duplicate went
+               unreported — while `ckey` sorts, which is why it is the identity
+               function every other check in this file already uses.
+
+               Not gated on the joiner: a duplicate changes nothing in an
+               or-card either. */
+          } else if (ckey(ca) === ckey(cb)) {
             out.push({
               id: `duplicate-${r.id}-${ca.id}-${cb.id}`,
               code: 'PE112',
@@ -434,7 +451,7 @@ export function diagnose(
               severity: 'info',
               ruleIndex: i,
               title: 'Duplicate condition',
-              detail: `${conditionType(ca.typeId).label} “${ca.operator} ${ca.values.join(', ')}” is listed twice in the same alternative. The second one changes nothing.`,
+              detail: `${conditionType(ca.typeId).label} “${ca.operator} ${ca.values.join(', ')}” is listed twice in the same branch. The second one changes nothing.`,
             })
           }
         }

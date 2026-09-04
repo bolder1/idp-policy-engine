@@ -1730,3 +1730,51 @@ button.bb__idx::after {
   .bb:has(.bb__sheet) .bb__insp { display: none; }
   .bb__sheet { top: var(--space-3); height: auto; }
 }
+
+/* --- The predicate, read rather than edited ------------------------------------
+
+   What is left in the panel now that conditions are edited on the canvas. It is
+   deliberately not a summary: every condition is drawn with its value, grouped
+   by branch, joined by the words the rule actually holds. A readout that says
+   less than the rule does is a readout somebody has to open the canvas to
+   trust, which would make the canvas the only view and this a decoration. */
+.bb__readout { display: grid; gap: var(--space-3); }
+.bb__readout__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.bb__readout__what { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bb__readout__none {
+  margin: 0; padding: var(--space-3);
+  border-radius: var(--radius-md); background: var(--fb-notice-bg);
+  font-size: var(--fs-xs); color: var(--fb-notice-fg); line-height: 1.5;
+}
+.bb__readout__branches { display: grid; gap: var(--space-2); }
+.bb__readout__branch {
+  display: grid; gap: 3px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.bb__readout__branch.is-grouped { border-style: dashed; }
+.bb__readout__head {
+  display: flex; align-items: center; gap: 5px; margin-bottom: 2px;
+  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.bb__readout__empty { margin: 0; font-size: var(--fs-xs); color: var(--fb-notice-fg); }
+/* One joiner per level, printed between every pair — the setting itself lives
+   on the canvas, so here it is a reading and never a control. */
+.bb__readout__join, .bb__readout__trunk b {
+  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.bb__readout__join { padding-left: var(--space-2); }
+.bb__readout__trunk { display: flex; justify-content: center; padding: 1px 0; }
+.bb__readout__trunk b { color: var(--fb-notice-fg); }
+.bb__readout__cond {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px;
+  font-size: var(--fs-xs); color: var(--text-secondary);
+}
+.bb__readout__cond i { position: relative; top: 1px; color: var(--tone-fg, var(--text-tertiary)); }
+.bb__readout__label { font-weight: var(--fw-medium); color: var(--text-primary); }
+.bb__readout__cond em { font-style: normal; color: var(--text-muted); }
+.bb__readout__cond b { font-weight: var(--fw-medium); color: var(--text-primary); overflow-wrap: anywhere; }
+.bb__readout__cond b.is-unset { color: var(--fb-notice-fg); }

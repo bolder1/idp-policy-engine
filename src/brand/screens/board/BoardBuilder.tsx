@@ -14,6 +14,7 @@ import { canRedo, canUndo, commit, historyKey, historyOf, redo, undo, type Histo
 import { walk, type SimEnv } from '../simulate'
 import { Board } from './Board'
 import { Inspector } from './Inspector'
+import { ConditionCanvas } from '../canvas/ConditionCanvas'
 import type { Selection, Tab, Trace } from './model'
 
 import './board.css'
@@ -95,6 +96,13 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
      several minutes ago, and no way to say "all of them" except by finding and
      unfolding each one. A chain-wide control that cannot actually reach the
      whole chain is not worth having. */
+  /* Which rule's conditions are open on the canvas, by id.
+
+     By id and re-resolved every render, because undo can delete the rule under
+     an open canvas — and a canvas holding a rule that no longer exists would
+     commit it back on close. Same discipline as the selection, for the same
+     reason. */
+  const [editing, setEditing] = useState<string | null>(null)
   const [density, setDensity] = useState<'outline' | 'detailed'>('detailed')
   const [folds, setFolds] = useState<Record<string, boolean>>({})
   const expandedOf = (ruleId: string) => folds[ruleId] ?? density === 'detailed'
@@ -454,8 +462,21 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
     setTrace(null)
   }
 
+  /* Resolved every render, never held. */
+  const editAt = editing ? draft.rules.findIndex((r) => r.id === editing) : -1
+
   return (
-    <div ref={shell} className={`bb ${panelShown ? '' : 'is-insp-closed'} ${gripping ? 'is-gripping' : ''}`} style={{ '--bb-insp': `${inspW}px` } as React.CSSProperties}>
+    <>
+    <div
+      ref={shell}
+      className={`bb ${panelShown ? '' : 'is-insp-closed'} ${gripping ? 'is-gripping' : ''}`}
+      style={{ '--bb-insp': `${inspW}px` } as React.CSSProperties}
+      /* `.bb` IS this component's root — every float, the grip, the panel and
+         the leave dialog render inside it — so the canvas has to be a sibling.
+         Marking the root inert rather than the canvas is the difference between
+         a modal layer and a layer nobody can reach. */
+      inert={editAt >= 0}
+    >
       <Board
         policy={draft}
         selection={selection}
@@ -614,6 +635,7 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
           selection={selection}
           onPatchRule={patchRule}
           onPatchFallback={patchFallback}
+          onEditConditions={setEditing}
           onClose={() => setInspOpen(false)}
         />
       )}
@@ -717,5 +739,25 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
         </p>
       </Modal>
     </div>
+
+    {/* The canvas, over the builder rather than instead of it.
+
+        Rendered from here — below the `if (!saved) return` and after the
+        mutators — because it commits through the very same `patchRule` the
+        panel uses. One draft, one history, one `dirty`: Discard, the publish
+        gate, the leave guard and ⌘↵ all keep meaning what they mean while it is
+        open, and ⌘Z undoes the policy rather than a second private stack. */}
+    {editAt >= 0 && (
+      <ConditionCanvas
+        rule={draft.rules[editAt]}
+        index={editAt}
+        findings={diagnostics.filter((d) => d.ruleIndex === editAt)}
+        onChange={(next) => patchRule(editAt, { when: next })}
+        onUndo={() => setHist(undo)}
+        onRedo={() => setHist(redo)}
+        onClose={() => setEditing(null)}
+      />
+    )}
+    </>
   )
 }

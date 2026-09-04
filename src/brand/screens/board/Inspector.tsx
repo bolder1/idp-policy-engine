@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { Maximize2, Plus, X } from 'lucide-react'
+import { Maximize2, X } from 'lucide-react'
 
 import { Modal, Toggle } from '../../kit'
 import { fallbackRule, type Policy, type Rule } from '../../data'
+import { useNameLookup } from '../../store'
 import { TONE, type Selection } from './model'
 import { WhatEditor } from './WhatEditor'
-import { WhenEditor } from './WhenEditor'
+import { WhenReadout } from './WhenReadout'
 
 /* -----------------------------------------------------------------------------
    The inspector — the right pane, for whatever is selected on the board.
@@ -33,12 +34,14 @@ export function Inspector({
   selection,
   onPatchRule,
   onPatchFallback,
+  onEditConditions,
   onClose,
 }: {
   draft: Policy
   selection: Selection
   onPatchRule: (i: number, p: Partial<Rule>) => void
   onPatchFallback: (p: Partial<Rule>) => void
+  onEditConditions: (ruleId: string) => void
   onClose: () => void
 }) {
   /* Resolved once. `at` is -1 when the selected rule is gone — undone, deleted,
@@ -55,7 +58,7 @@ export function Inspector({
 
   const body = (inFocus: boolean) =>
     rule ? (
-      <RulePane rule={rule} index={at} draft={draft} focus={inFocus} onPatch={(p) => onPatchRule(at, p)} />
+      <RulePane rule={rule} index={at} draft={draft} focus={inFocus} onPatch={(p) => onPatchRule(at, p)} onEditConditions={() => rule && onEditConditions(rule.id)} />
     ) : (
       /* `?? fallbackRule()` rather than a truthiness gate: the default is drawn
          on the stage whether or not the policy has ever stored one, so
@@ -107,19 +110,20 @@ function RulePane({
   index,
   draft,
   onPatch,
+  onEditConditions,
   focus,
 }: {
   rule: Rule
   index: number
   draft: Policy
   onPatch: (p: Partial<Rule>) => void
+  /** Opens the canvas on this rule. The panel no longer edits conditions. */
+  onEditConditions: () => void
   /** In the wide dialog rather than the 400px column: IF and THEN sit side by
       side instead of one under the other. */
   focus?: boolean
 }) {
-  /* Just a nonce now. The catalogue is a dialog, so it has no anchor to be
-     positioned against — the same button pressed twice still opens twice. */
-  const [openAt, setOpenAt] = useState<{ nonce: number } | null>(null)
+  const resolve = useNameLookup()
   const leaves = rule.when.cards.reduce((n, k) => n + k.conditions.length, 0)
   /* Which rule catches a sign-in this one lets through. It belongs to THEN —
      it is the other half of "what happens" — so it is passed down there rather
@@ -175,20 +179,20 @@ function RulePane({
         <div className="bb__rulehead">
           <h3>If and then</h3>
           {leaves > 0 && <span className="bb__count">{leaves}</span>}
-          <button
-            type="button"
-            className="bb__secact"
-            aria-label="Add a condition"
-            title="Add a condition"
-            onClick={() => setOpenAt({ nonce: Date.now() })}
-          >
-            <Plus size={15} strokeWidth={2} />
-          </button>
         </div>
 
         <div className="bb__rulebody">
           <div className="bb__rulehalf">
-            <WhenEditor rule={rule} onPatch={onPatch} openAt={openAt} />
+            {/* Read here, edited on the canvas.
+
+                The panel used to hold the whole condition editor: an attribute
+                chip, an operator picker, one or more value controls and a row
+                of icon actions, per condition, in a 400px column. Every click
+                landed somewhere different. Conditions have one home now, and
+                this is the view of them that sits beside the rest of the rule —
+                the name, the outcome, the settings somebody changes in the same
+                sitting. */}
+            <WhenReadout rule={rule} resolve={resolve} onEdit={onEditConditions} />
           </div>
           <div className="bb__rulehalf">
             {/* The keyword, so the two halves read as one sentence rather than

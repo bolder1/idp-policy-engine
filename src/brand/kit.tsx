@@ -1228,6 +1228,14 @@ export function Drawer({
 const clampWidth = (want: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Math.min(want, typeof window === 'undefined' ? max : window.innerWidth - 120)))
 
+/* Every dialog currently open, innermost last.
+
+   Module-level rather than a context because it is answering a window-level
+   question — "who owns Escape right now" — and the dialogs that stack are not
+   always in one another's React tree: a picker portalled to the body sits
+   inside a dialog visually and beside it in the DOM. */
+const openDialogs: symbol[] = []
+
 export function Modal({
   open,
   onClose,
@@ -1275,13 +1283,27 @@ export function Modal({
     if (!open) return
     returnTo.current = document.activeElement as HTMLElement | null
 
+    /* This dialog's place in the stack.
+
+       Every open Modal used to listen for Escape on the window and close
+       itself, so two of them open at once meant one Escape closed both — back
+       out of a picker opened from inside a dialog and the dialog went with it,
+       losing whatever was being edited. Pushing an identity here and answering
+       only when this dialog is the innermost one makes Escape peel one layer,
+       which is what it means everywhere else in the product. */
+    const me = Symbol('dialog')
+    openDialogs.push(me)
+
     // Focus the panel itself rather than its first control: dialogs here open
     // with a heading, and starting on a button skips the sentence that says
     // what the dialog is for.
     const id = window.requestAnimationFrame(() => panel.current?.focus())
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') return onCloseRef.current()
+      if (e.key === 'Escape') {
+        if (openDialogs[openDialogs.length - 1] !== me) return
+        return onCloseRef.current()
+      }
       if (e.key !== 'Tab' || !panel.current) return
       const focusable = panel.current.querySelectorAll<HTMLElement>(
         'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
@@ -1303,6 +1325,8 @@ export function Modal({
     return () => {
       window.cancelAnimationFrame(id)
       window.removeEventListener('keydown', onKey)
+      const at = openDialogs.indexOf(me)
+      if (at !== -1) openDialogs.splice(at, 1)
       /* Only restore to a control that still exists. Some dialogs are opened by
          a trigger that navigates — the policy list's exposure cell opens the
          gauntlet and unmounts the whole table doing it — and calling focus() on

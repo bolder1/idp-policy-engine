@@ -110,6 +110,15 @@ export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup 
           {v.text}
         </IfChip>
       ))}
+      {/* Which half of the zone, when it is narrower than the zone as written.
+
+          A zone is an AND of a network section and a geographic one, and a
+          condition can now ask about either alone. Two rules that differ only
+          in that read as the same rule on the canvas without this — the one
+          thing a card must never do — and the card is where somebody decides
+          whether they need to open the panel at all. Absent when it is both,
+          because that is what the zone already means. */}
+      {c.scope && <IfKw tone="op">{c.scope === 'ip' ? 'on the network only' : 'by location only'}</IfKw>}
     </>
   )
 }
@@ -221,9 +230,25 @@ export function IfBlock({ rule, next, resolve, token, terminal }: { rule: Rule; 
              is worse than a card that shows less. */
           const join = cardJoin(k)
           return (
-          <div key={k.id} className="bb__ifgroup" title={k.label}>
+          /* A frame means a group somebody MADE, and this drew one round every
+             card unconditionally — so a rule whose conditions were simply typed
+             one after another came back wearing a bracket its author had not
+             asked for. The editor has told these two states apart since groups
+             became a thing; the card went on showing them the same, which meant
+             the canvas and the panel described the same rule differently.
+
+             `grouped` is the field that says which is which, and it is exactly
+             what it is for. */
+          <div key={k.id} className={k.grouped ? 'bb__ifgroup' : 'bb__ifplain'} title={k.label}>
             {k.conditions.map((c, j) => (
-              <div key={c.id} className="bb__ifrow">
+              /* Each condition is its own row with its own edge, rather than a
+                 line in an undivided block. Reading a five-condition rule off
+                 the card meant finding where one ended and the next began in a
+                 run of chips of whatever width their contents happened to be —
+                 the operator that starts each row is the only mark, and at
+                 11px it is easy to lose. A rule per row makes the count
+                 readable at a glance, which is the whole job of the card. */
+              <div key={c.id} className="bb__ifrow is-cond">
                 {j === 0 ? (
                   <>
                     {i === 0 && (

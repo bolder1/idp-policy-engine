@@ -55,7 +55,7 @@ export function Inspector({
 
   const body = (inFocus: boolean) =>
     rule ? (
-      <RulePane rule={rule} index={at} draft={draft} focus={inFocus} onPatch={(p) => onPatchRule(at, p)} />
+      <RulePane rule={rule} index={at} focus={inFocus} onPatch={(p) => onPatchRule(at, p)} />
     ) : (
       /* `?? fallbackRule()` rather than a truthiness gate: the default is drawn
          on the stage whether or not the policy has ever stored one, so
@@ -114,23 +114,22 @@ export function Inspector({
 function RulePane({
   rule,
   index,
-  draft,
   onPatch,
   focus,
 }: {
   rule: Rule
   index: number
-  draft: Policy
   onPatch: (p: Partial<Rule>) => void
   /** In the wide dialog rather than the 400px column: IF and THEN sit side by
       side instead of one under the other. */
   focus?: boolean
 }) {
   const [openAt] = useState<{ nonce: number } | null>(null)
-  /* Which rule catches a sign-in this one lets through. It belongs to THEN —
-     it is the other half of "what happens" — so it is passed down there rather
-     than drawn as an `else` row inside the condition block. */
-  const next = draft.rules.find((r, i) => i > index && r.enabled)
+  /* The rule that catches whatever this one lets through was resolved here and
+     handed to THEN, which printed it as a sentence: "everyone else falls to
+     rule 3, Executive step-up". It is the arrow the chain draws on the canvas,
+     which the panel only ever opens beside — the same fact, told twice, in the
+     half of the panel with the least room for it. */
 
   return (
     <>
@@ -217,7 +216,12 @@ function RulePane({
                 <h3>Then</h3>
                 <p>What happens when it matches?</p>
               </div>
-              <WhatEditor rule={rule} onPatch={onPatch} focus={focus} next={next ? { index: draft.rules.indexOf(next), name: next.name } : null} />
+              {/* `focus` and `next` are gone from its props along with the two
+                  paragraphs that needed them. `next` fed a sentence naming the
+                  rule that catches whatever this one lets past — which is the
+                  arrow the chain on the canvas draws, and `focus` existed only
+                  to suppress that sentence when the panel was wide. */}
+              <WhatEditor rule={rule} onPatch={onPatch} />
             </div>
           </div>
         </div>

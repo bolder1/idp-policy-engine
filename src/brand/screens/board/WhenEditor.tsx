@@ -1,11 +1,12 @@
 import { Fragment, useEffect, useState } from 'react'
-import { ChevronDown, Plus, Split, Trash2, X } from 'lucide-react'
+import { ChevronDown, Fingerprint, Globe, Plus, Split, Trash2, UserRound, Users, Webhook, X } from 'lucide-react'
 
 import { Picker } from '../../picker'
 import { modeLabel } from '../../fingerprint'
 import { cardJoin, cardLetter, ckey, duplicatedAcrossCards, topJoin } from '../../predicate'
 import {
   CONDITION_CATALOGUE,
+  ZONE_SCOPE_LABEL,
   conditionRank,
   conditionType,
   type Condition,
@@ -13,12 +14,14 @@ import {
   type Joiner,
   type Predicate,
   type Rule,
+  type ZoneScope,
 } from '../../data'
 import * as ops from '../../when-ops'
 import { useBrand, useNameLookup } from '../../store'
 import { predicateParts } from '../predicate-prose'
 import { ConditionPicker } from '../rule-form'
 import { IfChip, IfKw } from './IfBlock'
+import { ValueSheet, zoneShape, type SheetOption } from '../ValueSheet'
 import { groupIcon } from './tones'
 
 /* -----------------------------------------------------------------------------
@@ -185,6 +188,12 @@ export function WhenEditor({
                     resolve={resolve}
                     onChange={(nextC) => patchCondition(c.id, nextC)}
                     onRetype={(typeId) => write(ops.retypeCondition(rule.when, c.id, typeId, conditionType(typeId).operators[0]))}
+                    /* Through `when-ops` like every other edit, because "both"
+                       has to DELETE the field rather than store the word — a
+                       patch merges and cannot express that, and a scope
+                       materialised at its default lights the save bar on a rule
+                       that means exactly what it did. */
+                    onScope={(s) => write(ops.setScope(rule.when, c.id, s))}
                     onFlipJoin={() => flipCardJoin(k.id)}
                     onRemove={() => removeCondition(c.id)}
                     /* Gated on the same predicate the writer uses. The two used to
@@ -396,6 +405,7 @@ function ConditionRow({
   resolve,
   onChange,
   onRetype,
+  onScope,
   onFlipJoin,
   onRemove,
   onSplit,
@@ -411,6 +421,8 @@ function ConditionRow({
   resolve: ReturnType<typeof useNameLookup>
   onChange: (c: Condition) => void
   onRetype: (typeId: string) => void
+  /** Zone conditions only — the one writer for `scope` runs through here. */
+  onScope: (s: 'both' | ZoneScope) => void
   onFlipJoin: () => void
   onRemove: () => void
   /** Absent when the row is the only condition in its run — nothing to split. */
@@ -427,9 +439,17 @@ function ConditionRow({
             type="button"
             className={`bb__joinsel is-${join}`}
             aria-label={`${join === 'and' ? 'All of these must be true' : 'Any one of these is enough'}. Switch to ${join === 'and' ? 'OR' : 'AND'}.`}
+            title={`Click for ${join === 'and' ? 'OR' : 'AND'}`}
             onClick={onFlipJoin}
           >
             {join}
+            {/* The chevron is the affordance, and dropping it cost the control
+                its only visible claim to being one. A coloured pill reading
+                "AND" is a label everywhere else in this product — it is exactly
+                what the read-only card draws — so without the mark the one
+                place it is pressable looks identical to the places it is not.
+                The pill does not move when it flips, which is the whole point
+                of putting the joiner in the row. */}
             <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
           </button>
         ) : (
@@ -475,7 +495,15 @@ function ConditionRow({
       </span>
 
       <span className="bb__cond__val">
-        <ValueControl type={t} values={c.values} store={store} resolve={resolve} autoOpen={fresh} onChange={(values) => onChange({ ...c, values })} />
+        <ValueControl
+          c={c}
+          type={t}
+          store={store}
+          resolve={resolve}
+          autoOpen={fresh}
+          onChange={(values) => onChange({ ...c, values })}
+          onScope={onScope}
+        />
       </span>
 
       <span className="bb__cond__acts">
@@ -493,126 +521,249 @@ function ConditionRow({
 }
 
 /* --- The value, by kind ---------------------------------------------------------
-   The same shapes the trail uses, so a rule reads the same in both builders. */
+
+   Every kind that can hold more than one thing now shows ONE control: a trigger
+   naming what is chosen, opening the sheet to change it. The row therefore has
+   a fixed number of cells whatever the condition is, which is the whole point —
+   it used to grow a chip per value inside the cell, so three groups wrapped the
+   row onto a second line and a rule of five conditions had no column to read
+   down.
+
+   The three kinds that stay inline are the three that are genuinely one control
+   already: a time range (two 92px fields and the word between them), a number
+   with its unit, and a line of free text. Sending those to a sheet would be a
+   click to reach a box you can already see.
+   -------------------------------------------------------------------------- */
+
+/* The summary on the trigger: what is chosen, in the row's width.
+
+   One name and a count, never a run of names. "Finance, Engineering, Contractors"
+   is three names in a 200px cell — it elides to "Finance, Engi…", which reads as
+   a truncated single value rather than as three. "Finance +2" is the same
+   information and cannot be mistaken for one thing. */
+function summarise(names: string[], placeholder: string): string {
+  if (names.length === 0) return placeholder
+  if (names.length === 1) return names[0]
+  return `${names[0]} +${names.length - 1}`
+}
+
+function ValueTrigger({
+  label,
+  summary,
+  sub,
+  count,
+  open,
+  unset,
+  onOpen,
+}: {
+  label: string
+  summary: string
+  /** A second line — the zone half, once it is narrower than the default. */
+  sub?: string
+  /** How many are chosen. The summary elides to "Finance +2"; this does not. */
+  count: number
+  open: boolean
+  unset: boolean
+  onOpen: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={`bb__valtrig ${unset ? 'is-unset' : ''}`}
+      /* The whole state, not just the field name.
+
+         `aria-label` REPLACES a button's text, so labelling this with the
+         attribute alone — "Network Zone" — announced the control and hid the
+         one thing it exists to show. A sighted reader saw "Office Network +1,
+         IP networks only"; a screen reader heard "Network Zone, button", with
+         no way to find out what the condition was actually testing short of
+         opening the sheet.
+
+         `count` rather than the elided summary once there are several, because
+         "+1" is a visual abbreviation and reads as part of a name out loud. */
+      aria-label={[
+        label,
+        unset ? 'nothing chosen' : count > 1 ? `${summary.replace(/ \+\d+$/, '')} and ${count - 1} more` : summary,
+        sub,
+      ]
+        .filter(Boolean)
+        .join(', ')}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      title={sub ? `${summary} · ${sub}` : summary}
+      onClick={onOpen}
+    >
+      <span className="bb__valtrig__text">
+        <b>{summary}</b>
+        {sub && <em>{sub}</em>}
+      </span>
+      <ChevronDown size={12} strokeWidth={2.1} aria-hidden />
+    </button>
+  )
+}
 
 function ValueControl({
+  c,
   type,
-  values,
   store,
   resolve,
   autoOpen,
   onChange,
+  onScope,
 }: {
+  c: Condition
   type: ConditionType
-  values: string[]
   store: ReturnType<typeof useBrand>
   resolve: ReturnType<typeof useNameLookup>
   autoOpen: boolean
   onChange: (v: string[]) => void
+  onScope: (s: 'both' | ZoneScope) => void
 }) {
+  /* Open on mount for a row that was just added, which is the one moment the
+     next thing somebody wants is certainly this sheet. */
+  const [open, setOpen] = useState(autoOpen)
+  const values = c.values.filter(Boolean)
   const v = values[0] ?? ''
 
+  /* --- Library references: zones, device profiles, hooks --------------------- */
   if (type.valueKind === 'zone' || type.valueKind === 'fingerprint' || type.valueKind === 'hook') {
-    const items =
-      type.valueKind === 'zone'
-        ? store.zones.map((z) => ({ value: z.id, label: z.name, meta: z.usedIn ? `${z.usedIn} uses` : undefined }))
-        : type.valueKind === 'fingerprint'
-          ? store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p) }))
-          : store.hooks.filter((h) => h.mode === 'sync').map((h) => ({ value: h.id, label: h.name, meta: `${h.timeoutMs}ms` }))
-    const screen = type.valueKind === 'zone' ? 'zones' : type.valueKind === 'fingerprint' ? 'fingerprint' : 'hooks'
+    const kind = type.valueKind
+    /* A hook holds exactly one, and that is not a simplification — `diagnostics`
+       reads `values[0]` to check the endpoint still exists, and a rule that
+       consulted two external services would need to say what to do when they
+       disagree. */
+    const single = kind === 'hook'
+    const items: SheetOption[] =
+      kind === 'zone'
+        ? store.zones.map((z) => ({
+            value: z.id,
+            label: z.name,
+            meta: zoneShape(z),
+            note: z.usedIn ? `Used by ${z.usedIn} rule${z.usedIn === 1 ? '' : 's'}` : undefined,
+            icon: Globe,
+          }))
+        : kind === 'fingerprint'
+          ? store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p), icon: Fingerprint }))
+          : store.hooks
+              .filter((h) => h.mode === 'sync')
+              .map((h) => ({ value: h.id, label: h.name, meta: `Answers within ${h.timeoutMs}ms`, icon: Webhook }))
+
+    const names = values.map((id) => resolve(kind, id) ?? `deleted · ${id}`)
+    /* Every value, not `values[0]`. The stale check only ever looked at the
+       first, so a zone deleted from the library sitting at index 1 rendered as
+       perfectly valid. */
+    const stale = values.some((id) => !items.some((o) => o.value === id))
+
     return (
       <>
-        <Picker
+        <ValueTrigger
           label={type.label}
-          size="sm"
-          value={v}
+          summary={summarise(names, 'Choose…')}
+          /* Said only when it is narrower than the zone as written. A row that
+             printed "IP and location" on every zone condition would spend its
+             second line on the default. */
+          sub={kind === 'zone' && c.scope ? ZONE_SCOPE_LABEL[c.scope] : undefined}
+          count={values.length}
+          open={open}
+          unset={values.length === 0 || stale}
+          onOpen={() => setOpen(true)}
+        />
+        <ValueSheet
+          open={open}
+          onClose={() => setOpen(false)}
+          title={kind === 'zone' ? 'Network zones' : kind === 'fingerprint' ? 'Device profiles' : 'External hooks'}
+          caption={
+            kind === 'zone'
+              ? 'Zones come from your library, so an address block that moves is edited once rather than in every rule that names it.'
+              : kind === 'fingerprint'
+                ? 'A profile decides whether this is the same device as last time — not whether the device is healthy.'
+                : 'Only a hook that answers synchronously can decide a sign-in. An async hook is notified and cannot hold the request up.'
+          }
           options={items}
-          autoOpen={autoOpen}
-          placeholder="choose…"
-          invalid={!v}
-          onChange={(id) => onChange([id])}
-          footer={type.valueKind === 'zone' ? 'Manage zones →' : type.valueKind === 'fingerprint' ? 'Manage device profiles →' : 'Manage hooks →'}
-          onFooter={() => store.go({ name: screen } as never)}
+          picked={values}
+          single={single}
+          scope={kind === 'zone' ? (c.scope ?? 'both') : undefined}
+          onScope={onScope}
+          onToggle={(id) => onChange(single ? [id] : values.includes(id) ? values.filter((x) => x !== id) : [...values, id])}
+          footer={kind === 'zone' ? 'Manage zones' : kind === 'fingerprint' ? 'Manage device profiles' : 'Manage hooks'}
+          onFooter={() => store.go({ name: kind === 'zone' ? 'zones' : kind === 'fingerprint' ? 'fingerprint' : 'hooks' } as never)}
+          empty={
+            kind === 'zone'
+              ? 'No zones yet. A day-one tenant starts with none — nothing is restricted until somebody says so.'
+              : kind === 'fingerprint'
+                ? 'No device profiles yet.'
+                : 'No synchronous hooks yet.'
+          }
         />
-        {v && !items.some((i) => i.value === v) && <IfChip unset>deleted · {v}</IfChip>}
       </>
     )
   }
 
+  /* --- Directory references: groups and people ------------------------------- */
   if (type.valueKind === 'group' || type.valueKind === 'user') {
-    const items =
-      type.valueKind === 'group'
-        ? store.groups.map((g) => ({ value: g.id, label: g.name, meta: `${g.memberCount.toLocaleString()} people` }))
-        : store.users.map((u) => ({ value: u.id, label: u.name, meta: u.email }))
+    const kind = type.valueKind
+    const items: SheetOption[] =
+      kind === 'group'
+        ? store.groups.map((g) => ({ value: g.id, label: g.name, meta: `${g.memberCount.toLocaleString()} people`, icon: Users }))
+        : store.users.map((u) => ({ value: u.id, label: u.name, meta: u.email, icon: UserRound }))
+    const names = values.map((id) => resolve(kind, id) ?? `deleted · ${id}`)
+
     return (
       <>
-        {values.filter(Boolean).map((id) => (
-          <IfChip
-            key={id}
-            onClick={() => onChange(values.filter((x) => x !== id))}
-            title="Remove"
-            ariaLabel={`Remove ${resolve(type.valueKind as 'group' | 'user', id) ?? id}`}
-          >
-            {resolve(type.valueKind as 'group' | 'user', id) ?? id}
-            <X size={9} strokeWidth={2.6} aria-hidden />
-          </IfChip>
-        ))}
-        <Picker
-          label={type.label}
-          size="sm"
-          value={null}
-          options={items.filter((i) => !values.includes(i.value))}
-          placeholder={values.length ? '+ add' : 'choose…'}
-          invalid={values.filter(Boolean).length === 0}
-          searchable
-          autoOpen={autoOpen}
-          onChange={(id) => onChange([...values.filter(Boolean), id])}
-          footer={type.valueKind === 'user' && store.unlistedUsers > 0 ? `${store.unlistedUsers.toLocaleString()} more in the directory` : undefined}
+        <ValueTrigger label={type.label} summary={summarise(names, 'Choose…')} count={values.length} open={open} unset={values.length === 0} onOpen={() => setOpen(true)} />
+        <ValueSheet
+          open={open}
+          onClose={() => setOpen(false)}
+          title={kind === 'group' ? 'Groups' : 'People'}
+          caption={
+            kind === 'group'
+              ? 'Membership is read at sign-in, so the rule follows whoever is in the group on the day rather than who was in it when it was written.'
+              : 'Named individuals. A group is usually the better answer — a person named in a rule is a rule somebody has to remember to edit when they change team.'
+          }
+          options={items}
+          picked={values}
+          onToggle={(id) => onChange(values.includes(id) ? values.filter((x) => x !== id) : [...values, id])}
+          footer={kind === 'user' && store.unlistedUsers > 0 ? `${store.unlistedUsers.toLocaleString()} more in the directory` : undefined}
         />
       </>
     )
   }
 
+  /* --- A fixed list ---------------------------------------------------------- */
   if (type.options?.length) {
-    const picked = values.filter(Boolean)
     return (
       <>
-        {picked.map((o) => (
-          <IfChip key={o} onClick={() => onChange(values.filter((x) => x !== o))} title="Remove" ariaLabel={`Remove ${o}`}>
-            {o}
-            <X size={9} strokeWidth={2.6} aria-hidden />
-          </IfChip>
-        ))}
-        <Picker
-          label={type.label}
-          size="sm"
-          value={null}
-          options={type.options.filter((o) => !picked.includes(o)).map((o) => ({ value: o, label: o }))}
-          placeholder={picked.length ? '+ add' : 'choose…'}
-          invalid={picked.length === 0}
-          autoOpen={autoOpen}
-          onChange={(o) => onChange([...picked, o])}
+        <ValueTrigger label={type.label} summary={summarise(values, 'Choose…')} count={values.length} open={open} unset={values.length === 0} onOpen={() => setOpen(true)} />
+        <ValueSheet
+          open={open}
+          onClose={() => setOpen(false)}
+          title={type.label}
+          caption={type.hint}
+          options={type.options.map((o) => ({ value: o, label: o }))}
+          picked={values}
+          onToggle={(o) => onChange(values.includes(o) ? values.filter((x) => x !== o) : [...values, o])}
         />
       </>
     )
   }
 
+  /* --- The three that are already one control -------------------------------- */
   if (type.valueKind === 'time') {
     return (
-      <>
-        <input type="time" className="bb__ifinput" aria-label="From" value={values[0] ?? '09:00'} onChange={(e) => onChange([e.target.value, values[1] ?? '17:00'])} />
+      <span className="bb__valrange">
+        <input type="time" className="bb__ifinput" aria-label="From" value={c.values[0] ?? '09:00'} onChange={(e) => onChange([e.target.value, c.values[1] ?? '17:00'])} />
         <IfKw tone="op">to</IfKw>
-        <input type="time" className="bb__ifinput" aria-label="To" value={values[1] ?? '17:00'} onChange={(e) => onChange([values[0] ?? '09:00', e.target.value])} />
-      </>
+        <input type="time" className="bb__ifinput" aria-label="To" value={c.values[1] ?? '17:00'} onChange={(e) => onChange([c.values[0] ?? '09:00', e.target.value])} />
+      </span>
     )
   }
 
   if (type.valueKind === 'range') {
     return (
-      <>
+      <span className="bb__valrange">
         <input type="number" className="bb__ifinput is-num" aria-label={type.label} value={v} placeholder="0" onChange={(e) => onChange([e.target.value])} />
         <IfKw tone="op">{type.id === 'trust-age' ? 'days' : type.id === 'coords' ? 'km' : 'score'}</IfKw>
-      </>
+      </span>
     )
   }
 

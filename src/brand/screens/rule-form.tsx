@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
   Clock,
   Copy,
   Fingerprint,
@@ -29,6 +30,7 @@ import { predicateParts, type NameLookup } from './predicate-prose'
 import {
   CONDITION_CATALOGUE,
   CONDITION_GROUPS,
+  ZONE_SCOPE_LABEL,
   conditionRank,
   card,
   cond,
@@ -39,7 +41,9 @@ import {
   type ConditionType,
   type Policy,
   type Rule,
+  type ZoneScope,
 } from '../data'
+import { ValueSheet, zoneShape, type SheetOption } from './ValueSheet'
 import { useBrand, useNameLookup } from '../store'
 import { modeLabel } from '../fingerprint'
 import { ruleSentence } from './builder-dialogs'
@@ -634,7 +638,11 @@ function CardBlock({
               autoOpen={justAdded === c.id}
               onPatch={(p) => patchOne(c.id, p)}
               onRemove={() => set(k.conditions.filter((x) => x.id !== c.id))}
-              onDuplicate={() => set([...k.conditions, cond(c.typeId, c.operator, [...c.values])])}
+              /* `c.scope` too. Duplicate rebuilds the condition field by field,
+                 so anything not named here is quietly dropped — and a copy of a
+                 zone condition that lost its half is a copy that asks a wider
+                 question than the one it was made from. */
+              onDuplicate={() => set([...k.conditions, cond(c.typeId, c.operator, [...c.values], c.scope)])}
               onSplit={() => onSplit(c.id)}
               onMove={(to) => onMove(c.id, to)}
               canSplit={k.conditions.length > 1}
@@ -736,7 +744,13 @@ function ConditionRow({
              produce a condition the engine cannot evaluate. Values go too —
              "Registered" means nothing to a country test. */
           const next = conditionType(typeId)
-          onPatch({ typeId, operator: next.operators[0], values: [] })
+          /* `scope` goes with the type. It belongs to a zone condition and to
+             nothing else, and `onPatch` merges — so retyping a scoped zone into
+             a Country left the field behind: invisible on screen, still reaching
+             `ckey`, and therefore able to split two identical Country conditions
+             into two different conditions for the linter and for both merges.
+             The board's writer rebuilds for the same reason; see when-ops. */
+          onPatch({ typeId, operator: next.operators[0], values: [], scope: undefined })
         }}
       />
 
@@ -750,10 +764,14 @@ function ConditionRow({
       <ValueControl
         type={t}
         values={c.values}
+        scope={c.scope}
         store={store}
         resolve={resolve}
         autoOpen={autoOpen}
         onChange={(values) => onPatch({ values })}
+        /* `undefined` for both, never the stored word — absent is the default
+           and every dirty check here is a `JSON.stringify` comparison. */
+        onScope={(sc) => onPatch({ scope: sc === 'both' ? undefined : sc })}
       />
 
       <span className="bf__condstate">
@@ -796,60 +814,102 @@ function ConditionRow({
 function ValueControl({
   type,
   values,
+  scope,
   store,
   resolve,
   autoOpen,
   onChange,
+  onScope,
 }: {
   type: ConditionType
   values: string[]
+  /** Zone conditions only. Absent means both halves — see `Condition.scope`. */
+  scope?: ZoneScope
   store: ReturnType<typeof useBrand>
   resolve: NameLookup
   autoOpen: boolean
   onChange: (v: string[]) => void
+  onScope: (s: 'both' | ZoneScope) => void
 }) {
   const v = values[0] ?? ''
+  const [sheet, setSheet] = useState(autoOpen)
 
+  /* Zones, device profiles and hooks: the shared sheet, the same one the board
+     opens.
+
+     It was a single-select `Picker` writing `onChange([id])` — and `values` is
+     an array the evaluator ORs, so choosing a second zone did not add one, it
+     silently deleted the first. That was survivable only while nothing could
+     produce a second value; the sheet can, so the control has to. The stale
+     reference check had the same shape of bug, inspecting `values[0]` alone, so
+     a zone deleted from the library at index 1 rendered as perfectly valid.
+
+     One component across both builders rather than a second implementation
+     here. The note this comment replaces was about exactly that drift: this
+     copy navigated to `'fingerprints'`, a screen name matching nothing, while
+     the board's copy of the same ternary had it right. */
   if (type.valueKind === 'zone' || type.valueKind === 'fingerprint' || type.valueKind === 'hook') {
-    const items =
-      type.valueKind === 'zone'
-        ? store.zones.map((z) => ({ value: z.id, label: z.name, meta: z.usedIn ? `${z.usedIn} uses` : undefined }))
-        : type.valueKind === 'fingerprint'
-          ? store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p) }))
+    const kind = type.valueKind
+    /* A hook holds one. `diagnostics` reads `values[0]` to check the endpoint
+       still exists, and a rule consulting two services would have to say what
+       happens when they disagree. */
+    const single = kind === 'hook'
+    const items: SheetOption[] =
+      kind === 'zone'
+        ? store.zones.map((z) => ({
+            value: z.id,
+            label: z.name,
+            meta: zoneShape(z),
+            note: z.usedIn ? `Used by ${z.usedIn} rule${z.usedIn === 1 ? '' : 's'}` : undefined,
+            icon: Globe,
+          }))
+        : kind === 'fingerprint'
+          ? store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p), icon: Fingerprint }))
           : store.hooks
               .filter((h) => h.mode === 'sync')
-              .map((h) => ({ value: h.id, label: h.name, meta: `${h.timeoutMs}ms` }))
+              .map((h) => ({ value: h.id, label: h.name, meta: `Answers within ${h.timeoutMs}ms`, icon: Webhook }))
 
-    /* 'fingerprint', not 'fingerprints'. The BrandScreen union spells it
-       singular, so "Manage device profiles →" navigated to a screen name that
-       matches nothing and the console rendered blank. The board's copy of this
-       same ternary has it right — which is the drift two renderers of one thing
-       produce, and the reason they are being merged. */
-    const screen =
-      type.valueKind === 'zone' ? 'zones' : type.valueKind === 'fingerprint' ? 'fingerprint' : 'hooks'
-    const footer =
-      type.valueKind === 'zone'
-        ? 'Manage zones →'
-        : type.valueKind === 'fingerprint'
-          ? 'Manage device profiles →'
-          : 'Manage hooks →'
+    const chosen = values.filter(Boolean)
+    const names = chosen.map((id) => resolve(kind, id) ?? id)
+    const stale = chosen.some((id) => !items.some((o) => o.value === id))
+    const summary = names.length === 0 ? 'Choose…' : names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`
 
     return (
       <span className="bf__val">
-        <Picker
-          label={type.label}
-          value={v}
+        <button
+          type="button"
+          className={`bf__valtrig ${chosen.length === 0 || stale ? 'is-unset' : ''}`}
+          /* The state, not just the field name — `aria-label` REPLACES a
+             button's text, so labelling this with the attribute alone hid the
+             one thing it exists to show. See the board's ValueTrigger. */
+          aria-label={[type.label, chosen.length === 0 ? 'nothing chosen' : names.length > 1 ? `${names[0]} and ${names.length - 1} more` : names[0], kind === 'zone' && scope ? ZONE_SCOPE_LABEL[scope] : '']
+            .filter(Boolean)
+            .join(', ')}
+          aria-haspopup="dialog"
+          aria-expanded={sheet}
+          onClick={() => setSheet(true)}
+        >
+          <b>{summary}</b>
+          {kind === 'zone' && scope && <em>{ZONE_SCOPE_LABEL[scope]}</em>}
+          <ChevronDown size={12} strokeWidth={2.1} aria-hidden />
+        </button>
+        {/* A reference to something deleted renders as itself, never as a
+            plausible substitute — `groupById` falls back to the first group,
+            which is exactly how a stale id comes to read as real. */}
+        {stale && <span className="bf__valgone">Deleted · {chosen.filter((id) => !items.some((o) => o.value === id)).join(', ')}</span>}
+        <ValueSheet
+          open={sheet}
+          onClose={() => setSheet(false)}
+          title={kind === 'zone' ? 'Network zones' : kind === 'fingerprint' ? 'Device profiles' : 'External hooks'}
           options={items}
-          width="fill"
-          autoOpen={autoOpen}
-          onChange={(id) => onChange([id])}
-          footer={footer}
-          onFooter={() => store.go({ name: screen } as never)}
+          picked={chosen}
+          single={single}
+          scope={kind === 'zone' ? (scope ?? 'both') : undefined}
+          onScope={onScope}
+          onToggle={(id) => onChange(single ? [id] : chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id])}
+          footer={kind === 'zone' ? 'Manage zones' : kind === 'fingerprint' ? 'Manage device profiles' : 'Manage hooks'}
+          onFooter={() => store.go({ name: kind === 'zone' ? 'zones' : kind === 'fingerprint' ? 'fingerprint' : 'hooks' } as never)}
         />
-        {/* A reference to something that has been deleted renders as itself,
-            not as a plausible substitute. `groupById` falls back to the first
-            group, which is exactly how a stale id comes to read as real. */}
-        {v && !items.some((i) => i.value === v) && <span className="bf__valgone">Deleted · {v}</span>}
       </span>
     )
   }

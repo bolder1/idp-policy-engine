@@ -81,7 +81,21 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
      six conditions all want more, and a stage you are arranging wants less.
      The number was never going to suit both regions at once, so it stops being
      a constant and becomes a handle. */
-  const [inspW, setInspW] = useState(400)
+  /* 560, and the number follows the row rather than the other way round.
+
+     A condition is a joiner, an attribute, an operator, a value and a delete on
+     ONE line. Measured, that wants about 510px INSIDE the block — the container
+     query is on the content box, so the block's own 12px padding comes off
+     first — which makes a 560px panel. At 480 the attribute picker elides to
+     "Group M…" and the operator to "not in z…", which is a row nobody can read
+     and therefore not a row worth keeping on one line.
+
+     The old 400 was chosen when a condition was a run of chips that wrapped
+     anyway, so no width had ever been right. Below the breakpoint the row folds
+     to two deliberate lines instead of crushing — that is what the named grid
+     areas at the foot of board.css are for. The grip still moves it 320 to 720,
+     and focus mode is the way to the whole screen. */
+  const [inspW, setInspW] = useState(560)
   /* How much of itself every card shows, and the per-card exceptions.
 
      Two pieces of state rather than one, because they answer different

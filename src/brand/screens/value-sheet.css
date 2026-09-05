@@ -1,0 +1,263 @@
+/* -----------------------------------------------------------------------------
+   The value sheet.
+
+   A fresh `vp__` prefix rather than another `bb__` name, deliberately. board.css
+   is 1,880 lines with eleven selectors already declared twice — `.bb__cond` is
+   defined once as a 24px read-only chip and again as the editor's grid row, and
+   the first one still wins every property the second does not set. A new
+   component adding names to that file is a new name to check against 1,880
+   lines by hand. This one is scoped to a file nothing else imports.
+   -------------------------------------------------------------------------- */
+
+.vp {
+  display: flex;
+  flex-direction: column;
+  height: min(560px, 74vh);
+}
+
+/* --- Search ------------------------------------------------------------------
+   The same shape the condition catalogue uses, so the two sheets in this
+   product open the same way: a full-width field, no border of its own, the
+   dialog's own edge doing the containing. */
+.vp__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  height: 52px;
+  flex: none;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+}
+.vp__bar input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--fs-md);
+  color: var(--text-primary);
+}
+.vp__bar input::placeholder { color: var(--text-muted); }
+.vp__bar input:focus-visible { outline: none; }
+.vp__clear {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.vp__clear:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.vp__clear:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+.vp__caption {
+  margin: 0;
+  flex: none;
+  padding: var(--space-3) var(--space-4) 0;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+/* --- The zone's two halves ---------------------------------------------------
+
+   Three tiles across, not a dropdown. It is the one setting on this sheet that
+   is not "which of these", and a select would have hidden two thirds of a
+   three-way choice behind a click — on the very control that exists to make the
+   choice visible. The hint under them changes with the selection, because the
+   difference between the two narrow options is a sentence, not a word. */
+.vp__scope {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.vp__scope > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+}
+.vp__scope > button:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.vp__scope > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.vp__scope > button.is-on {
+  background: var(--fb-info-bg);
+  border-color: var(--fb-info-border);
+  color: var(--fb-info-fg);
+}
+.vp__scope > button svg { flex: none; }
+.vp__scopehint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+/* --- The options -------------------------------------------------------------
+   Big rows. The brief for this control was "bold and accessible, and big and
+   accessible" — a 44px row with a real tick, a 15px mark and up to three lines
+   of text, rather than a 22px chip you aim at. */
+.vp__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-2);
+}
+.vp__opt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.vp__opt.is-cursor { background: var(--surface-sunken); }
+.vp__opt.is-on { background: var(--fb-info-bg); border-color: var(--fb-info-border); }
+.vp__opt:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+.vp__tick {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--surface-raised);
+}
+.vp__opt.is-on .vp__tick { background: var(--fb-info-fg); border-color: var(--fb-info-fg); }
+
+.vp__icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-tertiary);
+}
+.vp__opt.is-on .vp__icon { background: var(--surface-raised); color: var(--fb-info-fg); }
+
+.vp__text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.vp__text strong {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vp__text em {
+  font-style: normal;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+.vp__text small {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vp__none {
+  margin: 0;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+}
+
+/* --- The foot ----------------------------------------------------------------
+   The count is on the left because it is the answer to "did that click land",
+   which is the question a multi-select raises and a chip list answered for
+   free. */
+.vp__foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+.vp__count { margin-right: auto; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.vp__manage {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 var(--space-2);
+  height: 30px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--brand);
+  cursor: pointer;
+}
+.vp__manage:hover { background: var(--surface-sunken); }
+/* The same slot when the footer names a fact rather than a destination —
+   "1,240 more in the directory". Not a button, because there is nowhere to go. */
+.vp__hint { padding: 0 var(--space-2); font-size: var(--fs-xs); color: var(--text-tertiary); }
+.vp__manage:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.vp__done {
+  height: 32px;
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--brand);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  /* `--text-on-brand`, which is the token this kit actually ships. `--on-brand`
+     does not exist, so the fallback was doing all the work — and a hardcoded
+     #fff is the one value that cannot follow a theme. */
+  color: var(--text-on-brand);
+  cursor: pointer;
+}
+.vp__done:hover { filter: brightness(0.95); }
+.vp__done:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+@media (max-width: 560px) {
+  .vp__scope { grid-template-columns: minmax(0, 1fr); }
+}

@@ -7,8 +7,13 @@
    nothing else.
    -------------------------------------------------------------------------- */
 
+/* 560 so a condition row is ONE row out of the box. The container query below
+   is on the content box, so the block's 12px padding comes off before the
+   430px test — a 560px panel leaves 510px inside, which is what five controls
+   need to be legible side by side. BoardBuilder writes this inline from its own
+   state; the two are kept in step deliberately. */
 .bb {
-  --bb-insp: 400px;
+  --bb-insp: 560px;
   --bb-card: 560px;
   --bb-dot: #d3dae1;
   --bb-stage: #f6f7f9;
@@ -356,21 +361,22 @@ button.bb__idx svg { display: none; }
 .bb__and { font-size: var(--fs-xs); color: var(--text-muted); padding: 0 1px; }
 .bb__any { font-size: var(--fs-sm); color: var(--text-tertiary); padding-top: 4px; }
 
-/* A condition chip: the component's mark, the attribute, the operator, the value. */
-.bb__cond {
-  display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
-  height: 24px; padding: 0 8px 0 5px; border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle); background: var(--surface-raised);
-  font-size: var(--fs-xs); color: var(--text-primary); white-space: nowrap;
-}
-.bb__cond > i {
-  display: grid; place-items: center; width: 15px; height: 15px; border-radius: 3px;
-  background: var(--cond-bg, var(--fb-neutral-bg)); color: var(--cond-fg, var(--fb-neutral-fg));
-}
-.bb__cond em { font-style: normal; color: var(--text-muted); }
-.bb__cond b { font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; }
-.bb__cond.is-unset { border-style: dashed; color: var(--text-muted); }
-.bb__cond.is-unset b { color: var(--fb-negative-fg); }
+/* `.bb__cond` is DEFINED ONCE, and this is not the place.
+
+   It was two blocks: a 24px inline-flex chip here, belonging to a read-only
+   renderer nothing has emitted for some time, and the editor's grid row at the
+   foot of this file. Both matched the same element, and the later one only wins
+   the properties it happens to SET — so every live condition row inherited
+   `height: 24px`, a 1px border, a raised background, a radius and
+   `white-space: nowrap` from a component that no longer exists. Its own
+   children are 26px and taller, so each row overflowed its box and consecutive
+   rows overlapped.
+
+   Same failure as the `.bb__step` collision documented further down, one file
+   later: a class name is a global. `.bb__cond > i` was doing damage of its own
+   here, painting a tinted tile behind `.bb__cond__mark`, which sets its own
+   colour and wants no box at all. The dead half goes; the grid row keeps the
+   name. */
 
 /* Component tones — one per catalogue group, never negative. */
 .is-tone-info { --cond-bg: var(--fb-info-bg); --cond-fg: var(--fb-info-fg); }
@@ -390,19 +396,14 @@ button.bb__idx svg { display: none; }
   font-size: var(--fs-xs); font-weight: var(--fw-semibold);
 }
 .bb__journey { display: inline-flex; align-items: center; gap: 4px; min-width: 0; flex-wrap: wrap; }
-.bb__step {
-  display: inline-flex; flex-direction: column; justify-content: center;
-  height: 26px; padding: 0 9px; border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle); background: var(--surface-raised);
-  font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.1;
-}
-.bb__step b { font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__step em { font-style: normal; font-size: 10px; color: var(--text-tertiary); }
-.bb__step.is-end { border-color: var(--fb-positive-border); background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
-.bb__step.is-end b { color: inherit; }
-.bb__step.is-stop { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bb__step.is-stop b { color: inherit; }
-.bb__step.is-remember { border-style: dashed; }
+/* `.bb__step` is gone rather than kept for later.
+
+   Nothing has emitted it since the journey became a running line, but the name
+   stayed reserved — and it cost an afternoon: a new section class called
+   `bb__step` matched this rule's `height: 26px` and collapsed an entire
+   full-screen dialog to the height of a chip, with nothing about the symptom
+   pointing at the cause. A dead rule with a plausible name is a trap set for
+   the next person, so it is deleted, not commented out. */
 .bb__arrow { color: var(--border-strong); display: grid; }
 
 /* The rehearsal's verdict on a card. */
@@ -720,6 +721,90 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__decide > button.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); }
 .bb__decide > button.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); }
 
+/* The placeholder. Dashed and quiet, and it does not lift on hover — a tile
+   that answers a pointer looks pressable, and this one is not. */
+.bb__decide > button.is-soon {
+  border-style: dashed;
+  background: none;
+  cursor: default;
+}
+.bb__decide > button.is-soon:hover { transform: none; border-color: var(--border-default); }
+.bb__decide > button.is-soon strong, .bb__decide > button.is-soon svg { color: var(--text-muted); }
+.bb__decide > button.is-soon em { color: var(--text-muted); }
+
+/* --- The steps, as a ladder ---------------------------------------------------
+
+   First factor and second factor were two property rows a screen apart, the
+   second gated on a tile above them. They are the two things a person walks
+   through in order, so they are drawn in order, numbered, with a rail down the
+   side — and adding the second rung is what makes the rule two-factor. */
+.bb__ladder {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.bb__rung {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+.bb__rung__n {
+  display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--surface-sunken); color: var(--text-tertiary);
+  font-size: 11px; font-weight: var(--fw-semibold);
+}
+.bb__rung__body {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 88px) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+.bb__rung__body > b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bb__rung__body .bx-picker { width: 100%; }
+/* Shown on hover or focus, like every other destructive control in the panel.
+   Always visible it reads as part of the step rather than as a way to undo it. */
+.bb__rung__drop {
+  display: grid; place-items: center; width: 24px; height: 24px;
+  border: 0; border-radius: var(--radius-sm); background: none;
+  color: var(--text-tertiary); cursor: pointer;
+  opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bb__rung:hover .bb__rung__drop, .bb__rung:focus-within .bb__rung__drop { opacity: 1; }
+.bb__rung__drop:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bb__rung__drop:focus-visible { outline: none; opacity: 1; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* A rung's own settings sit under it, indented past the number so the ladder
+   still reads as a ladder. */
+.bb__rung.is-sub { grid-template-columns: 22px minmax(0, 1fr); }
+.bb__rung.is-sub > * { grid-column: 2; }
+.bb__rung.is-add { grid-template-columns: 22px minmax(0, 1fr); }
+.bb__rung.is-add > * { grid-column: 2; justify-self: start; }
+.bb__addrung {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 var(--space-3);
+  border: 1px dashed var(--border-default); border-radius: var(--radius-md);
+  background: none; font-family: inherit;
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bb__addrung:hover { border-style: solid; border-color: var(--fb-notice-fg); background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bb__addrung:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* What happens after the steps — remembering the device, and the opt-out.
+   Separated by a rule rather than by a heading: they are settings on the rule,
+   not a third step somebody walks. */
+.bb__after {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
 /* Method chips — a chip per method, on/off. */
 .bb__chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .bb__chip {
@@ -768,31 +853,13 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__altdiv::before, .bb__altdiv::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
 
-.bb__conds { display: flex; flex-direction: column; }
-.bb__condrow {
-  display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px;
-  padding: var(--space-3) 0;
-}
-.bb__condrow + .bb__condrow { border-top: 1px dashed var(--border-subtle); }
-.bb__condrow.is-new { animation: bb-in 0.28s ease-out; }
+/* The previous WHEN editor's rules stood here — `.bb__conds`, `.bb__condrow`,
+   `.bb__condtop`, `.bb__condmark`, `.bb__condname`, `.bb__condval`,
+   `.bb__condgone`. Nothing has emitted any of them since the editor became a
+   grid of rows, and `.bb__condmark` in particular is one underscore from the
+   live `.bb__cond__mark`. Deleted for the reason `.bb__step` was: a dead rule
+   with a plausible name is a trap. The keyframes stay — two live rules use it. */
 @keyframes bb-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-.bb__condtop { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 6px; align-items: center; }
-.bb__condmark {
-  display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-sm);
-  background: var(--cond-bg, var(--fb-neutral-bg)); color: var(--cond-fg, var(--fb-neutral-fg));
-}
-.bb__condname { min-width: 0; display: flex; flex-direction: column; }
-.bb__condname b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bb__condname em { font-style: normal; font-size: 10px; color: var(--text-tertiary); }
-.bb__condval { padding-left: 30px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.bb__condval input[type='text'], .bb__condval input:not([type]) { flex: 1; min-width: 120px; }
-.bb__condval input[type='time'], .bb__condval input[type='number'] {
-  height: 28px; padding: 0 6px; border: 1px solid var(--border-default); border-radius: var(--radius-sm);
-  background: var(--surface-raised); color: var(--text-primary); font-family: inherit; font-size: var(--fs-xs);
-}
-.bb__condval input:focus-visible { outline: none; border-color: var(--focus-ring); box-shadow: 0 0 0 1px var(--focus-ring); }
-.bb__condval .bb__unit { margin-left: 0; }
-.bb__condgone { font-size: var(--fs-xs); color: var(--fb-negative-fg); }
 .bb__andpill {
   align-self: flex-start; margin: -8px 0 -8px 8px; position: relative; z-index: 1;
   padding: 1px 6px; border-radius: 3px; background: var(--surface-inset, #eef1f4);
@@ -1048,7 +1115,9 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 
 /* --- Narrow ----------------------------------------------------------------- */
 @media (max-width: 1100px) {
-  .bb { --bb-insp: 360px; }
+  /* Under 1100 the stage cannot spare 480, so the panel takes 400 and the rows
+     fold — which is what the two-line layout at the foot of this file is for. */
+  .bb { --bb-insp: 400px; }
 }
 @media (max-width: 900px) {
   /* The panel already floats; on a narrow screen it floats across the
@@ -1061,7 +1130,12 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   .bb__card, .bb__link::before, .bb__dot, .bb__decide > button { transition: none; }
   /* The fold still folds — it just arrives. */
   .bb__fold, .bb__fold__btn svg { transition: none; }
-  .bb__condrow.is-new { animation: none; }
+  /* The condition row's silencer is NOT here — it sits beside the declaration
+     it has to beat, at the foot of this file. A media query adds no
+     specificity, so `.bb__cond.is-new { animation: none }` here (0,2,0) and
+     `.bb__cond.is-new { animation: bb-in … }` there (0,2,0) are decided by
+     source order, and there comes later. The `.bb__ifrow` silencer below works
+     only because its declaration happens to sit above it. */
 }
 
 /* --- The conditional block ---------------------------------------------------
@@ -1116,6 +1190,12 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   background: var(--if-bg);
   color: var(--if-fg);
   font-size: var(--fs-xs);
+  /* So a condition row can lay itself out against the width it is actually
+     given. The panel is draggable from 320 to 720 and the focus dialog is the
+     screen, both against a window that never moves — see the container query
+     at the foot of this file. */
+  container-type: inline-size;
+  container-name: ifblock;
 }
 
 .bb__ifrow {
@@ -1124,6 +1204,43 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__ifrow.is-new { animation: bb-in 0.28s ease-out; }
 .bb__ifrow.is-quiet { min-height: 20px; }
+
+/* One condition, one section.
+
+   On the card these were lines in an undivided block: the operator at the start
+   of each row was the only thing marking where one condition ended and the next
+   began, and at 11px in a run of chips it is easy to lose. A person reading a
+   card should be able to count the conditions without opening the panel, which
+   is the whole reason the card draws them at all.
+
+   A hairline and a little air, not a box each — four boxes inside a box is a
+   heavier drawing of the same information, and the frame is already spoken for:
+   it means a group somebody made. */
+.bb__ifrow.is-cond { padding: 4px 0; }
+.bb__ifrow.is-cond + .bb__ifrow.is-cond { border-top: 1px solid var(--if-line); }
+/* Inside a group the rows are already bracketed together, so the hairline is
+   doing less work and the frame's own padding gives them the air. */
+.bb__ifgroup > .bb__ifrow.is-cond { padding: 3px 0; }
+.bb__ifgroup > .bb__ifrow.is-cond + .bb__ifrow.is-cond { border-top-style: dashed; }
+
+/* Two alternatives still have to read as two.
+
+   The frames used to do that job on the card, badly — they said "group" about
+   runs nobody had grouped. Removing them left the `OR` pill as the only mark
+   that a second way in had started, and a pill at the head of a row looks very
+   like the `AND` pills above it. So the break between cards is drawn as a
+   break: the accent rule the editor already uses for the same junction, at the
+   card's own scale.
+
+   The editor is unaffected — it puts a `.bb__ifjoin` element between its cards,
+   so the adjacency this selector needs never occurs there. */
+.bb__if > .bb__ifplain + .bb__ifplain,
+.bb__if > .bb__ifplain + .bb__ifgroup,
+.bb__if > .bb__ifgroup + .bb__ifplain {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--fb-accent-border);
+}
 
 
 .bb__ifbranch { display: grid; color: var(--if-muted); margin-right: -2px; }
@@ -1241,9 +1358,8 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifjsub::before { content: '· '; }
 .bb__ifaction .bb__token { margin-right: 2px; }
 
-/* Row actions: shown when the row is hovered or holds focus. */
-.bb__ifacts { margin-left: auto; display: inline-flex; gap: 1px; opacity: 0; transition: opacity 0.12s ease; }
-.bb__ifrow:hover .bb__ifacts, .bb__ifrow:focus-within .bb__ifacts, .bb__ifacts.is-always { opacity: 1; }
+/* Row actions. `.bb__ifacts` — the plural, one letter from this — was the
+   container they used to sit in, and nothing has emitted it for some time. */
 .bb__ifact {
   display: grid; place-items: center; width: 22px; height: 22px; border-radius: 4px;
   border: none; background: none; color: var(--if-muted); cursor: pointer;
@@ -1799,6 +1915,15 @@ button.bb__idx::after {
   padding: 3px 0;
 }
 .bb__cond.is-new { animation: bb-in 0.28s ease-out; }
+/* Silenced here rather than up in the file's reduced-motion block, because a
+   media query carries no specificity of its own: both selectors are (0,2,0) and
+   source order decides. The block up there ran first and lost, so a reader who
+   has asked for no motion got the slide-in anyway — on the one control this
+   editor animates. The rule the class replaced (`.bb__condrow`) named an editor
+   that no longer exists, which is why nobody noticed it had stopped matching. */
+@media (prefers-reduced-motion: reduce) {
+  .bb__cond.is-new { animation: none; }
+}
 
 .bb__cond__join { display: flex; justify-content: flex-end; }
 /* `if` on the first row, in the quiet weight a keyword gets — it is the sentence
@@ -1822,9 +1947,16 @@ button.bb__idx::after {
 .bb__joinsel:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
 /* The attribute is a picker now, with its category mark sitting inside the
-   field rather than beside it — so the row keeps four columns instead of five. */
-.bb__cond__what { position: relative; min-width: 0; }
-.bb__cond__what .bx-picker { width: 100%; }
+   field rather than beside it — so the row keeps four columns instead of five.
+
+   A flex row, not a block. The `·2` badge that marks a condition repeated in
+   another branch is a sibling of the field, and in normal flow it landed on a
+   line of its own — so the two rows carrying it were 46px while every other row
+   was 32px, and the columns the block is supposed to line up on stopped lining
+   up on exactly the rows that most need reading carefully. */
+.bb__cond__what { position: relative; min-width: 0; display: flex; align-items: center; gap: 4px; }
+.bb__cond__what .bx-picker { flex: 1; min-width: 0; }
+.bb__cond__what .bb__ifdupe { flex: none; }
 .bb__cond__what .bx-picker__trigger { padding-left: 26px; }
 .bb__cond__mark {
   position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
@@ -1833,17 +1965,93 @@ button.bb__idx::after {
 }
 .bb__cond__op, .bb__cond__val { min-width: 0; }
 .bb__cond__op .bx-picker, .bb__cond__val .bx-picker { width: 100%; }
-.bb__cond__val { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+/* `nowrap`, and that is the whole change.
+
+   This cell used to wrap, because it held a chip per value plus an adder, and
+   wrapping was the only way three groups could fit. So the row that reads as
+   one sentence became two lines whenever anybody chose a second thing, and the
+   columns the rest of the block lines up on stopped meaning anything. The value
+   is one control now — a trigger that names what is chosen — so there is
+   nothing left to wrap and the row is a row at every width. */
+.bb__cond__val { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; }
 .bb__cond__acts { display: flex; align-items: center; gap: 2px; opacity: 0; }
 .bb__cond:hover .bb__cond__acts, .bb__cond:focus-within .bb__cond__acts { opacity: 1; }
 .bb__ifact.is-danger:hover { color: var(--fb-negative-fg); }
 
+/* --- The value, as one control ------------------------------------------------
+
+   The trigger. It names what is chosen and opens the sheet; it never grows with
+   the number of values, which is what lets the row keep its columns. Two lines
+   when a zone has been narrowed to one of its halves, because "Office Network"
+   and "Office Network, on the network only" are different rules and the row
+   must not read the same for both. */
+.bb__valtrig {
+  display: flex; align-items: center; gap: 4px;
+  width: 100%; min-width: 0; height: 26px;
+  padding: 0 6px 0 8px; border-radius: 5px;
+  background: var(--if-chip); border: 1px solid var(--if-chip-border);
+  font-family: inherit; color: var(--text-primary); cursor: pointer; text-align: left;
+  transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bb__valtrig:hover { background: var(--if-chip-hover); border-color: var(--border-strong); }
+.bb__valtrig:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+/* Dashed and in the negative tone, matching every other unset control in the
+   block: a condition with no value never matches, which the linter also reports
+   — this is the same fact said where the value would be. */
+.bb__valtrig.is-unset { border-style: dashed; border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
+.bb__valtrig svg { flex: none; opacity: 0.55; margin-left: auto; }
+.bb__valtrig__text { min-width: 0; display: flex; align-items: baseline; gap: 5px; overflow: hidden; }
+.bb__valtrig__text b {
+  font-size: 11px; font-weight: var(--fw-medium);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bb__valtrig__text em {
+  flex: none; font-style: normal; font-size: 10px; color: var(--text-tertiary); white-space: nowrap;
+}
+
+/* The three values that are already one control: a time range, a number with
+   its unit, a line of text. `nowrap` so the two ends of a range stay one row —
+   the kit defaults inputs to `width: 100%` at zero specificity, and this cell is
+   where that used to turn one condition into three stacked lines. */
+.bb__valrange { display: flex; align-items: center; gap: 5px; min-width: 0; flex-wrap: nowrap; }
+
 /* Narrow: the value drops under the row rather than crushing the other three.
-   The panel is 320px at its narrowest and four controls do not fit across it. */
-@media (max-width: 560px) {
-  .bb__cond { grid-template-columns: 44px minmax(0, 1fr) auto; }
-  .bb__cond__op { grid-column: 2 / -1; }
-  .bb__cond__val { grid-column: 2 / -1; }
+
+   A CONTAINER query, not a media query, and that is the fix rather than a
+   preference. The thing that runs out of room is the panel, and the panel is
+   resizable from 320px to 720px against a window that never changes — so a
+   breakpoint on the viewport answered a question nobody was asking. Dragged in
+   to 320px on a wide screen, the row stayed five columns and crushed the value
+   to nothing; opened in the 1400px focus dialog on a narrow laptop, it wrapped
+   with two thirds of the row empty.
+
+   The block declares the containment, so the rows respond to the width they are
+   actually given, in the panel and in the dialog alike. */
+@container ifblock (max-width: 430px) {
+  /* Two lines, and they are the two halves of the sentence.
+
+     The fallback used to put each control on a line of its own — attribute,
+     then operator, then value, three rows and no relationship between them,
+     which is a list of settings rather than a condition. Named areas instead:
+     WHAT it checks on the first line beside the joiner that introduces it, HOW
+     and AGAINST WHAT together on the second. The value keeps the larger share
+     of that line because it is the part that holds a name. */
+  .bb__cond {
+    grid-template-columns: 44px minmax(0, 86px) minmax(0, 1fr) auto;
+    grid-template-areas:
+      'join what what acts'
+      '.    op   val  .';
+    row-gap: 4px;
+  }
+  .bb__cond__join { grid-area: join; align-self: start; padding-top: 3px; }
+  .bb__cond__what { grid-area: what; }
+  .bb__cond__op { grid-area: op; }
+  .bb__cond__val { grid-area: val; }
+  .bb__cond__acts { grid-area: acts; align-self: start; }
+  /* A rule between conditions, once they are two lines each. Without it two
+     stacked conditions read as one four-line condition — the row gap that told
+     them apart is now the same size as the gap inside each of them. */
+  .bb__cond + .bb__cond { border-top: 1px dashed var(--if-line); margin-top: 3px; padding-top: 6px; }
 }
 
 /* --- The form, as numbered steps ---------------------------------------------

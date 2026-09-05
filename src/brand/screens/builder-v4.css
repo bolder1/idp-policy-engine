@@ -591,6 +591,29 @@
 .bf__val--range input { width: 82px; }
 .bf__valgone { font-size: var(--fs-xs); color: var(--fb-negative-fg); font-family: var(--font-mono, monospace); }
 
+/* The trigger that opens the value sheet.
+
+   Dressed as the `Picker` it replaced, because it stands in the same cell and
+   answers the same question — what this condition is measured against. What it
+   is not is a single-select: a zone condition holds a list, and the picker here
+   wrote `[id]`, which replaced the list rather than adding to it. */
+.bf__valtrig {
+  display: flex; align-items: center; gap: var(--space-2);
+  min-width: 0; flex: 1; height: 32px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font-family: inherit; font-size: var(--fs-sm); color: var(--text-primary);
+  text-align: left; cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.bf__valtrig:hover { border-color: var(--border-strong); }
+.bf__valtrig:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bf__valtrig.is-unset { border-style: dashed; color: var(--text-muted); }
+.bf__valtrig > b { min-width: 0; font-weight: var(--fw-regular); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bf__valtrig > em { flex: none; font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); white-space: nowrap; }
+.bf__valtrig > svg { flex: none; margin-left: auto; opacity: 0.55; }
+
 /* Multi-value as toggles. `values` has always been an array on the model; a
    single select was the control lying about it. */
 .bf__vchip {

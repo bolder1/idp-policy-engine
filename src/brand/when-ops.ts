@@ -1,4 +1,4 @@
-import { cond, emptyGroup, type Condition, type ConditionCard, type Predicate } from './data'
+import { cond, emptyGroup, type Condition, type ConditionCard, type Predicate, type ZoneScope } from './data'
 import { cardJoin, ckey, topJoin } from './predicate'
 
 /* -----------------------------------------------------------------------------
@@ -87,14 +87,15 @@ export function removeCondition(w: Predicate, conditionId: string): Predicate {
   )
 }
 
-export function patchCondition(w: Predicate, conditionId: string, next: Partial<Condition>): Predicate {
-  return withCards(
+/** Rewrite every condition through a function, branches untouched. */
+const mapConditions = (w: Predicate, f: (c: Condition) => Condition): Predicate =>
+  withCards(
     w,
-    w.cards.map((k) => ({
-      ...k,
-      conditions: k.conditions.map((c) => (c.id === conditionId ? { ...c, ...next } : c)),
-    })),
+    w.cards.map((k) => ({ ...k, conditions: k.conditions.map(f) })),
   )
+
+export function patchCondition(w: Predicate, conditionId: string, next: Partial<Condition>): Predicate {
+  return mapConditions(w, (c) => (c.id === conditionId ? { ...c, ...next } : c))
 }
 
 /* Change what a condition CHECKS, which is not the same as patching it.
@@ -106,7 +107,34 @@ export function patchCondition(w: Predicate, conditionId: string, next: Partial<
    dropped, which lands the row in the unset state the catalogue already treats
    as first-class and diagnosable. */
 export function retypeCondition(w: Predicate, conditionId: string, typeId: string, firstOperator: string): Predicate {
-  return patchCondition(w, conditionId, { typeId, operator: firstOperator, values: [] })
+  /* Not `patchCondition`, and the difference is a field it cannot express.
+
+     `scope` belongs to a zone condition and to nothing else, and it is written
+     as absent-when-default. A patch merges, so retyping a scoped zone into a
+     Country left `scope: 'ip'` sitting on a condition whose type has no halves
+     — invisible on screen, carried into `ckey`, and therefore able to split two
+     identical Country conditions into two different rules for the linter. The
+     rebuild drops every field the new type does not own. */
+  return mapConditions(w, (c) => (c.id === conditionId ? { id: c.id, typeId, operator: firstOperator, values: [] } : c))
+}
+
+/* Which half of its zones a condition tests. The one writer for `scope`.
+
+   Absent is BOTH, so choosing "both" DELETES the field rather than storing the
+   word — the same shape `renameBranch`, `setGrouped` and the two joiner flips
+   use, and for the same reason: every dirty check in this app is a
+   `JSON.stringify` comparison, so a scope set to its default and back would
+   otherwise leave the save bar lit on a rule that means exactly what it did.
+   `patchCondition` merges and cannot express a delete, which is why this is a
+   function rather than a call site. */
+export function setScope(w: Predicate, conditionId: string, scope: ZoneScope | 'both'): Predicate {
+  return mapConditions(w, (c) => {
+    if (c.id !== conditionId) return c
+    const next = { ...c }
+    if (scope === 'both') delete next.scope
+    else next.scope = scope
+    return next
+  })
 }
 
 /* Move a condition into a branch at an index.

@@ -45,17 +45,62 @@ export const RISKS = ['Low', 'Medium', 'High']
    "not in zone X" is definite for all X. */
 export interface PlaceFacts {
   zonesIn: string[] | null
+  /* Which half of each zone this origin actually satisfies.
+
+     A zone is two ANDed sections — a network half and a geographic half — and a
+     condition may now name one of them. `zonesIn` alone cannot answer that: it
+     says the origin is inside "Corporate ASN" without saying whether it got
+     there by its address or by its country, so a rule narrowed to one half
+     would be graded against the other and the trace would state a verdict it
+     had not earned. That is the one failure this simulator is written to avoid.
+
+     Two explicit lists rather than one plus a subtraction, because a zone can
+     be satisfied on BOTH halves — "Reliance Jio · India" is an ASN and a
+     country — and `zonesIn minus zonesByIp` would silently drop it from the
+     geographic side. `zonesIn` stays the union of the two, and a test pins
+     that. */
+  zonesByIp: string[]
+  zonesByLocation: string[]
   country: string | null
   state: string | null
   city: string | null
 }
 
+/* Derived from the zone library rather than asserted — and two rows changed
+   when somebody finally derived them.
+
+   An EMPTY section of a zone means ANY, not none. The zones screen draws it as
+   "Any network" / "Any location" and the validator says so out loud, so a zone
+   with no addresses at all is reached by its geography alone — and two of these
+   origins reach one:
+
+     `eu`      no addresses, countries [Germany, France]. "Known proxy"
+               geolocates to Germany, so it is inside, by location.
+     `pune-hq` no addresses, India / Maharashtra / 25km of Pune. "Office
+               Network" geolocates to Pune, so it is inside, by location.
+     `jio-in`  countries [India], but its network half is `asn: ['AS55836']`,
+               which is CONSTRAINED — and nothing here is on Reliance Jio. It is
+               the one library zone none of these five origins is in.
+
+   `zonesIn` was already wrong about the first two before the halves existed:
+   "Known proxy" answered PASS to `Country is Germany` and FAIL to `in zone EU
+   Countries` in the same trace, which is the single contradiction this module's
+   header says would end an administrator's trust in every other answer it gives.
+
+   Splitting the field is what surfaced it. An all-empty geographic column is
+   the only value consistent with the old `zonesIn`, and it would have meant no
+   location-scoped rule could ever match anything in a rehearsal, a sweep or a
+   gauntlet round — so the new half could not be written honestly without
+   checking the old one. */
 export const PLACE_FACTS: Record<string, PlaceFacts> = {
-  'Any location': { zonesIn: null, country: null, state: null, city: null },
-  'Office Network': { zonesIn: ['office'], country: 'India', state: 'Maharashtra', city: 'Pune' },
-  'Outside all zones': { zonesIn: [], country: 'United States', state: 'Texas', city: 'Austin' },
-  'Tor exit node': { zonesIn: ['anon'], country: null, state: null, city: null },
-  'Known proxy': { zonesIn: ['anon'], country: 'Germany', state: null, city: null },
+  'Any location': { zonesIn: null, zonesByIp: [], zonesByLocation: [], country: null, state: null, city: null },
+  'Office Network': { zonesIn: ['office', 'pune-hq'], zonesByIp: ['office'], zonesByLocation: ['pune-hq'], country: 'India', state: 'Maharashtra', city: 'Pune' },
+  /* Austin, Texas is in none of the six, which is what makes this the origin
+     worth rehearsing an off-network rule against. */
+  'Outside all zones': { zonesIn: [], zonesByIp: [], zonesByLocation: [], country: 'United States', state: 'Texas', city: 'Austin' },
+  /* No country at all, so it is in `anon` by address and in nothing by map. */
+  'Tor exit node': { zonesIn: ['anon'], zonesByIp: ['anon'], zonesByLocation: [], country: null, state: null, city: null },
+  'Known proxy': { zonesIn: ['anon', 'eu'], zonesByIp: ['anon'], zonesByLocation: ['eu'], country: 'Germany', state: null, city: null },
 }
 
 export interface DeviceFacts {
@@ -164,9 +209,32 @@ export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: 
   switch (t.id) {
     case 'zone': {
       if (!place.zonesIn) return unknown('“Any location” does not fix an origin, so zone membership is undecided')
-      const inside = vals.some((v) => place.zonesIn!.includes(v))
-      const where = place.zonesIn.length === 0 ? 'this sign-in is in no zone at all' : `this sign-in is in ${ctx.place}`
-      return decide(inside, where)
+      /* The half the condition asked about, and nothing wider. A rule scoped to
+         the network half must not be satisfied by a geographic match it did not
+         ask for — that is the whole reason the scope exists. */
+      const pool = c.scope === 'ip' ? place.zonesByIp : c.scope === 'location' ? place.zonesByLocation : place.zonesIn
+      const inside = vals.some((v) => pool.includes(v))
+      const half = c.scope === 'ip' ? ' on the network' : c.scope === 'location' ? ' by location' : ''
+      /* Built from the membership that was actually tested, not from the
+         origin's standing generally — otherwise the sentence asserts the thing
+         the verdict has just rejected. Asking about the office network by
+         geography returned FAIL under the detail "this sign-in is in Office
+         Network by location": true of the origin, false of the half tested, and
+         printed directly beneath the word FAIL.
+
+         Gating on `pool.length` alone is not enough, and it took a test to say
+         so: once an origin is inside SOME zone by location, a location-scoped
+         miss still has a non-empty pool, so the "in ${ctx.place}" branch fired
+         again. The three cases are the three real answers — it is in one of
+         these, it is in none at all, or it is in a zone but not one of these.
+
+         Unscoped, the first two branches are word-for-word what they were. */
+      const where = inside
+        ? `this sign-in is in ${ctx.place}`
+        : pool.length === 0
+          ? 'this sign-in is in no zone at all'
+          : 'this sign-in is in another zone'
+      return decide(inside, `${where}${half}`)
     }
     case 'country':
       return place.country === null

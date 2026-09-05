@@ -188,12 +188,42 @@ export function conditionType(id: string): ConditionType {
   return CONDITION_CATALOGUE.find((c) => c.id === id) ?? CONDITION_CATALOGUE[0]
 }
 
+/* Which half of a zone a condition tests.
+
+   A zone has two sections and they are ANDed — the network half (addresses,
+   CIDR blocks, ASNs) and the geographic half (countries, states, cities, a
+   radius). "Reliance Jio · India" is inside neither alone. So a rule that says
+   "in zone X" has always had a third thing to say that it could not: whether it
+   means the whole zone, or only where the request came from on the network, or
+   only where it came from on the map.
+
+   `undefined` is BOTH, and that is the only correct default: a zone means the
+   conjunction of its halves, so a condition that says nothing extra must mean
+   the zone as written. Absent rather than a stored `'both'` because every dirty
+   check in this app is a `JSON.stringify` comparison — materialising the
+   default would light the save bar on every rule anybody opened. */
+export type ZoneScope = 'ip' | 'location'
+
+export const ZONE_SCOPE_LABEL: Record<'both' | ZoneScope, string> = {
+  both: 'IP and location',
+  ip: 'IP networks only',
+  location: 'Locations only',
+}
+
 /** A single predicate. `values: []` means UNSET — a first-class, diagnosable state. */
 export interface Condition {
   id: string
   typeId: string
   operator: string
   values: string[]
+  /* Which half of the named zones to test. Zone conditions only; absent = both.
+
+     It lives on the CONDITION rather than on the zone because it is a property
+     of this rule's question, not of the zone: the same "Reliance Jio · India"
+     is asked about as a network by one rule and as a place by another, and
+     storing the answer on the zone would make one rule's narrowing silently
+     rewrite the other's. */
+  scope?: ZoneScope
 }
 
 /* An AND-set, and the unit of grouping.
@@ -718,8 +748,13 @@ const nextCardId = () => `k${(cardSeq += 1)}`
    That is deliberate: it turns every authored call site into an arity error
    rather than a silent no-op, which is the only reliable way to find seventy of
    them. */
-export function cond(typeId: string, operator: string, values: string[] = []): Condition {
-  return { id: nextCondId(), typeId, operator, values }
+export function cond(typeId: string, operator: string, values: string[] = [], scope?: ZoneScope): Condition {
+  /* Spread-if-set rather than `scope` unconditionally. `{ scope: undefined }`
+     and `{}` are the same object to every reader and two different strings to
+     `JSON.stringify`, which is what the whole estate's dirty checking compares
+     — so an authored `cond(...)` with no scope has to be byte-identical to one
+     written before this parameter existed. */
+  return { id: nextCondId(), typeId, operator, values, ...(scope ? { scope } : null) }
 }
 
 /** One alternative. Throws on empty, because an empty card matches everything. */

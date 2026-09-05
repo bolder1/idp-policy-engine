@@ -145,6 +145,92 @@ describe('contradictory conditions', () => {
     expect(ids(p)).toContain('contradiction')
   })
 
+  /* --- Multi-valued conditions OR their values ------------------------------
+
+     Which makes an OVERLAP test unsound, and unsound here means a blocking
+     error on a rule the author had every right to write, clearable only by
+     deleting a condition they meant. `in [office, hq] AND not in [office]`
+     is the rule "hq but not office". Reachable through the UI as soon as the
+     value pickers became multi-select. */
+  it('stays quiet when the negation covers only part of what the affirmative offers', () => {
+    const p = policy([
+      rule({ when: when(card(cond('zone', 'in zone', ['office', 'eu']), cond('zone', 'not in zone', ['office']))) }),
+    ])
+    expect(ids(p)).not.toContain('contradiction')
+  })
+
+  it('still flags it once the negation covers every value the affirmative offers', () => {
+    const p = policy([
+      rule({ when: when(card(cond('zone', 'in zone', ['office']), cond('zone', 'not in zone', ['office', 'eu']))) }),
+    ])
+    expect(ids(p)).toContain('contradiction')
+  })
+
+  /* The same unsoundness has always been latent for fixed-list kinds, where
+     multiple values were already authorable. Order matters: the loop yields the
+     pair as written, so the negated one is `ca` half the time and `every` is
+     not symmetric. */
+  it('reads the pair in either authoring order', () => {
+    const covered = policy([
+      rule({ when: when(card(cond('country', 'is not', ['India', 'Germany']), cond('country', 'is', ['India']))) }),
+    ])
+    const partial = policy([
+      rule({ when: when(card(cond('country', 'is not', ['India']), cond('country', 'is', ['India', 'Germany']))) }),
+    ])
+    expect(ids(covered)).toContain('contradiction')
+    expect(ids(partial)).not.toContain('contradiction')
+  })
+
+  /* --- A window is an interval, not a set of two values --------------------
+
+     The containment test that made PE111 sound for multi-valued conditions is
+     the wrong test for `between`, whose two values are endpoints. Asked
+     value-for-value it gets both directions wrong: it misses a window sitting
+     wholly inside the window that excludes it, and it flags two windows that
+     are complements of each other and agree perfectly. */
+  it('flags a window that sits wholly inside the window excluding it', () => {
+    const p = policy([
+      rule({ when: when(card(cond('time', 'between', ['09:00', '17:00']), cond('time', 'not between', ['09:00', '22:00']))) }),
+    ])
+    expect(ids(p)).toContain('contradiction')
+  })
+
+  it('stays quiet on two windows that are complements — they agree', () => {
+    const p = policy([
+      rule({ when: when(card(cond('time', 'between', ['09:00', '17:00']), cond('time', 'not between', ['17:00', '09:00']))) }),
+    ])
+    expect(ids(p)).not.toContain('contradiction')
+  })
+
+  it('stays quiet when the two windows merely overlap', () => {
+    const p = policy([
+      rule({ when: when(card(cond('time', 'between', ['09:00', '17:00']), cond('time', 'not between', ['12:00', '20:00']))) }),
+    ])
+    expect(ids(p)).not.toContain('contradiction')
+  })
+
+  /* Still flags the identical pair, which is the case the old overlap test got
+     right and the one authors actually produce. */
+  it('flags the same window asserted and denied', () => {
+    const p = policy([
+      rule({ when: when(card(cond('time', 'between', ['09:00', '17:00']), cond('time', 'not between', ['09:00', '17:00']))) }),
+    ])
+    expect(ids(p)).toContain('contradiction')
+  })
+
+  /* Two halves of one zone are two questions. "In the office network by
+     address" and "not in the office network by geography" are both satisfiable
+     together — the addresses and the map disagree, which is precisely what a
+     scoped rule is written to catch. */
+  it('stays quiet on the same zone asked about on two different halves', () => {
+    const p = policy([
+      rule({
+        when: when(card(cond('zone', 'in zone', ['office'], 'ip'), cond('zone', 'not in zone', ['office'], 'location'))),
+      }),
+    ])
+    expect(ids(p)).not.toContain('contradiction')
+  })
+
   /* The check's own comment used to say "inside one card is the whole test",
      and it was right until a card could be an or-run. In one, the pair is not
      a contradiction at all: "is India OR is not India" matches everything,

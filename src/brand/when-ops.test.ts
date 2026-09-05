@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { card, cond, emptyGroup, when, type Predicate } from './data'
-import { cardJoin, sig, topJoin } from './predicate'
+import { cardJoin, ckey, sig, topJoin } from './predicate'
 import {
   addBranch,
   addCondition,
@@ -16,6 +16,7 @@ import {
   renameBranch,
   retypeCondition,
   setGrouped,
+  setScope,
   splitOut,
 } from './when-ops'
 
@@ -174,6 +175,42 @@ describe('a setting returned to its default leaves no trace', () => {
     const back = setGrouped(setGrouped(w, w.cards[0].id, true), w.cards[0].id, false)
     expect(JSON.stringify(back)).toBe(JSON.stringify(w))
   })
+
+  it('round-trips a zone scope narrowed and widened again', () => {
+    const z = cond('zone', 'in zone', ['office'])
+    const w = when(card(z))
+    const back = setScope(setScope(w, z.id, 'ip'), z.id, 'both')
+    expect(JSON.stringify(back)).toBe(JSON.stringify(w))
+  })
+})
+
+describe('a zone condition can name the half of the zone it means', () => {
+  it('stores the narrowed half and drops the field for both', () => {
+    const z = cond('zone', 'in zone', ['office'])
+    const w = when(card(z))
+    expect(setScope(w, z.id, 'location').cards[0].conditions[0].scope).toBe('location')
+    expect('scope' in setScope(setScope(w, z.id, 'location'), z.id, 'both').cards[0].conditions[0]).toBe(false)
+  })
+
+  /* The two are different questions with different answers — on the network, or
+     on the map — so every reader that keys through `ckey` has to tell them
+     apart: the duplicate-rule blocker, the two merges that DROP what they
+     consider a twin, and the change list. */
+  it('keys two halves of one zone as two different conditions', () => {
+    const w = when(card(cond('zone', 'in zone', ['office'])))
+    const id = w.cards[0].conditions[0].id
+    const byIp = setScope(w, id, 'ip').cards[0].conditions[0]
+    const byPlace = setScope(w, id, 'location').cards[0].conditions[0]
+    expect(ckey(byIp)).not.toBe(ckey(byPlace))
+    expect(ckey(byIp)).not.toBe(ckey(w.cards[0].conditions[0]))
+  })
+
+  /* An unscoped condition has to key to the byte-identical string it keyed to
+     before the field existed, or every signature in the seeded estate moves and
+     the stale-estimate check reports the whole tenant as edited. */
+  it('leaves an unscoped condition keying exactly as it always did', () => {
+    expect(ckey(cond('group', 'in', ['b', 'a']))).toBe('group|in|a,b|')
+  })
 })
 
 describe('changing what a condition checks', () => {
@@ -183,7 +220,21 @@ describe('changing what a condition checks', () => {
   it('resets the operator and the values with the type', () => {
     const w = when(card(A))
     const next = retypeCondition(w, A.id, 'country', 'is')
-    expect(next.cards[0].conditions[0]).toMatchObject({ typeId: 'country', operator: 'is', values: [] })
+    /* `toEqual`, not `toMatchObject`. A subset assertion passes on a condition
+       carrying a field the new type has no idea what to do with, which is
+       exactly the bug below — so the assertion that was meant to catch it
+       could not. */
+    expect(next.cards[0].conditions[0]).toEqual({ id: A.id, typeId: 'country', operator: 'is', values: [] })
+  })
+
+  /* `scope` belongs to a zone and nothing else. Left behind on a retyped
+     condition it is invisible on screen and still reaches `ckey`, which can
+     split two identical Country conditions into two different rules for the
+     linter. */
+  it('drops a zone scope when the condition becomes something else', () => {
+    const z = cond('zone', 'in zone', ['office'])
+    const w = setScope(when(card(z)), z.id, 'ip')
+    expect('scope' in retypeCondition(w, z.id, 'country', 'is').cards[0].conditions[0]).toBe(false)
   })
 })
 

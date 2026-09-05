@@ -59,21 +59,44 @@ export function conditionSentence(c: Condition, resolve?: NameLookup): string {
   const t = conditionType(c.typeId)
   const raw = c.values.filter((v) => v.trim() !== '')
 
+  /* Values are joined with "or", not with a comma.
+
+     A condition holds when ANY of its values match — the evaluator is
+     `vals.some(...)` — and a comma-separated list reads as a conjunction: "in
+     zone Office Network, Corporate ASN" sounds like both are required. "or"
+     says what actually happens, and it stays correct under negation because the
+     operator scopes the whole disjunction: "not in zone A or B" is not-(A or B),
+     which is exactly neither.
+
+     A real misreading rather than a stylistic one. It could not bite while both
+     value pickers were single-select; the multi-select sheet is what made a
+     two-value condition something an author can produce, and the sentence under
+     it described a narrower rule than the one that would run. */
   let value: string
   if (REF_KINDS.has(t.valueKind)) {
     const kind = t.valueKind as RefKind
-    value = raw.map((v) => resolve?.(kind, v) ?? seedName(kind, v) ?? v).join(', ')
+    value = raw.map((v) => resolve?.(kind, v) ?? seedName(kind, v) ?? v).join(' or ')
   } else if (t.valueKind === 'time' || t.valueKind === 'range') {
     value = raw.join('–')
   } else {
-    value = raw.join(', ')
+    value = raw.join(' or ')
   }
 
   // Said out loud rather than left blank: the linter calls this an error, and
   // the prose has to agree with the panel next to it.
   if (!value) value = '(no value set)'
 
-  if (t.valueKind === 'zone' || t.valueKind === 'fingerprint') return `${c.operator} ${value}`
+  /* The zone's half, said out loud.
+
+     "not in zone Office Network" and "not in zone Office Network, on the
+     network only" are two different rules, and this sentence is what the
+     change list and the card both print. Without it they read identically,
+     which is the one thing a read-back must never do.
+
+     Only when it is narrower than the zone as written — the default is the
+     zone's own meaning, and a clause restating a default is noise. */
+  if (t.valueKind === 'zone') return `${c.operator} ${value}${c.scope ? (c.scope === 'ip' ? ', on the network only' : ', by location only') : ''}`
+  if (t.valueKind === 'fingerprint') return `${c.operator} ${value}`
   if (t.valueKind === 'hook') return `${value} ${c.operator}`
   return `${t.label} ${c.operator} ${value}`
 }

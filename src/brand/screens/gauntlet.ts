@@ -1,4 +1,4 @@
-import { blankRule, card, cond, when, type AccessDecision, type Policy, type Rule } from '../data'
+import { blankRule, card, cond, when, type AccessDecision, type Condition, type Policy, type Rule, type ZoneScope } from '../data'
 import { ckey, isSingleAndRun, sig } from '../predicate'
 import { SIM_USERS, decide, inAudience, walk, type SimEnv, type SimUser, type TraceResult } from './simulate'
 
@@ -43,6 +43,19 @@ export const EXPECT_LABEL: Record<Expect, string> = {
     heavier than the card asked for — the two failures are not the same kind. */
 const STRICTNESS: Record<AccessDecision, number> = { '1fa': 0, '2fa': 1, deny: 2 }
 
+/* One condition of a fix spec, in the same shape `cond()` takes.
+
+   `scope` is here so a spec can name the half of a zone it means. Without it,
+   the conditions this spec builds could never be the twin of a rule an author
+   had narrowed to one half — `ckey` would separate them, the exact match would
+   miss, and the fix would offer to insert a broader duplicate above it. */
+export interface SpecCondition {
+  typeId: string
+  operator: string
+  values: string[]
+  scope?: ZoneScope
+}
+
 export interface Challenge {
   id: string
   /** Hostile attempts are the ones a miss on is a breach. */
@@ -70,7 +83,7 @@ export interface Challenge {
      makes the card hostile, which is the thing worth writing a rule about. */
   fix?: {
     name: string
-    conditions: { typeId: string; operator: string; values: string[] }[]
+    conditions: SpecCondition[]
     why: string
   }
 }
@@ -410,8 +423,23 @@ export interface ProposedFix {
 
    Built through the real constructors now, so there is one canonical form and
    this cannot drift from it again. */
-const specKey = (conditions: { typeId: string; operator: string; values: string[] }[]) =>
-  sig(when(card(...conditions.map((c) => cond(c.typeId, c.operator, [...c.values])))))
+/* One place a spec becomes real conditions.
+
+   There were three, and they had drifted apart in the way three copies of one
+   mapping always do: `specKey` built them to sign the spec, the `insert` branch
+   at the foot built them again to make the rule, and `want` did not build them
+   at all — it hand-inlined `ckey`'s string format, which then had to be kept in
+   step with `ckey` by hand and was not. Adding a segment to `ckey` broke it
+   silently: `covers` compared a four-segment key against a three-segment one
+   and matched nothing, so every fix fell through to proposing an insert above a
+   rule that already said the same thing — the exact unpublishable-shadow bug
+   the comment above `specKey` was written about.
+
+   One builder now, and the two identities are both derived from what it makes. */
+const specConds = (conditions: SpecCondition[]): Condition[] =>
+  conditions.map((c) => cond(c.typeId, c.operator, [...c.values], c.scope))
+
+const specKey = (conditions: SpecCondition[]) => sig(when(card(...specConds(conditions))))
 
 export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
   const spec = round.challenge.fix
@@ -453,7 +481,7 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
      spec's, preferring an exact match. Only single-card rules qualify, because
      a rule with alternatives is not made unreachable by a broader rule above it
      in the same way and re-aiming it would change more than the card asks. */
-  const want = new Set(spec.conditions.map((c) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}`))
+  const want = new Set(specConds(spec.conditions).map(ckey))
   /* And an AND-run specifically: a single card whose conditions are joined by
      OR covers none of them jointly, so re-aiming it would not do what the fix
      spec asks. */
@@ -492,7 +520,7 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
     /* One card: a fix spec is a set of conditions that must all hold. The
        hardcoded `appliesTo: ['all']` that used to sit here is gone — a rule
        cannot be broader than its policy, so there is nothing to widen it to. */
-    when: when(card(...spec.conditions.map((c) => cond(c.typeId, c.operator, [...c.values])))),
+    when: when(card(...specConds(spec.conditions))),
     decision: round.want,
   }
 

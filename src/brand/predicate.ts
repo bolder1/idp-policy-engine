@@ -41,8 +41,21 @@ export const cardPasses = (k: ConditionCard, passed: (c: Condition) => boolean) 
 export const predicatePasses = (p: Predicate, passed: (c: Condition) => boolean) =>
   p.cards.length === 0 ? true : topJoin(p) === 'or' ? p.cards.some((k) => cardPasses(k, passed)) : p.cards.every((k) => cardPasses(k, passed))
 
-/** Identity of one condition, order-insensitive across its values. */
-export const ckey = (c: Condition) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}`
+/* Identity of one condition, order-insensitive across its values.
+
+   The `scope` segment is what keeps "in zone Office, on the network" and "in
+   zone Office, on the map" from being the same condition. They are two
+   different questions with two different answers, and nine separate readers get
+   that right for free by keying through here: PE101's duplicate-rule blocker,
+   PE102, PE112, `duplicatedAcrossCards`, `mergeBranches` and the trail's
+   `mergeUp` (both of which DROP a condition they consider a twin), the
+   gauntlet's twin matching, `changes.ts`, and the stale-estimate test.
+
+   `?? ''` rather than `?? 'both'`: a condition with no scope has to key to the
+   byte-identical string it keyed to before this field existed, or every
+   signature in the seeded estate moves and the stale-estimate check reports the
+   whole tenant as edited. */
+export const ckey = (c: Condition) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}|${c.scope ?? ''}`
 
 /* The canonical identity of a whole predicate, and the product's single audit
    primitive. Conditions inside a card sort; cards sort among themselves. So it

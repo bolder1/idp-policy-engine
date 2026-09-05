@@ -55,6 +55,36 @@ export interface Diagnostic {
   relatedIndex?: number
 }
 
+const clockMinutes = (s: string) => {
+  const [h, m] = s.split(':').map(Number)
+  return (h || 0) * 60 + (m || 0)
+}
+
+/* Is every minute of one window also a minute of the other?
+
+   An interval is not a value set, and PE111's containment test cannot be told
+   the difference by looking at `values` — a `between` condition holds
+   `[from, to]`, two endpoints, where a `list` condition holds alternatives. Ask
+   "does every value of the affirmative appear among the negation's" of a window
+   and it answers three real questions wrong: it says yes for `09:00–17:00`
+   against `not 17:00–09:00`, which are complements and agree perfectly; and it
+   says no for `09:00–17:00` against `not 09:00–22:00`, where the first window
+   sits wholly inside the second and nothing can satisfy both.
+
+   Minutes, and the evaluator's own wrap rule — a window whose end precedes its
+   start crosses midnight and is a union of two runs, so it is unrolled to those
+   runs before either side is compared. */
+const windowRuns = (v: string[]): [number, number][] => {
+  const from = clockMinutes(v[0] ?? '00:00')
+  const to = clockMinutes(v[1] ?? '23:59')
+  return from <= to ? [[from, to]] : [[from, 1439], [0, to]]
+}
+
+const windowInside = (aff: string[], neg: string[]): boolean => {
+  const cover = windowRuns(neg)
+  return windowRuns(aff).every(([a, b]) => cover.some(([c, d]) => c <= a && b <= d))
+}
+
 /** Negating operators, paired with the affirmative they contradict. */
 const NEGATIONS: Record<string, string> = {
   'is not': 'is',
@@ -421,11 +451,60 @@ export function diagnose(
           const ca = k.conditions[a]
           const cb = k.conditions[b]
           if (ca.typeId !== cb.typeId) continue
+          /* Same attribute is not yet the same question.
 
-          const overlap = ca.values.filter((v) => cb.values.includes(v))
+             A zone condition names a half — the network one, the geographic
+             one, or both — and two halves of one zone are two independent
+             facts. "In the office network by address" and "not in the office
+             network by geography" hold together whenever the addresses and the
+             map disagree, which is exactly the case somebody writes a scoped
+             rule to catch. Comparing them on values alone reports that rule as
+             cancelling out and refuses to publish it. */
+          if (ca.scope !== cb.scope) continue
+
           const opposed = NEGATIONS[cb.operator] === ca.operator || NEGATIONS[ca.operator] === cb.operator
 
-          if (requiresBoth && opposed && overlap.length > 0) {
+          /* COVERED, not overlapping — and the difference is a false error that
+             blocks publishing on a rule that is perfectly satisfiable.
+
+             A multi-valued condition ORs its values: `zone in [office, hq]`
+             passes in either one. So `in [office, hq] AND not in [office]` is
+             not a contradiction, it is the rule "hq but not office", which is
+             exactly how somebody would write that. Overlap is non-empty, the
+             operators are opposed, and the old test raised a blocking ERROR the
+             author could only clear by deleting a condition they meant.
+
+             A contradiction needs the negation to cover EVERY value the
+             affirmative offers — only then is there nothing left to satisfy.
+             Which side is which has to be resolved first: the loop yields the
+             pair in authoring order, so `ca` is the negated one about half the
+             time, and `every` is not symmetric.
+
+             This was reachable before today only through hand-authored data,
+             because both value pickers were single-select. They are not any
+             more. The same unsoundness has always been latent for `list` kinds
+             whose operators are a `not`-pair — Country, Day of week, MDM
+             Managed — and this closes those too. Device posture is NOT among
+             them, and neither is External hook: `passes`/`fails` and
+             `returns true`/`returns false` are not in NEGATIONS, so `opposed`
+             is false and neither pair has ever reached this test at all.
+
+             `time` needs its own containment test and gets one below —
+             `between` holds two endpoints rather than two alternatives, and
+             asking whether one pair appears among the other is wrong in both
+             directions. */
+          const neg = NEGATIONS[ca.operator] ? ca : cb
+          const aff = neg === ca ? cb : ca
+          /* Set containment for the kinds whose values are alternatives;
+             interval containment for the one whose values are endpoints. Which
+             is which is a property of the attribute, so it is read off the
+             catalogue rather than guessed from the shape of the array. */
+          const covered =
+            conditionType(ca.typeId).valueKind === 'time'
+              ? windowInside(aff.values, neg.values)
+              : aff.values.length > 0 && aff.values.every((v) => neg.values.includes(v))
+
+          if (requiresBoth && opposed && covered) {
             out.push({
               id: `contradiction-${r.id}-${ca.id}-${cb.id}`,
               code: 'PE111',
@@ -433,7 +512,11 @@ export function diagnose(
               severity: 'error',
               ruleIndex: i,
               title: 'These conditions cancel out',
-              detail: `${conditionType(ca.typeId).label} is required to be both “${ca.operator} ${overlap.join(', ')}” and “${cb.operator} ${overlap.join(', ')}” in the same branch. Nothing can satisfy both.`,
+              /* Quotes what the author wrote, rather than the intersection.
+                 The message named `overlap` on both sides, so a rule whose two
+                 conditions listed different values was explained back with
+                 values neither of them held. */
+              detail: `${conditionType(ca.typeId).label} is required to be both “${aff.operator} ${aff.values.join(', ')}” and “${neg.operator} ${neg.values.join(', ')}” in the same branch. Nothing can satisfy both.`,
             })
             /* `ckey`, not `JSON.stringify(values)`. The stringify is
                order-sensitive, so the same two values typed in the other order

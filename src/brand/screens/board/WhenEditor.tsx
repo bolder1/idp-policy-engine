@@ -1,11 +1,11 @@
 import { Fragment, useEffect, useState } from 'react'
-import { ChevronDown, Copy, Plus, Split, X } from 'lucide-react'
+import { ChevronDown, Plus, Split, Trash2, X } from 'lucide-react'
 
 import { Picker } from '../../picker'
 import { modeLabel } from '../../fingerprint'
 import { cardJoin, cardLetter, ckey, duplicatedAcrossCards, topJoin } from '../../predicate'
 import {
-  cond,
+  CONDITION_CATALOGUE,
   conditionType,
   type Condition,
   type ConditionType,
@@ -18,7 +18,7 @@ import { useBrand, useNameLookup } from '../../store'
 import { predicateParts } from '../predicate-prose'
 import { ConditionPicker } from '../rule-form'
 import { IfChip, IfKw } from './IfBlock'
-import { GROUP_TONE, groupIcon } from './tones'
+import { groupIcon } from './tones'
 
 /* -----------------------------------------------------------------------------
    WHEN — the conditional, editable.
@@ -34,13 +34,6 @@ import { GROUP_TONE, groupIcon } from './tones'
    two builders cannot disagree about what the attributes are or how they are
    found.
    -------------------------------------------------------------------------- */
-
-const GROUP_LABEL: Record<string, string> = {
-  Device: 'Device profiles',
-  Webhooks: 'External hooks',
-  Group: 'Groups',
-  User: 'People',
-}
 
 export function WhenEditor({
   rule,
@@ -118,10 +111,6 @@ export function WhenEditor({
 
   const removeCondition = (conditionId: string) => write(ops.removeCondition(rule.when, conditionId))
   const patchCondition = (conditionId: string, next: Partial<Condition>) => write(ops.patchCondition(rule.when, conditionId, next))
-  const duplicateCondition = (c: Condition) => {
-    const home = ops.branchOf(rule.when, c.id)
-    if (home) write(ops.addCondition(rule.when, home.id, cond(c.typeId, c.operator, [...c.values])))
-  }
   const splitOut = (conditionId: string) => write(ops.splitOut(rule.when, conditionId))
   const mergeUp = (i: number) => {
     if (i < 1 || i >= cards.length) return
@@ -176,31 +165,33 @@ export function WhenEditor({
                   because only then is there a bracket to show. */}
               <div className={k.grouped ? 'bb__ifgroup' : 'bb__ifplain'}>
                 {k.conditions.map((c, j) => (
-                  <Fragment key={c.id}>
-                    {j > 0 && <Junction join={cardJoin(k)} scope="group" onFlip={() => flipCardJoin(k.id)} />}
-                    <ConditionRow
-                      c={c}
-                      showIf={i === 0 && j === 0}
-                      fresh={fresh === c.id}
-                      /* `duplicatedAcrossCards` returns ckeys, not ids. Asking it
-                         about `c.id` compared two string spaces that never meet, so
-                         the ·2 badge and its tooltip were unreachable. */
-                      dupe={dupes.includes(ckey(c))}
-                      store={store}
-                      resolve={resolve}
-                      onChange={(nextC) => patchCondition(c.id, nextC)}
-                      onRemove={() => removeCondition(c.id)}
-                      onDuplicate={() => duplicateCondition(c)}
-                      /* Splitting is a deliberate restructure now, on the row
-                         that moves, rather than a side effect of pressing an
-                         operator. */
-                      /* Gated on the same predicate the writer uses. The two used to
-                         disagree — the button was drawn on every row while the
-                         writer bailed whenever the row was the only one — so the
-                         first row of every group had a control that did nothing. */
-                      onSplit={k.conditions.length > 1 ? () => splitOut(c.id) : undefined}
-                    />
-                  </Fragment>
+                  <ConditionRow
+                    key={c.id}
+                    c={c}
+                    at={j}
+                    join={cardJoin(k)}
+                    /* Every row but the first carries it, and pressing any one
+                       flips the whole level — a level holds ONE joiner, so this
+                       is one setting shown between each pair rather than one
+                       setting per gap. */
+                    showJoin={j > 0}
+                    fresh={fresh === c.id}
+                    /* `duplicatedAcrossCards` returns ckeys, not ids. Asking it
+                       about `c.id` compared two string spaces that never meet, so
+                       the ·2 badge and its tooltip were unreachable. */
+                    dupe={dupes.includes(ckey(c))}
+                    store={store}
+                    resolve={resolve}
+                    onChange={(nextC) => patchCondition(c.id, nextC)}
+                    onRetype={(typeId) => write(ops.retypeCondition(rule.when, c.id, typeId, conditionType(typeId).operators[0]))}
+                    onFlipJoin={() => flipCardJoin(k.id)}
+                    onRemove={() => removeCondition(c.id)}
+                    /* Gated on the same predicate the writer uses. The two used to
+                       disagree — the button was drawn on every row while the
+                       writer bailed whenever the row was the only one — so the
+                       first row of every group had a control that did nothing. */
+                    onSplit={k.conditions.length > 1 ? () => splitOut(c.id) : undefined}
+                  />
                 ))}
 
                 {/* A group gets its own adder, inside its frame, because that is
@@ -376,74 +367,120 @@ function Junction({ join, scope, onFlip }: { join: Joiner; scope: 'top' | 'group
 
 /* --- One condition, live ------------------------------------------------------ */
 
+/* One condition, as one row of controls.
+
+   Four cells that line up down the whole block: the joiner, what is being
+   checked, how, and what against — then a delete. It used to be a run of inline
+   chips of whatever width their contents happened to be, wrapping onto two and
+   three lines, so no two rows agreed about where anything was and a rule of
+   five conditions had no column to read down.
+
+   The attribute is a picker rather than a label now. It was the one part of a
+   condition you could not change: choosing the wrong one meant deleting the row
+   and adding another, losing your place in a list you were halfway through. The
+   writer resets the operator and the value with the type, because carrying them
+   over produces a condition naming an operator its type does not have.
+
+   The joiner lives in the row rather than between rows for the same reason the
+   rest of it moved: a control floating in the gap belongs to neither row above
+   nor below it, and it made every second row start at a different height. */
 function ConditionRow({
   c,
-  showIf,
+  at,
+  join,
+  showJoin,
   fresh,
   dupe,
   store,
   resolve,
   onChange,
+  onRetype,
+  onFlipJoin,
   onRemove,
-  onDuplicate,
   onSplit,
 }: {
   c: Condition
-  /** Only the very first row of the first group wears the `if`. */
-  showIf: boolean
+  at: number
+  join: Joiner
+  /** Every row but the first carries the level's joiner. */
+  showJoin: boolean
   fresh: boolean
   dupe: boolean
   store: ReturnType<typeof useBrand>
   resolve: ReturnType<typeof useNameLookup>
   onChange: (c: Condition) => void
+  onRetype: (typeId: string) => void
+  onFlipJoin: () => void
   onRemove: () => void
-  onDuplicate: () => void
   /** Absent when the row is the only condition in its run — nothing to split. */
   onSplit?: () => void
 }) {
   const t = conditionType(c.typeId)
   const Ico = groupIcon(t.group)
-  const tone = GROUP_TONE[t.group] ?? 'neutral'
+
   return (
-    <div className={`bb__ifrow ${fresh ? 'is-new' : ''}`}>
-      {/* `if` once, on the very first row. Every other junction is a pill
-          between rows now, so a keyword here would be the same operator said
-          twice — and the `or` this used to print at the head of a second group
-          was a word standing where the control belongs. */}
-      {showIf && (
-        <>
-          <span className="bb__ifbranch" aria-hidden>
-            <Split size={12} strokeWidth={2} />
+    <div className={`bb__cond ${fresh ? 'is-new' : ''}`}>
+      <span className="bb__cond__join">
+        {showJoin ? (
+          <button
+            type="button"
+            className={`bb__joinsel is-${join}`}
+            aria-label={`${join === 'and' ? 'All of these must be true' : 'Any one of these is enough'}. Switch to ${join === 'and' ? 'OR' : 'AND'}.`}
+            onClick={onFlipJoin}
+          >
+            {join}
+            <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
+          </button>
+        ) : (
+          <span className="bb__cond__first" aria-hidden>
+            {at === 0 ? 'if' : ''}
           </span>
-          <IfKw>if</IfKw>
-        </>
-      )}
-
-      <IfChip tone={tone} icon={<Ico size={9} strokeWidth={2.2} />} title={dupe ? `${t.label} — also in another way in` : GROUP_LABEL[t.group] ?? t.group}>
-        {t.label}
-        {dupe && <span className="bb__ifdupe" aria-label="Also in another branch">·2</span>}
-      </IfChip>
-
-      <span className="bb__ifop">
-        <Picker label={`${t.label} operator`} size="sm" value={c.operator} options={t.operators.map((o) => ({ value: o, label: o }))} onChange={(operator) => onChange({ ...c, operator })} />
+        )}
       </span>
 
-      <ValueControl type={t} values={c.values} store={store} resolve={resolve} autoOpen={fresh} onChange={(values) => onChange({ ...c, values })} />
+      <span className="bb__cond__what">
+        <Picker
+          label="What to check"
+          size="sm"
+          width="fill"
+          searchable
+          value={c.typeId}
+          options={CONDITION_CATALOGUE.map((x) => ({ value: x.id, label: x.label, meta: x.group }))}
+          onChange={onRetype}
+        />
+        <i className="bb__cond__mark" aria-hidden>
+          <Ico size={12} strokeWidth={2} />
+        </i>
+        {dupe && (
+          <span className="bb__ifdupe" title="This exact condition is also in another branch" aria-label="Also in another branch">
+            ·2
+          </span>
+        )}
+      </span>
 
-      {/* The row's own `+ and` chip and its split icon both moved to the
-          junctions between rows, where the same two moves are one press each
-          and are visible without hovering first. */}
-      <span className="bb__ifacts">
+      <span className="bb__cond__op">
+        <Picker
+          label={`${t.label} operator`}
+          size="sm"
+          width="fill"
+          value={c.operator}
+          options={t.operators.map((o) => ({ value: o, label: o }))}
+          onChange={(operator) => onChange({ ...c, operator })}
+        />
+      </span>
+
+      <span className="bb__cond__val">
+        <ValueControl type={t} values={c.values} store={store} resolve={resolve} autoOpen={fresh} onChange={(values) => onChange({ ...c, values })} />
+      </span>
+
+      <span className="bb__cond__acts">
         {onSplit && (
           <button type="button" className="bb__ifact" aria-label={`Move ${t.label} into its own group`} title="Move into its own group" onClick={onSplit}>
             <Split size={11} strokeWidth={2} />
           </button>
         )}
-        <button type="button" className="bb__ifact" aria-label={`Duplicate ${t.label}`} title="Duplicate" onClick={onDuplicate}>
-          <Copy size={11} strokeWidth={2} />
-        </button>
-        <button type="button" className="bb__ifact" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
-          <X size={11} strokeWidth={2.2} />
+        <button type="button" className="bb__ifact is-danger" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
+          <Trash2 size={12} strokeWidth={2} />
         </button>
       </span>
     </div>

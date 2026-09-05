@@ -600,6 +600,15 @@ button.bb__idx svg { display: none; }
    than the panel it came from.
 
    One column here; the halves divide inside the rule. */
+/* Full-bleed rather than a centred box.
+
+   The Modal takes its width as an inline pixel value and caps it at 100%, so a
+   number larger than any screen makes it fill the scrim, and the scrim's own
+   padding becomes the margin. Nothing in the kit changes; the dialog is simply
+   asked for more than there is. */
+.bx-scrim--center:has(.bb__focus) { padding: var(--space-4); }
+.bx-scrim--center:has(.bb__focus) .bx-modal { max-height: 94vh; width: 100%; }
+
 .bb__focus { display: block; }
 .bb__focus > * { min-width: 0; }
 /* No border under the identity block in the dialog — the modal's own head is
@@ -1265,6 +1274,14 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   background: var(--if-chip); border: 1px solid var(--if-chip-border); color: var(--text-primary);
   font-family: inherit; font-size: 11px;
 }
+/* A time field is as wide as a time.
+
+   The kit defaults every input to `width: 100%` at zero specificity — its own
+   comment says only an explicit width wins — and this class never set one. So
+   the two ends of a time range each took a whole row, and "Time between 09:00
+   and 17:00" rendered as three stacked lines: the one condition on the panel
+   that is genuinely two values, drawn as the tallest thing on it. */
+.bb__ifinput[type='time'] { width: 92px; }
 .bb__ifinput.is-num { width: 58px; text-align: right; font-variant-numeric: tabular-nums; }
 .bb__ifinput.is-text { flex: 1; min-width: 120px; }
 .bb__ifinput:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
@@ -1415,7 +1432,40 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 
 /* Focus mode puts the halves side by side rather than stacked — the reason to
    open it is a rule whose conditions have outgrown the column. */
-.bb__rule.is-focus .bb__rulebody { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: var(--space-6); align-items: start; }
+/* Two columns, and the conditions get the wider one.
+
+   It was 1.15fr to 1fr, which is nearly even — and the two halves are not
+   nearly even. A condition row carries a mark, an attribute, an operator and a
+   value and wants every pixel; the outcome is three tiles and a handful of
+   settings that were rendering at half a screen wide with the right two thirds
+   empty. Capping the outcome column stops the settings sprawling and gives the
+   conditions the rest. */
+.bb__rule.is-focus .bb__rulebody {
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 440px);
+  gap: var(--space-8);
+  align-items: start;
+}
+/* The halves do NOT scroll independently.
+
+   They did, briefly, on the reasoning that a long predicate should not push the
+   outcome off the bottom. It collapsed both columns to a single row: a grid
+   item that is a scroll container has an automatic minimum size of zero, so the
+   auto row sized to the tallest thing that could not shrink — the 26px step
+   number — and every column clipped to it. The modal body already scrolls, and
+   one scrollbar for one dialog is the right number anyway. */
+.bb__rule.is-focus .bb__rulehalf { padding-right: var(--space-2); }
+
+/* The two questions, said once each at the top of their column. */
+.bb__halfhead {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+
+/* One line for the note, full screen. It grows if there is something in it and
+   takes no room when there is not — where the panel's two-row box is a
+   paragraph of empty space across a screen's width. */
+.bb__insphead.is-focus { align-items: center; }
+.bb__insphead.is-focus .bb__input--desc { min-height: 30px; resize: vertical; }
 @media (max-width: 1000px) { .bb__rule.is-focus .bb__rulebody { grid-template-columns: minmax(0, 1fr); } }
 
 /* --- Name and description, in one block ---------------------------------------
@@ -1730,3 +1780,101 @@ button.bb__idx::after {
   .bb:has(.bb__sheet) .bb__insp { display: none; }
   .bb__sheet { top: var(--space-3); height: auto; }
 }
+
+/* --- A condition, as one row of controls ---------------------------------------
+
+   Four cells that line up down the whole block — joiner, what, how, against —
+   and a delete at the end. It was a run of inline chips whose widths came from
+   their contents, wrapping onto two and three lines, so no two rows agreed
+   about where anything was and a rule of five conditions had no column to read
+   down. Every control is the same height and starts in the same place now.
+
+   `minmax(0, …)` on all four, because a grid track's default `auto` minimum is
+   its content's min-content width — a zone named "Reliance Jio · India" would
+   otherwise push the delete button off the end rather than eliding. */
+.bb__cond {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1.15fr) minmax(0, 0.85fr) minmax(0, 1.3fr) auto;
+  align-items: center; gap: var(--space-2);
+  padding: 3px 0;
+}
+.bb__cond.is-new { animation: bb-in 0.28s ease-out; }
+
+.bb__cond__join { display: flex; justify-content: flex-end; }
+/* `if` on the first row, in the quiet weight a keyword gets — it is the sentence
+   starting, not a control. */
+.bb__cond__first { font-size: var(--fs-xs); color: var(--text-muted); font-weight: var(--fw-medium); }
+
+/* The joiner, drawn as the select it behaves like: press it and the level
+   flips. It reads as a control rather than as a label, which the pill floating
+   between rows never did. */
+.bb__joinsel {
+  display: inline-flex; align-items: center; gap: 2px;
+  height: 26px; padding: 0 5px 0 7px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-family: inherit; font-size: 11px; font-weight: var(--fw-medium);
+  text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--text-secondary); cursor: pointer;
+}
+.bb__joinsel.is-and { color: var(--fb-info-fg); border-color: var(--fb-info-border); background: var(--fb-info-bg); }
+.bb__joinsel.is-or { color: var(--fb-notice-fg); border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.bb__joinsel:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* The attribute is a picker now, with its category mark sitting inside the
+   field rather than beside it — so the row keeps four columns instead of five. */
+.bb__cond__what { position: relative; min-width: 0; }
+.bb__cond__what .bx-picker { width: 100%; }
+.bb__cond__what .bx-picker__trigger { padding-left: 26px; }
+.bb__cond__mark {
+  position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; pointer-events: none;
+  color: var(--text-tertiary);
+}
+.bb__cond__op, .bb__cond__val { min-width: 0; }
+.bb__cond__op .bx-picker, .bb__cond__val .bx-picker { width: 100%; }
+.bb__cond__val { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.bb__cond__acts { display: flex; align-items: center; gap: 2px; opacity: 0; }
+.bb__cond:hover .bb__cond__acts, .bb__cond:focus-within .bb__cond__acts { opacity: 1; }
+.bb__ifact.is-danger:hover { color: var(--fb-negative-fg); }
+
+/* Narrow: the value drops under the row rather than crushing the other three.
+   The panel is 320px at its narrowest and four controls do not fit across it. */
+@media (max-width: 560px) {
+  .bb__cond { grid-template-columns: 44px minmax(0, 1fr) auto; }
+  .bb__cond__op { grid-column: 2 / -1; }
+  .bb__cond__val { grid-column: 2 / -1; }
+}
+
+/* --- The form, as numbered steps ---------------------------------------------
+
+   Two questions, asked in order, each with its number and a line running down
+   to the next. It was one header reading "If and then" over an undivided body,
+   which named both halves in one breath and then left the reader to work out
+   where one ended. */
+/* `bb__ask`, not `bb__step`.
+
+   It was `bb__step` for about an hour, and `.bb__step` has been taken since the
+   card's journey row was written: an inline-flex chip with `height: 26px` on
+   it. So every one of these collapsed to 26px, and because the collapse
+   happened at the container the whole dialog folded to a sliver — two columns
+   of controls clipped to the height of a chip that belongs to a different
+   component entirely.
+
+   Worth the note because nothing about the symptom pointed at the cause. The
+   computed styles showed no height on the element I was measuring, the parent
+   grid looked like the culprit, and a clone lifted out of the modal collapsed
+   just the same — which is what finally said "this element's own styles",
+   rather than anything about where it sat. A name is a global in CSS. */
+.bb__ask { display: block; }
+.bb__ask__head { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3); }
+.bb__ask__n {
+  display: inline-grid; place-items: center; flex: none;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--fb-info-bg); color: var(--fb-info-fg);
+  font-size: 11px; font-weight: var(--fw-semibold);
+  align-self: center;
+}
+.bb__ask__head p { flex-basis: 100%; }
+.bb__ask__head h3 { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bb__ask__head p { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); }

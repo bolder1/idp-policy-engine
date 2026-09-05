@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { Maximize2, Plus, X } from 'lucide-react'
+import { Maximize2, X } from 'lucide-react'
 
 import { Modal, Toggle } from '../../kit'
 import { fallbackRule, type Policy, type Rule } from '../../data'
@@ -79,7 +79,16 @@ export function Inspector({
         </button>
       </div>
 
-      <Modal open={focus} onClose={() => setFocus(false)} title={what} width={1100}>
+      {/* Full-bleed, not a wider box.
+
+          It was a 1100px dialog centred on the board, which is the shape you
+          reach for when a form is long — and this is not a long form, it is two
+          halves of one sentence that were being squeezed into a column each. At
+          1100 the conditions wrapped, the time fields stacked, and the right
+          half ran out of content two thirds of the way down. Giving it the
+          screen lets the halves be the width they actually need and puts the
+          rule's own name at the top of it rather than in a box inside a box. */}
+      <Modal open={focus} onClose={() => setFocus(false)} title={what} width={2400}>
         <div className="bb__focus">{body(true)}</div>
       </Modal>
 
@@ -117,10 +126,7 @@ function RulePane({
       side instead of one under the other. */
   focus?: boolean
 }) {
-  /* Just a nonce now. The catalogue is a dialog, so it has no anchor to be
-     positioned against — the same button pressed twice still opens twice. */
-  const [openAt, setOpenAt] = useState<{ nonce: number } | null>(null)
-  const leaves = rule.when.cards.reduce((n, k) => n + k.conditions.length, 0)
+  const [openAt] = useState<{ nonce: number } | null>(null)
   /* Which rule catches a sign-in this one lets through. It belongs to THEN —
      it is the other half of "what happens" — so it is passed down there rather
      than drawn as an `else` row inside the condition block. */
@@ -140,7 +146,15 @@ function RulePane({
           description is what the next person reads before deciding whether
           they are allowed to delete it. So they share a block, the heading is
           gone, and the placeholder does the explaining. Both save as typed. */}
-      <div className="bb__insphead">
+      {/* The identity block, and in focus mode it is one line.
+
+          The panel needs the name and the note stacked because it is 400px
+          wide. Full screen it does not: a two-row textarea across 2400px is a
+          field with a paragraph of empty space in it, and it pushed the two
+          halves — the part somebody opened focus mode to see — below the fold.
+          The note becomes a single line that grows only if there is something
+          in it. */}
+      <div className={`bb__insphead ${focus ? 'is-focus' : ''}`}>
         <span className={`bb__idx is-${TONE[rule.decision]}`} aria-hidden>
           {index + 1}
         </span>
@@ -148,7 +162,7 @@ function RulePane({
           <input className="bb__input bb__input--title" aria-label="Rule name" value={rule.name} placeholder="Name this rule" onChange={(e) => onPatch({ name: e.target.value })} />
           <textarea
             className="bb__input bb__input--desc"
-            rows={2}
+            rows={focus ? 1 : 2}
             aria-label="What this rule is for"
             placeholder="What is this for? A regulator, an incident, an audit finding…"
             value={rule.description ?? ''}
@@ -171,32 +185,40 @@ function RulePane({
           the conditions above and the outcome below, in the order they are
           read. In focus mode the grid puts them side by side instead; same
           editors either way. */}
-      <section className={`bb__rule ${focus ? 'is-focus' : ''}`}>
-        <div className="bb__rulehead">
-          <h3>If and then</h3>
-          {leaves > 0 && <span className="bb__count">{leaves}</span>}
-          <button
-            type="button"
-            className="bb__secact"
-            aria-label="Add a condition"
-            title="Add a condition"
-            onClick={() => setOpenAt({ nonce: Date.now() })}
-          >
-            <Plus size={15} strokeWidth={2} />
-          </button>
-        </div>
+      {/* Two questions, numbered, with a rail between them.
 
+          It was one header reading "If and then" over an undivided body, which
+          names both halves in one breath and then leaves the reader to find
+          where one stops. Numbering them says there are two and says which
+          comes first, and the caption under each says what it is asking — so
+          nothing on the form has to be inferred from the shape of the controls
+          below it. */}
+      <section className={`bb__rule ${focus ? 'is-focus' : ''}`}>
         <div className="bb__rulebody">
           <div className="bb__rulehalf">
-            <WhenEditor rule={rule} onPatch={onPatch} openAt={openAt} />
+            <div className="bb__ask">
+              <div className="bb__ask__head">
+                <span className="bb__ask__n" aria-hidden>
+                  1
+                </span>
+                <h3>If</h3>
+                <p>When does this rule apply?</p>
+              </div>
+              <WhenEditor rule={rule} onPatch={onPatch} openAt={openAt} />
+            </div>
           </div>
+
           <div className="bb__rulehalf">
-            {/* The keyword, so the two halves read as one sentence rather than
-                as two panels. It is the same word the card uses. */}
-            <p className="bb__rulekw">
-              <span className="bb__ifkw">then</span>
-            </p>
-            <WhatEditor rule={rule} onPatch={onPatch} next={next ? { index: draft.rules.indexOf(next), name: next.name } : null} />
+            <div className="bb__ask">
+              <div className="bb__ask__head">
+                <span className="bb__ask__n" aria-hidden>
+                  2
+                </span>
+                <h3>Then</h3>
+                <p>What happens when it matches?</p>
+              </div>
+              <WhatEditor rule={rule} onPatch={onPatch} focus={focus} next={next ? { index: draft.rules.indexOf(next), name: next.name } : null} />
+            </div>
           </div>
         </div>
       </section>

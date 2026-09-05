@@ -42,11 +42,20 @@ export function WhatEditor({
   rule,
   onPatch,
   terminal,
+  focus,
   next,
 }: {
   rule: Rule
   onPatch: (p: Partial<Rule>) => void
   terminal?: boolean
+  /* Side by side rather than stacked, which changes what needs saying.
+
+     Two of the paragraphs here exist because the panel is a narrow column read
+     top to bottom: they restate, in prose, what the control above them already
+     did. Full screen the conditions are in the next column and the chain is one
+     Escape away, so the same sentences are a wall of text between somebody and
+     the two settings they came to change. */
+  focus?: boolean
   /* Which rule catches the sign-ins this one lets past.
 
      This was an `else` row inside the condition block, which put it beside the
@@ -114,7 +123,7 @@ export function WhatEditor({
       </div>
 
       {rule.decision === 'deny' ? (
-        <p className="bb__secnote">No prompt and no alternate path. A Deny here is final — the ML engine may escalate other decisions, never soften this one.</p>
+        !focus && <p className="bb__secnote">No prompt and no alternate path. A Deny here is final — the ML engine may escalate other decisions, never soften this one.</p>
       ) : (
         <>
           {unsatisfiable && (
@@ -245,7 +254,7 @@ export function WhatEditor({
         </>
       )}
 
-      {!terminal && (
+      {!terminal && !focus && (
         <p className="bb__secnote" style={{ marginTop: 10 }}>
           Matched sign-ins stop here — {DECISION_NAME[rule.decision]} is the answer and nothing below runs.
           {next ? (

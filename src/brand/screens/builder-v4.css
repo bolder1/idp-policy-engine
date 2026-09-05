@@ -1440,3 +1440,13 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focu
   margin: var(--space-5) 0 0;
   font-size: var(--fs-sm); color: var(--text-tertiary);
 }
+
+/* An attribute only an installed agent can read. Stated on the row in the
+   catalogue, because the cost of not knowing is a rule that never fires and
+   gives no reason. */
+.bf__catagent {
+  margin-left: 6px; padding: 1px 6px; border-radius: var(--radius-full);
+  background: var(--fb-notice-bg); color: var(--fb-notice-fg);
+  font-style: normal; font-size: 10px; font-weight: var(--fw-medium);
+  vertical-align: middle;
+}

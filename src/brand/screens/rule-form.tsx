@@ -29,6 +29,7 @@ import { predicateParts, type NameLookup } from './predicate-prose'
 import {
   CONDITION_CATALOGUE,
   CONDITION_GROUPS,
+  conditionRank,
   card,
   cond,
   conditionType,
@@ -1093,6 +1094,9 @@ export function ConditionPicker({
      nothing in the selected component would otherwise show an empty pane with
      the answer sitting one click away. */
   const searching = q.trim().length > 0
+  /* The lead order applies only when the whole catalogue is on screen — the
+     "All" pane, or a search, which already leaves the category behind. */
+  const leading = searching || group === ALL
 
   const shown = useMemo(() => {
     const n = q.trim().toLowerCase()
@@ -1111,8 +1115,25 @@ export function ConditionPicker({
           c.hint.toLowerCase().includes(n),
       )
       .slice()
-      .sort((x, y) => rank(x.group) - rank(y.group))
-  }, [pool, q, group, searching])
+      /* The lead order first, then the component order.
+
+         Seven attributes answer the question a rule usually opens with — who is
+         this for, and where from — and they sit in five different components,
+         so no category order can put them together. They are named in
+         `CONDITION_ORDER` and come first; everything else keeps the taxonomy.
+
+         Only while the whole catalogue is on screen. Inside a chosen category
+         the lead order would shuffle that category's own rows for a reason the
+         reader cannot see, so there it sorts by nothing and keeps catalogue
+         order. */
+      .sort((x, y) => {
+        if (leading) {
+          const d = conditionRank(x.id) - conditionRank(y.id)
+          if (d !== 0) return d
+        }
+        return rank(x.group) - rank(y.group)
+      })
+  }, [pool, q, group, searching, leading])
 
   /* Section headings only where the pane spans more than one component. Inside
      a single category they would repeat its name down the page. */
@@ -1237,7 +1258,16 @@ export function ConditionPicker({
                         <Ico size={14} strokeWidth={1.8} />
                       </span>
                       <span className="bf__catlabel">
-                        <strong>{c.label}</strong>
+                        <strong>
+                          {c.label}
+                          {/* Said before the row is added, not after it never
+                              fires. A page cannot read a MAC address or an OS
+                              build, so on an agentless estate these arrive
+                              empty and the condition simply never matches —
+                              which looks like a rule that does not work rather
+                              than one that cannot. */}
+                          {c.agent && <i className="bf__catagent">Needs the agent</i>}
+                        </strong>
                         <em>{c.hint}</em>
                       </span>
                     </button>

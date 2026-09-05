@@ -63,6 +63,14 @@ export interface ConditionType {
   /** Where the value comes from: a library object, a fixed list, or free text. */
   valueKind: 'zone' | 'fingerprint' | 'hook' | 'group' | 'user' | 'list' | 'text' | 'range' | 'time'
   options?: string[]
+  /* True when only an installed agent can read this.
+
+     Not a preference — a hard limit on what the browser can see. A page cannot
+     read a MAC address or an OS build number, so a rule that tests one on an
+     agentless estate is not misconfigured, it is inert: the value never
+     arrives, so it never matches. Marked on the attribute so the picker can say
+     so before the row is added rather than after it never fires. */
+  agent?: true
 }
 
 /* The nine major components the condition catalogue is organised by.
@@ -84,8 +92,44 @@ export const CONDITION_GROUPS = [
   'Webhooks',
 ] as const
 
+/* The order the picker leads with, chosen rather than derived.
+
+   Everything else in the catalogue is filed by component — Network, Location,
+   Device — which is the right taxonomy for finding a thing you already know the
+   name of, and the wrong one for the first row of a new rule. The question a
+   rule opens with is nearly always "who is this for", and the answers to it sit
+   in three different components.
+
+   So these seven come first, in this order, above the categories. It is a
+   stated order and not a usage statistic: nothing here counts clicks, and a
+   list that reordered itself as people used it would move the row somebody was
+   reaching for. */
+export const CONDITION_ORDER = [
+  'group',
+  'user',
+  'user-role',
+  'user-attr',
+  'group-attr',
+  'zone',
+  'webhook',
+] as const
+
+/** Where an id sits in the lead order, or past the end when it is not in it. */
+export const conditionRank = (id: string) => {
+  const i = (CONDITION_ORDER as readonly string[]).indexOf(id)
+  return i === -1 ? CONDITION_ORDER.length : i
+}
+
 export const CONDITION_CATALOGUE: ConditionType[] = [
-  { id: 'ip', label: 'IP Address', group: 'Network', hint: 'Match by IPv4/IPv6 address, range, or CIDR', operators: ['is', 'is not'], valueKind: 'text' },
+  /* One condition, four forms.
+
+     The parameter sheet lists IPv4 single, IPv4 range, IPv4 CIDR and IPv6 range
+     as four rows, and they are four ways of writing one thing rather than four
+     decisions — the same argument that keeps VPN detection from being five
+     dials. Each is a value this accepts, and the comment column's "multiple
+     should be supported" is what makes it multi-valued rather than what makes
+     it four conditions. */
+  { id: 'ip', label: 'IP address', group: 'Network', hint: 'A single address, a range, a CIDR block, or IPv6', operators: ['is', 'is not'], valueKind: 'text' },
   { id: 'zone', label: 'Network Zone', group: 'Network', hint: 'Match by named zone from your library', operators: ['in zone', 'not in zone'], valueKind: 'zone' },
 
   { id: 'country', label: 'Country', group: 'Location', hint: 'Match by country', operators: ['is', 'is not'], valueKind: 'list', options: ['India', 'United States', 'United Kingdom', 'Germany', 'Singapore'] },
@@ -93,11 +137,16 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
   { id: 'city', label: 'City', group: 'Location', hint: 'Match by city', operators: ['is', 'is not'], valueKind: 'list', options: ['Pune', 'Bengaluru', 'London', 'Austin'] },
   { id: 'coords', label: 'Coordinates', group: 'Location', hint: 'Match within a geographic radius', operators: ['within'], valueKind: 'range' },
 
-  { id: 'time', label: 'Time', group: 'Time', hint: 'Match by login time, timezone, and day of week', operators: ['between', 'not between'], valueKind: 'time' },
+  { id: 'time', label: 'Time of day', group: 'Time', hint: 'A window in the tenant’s timezone', operators: ['between', 'not between'], valueKind: 'time' },
+  /* Separate from the window, because they answer different questions and get
+     asked separately: "office hours" is a time, "not at the weekend" is a day,
+     and a rule usually wants one or the other rather than a single control that
+     means both. */
+  { id: 'day', label: 'Day of week', group: 'Time', hint: 'Match particular days', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
 
   { id: 'device-type', label: 'Device Type', group: 'Device', hint: 'Mobile, PC, tablet, etc.', operators: ['is', 'is not'], valueKind: 'list', options: ['Mobile', 'PC', 'Tablet', 'Other'] },
-  { id: 'mac', label: 'MAC Address', group: 'Device', hint: 'Match device MAC addresses', operators: ['is', 'is not'], valueKind: 'text' },
-  { id: 'os', label: 'Operating System', group: 'Device', hint: 'Match OS name and version', operators: ['is', 'is not'], valueKind: 'list', options: ['Windows', 'macOS', 'iOS', 'Android', 'Linux', 'ChromeOS'] },
+  { id: 'mac', label: 'MAC address', group: 'Device', hint: 'Match device MAC addresses', operators: ['is', 'is not'], valueKind: 'text', agent: true },
+  { id: 'os', label: 'Operating system', group: 'Device', hint: 'Match OS name and version', operators: ['is', 'is not'], valueKind: 'list', options: ['Windows', 'macOS', 'iOS', 'Android', 'Linux', 'ChromeOS'], agent: true },
   { id: 'mdm', label: 'MDM Managed', group: 'Device', hint: 'Require MDM enrollment', operators: ['is', 'is not'], valueKind: 'list', options: ['Enrolled', 'Not enrolled'] },
   { id: 'browser', label: 'Browser', group: 'Device', hint: 'Match browser name and version', operators: ['is', 'is not'], valueKind: 'list', options: ['Chrome', 'Edge', 'Safari', 'Firefox'] },
   { id: 'device-risk', label: 'Device Risk Score', group: 'Risk', hint: 'Device risk management score', operators: ['above', 'below'], valueKind: 'range' },
@@ -107,7 +156,16 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
   /* Replaced the old Device Posture Policy condition. Posture asked whether a
      device was healthy; this asks whether it is the same device as last time,
      which is what the fingerprint profiles actually decide. */
-  { id: 'fingerprint', label: 'Device Fingerprint', group: 'Device', hint: 'Match by saved fingerprint profile from your library', operators: ['recognised by', 'not recognised by'], valueKind: 'fingerprint' },
+  { id: 'fingerprint', label: 'Device fingerprint', group: 'Device', hint: 'Match by saved fingerprint profile from your library', operators: ['recognised by', 'not recognised by'], valueKind: 'fingerprint' },
+  /* Posture is back, and it is not the fingerprint.
+
+     It was removed once, on the argument that "posture asked whether a device
+     was healthy, which is a different question from whether it is the same
+     device". That argument was right and it is the reason these are two
+     attributes rather than one: the fingerprint says it is the same handset,
+     posture says the handset is in a state you are willing to accept. A
+     recognised device with disk encryption switched off is both. */
+  { id: 'posture', label: 'Device posture', group: 'Device', hint: 'Checks an MDM reports about the device’s state', operators: ['passes', 'fails'], valueKind: 'list', options: ['Disk encryption', 'Screen lock', 'OS up to date', 'Antivirus running', 'Firewall on'], agent: true },
 
   { id: 'group', label: 'Group Membership', group: 'Group', hint: "Match by the user's group", operators: ['in', 'not in'], valueKind: 'group' },
   { id: 'user', label: 'Specific people', group: 'User', hint: 'Match named individuals from the directory', operators: ['is', 'is not'], valueKind: 'user' },

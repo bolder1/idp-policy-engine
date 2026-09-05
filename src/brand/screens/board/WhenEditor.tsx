@@ -6,6 +6,7 @@ import { modeLabel } from '../../fingerprint'
 import { cardJoin, cardLetter, ckey, duplicatedAcrossCards, topJoin } from '../../predicate'
 import {
   CONDITION_CATALOGUE,
+  conditionRank,
   conditionType,
   type Condition,
   type ConditionType,
@@ -445,7 +446,11 @@ function ConditionRow({
           width="fill"
           searchable
           value={c.typeId}
-          options={CONDITION_CATALOGUE.map((x) => ({ value: x.id, label: x.label, meta: x.group }))}
+          /* Same lead order the catalogue dialog uses, so the row and the
+             dialog do not disagree about what comes first. */
+          options={[...CONDITION_CATALOGUE]
+            .sort((a, b) => conditionRank(a.id) - conditionRank(b.id))
+            .map((x) => ({ value: x.id, label: x.label, meta: x.group }))}
           onChange={onRetype}
         />
         <i className="bb__cond__mark" aria-hidden>

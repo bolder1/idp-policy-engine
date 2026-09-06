@@ -1,8 +1,27 @@
 import { useMemo, useState } from 'react'
-import { Info, Search } from 'lucide-react'
+import {
+  Activity,
+  Bug,
+  Copy,
+  Crosshair,
+  EyeOff,
+  FileWarning,
+  Info,
+  MonitorSmartphone,
+  Network,
+  Search,
+  ServerCog,
+  ShieldOff,
+  Smartphone,
+  SplitSquareHorizontal,
+  Unlock,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react'
 
 import { PageHead } from '../Shell'
-import { Button, Chip, Toggle } from '../kit'
+import { Button, Toggle } from '../kit'
+import { Picker } from '../picker'
 import { TierPick } from '../tier-pick'
 import { useBrand } from '../store'
 import {
@@ -14,11 +33,59 @@ import {
   isOn,
   tierFor,
   tierKey,
+  type RiskProfile,
   type RiskSignal,
   type SignalCategory,
 } from '../risk-signals'
 
 import './risk-signals.css'
+
+/* A mark per signal, tinted by the family it belongs to.
+
+   Two jobs, and the second is the one that earns it. A distinct glyph makes a
+   row recognisable in a table of sixteen that are all one sentence of grey text
+   under one name of dark text — but a glyph alone is decoration. The TONE
+   carries the category, which matters precisely when the category heading is
+   not on screen: searching flattens the list, and until now the only thing
+   saying which family a hit came from was a 10px line of muted text under the
+   sentence.
+
+   Never `negative`. Red means danger in this kit, and every one of these
+   signals is about danger — if they were all red the tone would carry nothing,
+   and the two that genuinely warrant alarm (a rooted handset, a known attack
+   source) would stop standing out. The severity is the weight column's job. */
+const SIGNAL_ICON: Record<string, LucideIcon> = {
+  emulator: MonitorSmartphone,
+  simulator: MonitorSmartphone,
+  rooted: Unlock,
+  jailbroken: Unlock,
+  cloned: Copy,
+  'dev-mode': Wrench,
+
+  hooking: SplitSquareHorizontal,
+  debugger: Bug,
+  'tampered-request': FileWarning,
+  mitm: EyeOff,
+
+  tor: ShieldOff,
+  datacenter: ServerCog,
+  'residential-proxy': Network,
+  vpn: Network,
+
+  'known-attacker': Crosshair,
+  'high-activity': Activity,
+}
+
+const CATEGORY_TONE: Record<SignalCategory, string> = {
+  'Device integrity': 'accent',
+  Instrumentation: 'magenta',
+  'Network origin': 'info',
+  'Address reputation': 'notice',
+  Behaviour: 'lime',
+}
+
+/** The glyph for a signal, falling back rather than rendering nothing. */
+const signalIcon = (id: string): LucideIcon => SIGNAL_ICON[id] ?? Smartphone
 
 /* -----------------------------------------------------------------------------
    The risk signal profile.
@@ -56,11 +123,12 @@ export function RiskSignals() {
     })
   }, [q, cat])
 
-  const searching = q.trim().length > 0
-  const groups = useMemo(
-    () => SIGNAL_CATEGORIES.map((c) => ({ category: c, items: shown.filter((s) => s.category === c) })).filter((g) => g.items.length > 0),
-    [shown],
-  )
+  /* Grouped into five sections once, each with its own heading, its own count
+     and its own repeated `Signal / Android / iOS / On` header row. Sixteen
+     signals do not need five tables: the headings were four fifths chrome, and
+     a reader scanning for one signal had to find which of five blocks it lived
+     in first. One table, and the category rides on the row as a pill — which is
+     where it was already going whenever a search flattened the list. */
 
   const toggle = (s: RiskSignal, on: boolean) =>
     setRiskProfile({ ...profile, off: on ? profile.off.filter((id) => id !== s.id) : [...profile.off, s.id] })
@@ -142,104 +210,118 @@ export function RiskSignals() {
             onChange={(e) => setQ(e.target.value)}
           />
         </label>
-        <div className="btoolbar__filters">
-          {[ALL, ...SIGNAL_CATEGORIES].map((c) => (
-            <Chip key={c} active={cat === c} onClick={() => setCat(c)}>
-              {c}
-            </Chip>
-          ))}
-        </div>
+        {/* A select, not six chips.
+
+            Six chips is a row of buttons showing five answers nobody chose in
+            order to show the one they did, and it wrapped to two lines on a
+            narrow window — where the thing it filters is a single table that
+            fits comfortably. A closed select says which filter is on, in the
+            width of the word. */}
+        <Picker
+          label="Filter by category"
+          value={cat}
+          options={[
+            { value: ALL, label: 'All categories', meta: `${RISK_SIGNALS.length} signals` },
+            ...SIGNAL_CATEGORIES.map((c) => {
+              const n = RISK_SIGNALS.filter((s) => s.category === c).length
+              return { value: c, label: c, meta: `${n} signal${n === 1 ? '' : 's'}` }
+            }),
+          ]}
+          onChange={setCat}
+        />
       </div>
 
-      {groups.length === 0 ? (
+      {shown.length === 0 ? (
         <p className="brs__none">No signal matches “{q.trim()}”.</p>
       ) : (
-        groups.map((g) => <CategoryBlock key={g.category} category={g.category} items={g.items} searching={searching} onToggle={toggle} onTier={setTier} />)
+        <SignalTable items={shown} profile={profile} onToggle={toggle} onTier={setTier} />
       )}
     </div>
   )
 }
 
-/* One category, with its own weight in the heading.
+/* Every signal, in one table.
 
-   A count of how many are on says how much of the category you kept; the
-   proportion of weight says how much it can still contribute. They differ —
-   switching off one High signal and keeping four Low ones keeps most of the
-   category and almost none of its force — and it is the second that decides
-   what a sign-in scores. */
-function CategoryBlock({
-  category,
+   It was five, one per category, each with a heading carrying a count and its
+   own repeated column header. That shape earns its keep when the sections are
+   long enough that you lose the header scrolling; sixteen rows is not that, and
+   the cost was paid on every read — four extra headings, five extra header
+   rows, and the question "which block is Tor in" standing between somebody and
+   the row they came for.
+
+   The category is on the row instead, as a pill. It was already rendered there
+   whenever a search flattened the list, which is the tell: the information was
+   wanted per row, and the headings were how it got there when nothing had been
+   typed. */
+function SignalTable({
   items,
-  searching,
+  profile,
   onToggle,
   onTier,
 }: {
-  category: SignalCategory
   items: RiskSignal[]
-  searching: boolean
+  profile: RiskProfile
   onToggle: (s: RiskSignal, on: boolean) => void
   onTier: (s: RiskSignal, p: 'android' | 'ios', t: RiskSignal['tier']) => void
 }) {
-  const store = useBrand()
-  const profile = store.riskProfile
-  const on = items.filter((s) => isOn(profile, s.id)).length
-
   return (
-    <section className="brs__cat">
-      <h2 className="brs__cat__head">
-        {category}
-        <em>
-          {on} of {items.length} on
-        </em>
-      </h2>
-
-      <div className="brs__table" role="table" aria-label={category}>
-        <div className="brs__row brs__row--head" role="row">
-          <span role="columnheader">Signal</span>
-          <span role="columnheader" className="brs__col">
-            Android
-          </span>
-          <span role="columnheader" className="brs__col">
-            iOS
-          </span>
-          <span role="columnheader" className="brs__col brs__col--on">
-            On
-          </span>
-        </div>
-
-        {items.map((s) => {
-          const live = isOn(profile, s.id)
-          return (
-            <div className={`brs__row ${live ? '' : 'is-off'}`} role="row" key={s.id}>
-              <span className="brs__sig" role="cell">
-                <b>{s.name}</b>
-                <em>{s.purpose}</em>
-                {searching && <i className="brs__where">{s.category}</i>}
-              </span>
-
-              {PLATFORMS.map((p) => (
-                <span className="brs__col" role="cell" key={p.id}>
-                  {s.on.includes(p.id) ? (
-                    <TierPick
-                      value={tierFor(profile, s, p.id)}
-                      label={`${s.name} weight on ${p.label}`}
-                      onChange={(t) => onTier(s, p.id, t)}
-                    />
-                  ) : (
-                    /* Words, not a dash. A dash is ambiguous between "off",
-                       "zero" and "not collected", and only the third is true. */
-                    <span className="bx-tiers--none">Not collected</span>
-                  )}
-                </span>
-              ))}
-
-              <span className="brs__col brs__col--on" role="cell">
-                <Toggle checked={live} onChange={(v) => onToggle(s, v)} label={`${s.name} is ${live ? 'on' : 'off'}`} size="sm" />
-              </span>
-            </div>
-          )
-        })}
+    <div className="brs__table" role="table" aria-label="Risk signals">
+      <div className="brs__row brs__row--head" role="row">
+        <span role="columnheader">Signal</span>
+        <span role="columnheader" className="brs__col">
+          Android
+        </span>
+        <span role="columnheader" className="brs__col">
+          iOS
+        </span>
+        <span role="columnheader" className="brs__col brs__col--on">
+          On
+        </span>
       </div>
-    </section>
+
+      {items.map((s) => {
+        const live = isOn(profile, s.id)
+        return (
+          <div className={`brs__row ${live ? '' : 'is-off'}`} role="row" key={s.id}>
+            <span className="brs__sig" role="cell">
+              {/* Outside the text column, so the name and the sentence keep one
+                  left edge down the whole table. Inside it, every row's text
+                  would start wherever that row's glyph happened to end. */}
+              <i className={`brs__mark is-${CATEGORY_TONE[s.category]}`} aria-hidden>
+                {(() => {
+                  const Ico = signalIcon(s.id)
+                  return <Ico size={15} strokeWidth={1.9} />
+                })()}
+              </i>
+              <span className="brs__sigtext">
+                <span className="brs__name">
+                  <b>{s.name}</b>
+                  {/* The heading, per row. Same tone as the mark beside it, so
+                      the two say one thing rather than two. */}
+                  <i className={`brs__cat is-${CATEGORY_TONE[s.category]}`}>{s.category}</i>
+                </span>
+                <em>{s.purpose}</em>
+              </span>
+            </span>
+
+            {PLATFORMS.map((p) => (
+              <span className="brs__col" role="cell" key={p.id}>
+                {s.on.includes(p.id) ? (
+                  <TierPick value={tierFor(profile, s, p.id)} label={`${s.name} weight on ${p.label}`} onChange={(t) => onTier(s, p.id, t)} />
+                ) : (
+                  /* Words, not a dash. A dash is ambiguous between "off",
+                     "zero" and "not collected", and only the third is true. */
+                  <span className="bx-tiers--none">Not collected</span>
+                )}
+              </span>
+            ))}
+
+            <span className="brs__col brs__col--on" role="cell">
+              <Toggle checked={live} onChange={(v) => onToggle(s, v)} label={`${s.name} is ${live ? 'on' : 'off'}`} size="sm" />
+            </span>
+          </div>
+        )
+      })}
+    </div>
   )
 }

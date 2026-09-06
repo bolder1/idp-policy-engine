@@ -1,13 +1,9 @@
 import { Fragment, useEffect, useState } from 'react'
-import { ChevronDown, Fingerprint, Globe, Plus, Split, Trash2, UserRound, Users, Webhook, X } from 'lucide-react'
+import { ChevronDown, Fingerprint, Globe, Plus, Split, UserRound, Users, Webhook, X } from 'lucide-react'
 
-import { Picker } from '../../picker'
 import { modeLabel } from '../../fingerprint'
 import { cardJoin, cardLetter, ckey, duplicatedAcrossCards, topJoin } from '../../predicate'
 import {
-  CONDITION_CATALOGUE,
-  ZONE_SCOPE_LABEL,
-  conditionRank,
   conditionType,
   type Condition,
   type ConditionType,
@@ -21,8 +17,7 @@ import { useBrand, useNameLookup } from '../../store'
 import { predicateParts } from '../predicate-prose'
 import { ConditionPicker } from '../rule-form'
 import { IfChip, IfKw } from './IfBlock'
-import { ValueSheet, zoneShape, type SheetOption } from '../ValueSheet'
-import { groupIcon } from './tones'
+import { ConditionPopover, summarise, zoneShape, type ValueOption } from '../ConditionPopover'
 
 /* -----------------------------------------------------------------------------
    WHEN — the conditional, editable.
@@ -172,13 +167,23 @@ export function WhenEditor({
                   <ConditionRow
                     key={c.id}
                     c={c}
-                    at={j}
                     join={cardJoin(k)}
-                    /* Every row but the first carries it, and pressing any one
-                       flips the whole level — a level holds ONE joiner, so this
-                       is one setting shown between each pair rather than one
-                       setting per gap. */
-                    showJoin={j > 0}
+                    /* ONE joiner per run, drawn at the first gap, with a rail
+                       down the rest.
+
+                       A run holds a single joiner — pressing any pill always
+                       flipped every condition in it — but drawing that pill in
+                       every gap presented one setting as four controls, and
+                       nothing said they moved together until you pressed one
+                       and watched the others change. */
+                    showJoin={j === 1}
+                    railed={j > 1}
+                    /* `if` opens the sentence once, on the very first row of
+                       the block. The second run had one too, which reads as a
+                       second rule starting — the OR above it is what introduces
+                       an alternative, and a keyword meaning "here is the
+                       condition" is not the thing to repeat at the head of one. */
+                    lead={i === 0 && j === 0}
                     fresh={fresh === c.id}
                     /* `duplicatedAcrossCards` returns ckeys, not ids. Asking it
                        about `c.id` compared two string spaces that never meet, so
@@ -362,14 +367,23 @@ function Junction({ join, scope, onFlip }: { join: Joiner; scope: 'top' | 'group
   const other: Joiner = join === 'and' ? 'or' : 'and'
   return (
     <div className={`bb__ifjoin is-${join}`}>
+      {/* The same pill the rows use, deliberately.
+
+          Two joiner controls were on screen at once and they looked nothing
+          alike — a bordered select inside the runs, a bare coloured word
+          between them — so the block appeared to offer two different KINDS of
+          operator when it has one kind at two levels. Same control and same
+          affordance now; what differs is what each one joins, which the rule it
+          sits on already says. */}
       <button
         type="button"
-        className={`bb__ifkw is-${join} is-flip`}
+        className={`bb__joinsel is-${join}`}
         aria-label={`${SAYS[join][scope]} Switch to ${other.toUpperCase()}.`}
         title={`${SAYS[join][scope]} Click for ${other.toUpperCase()}.`}
         onClick={onFlip}
       >
         {join}
+        <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
       </button>
     </div>
   )
@@ -377,28 +391,23 @@ function Junction({ join, scope, onFlip }: { join: Joiner; scope: 'top' | 'group
 
 /* --- One condition, live ------------------------------------------------------ */
 
-/* One condition, as one row of controls.
+/* One condition, as one row: the joiner, the condition, and a way out of it.
 
-   Four cells that line up down the whole block: the joiner, what is being
-   checked, how, and what against — then a delete. It used to be a run of inline
-   chips of whatever width their contents happened to be, wrapping onto two and
-   three lines, so no two rows agreed about where anything was and a rule of
-   five conditions had no column to read down.
+   It was five cells — joiner, attribute, operator, value, actions — and that
+   is three decisions laid out as though they were independent. They are not:
+   the operators come from the attribute and the values come from the operator,
+   so reading a row meant assembling one sentence out of three boxes and
+   changing a condition meant visiting them in order.
 
-   The attribute is a picker rather than a label now. It was the one part of a
-   condition you could not change: choosing the wrong one meant deleting the row
-   and adding another, losing your place in a list you were halfway through. The
-   writer resets the operator and the value with the type, because carrying them
-   over produces a condition naming an operator its type does not have.
-
-   The joiner lives in the row rather than between rows for the same reason the
-   rest of it moved: a control floating in the gap belongs to neither row above
-   nor below it, and it made every second row start at a different height. */
+   The condition is a pill now, and everything about it is inside what the pill
+   opens. Jira's filter bar is the reference: a filter there is one chip you
+   press, and the operator and the values live in the panel under it. */
 function ConditionRow({
   c,
-  at,
   join,
   showJoin,
+  railed,
+  lead,
   fresh,
   dupe,
   store,
@@ -411,10 +420,13 @@ function ConditionRow({
   onSplit,
 }: {
   c: Condition
-  at: number
   join: Joiner
-  /** Every row but the first carries the level's joiner. */
+  /** The first gap in the run, and the only place the joiner is drawn. */
   showJoin: boolean
+  /** A later row in the same run: a rail, tying it to the joiner above. */
+  railed: boolean
+  /** The very first row of the whole block, which opens with `if`. */
+  lead: boolean
   fresh: boolean
   dupe: boolean
   store: ReturnType<typeof useBrand>
@@ -429,81 +441,69 @@ function ConditionRow({
   onSplit?: () => void
 }) {
   const t = conditionType(c.typeId)
-  const Ico = groupIcon(t.group)
+  const values = c.values.filter(Boolean)
+  const { options, names, single, footer, onFooter } = valueSource(t, values, store, resolve)
+  /* Every value, not `values[0]`. The stale check only ever looked at the
+     first, so a zone deleted from the library sitting at index 1 rendered as
+     perfectly valid. */
+  const stale = options.length > 0 && values.some((id) => !options.some((o) => o.value === id))
+
+  const summary =
+    t.valueKind === 'time'
+      ? `${c.values[0] ?? '09:00'} – ${c.values[1] ?? '17:00'}`
+      : t.valueKind === 'range'
+        ? values[0]
+          ? `${values[0]} ${t.id === 'trust-age' ? 'days' : t.id === 'coords' ? 'km' : ''}`.trim()
+          : 'Choose…'
+        : summarise(names.length ? names : values, 'Choose…')
 
   return (
     <div className={`bb__cond ${fresh ? 'is-new' : ''}`}>
-      <span className="bb__cond__join">
-        {showJoin ? (
+      <span className={`bb__cond__join ${railed ? 'is-railed' : ''}`}>
+        {showJoin && (
           <button
             type="button"
             className={`bb__joinsel is-${join}`}
-            aria-label={`${join === 'and' ? 'All of these must be true' : 'Any one of these is enough'}. Switch to ${join === 'and' ? 'OR' : 'AND'}.`}
-            title={`Click for ${join === 'and' ? 'OR' : 'AND'}`}
+            /* Says what it governs, not just what it is. One press changes
+               every condition in this run, and a control that announces itself
+               as "and" gives no hint of that. */
+            aria-label={`${join === 'and' ? 'Every condition here must match' : 'Any one condition here is enough'}. Switch to ${join === 'and' ? 'OR' : 'AND'} for all of them.`}
+            title={`All of these are joined by ${join.toUpperCase()}. Click for ${join === 'and' ? 'OR' : 'AND'}.`}
             onClick={onFlipJoin}
           >
             {join}
-            {/* The chevron is the affordance, and dropping it cost the control
-                its only visible claim to being one. A coloured pill reading
-                "AND" is a label everywhere else in this product — it is exactly
-                what the read-only card draws — so without the mark the one
-                place it is pressable looks identical to the places it is not.
-                The pill does not move when it flips, which is the whole point
-                of putting the joiner in the row. */}
             <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
           </button>
-        ) : (
+        )}
+        {lead && (
           <span className="bb__cond__first" aria-hidden>
-            {at === 0 ? 'if' : ''}
+            if
           </span>
         )}
       </span>
 
-      <span className="bb__cond__what">
-        <Picker
-          label="What to check"
-          size="sm"
-          width="fill"
-          searchable
-          value={c.typeId}
-          /* Same lead order the catalogue dialog uses, so the row and the
-             dialog do not disagree about what comes first. */
-          options={[...CONDITION_CATALOGUE]
-            .sort((a, b) => conditionRank(a.id) - conditionRank(b.id))
-            .map((x) => ({ value: x.id, label: x.label, meta: x.group }))}
-          onChange={onRetype}
+      <span className="bb__cond__body">
+        <ConditionPopover
+          c={c}
+          summary={summary}
+          options={options}
+          names={names}
+          single={single}
+          unset={values.length === 0 || stale}
+          autoOpen={fresh}
+          onRetype={onRetype}
+          onOperator={(operator) => onChange({ ...c, operator })}
+          onValues={(v) => onChange({ ...c, values: v })}
+          onScope={onScope}
+          onRemove={onRemove}
+          footer={footer}
+          onFooter={onFooter}
         />
-        <i className="bb__cond__mark" aria-hidden>
-          <Ico size={12} strokeWidth={2} />
-        </i>
         {dupe && (
           <span className="bb__ifdupe" title="This exact condition is also in another branch" aria-label="Also in another branch">
             ·2
           </span>
         )}
-      </span>
-
-      <span className="bb__cond__op">
-        <Picker
-          label={`${t.label} operator`}
-          size="sm"
-          width="fill"
-          value={c.operator}
-          options={t.operators.map((o) => ({ value: o, label: o }))}
-          onChange={(operator) => onChange({ ...c, operator })}
-        />
-      </span>
-
-      <span className="bb__cond__val">
-        <ValueControl
-          c={c}
-          type={t}
-          store={store}
-          resolve={resolve}
-          autoOpen={fresh}
-          onChange={(values) => onChange({ ...c, values })}
-          onScope={onScope}
-        />
       </span>
 
       <span className="bb__cond__acts">
@@ -512,128 +512,25 @@ function ConditionRow({
             <Split size={11} strokeWidth={2} />
           </button>
         )}
-        <button type="button" className="bb__ifact is-danger" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
-          <Trash2 size={12} strokeWidth={2} />
-        </button>
       </span>
     </div>
   )
 }
 
-/* --- The value, by kind ---------------------------------------------------------
+/* Where a condition's choices come from, by kind — one place, so the pill's
+   summary and the panel's list can never be built from different lists.
 
-   Every kind that can hold more than one thing now shows ONE control: a trigger
-   naming what is chosen, opening the sheet to change it. The row therefore has
-   a fixed number of cells whatever the condition is, which is the whole point —
-   it used to grow a chip per value inside the cell, so three groups wrapped the
-   row onto a second line and a rule of five conditions had no column to read
-   down.
-
-   The three kinds that stay inline are the three that are genuinely one control
-   already: a time range (two 92px fields and the word between them), a number
-   with its unit, and a line of free text. Sending those to a sheet would be a
-   click to reach a box you can already see.
-   -------------------------------------------------------------------------- */
-
-/* The summary on the trigger: what is chosen, in the row's width.
-
-   One name and a count, never a run of names. "Finance, Engineering, Contractors"
-   is three names in a 200px cell — it elides to "Finance, Engi…", which reads as
-   a truncated single value rather than as three. "Finance +2" is the same
-   information and cannot be mistaken for one thing. */
-function summarise(names: string[], placeholder: string): string {
-  if (names.length === 0) return placeholder
-  if (names.length === 1) return names[0]
-  return `${names[0]} +${names.length - 1}`
-}
-
-function ValueTrigger({
-  label,
-  summary,
-  sub,
-  count,
-  open,
-  unset,
-  onOpen,
-}: {
-  label: string
-  summary: string
-  /** A second line — the zone half, once it is narrower than the default. */
-  sub?: string
-  /** How many are chosen. The summary elides to "Finance +2"; this does not. */
-  count: number
-  open: boolean
-  unset: boolean
-  onOpen: () => void
-}) {
-  return (
-    <button
-      type="button"
-      className={`bb__valtrig ${unset ? 'is-unset' : ''}`}
-      /* The whole state, not just the field name.
-
-         `aria-label` REPLACES a button's text, so labelling this with the
-         attribute alone — "Network Zone" — announced the control and hid the
-         one thing it exists to show. A sighted reader saw "Office Network +1,
-         IP networks only"; a screen reader heard "Network Zone, button", with
-         no way to find out what the condition was actually testing short of
-         opening the sheet.
-
-         `count` rather than the elided summary once there are several, because
-         "+1" is a visual abbreviation and reads as part of a name out loud. */
-      aria-label={[
-        label,
-        unset ? 'nothing chosen' : count > 1 ? `${summary.replace(/ \+\d+$/, '')} and ${count - 1} more` : summary,
-        sub,
-      ]
-        .filter(Boolean)
-        .join(', ')}
-      aria-haspopup="dialog"
-      aria-expanded={open}
-      title={sub ? `${summary} · ${sub}` : summary}
-      onClick={onOpen}
-    >
-      <span className="bb__valtrig__text">
-        <b>{summary}</b>
-        {sub && <em>{sub}</em>}
-      </span>
-      <ChevronDown size={12} strokeWidth={2.1} aria-hidden />
-    </button>
-  )
-}
-
-function ValueControl({
-  c,
-  type,
-  store,
-  resolve,
-  autoOpen,
-  onChange,
-  onScope,
-}: {
-  c: Condition
-  type: ConditionType
-  store: ReturnType<typeof useBrand>
-  resolve: ReturnType<typeof useNameLookup>
-  autoOpen: boolean
-  onChange: (v: string[]) => void
-  onScope: (s: 'both' | ZoneScope) => void
-}) {
-  /* Open on mount for a row that was just added, which is the one moment the
-     next thing somebody wants is certainly this sheet. */
-  const [open, setOpen] = useState(autoOpen)
-  const values = c.values.filter(Boolean)
-  const v = values[0] ?? ''
-
-  /* --- Library references: zones, device profiles, hooks --------------------- */
-  if (type.valueKind === 'zone' || type.valueKind === 'fingerprint' || type.valueKind === 'hook') {
-    const kind = type.valueKind
-    /* A hook holds exactly one, and that is not a simplification — `diagnostics`
-       reads `values[0]` to check the endpoint still exists, and a rule that
-       consulted two external services would need to say what to do when they
-       disagree. */
-    const single = kind === 'hook'
-    const items: SheetOption[] =
+   The three kinds that have no list (a time window, a number, a line of text)
+   return none, and the panel renders the control they need instead. */
+function valueSource(
+  t: ConditionType,
+  values: string[],
+  store: ReturnType<typeof useBrand>,
+  resolve: ReturnType<typeof useNameLookup>,
+): { options: ValueOption[]; names: string[]; single?: boolean; footer?: string; onFooter?: () => void } {
+  if (t.valueKind === 'zone' || t.valueKind === 'fingerprint' || t.valueKind === 'hook') {
+    const kind = t.valueKind
+    const options: ValueOption[] =
       kind === 'zone'
         ? store.zones.map((z) => ({
             value: z.id,
@@ -644,130 +541,35 @@ function ValueControl({
           }))
         : kind === 'fingerprint'
           ? store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p), icon: Fingerprint }))
-          : store.hooks
-              .filter((h) => h.mode === 'sync')
-              .map((h) => ({ value: h.id, label: h.name, meta: `Answers within ${h.timeoutMs}ms`, icon: Webhook }))
-
-    const names = values.map((id) => resolve(kind, id) ?? `deleted · ${id}`)
-    /* Every value, not `values[0]`. The stale check only ever looked at the
-       first, so a zone deleted from the library sitting at index 1 rendered as
-       perfectly valid. */
-    const stale = values.some((id) => !items.some((o) => o.value === id))
-
-    return (
-      <>
-        <ValueTrigger
-          label={type.label}
-          summary={summarise(names, 'Choose…')}
-          /* Said only when it is narrower than the zone as written. A row that
-             printed "IP and location" on every zone condition would spend its
-             second line on the default. */
-          sub={kind === 'zone' && c.scope ? ZONE_SCOPE_LABEL[c.scope] : undefined}
-          count={values.length}
-          open={open}
-          unset={values.length === 0 || stale}
-          onOpen={() => setOpen(true)}
-        />
-        <ValueSheet
-          open={open}
-          onClose={() => setOpen(false)}
-          title={kind === 'zone' ? 'Network zones' : kind === 'fingerprint' ? 'Device profiles' : 'External hooks'}
-          caption={
-            kind === 'zone'
-              ? 'Zones come from your library, so an address block that moves is edited once rather than in every rule that names it.'
-              : kind === 'fingerprint'
-                ? 'A profile decides whether this is the same device as last time — not whether the device is healthy.'
-                : 'Only a hook that answers synchronously can decide a sign-in. An async hook is notified and cannot hold the request up.'
-          }
-          options={items}
-          picked={values}
-          single={single}
-          scope={kind === 'zone' ? (c.scope ?? 'both') : undefined}
-          onScope={onScope}
-          onToggle={(id) => onChange(single ? [id] : values.includes(id) ? values.filter((x) => x !== id) : [...values, id])}
-          footer={kind === 'zone' ? 'Manage zones' : kind === 'fingerprint' ? 'Manage device profiles' : 'Manage hooks'}
-          onFooter={() => store.go({ name: kind === 'zone' ? 'zones' : kind === 'fingerprint' ? 'fingerprint' : 'hooks' } as never)}
-          empty={
-            kind === 'zone'
-              ? 'No zones yet. A day-one tenant starts with none — nothing is restricted until somebody says so.'
-              : kind === 'fingerprint'
-                ? 'No device profiles yet.'
-                : 'No synchronous hooks yet.'
-          }
-        />
-      </>
-    )
+          : store.hooks.filter((h) => h.mode === 'sync').map((h) => ({ value: h.id, label: h.name, meta: `Answers within ${h.timeoutMs}ms`, icon: Webhook }))
+    return {
+      options,
+      names: values.map((id) => resolve(kind, id) ?? `deleted · ${id}`),
+      /* A hook holds one. `diagnostics` reads `values[0]` to check the endpoint
+         still exists, and a rule consulting two services would have to say what
+         happens when they disagree. */
+      single: kind === 'hook',
+      footer: kind === 'zone' ? 'Manage zones' : kind === 'fingerprint' ? 'Manage device profiles' : 'Manage hooks',
+      onFooter: () => store.go({ name: kind === 'zone' ? 'zones' : kind === 'fingerprint' ? 'fingerprint' : 'hooks' } as never),
+    }
   }
 
-  /* --- Directory references: groups and people ------------------------------- */
-  if (type.valueKind === 'group' || type.valueKind === 'user') {
-    const kind = type.valueKind
-    const items: SheetOption[] =
+  if (t.valueKind === 'group' || t.valueKind === 'user') {
+    const kind = t.valueKind
+    const options: ValueOption[] =
       kind === 'group'
         ? store.groups.map((g) => ({ value: g.id, label: g.name, meta: `${g.memberCount.toLocaleString()} people`, icon: Users }))
         : store.users.map((u) => ({ value: u.id, label: u.name, meta: u.email, icon: UserRound }))
-    const names = values.map((id) => resolve(kind, id) ?? `deleted · ${id}`)
-
-    return (
-      <>
-        <ValueTrigger label={type.label} summary={summarise(names, 'Choose…')} count={values.length} open={open} unset={values.length === 0} onOpen={() => setOpen(true)} />
-        <ValueSheet
-          open={open}
-          onClose={() => setOpen(false)}
-          title={kind === 'group' ? 'Groups' : 'People'}
-          caption={
-            kind === 'group'
-              ? 'Membership is read at sign-in, so the rule follows whoever is in the group on the day rather than who was in it when it was written.'
-              : 'Named individuals. A group is usually the better answer — a person named in a rule is a rule somebody has to remember to edit when they change team.'
-          }
-          options={items}
-          picked={values}
-          onToggle={(id) => onChange(values.includes(id) ? values.filter((x) => x !== id) : [...values, id])}
-          footer={kind === 'user' && store.unlistedUsers > 0 ? `${store.unlistedUsers.toLocaleString()} more in the directory` : undefined}
-        />
-      </>
-    )
+    return {
+      options,
+      names: values.map((id) => resolve(kind, id) ?? `deleted · ${id}`),
+      footer: kind === 'user' && store.unlistedUsers > 0 ? `${store.unlistedUsers.toLocaleString()} more in the directory` : undefined,
+    }
   }
 
-  /* --- A fixed list ---------------------------------------------------------- */
-  if (type.options?.length) {
-    return (
-      <>
-        <ValueTrigger label={type.label} summary={summarise(values, 'Choose…')} count={values.length} open={open} unset={values.length === 0} onOpen={() => setOpen(true)} />
-        <ValueSheet
-          open={open}
-          onClose={() => setOpen(false)}
-          title={type.label}
-          caption={type.hint}
-          options={type.options.map((o) => ({ value: o, label: o }))}
-          picked={values}
-          onToggle={(o) => onChange(values.includes(o) ? values.filter((x) => x !== o) : [...values, o])}
-        />
-      </>
-    )
-  }
+  if (t.options?.length) return { options: t.options.map((o) => ({ value: o, label: o })), names: values }
 
-  /* --- The three that are already one control -------------------------------- */
-  if (type.valueKind === 'time') {
-    return (
-      <span className="bb__valrange">
-        <input type="time" className="bb__ifinput" aria-label="From" value={c.values[0] ?? '09:00'} onChange={(e) => onChange([e.target.value, c.values[1] ?? '17:00'])} />
-        <IfKw tone="op">to</IfKw>
-        <input type="time" className="bb__ifinput" aria-label="To" value={c.values[1] ?? '17:00'} onChange={(e) => onChange([c.values[0] ?? '09:00', e.target.value])} />
-      </span>
-    )
-  }
-
-  if (type.valueKind === 'range') {
-    return (
-      <span className="bb__valrange">
-        <input type="number" className="bb__ifinput is-num" aria-label={type.label} value={v} placeholder="0" onChange={(e) => onChange([e.target.value])} />
-        <IfKw tone="op">{type.id === 'trust-age' ? 'days' : type.id === 'coords' ? 'km' : 'score'}</IfKw>
-      </span>
-    )
-  }
-
-  return <input className="bb__ifinput is-text" aria-label={type.label} placeholder="value…" value={v} onChange={(e) => onChange([e.target.value])} />
+  return { options: [], names: values }
 }
 
 /* The catalogue is the trail's dialog, not a popover of its own.

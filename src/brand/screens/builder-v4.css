@@ -520,7 +520,11 @@
 .bf__cond {
   position: relative;
   display: grid;
-  grid-template-columns: 22px minmax(110px, 180px) minmax(90px, max-content) minmax(0, 1fr) auto auto;
+  /* Four cells, not six. The three that held the attribute, the operator and
+     the value have collapsed into one pill — see ConditionPopover — so the
+     tracks sized for them would leave the pill in a 180px column with its value
+     elided to nothing. */
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
@@ -529,31 +533,18 @@
   border-radius: var(--radius-md);
   box-shadow: inset 3px 0 0 0 var(--cond-dot, var(--border-default));
 }
-/* Driven by the CARD's width, not the viewport — so a rule in a narrow pane, a
-   drawer, or any future host gets the same behaviour without any of them
-   knowing about each other.
+/* The two narrow-row container queries have gone with the columns they folded.
 
-   The container was declared on `.bf__cond` itself for a long time, and an
-   element is not its own container: `container-type` makes a box a container
-   for its DESCENDANTS, so `@container { .bf__cond { … } }` could never match and
-   none of this ran. Every narrow-row layout below is new behaviour, not
-   restored behaviour.
+   They existed because a condition was six cells and four of them do not fit
+   across a narrow card: below 560px the value dropped to its own line, below
+   360 the attribute did too. A row is a pill and a menu now, which fits at
+   every width the card can be, so there is nothing left to fold — and a
+   breakpoint that only ever reshuffles tracks that no longer exist is a rule
+   the next person has to read before discovering it does nothing.
 
-   560 rather than something smaller because of what the value slot holds: a
-   fixed-list condition renders every option as a chip, and four chips in a
-   150px column is four stacked lines pretending to be one field. Below this the
-   value takes a line of its own and the chips lay out across it. */
-@container cond (max-width: 560px) {
-  .bf__cond {
-    grid-template-columns: 22px minmax(0, 1fr) auto auto;
-    row-gap: var(--space-3);
-  }
-  .bf__cond > .bf__val { grid-column: 2 / -1; }
-}
-@container cond (max-width: 360px) {
-  .bf__cond { grid-template-columns: 22px minmax(0, 1fr) auto; }
-  .bf__cond > .bx-picker { grid-column: 2 / -1; }
-}
+   The container declaration itself stays on `.bf__condwrap`; it is what let
+   this respond to the CARD rather than the viewport, and that is still the
+   right axis for anything added here later. */
 
 .bf__cond.is-info { --cond-dot: var(--fb-info-dot); --cond-bg: var(--fb-info-bg); --cond-fg: var(--fb-info-fg); }
 .bf__cond.is-lime { --cond-dot: var(--fb-lime-dot); --cond-bg: var(--fb-lime-bg); --cond-fg: var(--fb-lime-fg); }

@@ -82,7 +82,7 @@ export type BrandScreen =
      it has a top bar and no rail to put one in. */
   | { name: 'apps' }
 
-interface BrandStore {
+export interface BrandStore {
   apps: App[]
   groups: Group[]
   /* The directory. Fabricated fixture data — see the note on `users` in

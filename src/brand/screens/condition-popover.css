@@ -1,0 +1,288 @@
+/* -----------------------------------------------------------------------------
+   A condition as one pill, and the panel it opens.
+
+   A fresh `cp__` prefix rather than more `bb__` names: board.css is 1,900 lines
+   with a documented history of two different components claiming one class and
+   the later rule silently poisoning the earlier one. This file is imported by
+   one component and nothing else reaches into it.
+   -------------------------------------------------------------------------- */
+
+/* --- The pill ----------------------------------------------------------------
+   The whole condition, as a sentence you press: what is checked, how, and
+   against what. It replaced three separate controls sitting side by side. */
+.cp__pill {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.cp__pill:hover { border-color: var(--border-strong); }
+.cp__pill:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+
+.cp__pill__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 6px 0 10px;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.cp__pill__main:focus-visible { outline: none; }
+/* The attribute. It anchors the sentence, so it keeps the weight; the operator
+   beside it is the quiet connective and the value is what changes. */
+.cp__pill__main > b {
+  flex: none;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
+.cp__pill__main > em {
+  flex: none;
+  font-style: normal;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+/* The value gets the room, because it is the part that grows and the part
+   somebody is scanning for. It elides rather than pushing the delete off the
+   end — `min-width: 0` on the flex item is what actually permits that. */
+.cp__pill__val {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--brand);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp__pill__main.is-unset { border-color: transparent; }
+.cp__pill__main.is-unset .cp__pill__val { color: var(--fb-negative-fg); font-style: italic; }
+/* Dashed when the condition has no value: it never matches, which the linter
+   also reports — this is the same fact said where the value would be. */
+.cp__pill:has(.is-unset) { border-style: dashed; border-color: var(--fb-negative-border); }
+.cp__pill__main > svg { flex: none; opacity: 0.5; }
+/* Which half of a zone, when it is narrower than the zone as written. Absent
+   for "both", because that is what the zone already means. */
+.cp__pill__scope {
+  flex: none;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: var(--fw-medium);
+  letter-spacing: 0.02em;
+  padding: 1px 5px;
+  border-radius: var(--radius-full);
+  background: var(--fb-info-bg);
+  color: var(--fb-info-fg);
+  white-space: nowrap;
+}
+
+.cp__pill__x {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  border: 0;
+  border-left: 1px solid var(--border-subtle);
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.cp__pill:hover .cp__pill__x,
+.cp__pill:focus-within .cp__pill__x { opacity: 1; }
+.cp__pill__x:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.cp__pill__x:focus-visible { outline: none; opacity: 1; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+
+/* --- The panel ---------------------------------------------------------------
+
+   Portalled to `document.body` and `position: fixed`, which is this codebase's
+   proven un-clippable pattern — the inspector body is a scroll container and
+   an absolutely-positioned panel inside it gets cut at the fold. */
+.cp__pop {
+  position: fixed;
+  z-index: var(--z-dropdown);
+  max-width: min(420px, calc(100vw - 16px));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--el-high, 0 12px 32px -8px rgba(16, 24, 40, 0.24));
+  overflow: hidden;
+}
+
+/* What is checked and how, stacked in the order they depend on each other —
+   the attribute decides which operators exist, and the operator decides what
+   the values mean. */
+.cp__head {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.cp__head .bx-picker { width: 100%; }
+
+.cp__scope {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: var(--space-3) var(--space-3) 0;
+}
+.cp__scope > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+.cp__scope > button:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.cp__scope > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.cp__scope > button.is-on { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
+.cp__scope > button svg { flex: none; }
+
+.cp__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+}
+.cp__search input {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+.cp__search input:focus-visible { outline: none; }
+.cp__search input::placeholder { color: var(--text-muted); }
+
+.cp__list {
+  /* `flex: 1` with `min-height: 0` rather than a fixed cap: the panel is given
+     a max-height from the room it actually has, and the list is the part that
+     gives — the attribute, the operator, the halves and the count all have to
+     stay visible however short the window is. `min-height: 0` is what lets a
+     flex child shrink below its content at all. */
+  flex: 1;
+  min-height: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+}
+.cp__opt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 34px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.cp__opt:hover { background: var(--surface-sunken); }
+.cp__opt:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.cp__tick {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-raised);
+  color: var(--surface-raised);
+}
+.cp__opt.is-on .cp__tick { background: var(--brand); border-color: var(--brand); color: var(--text-on-brand); }
+.cp__icon { display: grid; place-items: center; width: 18px; flex: none; color: var(--text-tertiary); }
+.cp__text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 0; }
+.cp__text b {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp__text em { font-style: normal; font-size: 11px; color: var(--text-tertiary); }
+.cp__text small { font-size: 10px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cp__none { margin: 0; padding: var(--space-4); text-align: center; font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* The three values that are one control already. */
+.cp__body--inline { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); }
+.cp__input {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+.cp__input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+/* The kit defaults every input to `width: 100%` at zero specificity, and only
+   an explicit width wins — which is how a time range once became three stacked
+   rows on a panel. */
+.cp__input[type='time'] { width: 104px; }
+.cp__input.is-num { width: 84px; text-align: right; font-variant-numeric: tabular-nums; }
+.cp__input.is-text { flex: 1; min-width: 0; }
+.cp__to { font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* Jira's count, and it earns its place: it says whether the search narrowed
+   anything, which a filtered list otherwise cannot tell you. */
+.cp__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+.cp__count { margin-right: auto; font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.cp__manage {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: var(--fw-medium);
+  color: var(--brand);
+  cursor: pointer;
+}
+.cp__manage:hover { text-decoration: underline; }
+.cp__manage:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: 2px; }
+.cp__hint { font-size: 11px; color: var(--text-tertiary); }

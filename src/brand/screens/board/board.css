@@ -1190,10 +1190,15 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   background: var(--if-bg);
   color: var(--if-fg);
   font-size: var(--fs-xs);
-  /* So a condition row can lay itself out against the width it is actually
-     given. The panel is draggable from 320 to 720 and the focus dialog is the
-     screen, both against a window that never moves — see the container query
-     at the foot of this file. */
+  /* The containment stays even though the query that needed it has gone.
+
+     A condition row used to fold to two lines below 430px of block, because
+     four controls do not fit across a narrow panel — and that had to be
+     measured against the BLOCK, since the panel is draggable from 320 to 720
+     against a window that never moves. The row is one pill now and fits at
+     every width, so there is nothing left to fold. Kept because it costs
+     nothing and the next thing that needs to respond to the panel's width will
+     want it. */
   container-type: inline-size;
   container-name: ifblock;
 }
@@ -1437,7 +1442,11 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   content: ''; position: absolute; left: 0; right: 0; top: 50%;
   border-top: 1px dashed var(--fb-accent-border);
 }
-.bb__ifjoin.is-or .bb__ifkw { position: relative; margin-left: 12px; }
+/* The divider now hosts the SAME pill the rows use, so it is aligned to the
+   same column: the trunk joiner sits under the run joiners rather than
+   floating at an indent of its own. Two operators at two levels, one control. */
+.bb__ifjoin .bb__joinsel { position: relative; margin-left: 14px; }
+.bb__ifjoin.is-or .bb__joinsel { margin-left: 12px; }
 
 /* The pill, as a control. Same colours as the read-only keyword so the block
    and the card stay one language, plus the affordances a button needs. */
@@ -1909,45 +1918,57 @@ button.bb__idx::after {
   .bb__sheet { top: var(--space-3); height: auto; }
 }
 
-/* --- A condition, as one row of controls ---------------------------------------
+/* --- A condition, as one row -------------------------------------------------
 
-   Four cells that line up down the whole block — joiner, what, how, against —
-   and a delete at the end. It was a run of inline chips whose widths came from
-   their contents, wrapping onto two and three lines, so no two rows agreed
-   about where anything was and a rule of five conditions had no column to read
-   down. Every control is the same height and starts in the same place now.
+   Three cells: the joiner, the condition, and the one action that is not
+   inside it. It was five — joiner, attribute, operator, value, actions — and
+   the middle three have collapsed into a single pill, because they were never
+   three independent decisions: the operators come from the attribute and the
+   values come from the operator. See ConditionPopover.
 
-   `minmax(0, …)` on all four, because a grid track's default `auto` minimum is
-   its content's min-content width — a zone named "Reliance Jio · India" would
-   otherwise push the delete button off the end rather than eliding. */
+   That also ends the width problem the five-column version had. Four controls
+   across a 400px panel is four crushed controls; one pill and a panel is the
+   same information at any width, so the container query that used to fold the
+   row into two lines is gone with it. */
 .bb__cond {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1.15fr) minmax(0, 0.85fr) minmax(0, 1.3fr) auto;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
   align-items: center; gap: var(--space-2);
   padding: 3px 0;
 }
 .bb__cond.is-new { animation: bb-in 0.28s ease-out; }
-/* Silenced here rather than up in the file's reduced-motion block, because a
-   media query carries no specificity of its own: both selectors are (0,2,0) and
-   source order decides. The block up there ran first and lost, so a reader who
-   has asked for no motion got the slide-in anyway — on the one control this
-   editor animates. The rule the class replaced (`.bb__condrow`) named an editor
-   that no longer exists, which is why nobody noticed it had stopped matching. */
+/* Silenced here rather than in the reduced-motion block further up the file: a
+   media query carries no specificity of its own, both selectors are (0,2,0),
+   and source order decides. That block ran first and lost, so a reader who had
+   asked for no motion got the slide-in anyway. */
 @media (prefers-reduced-motion: reduce) {
   .bb__cond.is-new { animation: none; }
 }
 
-.bb__cond__join { display: flex; justify-content: flex-end; }
-/* `if` on the first row, in the quiet weight a keyword gets — it is the sentence
-   starting, not a control. */
+/* The joiner column, and the rail that says one operator governs the run.
+
+   The pill is drawn once, at the first gap. Every row below it in the same run
+   gets a hairline in this column instead — so the four conditions read as four
+   things held together by the one operator above them, which is exactly what
+   the model says: a run has a single joiner and flipping it flips all of them.
+   Drawn as a pill per gap, the same fact looked like four independent selects
+   that happened to agree. */
+.bb__cond__join { position: relative; display: flex; align-items: center; justify-content: flex-end; }
+.bb__cond__join.is-railed::before {
+  content: '';
+  position: absolute; right: 13px; top: -3px; bottom: -3px;
+  width: 1px; background: var(--border-default);
+}
+/* `if` on the very first row, in the quiet weight a keyword gets — it is the
+   sentence starting, not a control. */
 .bb__cond__first { font-size: var(--fs-xs); color: var(--text-muted); font-weight: var(--fw-medium); }
 
 /* The joiner, drawn as the select it behaves like: press it and the level
-   flips. It reads as a control rather than as a label, which the pill floating
-   between rows never did. */
+   flips. The pill does not move when it does, which is the whole reason the
+   joiner sits in the row rather than floating in the gap between two. */
 .bb__joinsel {
-  display: inline-flex; align-items: center; gap: 2px;
-  height: 26px; padding: 0 5px 0 7px;
+  display: inline-flex; align-items: center; gap: 1px;
+  height: 26px; padding: 0 4px 0 7px;
   border: 1px solid var(--border-default); border-radius: var(--radius-sm);
   background: var(--surface-raised);
   font-family: inherit; font-size: 11px; font-weight: var(--fw-medium);
@@ -1956,115 +1977,14 @@ button.bb__idx::after {
 }
 .bb__joinsel.is-and { color: var(--fb-info-fg); border-color: var(--fb-info-border); background: var(--fb-info-bg); }
 .bb__joinsel.is-or { color: var(--fb-notice-fg); border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.bb__joinsel svg { opacity: 0.6; }
 .bb__joinsel:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
-/* The attribute is a picker now, with its category mark sitting inside the
-   field rather than beside it — so the row keeps four columns instead of five.
-
-   A flex row, not a block. The `·2` badge that marks a condition repeated in
-   another branch is a sibling of the field, and in normal flow it landed on a
-   line of its own — so the two rows carrying it were 46px while every other row
-   was 32px, and the columns the block is supposed to line up on stopped lining
-   up on exactly the rows that most need reading carefully. */
-.bb__cond__what { position: relative; min-width: 0; display: flex; align-items: center; gap: 4px; }
-.bb__cond__what .bx-picker { flex: 1; min-width: 0; }
-.bb__cond__what .bb__ifdupe { flex: none; }
-.bb__cond__what .bx-picker__trigger { padding-left: 26px; }
-.bb__cond__mark {
-  position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
-  display: grid; place-items: center; pointer-events: none;
-  color: var(--text-tertiary);
-}
-.bb__cond__op, .bb__cond__val { min-width: 0; }
-.bb__cond__op .bx-picker, .bb__cond__val .bx-picker { width: 100%; }
-/* `nowrap`, and that is the whole change.
-
-   This cell used to wrap, because it held a chip per value plus an adder, and
-   wrapping was the only way three groups could fit. So the row that reads as
-   one sentence became two lines whenever anybody chose a second thing, and the
-   columns the rest of the block lines up on stopped meaning anything. The value
-   is one control now — a trigger that names what is chosen — so there is
-   nothing left to wrap and the row is a row at every width. */
-.bb__cond__val { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; }
+.bb__cond__body { min-width: 0; display: flex; align-items: center; gap: 6px; }
+.bb__cond__body .cp__pill { flex: 1; min-width: 0; }
 .bb__cond__acts { display: flex; align-items: center; gap: 2px; opacity: 0; }
 .bb__cond:hover .bb__cond__acts, .bb__cond:focus-within .bb__cond__acts { opacity: 1; }
 .bb__ifact.is-danger:hover { color: var(--fb-negative-fg); }
-
-/* --- The value, as one control ------------------------------------------------
-
-   The trigger. It names what is chosen and opens the sheet; it never grows with
-   the number of values, which is what lets the row keep its columns. Two lines
-   when a zone has been narrowed to one of its halves, because "Office Network"
-   and "Office Network, on the network only" are different rules and the row
-   must not read the same for both. */
-.bb__valtrig {
-  display: flex; align-items: center; gap: 4px;
-  width: 100%; min-width: 0; height: 26px;
-  padding: 0 6px 0 8px; border-radius: 5px;
-  background: var(--if-chip); border: 1px solid var(--if-chip-border);
-  font-family: inherit; color: var(--text-primary); cursor: pointer; text-align: left;
-  transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
-}
-.bb__valtrig:hover { background: var(--if-chip-hover); border-color: var(--border-strong); }
-.bb__valtrig:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-/* Dashed and in the negative tone, matching every other unset control in the
-   block: a condition with no value never matches, which the linter also reports
-   — this is the same fact said where the value would be. */
-.bb__valtrig.is-unset { border-style: dashed; border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
-.bb__valtrig svg { flex: none; opacity: 0.55; margin-left: auto; }
-.bb__valtrig__text { min-width: 0; display: flex; align-items: baseline; gap: 5px; overflow: hidden; }
-.bb__valtrig__text b {
-  font-size: 11px; font-weight: var(--fw-medium);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bb__valtrig__text em {
-  flex: none; font-style: normal; font-size: 10px; color: var(--text-tertiary); white-space: nowrap;
-}
-
-/* The three values that are already one control: a time range, a number with
-   its unit, a line of text. `nowrap` so the two ends of a range stay one row —
-   the kit defaults inputs to `width: 100%` at zero specificity, and this cell is
-   where that used to turn one condition into three stacked lines. */
-.bb__valrange { display: flex; align-items: center; gap: 5px; min-width: 0; flex-wrap: nowrap; }
-
-/* Narrow: the value drops under the row rather than crushing the other three.
-
-   A CONTAINER query, not a media query, and that is the fix rather than a
-   preference. The thing that runs out of room is the panel, and the panel is
-   resizable from 320px to 720px against a window that never changes — so a
-   breakpoint on the viewport answered a question nobody was asking. Dragged in
-   to 320px on a wide screen, the row stayed five columns and crushed the value
-   to nothing; opened in the 1400px focus dialog on a narrow laptop, it wrapped
-   with two thirds of the row empty.
-
-   The block declares the containment, so the rows respond to the width they are
-   actually given, in the panel and in the dialog alike. */
-@container ifblock (max-width: 430px) {
-  /* Two lines, and they are the two halves of the sentence.
-
-     The fallback used to put each control on a line of its own — attribute,
-     then operator, then value, three rows and no relationship between them,
-     which is a list of settings rather than a condition. Named areas instead:
-     WHAT it checks on the first line beside the joiner that introduces it, HOW
-     and AGAINST WHAT together on the second. The value keeps the larger share
-     of that line because it is the part that holds a name. */
-  .bb__cond {
-    grid-template-columns: 44px minmax(0, 86px) minmax(0, 1fr) auto;
-    grid-template-areas:
-      'join what what acts'
-      '.    op   val  .';
-    row-gap: 4px;
-  }
-  .bb__cond__join { grid-area: join; align-self: start; padding-top: 3px; }
-  .bb__cond__what { grid-area: what; }
-  .bb__cond__op { grid-area: op; }
-  .bb__cond__val { grid-area: val; }
-  .bb__cond__acts { grid-area: acts; align-self: start; }
-  /* A rule between conditions, once they are two lines each. Without it two
-     stacked conditions read as one four-line condition — the row gap that told
-     them apart is now the same size as the gap inside each of them. */
-  .bb__cond + .bb__cond { border-top: 1px dashed var(--if-line); margin-top: 3px; padding-top: 6px; }
-}
 
 /* --- The form, as numbered steps ---------------------------------------------
 

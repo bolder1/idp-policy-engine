@@ -2,7 +2,6 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Check,
-  ChevronDown,
   Clock,
   Copy,
   Fingerprint,
@@ -30,7 +29,6 @@ import { predicateParts, type NameLookup } from './predicate-prose'
 import {
   CONDITION_CATALOGUE,
   CONDITION_GROUPS,
-  ZONE_SCOPE_LABEL,
   conditionRank,
   card,
   cond,
@@ -38,14 +36,11 @@ import {
   type AccessDecision,
   type Condition,
   type ConditionCard,
-  type ConditionType,
   type Policy,
   type Rule,
-  type ZoneScope,
 } from '../data'
-import { ValueSheet, zoneShape, type SheetOption } from './ValueSheet'
+import { ConditionPopover, condSummary, valueSource } from './ConditionPopover'
 import { useBrand, useNameLookup } from '../store'
-import { modeLabel } from '../fingerprint'
 import { ruleSentence } from './builder-dialogs'
 import { impactOf, type Diagnostic } from './diagnostics'
 import { SITUATIONS, sweep } from './impact-arena'
@@ -692,6 +687,13 @@ function ConditionRow({
   const t = conditionType(c.typeId)
   const Ico = GROUP_ICON[t.group] ?? ListFilter
   const unset = c.values.length === 0 || c.values.every((v) => !v.trim())
+  /* One source for the choices, shared with the board — so the pill's summary
+     and the panel's list can never be built from two different lists, which is
+     exactly how this row and the board's came to disagree about what a zone
+     condition could hold. */
+  const { options, names, single, footer, onFooter } = valueSource(t, c.values.filter(Boolean), store, resolve)
+  const stale = options.length > 0 && c.values.filter(Boolean).some((id) => !options.some((o) => o.value === id))
+
 
   /* Every condition type, grouped by major component, so changing a row's field
      never means deleting and re-adding it.
@@ -703,16 +705,6 @@ function ConditionRow({
      unsorted list prints "Device, Risk, Device" and "Group, User, Group". The
      sort belongs here rather than in the Picker: the caller owns the order, so
      a list somebody deliberately arranged is never silently reshuffled. */
-  const fieldOptions = useMemo(() => {
-    const rank = (g: string) => {
-      const i = (CONDITION_GROUPS as readonly string[]).indexOf(g)
-      return i === -1 ? CONDITION_GROUPS.length : i
-    }
-    return CONDITION_CATALOGUE.filter((x) => !METHOD_GROUPS.has(x.group))
-      .slice()
-      .sort((a, b) => rank(a.group) - rank(b.group))
-      .map((x) => ({ value: x.id, label: x.label, meta: x.hint, group: GROUP_LABEL[x.group] ?? x.group }))
-  }, [])
 
   const menu: MenuItem[] = [
     { id: 'dup', label: 'Duplicate' },
@@ -734,44 +726,45 @@ function ConditionRow({
         <Ico size={13} strokeWidth={1.9} />
       </span>
 
-      <Picker
-        label="Condition"
-        value={c.typeId}
-        options={fieldOptions}
-        searchable
-        onChange={(typeId) => {
+      {/* The condition, as ONE control.
+
+          It was three side by side — an attribute picker, an operator picker
+          and a value control — which is three decisions laid out as though they
+          were independent. They are not: the operators come from the attribute
+          and the values come from the operator, so reading a row meant
+          assembling one sentence out of three boxes.
+
+          The same pill and the same panel the board uses, so the two builders
+          cannot drift again. This one had already drifted twice in ways that
+          cost data: a single-select writing `onChange([id])` over a multi-valued
+          array, and a "Manage device profiles" footer pointing at a screen name
+          that matched nothing. */}
+      <ConditionPopover
+        c={c}
+        summary={condSummary(t, c, names)}
+        options={options}
+        names={names}
+        single={single}
+        unset={unset || stale}
+        autoOpen={autoOpen}
+        onRetype={(typeId) => {
           /* Operators are type-dependent, so carrying the old one over would
              produce a condition the engine cannot evaluate. Values go too —
-             "Registered" means nothing to a country test. */
+             "Registered" means nothing to a country test. And `scope` goes with
+             them: it belongs to a zone condition and nothing else, and `onPatch`
+             merges — so retyping a scoped zone into a Country left the field
+             behind, invisible on screen and still reaching `ckey`. */
           const next = conditionType(typeId)
-          /* `scope` goes with the type. It belongs to a zone condition and to
-             nothing else, and `onPatch` merges — so retyping a scoped zone into
-             a Country left the field behind: invisible on screen, still reaching
-             `ckey`, and therefore able to split two identical Country conditions
-             into two different conditions for the linter and for both merges.
-             The board's writer rebuilds for the same reason; see when-ops. */
           onPatch({ typeId, operator: next.operators[0], values: [], scope: undefined })
         }}
-      />
-
-      <Picker
-        label={`${t.label} operator`}
-        value={c.operator}
-        options={t.operators.map((o) => ({ value: o, label: o }))}
-        onChange={(operator) => onPatch({ operator })}
-      />
-
-      <ValueControl
-        type={t}
-        values={c.values}
-        scope={c.scope}
-        store={store}
-        resolve={resolve}
-        autoOpen={autoOpen}
-        onChange={(values) => onPatch({ values })}
+        onOperator={(operator) => onPatch({ operator })}
+        onValues={(values) => onPatch({ values })}
         /* `undefined` for both, never the stored word — absent is the default
            and every dirty check here is a `JSON.stringify` comparison. */
         onScope={(sc) => onPatch({ scope: sc === 'both' ? undefined : sc })}
+        onRemove={onRemove}
+        footer={footer}
+        onFooter={onFooter}
       />
 
       <span className="bf__condstate">
@@ -802,215 +795,23 @@ function ConditionRow({
   )
 }
 
-/* --- The value ------------------------------------------------------------------ */
+/* --- The value -----------------------------------------------------------------
 
-/* Library objects are values, not conditions.
+   `ValueControl` stood here — a per-kind control rendering a picker, a chip
+   list, two time fields or a text box, and a second implementation of what the
+   board's editor already did. It is gone with the three-control row it
+   belonged to.
 
-   The old picker listed every zone and every fingerprint profile at its top
-   level, as if each were its own condition — so the list of things you could
-   check grew every time somebody saved a zone, and "Network Zone" as a concept
-   never appeared at all. A zone is what you compare against; the condition is
-   "Network Zone". The footer is the way back to the library that holds them. */
-function ValueControl({
-  type,
-  values,
-  scope,
-  store,
-  resolve,
-  autoOpen,
-  onChange,
-  onScope,
-}: {
-  type: ConditionType
-  values: string[]
-  /** Zone conditions only. Absent means both halves — see `Condition.scope`. */
-  scope?: ZoneScope
-  store: ReturnType<typeof useBrand>
-  resolve: NameLookup
-  autoOpen: boolean
-  onChange: (v: string[]) => void
-  onScope: (s: 'both' | ZoneScope) => void
-}) {
-  const v = values[0] ?? ''
-  const [sheet, setSheet] = useState(autoOpen)
+   Worth recording what the duplication actually cost, because it was never
+   tidiness. This copy was single-select over a multi-valued model and wrote
+   `onChange([id])`, so choosing a second zone here DELETED the first; its
+   stale-reference badge only ever inspected `values[0]`, so a zone deleted
+   from the library at index 1 rendered as perfectly valid; and its "Manage
+   device profiles" footer navigated to a screen name matching nothing, which
+   the board's copy of the same ternary had right. Three defects, none of them
+   present in the other implementation of the same control.
 
-  /* Zones, device profiles and hooks: the shared sheet, the same one the board
-     opens.
-
-     It was a single-select `Picker` writing `onChange([id])` — and `values` is
-     an array the evaluator ORs, so choosing a second zone did not add one, it
-     silently deleted the first. That was survivable only while nothing could
-     produce a second value; the sheet can, so the control has to. The stale
-     reference check had the same shape of bug, inspecting `values[0]` alone, so
-     a zone deleted from the library at index 1 rendered as perfectly valid.
-
-     One component across both builders rather than a second implementation
-     here. The note this comment replaces was about exactly that drift: this
-     copy navigated to `'fingerprints'`, a screen name matching nothing, while
-     the board's copy of the same ternary had it right. */
-  if (type.valueKind === 'zone' || type.valueKind === 'fingerprint' || type.valueKind === 'hook') {
-    const kind = type.valueKind
-    /* A hook holds one. `diagnostics` reads `values[0]` to check the endpoint
-       still exists, and a rule consulting two services would have to say what
-       happens when they disagree. */
-    const single = kind === 'hook'
-    const items: SheetOption[] =
-      kind === 'zone'
-        ? store.zones.map((z) => ({
-            value: z.id,
-            label: z.name,
-            meta: zoneShape(z),
-            note: z.usedIn ? `Used by ${z.usedIn} rule${z.usedIn === 1 ? '' : 's'}` : undefined,
-            icon: Globe,
-          }))
-        : kind === 'fingerprint'
-          ? store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p), icon: Fingerprint }))
-          : store.hooks
-              .filter((h) => h.mode === 'sync')
-              .map((h) => ({ value: h.id, label: h.name, meta: `Answers within ${h.timeoutMs}ms`, icon: Webhook }))
-
-    const chosen = values.filter(Boolean)
-    const names = chosen.map((id) => resolve(kind, id) ?? id)
-    const stale = chosen.some((id) => !items.some((o) => o.value === id))
-    const summary = names.length === 0 ? 'Choose…' : names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`
-
-    return (
-      <span className="bf__val">
-        <button
-          type="button"
-          className={`bf__valtrig ${chosen.length === 0 || stale ? 'is-unset' : ''}`}
-          /* The state, not just the field name — `aria-label` REPLACES a
-             button's text, so labelling this with the attribute alone hid the
-             one thing it exists to show. See the board's ValueTrigger. */
-          aria-label={[type.label, chosen.length === 0 ? 'nothing chosen' : names.length > 1 ? `${names[0]} and ${names.length - 1} more` : names[0], kind === 'zone' && scope ? ZONE_SCOPE_LABEL[scope] : '']
-            .filter(Boolean)
-            .join(', ')}
-          aria-haspopup="dialog"
-          aria-expanded={sheet}
-          onClick={() => setSheet(true)}
-        >
-          <b>{summary}</b>
-          {kind === 'zone' && scope && <em>{ZONE_SCOPE_LABEL[scope]}</em>}
-          <ChevronDown size={12} strokeWidth={2.1} aria-hidden />
-        </button>
-        {/* A reference to something deleted renders as itself, never as a
-            plausible substitute — `groupById` falls back to the first group,
-            which is exactly how a stale id comes to read as real. */}
-        {stale && <span className="bf__valgone">Deleted · {chosen.filter((id) => !items.some((o) => o.value === id)).join(', ')}</span>}
-        <ValueSheet
-          open={sheet}
-          onClose={() => setSheet(false)}
-          title={kind === 'zone' ? 'Network zones' : kind === 'fingerprint' ? 'Device profiles' : 'External hooks'}
-          options={items}
-          picked={chosen}
-          single={single}
-          scope={kind === 'zone' ? (scope ?? 'both') : undefined}
-          onScope={onScope}
-          onToggle={(id) => onChange(single ? [id] : chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id])}
-          footer={kind === 'zone' ? 'Manage zones' : kind === 'fingerprint' ? 'Manage device profiles' : 'Manage hooks'}
-          onFooter={() => store.go({ name: kind === 'zone' ? 'zones' : kind === 'fingerprint' ? 'fingerprint' : 'hooks' } as never)}
-        />
-      </span>
-    )
-  }
-
-  if (type.valueKind === 'group' || type.valueKind === 'user') {
-    const items =
-      type.valueKind === 'group'
-        ? store.groups.map((g) => ({ value: g.id, label: g.name, meta: `${g.memberCount.toLocaleString()} people` }))
-        : store.users.map((u) => ({ value: u.id, label: u.name, meta: u.email }))
-    return (
-      <span className="bf__val bf__val--chips">
-        {values.filter(Boolean).map((id) => (
-          <button
-            key={id}
-            type="button"
-            className="bf__vchip is-on"
-            onClick={() => onChange(values.filter((x) => x !== id))}
-          >
-            {resolve(type.valueKind as 'group' | 'user', id) ?? id}
-            <X size={10} strokeWidth={2.6} aria-hidden />
-          </button>
-        ))}
-        <Picker
-          label={type.label}
-          value={null}
-          options={items.filter((i) => !values.includes(i.value))}
-          placeholder={values.length ? 'Add another…' : 'Choose…'}
-          searchable
-          autoOpen={autoOpen}
-          onChange={(id) => onChange([...values.filter(Boolean), id])}
-          footer={type.valueKind === 'user' && store.unlistedUsers > 0 ? `${store.unlistedUsers.toLocaleString()} more in the directory` : undefined}
-        />
-      </span>
-    )
-  }
-
-  /* Fixed lists stay chips. `values` has always been an array on the model and
-     "Country is India, United Kingdom or Germany" has always been expressible;
-     a single select was the control lying about it. */
-  if (type.options?.length) {
-    return (
-      <span className="bf__val bf__val--chips" role="group" aria-label={type.label}>
-        {type.options.map((o) => {
-          const on = values.includes(o)
-          return (
-            <button
-              key={o}
-              type="button"
-              className={`bf__vchip ${on ? 'is-on' : ''}`}
-              aria-pressed={on}
-              onClick={() => onChange(on ? values.filter((x) => x !== o) : [...values.filter(Boolean), o])}
-            >
-              {o}
-            </button>
-          )
-        })}
-      </span>
-    )
-  }
-
-  if (type.valueKind === 'time') {
-    return (
-      <span className="bf__val bf__val--time">
-        <input
-          type="time"
-          aria-label="From"
-          value={values[0] ?? '09:00'}
-          onChange={(e) => onChange([e.target.value, values[1] ?? '17:00'])}
-        />
-        <em>to</em>
-        <input
-          type="time"
-          aria-label="To"
-          value={values[1] ?? '17:00'}
-          onChange={(e) => onChange([values[0] ?? '09:00', e.target.value])}
-        />
-      </span>
-    )
-  }
-
-  if (type.valueKind === 'range') {
-    return (
-      <span className="bf__val bf__val--range">
-        <input
-          type="number"
-          aria-label={type.label}
-          value={v}
-          placeholder="0"
-          onChange={(e) => onChange([e.target.value])}
-        />
-        <em>{type.id === 'trust-age' ? 'days' : type.id === 'coords' ? 'km' : 'score'}</em>
-      </span>
-    )
-  }
-
-  return (
-    <span className="bf__val">
-      <input aria-label={type.label} placeholder="Enter a value…" value={v} onChange={(e) => onChange([e.target.value])} />
-    </span>
-  )
-}
+   Both builders render `ConditionPopover` now. */
 
 /* --- The readback ---------------------------------------------------------------
 

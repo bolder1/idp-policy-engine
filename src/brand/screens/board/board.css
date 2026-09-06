@@ -1231,17 +1231,18 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 /* Two alternatives still have to read as two.
 
    The frames used to do that job on the card, badly — they said "group" about
-   runs nobody had grouped. Removing them left the `OR` pill as the only mark
-   that a second way in had started, and a pill at the head of a row looks very
-   like the `AND` pills above it. So the break between cards is drawn as a
-   break: the accent rule the editor already uses for the same junction, at the
-   card's own scale.
+   runs nobody had grouped. Removing them left nothing marking where a second
+   way in began, so the break between runs is drawn as a break: one accent rule.
 
-   The editor is unaffected — it puts a `.bb__ifjoin` element between its cards,
-   so the adjacency this selector needs never occurs there. */
+   It applies to BOTH renderers now, which it did not before. The editor used to
+   put a `.bb__ifjoin` divider between its runs, so this adjacency never
+   occurred there; the divider has gone, and this line is what has taken over
+   its one useful job — saying that an alternative starts here — without
+   spending a row on it or repeating a setting that has one value. */
 .bb__if > .bb__ifplain + .bb__ifplain,
 .bb__if > .bb__ifplain + .bb__ifgroup,
-.bb__if > .bb__ifgroup + .bb__ifplain {
+.bb__if > .bb__ifgroup + .bb__ifplain,
+.bb__if > .bb__ifgroup + .bb__ifgroup {
   margin-top: 7px;
   padding-top: 7px;
   border-top: 1px dashed var(--fb-accent-border);
@@ -1415,51 +1416,42 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   .bb__ifrow.is-new { animation: none; }
 }
 
-/* --- The IF editor: groups, and the operators between them --------------------
+/* --- The IF editor: groups, and the operator between them ---------------------
 
-   The block used to be one run of rows with the operator printed at the start
-   of each: `if` on the first, `and` on the rest, `or` at the head of a second
-   alternative. That reads, and it cannot be edited — turning an `and` into an
-   `or` meant finding a split icon that appeared on hover, and turning it back
-   meant deleting a condition and retyping it somewhere else.
+   `.bb__ifjoin` and `.bb__ifkw.is-flip` stood here: a full-width divider
+   between two runs with a pressable pill sitting on it. Both are gone with the
+   `Junction` component, and the reason is worth keeping.
 
-   Now the operator sits BETWEEN the two things it joins and is a button. A
-   group is a framed run of ANDs; the groups are joined by OR. Pressing an AND
-   splits its group in two, pressing an OR merges two into one, and neither can
-   produce a third level — which is the model, not a simplification of it. */
+   A block has two levels of operator — the one joining conditions inside a run
+   and the one joining the runs — and `when.join` is a SINGLE value for the whole
+   predicate. The divider drew it once per boundary, which is one setting shown
+   as N controls; moving it into the head of each alternative was worse, because
+   it then sat directly above each run's own joiner and the block appeared to
+   hold six operators where the model holds two.
 
-.bb__ifjoin {
-  display: flex; align-items: center;
-  padding: 2px 0 2px 16px;
-  position: relative;
+   The run joiner lives in the joiner column, once per run. The trunk joiner
+   lives once, in the foot, and says what it governs — see `.bb__trunksel`. */
+
+/* The one control for how the alternatives are joined. Worded rather than
+   lettered, because at the foot of the block there is no adjacent condition to
+   make a bare "OR" mean anything. */
+.bb__trunksel {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; padding: 0 7px 0 9px;
+  border: 1px dashed var(--border-default); border-radius: var(--radius-sm);
+  background: none;
+  font-family: inherit; font-size: 11px; color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
 }
-/* The OR between two groups is a full-width divider with the pill sitting on
-   it, so the two groups read as siblings rather than as one long list. The AND
-   inside a group has no rule: the frame already says those rows belong
-   together, and a second line inside it would cut the group in half. */
-.bb__ifjoin.is-or { padding-left: 0; }
-.bb__ifjoin.is-or::before {
-  content: ''; position: absolute; left: 0; right: 0; top: 50%;
-  border-top: 1px dashed var(--fb-accent-border);
+.bb__trunksel b {
+  font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: 0.03em;
 }
-/* The divider now hosts the SAME pill the rows use, so it is aligned to the
-   same column: the trunk joiner sits under the run joiners rather than
-   floating at an indent of its own. Two operators at two levels, one control. */
-.bb__ifjoin .bb__joinsel { position: relative; margin-left: 14px; }
-.bb__ifjoin.is-or .bb__joinsel { margin-left: 12px; }
-
-/* The pill, as a control. Same colours as the read-only keyword so the block
-   and the card stay one language, plus the affordances a button needs. */
-.bb__ifkw.is-flip {
-  border: 1px solid transparent; cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease-standard), filter var(--dur-fast) var(--ease-standard);
-}
-.bb__ifkw.is-and.is-flip { border-color: var(--fb-info-border); }
-.bb__ifkw.is-or.is-flip { border-color: var(--fb-accent-border); }
-.bb__ifkw.is-flip:hover { filter: brightness(0.96); }
-.bb__ifkw.is-and.is-flip:hover { border-color: var(--fb-info-fg); }
-.bb__ifkw.is-or.is-flip:hover { border-color: var(--fb-accent-fg); }
-.bb__ifkw.is-flip:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__trunksel svg { opacity: 0.6; }
+.bb__trunksel.is-or { color: var(--fb-notice-fg); border-color: var(--fb-notice-border); }
+.bb__trunksel.is-and { color: var(--fb-info-fg); border-color: var(--fb-info-border); }
+.bb__trunksel:hover { border-style: solid; background: var(--surface-sunken); }
+.bb__trunksel:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
 /* A frame means a group, and a group is something the author made.
 

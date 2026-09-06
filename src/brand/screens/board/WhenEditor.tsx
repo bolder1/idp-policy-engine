@@ -140,15 +140,16 @@ export function WhenEditor({
         ) : (
           cards.map((k, i) => (
             <Fragment key={k.id}>
-              {/* The operator between two groups, and it is a control.
+              {/* The operator between two runs is IN the first row of the
+                  second one, not on a band of its own.
 
-                  It used to be a word printed at the start of the second
-                  group's first row, which said what the model held and offered
-                  no way to change it: making `A and B` into `A or B` meant
-                  finding the split icon on a row, and going back meant deleting
-                  a condition and retyping it into the other group. Both
-                  directions are one click on the operator now. */}
-              {i > 0 && <Junction join={topJoin(rule.when)} scope="top" onFlip={flipTopJoin} />}
+                  It was a full-width divider carrying the pill, which put the
+                  one joiner that is not in the joiner column on a line with no
+                  condition on it — so a block of five conditions drew six rows,
+                  and the two levels of operator sat in two different places.
+                  Both are pills in the same column now: the trunk's on the row
+                  that opens an alternative, the run's on the row after the one
+                  that opens it. */}
 
               {/* Framed only once a group actually exists.
 
@@ -275,6 +276,33 @@ export function WhenEditor({
               <Plus size={11} strokeWidth={2.4} aria-hidden />
               Add group
             </button>
+            {/* The joiner BETWEEN alternatives: one setting, one control, said
+                once at the foot of the block.
+
+                It has been three things and each was the same mistake in a
+                different place — a word you could not press, a full-width
+                divider on a line of its own, then a pill at the head of every
+                alternative. The last is the one worth naming: `when.join` is a
+                single value for the whole predicate, so drawing it once per
+                group showed one setting as three controls, stacked directly
+                above the run joiners and reading as six operators where the
+                model has two.
+
+                Here it names what it governs and appears only when there is
+                more than one alternative to join. */}
+            {cards.length > 1 && (
+              <button
+                type="button"
+                className={`bb__trunksel is-${topJoin(rule.when)}`}
+                aria-label={`The alternatives are joined by ${topJoin(rule.when).toUpperCase()}. Switch to ${topJoin(rule.when) === 'or' ? 'AND' : 'OR'}.`}
+                title={topJoin(rule.when) === 'or' ? 'Any one alternative is enough. Click for AND.' : 'Every alternative must match. Click for OR.'}
+                onClick={flipTopJoin}
+              >
+                Alternatives joined by
+                <b>{topJoin(rule.when)}</b>
+                <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -346,48 +374,26 @@ export function WhenEditor({
 
 /* --- The operator at a level --------------------------------------------------
 
-   A pill you press. It reads the joiner the level currently holds, and pressing
-   it flips that level — every pill at the level reads the same word, because
-   there is one joiner per level rather than one per gap.
+   `Junction` stood here: the trunk joiner drawn as a full-width divider with a
+   pill sitting on it, between two runs. It has gone into the row.
 
-   It used to restructure instead: the AND pill split the run at that point and
-   the OR pill merged the previous group in. That gave two operators without a
-   model that could hold them, at the cost of pressing AND between the second
-   and third of four conditions turning `A and B and C and D` into
-   `(A and B) or (C and D)` — regrouping everything after the press. The model
-   carries a joiner per level now, so the operator changes the operator, and
-   restructuring moved to the row that actually moves. */
+   A block has two levels of operator — the one joining conditions inside a run,
+   and the one joining the runs — and the divider put those two in two different
+   places, one in the joiner column and one on a band of its own. So a rule with
+   five conditions drew six rows, the extra one carrying no condition, and the
+   two operators looked like two unrelated kinds of control.
 
-const SAYS: Record<Joiner, { top: string; group: string }> = {
-  and: { top: 'Every group must match.', group: 'All of these must be true.' },
-  or: { top: 'Any one group is enough.', group: 'Any one of these is enough.' },
-}
+   Both are pills in the joiner column now: the trunk's on the row that OPENS an
+   alternative, the run's on the row after the one that opens it. Same column,
+   same control, one per level.
 
-function Junction({ join, scope, onFlip }: { join: Joiner; scope: 'top' | 'group'; onFlip: () => void }) {
-  const other: Joiner = join === 'and' ? 'or' : 'and'
-  return (
-    <div className={`bb__ifjoin is-${join}`}>
-      {/* The same pill the rows use, deliberately.
-
-          Two joiner controls were on screen at once and they looked nothing
-          alike — a bordered select inside the runs, a bare coloured word
-          between them — so the block appeared to offer two different KINDS of
-          operator when it has one kind at two levels. Same control and same
-          affordance now; what differs is what each one joins, which the rule it
-          sits on already says. */}
-      <button
-        type="button"
-        className={`bb__joinsel is-${join}`}
-        aria-label={`${SAYS[join][scope]} Switch to ${other.toUpperCase()}.`}
-        title={`${SAYS[join][scope]} Click for ${other.toUpperCase()}.`}
-        onClick={onFlip}
-      >
-        {join}
-        <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
-      </button>
-    </div>
-  )
-}
+   The operator still changes the operator and nothing else. An older version
+   restructured instead — AND split the run at that point, OR merged the
+   previous group in — which gave two operators without a model that could hold
+   them, at the cost of pressing AND between the second and third of four
+   conditions turning `A and B and C and D` into `(A and B) or (C and D)`. The
+   model carries a joiner per level, so restructuring lives on the row that
+   actually moves. */
 
 /* --- One condition, live ------------------------------------------------------ */
 

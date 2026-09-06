@@ -1836,10 +1836,22 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 
    `position: relative` on the hosts is what makes the pseudo-element land in
    the right place; none of them set it before. */
+/* `.bb__link__add` is NOT in this list, and leaving it in was a positioning
+   bug rather than a redundancy.
+
+   It is already `position: absolute` with `left: -9px; top: 50%`, which is what
+   puts it on the connector line. This rule comes later in the file and set it
+   back to `relative` — so the offsets stopped applying, the button fell into
+   `.bb__link`'s `place-items: center`, and the `+` for inserting a rule ended up
+   223px to the RIGHT of the line it is supposed to sit on, floating in the dot
+   grid beside the card.
+
+   Nothing was lost by dropping it: `absolute` establishes a containing block
+   for the `::after` hit area exactly as `relative` does, which is the only
+   reason any of these are here. */
 .bb__act,
 .bb__ifact,
 .bb__secact,
-.bb__link__add,
 button.bb__idx { position: relative; }
 
 .bb__act::after,

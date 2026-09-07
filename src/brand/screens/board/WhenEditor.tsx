@@ -1,11 +1,12 @@
-import { Fragment, useEffect, useState } from 'react'
-import { ArrowUpToLine, ChevronDown, Fingerprint, Globe, Plus, Split, UserRound, Users, Webhook, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Braces, ChevronDown, Fingerprint, Globe, Plus, Split, Ungroup, UserRound, Users, Webhook, X } from 'lucide-react'
 
 import { modeLabel } from '../../fingerprint'
-import { cardJoin, cardLetter, ckey, duplicatedAcrossCards } from '../../predicate'
+import { cardJoin, cardLetter, ckey, drawsAsBracket, duplicatedAcrossCards, outerJoin } from '../../predicate'
 import {
   conditionType,
   type Condition,
+  type ConditionCard,
   type ConditionType,
   type Joiner,
   type Predicate,
@@ -13,7 +14,7 @@ import {
   type ZoneScope,
 } from '../../data'
 import * as ops from '../../when-ops'
-import { isWho, restConditions, whoEditable } from '../../audience-ops'
+import { isWho, whoEditable } from '../../audience-ops'
 import { useBrand, useNameLookup } from '../../store'
 import { ConditionPicker } from '../rule-form'
 import { ConditionPopover, summarise, zoneShape, type ValueOption } from '../ConditionPopover'
@@ -21,12 +22,24 @@ import { ConditionPopover, summarise, zoneShape, type ValueOption } from '../Con
 /* -----------------------------------------------------------------------------
    WHEN — the conditional, editable.
 
-   The same block the card draws, with every chip live: the operator is a
-   picker, the value is the control the attribute needs, `and` adds into the
-   group, `or` starts another way in, and the `└` under `if` is the decision.
-   The `else` is real — it names the rule that inherits whatever this one lets
-   past — because that is the half of a conditional people forget to think
-   about, and under first-match it is most of what a rule does.
+   A rule is ONE bracket: `A · B · C · (group) · D`. Every plain condition is a
+   member of it, every group is a member of it, and one and/or governs the lot.
+   A group is a bracket of its own nested inside, and the operator in there is
+   its own — which is the only place a second operator exists on this pane.
+
+   That is the whole grammar, and it took four goes to arrive at. The joiner has
+   been a word you could not press, a full-width divider, a pill at the head of
+   every alternative, and a chip on the seam between two cards; the last of
+   those was removed outright, which left `Predicate.join` with no control at
+   all and two runs of conditions stacked with nothing between them. The model
+   was never the problem — two levels of joining is exactly what it carries.
+   What was wrong is that it divided them by CARD, and a person does not think
+   in cards: they think in one list with a bracket in the middle of it.
+
+   So `outerJoin` and `setOuterJoin` read and write the two fields as one
+   operator, the members are laid out flat regardless of which card holds them,
+   and every structural edit re-establishes the lockstep. See `predicate.ts` for
+   why that costs no model change and no migration.
 
    Adding a condition opens the same catalogue dialog the trail uses, so the
    two builders cannot disagree about what the attributes are or how they are
@@ -77,16 +90,31 @@ export function WhenEditor({
   const write = (next: Predicate) => onPatch({ when: next })
 
   const flipCardJoin = (id: string) => write(ops.flipBranchJoin(rule.when, id))
-  /* `flipTrunkJoin` has no caller any more — this was the last one, and the
-     trail never had one. It stays in `when-ops` with its round-trip test
-     rather than being deleted, because the FIELD is still live: `topJoin` is
-     read by the evaluator, the prose read-back and the card, and a predicate
-     arriving with `join: 'and'` still evaluates and still says so. What has
-     gone is the way to author one here, not the way to hold one. */
+
+  /* THE operator. One rule, one bracket, one and/or over everything in it.
+
+     `outerJoin` reads it off whichever field is carrying it — a lone run holds
+     it on the card, a rule with groups holds it on the trunk — and
+     `setOuterJoin` writes both at once so the two can never say different
+     things. Every structural edit below goes back through it, which is what
+     keeps `A ∧ B` from silently acquiring an OR the moment somebody adds a
+     group beside it: the operator that was on screen before the edit is the
+     operator on screen after it.
+
+     `flipTrunkJoin` still has no caller, and neither does `mergeBranches` now.
+     Both stay in `when-ops` with their tests for the reason the first one
+     already did: the FIELDS are live — `topJoin` is read by the evaluator, the
+     prose read-back and the card — and what has gone is a way to author them
+     from here, not a way to hold them. */
+  const outer = outerJoin(rule.when)
+  const flipOuter = () => write(ops.flipOuterJoin(rule.when))
+  /* Every edit that changes the SHAPE lands through here, so the lockstep is
+     re-established on each one rather than only where somebody remembered. */
+  const restructure = (next: Predicate) => write(ops.setOuterJoin(next, outer))
 
   /* Still three destinations, because there are still three things a person can
-     mean by "add": into this group, into the loose run at the end, or into a
-     group of its own. */
+     mean by "add": into this group, into the run at the end, or into a group of
+     its own. */
   const add = (typeId: string) => {
     if (!adding) return
     const t = conditionType(typeId)
@@ -97,15 +125,18 @@ export function WhenEditor({
          to leave the existing conditions where they were and draw a frame round
          them too, so making a NEW group visually swallowed the old ones. */
       const next = ops.addCondition(rule.when, 'new', c)
-      write(ops.setGrouped(next, next.cards[next.cards.length - 1].id, true))
+      restructure(ops.setGrouped(next, next.cards[next.cards.length - 1].id, true))
     } else if (adding.cardId === 'loose') {
       /* Join the last card when it is loose, and start a new run when it is a
          group — so a condition added from the button below a group lands after
-         it rather than jumping to the top. */
+         it rather than jumping to the top. Either way it is a member of the
+         same bracket: two loose runs on the same predicate carry the same
+         joiner, which is what makes them read as one flat list with a group
+         sitting in the middle of it. */
       const last = cards[cards.length - 1]
-      write(last && !last.grouped ? ops.addCondition(rule.when, last.id, c) : ops.addCondition(rule.when, 'new', c))
+      restructure(last && !last.grouped ? ops.addCondition(rule.when, last.id, c) : ops.addCondition(rule.when, 'new', c))
     } else {
-      write(ops.addCondition(rule.when, adding.cardId, c))
+      restructure(ops.addCondition(rule.when, adding.cardId, c))
     }
 
     setAdding(null)
@@ -114,21 +145,59 @@ export function WhenEditor({
 
   const removeCondition = (conditionId: string) => write(ops.removeCondition(rule.when, conditionId))
   const patchCondition = (conditionId: string, next: Partial<Condition>) => write(ops.patchCondition(rule.when, conditionId, next))
-  const splitOut = (conditionId: string) => write(ops.splitOut(rule.when, conditionId))
-  const mergeUp = (i: number) => {
-    if (i < 1 || i >= cards.length) return
-    write(ops.mergeBranches(rule.when, cards[i].id, cards[i - 1].id))
+  /* "Move into a group of its own" now makes a GROUP.
+
+     `splitOut` copies `grouped` from the card it came out of, which was right
+     when a bare second card drew as a second alternative — and is wrong now
+     that a bare card's conditions are members of the one bracket. Splitting a
+     loose condition used to move it to the end of the list and change nothing
+     else, so the button did visibly nothing. */
+  const splitOut = (conditionId: string) => {
+    const next = ops.splitOut(rule.when, conditionId)
+    if (next === rule.when) return
+    restructure(ops.setGrouped(next, next.cards[next.cards.length - 1].id, true))
   }
-  const removeGroup = (id: string) => write(ops.removeBranch(rule.when, id))
-  const addGroup = () => write(ops.addBranch(rule.when))
+  /* The inverse of "Add group", and it replaces "Merge up".
+
+     "Merge up" folded a group into whatever card happened to precede it, which
+     was a group on some rules and the loose run on others — one button with two
+     outcomes, neither of them named by its label. Dissolving the bracket is the
+     thing people actually want back, it is the exact undo of the button that
+     made it, and it means one thing wherever it is pressed. The conditions stay
+     where they are in reading order and join the bracket around them. */
+  const ungroup = (id: string) => restructure(ops.setGrouped(rule.when, id, false))
+  const removeGroup = (id: string) => restructure(ops.removeBranch(rule.when, id))
+  const addGroup = () => restructure(ops.addBranch(rule.when))
 
   const dupes = duplicatedAcrossCards(rule.when)
   const openCatalogue = (cardId: string | 'new') => () => setAdding({ cardId })
 
-  /* Counted the way the list DRAWS it: the who-conditions are hidden here
-     whenever the Who pane owns them, so a rule whose only condition is a group
-     membership has nothing on this pane and must say so. */
-  const empty = (whoEditable(rule.when) ? restConditions(rule.when) : rule.when.cards.flatMap((k) => k.conditions)).length === 0
+  /* Drawn the way the model is read, not the way it is stored.
+
+     The bracket's members are laid out in one flat list: a plain condition is a
+     member, and a whole group is ONE member however much is inside it. Which
+     card a plain condition happens to live in does not survive into the
+     drawing, because it is not a fact about the rule — `A ∧ B ∧ (group) ∧ C`
+     stores C in a second card only because a group sits between them.
+
+     The who-conditions are filtered out wherever the Who pane owns them, so a
+     card can contribute no members at all and simply not appear. */
+  const shownIn = (k: ConditionCard) => (whoEditable(rule.when) ? k.conditions.filter((c) => !isWho(c)) : k.conditions)
+
+  type Member =
+    | { kind: 'cond'; key: string; c: Condition; card: ConditionCard }
+    | { kind: 'group'; key: string; card: ConditionCard; index: number }
+
+  const members: Member[] = []
+  cards.forEach((k, i) => {
+    if (drawsAsBracket(rule.when, k)) members.push({ kind: 'group', key: k.id, card: k, index: i })
+    else shownIn(k).forEach((c) => members.push({ kind: 'cond', key: c.id, c, card: k }))
+  })
+
+  /* Counted in members, not conditions. A group somebody just made holds
+     nothing yet and is still the thing on the screen, so the empty state must
+     not take the pane back off them. */
+  const empty = members.length === 0
 
 
   return (
@@ -162,210 +231,111 @@ export function WhenEditor({
             </div>
           </div>
         ) : (
-          cards.map((k, i) => (
-            <Fragment key={k.id}>
-              {/* No joiner control on the seam, and none in the foot.
+          /* ONE bracket, drawn as one.
 
-                  It has been four things now — a word you could not press, a
-                  full-width divider, a pill at the head of every alternative, a
-                  chip on the seam — and the fourth was still one operator too
-                  many. A group and the conditions beside it read as one bracket
-                  governed by one and/or; putting a second operator between the
-                  brackets asks somebody to hold two levels of joining in their
-                  head to answer a question that is really "all of these, or any
-                  of them?".
+             This used to be a list of cards, each drawn as its own block, with
+             a dashed accent rule on every seam. That is the model's shape, not
+             the rule's: a person writing `IP network, then two more conditions,
+             then a group, then one more` means one bracket with four members in
+             it, and the fourth is a bracket of its own. Drawn as cards it came
+             out as three separate blocks with no operator between them, and the
+             group read as an ALTERNATIVE to the conditions above it rather than
+             as another thing that has to hold alongside them.
 
-                  `Predicate.join` is untouched and still means what it meant:
-                  alternatives are ORed, which is the default and the only value
-                  this editor now produces. What remains editable is the joiner
-                  INSIDE a run — one control, in the joiner column, where the
-                  conditions it joins are. */}
-              {/* Framed only once a group actually exists.
+             So the frame is the bracket, everything in it is a member, and the
+             one operator governing them sits in the joiner column at the first
+             gap with a rail running down the rest — the same drawing the run
+             inside a group gets, one level in. */
+          <div className="bb__ifbracket" role="group" aria-label={`All of this rule's conditions, joined by ${outer.toUpperCase()}`}>
+            {members.map((m, i) =>
+              m.kind === 'cond' ? (
+                <ConditionRow
+                  key={m.key}
+                  c={m.c}
+                  join={outer}
+                  /* ONE joiner for the bracket, drawn at the first gap, with a
+                     rail down the rest.
 
-                  Every condition lives in a card because a card IS an
-                  unbroken run of ANDs — that is the model. But drawing a frame
-                  around the first one told a different story: it said the
-                  first condition you add creates a group and everything after
-                  it goes inside, when what is really happening is that plain
-                  independent conditions are being ANDed together.
+                     The bracket holds a single operator — pressing it changes
+                     how every member joins — but drawing a pill in every gap
+                     presented one setting as four controls, and nothing said
+                     they moved together until you pressed one and watched the
+                     others change. */
+                  showJoin={i === 1}
+                  railed={i > 1}
+                  /* `if` opens the sentence once, on the very first member. */
+                  lead={i === 0}
+                  scope="rule"
+                  fresh={fresh === m.c.id}
+                  /* `duplicatedAcrossCards` returns ckeys, not ids. Asking it
+                     about `c.id` compared two string spaces that never meet, so
+                     the ·2 badge and its tooltip were unreachable. */
+                  dupe={dupes.includes(ckey(m.c))}
+                  store={store}
+                  resolve={resolve}
+                  onChange={(nextC) => patchCondition(m.c.id, nextC)}
+                  onRetype={(typeId) => write(ops.retypeCondition(rule.when, m.c.id, typeId, conditionType(typeId).operators[0]))}
+                  /* Through `when-ops` like every other edit, because "both"
+                     has to DELETE the field rather than store the word — a
+                     patch merges and cannot express that, and a scope
+                     materialised at its default lights the save bar on a rule
+                     that means exactly what it did. */
+                  onScope={(s) => write(ops.setScope(rule.when, m.c.id, s))}
+                  onFlipJoin={flipOuter}
+                  onRemove={() => removeCondition(m.c.id)}
+                  /* Gated on the same predicate the writer uses. The two used to
+                     disagree — the button was drawn on every row while the
+                     writer bailed whenever the row was the only one — so the
+                     first row of every group had a control that did nothing. */
+                  onSplit={m.card.conditions.length > 1 ? () => splitOut(m.c.id) : undefined}
+                />
+              ) : (
+                <GroupMember
+                  key={m.key}
+                  k={m.card}
+                  letter={cardLetter(m.index)}
+                  outer={outer}
+                  showJoin={i === 1}
+                  railed={i > 1}
+                  lead={i === 0}
+                  onFlipOuter={flipOuter}
+                  rows={shownIn(m.card)}
+                  fresh={fresh}
+                  dupes={dupes}
+                  store={store}
+                  resolve={resolve}
+                  onAdd={openCatalogue(m.card.id)}
+                  onUngroup={() => ungroup(m.card.id)}
+                  onRemove={() => removeGroup(m.card.id)}
+                  onFlipJoin={() => flipCardJoin(m.card.id)}
+                  patchCondition={patchCondition}
+                  removeCondition={removeCondition}
+                  retype={(id, typeId) => write(ops.retypeCondition(rule.when, id, typeId, conditionType(typeId).operators[0]))}
+                  setScope={(id, s) => write(ops.setScope(rule.when, id, s))}
+                  splitOut={splitOut}
+                />
+              ),
+            )}
 
-                  So a single card draws as bare rows. Press "Add group" and a
-                  second card appears; only then does either wear a frame,
-                  because only then is there a bracket to show. */}
-              <div className={k.grouped ? 'bb__ifgroup' : 'bb__ifplain'}>
-                {/* The who-conditions are not drawn here.
+            {/* The bracket's own foot, INSIDE the frame.
 
-                    They ARE conditions and the model holds them exactly as it
-                    holds the rest — but the WHO step above owns them, and one
-                    fact with two controls on one screen is the thing this panel
-                    has spent its life removing. Editing either place writes the
-                    same condition; only one place draws it.
-
-                    Only when that step is actually editing them. On a predicate
-                    with two alternatives it stands down and says so, and then
-                    these rows are the only way to reach them, so they must
-                    show. */}
-                {(whoEditable(rule.when) ? k.conditions.filter((c) => !isWho(c)) : k.conditions).map((c, j) => (
-                  <ConditionRow
-                    key={c.id}
-                    c={c}
-                    join={cardJoin(k)}
-                    /* ONE joiner per run, drawn at the first gap, with a rail
-                       down the rest.
-
-                       A run holds a single joiner — pressing any pill always
-                       flipped every condition in it — but drawing that pill in
-                       every gap presented one setting as four controls, and
-                       nothing said they moved together until you pressed one
-                       and watched the others change. */
-                    showJoin={j === 1}
-                    railed={j > 1}
-                    /* `if` opens the sentence once, on the very first row of
-                       the block. The second run had one too, which reads as a
-                       second rule starting — the OR above it is what introduces
-                       an alternative, and a keyword meaning "here is the
-                       condition" is not the thing to repeat at the head of one. */
-                    lead={i === 0 && j === 0}
-                    fresh={fresh === c.id}
-                    /* `duplicatedAcrossCards` returns ckeys, not ids. Asking it
-                       about `c.id` compared two string spaces that never meet, so
-                       the ·2 badge and its tooltip were unreachable. */
-                    dupe={dupes.includes(ckey(c))}
-                    store={store}
-                    resolve={resolve}
-                    onChange={(nextC) => patchCondition(c.id, nextC)}
-                    onRetype={(typeId) => write(ops.retypeCondition(rule.when, c.id, typeId, conditionType(typeId).operators[0]))}
-                    /* Through `when-ops` like every other edit, because "both"
-                       has to DELETE the field rather than store the word — a
-                       patch merges and cannot express that, and a scope
-                       materialised at its default lights the save bar on a rule
-                       that means exactly what it did. */
-                    onScope={(s) => write(ops.setScope(rule.when, c.id, s))}
-                    onFlipJoin={() => flipCardJoin(k.id)}
-                    onRemove={() => removeCondition(c.id)}
-                    /* Gated on the same predicate the writer uses. The two used to
-                       disagree — the button was drawn on every row while the
-                       writer bailed whenever the row was the only one — so the
-                       first row of every group had a control that did nothing. */
-                    onSplit={k.conditions.length > 1 ? () => splitOut(c.id) : undefined}
-                  />
-                ))}
-
-                {/* A group gets its own adder, inside its frame, because that is
-                    where the condition will land. A loose run does not: the one
-                    at the foot of the block already adds to it, and two buttons
-                    saying "Add condition" a centimetre apart is a choice nobody
-                    can make correctly. */}
-                {/* A group with nothing in it says so, rather than rendering as
-                    an empty frame somebody has to guess the purpose of. The
-                    linter reports the same fact as PE320 at the same moment, so
-                    this is the friendly half of a finding that also blocks
-                    publishing. */}
-                {k.grouped && k.conditions.length === 0 && (
-                  <p className="bb__ifempty">
-                    Nothing in this group yet — it matches everything until you add a condition.
-                  </p>
-                )}
-
-                {k.grouped && (
-                <div className="bb__ifgroupfoot">
-                  {/* Adding on the left, restructuring on the right, and the
-                      two no longer look alike.
-
-                      "Merge up" wore the same dashed outline as "Add
-                      condition" — one adds a row, the other folds this whole
-                      group into the one above it and deletes the bracket, and
-                      they were a centimetre apart in the same clothes. The
-                      remove `×` then sat alone at the far edge on `margin-left:
-                      auto`, an unlabelled icon with nothing near it.
-
-                      Now the dashed outline means exactly one thing on this
-                      surface — something is about to be added — and the two
-                      controls that RESTRUCTURE are quiet, labelled, and
-                      clustered together at the other end where a group's own
-                      housekeeping belongs. */}
-                  <button type="button" className="bb__ifadd" onClick={openCatalogue(k.id)}>
-                    <Plus size={11} strokeWidth={2.4} aria-hidden />
-                    Add condition
-                  </button>
-                  <span className="bb__ifgroupacts">
-                    {/* Only once there is more than one group. Ungrouped, this
-                        would delete every condition on the rule from a control
-                        sitting beside "Add condition". */}
-                    {i > 0 && k.conditions.length > 0 && (
-                      <button
-                        type="button"
-                        className="bb__ifutil"
-                        title="Fold these conditions into the group above"
-                        onClick={() => mergeUp(i)}
-                      >
-                        <ArrowUpToLine size={11} strokeWidth={2.2} aria-hidden />
-                        Merge up
-                      </button>
-                    )}
-                    {/* Labelled now. It was a bare glyph, which is the one
-                        control here that cannot be undone by pressing it
-                        again. */}
-                    <button
-                      type="button"
-                      className="bb__ifutil is-danger"
-                      aria-label={`Remove group ${cardLetter(i)}`}
-                      title="Remove this group and the conditions in it"
-                      onClick={() => removeGroup(k.id)}
-                    >
-                      <X size={11} strokeWidth={2.2} aria-hidden />
-                      Remove
-                    </button>
-                  </span>
-                </div>
-                )}
-              </div>
-            </Fragment>
-          ))
-        )}
-
-        {!empty && (
-          <div className="bb__iffoot">
-            {/* Two destinations, said as two buttons. "Add condition" here puts
-                one at the top level beside the others; "Add group" starts a
-                bracket. Inside a group there is a third — that group's own
-                "Add condition" — so every place a condition can land has a
-                control sitting in it. */}
-            <button type="button" className="bb__ifadd" onClick={openCatalogue('loose')}>
-              <Plus size={11} strokeWidth={2.4} aria-hidden />
-              Add condition
-            </button>
-            <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
-              <Plus size={11} strokeWidth={2.4} aria-hidden />
-              Add group
-            </button>
-            {/* The joiner used to sit here as a third button, then on the
-                seams between the alternatives, and now nowhere: one bracket,
-                one and/or, and that one lives in the joiner column beside the
-                conditions it joins. What is left in this row is the two
-                controls that ADD, which is now the only thing a dashed outline
-                means on this surface. */}
+                It sat outside, under everything, which put the control that
+                adds a member to this bracket in the one place that does not
+                look like part of it — and it read as a footer for the pane
+                rather than for the thing above it. */}
+            <div className="bb__iffoot">
+              <button type="button" className="bb__ifadd" onClick={openCatalogue('loose')}>
+                <Plus size={12} strokeWidth={2.4} aria-hidden />
+                Add condition
+              </button>
+              <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
+                <Braces size={12} strokeWidth={2.2} aria-hidden />
+                Add group
+              </button>
+            </div>
           </div>
         )}
       </div>
-
-            {/* A "Reads as" disclosure stood here, restating the rows above it as a
-          sentence: "This rule matches when Group Membership in Finance or
-          Engineering or Contractors or Executives."
-
-          It was written for a predicate you could not otherwise be sure of,
-          and the rows now say it better than the prose did — each condition on
-          its own line, each joiner in its own column, the brackets drawn as
-          brackets. What the paragraph added was a second rendering of the same
-          predicate that had to be kept in step with the first, and it grew
-          with every condition: five conditions across two groups pushed THEN
-          off the screen exactly when the rule was complicated enough to want
-          both on one page.
-
-          `predicateSentence` and `predicateParts` are untouched in
-          `predicate-prose.ts` — the read-only card, the review dialog and the
-          change log all still speak. This was the one place the sentence sat
-          beside the thing it described. */}
 
       <ConditionPicker
         open={adding !== null}
@@ -377,28 +347,237 @@ export function WhenEditor({
   )
 }
 
-/* --- The operator at a level --------------------------------------------------
+/* --- A group: a bracket inside the bracket -------------------------------------
+
+   One member of the outer bracket, however many conditions are inside it — so
+   it takes one slot in the outer joiner column, exactly as a plain condition
+   does, and then opens a frame of its own with its own operator in it.
+
+   That is the whole grammar of this pane: the outer operator says how the
+   members join, the frame says where a member stops, and the operator inside a
+   frame is that group's own business. Naming it (`Group A`) is what makes the
+   second one distinguishable from the first at a glance, and it is the name the
+   linter and the change log already use for it. */
+function GroupMember({
+  k,
+  letter,
+  outer,
+  showJoin,
+  railed,
+  lead,
+  onFlipOuter,
+  rows,
+  fresh,
+  dupes,
+  store,
+  resolve,
+  onAdd,
+  onUngroup,
+  onRemove,
+  onFlipJoin,
+  patchCondition,
+  removeCondition,
+  retype,
+  setScope,
+  splitOut,
+}: {
+  k: ConditionCard
+  letter: string
+  outer: Joiner
+  showJoin: boolean
+  railed: boolean
+  lead: boolean
+  onFlipOuter: () => void
+  rows: Condition[]
+  fresh: string | null
+  dupes: string[]
+  store: ReturnType<typeof useBrand>
+  resolve: ReturnType<typeof useNameLookup>
+  onAdd: () => void
+  onUngroup: () => void
+  onRemove: () => void
+  onFlipJoin: () => void
+  patchCondition: (id: string, next: Partial<Condition>) => void
+  removeCondition: (id: string) => void
+  retype: (id: string, typeId: string) => void
+  setScope: (id: string, s: 'both' | ZoneScope) => void
+  splitOut: (id: string) => void
+}) {
+  const join = cardJoin(k)
+  const name = k.label?.trim() || `Group ${letter}`
+
+  return (
+    <div className="bb__ifmember">
+      <JoinCell join={outer} show={showJoin} railed={railed} lead={lead} scope="rule" onFlip={onFlipOuter} />
+
+      <div
+        className="bb__ifgroup"
+        role="group"
+        aria-label={`${name}: ${rows.length} condition${rows.length === 1 ? '' : 's'}, joined by ${join.toUpperCase()}. One member of the rule's conditions.`}
+      >
+        <div className="bb__ifgrouphead">
+          <span className="bb__ifgroupname">
+            <Braces size={12} strokeWidth={2.2} aria-hidden />
+            {name}
+          </span>
+          {/* Said once, in words, for the run that is about to be read — and
+              only when there is more than one thing in it to join. The pill in
+              the column below is the control; this is the caption. */}
+          {rows.length > 1 && (
+            <span className="bb__ifgroupjoin">{join === 'and' ? 'all must match' : 'any one matches'}</span>
+          )}
+        </div>
+
+        {rows.map((c, j) => (
+          <ConditionRow
+            key={c.id}
+            c={c}
+            join={join}
+            showJoin={j === 1}
+            railed={j > 1}
+            /* Never. `if` opens the rule, and the rule opened above this
+               frame — a second one here reads as a second rule starting. */
+            lead={false}
+            scope="group"
+            fresh={fresh === c.id}
+            dupe={dupes.includes(ckey(c))}
+            store={store}
+            resolve={resolve}
+            onChange={(nextC) => patchCondition(c.id, nextC)}
+            onRetype={(typeId) => retype(c.id, typeId)}
+            onScope={(s) => setScope(c.id, s)}
+            onFlipJoin={onFlipJoin}
+            onRemove={() => removeCondition(c.id)}
+            onSplit={k.conditions.length > 1 ? () => splitOut(c.id) : undefined}
+          />
+        ))}
+
+        {/* A group with nothing in it says so, rather than rendering as an
+            empty frame somebody has to guess the purpose of. The linter reports
+            the same fact as PE320 at the same moment, so this is the friendly
+            half of a finding that also blocks publishing. */}
+        {rows.length === 0 && <p className="bb__ifempty">Nothing in this group yet — it matches everything until you add a condition.</p>}
+
+        <div className="bb__ifgroupfoot">
+          {/* Adding on the left, restructuring on the right, and the two no
+              longer look alike.
+
+              "Merge up" wore the same dashed outline as "Add condition" — one
+              adds a row, the other folded this whole group into whatever card
+              preceded it — and they were a centimetre apart in the same
+              clothes. Dashed means exactly one thing on this surface now:
+              something is about to be added. The two controls that RESTRUCTURE
+              are quiet, labelled, and clustered at the other end where a
+              group's own housekeeping belongs. */}
+          <button type="button" className="bb__ifadd" onClick={onAdd}>
+            <Plus size={12} strokeWidth={2.4} aria-hidden />
+            Add condition
+          </button>
+          <span className="bb__ifgroupacts">
+            <button
+              type="button"
+              className="bb__ifutil"
+              aria-label={`Ungroup ${name}`}
+              title="Dissolve this bracket — its conditions join the ones around it"
+              onClick={onUngroup}
+            >
+              <Ungroup size={12} strokeWidth={2.2} aria-hidden />
+              Ungroup
+            </button>
+            {/* Labelled. It was a bare glyph, which is the one control here
+                that cannot be undone by pressing it again. */}
+            <button
+              type="button"
+              className="bb__ifutil is-danger"
+              aria-label={`Remove ${name} and the conditions in it`}
+              title="Remove this group and the conditions in it"
+              onClick={onRemove}
+            >
+              <X size={12} strokeWidth={2.2} aria-hidden />
+              Remove
+            </button>
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* --- The joiner column ---------------------------------------------------------
+
+   One cell, two states: the operator for this bracket, drawn once at the first
+   gap, and a rail on every member after it saying the operator above governs
+   them too.
+
+   Shared by both levels rather than written twice, because the two ARE the same
+   control at different depths — and the moment they were two pieces of code
+   they started drifting apart in copy, size and colour, which is precisely what
+   made a group look like a different kind of thing from the conditions beside
+   it. */
+function JoinCell({
+  join,
+  show,
+  railed,
+  lead,
+  scope,
+  onFlip,
+}: {
+  join: Joiner
+  show: boolean
+  railed: boolean
+  lead: boolean
+  /** What the operator governs, which is the only thing the two levels say differently. */
+  scope: 'rule' | 'group'
+  onFlip: () => void
+}) {
+  const where = scope === 'group' ? 'in this group' : 'in this rule'
+  return (
+    <span className={`bb__cond__join ${railed ? 'is-railed' : ''}`}>
+      {show && (
+        <button
+          type="button"
+          className={`bb__joinsel is-${join}`}
+          /* Says what it governs, not just what it is. One press changes every
+             condition at this level, and a control that announces itself as
+             "and" gives no hint of that. */
+          aria-label={`${join === 'and' ? `Every condition ${where} must match` : `Any one condition ${where} is enough`}. Switch to ${join === 'and' ? 'OR' : 'AND'} for all of them.`}
+          title={`Everything ${where} is joined by ${join.toUpperCase()}. Click for ${join === 'and' ? 'OR' : 'AND'}.`}
+          onClick={onFlip}
+        >
+          {join}
+          <ChevronDown size={12} strokeWidth={2.2} aria-hidden />
+        </button>
+      )}
+      {lead && (
+        <span className="bb__cond__first" aria-hidden>
+          if
+        </span>
+      )}
+    </span>
+  )
+}
+
+/* --- The two operators, and where they live -----------------------------------
 
    `Junction` stood here: the trunk joiner drawn as a full-width divider with a
-   pill sitting on it, between two runs. It has gone into the row.
+   pill sitting on it, between two runs. Then it was a chip on the seam. Then it
+   was nothing at all, which is how a predicate could carry an OR that no
+   control on the pane could show you, let alone change.
 
-   A block has two levels of operator — the one joining conditions inside a run,
-   and the one joining the runs — and the divider put those two in two different
-   places, one in the joiner column and one on a band of its own. So a rule with
-   five conditions drew six rows, the extra one carrying no condition, and the
-   two operators looked like two unrelated kinds of control.
-
-   Both are pills in the joiner column now: the trunk's on the row that OPENS an
-   alternative, the run's on the row after the one that opens it. Same column,
-   same control, one per level.
+   Both operators are pills in the joiner column now, one per bracket, drawn by
+   the same `JoinCell` at both depths: the rule's on the second member of the
+   block, a group's on the second row inside its frame. Same column, same
+   control, one per level — and a rail down every member after it, because a
+   bracket has ONE operator and drawing it in every gap presented one setting as
+   four controls that happened to agree.
 
    The operator still changes the operator and nothing else. An older version
    restructured instead — AND split the run at that point, OR merged the
    previous group in — which gave two operators without a model that could hold
    them, at the cost of pressing AND between the second and third of four
-   conditions turning `A and B and C and D` into `(A and B) or (C and D)`. The
-   model carries a joiner per level, so restructuring lives on the row that
-   actually moves. */
+   conditions turning `A and B and C and D` into `(A and B) or (C and D)`.
+   Restructuring lives on the controls that say they restructure: "Add group",
+   "Ungroup", and the split on a row. */
 
 /* --- One condition, live ------------------------------------------------------ */
 
@@ -419,6 +598,7 @@ function ConditionRow({
   showJoin,
   railed,
   lead,
+  scope,
   fresh,
   dupe,
   store,
@@ -438,6 +618,8 @@ function ConditionRow({
   railed: boolean
   /** The very first row of the whole block, which opens with `if`. */
   lead: boolean
+  /** Which bracket's operator this row's joiner cell governs. */
+  scope: 'rule' | 'group'
   fresh: boolean
   dupe: boolean
   store: ReturnType<typeof useBrand>
@@ -470,28 +652,7 @@ function ConditionRow({
 
   return (
     <div className={`bb__cond ${fresh ? 'is-new' : ''}`}>
-      <span className={`bb__cond__join ${railed ? 'is-railed' : ''}`}>
-        {showJoin && (
-          <button
-            type="button"
-            className={`bb__joinsel is-${join}`}
-            /* Says what it governs, not just what it is. One press changes
-               every condition in this run, and a control that announces itself
-               as "and" gives no hint of that. */
-            aria-label={`${join === 'and' ? 'Every condition here must match' : 'Any one condition here is enough'}. Switch to ${join === 'and' ? 'OR' : 'AND'} for all of them.`}
-            title={`All of these are joined by ${join.toUpperCase()}. Click for ${join === 'and' ? 'OR' : 'AND'}.`}
-            onClick={onFlipJoin}
-          >
-            {join}
-            <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
-          </button>
-        )}
-        {lead && (
-          <span className="bb__cond__first" aria-hidden>
-            if
-          </span>
-        )}
-      </span>
+      <JoinCell join={join} show={showJoin} railed={railed} lead={lead} scope={scope} onFlip={onFlipJoin} />
 
       <span className="bb__cond__body">
         <ConditionPopover
@@ -519,8 +680,14 @@ function ConditionRow({
 
       <span className="bb__cond__acts">
         {onSplit && (
-          <button type="button" className="bb__ifact" aria-label={`Move ${t.label} into its own group`} title="Move into its own group" onClick={onSplit}>
-            <Split size={11} strokeWidth={2} />
+          <button
+            type="button"
+            className="bb__ifact"
+            aria-label={`Move ${t.label} into a group of its own`}
+            title="Move into a group of its own"
+            onClick={onSplit}
+          >
+            <Split size={13} strokeWidth={2} />
           </button>
         )}
       </span>

@@ -1,5 +1,6 @@
 import { cond, emptyGroup, type Condition, type ConditionCard, type Predicate, type ZoneScope } from './data'
-import { cardJoin, ckey, topJoin } from './predicate'
+import { cardJoin, ckey, drawsAsBracket, outerJoin, topJoin } from './predicate'
+import type { Joiner } from './data'
 
 /* -----------------------------------------------------------------------------
    Every edit a person can make to a rule's WHEN, in one place.
@@ -289,6 +290,48 @@ export function flipTrunkJoin(w: Predicate): Predicate {
   else delete next.join
   return next
 }
+
+/* The one operator over the whole bracket, written to both levels at once.
+
+   A rule reads as one bracket with one and/or in it — `A · B · C · (group) ·
+   D` — and the model spends two fields saying that: the trunk joiner between
+   the cards, and the run joiner inside the loose one. Setting only the trunk
+   leaves `A ∧ B` ANDed under an OR nobody chose; setting only the run leaves
+   the group joined by something else. So this sets both, and every add, split
+   and group in the editor runs the result through it, which is what keeps
+   `drawsAsBracket` from ever seeing a disagreement it did not inherit.
+
+   Two things are deliberately NOT written, both for the stringify reason the
+   flippers above carry:
+
+   - The trunk on a single-card predicate. There is nothing for it to join, and
+     the operator a person sees there is the card's own — so materialising a
+     second copy means `and → or → and` comes back as a different string and
+     lights the save bar on a rule nobody changed.
+   - The joiner on a run of one. A run of one condition has no gap to join, and
+     `join: 'or'` on it says nothing the model reads.
+
+   Cards that draw as their own bracket keep their own operator. That is the
+   point of a bracket: the outer control governs the members of the outer
+   bracket, and a group is ONE member however many conditions are inside it. */
+export function setOuterJoin(w: Predicate, join: Joiner): Predicate {
+  const next: Predicate = {
+    ...w,
+    cards: w.cards.map((k) => {
+      if (drawsAsBracket(w, k) || k.conditions.length < 2) return k
+      const c = { ...k }
+      if (join === 'and') delete c.join
+      else c.join = 'or'
+      return c
+    }),
+  }
+  if (join === 'or' || w.cards.length < 2) delete next.join
+  else next.join = 'and'
+  return next
+}
+
+/** Flip the bracket's operator — the read of `outerJoin`, written to both levels. */
+export const flipOuterJoin = (w: Predicate): Predicate => setOuterJoin(w, outerJoin(w) === 'and' ? 'or' : 'and')
 
 /** A fresh, unset condition of a type — what every "add" route inserts. */
 export const freshCondition = (typeId: string, firstOperator: string) => cond(typeId, firstOperator, [])

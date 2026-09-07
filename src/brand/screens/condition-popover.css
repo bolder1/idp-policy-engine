@@ -34,8 +34,12 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
-  height: 32px;
-  padding: 0 7px;
+  /* 36, with the row that holds it grown to match. The pill is the control this
+     whole pane exists to operate and it was the height of a table cell; at 36
+     the attribute, the operator and the values are comfortably readable and the
+     press target clears the 32px floor with its border. */
+  height: 36px;
+  padding: 0 9px;
   border: 0;
   border-left: 1px solid var(--border-subtle);
   background: none;

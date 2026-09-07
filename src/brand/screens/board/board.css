@@ -1370,6 +1370,23 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   container-name: ifblock;
 }
 
+/* One box, not three.
+
+   The read-only card wants the sunken tile above — it is a block of text inside
+   a card and needs an edge. The EDITOR has the pane's own frame around it and
+   now draws a bracket inside it, so the tile in the middle was a third border
+   between the panel and the conditions: a box, in a box, in a box, each with
+   its own padding, and the thing they were all framing squeezed into what was
+   left. The bracket is the frame here; this is just where the custom properties
+   live. */
+.bb__if.is-editable {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  gap: 0;
+}
+
 .bb__ifrow {
   display: flex; align-items: center; flex-wrap: wrap;
   gap: 4px 6px; min-height: 26px;
@@ -1534,7 +1551,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 /* Row actions. `.bb__ifacts` — the plural, one letter from this — was the
    container they used to sit in, and nothing has emitted it for some time. */
 .bb__ifact {
-  display: grid; place-items: center; width: 22px; height: 22px; border-radius: 4px;
+  display: grid; place-items: center; width: 26px; height: 26px; border-radius: var(--radius-sm);
   border: none; background: none; color: var(--if-muted); cursor: pointer;
 }
 .bb__ifact:hover { background: var(--if-chip-hover); color: var(--text-primary); }
@@ -1641,7 +1658,105 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 }
 .bb__ifgroup + .bb__ifgroup { margin-top: 0; }
 
-.bb__ifgroupfoot { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+/* --- The bracket, drawn as a bracket ------------------------------------------
+
+   A rule is ONE bracket. Everything in it is a member — each plain condition,
+   and each group somebody made — and one and/or governs all of them. A group is
+   a bracket of its own, nested inside, with its own operator.
+
+   That has to be legible at a glance or the operator column means nothing, and
+   the editor spent a long time not drawing it: cards stacked with a dashed
+   accent rule on each seam, which said "here is another block" and never said
+   "here is where the bracket opens". So the bracket is a `[` — an actual one,
+   three borders of a rounded box with the right-hand side left off — and the
+   nested one is the same mark a shade stronger over a filled ground.
+
+   Two levels, one visual idea, told apart by fill and by a name. A third level
+   is not expressible in the model and so cannot arrive here to muddy it. */
+.bb__ifbracket {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  /* 12px each side, which is the bracket mark plus a hair. The pane is
+     draggable down to 320 and every pixel here comes off the values, so the
+     notation gets exactly the room it needs to be read as notation. */
+  padding: var(--space-4) var(--space-5) var(--space-4) var(--space-5);
+}
+/* Both halves, `[` and `]`, because half a bracket is a margin rule.
+
+   Drawn at 0.45 opacity on one side first, which is where this started, and it
+   read as a hairline somebody had forgotten to remove — the eye needs the
+   RETURN at the top and bottom to see a bracket at all, and it needs the
+   closing one to see what is inside it. Two marks, full strength, and the
+   notation says itself. */
+.bb__ifbracket::before,
+.bb__ifbracket::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; width: 7px;
+  border: 2px solid var(--bb-ring);
+  pointer-events: none;
+}
+.bb__ifbracket::before { left: 0; border-right: 0; border-radius: 7px 0 0 7px; }
+.bb__ifbracket::after { right: 0; border-left: 0; border-radius: 0 7px 7px 0; }
+
+/* A group takes ONE slot in the outer joiner column, however much is inside it
+   — which is the whole claim the layout is making, so it is made in the grid
+   rather than in a comment: same two columns as a condition row, same 54px
+   gutter, so the operator governing it lands in exactly the column the
+   operators governing its siblings land in. */
+.bb__ifmember {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+/* Top-aligned, not centred. A group is tall; centring put its operator halfway
+   down a frame, level with nothing, while every other operator on the pane sits
+   on the line of the thing it introduces. The rail carries on down from it. */
+.bb__ifmember > .bb__cond__join { align-items: flex-start; padding-top: 11px; }
+
+/* Told apart by material and by name, NOT by a second pair of bracket marks.
+
+   Nesting the same glyph one level in was the first attempt and it was worse
+   than either alternative: two `[ ]` pairs a few pixels apart read as one
+   thicker bracket, and the thing that actually needs to be obvious — that this
+   frame is a member of the frame around it, with its own operator — was said
+   twice in the same voice.
+
+   So the outer bracket is notation, and a group is a THING: raised off the
+   ground, edged, and carrying its name. Different means for the two levels,
+   which is what makes them tellable apart at a glance. */
+.bb__if.is-editable .bb__ifgroup {
+  position: relative;
+  display: grid; gap: var(--space-1);
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--bb-ring);
+  border-radius: var(--radius-md);
+}
+
+/* The group's name, which is what tells the second one from the first.
+
+   `Group A` is the name the linter, the change log and the prose read-back
+   already use for this card, so nothing here invents a vocabulary. The joiner
+   caption beside it says the operator in words for the run below — the pill in
+   the column is the control, this is the label — and it is drawn only when
+   there is more than one condition for it to join. */
+.bb__ifgrouphead {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: 20px; margin-bottom: var(--space-1);
+}
+.bb__ifgroupname {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  letter-spacing: 0.02em; color: var(--text-secondary);
+}
+.bb__ifgroupname svg { flex: none; opacity: 0.7; }
+.bb__ifgroupjoin { font-size: var(--fs-xs); color: var(--text-secondary); opacity: 0.8; }
+
+.bb__ifgroupfoot { display: flex; align-items: center; gap: 6px; margin-top: var(--space-3); }
 /* Housekeeping, gathered at the far end.
 
    The remove `×` used to carry `margin-left: auto` on its own, which left it
@@ -1655,9 +1770,9 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 /* Quiet, labelled, and never dashed — these change what is already here. */
 .bb__ifutil {
   display: inline-flex; align-items: center; gap: 4px;
-  height: 22px; padding: 0 7px;
+  height: 26px; padding: 0 8px;
   border: none; border-radius: var(--radius-sm); background: none;
-  font-family: inherit; font-size: 11px; color: var(--text-tertiary);
+  font-family: inherit; font-size: 11px; color: var(--text-secondary);
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
@@ -1674,7 +1789,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifadd,
 .bb__ifaddgroup {
   display: inline-flex; align-items: center; gap: 5px;
-  height: 24px; padding: 0 9px; border-radius: var(--radius-sm);
+  height: 28px; padding: 0 11px; border-radius: var(--radius-sm);
   border: 1px dashed var(--border-default); background: none; cursor: pointer;
   font-size: 11px; font-weight: var(--fw-medium); color: var(--text-secondary);
   transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
@@ -2144,8 +2259,13 @@ button.bb__idx::after {
 .bb__cond {
   display: grid;
   grid-template-columns: 54px minmax(0, 1fr) auto;
-  align-items: center; gap: var(--space-2);
-  padding: 3px 0;
+  align-items: center; gap: var(--space-3);
+  /* Taller. A condition is the unit of this pane and it was reading at the
+     density of a table row — 3px of padding around a 32px control, four of them
+     stacked, with the operator that governs them all the same height as the
+     values it joins. The row is the thing being edited; it gets the space. */
+  padding: var(--space-2) 0;
+  min-height: 44px;
 }
 .bb__cond.is-new { animation: bb-in 0.28s ease-out; }
 /* Silenced here rather than in the reduced-motion block further up the file: a
@@ -2167,7 +2287,7 @@ button.bb__idx::after {
 .bb__cond__join { position: relative; display: flex; align-items: center; justify-content: flex-end; }
 .bb__cond__join.is-railed::before {
   content: '';
-  position: absolute; right: 13px; top: -3px; bottom: -3px;
+  position: absolute; right: 14px; top: -4px; bottom: -4px;
   width: 1px; background: var(--border-default);
 }
 /* `if` on the very first row, in the quiet weight a keyword gets — it is the
@@ -2179,7 +2299,7 @@ button.bb__idx::after {
    joiner sits in the row rather than floating in the gap between two. */
 .bb__joinsel {
   display: inline-flex; align-items: center; gap: 1px;
-  height: 26px; padding: 0 4px 0 7px;
+  height: 30px; padding: 0 5px 0 9px;
   border: 1px solid var(--border-default); border-radius: var(--radius-sm);
   background: var(--surface-raised);
   font-family: inherit; font-size: 11px; font-weight: var(--fw-medium);

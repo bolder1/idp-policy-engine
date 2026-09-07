@@ -33,6 +33,46 @@ import type { Condition, ConditionCard, Joiner, Predicate } from './data'
 export const cardJoin = (k: ConditionCard): Joiner => k.join ?? 'and'
 export const topJoin = (p: Predicate): Joiner => p.join ?? 'or'
 
+/* --- One bracket, one operator ------------------------------------------------
+
+   The two joiners above are what the model HOLDS. These two are what a rule
+   READS as, and the difference is the whole point of them.
+
+   A rule is one bracket. Everything in it — each plain condition, and each
+   group somebody made — is a member of that bracket, and one and/or governs
+   all of them: `A · B · C · (group) · D`. A group is a bracket of its own,
+   nested inside, and the operator inside it is its own business. That is two
+   levels of joining, which is exactly what the model carries, but it is not
+   how the model divides them: the model's outer joiner sits between CARDS, and
+   the loose conditions are one card, so `A ∧ B` and the group beside it were
+   two operators the moment a group appeared.
+
+   `outerJoin` reads the one operator a person actually sees, and
+   `setOuterJoin` in `when-ops` writes both levels in lockstep so the two
+   readings cannot come apart. `(A ∧ B) ∧ (group)` and `A ∧ B ∧ (group)` are
+   the same predicate — the flattening is free, and it is free in either
+   direction, so nothing about the model had to change to say this. */
+
+/** The operator governing the whole bracket, as read. */
+export const outerJoin = (p: Predicate): Joiner =>
+  p.cards.length === 1 && !p.cards[0].grouped ? cardJoin(p.cards[0]) : topJoin(p)
+
+/* Which cards are brackets of their own rather than members of the outer one.
+
+   A group is, because somebody said so. And so is a run of two or more
+   conditions whose joiner DISAGREES with the outer operator — because there is
+   no honest way to draw `(A ∧ B ∧ C) ∨ (D ∧ E)` as one flat bracket, and
+   predicates in exactly that shape exist: two ungrouped cards is what the model
+   has always meant by "alternatives", and rules were authored that way before
+   the editor said `grouped` out loud.
+
+   Under the writers below the disagreement never arises on anything authored
+   from here — every add, split and group re-establishes the lockstep — so this
+   arm is what keeps faith with predicates that predate it, not a state the
+   editor produces. */
+export const drawsAsBracket = (p: Predicate, k: ConditionCard): boolean =>
+  k.grouped || (k.conditions.length > 1 && cardJoin(k) !== outerJoin(p))
+
 /** Does this card hold, given a test for one condition? */
 export const cardPasses = (k: ConditionCard, passed: (c: Condition) => boolean) =>
   cardJoin(k) === 'or' ? k.conditions.some(passed) : k.conditions.every(passed)

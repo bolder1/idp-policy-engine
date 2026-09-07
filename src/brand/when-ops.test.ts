@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { card, cond, emptyGroup, when, type Predicate } from './data'
-import { cardJoin, ckey, sig, topJoin } from './predicate'
+import { cardJoin, ckey, drawsAsBracket, outerJoin, sig, topJoin } from './predicate'
 import {
   addBranch,
   addCondition,
@@ -16,6 +16,7 @@ import {
   renameBranch,
   retypeCondition,
   setGrouped,
+  setOuterJoin,
   setScope,
   splitOut,
 } from './when-ops'
@@ -253,5 +254,138 @@ describe('the meaning survives a regrouping that changes the shape', () => {
   it('signs a split differently from what it split', () => {
     const w = when(card(A, B))
     expect(sig(splitOut(w, A.id))).not.toBe(sig(w))
+  })
+})
+
+/* -----------------------------------------------------------------------------
+   One bracket, one operator.
+
+   A rule reads as a single bracket — `A · B · C · (group) · D` — with one
+   and/or over every member of it and a group carrying its own operator inside.
+   The model spends two fields saying that, and the entire risk in this design is
+   that the two come apart: the trunk saying OR while the run beside it says AND
+   means the pane draws one operator and the evaluator applies another.
+
+   These pin the read (`outerJoin`), the write (`setOuterJoin`) and the one case
+   where the flat drawing would be a lie (`drawsAsBracket`).
+   -------------------------------------------------------------------------- */
+
+const D = cond('device-type', 'is', ['Mobile'])
+
+describe('outerJoin — the operator a person actually sees', () => {
+  it("is the run's own joiner while the run is all there is", () => {
+    expect(outerJoin(when(card(A, B)))).toBe('and')
+    expect(outerJoin({ cards: [{ ...card(A, B), join: 'or' }] })).toBe('or')
+  })
+
+  /* The trunk takes over the moment there is more than one card, because that
+     is the field that joins them. The run's joiner is then the operator INSIDE
+     one member, which is a different question. */
+  it('is the trunk once a group is beside the run', () => {
+    const w: Predicate = { join: 'and', cards: [card(A, B), { ...emptyGroup(), conditions: [C] }] }
+    expect(outerJoin(w)).toBe('and')
+    expect(cardJoin(w.cards[1])).toBe('and')
+  })
+})
+
+describe('setOuterJoin — both levels, or the two come apart', () => {
+  it('writes the run and the trunk together', () => {
+    const w = setOuterJoin(when(card(A, B), { ...emptyGroup(), conditions: [C] }), 'and')
+    expect(topJoin(w)).toBe('and')
+    expect(cardJoin(w.cards[0])).toBe('and')
+    expect(outerJoin(w)).toBe('and')
+
+    const or = setOuterJoin(w, 'or')
+    expect(topJoin(or)).toBe('or')
+    expect(cardJoin(or.cards[0])).toBe('or')
+    expect(outerJoin(or)).toBe('or')
+  })
+
+  /* The reason every other joiner writer in this file deletes at the default:
+     each dirty check in the app is a `JSON.stringify` comparison, so a field
+     materialised at its own default lights the save bar on a rule that means
+     exactly what it did before. */
+  it('round-trips to the identical object on a lone run', () => {
+    const w = when(card(A, B))
+    expect(setOuterJoin(setOuterJoin(w, 'or'), 'and')).toEqual(w)
+  })
+
+  it('round-trips to the identical object with a group beside the run', () => {
+    /* From a predicate already in lockstep, which is every predicate this
+       editor authors. `when(card(A, B), group)` raw is NOT one — the trunk
+       defaults to OR while the run beside it defaults to AND — so the first
+       write there normalises rather than round-trips, which the next test is
+       about. */
+    const w = setOuterJoin(when(card(A, B), { ...emptyGroup(), conditions: [C] }), 'and')
+    expect(setOuterJoin(setOuterJoin(w, 'or'), 'and')).toEqual(w)
+  })
+
+  /* A shape from before the editor drew one bracket: `(A ∧ B) ∨ (group)`, where
+     the two levels genuinely disagree. Setting the outer operator writes the
+     trunk and leaves the run alone, because a run whose joiner disagrees is
+     drawn as its own bracket and the outer control does not reach into a
+     bracket. The rule keeps meaning what it meant. */
+  it('leaves a disagreeing run alone and writes only the trunk', () => {
+    const w = when(card(A, B), { ...emptyGroup(), conditions: [C] })
+    const next = setOuterJoin(w, 'and')
+    expect(next.cards[0].join).toBeUndefined()
+    expect(cardJoin(next.cards[0])).toBe('and')
+    expect(topJoin(next)).toBe('and')
+  })
+
+  /* A run of one has no gap to join, and a lone card's operator is already the
+     one on screen. Writing either would be a second copy of a setting that has
+     one place to live. */
+  it('leaves a joiner off a run with nothing to join', () => {
+    const w = setOuterJoin(when(card(A), { ...emptyGroup(), conditions: [C] }), 'or')
+    expect(w.cards[0].join).toBeUndefined()
+  })
+
+  it('leaves the trunk off a predicate with one card', () => {
+    expect(setOuterJoin(when(card(A, B)), 'and').join).toBeUndefined()
+  })
+
+  /* A group is ONE member of the outer bracket however many conditions are in
+     it. The outer operator says how the members join; what happens inside the
+     frame is the group's own business, and flipping the outer one must not
+     reach in and rewrite it. */
+  it("does not touch a group's own operator", () => {
+    const group = { ...emptyGroup(), join: 'or' as const, conditions: [C, D] }
+    const w = setOuterJoin(when(card(A, B), group), 'and')
+    expect(cardJoin(w.cards[1])).toBe('or')
+  })
+
+  it('is what keeps the operator on screen when a group arrives beside a run', () => {
+    /* `A and B`, then "Add group". The trunk defaults to OR, so without the
+       lockstep the AND a person was looking at becomes an OR they did not
+       choose — which is the bug this whole pairing exists to prevent. */
+    const before = when(card(A, B))
+    const after = setOuterJoin(addBranch(before), outerJoin(before))
+    expect(outerJoin(after)).toBe('and')
+    expect(topJoin(after)).toBe('and')
+  })
+})
+
+describe('drawsAsBracket — when a flat drawing would be a lie', () => {
+  it('brackets a group, and nothing else the editor authors', () => {
+    const w = setOuterJoin(when(card(A, B), { ...emptyGroup(), conditions: [C] }), 'and')
+    expect(drawsAsBracket(w, w.cards[0])).toBe(false)
+    expect(drawsAsBracket(w, w.cards[1])).toBe(true)
+  })
+
+  /* Two ungrouped runs of ANDs under an OR trunk is what "alternatives" meant
+     before the editor said `grouped` out loud, and rules were authored that way
+     — `(A ∧ B) ∨ (C ∧ D)` cannot be drawn as one flat bracket without changing
+     what it says, so each run keeps a frame of its own. */
+  it('brackets a legacy run whose joiner disagrees with the trunk', () => {
+    const w = when(card(A, B), card(C, D))
+    expect(outerJoin(w)).toBe('or')
+    expect(drawsAsBracket(w, w.cards[0])).toBe(true)
+    expect(drawsAsBracket(w, w.cards[1])).toBe(true)
+  })
+
+  it('draws a run of one flat whatever the trunk says', () => {
+    const w = when(card(A), card(B))
+    expect(drawsAsBracket(w, w.cards[0])).toBe(false)
   })
 })

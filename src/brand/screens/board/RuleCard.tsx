@@ -56,18 +56,40 @@ function CardSummary({ rule, resolve }: { rule: Rule; resolve?: NameLookup }) {
      head of this line now, and counting a group twice inflates the number the
      line exists to give. */
   const n = restConditions(rule.when).length
-  const who = resolve
-    ? [
-        ...whoIds(rule.when, 'group').map((id) => resolve('group', id) ?? id),
-        ...whoIds(rule.when, 'user').map((id) => resolve('user', id) ?? id),
-      ]
-    : []
+  /* `whoEditable` gates it: on an OR-shaped rule the who belongs to each
+     alternative and is drawn inside them, so naming it once at the head of the
+     line would flatten a distinction the body is careful about. */
+  const who =
+    resolve && whoEditable(rule.when)
+      ? [
+          ...whoIds(rule.when, 'group').map((id) => resolve('group', id) ?? id),
+          ...whoIds(rule.when, 'user').map((id) => resolve('user', id) ?? id),
+        ]
+      : []
+  /* The same rule the expanded body follows: nothing is reported until it has
+     been answered.
+
+     This line said "everyone · any sign-in → Let in, then verify" on a rule
+     somebody had just added — three defaults read back as decisions, and the
+     folded card contradicting its own body, which said "Nothing set yet" two
+     pixels below. Whichever of the two you believed, the card was wrong. */
+  const configured = who.length > 0 || n > 0
+
+  if (!configured) {
+    return (
+      <div className="bb__cardsum">
+        <span className="bb__ifkw is-blank">Nothing set yet</span>
+      </div>
+    )
+  }
+
   return (
     <div className="bb__cardsum">
-      {/* Who first, because it is the subject. A folded card said how much test
-          there was and what it decided, and never who it was about — which is
-          the one of the three you cannot infer from the others. */}
-      {resolve && whoEditable(rule.when) && (
+      {/* Who first, because it is the subject — and only when there is one.
+          A folded card said how much test there was and what it decided, and
+          never who it was about, which is the one of the three you cannot
+          infer from the others. */}
+      {who.length > 0 && (
         <>
           <Users size={11} strokeWidth={2} aria-hidden />
           <AvatarStack names={who} />
@@ -76,10 +98,14 @@ function CardSummary({ rule, resolve }: { rule: Rule; resolve?: NameLookup }) {
           </span>
         </>
       )}
-      <span className="bb__ifbranch" aria-hidden>
-        <Split size={11} strokeWidth={2} />
-      </span>
-      <span className="bb__cardsum__n">{n === 0 ? 'any sign-in' : `${n} condition${n === 1 ? '' : 's'}`}</span>
+      {n > 0 && (
+        <>
+          <span className="bb__ifbranch" aria-hidden>
+            <Split size={11} strokeWidth={2} />
+          </span>
+          <span className="bb__cardsum__n">{`${n} condition${n === 1 ? '' : 's'}`}</span>
+        </>
+      )}
       <ArrowRight size={11} strokeWidth={2} aria-hidden />
       <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>
     </div>
@@ -324,30 +350,32 @@ export function RuleCard({
           happens, and where they cost the chain nothing — so what belongs here
           is what belonged here before: a reading of the rule, which is all a
           folded card ever needed to be. */}
-      {/* Two folds, opposite ways round.
+      {/* One fold, and no summary line above it.
 
-          The summary shrinks as the body grows, so the card never shows both
-          readings of itself at once and never jumps: one grid row goes
-          1fr→0fr while the other goes 0fr→1fr, on the same curve, and the
-          height between them is continuous.
+          A folded card carried "Finance +4 · 1 condition → Deny" — a
+          compressed restatement of the body directly beneath it, which the
+          chevron reveals in full and in the shape a rule is actually written
+          in. It answered no question the head does not: the name says which
+          rule this is, the state pip says whether it is ready, and anybody who
+          wants to know what it checks is one press away from the thing itself.
+          A second, worse reading of the same rule is not a summary, it is
+          duplication that has to be kept in step.
 
-          Both stay MOUNTED at zero height rather than being conditionally
+          So the counterweight goes with it and one disclosure is left. Still
+          continuous, still nothing measured; the card simply grows, which is
+          what a disclosure does.
+
+          It stays MOUNTED at zero height rather than being conditionally
           rendered. `grid-template-rows` has nothing to animate from if the
-          content arrives in the same frame as the class, so unmounting it would
-          make the first press of the chevron jump and every press after it
-          glide.
+          content arrives in the same frame as the class, so unmounting it
+          would make the first press of the chevron jump and every press after
+          it glide.
 
           `inert={!expanded}` — a real boolean. Written as `inert: ''` first,
           which React 19 reports as "an empty string for a boolean attribute"
           and treats as FALSE, so the folded half kept every one of its buttons
           in the tab order: Tab walked into a zero-height region and focus went
-          somewhere invisible. The cast that silenced the type error was the
-          tell that the value was wrong. */}
-      <div className="bb__fold bb__fold--sum" aria-hidden={expanded} inert={expanded}>
-        <div>
-          <CardSummary rule={rule} resolve={resolve} />
-        </div>
-      </div>
+          somewhere invisible. */}
       <div className="bb__fold bb__fold--body" id={`bb-rule-${rule.id}-body`} inert={!expanded}>
         <div>
           <div className="bb__cardbody">

@@ -13,11 +13,10 @@ import {
   type ZoneScope,
 } from '../../data'
 import * as ops from '../../when-ops'
-import { isWho, whoEditable } from '../../audience-ops'
+import { isWho, restConditions, whoEditable } from '../../audience-ops'
 import { useBrand, useNameLookup } from '../../store'
 import { predicateParts } from '../predicate-prose'
 import { ConditionPicker } from '../rule-form'
-import { IfChip, IfKw } from './IfBlock'
 import { ConditionPopover, summarise, zoneShape, type ValueOption } from '../ConditionPopover'
 
 /* -----------------------------------------------------------------------------
@@ -128,20 +127,41 @@ export function WhenEditor({
   const parts = predicateParts(rule.when, resolve)
   const openCatalogue = (cardId: string | 'new') => () => setAdding({ cardId })
 
+  /* Counted the way the list DRAWS it: the who-conditions are hidden here
+     whenever the Who pane owns them, so a rule whose only condition is a group
+     membership has nothing on this pane and must say so. */
+  const empty = (whoEditable(rule.when) ? restConditions(rule.when) : rule.when.cards.flatMap((k) => k.conditions)).length === 0
+
 
   return (
     <div>
       <div className="bb__if is-editable">
-        {cards.length === 0 ? (
-          <div className="bb__ifrow">
-            <span className="bb__ifbranch" aria-hidden>
-              <Split size={12} strokeWidth={2} />
+        {empty ? (
+          /* A proper empty state, and it fires on NO CONDITIONS rather than on
+             no cards.
+
+             `cards.length === 0` was the old test, and it is not the state you
+             land in: removing the last condition leaves the card behind, so
+             the pane rendered an empty grey box with two dashed buttons
+             floating in it and no sentence at all. A rule with nothing to check
+             is a rule that catches everything reaching it, which is the fact
+             worth saying — and it is the reason somebody is on this pane. */
+          <div className="bb__ifblank">
+            <span className="bb__ifblank__mark" aria-hidden>
+              <Split size={18} strokeWidth={1.8} />
             </span>
-            <IfKw>if</IfKw>
-            <IfChip muted icon={<Plus size={10} strokeWidth={2.4} />} onClick={openCatalogue('loose')}>
-              add a condition
-            </IfChip>
-            <span className="bb__ifjourney">— until then, any sign-in that reaches it</span>
+            <h4>No conditions yet</h4>
+            <p>Every sign-in that reaches this rule matches it. Add a condition to narrow that.</p>
+            <div className="bb__ifblank__acts">
+              <button type="button" className="bb__ifadd" onClick={openCatalogue('loose')}>
+                <Plus size={11} strokeWidth={2.4} aria-hidden />
+                Add condition
+              </button>
+              <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
+                <Plus size={11} strokeWidth={2.4} aria-hidden />
+                Add group
+              </button>
+            </div>
           </div>
         ) : (
           cards.map((k, i) => (
@@ -306,7 +326,7 @@ export function WhenEditor({
           ))
         )}
 
-        {cards.length > 0 && (
+        {!empty && (
           <div className="bb__iffoot">
             {/* Two destinations, said as two buttons. "Add condition" here puts
                 one at the top level beside the others; "Add group" starts a

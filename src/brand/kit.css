@@ -411,9 +411,16 @@ html[data-theme='dark'] {
 .bx-toggle--sm { width: 32px; height: 18px; }
 .bx-toggle--lg { width: 52px; height: 30px; }
 
-.bx-toggle.is-on { background: var(--int-brand-bg); border-color: var(--int-brand-bg); }
+/* On is GREEN, not brand.
+
+   A switch says "this is running", which is a state, and the console already
+   has a colour for that state: the positive dot on every Active pill. Brand is
+   for the thing you press to commit, and a page of brand-orange switches spent
+   that meaning on rows nobody is about to act on — nine rules, nine orange
+   bars, none of them the primary action. */
+.bx-toggle.is-on { background: var(--fb-positive-fg); border-color: var(--fb-positive-fg); }
 .bx-toggle:not(:disabled):hover { border-color: var(--border-strong); }
-.bx-toggle.is-on:not(:disabled):hover { border-color: var(--int-brand-bg-hover); background: var(--int-brand-bg-hover); }
+.bx-toggle.is-on:not(:disabled):hover { filter: brightness(0.93); }
 .bx-toggle:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .bx-toggle__knob {

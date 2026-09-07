@@ -864,7 +864,11 @@ html[data-theme='dark'] {
 
 /* Absent, not disabled: a signal a platform cannot collect has no weight to
    set, and a greyed control invites somebody to work out why. */
-.bx-tiers--none { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; }
+/* Was two words of grey text; it is a dash now, so it is sized like the
+   control it stands in place of rather than like a caption. The words are
+   still there for a pointer and a screen reader — see the note at the call
+   site in RiskSignals.tsx. */
+.bx-tiers--none { font-size: var(--fs-md); color: var(--text-muted); white-space: nowrap; }
 
 @media (max-width: 720px) {
   .bx-tier { padding: 0 8px; }

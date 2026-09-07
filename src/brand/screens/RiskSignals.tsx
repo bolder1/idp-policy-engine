@@ -26,6 +26,7 @@ import { PageHead } from '../Shell'
 import { Button, Toggle } from '../kit'
 import { Picker } from '../picker'
 import { TierPick } from '../tier-pick'
+import { PlatformMark } from '../logos/PlatformMark'
 import { useBrand } from '../store'
 import {
   EMPTY_RISK_PROFILE,
@@ -282,12 +283,17 @@ function SignalTable({
     <div className="brs__table" role="table" aria-label="Risk signals">
       <div className="brs__row brs__row--head" role="row">
         <span role="columnheader">Signal</span>
-        <span role="columnheader" className="brs__col">
-          Android
-        </span>
-        <span role="columnheader" className="brs__col">
-          iOS
-        </span>
+        {/* Mapped from PLATFORMS, like the cells underneath, so a third
+            platform cannot arrive as two columns of weights under one heading.
+            The marks are the real ones — a row saying "Not collected" is
+            answering a question about a PLATFORM, and the platform is quicker
+            to recognise by its logo than to read. */}
+        {PLATFORMS.map((p) => (
+          <span role="columnheader" className="brs__col" key={p.id}>
+            <PlatformMark platform={p.id} />
+            {p.label}
+          </span>
+        ))}
         <span role="columnheader" className="brs__col brs__col--on">
           On
         </span>
@@ -319,13 +325,39 @@ function SignalTable({
             </span>
 
             {PLATFORMS.map((p) => (
-              <span className="brs__col" role="cell" key={p.id}>
+              /* `data-label` feeds the narrow layout, where the header row is
+                 hidden and each cell prints its own column name. The rule that
+                 reads it has been in the stylesheet all along with nothing to
+                 read — so under 900px both weight columns were unlabelled and
+                 the two dropdowns sat in a row with nothing saying which was
+                 Android and which was iOS. */
+              <span className="brs__col" role="cell" data-label={p.label} key={p.id}>
                 {s.on.includes(p.id) ? (
                   <TierPick value={tierFor(profile, s, p.id)} label={`${s.name} weight on ${p.label}`} onChange={(t) => onTier(s, p.id, t)} />
                 ) : (
-                  /* Words, not a dash. A dash is ambiguous between "off",
-                     "zero" and "not collected", and only the third is true. */
-                  <span className="bx-tiers--none">Not collected</span>
+                  /* A dash, and the words moved to where they can still be
+                     had.
+
+                     This said "Not collected" in full, on the argument that a
+                     dash is ambiguous between "off", "zero" and "not
+                     collected" when only the third is true. The argument was
+                     right about the ambiguity and wrong about the cost: two
+                     words of grey text repeated down two columns sixteen rows
+                     deep drew the eye to the cells that hold nothing, which is
+                     the opposite of what a weights table is for. The signals
+                     that DO collect are the content, and they were competing
+                     with a sentence.
+
+                     So the cell is a dash and the sentence survives as the
+                     accessible name — hover it, or reach it with a screen
+                     reader, and it still says which of the three it is. An em
+                     dash rather than two hyphens, because that is the
+                     character this console already uses for "nothing here"
+                     wherever a cell has no value. */
+                  <span className="bx-tiers--none" title={`Not collected on ${p.label}`}>
+                    <span aria-hidden>—</span>
+                    <span className="u-sr">Not collected</span>
+                  </span>
                 )}
               </span>
             ))}

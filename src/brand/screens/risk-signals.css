@@ -98,11 +98,34 @@
   border-top: 1px solid var(--border-subtle);
 }
 .brs__row:first-child { border-top: 0; }
+/* The zones table's header, to the letter.
+
+   This one was 11px tertiary text on a sunken strip with 4px of padding — a
+   caption sitting above the table rather than the top of it, and the platform
+   marks beside it made that worse: two real logos next to type too small and
+   too faint to hold them.
+
+   The zones table had already settled this question. `--table-header-h` for
+   the height, `--surface-raised` so the head reads as part of the same card
+   rather than a band stuck on top, `--border-default` under it — a full-weight
+   rule, not the hairline the body rows use, so the head is separated from the
+   data by more than the rows are from each other — and `--fs-md` at weight 500
+   in `--text-primary`. It also explicitly turns OFF the uppercase and the
+   letter-spacing the shared `.btable` head carries, and that is deliberate
+   there: "Android" and "iOS" are proper nouns whose capitalisation is part of
+   their spelling, and upper-casing them would print "IOS". */
 .brs__row--head {
-  padding-top: var(--space-2); padding-bottom: var(--space-2);
-  background: var(--surface-sunken);
-  font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-tertiary);
+  min-height: var(--table-header-h);
+  padding-top: 0; padding-bottom: 0;
+  background: var(--surface-raised);
+  border-bottom: var(--bw-thin) solid var(--border-default);
+  font-size: var(--fs-md); font-weight: 500;
+  letter-spacing: 0; text-transform: none; color: var(--text-primary);
+  white-space: nowrap;
 }
+/* The first body row would otherwise draw its own hairline directly under the
+   header's rule — two lines, 1px apart. */
+.brs__row--head + .brs__row { border-top: 0; }
 /* Dimmed, not hidden. A signal you switched off is a decision you made, and it
    has to stay legible enough to change your mind about. */
 .brs__row.is-off .brs__sig,
@@ -174,7 +197,14 @@
 .brs__cat.is-notice { --sig-bg: var(--fb-notice-bg); --sig-fg: var(--fb-notice-fg); }
 .brs__cat.is-lime { --sig-bg: var(--fb-lime-bg); --sig-fg: var(--fb-lime-fg); }
 
-.brs__col { display: flex; align-items: center; }
+.brs__col { display: flex; align-items: center; gap: var(--space-3); }
+/* Enough room for a 13px mark and its name to sit as one label rather than as
+   an icon with a word after it. */
+.brs__row--head .brs__col { gap: var(--space-3); }
+/* The mark keeps its own size and never stretches with the flex row. Android
+   carries its green; Apple inherits the header's colour, which is what makes
+   it correct in both themes without a second asset. */
+.brs__col .bplat { flex: none; }
 .brs__col--on { justify-content: flex-end; }
 
 .brs__none { font-size: var(--fs-sm); color: var(--text-tertiary); }
@@ -186,7 +216,10 @@
   .brs__row--head { display: none; }
   .brs__col { grid-column: 1 / -1; gap: var(--space-2); }
   .brs__col--on { grid-column: 2; grid-row: 1; justify-content: flex-end; }
-  .brs__col::before {
+  /* Not on the On column: it has no `data-label` and never wanted one, so it
+     was reserving 62px for an empty box and pushing its own switch off the
+     edge. The switch is named by its own aria-label. */
+  .brs__col:not(.brs__col--on)::before {
     content: attr(data-label);
     font-size: var(--fs-xs); color: var(--text-tertiary); min-width: 62px;
   }

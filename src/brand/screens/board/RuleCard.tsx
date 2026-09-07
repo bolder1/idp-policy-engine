@@ -10,7 +10,7 @@ import type { NameLookup } from '../predicate-prose'
 import type { StepKind } from '../simulate'
 import type { RuleState } from '../rule-form'
 import { DECISION_NAME, TONE, type Part } from './model'
-import { IfBlock, IfChip, type NextRule } from './IfBlock'
+import { IfBlock, IfChip } from './IfBlock'
 
 /* -----------------------------------------------------------------------------
    A card on the chain — one rule, read whole, or read short.
@@ -89,7 +89,6 @@ function CardSummary({ rule, resolve }: { rule: Rule; resolve?: NameLookup }) {
 export function RuleCard({
   rule,
   index,
-  next,
   openPart,
   state,
   traceKind,
@@ -113,7 +112,6 @@ export function RuleCard({
 }: {
   rule: Rule
   index: number
-  next: NextRule
   /* Which part of this rule the panel is showing, or null when this card does
      not own the panel. One prop rather than a boolean and a part: `selected`
      is derived from it below, so nothing in the render path can claim the card
@@ -356,7 +354,6 @@ export function RuleCard({
           <div className="bb__cardbody">
             <IfBlock
               rule={rule}
-              next={next}
               resolve={resolve}
               token={
                 landed ? (
@@ -488,7 +485,6 @@ export function TerminalCard({
             <IfBlock
               terminal
               rule={rule}
-              next={null}
               resolve={resolve}
               token={
                 landed ? (

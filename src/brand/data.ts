@@ -23,7 +23,20 @@ export type PolicyType = 'App Access' | 'Session' | 'Account Management'
    two different questions, which every surface in this console was previously
    answering with `status !== 'inactive'` — a test that silently counts a
    monitor policy as protection the moment the state exists. Hence: */
-export type PolicyStatus = 'active' | 'inactive' | 'monitor' | 'always-on'
+/* `draft` is not `inactive`, and the difference is the whole reason it exists.
+
+   Inactive is a DECISION: this policy was published and somebody has since
+   switched it off, which is a state an auditor can ask about. Draft is the
+   absence of one — nobody has said anything about it yet. Both are off, and
+   collapsing them was costing the list its most useful sort: a tenant with
+   nine policies could not tell the two they had deliberately parked from the
+   four somebody had started and abandoned.
+
+   It enforces nothing and evaluates nothing, and it gets that for free from
+   `enforces` below rather than from a rule of its own — the two predicates
+   name the statuses that DO act, so a status that does not act needs no
+   entry. */
+export type PolicyStatus = 'draft' | 'active' | 'inactive' | 'monitor' | 'always-on'
 
 /** Decides real sign-ins. The question Coverage, conflicts and cover-counts ask. */
 export const enforces = (p: { status: PolicyStatus }) =>
@@ -1376,7 +1389,9 @@ export function blankPolicy(name: string, appId?: string): Policy {
     name,
     type: 'App Access',
     appId,
-    status: 'inactive',
+    /* A policy nobody has published yet is a DRAFT, not something switched
+       off. It has never been on. */
+    status: 'draft',
     lastModified: 'Just now',
     modifiedBy: 'You',
     /* A new policy governs everyone until somebody narrows it. The opposite

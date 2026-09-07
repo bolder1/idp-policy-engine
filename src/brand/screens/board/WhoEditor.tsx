@@ -131,54 +131,40 @@ export function WhoEditor({
 
   return (
     <div className="bb__who">
-      {/* What is chosen, as faces. Round, one letter, and the overflow says how
-          many more rather than growing the row — the same thing an avatar stack
-          does anywhere else, for the same reason. */}
-      <WhoChosen chosen={chosen} outside={outside} onRemove={(k, id) => toggle(k, id, false)} />
+      {/* A SEGMENTED control, not a second row of tabs.
 
-      <div className="bb__whotabs" role="tablist" aria-label="What this rule is about">
-        <button
-          role="tab"
-          type="button"
-          aria-selected={tab === 'group'}
-          className={tab === 'group' ? 'is-on' : ''}
-          onClick={() => {
-            setTab('group')
-            setQ('')
-          }}
-        >
-          <Users size={13} strokeWidth={2} aria-hidden />
-          Groups
-          {groupIds.length > 0 && <b>{groupIds.length}</b>}
-        </button>
-        <button
-          role="tab"
-          type="button"
-          aria-selected={tab === 'user'}
-          className={tab === 'user' ? 'is-on' : ''}
-          onClick={() => {
-            setTab('user')
-            setQ('')
-          }}
-        >
-          <UserRound size={13} strokeWidth={2} aria-hidden />
-          People
-          {userIds.length > 0 && <b>{userIds.length}</b>}
-        </button>
+          It was an underlined tab strip sitting directly beneath the panel's
+          own underlined tab strip — two identical switchers, back to back,
+          asking two unrelated questions. Nothing said which one moved you
+          between forms and which one moved you inside this one.
 
+          One of them had to stop looking like tabs, and it is this one: the
+          panel's strip changes the SUBJECT and this changes a filter within it,
+          which is what a segmented control means everywhere else in this kit. */}
+      <div className="bb__whopick" role="radiogroup" aria-label="What this rule is about">
+        {(['group', 'user'] as WhoType[]).map((k) => {
+          const on = tab === k
+          const n = k === 'group' ? groupIds.length : userIds.length
+          const Ico = k === 'group' ? Users : UserRound
+          return (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              className={on ? 'is-on' : ''}
+              onClick={() => {
+                setTab(k)
+                setQ('')
+              }}
+            >
+              <Ico size={13} strokeWidth={2} aria-hidden />
+              {k === 'group' ? 'Groups' : 'People'}
+              {n > 0 && <b>{n}</b>}
+            </button>
+          )
+        })}
       </div>
-
-      {/* An exclusion cannot be BUILT here any more, but one that already
-          exists must not be drawn as its opposite. A rule can arrive holding
-          `not in` — the Condition pane edits who-conditions directly whenever
-          the rule has more than one way in, and deleting an alternative can
-          then hand a negated condition back to this pane. Ticks that mean
-          "everyone except these" say so. */}
-      {negated(tab) && (
-        <p className="bb__whohint is-warn">
-          These are <b>excluded</b> — the rule covers everyone else. Change that in Condition.
-        </p>
-      )}
 
       {/* People are a directory and groups are a list that ends — so only one
           of them gets a search box. */}
@@ -192,6 +178,17 @@ export function WhoEditor({
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
+      )}
+
+      {/* An exclusion cannot be BUILT here any more, but one that already
+          exists must not be drawn as its opposite. A rule can arrive holding
+          `not in` — the Condition pane edits who-conditions directly whenever
+          the rule has more than one way in, and deleting an alternative can
+          then hand a negated condition back to this pane. */}
+      {negated(tab) && (
+        <p className="bb__whohint is-warn">
+          These are <b>excluded</b> — the rule covers everyone else. Change that in Condition.
+        </p>
       )}
 
       <div className="bb__whorows" role="group" aria-label={tab === 'group' ? 'Groups' : 'People'}>
@@ -237,18 +234,28 @@ export function WhoEditor({
 
       {/* The one line of prose that survived, and only on the tab it is true
           of: `unlistedUsers` is a count with no rows behind it, so the search
-          can only ever reach the loaded rows. Saying so is not decoration. */}
+          can only ever reach the loaded rows. */}
       {tab === 'user' && store.unlistedUsers > 0 && (
         <p className="bb__whohint">
           {store.users.length} of {(store.users.length + store.unlistedUsers).toLocaleString()} listed. The rest can be
           reached by the group they are in.
         </p>
       )}
+
+      {/* What is chosen, UNDER the lists rather than above them.
+
+          It sat at the top, between two switchers, where it was a third thing
+          in a stack of controls before you had reached the one you came for.
+          Below, it is what it actually is: the answer the lists have been
+          building, both kinds together, so the total is visible whichever
+          filter is showing. */}
+      <WhoChosen chosen={chosen} outside={outside} onRemove={(k, id) => toggle(k, id, false)} />
     </div>
   )
 }
 
-
+/* The chosen, as faces. Round, one letter, and the overflow says how many
+   more rather than growing the row. */
 function WhoChosen({
   chosen,
   outside,

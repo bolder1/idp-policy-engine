@@ -87,6 +87,11 @@ export function orderOf(rows: Policy[]): (number | null)[] {
    is reported as switched off, because that is the one fact that explains the
    other three and the only one worth acting on first. */
 export function whyNotDeciding(p: Policy): string | null {
+  /* Draft first, and it is not the same sentence as switched-off. "Switched
+     off" says somebody turned it off; a draft has never been on, and telling
+     an administrator they switched off something they never published is the
+     kind of small lie that costs a screen its credibility. */
+  if (p.status === 'draft') return 'Still a draft — it has never decided a sign-in.'
   if (p.status === 'inactive') return 'Switched off — skipped.'
   if (p.status === 'monitor') return 'Records what it would have done. Decides nothing.'
   if (!p.rules.some((r) => r.enabled)) return 'No rules enabled — every sign-in falls straight through.'

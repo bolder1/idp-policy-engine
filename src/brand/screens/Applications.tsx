@@ -253,10 +253,6 @@ export function Applications() {
       <NewPolicyDialog
         open={naming}
         fixedAppId={panelFor ?? undefined}
-        /* "Cancel", not "Back". From the gallery there is a step behind this
-           dialog to go back TO; from an application row there is not — the
-           panel underneath is where you already were. */
-        closeLabel="Cancel"
         onClose={() => setNaming(false)}
         onCreate={(policy) => {
           store.addPolicy(policy)

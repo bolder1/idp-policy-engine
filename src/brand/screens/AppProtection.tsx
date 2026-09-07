@@ -500,6 +500,7 @@ function nextDecider(policy: Policy | null, own: Policy[]): Policy | null {
    lower case beside a table of "Active" pills is the same fact in two
    dialects, and the raw value is the one nobody outside the model says. */
 const STATUS_WORD: Record<Policy['status'], string> = {
+  draft: 'Draft',
   active: 'Active',
   inactive: 'Inactive',
   monitor: 'Monitor',

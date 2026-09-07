@@ -35,7 +35,6 @@ export function NewPolicyDialog({
   seedName = '',
   fixedAppId,
   picked = null,
-  closeLabel = 'Back',
   onGuided,
 }: {
   open: boolean
@@ -46,8 +45,6 @@ export function NewPolicyDialog({
   /** The application, stated rather than asked. See `ApplicationFixed`. */
   fixedAppId?: string
   picked?: Scenario | null
-  /** "Back" where a step sits behind it, "Cancel" where none does. */
-  closeLabel?: string
   /* Absent in lite, and absent from an application row: the guided build is
      withheld there, and a button that opens nothing is worse than no button. */
   onGuided?: (appId: string | null) => void
@@ -95,16 +92,34 @@ export function NewPolicyDialog({
       width={picked ? 620 : 520}
       footer={
         <>
-          <p className="bnp__note">
-            {!name.trim()
-              ? 'Give the policy a name to continue.'
-              : noApp
-                ? 'Choose the application this policy protects.'
-                : 'Created switched off. Nothing changes for users until you turn it on.'}
-          </p>
+          {/* Only when it explains a control you cannot press.
 
+              The third state said "Created switched off. Nothing changes for
+              users until you turn it on." — true, and reassurance for a worry
+              nobody has while naming a thing. It sat in the footer of every
+              valid form, so the note was on screen almost always and the two
+              sentences that MATTER — the ones naming what is stopping the
+              button — were the exception rather than the point.
+
+              Nothing when the form is ready. The button is enabled; that is
+              the message. */}
+          {(!name.trim() || noApp) && (
+            <p className="bnp__note">
+              {!name.trim() ? 'Give the policy a name to continue.' : 'Choose the application this policy protects.'}
+            </p>
+          )}
+
+          {/* Cancel, from both callers.
+
+              It said "Back" from the gallery and "Cancel" from an application
+              row, on the argument that one has a step behind it and the other
+              does not. That is true and it is not what the button does: it
+              abandons a half-filled form either way, and "Back" reads as a
+              step in a sequence you can return forward through — which this is
+              not, because the dialog clears itself on open. One word, and the
+              prop that varied it is gone with the difference it was carrying. */}
           <Button variant="ghost" onClick={onClose}>
-            {closeLabel}
+            Cancel
           </Button>
 
           {/* Guided setup lives here rather than up on the gallery, because

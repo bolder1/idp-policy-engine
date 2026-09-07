@@ -236,7 +236,7 @@ export function Board({
   /* What the empty policy actually does today, named rather than described.
      `terminal` is resolved below for the card; this reads the same rule, so the
      sentence and the card cannot disagree about the outcome. */
-  const fallbackName = DECISION_NAME[(policy.fallback ?? fallbackRule()).decision].toLowerCase()
+  const fallbackName = DECISION_NAME[(policy.fallback ?? fallbackRule()).decision]
   if (drag && drag.over !== drag.from) {
     order.splice(drag.from, 1)
     order.splice(drag.over, 0, drag.from)
@@ -295,11 +295,10 @@ export function Board({
      already does `draft.fallback ?? fallbackRule()`, so the first real edit
      writes it and the bar wakes up then, which is the moment it should. */
   const terminal = policy.fallback ?? fallbackRule()
-  /* The `else` of a rule: the next rule that is on. Null means the default. */
-  const nextOf = (i: number) => {
-    const j = policy.rules.findIndex((r, k) => k > i && r.enabled)
-    return j === -1 ? null : { index: j, name: policy.rules[j].name }
-  }
+  /* `nextOf` has gone with the `else` row it fed. Which rule catches what this
+     one lets through is the LINE the chain already draws between the two
+     cards; computing it again so a card could print it inside itself was the
+     same fact told twice. */
 
   return (
     <div
@@ -341,10 +340,15 @@ export function Board({
               {/* The consequence, not a definition. Somebody looking at an
                   empty policy needs to know it is not inert — it is already
                   deciding sign-ins, with the default, and that is the thing a
-                  blank canvas hides. */}
+                  blank canvas hides.
+
+                  The decision keeps its capital: "falls through to let in" is
+                  a sentence with a verb where a noun belongs, and reads as a
+                  typo. "falls through to the default — Let in" names the thing
+                  the chain draws at the bottom, in the words the chain uses. */}
               <p>
-                Every sign-in to this application falls straight through to <strong>{fallbackName}</strong>. The policy
-                is running; it just has nothing of its own to say yet.
+                This policy is already running. Until you add a rule, every sign-in falls straight through to the
+                default — <strong>{fallbackName}</strong>.
               </p>
               <Button variant="brand" onClick={() => onInsert(0)}>
                 <Plus size={15} strokeWidth={2.2} aria-hidden />
@@ -401,7 +405,6 @@ export function Board({
                     <RuleCard
                       rule={r}
                       index={ri}
-                      next={nextOf(ri)}
                       /* One prop, not two. `selected` was a boolean the card
                          derived nothing from; `openPart` is null when this card
                          does not own the panel and the part when it does, so

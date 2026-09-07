@@ -174,25 +174,22 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
   )
 }
 
-export function ElseRow({ next, onJump }: { next: NextRule; onJump?: (i: number) => void }) {
-  return (
-    <>
-      <div className="bb__ifrow">
-        <IfKw>else</IfKw>
-      </div>
-      <IfSub>
-        <IfChip muted icon={<ArrowRight size={10} strokeWidth={2.2} />} onClick={next && onJump ? () => onJump(next.index) : undefined}>
-          {next ? `Rule ${next.index + 1} · ${next.name}` : 'Nothing else matched · the default'}
-        </IfChip>
-        <span className="bb__ifjourney">{next ? 'decides instead' : 'decides'}</span>
-      </IfSub>
-    </>
-  )
-}
+/* `ElseRow` stood here — the `else → Rule 3 · Executive step-up decides
+   instead` line at the foot of every card.
+
+   It is the arrow the chain draws BETWEEN two cards, printed again inside the
+   first of them. On a scrolling form that repetition earned its place; on a
+   canvas where the next card sits directly below and joined by a line, it is
+   the same fact told twice, in the half of the card with the least room for
+   it.
+
+   `NextRule` stays exported. `Board` still works out which rule follows which,
+   and the chain still draws it — that is the version of this fact that was
+   worth keeping. */
 
 /* --- The read-only block, for the card ------------------------------------- */
 
-export function IfBlock({ rule, next, resolve, token, terminal }: { rule: Rule; next: NextRule; resolve: NameLookup; token?: ReactNode; terminal?: boolean }) {
+export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolve: NameLookup; token?: ReactNode; terminal?: boolean }) {
   /* The who-conditions are drawn by the card's own `Who` button now, not here
      among the circumstances.
 
@@ -246,9 +243,33 @@ export function IfBlock({ rule, next, resolve, token, terminal }: { rule: Rule; 
       ]
     : []
 
+  /* Nothing is drawn until it has been ANSWERED.
+
+     A rule you had just added carried four rows and eleven words before you
+     touched it: `who everyone`, `if any sign-in reaches it`, `then Let in,
+     then verify · Password → Any enrolled method → Signed in`, and an `else`
+     naming the default. Every one of those was a DEFAULT reported as though it
+     were a decision — so the emptiest rule on the board was also the busiest
+     card on it, and the card whose whole job is to say what a rule does was
+     saying it loudest about the rule that does nothing.
+
+     They appear in the order a rule is written: who, then the circumstances,
+     and the outcome LAST, once there is something for it to be the outcome of.
+     A `then` above two blank rows answers a question nobody has asked yet. */
+  const hasWho = whoNames.length > 0
+  const hasIf = cards.length > 0
+  const configured = hasWho || hasIf
+
   return (
     <div className="bb__if">
-      {whoEditable(rule.when) && (
+      {!configured && (
+        /* One quiet line rather than a skeleton of the rule. The two doors that
+           fix it are on the panel, which this card opens. */
+        <div className="bb__ifrow">
+          <span className="bb__ifkw is-blank">Nothing set yet</span>
+        </div>
+      )}
+      {hasWho && (
         <div className="bb__ifrow is-cond bb__ifwho">
           <span className="bb__ifbranch" aria-hidden>
             <Users size={12} strokeWidth={2} />
@@ -262,15 +283,7 @@ export function IfBlock({ rule, next, resolve, token, terminal }: { rule: Rule; 
           <AvatarStack names={whoNames} />
         </div>
       )}
-      {cards.length === 0 ? (
-        <div className="bb__ifrow">
-          <span className="bb__ifbranch" aria-hidden>
-            <Split size={12} strokeWidth={2} />
-          </span>
-          <IfKw>if</IfKw>
-          <IfChip muted>any sign-in reaches it</IfChip>
-        </div>
-      ) : (
+      {hasIf && (
         cards.map((k, i) => {
           /* Read, not assumed.
 
@@ -321,8 +334,9 @@ export function IfBlock({ rule, next, resolve, token, terminal }: { rule: Rule; 
           )
         })
       )}
-      <ActionRow rule={rule} token={token} />
-      <ElseRow next={next} />
+      {/* The outcome, last, and only once there is something above it to be
+          the outcome OF. */}
+      {configured && <ActionRow rule={rule} token={token} />}
     </div>
   )
 }

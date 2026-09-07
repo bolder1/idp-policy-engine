@@ -199,11 +199,10 @@ function WhoPane({
   onOpenPart: (part: Part) => void
 }) {
   return (
+    /* No heading. The tab directly above says "Who", and a pane whose first
+       line repeats the control that opened it is the panel introducing itself
+       twice. */
     <div className="bb__ask bb__ask--pane">
-      <div className="bb__ask__head">
-        <h3>Who</h3>
-        <p>Which people is this rule about?</p>
-      </div>
       <WhoEditor rule={rule} audience={audience} onPatch={onPatch} onOpenPart={onOpenPart} />
     </div>
   )
@@ -221,8 +220,9 @@ function ConditionPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
   const n = restConditions(rule.when).length
   return (
     <div className="bb__ask bb__ask--pane">
+      {/* The head stays because the count and the `+` need somewhere to live;
+          the heading itself goes, for the same reason as the Who pane's. */}
       <div className="bb__ask__head">
-        <h3>Condition</h3>
         {n > 0 && <span className="bb__count">{n}</span>}
         <button
           type="button"
@@ -233,7 +233,6 @@ function ConditionPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
         >
           <Plus size={15} strokeWidth={2} />
         </button>
-        <p>And in what circumstances?</p>
       </div>
       <WhenEditor rule={rule} onPatch={onPatch} openAt={openAt} />
 

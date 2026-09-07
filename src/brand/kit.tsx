@@ -360,6 +360,16 @@ export function DecisionChip({
 
 export function StatusPill({ status }: { status: PolicyStatus }) {
   if (status === 'always-on') return <span className="bx-status bx-status--always">Always on</span>
+  /* Draft reads as unfinished rather than as off. An outline pill, because
+     every other status here is a state the policy IS and this one is a state
+     it has not reached — and no dot, since the dot is what the live statuses
+     use to say they are running. */
+  if (status === 'draft')
+    return (
+      <span className="bx-status bx-status--draft" title="Not published yet. It has never decided a sign-in.">
+        Draft
+      </span>
+    )
   /* Monitor gets its own pill rather than a variant of Active, because the two
      differ in the only way that matters — one refuses sign-ins and one does
      not. Notice tone, never positive: a monitor policy looking like a live one

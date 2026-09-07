@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { apps, coversEveryApp, policies, type Policy, type Rule } from '../data'
+import { apps, blankPolicy, coversEveryApp, policies, type Policy, type Rule } from '../data'
 import { appsAt, policiesAt, type Depth } from '../fixtures'
 import {
   NO_APP_ISSUE,
@@ -98,6 +98,32 @@ describe('protectionOf', () => {
     expect(got.own).toEqual([])
     expect(got.decides).toEqual([])
     expect(got.fallback?.id).toBe('global-default')
+  })
+})
+
+describe('a draft', () => {
+  it('decides nothing, however many enabled rules it has', () => {
+    /* It gets this from `enforces`, which names the statuses that DO act — so
+       a status that does not act needs no entry anywhere. This pins that the
+       free behaviour is the right behaviour. */
+    expect(decidesFor(policy({ status: 'draft', rules: [ruleOf(true), ruleOf(true)] }))).toBe(false)
+  })
+
+  it('is reported as unpublished, not as switched off', () => {
+    // Telling somebody they switched off a thing they never published is the
+    // kind of small lie that costs a screen its credibility.
+    expect(whyNotDeciding(policy({ status: 'draft' }))).toBe('Still a draft — it has never decided a sign-in.')
+    expect(whyNotDeciding(policy({ status: 'inactive' }))).toBe('Switched off — skipped.')
+  })
+
+  it('is what a new policy starts as', () => {
+    expect(blankPolicy('New one', 'workday').status).toBe('draft')
+  })
+
+  it('takes no precedence number, and does not push the ones below it down', () => {
+    expect(orderOf([policy({ status: 'draft' }), policy(), policy({ status: 'draft' }), policy()])).toEqual([
+      null, 1, null, 2,
+    ])
   })
 })
 

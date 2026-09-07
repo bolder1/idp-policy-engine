@@ -5,9 +5,8 @@ import { BookmarkPlus, Copy, Pencil, Trash2, Waypoints } from 'lucide-react'
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
 import { AppLogo } from '../logos/AppLogo'
-import { Badge, Button, DecisionChip, InfoDot, StatusPill } from '../kit'
+import { Badge, Button, InfoDot, StatusPill } from '../kit'
 import { enforces, type Policy, type PolicyType } from '../data'
-import { Peek } from './peek'
 import { useBrand } from '../store'
 import { NoResults } from '../empty'
 import { runGauntlet, type GauntletResult } from './gauntlet'
@@ -66,32 +65,13 @@ function exposureOf(r: GauntletResult) {
    -------------------------------------------------------------------------- */
 
 
-/* The rule stack, behind the count. `Peek` carries the hover, the portal and
-   the measured placement — see peek.tsx, where it moved when zones and device
-   profiles needed the same thing for their "Used by" column. */
-function RulePeek({ policy }: { policy: Policy }) {
-  return (
-    <Peek label={`${policy.rules.length} rule${policy.rules.length === 1 ? '' : 's'}`}>
-      <p className="brpk__head">Evaluated top to bottom · first match wins</p>
-      <ol className="brpk__stack">
-        {policy.rules.map((r, i) => (
-          <li key={r.id} className={`brpk__row ${r.enabled ? '' : 'is-off'}`}>
-            <span className="brpk__n">{i + 1}</span>
-            <span className="brpk__name">{r.name}</span>
-            <DecisionChip decision={r.decision} size="sm" />
-          </li>
-        ))}
-        <li className="brpk__row brpk__row--default">
-          <span className="brpk__n" aria-hidden>
-            ⌄
-          </span>
-          <span className="brpk__name">Everyone else</span>
-          <DecisionChip decision="1fa" size="sm" />
-        </li>
-      </ol>
-    </Peek>
-  )
-}
+/* `RulePeek` stood here — the rules count with the stack behind it on hover.
+
+   The column it filled is gone: Type, Rules and Last modified came off this
+   table, which leaves the name, the application it protects, whether it is on
+   and what it is exposed to. `Peek` itself stays in peek.tsx, where zones and
+   device profiles use it for their own Used-by columns. */
+
 
 const TYPE_FILTERS: (PolicyType | 'All')[] = ['All', 'App Access', 'Session', 'Account Management']
 
@@ -296,6 +276,7 @@ export function Policies() {
             className={`btoolbar__select ${status !== 'all' ? 'is-set' : ''}`}
           >
             <option value="all">All statuses</option>
+            <option value="draft">Draft</option>
             <option value="active">Active</option>
             <option value="monitor">Monitor</option>
             <option value="inactive">Inactive</option>
@@ -333,12 +314,12 @@ export function Policies() {
           <thead>
             <tr>
               {head('name', 'Policy name')}
-              {head('type', 'Type')}
+
               <th>Application</th>
-              {head('rules', 'Rules')}
+
               {store.features.exposure && head('exposure', 'Exposure')}
               <th>Status</th>
-              <th>Last modified</th>
+
               <th className="btable__right">Actions</th>
             </tr>
           </thead>
@@ -420,9 +401,6 @@ function PolicyRow({
           {policy.configIssue && <InfoDot text={policy.configIssue} />}
         </span>
       </td>
-      <td>
-        <Badge tone="info">{policy.type}</Badge>
-      </td>
       {/* The application, named. A stack of three marks and "3 apps" was the
           right cell for a policy that covered three; a policy covers one, so
           the cell says which one. */}
@@ -436,13 +414,6 @@ function PolicyRow({
           </span>
         ) : (
           <span className="applogo__none">Not assigned</span>
-        )}
-      </td>
-      <td>
-        {policy.rules.length === 0 ? (
-          <span className="u-muted">No rules</span>
-        ) : (
-          <RulePeek policy={policy} />
         )}
       </td>
       {/* The Exposure column is the grade in the list. Withheld in lite, so
@@ -482,7 +453,6 @@ function PolicyRow({
       <td>
         <StatusPill status={policy.status} />
       </td>
-      <td className="u-muted">{policy.lastModified}</td>
       <td className="btable__right">
         <div className="btable__menuwrap">
           <button type="button" className="btable__kebab" onClick={onMenu} aria-label={`Actions for ${policy.name}`} aria-expanded={menuOpen}>

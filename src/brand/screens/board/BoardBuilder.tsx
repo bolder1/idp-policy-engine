@@ -501,11 +501,29 @@ export function BoardBuilder({ policyId, openSheet }: { policyId: string; openSh
   const duplicate = (i: number) => insert(reidRule({ ...draft.rules[i], name: `${draft.rules[i].name} (copy)` }), i + 1)
 
   const publish = () => {
-    const next = { ...draft, lastModified: 'Just now', modifiedBy: 'You' }
-    store.savePolicy(draft)
+    /* Publishing is what ends a draft.
+
+       A draft that stayed a draft through its own publish step would make the
+       status decorative — the one transition the word implies is the one thing
+       it could not do. It becomes `inactive`: a real, published policy that is
+       switched off, which is the promise the create flow has always made and
+       the only landing that cannot start refusing sign-ins without being asked.
+
+       Any other status publishes unchanged. Republishing an active policy must
+       not quietly park it. */
+    const status = draft.status === 'draft' ? 'inactive' : draft.status
+    const next = { ...draft, status, lastModified: 'Just now', modifiedBy: 'You' }
+    /* `next`, not `draft`. This saved the pre-stamp object while seeding the
+       history from the stamped one, so the store and the undo stack disagreed
+       about the record by two fields from the moment it was published. */
+    store.savePolicy(next)
     setHist(historyOf(next))
     setReview(false)
-    store.showToast(`${draft.name} published`)
+    store.showToast(
+      draft.status === 'draft'
+        ? `${draft.name} published — switched off until you turn it on`
+        : `${draft.name} published`,
+    )
   }
   const discard = () => {
     setHist(historyOf(saved))

@@ -371,6 +371,10 @@ html[data-theme='dark'] {
 .bx-status--active { color: var(--text-body); }
 .bx-status--active i { background: var(--fb-positive-dot); }
 /* Inactive is a lifecycle state, not a failure — neutral, never red. */
+.bx-status--draft {
+  border: var(--bw-thin) dashed var(--border-strong);
+  color: var(--text-tertiary); background: none;
+}
 .bx-status--inactive { color: var(--text-tertiary); }
 .bx-status--inactive i { background: var(--fb-neutral-dot); }
 .bx-status--always {

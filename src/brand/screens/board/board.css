@@ -95,21 +95,42 @@
    Sized like a card rather than like a page, because it stands where a card
    will stand: press the button and the chain replaces it in the same place. */
 .bb__blank {
-  width: 420px;
-  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4);
-  padding: var(--space-7);
+  width: 460px;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: var(--space-9) var(--space-8) var(--space-8);
   background: var(--surface-raised);
+  /* Dashed, still: it stands exactly where the first card will stand, and a
+     dashed edge is how every canvas says "something goes here". Solid would
+     make it look like a card somebody had already made. */
   border: 1px dashed var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--el-low);
 }
+
+/* A round mark rather than a rounded square, and tinted rather than grey.
+
+   The squares on this surface are all cards and controls; a circle is the one
+   shape here that is plainly not either, which is what an illustration wants to
+   be. The brand tint is the only colour in the panel, so it is where the eye
+   lands first and the button is where it lands second. */
 .bb__blank__mark {
   display: grid; place-items: center;
-  width: 38px; height: 38px; border-radius: var(--radius-md);
-  background: var(--surface-sunken); color: var(--text-tertiary);
+  width: 46px; height: 46px; border-radius: 50%;
+  margin-bottom: var(--space-5);
+  background: var(--brand-subtle-bg); color: var(--brand-active);
 }
-.bb__blank h2 { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bb__blank p { margin: 0; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.6; }
-.bb__blank p strong { font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bb__blank h2 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+/* Capped in CHARACTERS, not pixels: a centred paragraph is readable to about
+   forty-five and ragged past it, whatever the panel is wide. */
+.bb__blank p {
+  margin: 0 0 var(--space-6);
+  max-width: 42ch;
+  font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.65;
+}
+.bb__blank p strong { font-weight: var(--fw-semibold); color: var(--text-secondary); }
 
 .bb__chain { display: flex; flex-direction: column; align-items: stretch; width: var(--bb-card); }
 
@@ -2157,9 +2178,13 @@ button.bb__idx::after {
 
 /* --- What is chosen, as faces ------------------------------------------------ */
 
+/* Under the lists, not above them — it is the ANSWER they build, and it was
+   sitting between two switchers as a third thing to get past. */
 .bb__whochosen {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
   min-height: 30px;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
 }
 .bb__whochosen.is-empty { color: var(--text-tertiary); gap: var(--space-3); }
 .bb__whochosen.is-empty b { font-size: var(--fs-md); font-weight: var(--fw-regular); }
@@ -2227,24 +2252,36 @@ button.bb__idx::after {
 
 /* --- The two lists, one at a time -------------------------------------------- */
 
-.bb__whotabs {
-  display: flex; align-items: center; gap: var(--space-2);
-  border-bottom: 1px solid var(--border-subtle);
+/* A segmented control, not a second row of tabs.
+
+   This was an underlined tab strip sitting directly beneath the panel's own
+   underlined tab strip — two identical switchers back to back, with nothing
+   saying which moved you between FORMS and which moved you within one. The
+   panel's strip changes the subject; this changes a filter inside it, and a
+   segmented control is what that means everywhere else in this kit. */
+.bb__whopick {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 2px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
 }
-.bb__whotabs > button {
+.bb__whopick > button {
   display: inline-flex; align-items: center; gap: 6px;
-  height: 30px; padding: 0 var(--space-3);
-  border: none; background: none;
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  height: 26px; padding: 0 var(--space-4);
+  border: none; border-radius: var(--radius-sm); background: none;
   font-family: inherit; font-size: var(--fs-md); color: var(--text-tertiary);
   cursor: pointer;
 }
-.bb__whotabs > button:hover { color: var(--text-primary); }
-.bb__whotabs > button.is-on { color: var(--text-primary); border-bottom-color: var(--brand); }
-.bb__whotabs > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
-.bb__whotabs > button svg { opacity: 0.75; }
-/* The count on the tab, so the closed list still says how much is in it. */
-.bb__whotabs > button b {
+.bb__whopick > button:hover { color: var(--text-primary); }
+.bb__whopick > button.is-on {
+  background: var(--surface-raised); color: var(--text-primary);
+  box-shadow: var(--el-low);
+}
+.bb__whopick > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__whopick > button svg { opacity: 0.75; }
+/* The count rides on the control, so the list you are not looking at still
+   says how much is in it. */
+.bb__whopick > button b {
   min-width: 16px; padding: 0 4px; border-radius: var(--radius-pill);
   background: var(--brand-subtle-bg); color: var(--brand-active);
   font-size: 10px; font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums;

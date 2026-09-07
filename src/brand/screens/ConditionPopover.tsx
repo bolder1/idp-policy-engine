@@ -136,11 +136,22 @@ export function ConditionPopover({
   onRemove: () => void
   footer?: string
   onFooter?: () => void
-  /** A row that was just added: start it at the first decision. */
+  /** A row that was just added: start it at the first UNANSWERED decision. */
   autoOpen?: boolean
 }) {
   const t = conditionType(c.typeId)
-  const [open, setOpen] = useState<Part | null>(autoOpen ? 'what' : null)
+  /* `'op'`, not `'what'`.
+
+     A row is only ever added by choosing an attribute in the catalogue dialog —
+     that is the whole content of that dialog — so a fresh condition arrives
+     with its attribute already decided. Opening the attribute menu on top of it
+     asked the same question twice, and answered by the same dialog the person
+     had just closed.
+
+     The first UNANSWERED decision is the operator, so that is where it lands,
+     and picking one carries on to the values. Nothing else opens by itself:
+     this is the one moment the next step is certain. */
+  const [open, setOpen] = useState<Part | null>(autoOpen ? 'op' : null)
   const values = c.values.filter(Boolean)
 
   const whatRef = useRef<HTMLButtonElement | null>(null)

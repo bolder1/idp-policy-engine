@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { ChevronDown, Fingerprint, Globe, Plus, Split, UserRound, Users, Webhook, X } from 'lucide-react'
+import { ArrowUpToLine, ChevronDown, Fingerprint, Globe, Plus, Split, UserRound, Users, Webhook, X } from 'lucide-react'
 
 import { modeLabel } from '../../fingerprint'
 import { cardJoin, cardLetter, ckey, duplicatedAcrossCards, topJoin } from '../../predicate'
@@ -141,6 +141,45 @@ export function WhenEditor({
         ) : (
           cards.map((k, i) => (
             <Fragment key={k.id}>
+              {/* The joiner, on the seam it governs.
+
+                  It sat in the footer, in a row with "Add condition" and "Add
+                  group" — three dissimilar things wearing one dashed outline,
+                  where the two that ADD something sat beside one that changes
+                  how the whole rule reads. Nothing about that row said which of
+                  the three would restructure the rule.
+
+                  So it moves to where the alternatives actually meet. `join` is
+                  still ONE value for the whole predicate and this is still one
+                  setting: every seam shows the same word, pressing any seam
+                  flips all of them, and the label says so rather than leaving
+                  it to be discovered by pressing one and watching the others
+                  change.
+
+                  That is the correction to the version this replaces — a pill
+                  at the HEAD of each alternative, which sat directly above each
+                  run's own joiner so the block appeared to hold six operators
+                  where the model holds two. On a seam BETWEEN two frames it is
+                  nowhere near the AND column, and the two levels stop being
+                  confusable by adjacency. */}
+              {i > 0 && (
+                <div className="bb__iftrunk">
+                  <button
+                    type="button"
+                    className={`bb__trunksel is-${topJoin(rule.when)}`}
+                    aria-label={`Alternatives are joined by ${topJoin(rule.when).toUpperCase()} — one setting for the whole rule. Switch to ${topJoin(rule.when) === 'or' ? 'AND' : 'OR'}.`}
+                    title={
+                      topJoin(rule.when) === 'or'
+                        ? 'Any one alternative is enough. One setting for every seam — click for AND.'
+                        : 'Every alternative must match. One setting for every seam — click for OR.'
+                    }
+                    onClick={flipTopJoin}
+                  >
+                    <b>{topJoin(rule.when)}</b>
+                    <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
+                  </button>
+                </div>
+              )}
               {/* The operator between two runs is IN the first row of the
                   second one, not on a band of its own.
 
@@ -241,32 +280,54 @@ export function WhenEditor({
 
                 {k.grouped && (
                 <div className="bb__ifgroupfoot">
+                  {/* Adding on the left, restructuring on the right, and the
+                      two no longer look alike.
+
+                      "Merge up" wore the same dashed outline as "Add
+                      condition" — one adds a row, the other folds this whole
+                      group into the one above it and deletes the bracket, and
+                      they were a centimetre apart in the same clothes. The
+                      remove `×` then sat alone at the far edge on `margin-left:
+                      auto`, an unlabelled icon with nothing near it.
+
+                      Now the dashed outline means exactly one thing on this
+                      surface — something is about to be added — and the two
+                      controls that RESTRUCTURE are quiet, labelled, and
+                      clustered together at the other end where a group's own
+                      housekeeping belongs. */}
                   <button type="button" className="bb__ifadd" onClick={openCatalogue(k.id)}>
                     <Plus size={11} strokeWidth={2.4} aria-hidden />
                     Add condition
                   </button>
-                  {/* Only once there is more than one group. Ungrouped, this
-                      would delete every condition on the rule from a control
-                      sitting beside "Add condition". */}
-                  {i > 0 && k.conditions.length > 0 && (
+                  <span className="bb__ifgroupacts">
+                    {/* Only once there is more than one group. Ungrouped, this
+                        would delete every condition on the rule from a control
+                        sitting beside "Add condition". */}
+                    {i > 0 && k.conditions.length > 0 && (
+                      <button
+                        type="button"
+                        className="bb__ifutil"
+                        title="Fold these conditions into the group above"
+                        onClick={() => mergeUp(i)}
+                      >
+                        <ArrowUpToLine size={11} strokeWidth={2.2} aria-hidden />
+                        Merge up
+                      </button>
+                    )}
+                    {/* Labelled now. It was a bare glyph, which is the one
+                        control here that cannot be undone by pressing it
+                        again. */}
                     <button
                       type="button"
-                      className="bb__ifadd"
-                      title="Fold these conditions into the group above"
-                      onClick={() => mergeUp(i)}
+                      className="bb__ifutil is-danger"
+                      aria-label={`Remove group ${cardLetter(i)}`}
+                      title="Remove this group and the conditions in it"
+                      onClick={() => removeGroup(k.id)}
                     >
-                      Merge up
+                      <X size={11} strokeWidth={2.2} aria-hidden />
+                      Remove
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="bb__ifdrop"
-                    aria-label={`Remove group ${cardLetter(i)}`}
-                    title="Remove this group"
-                    onClick={() => removeGroup(k.id)}
-                  >
-                    <X size={11} strokeWidth={2.2} aria-hidden />
-                  </button>
+                  </span>
                 </div>
                 )}
               </div>
@@ -289,33 +350,12 @@ export function WhenEditor({
               <Plus size={11} strokeWidth={2.4} aria-hidden />
               Add group
             </button>
-            {/* The joiner BETWEEN alternatives: one setting, one control, said
-                once at the foot of the block.
-
-                It has been three things and each was the same mistake in a
-                different place — a word you could not press, a full-width
-                divider on a line of its own, then a pill at the head of every
-                alternative. The last is the one worth naming: `when.join` is a
-                single value for the whole predicate, so drawing it once per
-                group showed one setting as three controls, stacked directly
-                above the run joiners and reading as six operators where the
-                model has two.
-
-                Here it names what it governs and appears only when there is
-                more than one alternative to join. */}
-            {cards.length > 1 && (
-              <button
-                type="button"
-                className={`bb__trunksel is-${topJoin(rule.when)}`}
-                aria-label={`The alternatives are joined by ${topJoin(rule.when).toUpperCase()}. Switch to ${topJoin(rule.when) === 'or' ? 'AND' : 'OR'}.`}
-                title={topJoin(rule.when) === 'or' ? 'Any one alternative is enough. Click for AND.' : 'Every alternative must match. Click for OR.'}
-                onClick={flipTopJoin}
-              >
-                Alternatives joined by
-                <b>{topJoin(rule.when)}</b>
-                <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
-              </button>
-            )}
+            {/* The joiner used to sit here as a third button. It governs how
+                the rule READS rather than adding anything to it, so it has
+                moved to the seams between the alternatives it joins — see the
+                note above `.bb__iftrunk`. What is left in this row is the two
+                controls that add, which is now the only thing a dashed outline
+                means on this surface. */}
           </div>
         )}
       </div>

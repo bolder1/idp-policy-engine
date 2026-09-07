@@ -1523,25 +1523,48 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    The run joiner lives in the joiner column, once per run. The trunk joiner
    lives once, in the foot, and says what it governs — see `.bb__trunksel`. */
 
-/* The one control for how the alternatives are joined. Worded rather than
-   lettered, because at the foot of the block there is no adjacent condition to
-   make a bare "OR" mean anything. */
+/* The joiner, on the seam between two alternatives.
+
+   It lived at the foot of the block in a row with the two add buttons, all
+   three wearing one dashed outline — so the control that changes how the whole
+   rule READS was dressed as a third way to add something. On the seam it is
+   beside the thing it governs and nowhere near the AND column inside the
+   frames, which is what the head-of-each-alternative version got wrong.
+
+   One value, every seam. Each button shows and sets the same `join`, and its
+   label says so, which is the honest version of "one setting as N controls":
+   the repetition is a READING of the predicate and the control is the same
+   control wherever you press it. */
+.bb__iftrunk {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin: 3px 0;
+}
+/* The rules either side make it a seam rather than a chip floating in a gap —
+   it is a JOIN, and a join is drawn as the thing between two things. */
+.bb__iftrunk::before,
+.bb__iftrunk::after {
+  content: ''; flex: 1; height: 1px; background: var(--border-subtle);
+}
+
 .bb__trunksel {
-  display: inline-flex; align-items: center; gap: 5px;
-  height: 26px; padding: 0 7px 0 9px;
-  border: 1px dashed var(--border-default); border-radius: var(--radius-sm);
-  background: none;
+  flex: none;
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 22px; padding: 0 6px 0 8px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-pill);
+  background: var(--surface-raised);
   font-family: inherit; font-size: 11px; color: var(--text-secondary);
   cursor: pointer;
   transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
 }
 .bb__trunksel b {
-  font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: 0.03em;
+  font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: 0.04em;
 }
-.bb__trunksel svg { opacity: 0.6; }
-.bb__trunksel.is-or { color: var(--fb-notice-fg); border-color: var(--fb-notice-border); }
-.bb__trunksel.is-and { color: var(--fb-info-fg); border-color: var(--fb-info-border); }
-.bb__trunksel:hover { border-style: solid; background: var(--surface-sunken); }
+.bb__trunksel svg { opacity: 0.55; }
+/* Solid rather than dashed now. Dashed means "this will add something" on this
+   surface and nothing else, which is the whole point of the separation. */
+.bb__trunksel.is-or { color: var(--fb-notice-fg); border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.bb__trunksel.is-and { color: var(--fb-info-fg); border-color: var(--fb-info-border); background: var(--fb-info-bg); }
+.bb__trunksel:hover { border-color: currentColor; }
 .bb__trunksel:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
 /* A frame means a group, and a group is something the author made.
@@ -1565,13 +1588,40 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 }
 .bb__ifgroup + .bb__ifgroup { margin-top: 0; }
 
-.bb__ifgroupfoot { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
-/* Quiet, and inside the frame. It adds to THIS group, and a button that adds to
-   a container reads wrong anywhere but inside it. */
+.bb__ifgroupfoot { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+/* Housekeeping, gathered at the far end.
+
+   The remove `×` used to carry `margin-left: auto` on its own, which left it
+   orphaned at the edge with nothing beside it while "Merge up" sat back with
+   the adder wearing the adder's clothes. The cluster carries the margin now, so
+   the two controls that restructure this group travel together and the gap
+   between them and "Add condition" is what says they are a different kind of
+   thing. */
+.bb__ifgroupacts { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; }
+
+/* Quiet, labelled, and never dashed — these change what is already here. */
+.bb__ifutil {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 22px; padding: 0 7px;
+  border: none; border-radius: var(--radius-sm); background: none;
+  font-family: inherit; font-size: 11px; color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bb__ifutil svg { flex: none; opacity: 0.8; }
+.bb__ifutil:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bb__ifutil:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__ifutil.is-danger:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+
+/* Dashed means one thing on this surface: something is about to be added.
+
+   It used to mean that AND "merge these two groups" AND "change how the whole
+   rule reads", because three unrelated controls shared the outline. The other
+   two have their own clothes now. */
 .bb__ifadd,
 .bb__ifaddgroup {
   display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 9px; border-radius: var(--radius-sm);
+  height: 24px; padding: 0 9px; border-radius: var(--radius-sm);
   border: 1px dashed var(--border-default); background: none; cursor: pointer;
   font-size: 11px; font-weight: var(--fw-medium); color: var(--text-secondary);
   transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
@@ -1584,14 +1634,10 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifaddgroup { margin-top: 6px; align-self: start; }
 .bb__ifaddgroup:hover { border-style: solid; border-color: var(--fb-accent-fg); background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
 
-.bb__ifdrop {
-  margin-left: auto; flex: none;
-  display: grid; place-items: center; width: 22px; height: 22px;
-  border: none; border-radius: var(--radius-sm); background: none;
-  color: var(--text-tertiary); cursor: pointer;
-}
-.bb__ifdrop:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bb__ifdrop:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+/* `.bb__ifdrop` has gone. It was the group's bare-glyph remove button, stranded
+   at the far edge by its own `margin-left: auto`; it is a labelled
+   `.bb__ifutil.is-danger` inside `.bb__ifgroupacts` now, beside the other
+   control that restructures the group. */
 
 /* --- The divider you can drag ------------------------------------------------
 

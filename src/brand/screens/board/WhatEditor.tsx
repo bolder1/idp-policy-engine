@@ -3,6 +3,7 @@ import { AlertTriangle, Check, Plus, ShieldAlert, Sparkles, UserCheck, X, XCircl
 
 import { Toggle } from '../../kit'
 import { Picker } from '../../picker'
+import { restConditions, whoIds } from '../../audience-ops'
 import type { AccessDecision, Rule } from '../../data'
 import { METHODS } from '../rule-form'
 import { Prop } from './Section'
@@ -107,11 +108,38 @@ export function WhatEditor({
      point of the merge, and it is why this is not simply `rule.decision`. */
   const active: string = allowed ? '1fa' : 'deny'
 
+  /* A rule nobody has answered shows no tile lit.
+
+     `blankRule` mints `decision: '2fa'`, so a rule you had just added opened
+     with Allow already chosen and a two-step ladder already built — an answer
+     presented as yours before you had given one, on the question that decides
+     whether a sign-in gets through.
+
+     PRISTINE, not merely untouched: no who, no conditions, and still holding
+     the exact decision `blankRule` writes. A rule that genuinely is
+     `2fa`-with-nothing-else is indistinguishable from a new one, and lighting
+     Allow for it is correct — it IS what that rule says.
+
+     Local, and remounted per rule by the pane's key, so it is a fact about
+     this visit rather than something stored. The moment a tile is pressed the
+     selection appears and stays: `answered` only ever goes one way.
+
+     The model is untouched, which is the trade this makes. A pristine rule
+     still HOLDS `2fa`, so if it is given a who or a condition without an
+     outcome ever being chosen, the card will read "Let in, then verify" while
+     these tiles show nothing. The card draws no outcome at all until something
+     else is set, so the window where the two disagree is narrow — but it is
+     real, and the honest fix is an optional `decision`, which is a change to
+     what a rule IS. */
+  const [answered, setAnswered] = useState(
+    () => rule.decision !== '2fa' || whoIds(rule.when, 'group').length > 0 || whoIds(rule.when, 'user').length > 0 || restConditions(rule.when).length > 0,
+  )
+
   return (
     <div>
       <div className="bb__decide" role="radiogroup" aria-label="What happens when this rule matches">
         {TILES.map((t, i) => {
-          const on = t.id === active
+          const on = answered && t.id === active
           const Ico = t.icon
           const soon = t.id === 'soon'
           return (
@@ -122,10 +150,16 @@ export function WhatEditor({
               aria-checked={on}
               aria-disabled={soon || undefined}
               disabled={soon}
-              tabIndex={on ? 0 : -1}
+              /* With nothing lit the roving tabindex has no home, so the
+                 first tile takes it — otherwise the whole group drops out of
+                 the tab order exactly when it most needs to be reachable. */
+              tabIndex={on || (!answered && i === 0) ? 0 : -1}
               className={`is-${t.tone} ${on ? 'is-on' : ''}`}
               title={t.hint}
-              onClick={() => pick(t.id)}
+              onClick={() => {
+                setAnswered(true)
+                pick(t.id)
+              }}
               onKeyDown={(e) => {
                 const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
                 if (!d) return

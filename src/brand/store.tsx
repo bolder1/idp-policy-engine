@@ -44,13 +44,17 @@ export type BrandScreen =
      gauntlet for that policy, instead of in a builder where you still have to
      find the button. */
   | { name: 'builder'; policyId: string; open?: 'gauntlet' | 'impact' }
-  /* Builder v2 — the board. The same policy, store and evaluator under a
-     different shape: a chain of cards on a stage, an inspector beside it.
-     See docs/builder-board.md.
+  /* Builder v2 — the board, and the one a policy opens in. The same policy,
+     store and evaluator under a different shape: a chain of cards on a stage,
+     an inspector beside it. See docs/builder-board.md.
 
-     No `open` here. It named an inspector tab, and the inspector has no tabs
-     any more — it is one pane, showing whatever is selected on the board. */
-  | { name: 'board'; policyId: string }
+     `open` is back, and it is not the field the trail has. On the trail it
+     named an INSPECTOR TAB; here it names a SHEET — the check and impact
+     panels that slide up over the stage. Same word, same two values, same
+     purpose: a caller that knows why you are coming can land you on the
+     answer rather than near it. The policy list says "this one has four
+     holes"; it should not then make you go and find the gauntlet. */
+  | { name: 'board'; policyId: string; open?: 'gauntlet' | 'impact' }
   /* The policy's own three facts — name, applications, audience — on one page.
 
      They used to be scattered across a top-bar input, a dialog and a card at

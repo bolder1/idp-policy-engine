@@ -80,7 +80,7 @@ function Screen() {
     case 'builder':
       return <BuilderPage policyId={screen.policyId} open={screen.open} />
     case 'board':
-      return <BoardPage policyId={screen.policyId} />
+      return <BoardPage policyId={screen.policyId} open={screen.open} />
     case 'policy-details':
       return <PolicyDetails policyId={screen.policyId} from={screen.from} />
     case 'templates':

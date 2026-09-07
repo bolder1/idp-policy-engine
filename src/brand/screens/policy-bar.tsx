@@ -161,19 +161,15 @@ export function PolicyBar({ policy }: { policy: Policy }) {
       </dl>
 
       <div className="bpbar__acts">
-        {/* Two builders over one policy — the trail and the board. The switch
+        {/* Two builders over one policy — the board and the trail. The switch
             lives on this bar because the bar is the one thing both share, and
             a layout choice belongs beside the policy rather than inside either
-            layout's own toolbar. */}
+            layout's own toolbar.
+
+            Board first, because it is where a policy opens from everywhere
+            now. The order of a two-way switch is a claim about which one is
+            the default, and it was making the wrong one. */}
         <div className="bpbar__view" role="group" aria-label="Builder layout">
-          <button
-            type="button"
-            className={store.screen.name === 'builder' ? 'is-on' : ''}
-            aria-pressed={store.screen.name === 'builder'}
-            onClick={() => store.go({ name: 'builder', policyId: policy.id })}
-          >
-            Trail
-          </button>
           <button
             type="button"
             className={store.screen.name === 'board' ? 'is-on' : ''}
@@ -181,6 +177,14 @@ export function PolicyBar({ policy }: { policy: Policy }) {
             onClick={() => store.go({ name: 'board', policyId: policy.id })}
           >
             Board
+          </button>
+          <button
+            type="button"
+            className={store.screen.name === 'builder' ? 'is-on' : ''}
+            aria-pressed={store.screen.name === 'builder'}
+            onClick={() => store.go({ name: 'builder', policyId: policy.id })}
+          >
+            Trail
           </button>
         </div>
 

@@ -216,7 +216,7 @@ export function AppProtection({
                   policy={p}
                   n={numbers[i]}
                   fresh={flash === p.id || justAdded === p.id}
-                  onOpen={() => store.go({ name: 'builder', policyId: p.id })}
+                  onOpen={() => store.go({ name: 'board', policyId: p.id })}
                   onRemove={() => setRemoving(p)}
                 />
               ))}

@@ -47,7 +47,7 @@ export function UsedByList({ users }: { users: PolicyUse[] }) {
           <button
             type="button"
             className="buse__open"
-            onClick={() => store.go({ name: 'builder', policyId: u.policy.id })}
+            onClick={() => store.go({ name: 'board', policyId: u.policy.id })}
             title={`Open ${u.policy.name}`}
           >
             <strong>{u.policy.name}</strong>

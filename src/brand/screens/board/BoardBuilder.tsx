@@ -53,7 +53,7 @@ const SHORTCUTS: [string, string][] = [
    render for a tenant that has overruled nothing. */
 const NO_OVERRIDES: Record<string, never> = {}
 
-export function BoardBuilder({ policyId }: { policyId: string }) {
+export function BoardBuilder({ policyId, openSheet }: { policyId: string; openSheet?: Tab }) {
   const store = useBrand()
   const { registerLeaveGuard } = store
   /* The edition, which this surface ignored entirely.
@@ -73,7 +73,13 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
   const [review, setReview] = useState(false)
   const [cmd, setCmd] = useState(false)
   const [keys, setKeys] = useState(false)
-  const [sheet, setSheet] = useState<Tab | null>(null)
+  /* Seeded from the route, not forced by it.
+
+     A caller that knows why you are coming — "this policy has four holes" —
+     lands you on the answer. `useState`'s initialiser rather than an effect,
+     so it opens with the first paint and closing it does not fight a prop that
+     is still set: after that the sheet is yours. */
+  const [sheet, setSheet] = useState<Tab | null>(openSheet ?? null)
   const [inspOpen, setInspOpen] = useState(true)
   /* The inspector's width, dragged rather than fixed.
 

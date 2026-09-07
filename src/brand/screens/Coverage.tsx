@@ -121,7 +121,7 @@ export function Coverage() {
   const cellAt = (r: number, c: number) => (flipped ? grid.rows[c].cells[r] : grid.rows[r].cells[c])
 
   function open(cell: Cell | null) {
-    if (cell) store.go({ name: 'builder', policyId: cell.policy.id })
+    if (cell) store.go({ name: 'board', policyId: cell.policy.id })
     else store.go({ name: 'create' })
   }
 

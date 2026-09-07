@@ -85,6 +85,32 @@
 
 /* --- The chain ------------------------------------------------------------- */
 
+/* The empty policy: a beginning, not a diagram of nothing.
+
+   The chain drew its full apparatus for a policy with no rules — arrival node,
+   connector, locked default — three pieces of machinery to say "a sign-in
+   arrives and nothing happens to it". The one action available was a 12px `+`
+   on a connector between two cards nobody put there.
+
+   Sized like a card rather than like a page, because it stands where a card
+   will stand: press the button and the chain replaces it in the same place. */
+.bb__blank {
+  width: 420px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4);
+  padding: var(--space-7);
+  background: var(--surface-raised);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+}
+.bb__blank__mark {
+  display: grid; place-items: center;
+  width: 38px; height: 38px; border-radius: var(--radius-md);
+  background: var(--surface-sunken); color: var(--text-tertiary);
+}
+.bb__blank h2 { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bb__blank p { margin: 0; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.6; }
+.bb__blank p strong { font-weight: var(--fw-medium); color: var(--text-secondary); }
+
 .bb__chain { display: flex; flex-direction: column; align-items: stretch; width: var(--bb-card); }
 
 /* The start node. A sign-in arrives here; everything below decides it. */

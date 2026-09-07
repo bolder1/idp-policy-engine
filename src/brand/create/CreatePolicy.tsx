@@ -91,7 +91,7 @@ export function CreatePolicy() {
         ? `${policy.name} created with ${policy.rules.length} rule${policy.rules.length === 1 ? '' : 's'}`
         : `${policy.name} created`,
     )
-    store.go({ name: 'builder', policyId: policy.id })
+    store.go({ name: 'board', policyId: policy.id })
   }
 
   return (
@@ -183,7 +183,7 @@ export function CreatePolicy() {
               policy.audience = audience
               store.addPolicy(policy)
               store.showToast(`${policy.name} created with ${rules.length} rule${rules.length === 1 ? '' : 's'}`)
-              store.go({ name: 'builder', policyId: policy.id })
+              store.go({ name: 'board', policyId: policy.id })
             }}
           />
           </Suspense>

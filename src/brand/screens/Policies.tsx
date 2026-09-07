@@ -412,7 +412,7 @@ function PolicyRow({
   return (
     <tr className={policy.isSystem ? 'is-system' : ''}>
       <td className="btable__primary">
-        <button type="button" className="btable__link" onClick={() => store.go({ name: 'builder', policyId: policy.id })}>
+        <button type="button" className="btable__link" onClick={() => store.go({ name: 'board', policyId: policy.id })}>
           {policy.name}
         </button>
         <span className="btable__marks">
@@ -457,7 +457,7 @@ function PolicyRow({
                 type="button"
                 className={`btable__exposure is-${e.tone}`}
                 title={gauntlet.gradeReason}
-                onClick={() => store.go({ name: 'builder', policyId: policy.id, open: 'gauntlet' })}
+                onClick={() => store.go({ name: 'board', policyId: policy.id, open: 'gauntlet' })}
               >
                 <i aria-hidden />
                 {e.label}
@@ -506,16 +506,17 @@ function PolicyRow({
                     it is read — which is the whole reason a menu you open a
                     hundred times has icons. Every row-action menu worth copying
                     does it: Zoom, Amplitude, Lightfield. */}
-                <button role="menuitem" onClick={() => store.go({ name: 'builder', policyId: policy.id })}>
+                <button role="menuitem" onClick={() => store.go({ name: 'board', policyId: policy.id })}>
                   <Pencil size={14} strokeWidth={1.9} aria-hidden />
                   Edit policy
                 </button>
-                {/* The second builder over the same policy — a chain of cards
-                    on a stage with an inspector beside it. Both edit the same
-                    draft; this is a different shape for the same work. */}
-                <button role="menuitem" onClick={() => store.go({ name: 'board', policyId: policy.id })}>
+                {/* The OTHER builder over the same policy — the trail, a
+                    scrolling column of forms. Both edit the same draft; this
+                    is a different shape for the same work, and it is the one
+                    you now have to ask for. */}
+                <button role="menuitem" onClick={() => store.go({ name: 'builder', policyId: policy.id })}>
                   <Waypoints size={14} strokeWidth={1.9} aria-hidden />
-                  Open in board
+                  Open in trail
                 </button>
                 <button role="menuitem" onClick={() => store.showToast(`${policy.name} saved as a template`)}>
                   <BookmarkPlus size={14} strokeWidth={1.9} aria-hidden />

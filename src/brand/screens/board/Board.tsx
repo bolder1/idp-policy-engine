@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
-import { Maximize2, Minus, Plus } from 'lucide-react'
+import { Maximize2, Minus, Plus, Split } from 'lucide-react'
 
+import { Button } from '../../kit'
 import { fallbackRule, type Policy } from '../../data'
 import { useCanvasView } from '../canvas-view'
 import type { Diagnostic } from '../diagnostics'
 import type { NameLookup } from '../predicate-prose'
 import { ruleState } from '../rule-form'
-import type { Selection, Trace } from './model'
+import { DECISION_NAME, type Selection, type Trace } from './model'
 import { RuleCard, TerminalCard } from './RuleCard'
 
 /* -----------------------------------------------------------------------------
@@ -198,6 +199,10 @@ export function Board({
   /* Render order during a drag: the dragged card is shown at its target slot
      so the others make room; the card itself follows the pointer. */
   const order = policy.rules.map((_, i) => i)
+  /* What the empty policy actually does today, named rather than described.
+     `terminal` is resolved below for the card; this reads the same rule, so the
+     sentence and the card cannot disagree about the outcome. */
+  const fallbackName = DECISION_NAME[(policy.fallback ?? fallbackRule()).decision].toLowerCase()
   if (drag && drag.over !== drag.from) {
     order.splice(drag.from, 1)
     order.splice(drag.over, 0, drag.from)
@@ -280,6 +285,39 @@ export function Board({
         style={{ transform: `translate3d(${viewRef.current.x}px, ${viewRef.current.y}px, 0) scale(${viewRef.current.z})` }}
       >
         <LayoutGroup id="bb-chain">
+          {/* A policy with no rules gets a beginning, not a diagram of nothing.
+
+              The chain drew its full apparatus for the empty case — the arrival
+              node, a connector, and the locked default — which is three pieces
+              of machinery saying "a sign-in arrives and nothing happens to it".
+              True, and a poor first thing to meet: the one action available was
+              a 12px `+` on the connector between two cards you did not put
+              there, and the default's own card is the piece most likely to be
+              mistaken for the rule you are supposed to edit.
+
+              So the empty policy says what it does today and offers the one
+              move worth making. The chain comes back the moment there is a rule
+              to draw, which is the same view, arrived at rather than sat in. */}
+          {policy.rules.length === 0 ? (
+            <div className="bb__blank">
+              <span className="bb__blank__mark" aria-hidden>
+                <Split size={20} strokeWidth={1.8} />
+              </span>
+              <h2>No rules yet</h2>
+              {/* The consequence, not a definition. Somebody looking at an
+                  empty policy needs to know it is not inert — it is already
+                  deciding sign-ins, with the default, and that is the thing a
+                  blank canvas hides. */}
+              <p>
+                Every sign-in to this application falls straight through to <strong>{fallbackName}</strong>. The policy
+                is running; it just has nothing of its own to say yet.
+              </p>
+              <Button variant="brand" onClick={() => onInsert(0)}>
+                <Plus size={15} strokeWidth={2.2} aria-hidden />
+                Add your first rule
+              </Button>
+            </div>
+          ) : (
           <div className="bb__chain">
             <div className="bb__start" aria-label="A sign-in arrives">
               {landedOn === null && trace && inAudience ? (
@@ -383,6 +421,7 @@ export function Board({
               cardRef={() => {}}
             />
           </div>
+          )}
         </LayoutGroup>
       </div>
 

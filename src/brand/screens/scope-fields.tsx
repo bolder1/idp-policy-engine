@@ -1,3 +1,4 @@
+import { AppLogo } from '../logos/AppLogo'
 import { Picker } from '../picker'
 import { useBrand } from '../store'
 
@@ -43,7 +44,19 @@ export function ApplicationField({ appId, onChange }: { appId: string | null; on
          placeholder again, and the footer will not let you past it. */
       placeholder="Choose an application"
       invalid={!appId}
-      options={store.apps.map((a) => ({ value: a.id, label: a.name, meta: a.protocol }))}
+      /* The real marks, back from the list this control replaced.
+
+         `AppList` drew them, and answering the same question with a picker had
+         quietly dropped them — ten rows of two grey lines where the eye was
+         used to finding Salesforce by its cloud. `AppLogo` keeps its own
+         fallback, so a logo host that moves a file gives a monogram on the
+         app's tint rather than a broken image. */
+      options={store.apps.map((a) => ({
+        value: a.id,
+        label: a.name,
+        meta: a.protocol,
+        art: <AppLogo appId={a.id} name={a.name} size={18} />,
+      }))}
       onChange={onChange}
     />
   )

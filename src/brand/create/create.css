@@ -498,7 +498,6 @@
 
 /* --- Step 2 ---------------------------------------------------------------- */
 
-.bname2__main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 .bcard { background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px 20px; }
 /* The whole form is one card of two fields. It was two cards because each one
    carried a heading and a paragraph and needed the separation; with the prose
@@ -511,7 +510,6 @@
   letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary);
 }
 .bname2__label i { font-style: normal; color: var(--fb-negative-dot); }
-.bname2__hint { font-size: var(--fs-xs); color: var(--text-tertiary); }
 /* The label and the counter share a row.
 
    The counter used to sit under the input with `align-self: flex-end`, so it
@@ -528,15 +526,71 @@
 .bname2__field input[type='text'] { max-width: 420px; }
 
 
+/* --- Name your policy, as a dialog -----------------------------------------
 
-.bname2__rules li { display: flex; align-items: center; gap: 9px; padding: 9px 11px; background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); }
-.bname2__acts { display: flex; gap: 8px; margin-top: 18px; }
-.bname2__acts .bx-btn { flex: 1; }
-.bname2__foot { margin-top: 10px; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
+   Step 2 was a page: its own title, its own fixed-height column, its own
+   footer bar, and reaching it replaced the catalogue you had just chosen from.
+   Two fields do not need a page. The gallery stays behind the scrim now, so
+   Back is a dismissal rather than a navigation.
 
-@media (max-width: 1100px) {
-  .bname2, .bname2.has-preview { grid-template-columns: minmax(0, 1fr); }
+   The FIELD classes stay `.bname2__*`. Policy details asks the same two
+   questions and shares them, and forking a second vocabulary for one label and
+   one character counter is how two forms that must agree start to drift. What
+   is local to the dialog is the layout around them. */
+.bnp { display: flex; flex-direction: column; gap: 18px; }
+/* The 420px cap exists to stop a 1,400px text input on a full-width page; in a
+   520px dialog it just leaves the field short of the picker beneath it. */
+.bnp .bname2__field input[type='text'] { width: 100%; max-width: none; }
+
+/* The footer is otherwise flush right, and the note belongs at the other end. */
+.bnp__note {
+  margin-right: auto;
+  max-width: 32ch;
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+  line-height: 1.45;
 }
+
+/* What the template is about to give you. Only rendered when there is a
+   template — from scratch this was a box apologising for its own emptiness. */
+.bnp__prev {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.bnp__prevhead {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  font-size: var(--fs-sm); color: var(--text-tertiary);
+}
+.bnp__prevhead strong { font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bnp__off {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--fb-neutral-bg);
+  border: 1px solid var(--fb-neutral-border);
+  color: var(--fb-neutral-fg);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); white-space: nowrap;
+}
+/* Capped and scrolling, so a nine-rule template cannot push the two fields the
+   dialog exists for off the top of an 88vh panel. */
+.bnp__rules {
+  list-style: none; margin: 0; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 208px; overflow-y: auto;
+}
+.bnp__rules li {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 11px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+.bnp__rules--default { border-style: dashed !important; background: transparent !important; }
 
 /* --- Bottom bar ------------------------------------------------------------ */
 
@@ -618,22 +672,6 @@ html[data-theme='dark'] .bguided__sheen {
 .bempty .glscene { border-bottom: none; border-radius: var(--radius-md) var(--radius-md) 0 0; }
 .bempty strong { display: block; margin-top: 10px; font-size: var(--fs-md); font-weight: 600; }
 .bempty span { display: block; margin: 4px 14px 0; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.55; }
-
-/* --- App transfer ---------------------------------------------------------- */
-
-
-/* Protects — one row, because there is one app. */
-
-/* Protects — the one place an app can be taken off the policy.
-   Box and scrolling live in the block near the bottom of this file. */
-.bname2__chipx {
-  width: 22px; height: 22px; border-radius: var(--radius-sm); flex: none;
-  color: var(--text-muted); font-size: var(--fs-base); line-height: 1;
-}
-.bname2__chipx:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-
-
-
 
 @media (max-width: 1120px) {
   /* The rail's width lives in one variable, so this needs no override — a
@@ -835,19 +873,13 @@ html[data-theme='dark'] .bguided__sheen {
 
 .bcp__stepcrumb { color: var(--brand-active); font-weight: 500; }
 
-/* Two columns of equal height, so their bottoms line up instead of ending
-   wherever their content happens to stop. */
-/* One page, two shapes.
+/* The form, wherever it is asked.
 
-   The second column used to render unconditionally, and for a blank policy —
-   which is most of them — its whole content was a box saying "No rules yet, you
-   will add them in the builder". A panel apologising for its own emptiness was
-   taking half the page from the form that needed it.
-
-   So: from a template there are rules worth reading before you commit, and the
-   page is two columns. From scratch there is nothing to read, and the form
-   takes the width — which is what lets the application list be a list rather
-   than six rows scrolling inside a 140px slot. */
+   This was a two-column page: a form on the left and, from a template, a
+   preview of the rules on the right, both stretched to a fixed-height column
+   with a footer bar under them. Create Policy asks it in a DIALOG now — see
+   `.bnp` below — and what is left under this class is Policy details, which
+   is a section of fields and nothing else. One column, no stretch. */
 .bname2 {
   /* `flex: 1` has gone with the resident lists. It existed to let two 475px
      scrollers stretch to the viewport; the step is now three rows tall, and
@@ -858,47 +890,7 @@ html[data-theme='dark'] .bguided__sheen {
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
-.bname2.has-preview { grid-template-columns: minmax(380px, 44%) minmax(0, 1fr); }
-.bname2__form, .bname2__side { min-height: 0; height: 100%; }
-
-.bname2__side {
-  display: flex;
-  flex-direction: column;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-.bname2__sidehead {
-  flex: none;
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-raised);
-}
-.bname2__sidehead h2 { font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
-.bname2__sidehead p { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); }
-.bname2__off {
-  flex: none;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--fb-neutral-bg);
-  border: 1px solid var(--fb-neutral-border);
-  color: var(--fb-neutral-fg);
-  font-size: var(--fs-xs); font-weight: var(--fw-medium); white-space: nowrap;
-}
-/* The only scroller on the page. */
-.bname2__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
-.bname2__rules { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.bname2__rules--default { border-style: dashed !important; background: transparent !important; }
-.bname2__blank {
-  height: 100%;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  text-align: center; padding: 24px;
-}
-.bname2__blank strong { font-size: var(--fs-base); color: var(--text-secondary); }
-.bname2__blank span { font-size: var(--fs-sm); color: var(--text-tertiary); max-width: 34ch; line-height: 1.5; }
-
+.bname2__form { min-height: 0; }
 
 /* Last row of the column, not a fixed overlay. */
 .bcp--fit .bbar {
@@ -913,20 +905,11 @@ html[data-theme='dark'] .bguided__sheen {
 }
 
 @media (max-width: 1120px) {
-  /* Below this the two columns cannot both be useful at half width, so the page
-     goes back to being a normal scrolling page. */
+  /* Below this a fixed-height column has too little of it to be worth the
+     scrolling it forces, so the page goes back to being a normal one. */
   .bcp--fit { height: auto; overflow: visible; }
-  .bname2 { grid-template-columns: minmax(0, 1fr); }
-  .bname2__form, .bname2__side { height: auto; }
-  .bname2__scroll { max-height: 420px; }
 }
 
-/* --- Application list -------------------------------------------------------
-   Open, not collapsed. It is the only choice on this page, so nothing is
-   competing for the room, and the column had nothing else to put in it. Search
-   is what makes this scale to a real tenant's catalogue — collapsing never was
-   the part doing that work. */
-.bname2__field--fill { flex: 1; min-height: 0; }
 .bname2__label em {
   font-style: normal; font-weight: var(--fw-regular);
   margin-left: 6px; letter-spacing: 0; text-transform: none;
@@ -1063,32 +1046,6 @@ html[data-theme='dark'] .bguided__sheen {
    description length — which is what keeps the Use buttons on one line. */
 .bgcard__body { flex: 1; min-height: 0; }
 .bgcard__foot { margin-top: auto; }
-
-
-/* --- Who it applies to, on the create form ---------------------------------
-
-   One of the three facts that make a policy a policy — a name, what it
-   protects, and who it is for — and it was the only one this form did not ask
-   for, so every policy arrived governing everyone and had to be narrowed later
-   by somebody who might not know it needed narrowing. */
-
-.bname2__aud {
-  display: flex; align-items: center; gap: var(--space-4);
-  width: 100%; min-height: 44px; padding: var(--space-3) var(--space-4);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
-  font-family: inherit; text-align: left; cursor: pointer;
-}
-.bname2__aud:hover { border-color: var(--brand); }
-.bname2__aud.is-empty { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); }
-.bname2__audbody { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
-.bname2__audbody > em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.bname2__aud.is-empty em { color: var(--fb-negative-fg); font-size: var(--fs-md); }
-.bname2__audedit {
-  flex: none; display: inline-flex; align-items: center; gap: var(--space-2);
-  font-size: var(--fs-sm); color: var(--text-secondary);
-}
-.bname2__aud:hover .bname2__audedit { color: var(--brand); }
 
 
 /* --- The audience picker, inline -------------------------------------------

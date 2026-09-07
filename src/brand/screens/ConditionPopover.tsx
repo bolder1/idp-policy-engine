@@ -352,8 +352,14 @@ function Pop({
     const a = anchor.current?.getBoundingClientRect()
     if (!a) return
     const p = pop.current?.getBoundingClientRect()
-    const w = Math.max(a.width, p?.width ?? 240)
     const h = p?.height ?? 0
+    /* Anchor-derived, never self-derived. Feeding the panel's own measured
+       border-box width back as a content-box `minWidth` widened it by its
+       border on every placement, and placement runs on every scroll event —
+       see the long note in `picker.tsx`, which had the identical bug. The
+       measurement is still read below, to keep the right edge on screen. */
+    const w = Math.max(a.width, 240)
+    const shown = Math.max(w, p?.width ?? 0)
     const below = window.innerHeight - a.bottom
     const above = a.top
     /* Flip only when below genuinely lacks room AND above has more — the rule
@@ -367,7 +373,7 @@ function Pop({
     const maxH = Math.max(200, room)
     setPos({
       top: up ? Math.max(MARGIN, a.top - Math.min(h, maxH) - GAP) : a.bottom + GAP,
-      left: Math.max(MARGIN, Math.min(a.left, window.innerWidth - w - MARGIN)),
+      left: Math.max(MARGIN, Math.min(a.left, window.innerWidth - shown - MARGIN)),
       width: w,
       maxH,
     })
@@ -377,7 +383,12 @@ function Pop({
   useLayoutEffect(place, [place, watch])
 
   useEffect(() => {
-    window.addEventListener('scroll', place, true)
+    // A scroll of the panel's own list does not move the panel.
+    const onScroll = (e: Event) => {
+      if (pop.current?.contains(e.target as Node)) return
+      place()
+    }
+    window.addEventListener('scroll', onScroll, true)
     window.addEventListener('resize', place)
     const onDown = (e: MouseEvent) => {
       const n = e.target as Node
@@ -386,7 +397,7 @@ function Pop({
     }
     document.addEventListener('mousedown', onDown)
     return () => {
-      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('scroll', onScroll, true)
       window.removeEventListener('resize', place)
       document.removeEventListener('mousedown', onDown)
     }

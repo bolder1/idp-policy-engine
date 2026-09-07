@@ -62,8 +62,19 @@
 
 .bx-picker__pop {
   position: fixed;
-  z-index: var(--z-dropdown, 200);
+  /* Above `--z-modal`, not below it: this is portalled to the body, and a menu
+     opened from inside a dialog that renders behind that dialog is a menu you
+     cannot use. Below `--z-tooltip`, so a `Tip` can still explain an option. */
+  /* Portalled to `document.body`, so the `.brand-root *` border-box reset does
+     not reach it. Without this the 1px border sits OUTSIDE any width the
+     placement code sets — which is how the panel used to gain 2px per scroll
+     tick, since that code fed its own measurement back in. `.brpk` carries the
+     same line for the same reason. */
+  box-sizing: border-box;
+  z-index: var(--z-popover, 500);
   max-width: min(420px, calc(100vw - 16px));
+  /* The pre-measurement cap only. Once placed, the panel takes the room its
+     side actually has — see `place()`. */
   max-height: 340px;
   display: flex;
   flex-direction: column;
@@ -72,6 +83,12 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   box-shadow: var(--el-high, var(--el-mid));
+}
+
+.bx-picker__pop *,
+.bx-picker__pop *::before,
+.bx-picker__pop *::after {
+  box-sizing: border-box;
 }
 
 .bx-picker__search {
@@ -118,6 +135,13 @@
 .bx-picker__opt.is-on { color: var(--text-primary); }
 .bx-picker__opt.is-off { opacity: 0.45; cursor: not-allowed; }
 .bx-picker__opt svg { flex: none; color: var(--text-muted); }
+
+/* A logo or avatar, sized by whatever the caller put in it. */
+.bx-picker__art {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
 
 .bx-picker__tick {
   flex: none;

@@ -28,12 +28,18 @@ import './picker.css'
    scroller moves it too, and stay hidden until measured so nothing is ever seen
    at 0,0.
 
-   It sits at `--z-dropdown`, deliberately below `--z-popover`, so a `Tip` can
-   still explain an option.
+   It sits at `--z-popover`, ABOVE `--z-modal`, because a menu is always opened
+   from something and has to be above whatever that was: at `--z-dropdown` it
+   rendered behind any dialog it was opened inside, which is where the create
+   form now asks for an application. Still below `--z-tooltip`, so a `Tip` can
+   explain an option.
    -------------------------------------------------------------------------- */
 
 const GAP = 4
 const MARGIN = 8
+/* The narrowest a popup may be, whatever the trigger it hangs off. A 90px pill
+   in a table cell still needs room to read "Corporate managed". */
+const MIN_POP = 220
 
 export interface PickerOption {
   value: string
@@ -41,6 +47,13 @@ export interface PickerOption {
   /** A second line — "12 uses", "Corporate managed". Searched as well as shown. */
   meta?: string
   icon?: LucideIcon
+  /* A mark the icon set cannot draw — an app logo, an avatar.
+
+     Wins over `icon`, and takes a node rather than a src so the caller keeps
+     its own fallback: `AppLogo` swaps a monogram in when a third-party host
+     moves a file, and a broken image in a list of applications reads as a
+     broken product. */
+  art?: ReactNode
   /** Section heading. Emitted when it changes, so caller order is preserved. */
   group?: string
   disabled?: boolean
@@ -90,13 +103,19 @@ export function Picker({
   const [open, setOpen] = useState(autoOpen)
   const [q, setQ] = useState('')
   const [cursor, setCursor] = useState(0)
-  const [pos, setPos] = useState<{ top: number; left: number; width: number; side: 'top' | 'bottom' } | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; width: number; maxH: number; side: 'top' | 'bottom' } | null>(null)
   const anchor = useRef<HTMLButtonElement | null>(null)
   const pop = useRef<HTMLDivElement | null>(null)
   const id = useId()
 
   const picked = multiple ? ((value as string[] | null) ?? []) : value ? [value as string] : []
   const canSearch = searchable ?? options.length >= 8
+
+  /* The closed trigger carries the chosen option's mark as well as its name.
+     A list of applications is scanned by logo before it is read, and a control
+     that shows the logo while open and drops it when closed makes the answer
+     look like a different thing from the choice that produced it. */
+  const sole = picked.length === 1 ? options.find((o) => o.value === picked[0]) : undefined
 
   const shown = q
     ? options.filter((o) => `${o.label} ${o.meta ?? ''} ${o.value}`.toLowerCase().includes(q.toLowerCase()))
@@ -118,21 +137,49 @@ export function Picker({
         ? (options.find((o) => o.value === picked[0])?.label ?? picked[0])
         : `${picked.length} selected`)
 
+  /* The popup's own width must never feed its own constraint.
+
+     The minimum was `Math.max(anchorWidth, measuredPopupWidth)`, and the
+     measurement is a BORDER-box width being written back as a CONTENT-box
+     minimum: the reset that would make those the same number is
+     `.brand-root *`, and this popup is portalled to `document.body`, outside
+     it. So each placement added the 2px of border, and placement runs on every
+     scroll event — scrolling the option list widened the panel a couple of
+     pixels a tick, without limit, for as long as somebody kept scrolling.
+
+     Both halves are fixed: the stylesheet now sets `box-sizing` on the popup,
+     as `.brpk` already does for the same reason, and the width comes from the
+     ANCHOR alone. The popup's measurement is still read to keep its right edge
+     on screen — reading it is fine, writing it back is the bug. */
   const place = useCallback(() => {
     const a = anchor.current?.getBoundingClientRect()
     if (!a) return
     const p = pop.current?.getBoundingClientRect()
-    const w = Math.max(a.width, p?.width ?? 220)
     const h = p?.height ?? 0
+    const w = Math.max(a.width, MIN_POP)
+    // What it actually occupies — content can carry it past `w`, up to max-width.
+    const shown = Math.max(w, p?.width ?? 0)
 
     const below = window.innerHeight - a.bottom
     const above = a.top
     const side: 'top' | 'bottom' = below < h + GAP + MARGIN && above > below ? 'top' : 'bottom'
 
+    /* Cap to the room on the side it opened, and let the LIST scroll.
+
+       Without this a control near the middle of the window had a flip
+       available on both sides and enough room on neither: ten applications
+       are 340px of panel, a dialog puts its fields 300px from either edge,
+       and the panel opened upward to a NEGATIVE top — its search box off the
+       top of the window and the first three rows with it. Same fix, and the
+       same reasoning, as the condition panel's. */
+    const room = (side === 'top' ? above : below) - GAP - MARGIN
+    const maxH = Math.min(340, Math.max(180, room))
+
     setPos({
-      top: side === 'bottom' ? a.bottom + GAP : a.top - h - GAP,
-      left: Math.max(MARGIN, Math.min(a.left, window.innerWidth - w - MARGIN)),
+      top: side === 'bottom' ? a.bottom + GAP : Math.max(MARGIN, a.top - Math.min(h, maxH) - GAP),
+      left: Math.max(MARGIN, Math.min(a.left, window.innerWidth - shown - MARGIN)),
       width: w,
+      maxH,
       side,
     })
   }, [])
@@ -145,8 +192,15 @@ export function Picker({
     }
     place()
     /* `capture: true` so a scroll inside any container moves it, not just the
-       window. That is the half of the fix that keeps it attached to its row. */
-    window.addEventListener('scroll', place, true)
+       window. That is the half of the fix that keeps it attached to its row —
+       and the reason a scroll of the popup's OWN list has to be skipped. The
+       panel does not move when its list scrolls, so re-placing there was pure
+       work, and it was the wheel ticks that made the ratchet above visible. */
+    const onScroll = (e: Event) => {
+      if (pop.current?.contains(e.target as Node)) return
+      place()
+    }
+    window.addEventListener('scroll', onScroll, true)
     window.addEventListener('resize', place)
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node
@@ -154,7 +208,7 @@ export function Picker({
     }
     document.addEventListener('mousedown', onDown)
     return () => {
-      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('scroll', onScroll, true)
       window.removeEventListener('resize', place)
       document.removeEventListener('mousedown', onDown)
     }
@@ -242,6 +296,11 @@ export function Picker({
         onClick={() => setOpen((v) => !v)}
         onKeyDown={onKey}
       >
+        {sole?.art && (
+          <span className="bx-picker__art" aria-hidden>
+            {sole.art}
+          </span>
+        )}
         <span className="bx-picker__value">{summary}</span>
         <ChevronDown size={size === 'sm' ? 12 : 13} strokeWidth={2.1} aria-hidden />
       </button>
@@ -256,7 +315,10 @@ export function Picker({
               {
                 top: pos?.top ?? 0,
                 left: pos?.left ?? 0,
-                minWidth: pos?.width ?? 220,
+                minWidth: pos?.width ?? MIN_POP,
+                // Unset until measured, so the stylesheet's cap governs the
+                // hidden first pass and this governs every pass after it.
+                maxHeight: pos?.maxH,
                 // Hidden until measured, so nothing is ever seen at 0,0.
                 visibility: pos ? 'visible' : 'hidden',
               } as CSSProperties
@@ -318,7 +380,13 @@ export function Picker({
                       <span className="bx-picker__tick" aria-hidden>
                         {on && <Check size={12} strokeWidth={3} />}
                       </span>
-                      {Ico && <Ico size={13} strokeWidth={1.8} aria-hidden />}
+                      {o.art ? (
+                        <span className="bx-picker__art" aria-hidden>
+                          {o.art}
+                        </span>
+                      ) : (
+                        Ico && <Ico size={13} strokeWidth={1.8} aria-hidden />
+                      )}
                       <span className="bx-picker__opttext">
                         <strong>{o.label}</strong>
                         {o.meta && <em>{o.meta}</em>}

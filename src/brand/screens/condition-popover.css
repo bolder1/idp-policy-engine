@@ -109,6 +109,9 @@
    an absolutely-positioned panel inside it gets cut at the fold. */
 .cp__pop {
   position: fixed;
+  /* Portalled out of `.brand-root`, so its border-box reset does not reach
+     here and the 1px border would otherwise sit outside the placed width. */
+  box-sizing: border-box;
   z-index: var(--z-dropdown);
   max-width: min(420px, calc(100vw - 16px));
   display: flex;
@@ -118,6 +121,11 @@
   background: var(--surface-raised);
   box-shadow: var(--el-high, 0 12px 32px -8px rgba(16, 24, 40, 0.24));
   overflow: hidden;
+}
+.cp__pop *,
+.cp__pop *::before,
+.cp__pop *::after {
+  box-sizing: border-box;
 }
 
 /* What is checked and how, stacked in the order they depend on each other —

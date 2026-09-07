@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Suspense, forwardRef, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowRight, Plus, Store, Upload, Wand2, X } from 'lucide-react'
 
-import { Button, DecisionChip } from '../kit'
+import { Button, DecisionChip, Modal } from '../kit'
 import { EVERYONE, blankPolicy, conditionType, scenarios, type Audience, type Scenario } from '../data'
 import { useBrand } from '../store'
 import { ApplicationField } from '../screens/scope-fields'
@@ -95,7 +95,7 @@ export function CreatePolicy() {
   }
 
   return (
-    <div className={`bpage bcp ${step === 2 ? 'bcp--fit' : ''}`}>
+    <div className="bpage bcp">
       <header className="bcp__head">
         {/* The step used to sit above the title as its own line, which made a
             subheading out of wayfinding. It belongs in the trail that is already
@@ -107,7 +107,7 @@ export function CreatePolicy() {
         </nav>
 
         <div className="bcp__headrow">
-          <h1>{step === 1 ? 'New policy' : 'Name your policy'}</h1>
+          <h1>New policy</h1>
         </div>
       </header>
 
@@ -118,58 +118,56 @@ export function CreatePolicy() {
 
           Guided setup is deliberately not here. It belongs on step 2's bar,
           beside Create policy — see the note there. */}
-      {step === 1 && (
-        <section className="bhero">
-          <div className="bhero__body">
-            <h2>Every policy starts one of four ways</h2>
-            <p>
-              Build it yourself, copy one you already run, or bring one in from a file. Nothing goes
-              live until you switch it on.
-            </p>
-            <div className="bhero__acts">
-              <Button variant="brand" onClick={() => choose(null)}>
-                <Plus size={15} strokeWidth={2.2} aria-hidden /> Start from scratch
-              </Button>
-              <Button onClick={() => store.showToast('Bulk import accepts CSV or JSON, up to 10,000 entries')}>
-                <Upload size={14} strokeWidth={1.9} aria-hidden /> Import from file
-              </Button>
-              <button type="button" className="bhero__jump" onClick={jumpToTemplates}>
-                Or start from a template <ArrowDown size={14} strokeWidth={2} aria-hidden />
-              </button>
-            </div>
+      <section className="bhero">
+        <div className="bhero__body">
+          <h2>Every policy starts one of four ways</h2>
+          <p>
+            Build it yourself, copy one you already run, or bring one in from a file. Nothing goes
+            live until you switch it on.
+          </p>
+          <div className="bhero__acts">
+            <Button variant="brand" onClick={() => choose(null)}>
+              <Plus size={15} strokeWidth={2.2} aria-hidden /> Start from scratch
+            </Button>
+            <Button onClick={() => store.showToast('Bulk import accepts CSV or JSON, up to 10,000 entries')}>
+              <Upload size={14} strokeWidth={1.9} aria-hidden /> Import from file
+            </Button>
+            <button type="button" className="bhero__jump" onClick={jumpToTemplates}>
+              Or start from a template <ArrowDown size={14} strokeWidth={2} aria-hidden />
+            </button>
           </div>
-          {/* Decorative only — the same dotted canvas the rule thumbnails use,
-              so the banner belongs to this product rather than to a marketing
-              page. aria-hidden because it says nothing the copy does not. */}
-          <div className="bhero__art" aria-hidden>
-            <span className="bhero__chip is-1">Deny</span>
-            <span className="bhero__chip is-2">MFA</span>
-            <span className="bhero__chip is-3">Allow</span>
-          </div>
-        </section>
-      )}
+        </div>
+        {/* Decorative only — the same dotted canvas the rule thumbnails use,
+            so the banner belongs to this product rather than to a marketing
+            page. aria-hidden because it says nothing the copy does not. */}
+        <div className="bhero__art" aria-hidden>
+          <span className="bhero__chip is-1">Deny</span>
+          <span className="bhero__chip is-2">MFA</span>
+          <span className="bhero__chip is-3">Allow</span>
+        </div>
+      </section>
 
-      <motion.div
-        key={step}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.18 }}
-      >
-        {step === 1 ? (
-            <Gallery ref={templatesRef} onChoose={choose} onOpenMarket={() => setMarket(true)} />
-          ) : (
-            <NameStep
-              picked={picked}
-              name={name}
-              setName={setName}
-              appId={appId}
-              setAppId={setAppId}
-              onBack={() => setStep(1)}
-              onCreate={create}
-              onGuided={store.features.guidedSetup ? () => setInterview(true) : undefined}
-            />
-        )}
-      </motion.div>
+      <Gallery ref={templatesRef} onChoose={choose} onOpenMarket={() => setMarket(true)} />
+
+      {/* Step 2 is a dialog over step 1, not a second page.
+
+          It was a whole screen — its own title, its own breadcrumb state, its
+          own fixed-height column and footer bar — to ask two questions, and
+          getting there replaced the catalogue you had just chosen from. As a
+          dialog the page underneath stays put, so Back is a dismissal rather
+          than a navigation, and the template you picked is still on screen
+          behind it. Two fields is dialog-sized work. */}
+      <NameStep
+        open={step === 2}
+        picked={picked}
+        name={name}
+        setName={setName}
+        appId={appId}
+        setAppId={setAppId}
+        onBack={() => setStep(1)}
+        onCreate={create}
+        onGuided={store.features.guidedSetup ? () => setInterview(true) : undefined}
+      />
 
       <Marketplace open={market} onClose={() => setMarket(false)} onChoose={choose} />
 
@@ -558,6 +556,7 @@ function Card({ s, onUse, onPreview }: { s: Scenario; onUse: () => void; onPrevi
    and opens a picker. See screens/scope-fields.tsx. */
 
 function NameStep({
+  open,
   picked,
   name,
   setName,
@@ -567,6 +566,7 @@ function NameStep({
   onCreate,
   onGuided,
 }: {
+  open: boolean
   picked: Scenario | null
   name: string
   setName: (v: string) => void
@@ -579,137 +579,44 @@ function NameStep({
   onGuided?: () => void
 }) {
   /* The two things a policy cannot be created without. The audience is not one
-     of them any more — see the note in the form below. */
+     of them any more - see the note in the form below. */
   const noApp = appId === null
+  const field = useRef<HTMLInputElement>(null)
+
+  /* `autoFocus` cannot win here: `Modal` focuses its own panel on the next
+     animation frame, so React's mount-time focus is taken back a frame later
+     and the field looks focusable but is not focused.
+
+     Landing after it rather than racing it. `Modal` is this component's child,
+     so its effect - and therefore its rAF - is registered first, and callbacks
+     queued within one frame run in the order they were queued. The panel still
+     gets focus for the instant the dialog announces itself; then the caret goes
+     where the work is, which in a two-field form is the first field. */
+  useEffect(() => {
+    if (!open) return
+    const id = requestAnimationFrame(() => {
+      if (field.current?.isConnected) field.current.focus()
+    })
+    return () => cancelAnimationFrame(id)
+  }, [open])
 
   return (
-    <section className={`bname2 ${picked ? 'has-preview' : ''}`}>
-      {/* Three answers, one line each.
+    <Modal
+      open={open}
+      onClose={onBack}
+      title="Name your policy"
+      /* Wider only when there is a second thing to read. */
+      width={picked ? 620 : 520}
+      footer={
+        <>
+          <p className="bnp__note">
+            {!name.trim()
+              ? 'Give the policy a name to continue.'
+              : noApp
+                ? 'Choose the application this policy protects.'
+                : 'Created switched off. Nothing changes for users until you turn it on.'}
+          </p>
 
-          It was a 59px name field above two 475px scrolling panels — the
-          Application list and the Applies-to list, side by side, each with its
-          own search box and the audience one with Groups/People TABS on top of
-          that. The required free-text input was a thin strip over 950px of
-          list; the OPTIONAL application came before the REQUIRED audience; and
-          the form carried two validation messages at once, one inside the right
-          panel and one in the footer.
-
-          A policy has three facts — its name, who it governs, what it protects
-          — so the step is three rows, each stating its own answer in words and
-          opening a picker to change it. Same move the condition row, the
-          risk-signal weights and the category filter all made this week.
-
-          `AppList` and `AudiencePicker` are NOT deleted: `PolicyDetails.tsx`
-          imports and renders both. This step stops using them; that screen
-          keeps them, and the `.bapps` / `.baudp` / `--fill` CSS stays for it. */}
-      <div className="bname2__form bcard">
-        <div className="bname2__field">
-          {/* The counter rides on the LABEL row rather than under the input.
-              Below it, appearing at character 40 pushed everything after it
-              down 18px mid-word. */}
-          <span className="bname2__labelrow">
-            <label htmlFor="np-name" className="bname2__label">
-              Policy name <i>*</i>
-            </label>
-            {name.length > 39 && <span className="bname2__count">{50 - name.length} left</span>}
-          </span>
-          <input
-            id="np-name"
-            type="text"
-            value={name}
-            autoFocus
-            maxLength={50}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Finance Team – High Security"
-          />
-        </div>
-
-        {/* Two questions, and the second is not optional.
-
-            "Applies to" has gone from this form. It was a required question on
-            the POLICY, answered with a tabbed list of groups and people, and it
-            is answered per RULE now by the Who step — which reads and writes
-            the `group` and `user` conditions the rule already held.
-            `blankPolicy` has always defaulted a new policy to `EVERYONE` with
-            the reason written beside it, "a new policy governs everyone until
-            somebody narrows it", so asking for the narrowing here was asking
-            for a decision the model was happy to defer and the rules are better
-            placed to make.
-
-            The application became required in the same move. A policy exists to
-            govern access TO something; one that names nothing is a set of rules
-            no sign-in can ever reach. */}
-        <div className="bname2__field">
-          <span className="bname2__label">
-            Application <i>*</i>
-          </span>
-          <ApplicationField appId={appId} onChange={setAppId} />
-        </div>
-      </div>
-
-      {/* The preview, conditionally.
-
-          It used to render unconditionally, and for a blank policy — which is
-          most of them — its entire content was a box saying "No rules yet. You
-          will add them in the builder once this policy is created." A panel
-          apologising for its own emptiness was taking half the page from the
-          form that needed it.
-
-          So it appears when there is something to show. From a template, the
-          rules you are about to get are worth reading before you commit to
-          them; from scratch there is nothing to read and the form gets the
-          whole width. Same page, two shapes. */}
-      {picked && (
-        <aside className="bname2__side">
-          <header className="bname2__sidehead">
-            <div>
-              <h2>{name.trim() || 'Untitled policy'}</h2>
-              <p>
-                From {picked.name} · {picked.rules.length} rule{picked.rules.length === 1 ? '' : 's'}
-              </p>
-            </div>
-            <span className="bname2__off">Created off</span>
-          </header>
-
-          <div className="bname2__scroll">
-            <ol className="bname2__rules">
-              {picked.rules.map((r, i) => (
-                <li key={r.name}>
-                  <span className="bprev__n">{i + 1}</span>
-                  <span className="bprev__body">
-                    <strong>{r.name}</strong>
-                    <span>IF {r.ifText}</span>
-                  </span>
-                  <DecisionChip decision={r.decision} size="sm" />
-                </li>
-              ))}
-              <li className="bname2__rules--default">
-                <span className="bprev__n" aria-hidden>
-                  ⌄
-                </span>
-                <span className="bprev__body">
-                  <strong>Everyone else</strong>
-                  <span>Nothing above matched</span>
-                </span>
-                <DecisionChip decision="1fa" size="sm" />
-              </li>
-            </ol>
-          </div>
-        </aside>
-      )}
-
-      {/* Bottom bar rather than buttons inside the panel — the panel is a
-          summary, and as this step grows the commit action should not drift
-          down the page with it. */}
-      <div className="bbar">
-        <p className="bbar__note">
-          {!name.trim()
-            ? 'Give the policy a name to continue.'
-            : noApp
-              ? 'Choose the application this policy protects.'
-              : 'Created switched off. Nothing changes for users until you turn it on.'}
-        </p>
-        <div className="bbar__acts">
           <Button variant="ghost" onClick={onBack}>
             Back
           </Button>
@@ -723,21 +630,116 @@ function NameStep({
 
               It is the only animated control in the product: a slow sheen and a
               wand that lifts on hover. Everything else here is still, so one
-              moving thing reads as an invitation instead of as noise — and it
+              moving thing reads as an invitation instead of as noise - and it
               stops entirely under prefers-reduced-motion. */}
           {onGuided && (
-          <button type="button" className="bguided" onClick={onGuided}>
-            <span className="bguided__sheen" aria-hidden />
-            <Wand2 size={14} strokeWidth={1.9} aria-hidden />
-            Guided setup
-          </button>
+            <button type="button" className="bguided" onClick={onGuided}>
+              <span className="bguided__sheen" aria-hidden />
+              <Wand2 size={14} strokeWidth={1.9} aria-hidden />
+              Guided setup
+            </button>
           )}
 
           <Button variant="brand" onClick={onCreate} disabled={!name.trim() || noApp}>
             Create policy
           </Button>
+        </>
+      }
+    >
+      {/* Two answers, one line each.
+
+          It was a 59px name field above two 475px scrolling panels - the
+          Application list and the Applies-to list, side by side, each with its
+          own search box and the audience one with Groups/People TABS on top of
+          that - laid out as a fixed-height page with a footer bar of its own.
+          The required free-text input was a thin strip over 950px of list; the
+          OPTIONAL application came before the REQUIRED audience; and the form
+          carried two validation messages at once, one inside the right panel
+          and one in the footer.
+
+          "Applies to" has since gone entirely. It was a required question on
+          the POLICY and it is answered per RULE now by the Who step, which
+          reads and writes the `group` and `user` conditions the rule already
+          held. `blankPolicy` has always defaulted a new policy to `EVERYONE`
+          with the reason written beside it - "a new policy governs everyone
+          until somebody narrows it" - so asking for the narrowing here was
+          asking for a decision the model was happy to defer and the rules are
+          better placed to make. The application became required in the same
+          move: a policy exists to govern access TO something, and one that
+          names nothing is a set of rules no sign-in can ever reach.
+
+          What is left is two rows, each stating its own answer in words and
+          opening a picker to change it - which is a dialog's worth of work, so
+          it is a dialog. */}
+      <div className="bnp">
+        <div className="bname2__field">
+          {/* The counter rides on the LABEL row rather than under the input.
+              Below it, appearing at character 40 pushed everything after it
+              down 18px mid-word. */}
+          <span className="bname2__labelrow">
+            <label htmlFor="np-name" className="bname2__label">
+              Policy name <i>*</i>
+            </label>
+            {name.length > 39 && <span className="bname2__count">{50 - name.length} left</span>}
+          </span>
+          <input
+            id="np-name"
+            ref={field}
+            type="text"
+            value={name}
+            maxLength={50}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Finance Team – High Security"
+          />
         </div>
+
+        <div className="bname2__field">
+          <span className="bname2__label">
+            Application <i>*</i>
+          </span>
+          <ApplicationField appId={appId} onChange={setAppId} />
+        </div>
+
+        {/* What the template is about to give you, when there is a template.
+
+            It renders only when there is something to read: from scratch its
+            whole content was a box saying "No rules yet, you will add them in
+            the builder", and a panel apologising for its own emptiness was
+            taking half the page from the form that needed it. */}
+        {picked && (
+          <section className="bnp__prev">
+            <header className="bnp__prevhead">
+              <span>
+                From <strong>{picked.name}</strong> · {picked.rules.length} rule
+                {picked.rules.length === 1 ? '' : 's'}
+              </span>
+              <span className="bnp__off">Created off</span>
+            </header>
+            <ol className="bnp__rules">
+              {picked.rules.map((r, i) => (
+                <li key={r.name}>
+                  <span className="bprev__n">{i + 1}</span>
+                  <span className="bprev__body">
+                    <strong>{r.name}</strong>
+                    <span>IF {r.ifText}</span>
+                  </span>
+                  <DecisionChip decision={r.decision} size="sm" />
+                </li>
+              ))}
+              <li className="bnp__rules--default">
+                <span className="bprev__n" aria-hidden>
+                  ⌄
+                </span>
+                <span className="bprev__body">
+                  <strong>Everyone else</strong>
+                  <span>Nothing above matched</span>
+                </span>
+                <DecisionChip decision="1fa" size="sm" />
+              </li>
+            </ol>
+          </section>
+        )}
       </div>
-    </section>
+    </Modal>
   )
 }

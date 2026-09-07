@@ -512,7 +512,20 @@
 }
 .bname2__label i { font-style: normal; color: var(--fb-negative-dot); }
 .bname2__hint { font-size: var(--fs-xs); color: var(--text-tertiary); }
-.bname2__count { align-self: flex-end; font-size: var(--fs-xs); color: var(--text-muted); }
+/* The label and the counter share a row.
+
+   The counter used to sit under the input with `align-self: flex-end`, so it
+   appeared at character 40 and pushed the two rows beneath it down 18px
+   mid-word. On the label row it occupies space that already exists. */
+.bname2__labelrow { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.bname2__count { font-size: var(--fs-xs); color: var(--text-muted); }
+/* Three answers, one column, capped. The two 475px list panels have gone — see
+   NameStep — so nothing here scrolls and the whole step fits above the fold.
+   Capped rather than full width because a 1,400px text input is a target with
+   no shape; the heading above it stops at the same edge. */
+.bname2__form { max-width: 720px; }
+.bname2__field .bx-picker { width: 100%; }
+.bname2__field input[type='text'] { max-width: 420px; }
 
 
 
@@ -836,7 +849,10 @@ html[data-theme='dark'] .bguided__sheen {
    takes the width — which is what lets the application list be a list rather
    than six rows scrolling inside a 140px slot. */
 .bname2 {
-  flex: 1;
+  /* `flex: 1` has gone with the resident lists. It existed to let two 475px
+     scrollers stretch to the viewport; the step is now three rows tall, and
+     stretching it just pushed the footer bar to the bottom of the window with
+     500px of nothing above it. */
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -983,38 +999,27 @@ html[data-theme='dark'] .bguided__sheen {
    scroller itself — the list inside it is. */
 .bname2__form { overflow: visible; display: flex; flex-direction: column; }
 
-/* A policy's scope is two questions of the same shape — what does it protect,
-   and who does it govern — so they get the same shape of control, side by side,
-   under a name that spans them both.
+/* One column, three rows.
 
-   A single 1200px column of stacked fields was a worse use of the page than the
-   preview panel had been, and the audience-as-chips row that sat in it grew a
-   line every time somebody added a group, inside a form whose other fields are
-   fixed height. Two equal list columns settle both problems at once: neither
-   can push the other around, and both scale by scrolling rather than by
-   growing. */
+   This was two equal list columns with `overflow: hidden`, and the reasoning
+   was right for what it held: two resident scrolling panels, neither able to
+   push the other around, both scaling by scrolling rather than by growing.
+
+   There are no panels now — each answer is one 35px trigger — so two columns
+   would sit the REQUIRED audience beside the OPTIONAL application at equal
+   weight and half width. That is both a lie about their importance and narrow
+   enough to elide the audience summary mid-sentence: measured, "Nobody yet — 5
+   groups and 24 people to choose from" cut off at "to c…".
+
+   Stacked, they read in the order they have to be answered and each gets the
+   full 720px to say what it holds. Nothing scrolls, so the `overflow` and the
+   two `--fill` overrides go with it — the class stays defined further up for
+   PolicyDetails, which still renders the resident lists. */
 .bname2__form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   align-content: start;
-  gap: 18px 24px;
-  overflow: hidden;
-}
-.bname2__form > .bname2__field:first-child { grid-column: 1 / -1; max-width: 520px; }
-.bname2__field--fill { min-height: 0; }
-
-/* With a preview the form is already the left column of the page, so its own
-   two columns would be two narrow ones. It stacks instead, and scrolls. */
-.bname2.has-preview .bname2__form {
-  display: flex; flex-direction: column;
-  overflow-y: auto;
-}
-.bname2.has-preview .bname2__field--fill { min-height: 260px; }
-
-@media (max-width: 1100px) {
-  .bname2__form { display: flex; flex-direction: column; overflow-y: auto; }
-  .bname2__field--fill { min-height: 300px; }
+  gap: 18px;
 }
 
 /* The name field, stated explicitly.

@@ -1,14 +1,14 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Suspense, forwardRef, lazy, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowRight, Check, Plus, Search, Store, Upload, Wand2, X } from 'lucide-react'
+import { ArrowDown, ArrowRight, Check, Plus, Search, Store, Upload, UserRound, Users, Wand2, X } from 'lucide-react'
 
 import { Button, DecisionChip } from '../kit'
+import { Picker } from '../picker'
 import { AppLogo } from '../logos/AppLogo'
 import { blankPolicy, conditionType, scenarios, type Audience, type Scenario } from '../data'
 import { useBrand } from '../store'
 import { leaves } from '../predicate'
 import { TemplateCard, TemplatePreview, type CardModel } from './TemplateCard'
-import { AudiencePicker } from '../screens/audience-drawer'
 
 /* Mounted only while it is open — the gallery is the common path and does not
    need the interview's questions, composer and figures in its chunk. */
@@ -597,6 +597,34 @@ export function AppList({ chosen, onChange }: { chosen: string | null; onChange:
   )
 }
 
+/* The sentinel for "no application".
+
+   `Picker` speaks in strings and the model's absence is `null`, so the two need
+   one agreed token between them. A named constant rather than `''`, because an
+   empty string is also what a cleared search field holds and the two would be
+   indistinguishable at the call site. */
+const NO_APP = '__none__'
+
+/* Toggle one id in the audience, without the caller knowing which list it
+   belongs to.
+
+   `Picker` emits one id and does not care what kind of thing it is; the model
+   keeps groups and people apart. Looking the id up against the group list is
+   what bridges them — and it is the reason the picker can offer both kinds in
+   one flat, searchable list, which is what let the Groups/People TABS go. A tab
+   is a mode, and a mode exists here only because five groups and twenty-four
+   people would not fit in a 340px box. In a panel as tall as the room below the
+   trigger they both fit under headings, and one search crosses both. */
+function toggleAudience(a: Audience, id: string, groups: { id: string }[]): Audience {
+  const isGroup = groups.some((g) => g.id === id)
+  const list = isGroup ? a.groupIds : a.userIds
+  const next = list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
+  /* `everyone: false` on every write. A policy that names somebody does not
+     also govern everyone, and leaving the flag set would make the two disagree
+     — see the note on `Audience`. */
+  return isGroup ? { ...a, everyone: false, groupIds: next } : { ...a, everyone: false, userIds: next }
+}
+
 function NameStep({
   picked,
   name,
@@ -628,21 +656,77 @@ function NameStep({
      govern everyone by accident — are both worse than being asked. */
   const noAudience = !audience.everyone && audience.groupIds.length === 0 && audience.userIds.length === 0
 
+  /* Groups first, then people, each under a heading — `Picker` emits one
+     whenever `group` CHANGES, so the caller owns the order and an unsorted list
+     would print "Groups, People, Groups". A person already inside a chosen
+     group says so rather than being refused: the union is deliberate, and an
+     exception you want to survive somebody editing the group is a real thing to
+     want. */
+  const audienceOptions = useMemo(
+    () => [
+      ...store.groups.map((g) => ({
+        value: g.id,
+        label: g.name,
+        meta: `${g.memberCount.toLocaleString()} members`,
+        group: 'Groups',
+        icon: Users,
+      })),
+      ...store.users.map((u) => ({
+        value: u.id,
+        label: u.name,
+        meta: audience.groupIds.includes(u.groupId) ? `${u.email} · already in ${store.groups.find((g) => g.id === u.groupId)?.name ?? 'a chosen group'}` : u.email,
+        group: 'People',
+        icon: UserRound,
+      })),
+    ],
+    [store.groups, store.users, audience.groupIds],
+  )
+
+  /* What the closed control says. Names up to three, then a count — never a
+     bare "N selected", and never a run of five names in a row that would
+     elide mid-word. The empty state states the size of the pool, so the
+     control says something even before it has an answer. */
+  const audienceSummary = useMemo(() => {
+    const names = [
+      ...audience.groupIds.map((id) => store.groups.find((g) => g.id === id)?.name ?? id),
+      ...audience.userIds.map((id) => store.users.find((u) => u.id === id)?.name ?? id),
+    ]
+    if (names.length === 0) return `Nobody yet — ${store.groups.length} groups and ${store.users.length} people to choose from`
+    if (names.length <= 3) return names.join(', ')
+    return `${names.slice(0, 3).join(', ')} +${names.length - 3}`
+  }, [audience, store.groups, store.users])
+
   return (
     <section className={`bname2 ${picked ? 'has-preview' : ''}`}>
-      {/* Two labelled controls and nothing else.
+      {/* Three answers, one line each.
 
-          The step used to carry a page subtitle, a line of help under each
-          field, a paragraph in the empty state and a note in the footer — four
-          layers of prose wrapped around two inputs. Enterprise forms that do
-          this well (Retool's create-license-key, Antimetal, Intercom's ticket
-          composer) put the whole explanation in the label and stop. A field
-          that needs a sentence under it is usually a field with a bad name. */}
+          It was a 59px name field above two 475px scrolling panels — the
+          Application list and the Applies-to list, side by side, each with its
+          own search box and the audience one with Groups/People TABS on top of
+          that. The required free-text input was a thin strip over 950px of
+          list; the OPTIONAL application came before the REQUIRED audience; and
+          the form carried two validation messages at once, one inside the right
+          panel and one in the footer.
+
+          A policy has three facts — its name, who it governs, what it protects
+          — so the step is three rows, each stating its own answer in words and
+          opening a picker to change it. Same move the condition row, the
+          risk-signal weights and the category filter all made this week.
+
+          `AppList` and `AudiencePicker` are NOT deleted: `PolicyDetails.tsx`
+          imports and renders both. This step stops using them; that screen
+          keeps them, and the `.bapps` / `.baudp` / `--fill` CSS stays for it. */}
       <div className="bname2__form bcard">
         <div className="bname2__field">
-          <label htmlFor="np-name" className="bname2__label">
-            Policy name <i>*</i>
-          </label>
+          {/* The counter rides on the LABEL row rather than under the input.
+              Below it, appearing at character 40 pushed everything after it
+              down 18px mid-word. */}
+          <span className="bname2__labelrow">
+            <label htmlFor="np-name" className="bname2__label">
+              Policy name <i>*</i>
+            </label>
+            {name.length > 39 && <span className="bname2__count">{50 - name.length} left</span>}
+          </span>
           <input
             id="np-name"
             type="text"
@@ -652,44 +736,49 @@ function NameStep({
             onChange={(e) => setName(e.target.value)}
             placeholder="Finance Team – High Security"
           />
-          {/* The counter earns its place only near the ceiling. */}
-          {name.length > 39 && <span className="bname2__count">{50 - name.length} left</span>}
         </div>
 
-        <div className="bname2__field bname2__field--fill">
-          <span className="bname2__label" id="np-app-label">
+        {/* Required before optional. Who a policy governs is what makes it a
+            policy; what it protects is the part you are allowed to defer, and
+            it used to come first. */}
+        <div className="bname2__field">
+          <span className="bname2__label">
+            Applies to <i>*</i>
+          </span>
+          <Picker
+            label="Who this policy governs"
+            width="fill"
+            size="md"
+            multiple
+            searchable
+            value={[...audience.groupIds, ...audience.userIds]}
+            /* Names, not a count. `${n} selected` is the one thing a closed
+               control must not say — see `Picker.summary`. */
+            summary={audienceSummary}
+            options={audienceOptions}
+            onChange={(id) => setAudience(toggleAudience(audience, id, store.groups))}
+          />
+        </div>
+
+        <div className="bname2__field">
+          <span className="bname2__label">
             Application <em>Optional</em>
           </span>
-          {/* No separate "Protects" block underneath. It restated the row that
-              is already ticked in this list — the selection is visible where it
-              is made, so repeating it was two places to keep in sync and one
-              more thing to read. */}
-          <AppList chosen={appId} onChange={setAppId} />
-        </div>
-
-        {/* Who it governs, beside what it protects.
-
-            It was a row of chips with a Change button that opened a drawer, and
-            chips do not scale — three groups and two named people already
-            wrapped to three lines, in a form whose other fields are fixed
-            height. It was also the only field on the page you could not act on
-            where you read it.
-
-            Now it is a list exactly like the application list beside it: a
-            search over both kinds, groups then people, togglable in place. The
-            two questions a policy asks about scope — what does it protect, and
-            who does it govern — are the same shape of question, so they are the
-            same shape of control, side by side. */}
-        <div className="bname2__field bname2__field--fill">
-          <span className="bname2__label">
-            Applies to <em>Groups and people</em>
-          </span>
-          <AudiencePicker
-            audience={audience}
-            groups={store.groups}
-            users={store.users}
-            unlisted={store.unlistedUsers}
-            onChange={setAudience}
+          <Picker
+            label="Application this policy protects"
+            width="fill"
+            size="md"
+            searchable
+            value={appId ?? NO_APP}
+            /* A statement of the current answer, not an instruction. "No
+               application" is a legitimate answer to an optional question, and
+               a placeholder reading "Choose…" would make it look unfinished. */
+            summary={appId ? (store.apps.find((a) => a.id === appId)?.name ?? appId) : 'No application'}
+            options={[
+              { value: NO_APP, label: 'No application', meta: 'The rules are saved, but nothing reaches them until one is attached.' },
+              ...store.apps.map((a) => ({ value: a.id, label: a.name, meta: a.protocol })),
+            ]}
+            onChange={(id) => setAppId(id === NO_APP ? null : id)}
           />
         </div>
       </div>

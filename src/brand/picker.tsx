@@ -60,6 +60,7 @@ export function Picker({
   onFooter,
   invalid = false,
   autoOpen = false,
+  summary: summaryText,
 }: {
   value: string | string[] | null
   options: PickerOption[]
@@ -78,6 +79,13 @@ export function Picker({
   invalid?: boolean
   /** Open on mount, for a row inserted with nothing chosen yet. */
   autoOpen?: boolean
+  /* What the closed trigger says, when the caller can say it better.
+
+     Overrides the built-in summary entirely — including the placeholder, so a
+     caller can state a meaningful empty ANSWER ("No application") instead of an
+     instruction ("Choose…"). Same prop name and type as `ConditionPopover`'s,
+     so moving between the two does not mean learning two words for one job. */
+  summary?: string
 }) {
   const [open, setOpen] = useState(autoOpen)
   const [q, setQ] = useState('')
@@ -95,12 +103,20 @@ export function Picker({
     : options
   const usable = shown.filter((o) => !o.disabled)
 
+  /* A caller's summary wins.
+
+     The multi-select fallback is `${picked.length} selected`, which is the one
+     thing a closed control must never say: it announces that something was
+     chosen and withholds what. Tolerable where the trigger is 90px in a table
+     cell and there is nowhere to put a name; not where the trigger is a
+     full-width row and the answer IS the row. */
   const summary =
-    picked.length === 0
+    summaryText ??
+    (picked.length === 0
       ? placeholder
       : picked.length === 1
         ? (options.find((o) => o.value === picked[0])?.label ?? picked[0])
-        : `${picked.length} selected`
+        : `${picked.length} selected`)
 
   const place = useCallback(() => {
     const a = anchor.current?.getBoundingClientRect()

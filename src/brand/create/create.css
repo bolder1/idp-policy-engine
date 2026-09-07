@@ -543,6 +543,30 @@
 .bnp .bname2__field input[type='text'] { width: 100%; max-width: none; }
 
 /* The footer is otherwise flush right, and the note belongs at the other end. */
+/* The application, stated rather than asked — for the dialog opened from an
+   application row, where the answer is the row. A plain statement, not a
+   disabled combobox: greyed chrome reads "you could change this, but not now",
+   which is not what is true here. */
+.bname2__fixed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-sunken);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  min-height: var(--ctl-height-md);
+}
+.bname2__fixed strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bname2__fixed .u-muted { font-size: var(--fs-xs); }
+.bname2__fixed em {
+  flex-basis: 100%;
+  font-style: normal;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
 .bnp__note {
   margin-right: auto;
   max-width: 32ch;

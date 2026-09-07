@@ -72,7 +72,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
     section: 'Configure',
     items: [
       { label: 'Identity Providers', icon: Fingerprint },
-      { label: 'Apps', icon: AppWindow },
+      { label: 'Apps', icon: AppWindow, screen: { name: 'applications' } },
       {
         label: 'Policies',
         icon: ShieldCheck,

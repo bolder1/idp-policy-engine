@@ -35,6 +35,7 @@ const CreatePolicy = lazy(() => import('./create/CreatePolicy').then((m) => ({ d
 const BuilderPage = lazy(() => import('./screens/BuilderPage').then((m) => ({ default: m.BuilderPage })))
 const BoardPage = lazy(() => import('./screens/board/BoardPage').then((m) => ({ default: m.BoardPage })))
 const PolicyDetails = lazy(() => import('./screens/PolicyDetails').then((m) => ({ default: m.PolicyDetails })))
+const Applications = lazy(() => import('./screens/Applications').then((m) => ({ default: m.Applications })))
 
 /* Same specifiers as the lazy() calls above — Vite dedupes them to one chunk
    each, so this warms exactly what navigation will ask for and nothing else. */
@@ -47,6 +48,7 @@ const warm = () => {
   void import('./create/CreatePolicy')
   void import('./screens/BuilderPage')
   void import('./screens/board/BoardPage')
+  void import('./screens/Applications')
 }
 
 function usePrefetchScreens() {
@@ -67,6 +69,10 @@ function usePrefetchScreens() {
 function Screen() {
   const { screen } = useBrand()
   switch (screen.name) {
+    /* The admin catalogue and the end-user launcher, adjacent so the two
+       names cannot be confused by anyone reading this switch. */
+    case 'applications':
+      return <Applications />
     case 'apps':
       return <UserApps />
     case 'policies':

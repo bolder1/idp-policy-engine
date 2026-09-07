@@ -667,23 +667,11 @@
 .blog__ctx li { color: var(--text-tertiary); }
 .blog__chain { grid-column: 1 / -1; padding-top: var(--space-4); border-top: var(--bw-thin) solid var(--border-subtle); }
 
-/* --- Assign apps ---------------------------------------------------------- */
-
-.bapps__search { margin-bottom: var(--space-5); }
-.bapps { display: flex; flex-direction: column; }
-.bapps__row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-3);
-  border-bottom: var(--bw-thin) solid var(--border-subtle);
-  cursor: pointer;
-}
-.bapps__row:hover { background: var(--surface-sunken); }
-.bapps__row input { accent-color: var(--brand); }
-.bapps__name { flex: 1; display: flex; flex-direction: column; font-size: var(--fs-md); }
-.bapps__name em { font-style: normal; font-size: var(--fs-xs); color: var(--fb-notice-fg); }
-.bapps__proto { font-size: var(--fs-xs); color: var(--text-muted); }
+/* `.bapps` stood here — the resident radiogroup of applications that the
+   create form and Policy details each rendered inline. Both ask with a picker
+   now and the component is deleted, so the rules went with it rather than
+   staying to collide with the Applications screen, which wants this prefix and
+   would have inherited a hover and a border it never asked for. */
 
 /* --- Master / detail pages ------------------------------------------------ */
 

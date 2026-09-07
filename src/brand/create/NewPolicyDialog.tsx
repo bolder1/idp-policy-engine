@@ -1,0 +1,235 @@
+import { useEffect, useRef, useState } from 'react'
+import { Wand2 } from 'lucide-react'
+
+import { Button, DecisionChip, Modal } from '../kit'
+import { blankPolicy, type Policy, type Scenario } from '../data'
+import { ApplicationField, ApplicationFixed } from '../screens/scope-fields'
+
+/* -----------------------------------------------------------------------------
+   Name your policy — the dialog, wherever the asking happens.
+
+   It was step 2 of Create Policy and nothing else: a whole page with its own
+   title, its own breadcrumb state, its own fixed-height column and footer bar,
+   to ask two questions. It became a dialog over the gallery, and then the
+   Applications screen needed to ask exactly the same two questions from an
+   application row — at which point it had to stop being part of one screen.
+
+   Extracted rather than copied. Two implementations of "what a new policy is"
+   means two 50-character caps, two counters that appear at character 40, and
+   two places for `blankPolicy` to be called with slightly different arguments;
+   `scope-fields.tsx` exists in this codebase precisely because two screens once
+   asked one question two ways and drifted.
+
+   The dialog owns the answers and hands back a finished `Policy`. What happens
+   to it next — where it is stored, what is toasted, whether the app navigates
+   — belongs to the caller, and the two callers genuinely differ: from the
+   gallery the errand was "I want to write a policy", so it ends in the builder;
+   from an application row the errand was "this application has nothing of its
+   own", and attaching completes it, so that caller stays where it is.
+   -------------------------------------------------------------------------- */
+
+export function NewPolicyDialog({
+  open,
+  onClose,
+  onCreate,
+  seedName = '',
+  fixedAppId,
+  picked = null,
+  closeLabel = 'Back',
+  onGuided,
+}: {
+  open: boolean
+  onClose: () => void
+  /** Hands out a finished policy. The caller stores it and decides where to go. */
+  onCreate: (p: Policy) => void
+  seedName?: string
+  /** The application, stated rather than asked. See `ApplicationFixed`. */
+  fixedAppId?: string
+  picked?: Scenario | null
+  /** "Back" where a step sits behind it, "Cancel" where none does. */
+  closeLabel?: string
+  /* Absent in lite, and absent from an application row: the guided build is
+     withheld there, and a button that opens nothing is worse than no button. */
+  onGuided?: (appId: string | null) => void
+}) {
+  const [name, setName] = useState(seedName)
+  const [appId, setAppId] = useState<string | null>(fixedAppId ?? null)
+  const field = useRef<HTMLInputElement>(null)
+
+  /* Cleared when it OPENS, not when it closes.
+
+     `Modal` unmounts only its children, so state living above it survives a
+     close and reopen — the same trap the zone naming dialog documents. Create
+     one policy, open this again, and the field would still hold the last name. */
+  useEffect(() => {
+    if (!open) return
+    setName(seedName)
+    setAppId(fixedAppId ?? null)
+  }, [open, seedName, fixedAppId])
+
+  /* `autoFocus` cannot win here: `Modal` focuses its own panel on the next
+     animation frame, so React's mount-time focus is taken back a frame later
+     and the field looks focusable but is not focused.
+
+     Landing after it rather than racing it. `Modal` is this component's child,
+     so its effect — and therefore its rAF — is registered first, and callbacks
+     queued within one frame run in the order they were queued. The panel still
+     gets focus for the instant the dialog announces itself; then the caret goes
+     where the work is, which in a two-field form is the first field. */
+  useEffect(() => {
+    if (!open) return
+    const id = requestAnimationFrame(() => {
+      if (field.current?.isConnected) field.current.focus()
+    })
+    return () => cancelAnimationFrame(id)
+  }, [open])
+
+  const noApp = appId === null
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Name your policy"
+      /* Wider only when there is a second thing to read. */
+      width={picked ? 620 : 520}
+      footer={
+        <>
+          <p className="bnp__note">
+            {!name.trim()
+              ? 'Give the policy a name to continue.'
+              : noApp
+                ? 'Choose the application this policy protects.'
+                : 'Created switched off. Nothing changes for users until you turn it on.'}
+          </p>
+
+          <Button variant="ghost" onClick={onClose}>
+            {closeLabel}
+          </Button>
+
+          {/* Guided setup lives here rather than up on the gallery, because
+              this is the moment somebody has decided to write the rules
+              themselves and is looking at an empty form. Offering it as a fifth
+              thing to choose between made it one more decision; offering it
+              beside Create policy makes it a way out of the one you are already
+              stuck on.
+
+              It is the only animated control in the product: a slow sheen and a
+              wand that lifts on hover. Everything else here is still, so one
+              moving thing reads as an invitation instead of as noise — and it
+              stops entirely under prefers-reduced-motion. */}
+          {onGuided && (
+            <button type="button" className="bguided" onClick={() => onGuided(appId)}>
+              <span className="bguided__sheen" aria-hidden />
+              <Wand2 size={14} strokeWidth={1.9} aria-hidden />
+              Guided setup
+            </button>
+          )}
+
+          <Button
+            variant="brand"
+            onClick={() => onCreate(blankPolicy(name.trim() || 'Untitled policy', appId ?? undefined))}
+            disabled={!name.trim() || noApp}
+          >
+            Create policy
+          </Button>
+        </>
+      }
+    >
+      {/* Two answers, one line each.
+
+          It was a 59px name field above two 475px scrolling panels — the
+          Application list and the Applies-to list, side by side, each with its
+          own search box and the audience one with Groups/People TABS on top of
+          that — laid out as a fixed-height page with a footer bar of its own.
+
+          "Applies to" has since gone entirely. It was a required question on
+          the POLICY and it is answered per RULE now by the Who step, which
+          reads and writes the `group` and `user` conditions the rule already
+          held. `blankPolicy` has always defaulted a new policy to `EVERYONE`
+          with the reason written beside it — "a new policy governs everyone
+          until somebody narrows it" — so asking for the narrowing here was
+          asking for a decision the model was happy to defer and the rules are
+          better placed to make. The application became required in the same
+          move: a policy exists to govern access TO something, and one that
+          names nothing is a set of rules no sign-in can ever reach. */}
+      <div className="bnp">
+        <div className="bname2__field">
+          {/* The counter rides on the LABEL row rather than under the input.
+              Below it, appearing at character 40 pushed everything after it
+              down 18px mid-word. */}
+          <span className="bname2__labelrow">
+            <label htmlFor="np-name" className="bname2__label">
+              Policy name <i>*</i>
+            </label>
+            {name.length > 39 && <span className="bname2__count">{50 - name.length} left</span>}
+          </span>
+          <input
+            id="np-name"
+            ref={field}
+            type="text"
+            value={name}
+            maxLength={50}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Finance Team – High Security"
+          />
+        </div>
+
+        {/* Asked, or stated.
+
+            No asterisk on the stated one: an asterisk means "you must answer
+            this", and it is answered. Locked rather than hidden, because
+            hiding it would undo the argument that made the field required in
+            the first place — it would only move the invisible default from
+            "no application" to "whichever one you happened to open this from".
+            And stated rather than shown as a disabled combobox: a greyed
+            control reads "you could change this, but not now", which is not
+            true either. */}
+        <div className="bname2__field">
+          <span className="bname2__label">Application {!fixedAppId && <i>*</i>}</span>
+          {fixedAppId ? <ApplicationFixed appId={fixedAppId} /> : <ApplicationField appId={appId} onChange={setAppId} />}
+        </div>
+
+        {/* What the template is about to give you, when there is a template.
+
+            It renders only when there is something to read: from scratch its
+            whole content was a box saying "No rules yet, you will add them in
+            the builder", and a panel apologising for its own emptiness was
+            taking half the page from the form that needed it. */}
+        {picked && (
+          <section className="bnp__prev">
+            <header className="bnp__prevhead">
+              <span>
+                From <strong>{picked.name}</strong> · {picked.rules.length} rule
+                {picked.rules.length === 1 ? '' : 's'}
+              </span>
+              <span className="bnp__off">Created off</span>
+            </header>
+            <ol className="bnp__rules">
+              {picked.rules.map((r, i) => (
+                <li key={r.name}>
+                  <span className="bprev__n">{i + 1}</span>
+                  <span className="bprev__body">
+                    <strong>{r.name}</strong>
+                    <span>IF {r.ifText}</span>
+                  </span>
+                  <DecisionChip decision={r.decision} size="sm" />
+                </li>
+              ))}
+              <li className="bnp__rules--default">
+                <span className="bprev__n" aria-hidden>
+                  ⌄
+                </span>
+                <span className="bprev__body">
+                  <strong>Everyone else</strong>
+                  <span>Nothing above matched</span>
+                </span>
+                <DecisionChip decision="1fa" size="sm" />
+              </li>
+            </ol>
+          </section>
+        )}
+      </div>
+    </Modal>
+  )
+}

@@ -1,0 +1,243 @@
+/* -----------------------------------------------------------------------------
+   Applications — the list, and the protection panel it opens.
+
+   Two prefixes, both checked against the whole tree before they were chosen:
+   `bapl` for the list, `bapr` for the panel. Neither existed. The obvious third
+   choice, `bapps`, DID exist — eighteen dead rules left behind by the deleted
+   application radiogroup — and they have been removed from screens.css rather
+   than inherited, because a new screen quietly picking up a hover and a bottom
+   border from a component that no longer exists is exactly the collision this
+   codebase has now had three times.
+
+   The table, the toolbar, the row menu and the empty state are the console's
+   shared ones. Only what is genuinely new to this screen is here.
+   -------------------------------------------------------------------------- */
+
+/* --- The list ------------------------------------------------------------- */
+
+/* The live page puts search on the left and the primary action on the right,
+   which is the reverse of the policies table. Kept, because this page is being
+   reproduced rather than redesigned — and the search is wider than the shared
+   260px because "Search Application" is a longer prompt than "Search policies". */
+.bapl__search { width: 340px; max-width: 100%; }
+
+.bapl__viewswitch button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.bapl__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.bapl__pager { display: inline-flex; gap: var(--space-2); }
+.bapl__pager button {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: var(--fs-base);
+  line-height: 1;
+  cursor: pointer;
+}
+.bapl__pager button:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text-primary); }
+/* Disabled at both ends rather than hidden. Ten applications fit on one page,
+   so this is the resting state — and a pager that vanishes when it cannot page
+   makes the footer jump the moment a search narrows the list. */
+.bapl__pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* The Protection cell. A dot, a count, and the shortfall when there is one —
+   the dot carries whether anything is outstanding, because a cell that reads
+   "3 policies" while two of them decide nothing is the list overstating its
+   own coverage. */
+.bapl__prot {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 2px 0;
+  background: none;
+  border: 0;
+  font-family: inherit;
+  font-size: var(--fs-md);
+  color: var(--text-body);
+  cursor: pointer;
+  text-align: left;
+}
+.bapl__prot:hover { color: var(--text-link); }
+.bapl__prot:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--brand-subtle-bg); border-radius: var(--radius-sm); }
+.bapl__prot i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fb-neutral-fg);
+}
+.bapl__prot.is-on i { background: var(--fb-positive-fg); }
+.bapl__prot.is-part i { background: var(--fb-notice-fg); }
+.bapl__prot.is-off i { background: var(--text-muted); }
+.bapl__prot.is-off span { color: var(--text-muted); }
+.bapl__prot em {
+  font-style: normal;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+/* --- The protection panel ------------------------------------------------- */
+
+.bapr__head { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.bapr__head h2 { font-size: var(--fs-lg); }
+.bapr__head p { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+.bapr__list { margin-top: var(--space-6); }
+.bapr__listhead { margin-bottom: var(--space-4); }
+.bapr__listhead h3 { font-size: var(--fs-base); font-weight: var(--fw-semibold); }
+.bapr__listhead p { margin-top: 2px; font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+.bapr__stack {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.bapr__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+/* Not greyed out — it is still attached and still real, it just is not in the
+   race. The dimming is on the NUMBER, which is the thing it has not earned. */
+.bapr__row.is-off .bapr__n { color: var(--text-muted); }
+
+.bapr__n {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+.bapr__n--fall { background: transparent; color: var(--text-muted); }
+
+.bapr__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.bapr__namerow { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.bapr__name {
+  min-width: 0;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bapr__name:hover { color: var(--text-link); text-decoration: underline; }
+
+.bapr__meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); font-size: var(--fs-xs); }
+.bapr__why {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+/* Where the sign-in actually goes when nothing above catches it. Same glyph
+   and same two-line body as the default row the template preview draws, on
+   purpose: one object, one shape for it, wherever it is read. */
+.bapr__fall {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: var(--bw-thin) dashed var(--border-default);
+  border-radius: var(--radius-md);
+}
+.bapr__fall .bapr__body strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bapr__fall .bapr__body span { font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* A brand tint on the row that just arrived, so the write is visible in the
+   list rather than only in a toast that is already fading. */
+.bapr__row.is-new { animation: bapr-land 900ms var(--ease-standard); }
+@keyframes bapr-land {
+  from { background: var(--brand-subtle-bg); border-color: var(--brand); }
+  to { background: var(--surface-raised); border-color: var(--border-subtle); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bapr__row.is-new { animation: none; }
+}
+
+/* --- The form ------------------------------------------------------------- */
+
+/* Permanently open, at the foot of the panel. Not behind a button and not in a
+   disclosure: the whole request was a form rather than an option, and a form
+   you have to reveal is an option with extra steps. */
+.bapr__form {
+  margin-top: var(--space-7);
+  padding: var(--space-5) 0 0;
+  border: 0;
+  border-top: var(--bw-thin) solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.bapr__form legend { padding: 0; margin-bottom: var(--space-2); }
+
+.bapr__choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 2px var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.bapr__choice:hover { border-color: var(--border-strong); }
+.bapr__choice.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bapr__choice.is-disabled { opacity: 0.6; cursor: not-allowed; }
+.bapr__choice input { grid-row: 1 / span 2; accent-color: var(--brand); }
+.bapr__choicename { font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bapr__choicehint { font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
+
+.bapr__pick { display: flex; flex-direction: column; gap: var(--space-4); padding-top: var(--space-2); }
+/* An unexplained absence is how a correct exclusion turns into folklore about
+   a broken picker. */
+.bapr__nodefault { margin-top: calc(-1 * var(--space-2)); font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
+
+.bapr__note {
+  margin-right: auto;
+  max-width: 34ch;
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+  line-height: 1.45;
+}
+
+.bapr__confirm { display: flex; flex-direction: column; gap: var(--space-4); font-size: var(--fs-base); line-height: 1.55; color: var(--text-body); }
+.bapr__confirm em { font-style: normal; font-weight: var(--fw-medium); color: var(--text-primary); }

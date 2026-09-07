@@ -32,12 +32,37 @@ export const enforces = (p: { status: PolicyStatus }) =>
 /** Runs and records what it would have done. Enforcing implies evaluating. */
 export const evaluates = (p: { status: PolicyStatus }) => enforces(p) || p.status === 'monitor'
 
+/* What the console calls "App Type", and it is NOT the protocol.
+
+   The live page types its one row "Desktop" while naming it "Default API App",
+   which does not parse as a protocol family — so this is a separate field and
+   it deliberately does not track `protocol`. Slack, Zoom and Box are SAML and
+   OIDC apps typed Desktop here.
+
+   The vocabulary is borrowed rather than invented, and says so: `Desktop` is
+   the only value ever observed on that page; the other two are lifted from the
+   protocol filter on the add-application screen, which is a different control
+   on a different page. Widen this union from that filter's list if a fixture
+   needs more — never from imagination. */
+export type AppType = 'SAML/WS-FED' | 'OAuth/OpenID' | 'Desktop'
+
 export interface App {
   id: string
   name: string
   protocol: 'SAML' | 'OIDC'
   glyph: string
   tint: string
+  type: AppType
+  /* Pre-formatted, exactly as `Policy.lastModified` is two hundred lines down,
+     and for the same reason: the console prints one shape, nothing here
+     computes a second, so the fixture holds what the page shows.
+
+     FABRICATED, and named as fabricated the way the `users` note is — there is
+     no audit trail behind these timestamps. The FORMAT is real, taken from the
+     live page ("Aug 14, 2026, 14:25:51"); the values are not. Anything that
+     sorts on this must sort on the order the fixture states, not on a parse of
+     the string. */
+  lastUpdated: string
 }
 
 export interface Group {
@@ -512,16 +537,16 @@ export interface Template {
 // --- Seed --------------------------------------------------------------------
 
 export const apps: App[] = [
-  { id: 'salesforce', name: 'Salesforce', protocol: 'SAML', glyph: '☁', tint: '#199fd8' },
-  { id: 'workday', name: 'Workday', protocol: 'SAML', glyph: '▲', tint: '#f5a623' },
-  { id: 'github', name: 'GitHub Enterprise', protocol: 'OIDC', glyph: '◐', tint: '#24292e' },
-  { id: 'm365', name: 'Microsoft 365', protocol: 'SAML', glyph: '▦', tint: '#e14c2a' },
-  { id: 'jira', name: 'Jira', protocol: 'OIDC', glyph: '◆', tint: '#2684ff' },
-  { id: 'slack', name: 'Slack', protocol: 'SAML', glyph: '✳', tint: '#611f69' },
-  { id: 'aws', name: 'AWS Console', protocol: 'SAML', glyph: '◢', tint: '#ff9900' },
-  { id: 'zoom', name: 'Zoom', protocol: 'SAML', glyph: '▣', tint: '#2d8cff' },
-  { id: 'box', name: 'Box', protocol: 'OIDC', glyph: '▢', tint: '#0061d5' },
-  { id: 'servicenow', name: 'ServiceNow', protocol: 'SAML', glyph: '◉', tint: '#62d84e' },
+  { id: 'salesforce', name: 'Salesforce', protocol: 'SAML', glyph: '☁', tint: '#199fd8', type: 'SAML/WS-FED', lastUpdated: 'Aug 14, 2026, 14:25:51' },
+  { id: 'workday', name: 'Workday', protocol: 'SAML', glyph: '▲', tint: '#f5a623', type: 'SAML/WS-FED', lastUpdated: 'Aug 02, 2026, 09:11:04' },
+  { id: 'github', name: 'GitHub Enterprise', protocol: 'OIDC', glyph: '◐', tint: '#24292e', type: 'OAuth/OpenID', lastUpdated: 'Jul 28, 2026, 17:40:22' },
+  { id: 'm365', name: 'Microsoft 365', protocol: 'SAML', glyph: '▦', tint: '#e14c2a', type: 'SAML/WS-FED', lastUpdated: 'Aug 21, 2026, 11:03:47' },
+  { id: 'jira', name: 'Jira', protocol: 'OIDC', glyph: '◆', tint: '#2684ff', type: 'OAuth/OpenID', lastUpdated: 'Jun 09, 2026, 08:52:19' },
+  { id: 'slack', name: 'Slack', protocol: 'SAML', glyph: '✳', tint: '#611f69', type: 'Desktop', lastUpdated: 'Aug 30, 2026, 16:18:35' },
+  { id: 'aws', name: 'AWS Console', protocol: 'SAML', glyph: '◢', tint: '#ff9900', type: 'SAML/WS-FED', lastUpdated: 'May 17, 2026, 13:07:58' },
+  { id: 'zoom', name: 'Zoom', protocol: 'SAML', glyph: '▣', tint: '#2d8cff', type: 'Desktop', lastUpdated: 'Jul 03, 2026, 10:44:12' },
+  { id: 'box', name: 'Box', protocol: 'OIDC', glyph: '▢', tint: '#0061d5', type: 'Desktop', lastUpdated: 'Apr 26, 2026, 15:29:06' },
+  { id: 'servicenow', name: 'ServiceNow', protocol: 'SAML', glyph: '◉', tint: '#62d84e', type: 'SAML/WS-FED', lastUpdated: 'Sep 01, 2026, 07:33:41' },
 ]
 
 /* The synthetic `all` row is gone.

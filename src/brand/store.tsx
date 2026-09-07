@@ -77,6 +77,14 @@ export type BrandScreen =
   | { name: 'hooks' }
   | { name: 'methods' }
   | { name: 'create' }
+  /* The admin's application catalogue — the console's Apps page.
+
+     NOT `apps`. That name is taken directly below by the end-user launcher,
+     and `store.apps` already means the admin's list, so a route called `apps`
+     that means the launcher while the collection called `apps` means the
+     catalogue is an ambiguity worth not compounding. The misleading name stays
+     confined to the one place it already is. */
+  | { name: 'applications' }
   /* End-user only: the app launcher the person lands on. The real product's
      end-user site has exactly two places — this and Setup 2FA — which is why
      it has a top bar and no rail to put one in. */

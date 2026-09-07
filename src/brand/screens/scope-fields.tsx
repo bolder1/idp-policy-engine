@@ -61,3 +61,35 @@ export function ApplicationField({ appId, onChange }: { appId: string | null; on
     />
   )
 }
+
+/* The application, stated. For a caller that already knows which one it is.
+
+   The Applications screen opens the naming dialog from a row, so the answer is
+   the row. Asking again would be offering a choice whose only other outcomes
+   are wrong: pick a different application there and the panel you return to is
+   about an app the policy does not protect, with no way for that surface to
+   represent the result.
+
+   Not a disabled `Picker`. `Picker` has no whole-control `disabled` prop —
+   only per-option — so adding one for this caller would give every other
+   picker in the console a state nobody asked for; and a greyed combobox reads
+   "you could change this, but not now", which is not what is true. A plain
+   statement reads "this is what it is", and it takes a tab stop out of the
+   dialog's focus trap so Enter has one obvious meaning.
+
+   It lives here rather than in the dialog because this module's whole purpose
+   is that the question is asked in one place. A third rendering of it
+   elsewhere restarts the drift this file was made to end. */
+export function ApplicationFixed({ appId }: { appId: string }) {
+  const store = useBrand()
+  const app = store.apps.find((a) => a.id === appId)
+  if (!app) return null
+  return (
+    <div className="bname2__fixed">
+      <AppLogo appId={app.id} name={app.name} size={20} />
+      <strong>{app.name}</strong>
+      <span className="u-muted">{app.protocol}</span>
+      <em>Set by the application you opened this from.</em>
+    </div>
+  )
+}

@@ -36,8 +36,11 @@ const asRule = (when: Predicate, decision: AccessDecision = '1fa') => ({ when, d
 const ruleWith = (p: Predicate): Rule => asRule(p)
 
 describe('the parts themselves', () => {
-  it('are three, in the order a rule is written', () => {
-    expect([...PARTS]).toEqual(['who', 'when', 'then'])
+  it('are two, in the order a rule is written', () => {
+    /* `then` shares the Condition pane: "when this happens, do that" is one
+       thought, and it had a pane of its own for exactly as long as it took to
+       use one. */
+    expect([...PARTS]).toEqual(['who', 'when'])
   })
 
   it('label the middle one Condition while its id stays when', () => {
@@ -48,22 +51,21 @@ describe('the parts themselves', () => {
 
   it('default to Who when a selection names no part', () => {
     expect(ruleAt('r1')).toEqual({ kind: 'rule', id: 'r1', part: 'who' })
-    expect(ruleAt('r1', 'then')).toEqual({ kind: 'rule', id: 'r1', part: 'then' })
+    expect(ruleAt('r1', 'when')).toEqual({ kind: 'rule', id: 'r1', part: 'when' })
   })
 })
 
 describe('nextPart', () => {
   it('steps forward and back', () => {
     expect(nextPart('who', 1)).toBe('when')
-    expect(nextPart('when', 1)).toBe('then')
     expect(nextPart('when', -1)).toBe('who')
   })
 
   it('wraps rather than clamping', () => {
-    /* `[` and `]` are the only route between parts on the keyboard, and a `]`
-       on Then that does nothing is a key that appears broken. */
-    expect(nextPart('then', 1)).toBe('who')
-    expect(nextPart('who', -1)).toBe('then')
+    /* `[` and `]` are a route between parts on the keyboard, and a `]` that
+       does nothing is a key that appears broken. */
+    expect(nextPart('when', 1)).toBe('who')
+    expect(nextPart('who', -1)).toBe('when')
   })
 
   it('returns to where it started after a full lap', () => {
@@ -74,13 +76,11 @@ describe('nextPart', () => {
 })
 
 describe('partSummary', () => {
-  it('names the outcome on Then', () => {
-    expect(partSummary(asRule(when(), 'deny'), 'then', resolve).text).toBe('Deny')
-  })
-
-  it('calls an empty predicate any sign-in, and dims it', () => {
-    const s = partSummary(ruleWith(when()), 'when', resolve)
-    expect(s).toEqual({ text: 'Any sign-in', dim: true })
+  it('carries the outcome with the count, because they share a pane', () => {
+    /* `then` stopped being a part of its own: the outcome is the second half of
+       the sentence the condition starts, and one phrase says both. */
+    const s = partSummary(asRule(when(), 'deny'), 'when', resolve)
+    expect(s).toEqual({ text: 'Any sign-in → Deny', dim: true })
   })
 
   it('counts conditions, and does not count the who among them', () => {
@@ -90,17 +90,19 @@ describe('partSummary', () => {
     const r = ruleWith(
       when(card(cond('group', 'in', ['finance']), cond('country', 'is', ['IN']), cond('time', 'between', ['09:00', '17:00']))),
     )
-    expect(partSummary(r, 'when', resolve).text).toBe('2 conditions')
+    expect(partSummary(r, 'when', resolve).text).toBe('2 conditions → Let in')
   })
 
   it('says any sign-in when the only condition is a who', () => {
     // A rule that names a group and nothing else tests no circumstances at all.
     const r = ruleWith(when(card(cond('group', 'in', ['finance']))))
-    expect(partSummary(r, 'when', resolve)).toEqual({ text: 'Any sign-in', dim: true })
+    expect(partSummary(r, 'when', resolve)).toEqual({ text: 'Any sign-in → Let in', dim: true })
   })
 
   it('singularises one condition', () => {
-    expect(partSummary(ruleWith(when(card(cond('country', 'is', ['IN'])))), 'when', resolve).text).toBe('1 condition')
+    expect(partSummary(ruleWith(when(card(cond('country', 'is', ['IN'])))), 'when', resolve).text).toBe(
+      '1 condition → Let in',
+    )
   })
 
   it('says Everyone, dimmed, when the rule names nobody', () => {
@@ -130,6 +132,6 @@ describe('partSummary', () => {
 
   it('still counts the conditions of an OR-shaped rule across every alternative', () => {
     const r = ruleWith(when(card(cond('group', 'in', ['finance'])), card(cond('country', 'is', ['IN']))))
-    expect(partSummary(r, 'when', resolve).text).toBe('1 condition')
+    expect(partSummary(r, 'when', resolve).text).toBe('1 condition → Let in')
   })
 })

@@ -193,8 +193,9 @@ export function CheckTab({
                       variant="neutral"
                       onClick={() => {
                         /* A rehearsal that landed ended in an OUTCOME, and
-                           that is what you came to look at. */
-                        onSelect(ruleAt(draft.rules[r.hitIndex!].id, 'then'))
+                           the outcome shares a pane with the test that
+                           produced it. */
+                        onSelect(ruleAt(draft.rules[r.hitIndex!].id, 'when'))
                         onClose()
                       }}
                     >
@@ -247,7 +248,7 @@ export function CheckTab({
               onOverride={(want) => store.setGauntletOverride(draft.id, round.challenge.id, want)}
               onJump={(i) => {
                 // A gauntlet round names the rule that DECIDED it.
-                onSelect(ruleAt(draft.rules[i].id, 'then'))
+                onSelect(ruleAt(draft.rules[i].id, 'when'))
                 onClose()
               }}
               onApply={(fix) => onApplyRules(applyFix(draft.rules, fix), fix.headline)}

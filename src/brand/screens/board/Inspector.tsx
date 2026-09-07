@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { Maximize2, Plus, X } from 'lucide-react'
 
 import { Modal, Toggle } from '../../kit'
 import { restConditions } from '../../audience-ops'
 import { fallbackRule, type Audience, type Policy, type Rule } from '../../data'
-import { TONE, type Part, type Selection } from './model'
+import { PARTS, TONE, type Part, type Selection } from './model'
 import { PART_LABEL } from './parts'
 import { WhatEditor } from './WhatEditor'
 import { WhenEditor } from './WhenEditor'
@@ -70,10 +70,8 @@ export function Inspector({
   const pane =
     !rule || !part ? null : part === 'who' ? (
       <WhoPane rule={rule} audience={draft.audience} onPatch={patch} onOpenPart={onOpenPart} />
-    ) : part === 'when' ? (
-      <ConditionPane rule={rule} onPatch={patch} />
     ) : (
-      <ThenPane rule={rule} onPatch={patch} />
+      <ConditionPane rule={rule} onPatch={patch} />
     )
 
   return (
@@ -135,6 +133,32 @@ export function Inspector({
             <motion.div key={`head:${rule.id}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
               <RuleHead rule={rule} index={at} onPatch={patch} />
             </motion.div>
+            {/* The two questions, as tabs on the form.
+
+                They were a row of buttons on the CARD, which put the
+                navigation on the canvas and the thing it navigated in the
+                panel — so choosing what to edit meant looking away from where
+                the editing happens, and every card carried two more controls
+                whether or not it was the one you were working on.
+
+                On the form they are where the work is, they cost the canvas
+                nothing, and the card goes back to being a reading of the rule
+                rather than a control surface. Clicking a card still opens Who,
+                which is the first question and the one people start with. */}
+            <div className="bb__panetabs" role="tablist" aria-label="Which part of this rule">
+              {PARTS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  role="tab"
+                  aria-selected={part === p}
+                  className={part === p ? 'is-on' : ''}
+                  onClick={() => onOpenPart(p)}
+                >
+                  {PART_LABEL[p]}
+                </button>
+              ))}
+            </div>
             <motion.div key={`pane:${rule.id}:${part}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
               {pane}
             </motion.div>
@@ -212,18 +236,23 @@ function ConditionPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
         <p>And in what circumstances?</p>
       </div>
       <WhenEditor rule={rule} onPatch={onPatch} openAt={openAt} />
-    </div>
-  )
-}
 
-function ThenPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
-  return (
-    <div className="bb__ask bb__ask--pane">
-      <div className="bb__ask__head">
-        <h3>Then</h3>
-        <p>What happens when it matches?</p>
+      {/* THEN, in the same pane, because it is the second half of the sentence
+          the condition starts.
+
+          It had a pane of its own for exactly as long as it took to use one:
+          "when this happens, do that" is one thought, and answering it meant
+          changing panes in the middle of it. Two sections under one header,
+          which is the shape they had before the split — and the split's one
+          good idea, that WHO is a different question, is the part that
+          survives. */}
+      <div className="bb__ask bb__ask--next">
+        <div className="bb__ask__head">
+          <h3>Then</h3>
+          <p>What happens when it matches?</p>
+        </div>
+        <WhatEditor rule={rule} onPatch={onPatch} />
       </div>
-      <WhatEditor rule={rule} onPatch={onPatch} />
     </div>
   )
 }
@@ -255,6 +284,28 @@ function RuleHead({
   focus?: boolean
   onPatch: (p: Partial<Rule>) => void
 }) {
+  /* The note is asked for, not offered.
+
+     It was a two-row textarea sitting under the name on every rule, empty on
+     most of them, carrying a placeholder that had to explain what the field was
+     even for — "What is this for? A regulator, an incident, an audit finding…".
+     That is a lot of permanent furniture for an optional field, and it put the
+     largest control in the panel above the question the panel exists to answer:
+     on a 400px column the Who list started below the fold because of an empty
+     box nobody had asked for.
+
+     So: a button until somebody wants it. Once there is a note the field is
+     simply there, because then it is content rather than an invitation — and a
+     note that hid itself again after being written would be a note you could
+     not find.
+
+     Opened state is local and deliberately not derived from focus or
+     selection: it is a fact about what this person is doing right now, and it
+     should not survive them moving to another rule. */
+  const [writing, setWriting] = useState(false)
+  const note = useRef<HTMLTextAreaElement>(null)
+  const shown = writing || Boolean(rule.description)
+
   return (
     <div className={`bb__insphead ${focus ? 'is-focus' : ''}`}>
       <span className={`bb__idx is-${TONE[rule.decision]}`} aria-hidden>
@@ -262,14 +313,34 @@ function RuleHead({
       </span>
       <div className="bb__inspname">
         <input className="bb__input bb__input--title" aria-label="Rule name" value={rule.name} placeholder="Name this rule" onChange={(e) => onPatch({ name: e.target.value })} />
-        <textarea
-          className="bb__input bb__input--desc"
-          rows={focus ? 1 : 2}
-          aria-label="What this rule is for"
-          placeholder="What is this for? A regulator, an incident, an audit finding…"
-          value={rule.description ?? ''}
-          onChange={(e) => onPatch({ description: e.target.value || undefined })}
-        />
+        {shown ? (
+          <textarea
+            ref={note}
+            className="bb__input bb__input--desc"
+            rows={focus ? 1 : 2}
+            aria-label="What this rule is for"
+            placeholder="A regulator, an incident, an audit finding…"
+            value={rule.description ?? ''}
+            /* Emptying it puts the button back, because `description` becomes
+               undefined and `writing` is only true while this visit opened it.
+               Clearing the box IS how you remove the note. */
+            onChange={(e) => onPatch({ description: e.target.value || undefined })}
+          />
+        ) : (
+          <button
+            type="button"
+            className="bb__addnote"
+            onClick={() => {
+              setWriting(true)
+              /* After the paint that mounts it. Focusing in the same tick
+                 focuses a textarea that does not exist yet. */
+              requestAnimationFrame(() => note.current?.focus())
+            }}
+          >
+            <Plus size={12} strokeWidth={2.4} aria-hidden />
+            Add a note
+          </button>
+        )}
       </div>
       <Toggle checked={rule.enabled} onChange={(enabled) => onPatch({ enabled })} label={rule.enabled ? 'On' : 'Off'} size="sm" />
     </div>

@@ -1,4 +1,4 @@
-import { ArrowRight, Split, Users, type LucideIcon } from 'lucide-react'
+import { Split, Users, type LucideIcon } from 'lucide-react'
 
 import { restConditions, whoEditable, whoIds } from '../../audience-ops'
 import type { Rule } from '../../data'
@@ -22,33 +22,17 @@ import { DECISION_SHORT, type Part } from './model'
    inside the predicate — `if … and … then` is the grammar of the thing, and it
    stays. This names the question you OPEN, and the word for that is the one
    the person asking for it used. The id underneath is still `'when'`. */
-export const PART_LABEL: Record<Part, string> = { who: 'Who', when: 'Condition', then: 'Then' }
-
-/* The two the CARD offers a door to.
-
-   Three buttons was one per pane, which is tidy and wrong: the card already
-   READS its outcome — "then Deny · Refused, no prompt" is right there in the
-   body — so a third button to go and look at what is printed under it was a
-   door to a room you are standing in. Who and Condition are the two that need
-   opening, because the card states them in a phrase and editing them is where
-   the work is.
-
-   Then keeps its pane, reached with `]` from Condition or by opening the whole
-   rule. It is not reachable from the card, and that is the trade. */
-export const CARD_PARTS = ['who', 'when'] as const
+export const PART_LABEL: Record<Part, string> = { who: 'Who', when: 'Condition' }
 
 export const PART_HINT: Record<Part, string> = {
   who: 'Which people is this rule about?',
-  when: 'And in what circumstances?',
-  then: 'What happens when it matches?',
+  when: 'In what circumstances, and what happens then?',
 }
 
-/* The three glyphs the card already draws with: `Users` is what the who rows
-   used, `Split` is the branch mark on the summary line and at the head of
-   every `if`, and `ArrowRight` is the arrow between the test and the outcome.
-   Nothing new is introduced — the buttons are labelling parts of the card that
-   were already there. */
-export const PART_ICON: Record<Part, LucideIcon> = { who: Users, when: Split, then: ArrowRight }
+/* Glyphs the card already draws with: `Users` is what the who rows used and
+   `Split` is the branch mark at the head of every `if`. Nothing new is
+   introduced — the buttons label parts of the card that were already there. */
+export const PART_ICON: Record<Part, LucideIcon> = { who: Users, when: Split }
 
 /** What a part button says after its label, and whether that reads as unset. */
 export interface PartSummary {
@@ -70,11 +54,15 @@ export interface PartSummary {
    "Any sign-in" for the empty case, because a rule with no conditions does not
    test less — it tests nothing, and it catches everything that reaches it. */
 export function partSummary(rule: Rule, part: Part, resolve: NameLookup): PartSummary {
-  if (part === 'then') return { text: DECISION_SHORT[rule.decision], dim: false }
-
   if (part === 'when') {
+    /* The count AND the outcome, because they share a pane now. "2 conditions
+       → Deny" is the whole of the second question in one phrase, which is what
+       the folded card used to say before any of this. */
     const n = restConditions(rule.when).length
-    return n === 0 ? { text: 'Any sign-in', dim: true } : { text: `${n} condition${n === 1 ? '' : 's'}`, dim: false }
+    const outcome = DECISION_SHORT[rule.decision]
+    return n === 0
+      ? { text: `Any sign-in → ${outcome}`, dim: true }
+      : { text: `${n} condition${n === 1 ? '' : 's'} → ${outcome}`, dim: false }
   }
 
   /* On an OR of alternatives the who belongs to each way in rather than to the

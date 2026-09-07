@@ -2,6 +2,7 @@ import { Fragment, type MouseEvent, type ReactNode } from 'react'
 import { ArrowRight, CornerDownRight, Split, Users } from 'lucide-react'
 
 import { isWho, whoEditable, whoIds } from '../../audience-ops'
+import { AvatarStack } from './Avatar'
 import { conditionType, type Condition, type Rule } from '../../data'
 import { cardJoin, topJoin } from '../../predicate'
 import type { NameLookup } from '../predicate-prose'
@@ -253,15 +254,12 @@ export function IfBlock({ rule, next, resolve, token, terminal }: { rule: Rule; 
             <Users size={12} strokeWidth={2} />
           </span>
           <span className="bb__ifkw">who</span>
-          {whoNames.length === 0 ? (
-            <IfChip muted>everyone</IfChip>
-          ) : (
-            whoNames.map((n) => (
-              <IfChip key={n} tone="info">
-                {n}
-              </IfChip>
-            ))
-          )}
+          {/* A stack, not a chip per name. It was one chip each, which is four
+              lines of them at eighteen people inside a rule somebody is trying
+              to read at a glance — and a real tenant has thousands. Five marks,
+              the first name in words and a count: the same width whatever it
+              holds. */}
+          <AvatarStack names={whoNames} />
         </div>
       )}
       {cards.length === 0 ? (

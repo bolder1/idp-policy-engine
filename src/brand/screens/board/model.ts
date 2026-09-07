@@ -66,8 +66,15 @@ export type Selection = { kind: 'none' } | { kind: 'rule'; id: string; part: Par
    `when-ops.ts`, the editor is `WhenEditor`. There are already three names for
    that one thing and a fourth id would be exactly the drift this file's
    comments spend their life undoing. The SCREEN says Condition — see
-   `PART_LABEL` in `parts.ts`. Ids follow the model; labels follow the person. */
-export const PARTS = ['who', 'when', 'then'] as const
+   `PART_LABEL` in `parts.ts`. Ids follow the model; labels follow the person.
+
+   TWO, not three. `'then'` was a pane of its own for exactly as long as it took
+   to use: the outcome is the second half of the sentence the condition starts,
+   and splitting them made you change panes mid-thought to answer "when this
+   happens, do that". They share a pane again — which is what they had before
+   the split, and the split's one good idea, that WHO is a different question,
+   survives it. */
+export const PARTS = ['who', 'when'] as const
 export type Part = (typeof PARTS)[number]
 
 /* The one constructor, so the default part is written down once.

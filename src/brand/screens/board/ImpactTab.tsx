@@ -87,7 +87,7 @@ export function ImpactTab({
 
   const jump = (i: number) => {
     // "This rule now decides it" is a statement about the outcome.
-    onSelect(ruleAt(draft.rules[i].id, 'then'))
+    onSelect(ruleAt(draft.rules[i].id, 'when'))
     onClose()
   }
 

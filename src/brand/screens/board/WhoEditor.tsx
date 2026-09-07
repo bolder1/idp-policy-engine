@@ -3,20 +3,19 @@ import { Check, UserRound, Users } from 'lucide-react'
 
 import { Button } from '../../kit'
 import { useBrand, useNameLookup } from '../../store'
-import { conditionType, type Audience, type Predicate, type Rule } from '../../data'
+import type { Audience, Predicate, Rule } from '../../data'
 import { cardLetter } from '../../predicate'
 import {
   isWho,
   outsideAudience,
   setWho,
-  setWhoOperator,
   whoEditable,
   whoIds,
   whoOperator,
   type WhoType,
 } from '../../audience-ops'
 import { conditionSentence } from '../predicate-prose'
-import { Seg } from './Section'
+import { Avatar } from './Avatar'
 import type { Part } from './model'
 
 /* -----------------------------------------------------------------------------
@@ -49,18 +48,19 @@ import type { Part } from './model'
    to remember to remove.
    -------------------------------------------------------------------------- */
 
-/* "Any of these" / "None of these" rather than `in` / `not in`.
+/* What a fresh who-condition is written with.
 
-   That is what the operators MEAN about a list, and this is a list. The raw
-   string round-trips untouched, which matters more than it looks: the evaluator
-   tests `c.operator.includes('not')` as a substring and nothing validates these
-   strings anywhere, so the words are a label and never a value. */
-const OP_WORD: Record<string, string> = {
-  in: 'Any of these',
-  'not in': 'None of these',
-  is: 'Any of these',
-  'is not': 'None of these',
-}
+   The pane used to carry an "Any of these / None of these" segment per tab and
+   it is gone. Ticking a name in a list called "Who" means the rule is about
+   them; the segment offered the opposite reading of the same ticks, one click
+   away, with nothing in the list itself changing to show which of the two was
+   in force. Two readings of one set of checkboxes is not a setting, it is a
+   trap.
+
+   An exclusion is still expressible — it is an ordinary condition, and the
+   Condition pane edits it as one. What this pane will no longer do is offer to
+   invert the meaning of its own list. */
+const AFFIRMATIVE: Record<WhoType, string> = { group: 'in', user: 'is' }
 
 /** How many avatars are drawn before the rest become a count. */
 const AVATAR_CAP = 6
@@ -84,27 +84,17 @@ export function WhoEditor({
   const [tab, setTab] = useState<WhoType>('group')
   const [q, setQ] = useState('')
 
-  /* The operator the form intends, for while there is no condition to hold it.
-
-     Two traps a visible list makes reachable in one gesture. The exclusion is
-     lost on a round trip through empty: `not in [contractors]` → untick the
-     last one → the condition is DELETED → `whoOperator` falls back to the
-     default `in` → tick a group → you have built a narrowing where an exclusion
-     was, and the only visible change was a checkbox. And `setWhoOperator` is a
-     no-op when nothing is picked, so above an empty list "None of these" was a
-     visibly dead button.
-
-     Answered here rather than in `setWho`, which is pure and stateless by
-     design and has nowhere to keep a remembered operator. The model wins
-     whenever it has an opinion: this is read only while there is no condition,
-     so an undo that restores `not in` shows immediately. */
-  const [pending, setPending] = useState<Record<WhoType, string>>({ group: 'in', user: 'is' })
 
   if (!whoEditable(rule.when)) return <WhoStandDown rule={rule} onOpenPart={onOpenPart} />
 
   const groupIds = whoIds(rule.when, 'group')
   const userIds = whoIds(rule.when, 'user')
-  const opFor = (k: WhoType) => (whoIds(rule.when, k).length > 0 ? whoOperator(rule.when, k) : pending[k])
+  /* Reads the stored operator and never changes it. Removing the control must
+     not silently rewrite a rule that already excludes: an exclusion built in
+     the Condition pane survives every tick and untick here, and is reported
+     below rather than being quietly read as its opposite. */
+  const opFor = (k: WhoType) => (whoIds(rule.when, k).length > 0 ? whoOperator(rule.when, k) : AFFIRMATIVE[k])
+  const negated = (k: WhoType) => whoIds(rule.when, k).length > 0 && opFor(k).includes('not')
   const outside = outsideAudience(audience, groupIds, userIds, store.users)
   const ids = tab === 'group' ? groupIds : userIds
 
@@ -117,10 +107,6 @@ export function WhoEditor({
     write(setWho(rule.when, kind, on ? [...new Set([...now, id])] : now.filter((x) => x !== id), opFor(kind)))
   }
 
-  const flip = (o: string) => {
-    setPending((p) => ({ ...p, [tab]: o }))
-    write(setWhoOperator(rule.when, tab, o))
-  }
 
   /* Everything chosen, both kinds, in one row above the tabs — which is the
      whole reason the lists became tabs. Two stacked sections could only ever
@@ -180,17 +166,19 @@ export function WhoEditor({
           {userIds.length > 0 && <b>{userIds.length}</b>}
         </button>
 
-        {/* The operator belongs to the list it governs, so it rides on the tab
-            strip and changes meaning with the tab. */}
-        <span className="bb__whoop">
-          <Seg
-            value={opFor(tab)}
-            options={conditionType(tab).operators.map((o) => ({ value: o, label: OP_WORD[o] ?? o }))}
-            onChange={flip}
-            label={tab === 'group' ? 'How the groups are matched' : 'How the people are matched'}
-          />
-        </span>
       </div>
+
+      {/* An exclusion cannot be BUILT here any more, but one that already
+          exists must not be drawn as its opposite. A rule can arrive holding
+          `not in` — the Condition pane edits who-conditions directly whenever
+          the rule has more than one way in, and deleting an alternative can
+          then hand a negated condition back to this pane. Ticks that mean
+          "everyone except these" say so. */}
+      {negated(tab) && (
+        <p className="bb__whohint is-warn">
+          These are <b>excluded</b> — the rule covers everyone else. Change that in Condition.
+        </p>
+      )}
 
       {/* People are a directory and groups are a list that ends — so only one
           of them gets a search box. */}
@@ -223,7 +211,7 @@ export function WhoEditor({
               <span className="bb__whotick" aria-hidden>
                 {on && <Check size={12} strokeWidth={3} />}
               </span>
-              <Avatar name={r.name} />
+              <Avatar name={r.name} on={on} />
               <b>{r.name}</b>
               <em>{r.meta}</em>
               {/* Both badges inform and neither blocks — no disabled rows,
@@ -260,21 +248,6 @@ export function WhoEditor({
   )
 }
 
-/* A round mark with one letter.
-
-   Deliberately not initials from two words: half these names are one word, and
-   a stack where some marks carry one letter and some two reads as two kinds of
-   thing. The tint is derived from the name so the same group is the same colour
-   everywhere it appears, without a colour having to be stored on anything. */
-function Avatar({ name }: { name: string }) {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360
-  return (
-    <span className="bb__avatar" style={{ background: `hsl(${h} 62% 92%)`, color: `hsl(${h} 58% 32%)` }} aria-hidden>
-      {name.slice(0, 1).toUpperCase()}
-    </span>
-  )
-}
 
 function WhoChosen({
   chosen,
@@ -312,7 +285,7 @@ function WhoChosen({
             aria-label={`Remove ${c.name}`}
             onClick={() => onRemove(c.kind, c.id)}
           >
-            <Avatar name={c.name} />
+            <Avatar name={c.name} on />
             <span>{c.name}</span>
           </button>
         )

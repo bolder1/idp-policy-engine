@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
 import { motion } from 'motion/react'
-import { ArrowDown, ArrowRight, ArrowUp, ChevronsDownUp, ChevronsUpDown, Copy, GripVertical, Home, Lock, Split, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, ChevronsDownUp, ChevronsUpDown, Copy, GripVertical, Home, Lock, Split, Trash2, Users } from 'lucide-react'
 
 import { Toggle } from '../../kit'
+import { restConditions, whoEditable, whoIds } from '../../audience-ops'
+import { AvatarStack } from './Avatar'
 import { type Rule } from '../../data'
 import type { NameLookup } from '../predicate-prose'
 import type { StepKind } from '../simulate'
 import type { RuleState } from '../rule-form'
 import { DECISION_NAME, TONE, type Part } from './model'
-import { CARD_PARTS, PART_HINT, PART_ICON, PART_LABEL, partSummary } from './parts'
 import { IfBlock, IfChip, type NextRule } from './IfBlock'
 
 /* -----------------------------------------------------------------------------
@@ -50,10 +51,31 @@ const STATE_LABEL: Record<RuleState, string> = { ready: 'Ready', setup: 'Needs s
    "any sign-in" rather than "0 conditions" for the empty case: a rule with no
    conditions does not test less, it tests nothing, and it catches everything
    that reaches it. That is the fact worth putting on a folded card. */
-function CardSummary({ rule }: { rule: Rule }) {
-  const n = rule.when.cards.reduce((sum, k) => sum + k.conditions.length, 0)
+function CardSummary({ rule, resolve }: { rule: Rule; resolve?: NameLookup }) {
+  /* `restConditions`, not every leaf. The who is reported separately at the
+     head of this line now, and counting a group twice inflates the number the
+     line exists to give. */
+  const n = restConditions(rule.when).length
+  const who = resolve
+    ? [
+        ...whoIds(rule.when, 'group').map((id) => resolve('group', id) ?? id),
+        ...whoIds(rule.when, 'user').map((id) => resolve('user', id) ?? id),
+      ]
+    : []
   return (
     <div className="bb__cardsum">
+      {/* Who first, because it is the subject. A folded card said how much test
+          there was and what it decided, and never who it was about — which is
+          the one of the three you cannot infer from the others. */}
+      {resolve && whoEditable(rule.when) && (
+        <>
+          <Users size={11} strokeWidth={2} aria-hidden />
+          <AvatarStack names={who} />
+          <span className="bb__cardsum__dot" aria-hidden>
+            ·
+          </span>
+        </>
+      )}
       <span className="bb__ifbranch" aria-hidden>
         <Split size={11} strokeWidth={2} />
       </span>
@@ -122,14 +144,6 @@ export function RuleCard({
   const tone = TONE[rule.decision]
   const titleId = `bb-rule-${rule.id}-title`
   const selected = openPart !== null
-  const partsRow = useRef<HTMLDivElement>(null)
-  /* Which button the roving tabindex is parked on. Follows the open part when
-     there is one, so tabbing into a card whose Condition pane is showing lands
-     on Condition rather than at the start of the row. */
-  const [focusPart, setFocusPart] = useState<Part>('who')
-  useEffect(() => {
-    if (openPart === 'who' || openPart === 'when') setFocusPart(openPart)
-  }, [openPart])
   const kindClass = traceKind === 'hit' ? 'is-hit' : traceKind === 'miss' ? 'is-miss' : traceKind === 'unreached' || traceKind === 'off' ? 'is-unreached' : ''
 
   return (
@@ -306,93 +320,21 @@ export function RuleCard({
         </div>
       </div>
 
-      {/* The three questions a rule answers, as the three ways into it.
+      {/* The summary line is back, and the parts row has gone to the panel.
 
-          This is the line that used to sit in the summary fold saying
-          "3 conditions → Let in": the same two facts, plus the one it never
-          said — who the rule is about — and each third of it is now the door to
-          the panel that edits it. It REPLACES that line rather than joining it,
-          so a folded card is the height it has always been.
+          That row was three facts and two doors in one control, on every card
+          on the canvas. The doors are tabs on the form now — where the editing
+          happens, and where they cost the chain nothing — so what belongs here
+          is what belonged here before: a reading of the rule, which is all a
+          folded card ever needed to be. */}
+      {/* Two folds, opposite ways round.
 
-          A sibling of the head, not a fifth child of it. The head is a
-          four-column grid and a fifth child would land in an implicit column
-          and break the negative margin that tucks the fold button against the
-          index. It is also never hover-gated and never conditionally rendered,
-          which is what keeps it clear of the reflow-on-hover hazard the head
-          comment warns about.
+          The summary shrinks as the body grows, so the card never shows both
+          readings of itself at once and never jumps: one grid row goes
+          1fr→0fr while the other goes 0fr→1fr, on the same curve, and the
+          height between them is continuous.
 
-          Ghost buttons, not a segmented control. `.bb__seg` is right there and
-          wrong twice: its rules size everything at 26px with no room for a
-          value, and `role="radiogroup"` says one of these is the rule's current
-          VALUE. A part is not a value of the rule — it is which third of it you
-          are looking at, which is navigation. Hence `role="toolbar"`, a roving
-          tabindex, and `aria-expanded` pointing at the panel body it opens.
-
-          One tab stop per card, not three: without the roving tabindex this
-          would cost twenty-seven tab stops between the canvas and anything
-          after it. */}
-      <div
-        ref={partsRow}
-        className="bb__parts"
-        role="toolbar"
-        aria-orientation="horizontal"
-        aria-label={`Rule ${index + 1} - open a part`}
-        /* Exactly what the meta cluster does, and not optional. React runs this
-           row's button handler first and the card's own `onClick` second; both
-           set the selection, both batch into one tick, and the card's whole-rule
-           Who would overwrite the part you just asked for with nothing on
-           screen to say why. */
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
-          if (!d) return
-          e.preventDefault()
-          /* The window owns `[` and `]` for the board; inside this row the
-             arrows move focus and must not escape to it. */
-          e.stopPropagation()
-          const to = CARD_PARTS[(CARD_PARTS.indexOf(focusPart as (typeof CARD_PARTS)[number]) + d + CARD_PARTS.length) % CARD_PARTS.length]
-          partsRow.current?.querySelector<HTMLButtonElement>(`[data-part="${to}"]`)?.focus()
-        }}
-      >
-        {CARD_PARTS.map((p) => {
-          const s = partSummary(rule, p, resolve)
-          const on = openPart === p
-          const Ico = PART_ICON[p]
-          return (
-            <button
-              key={p}
-              type="button"
-              data-part={p}
-              className={`bb__part ${on ? 'is-open' : ''} ${s.dim ? 'is-dim' : ''}`}
-              aria-expanded={on}
-              aria-controls="bb-insp-body"
-              aria-label={`${PART_LABEL[p]} - ${PART_HINT[p]}`}
-              title={PART_HINT[p]}
-              /* Parked on the open part when the row draws it, and on Who
-                 otherwise — including when the panel is showing Then, which
-                 this row has no button for. */
-              tabIndex={(openPart === 'when' ? 'when' : 'who') === p ? 0 : -1}
-              onFocus={() => setFocusPart(p)}
-              onClick={() => onOpen(p)}
-            >
-              <Ico size={12} strokeWidth={2} aria-hidden />
-              <span className="bb__part__k">{PART_LABEL[p]}</span>
-              <span className="bb__part__v">{s.text}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* One fold now, and the counterweight has gone with the summary.
-
-          There were two: the summary shrank 1fr→0fr as the body grew 0fr→1fr,
-          so the card never showed both readings of itself and the height
-          between them was continuous. The summary is no longer a reading of the
-          card — it is the parts row, permanent, above both — so one disclosure
-          is left and it animates alone. Still continuous, still nothing
-          measured; the card simply grows, which is what a disclosure does.
-
-          It stays MOUNTED at zero height rather than being conditionally
+          Both stay MOUNTED at zero height rather than being conditionally
           rendered. `grid-template-rows` has nothing to animate from if the
           content arrives in the same frame as the class, so unmounting it would
           make the first press of the chevron jump and every press after it
@@ -404,6 +346,11 @@ export function RuleCard({
           in the tab order: Tab walked into a zero-height region and focus went
           somewhere invisible. The cast that silenced the type error was the
           tell that the value was wrong. */}
+      <div className="bb__fold bb__fold--sum" aria-hidden={expanded} inert={expanded}>
+        <div>
+          <CardSummary rule={rule} resolve={resolve} />
+        </div>
+      </div>
       <div className="bb__fold bb__fold--body" id={`bb-rule-${rule.id}-body`} inert={!expanded}>
         <div>
           <div className="bb__cardbody">

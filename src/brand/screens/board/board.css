@@ -355,54 +355,41 @@ button.bb__idx svg { display: none; }
 }
 .bb__cardsum svg { color: var(--text-muted); flex: none; }
 .bb__cardsum__n { font-size: var(--fs-sm); color: var(--text-secondary); }
+/* The folded line reads who · how much test · what it decides, and the dot is
+   what stops the first two running together. */
+.bb__cardsum__dot { color: var(--border-strong); }
+.bb__cardsum > svg { flex: none; color: var(--text-muted); }
 
-/* --- The parts row: the card is the navigation --------------------------------
+/* --- The panel's two tabs ------------------------------------------------------
 
-   This was `.bb__cardsum`, a read-only line inside the summary fold saying
-   "3 conditions → Let in". It is the same line, plus the fact it was missing —
-   who — and each third of it is now the way into the panel that edits it. The
-   rule card no longer draws the summary; the DEFAULT still does, because the
-   default has one part and a row of three buttons on it would be two lies and
-   a truth.
+   The doors between Who and Condition were a row of buttons on the CARD, which
+   put the navigation on the canvas and the thing it navigated in the panel: you
+   looked away from where the editing happens in order to choose what to edit,
+   and every card carried two more controls whether or not it was the one you
+   were working on.
 
-   Ghost buttons, not a segmented control. `.bb__seg` is right there and wrong
-   twice: its `> button` rules size everything at 26px with no room for a value,
-   and `role="radiogroup"` says one of these is the rule's current VALUE. A part
-   is not a value of the rule — it is which third of it you are looking at,
-   which is navigation.
+   On the form they cost the chain nothing and sit where the work is. The card
+   goes back to being a reading of the rule — which is what a card on a canvas
+   is for — and clicking one still opens Who, the question people start with.
 
-   The padding is `.bb__cardsum`'s, so the row lands where the line it replaces
-   landed and aligns to the card's left edge rather than optically under the
-   title: it is a fact about the whole card. */
-.bb__parts {
-  display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
-  padding: 0 var(--space-5) var(--space-4) var(--space-4);
+   Its own class rather than the kit's `Tabs`: this strip sits inside a 400px
+   panel above a form, and `.bb__insp .bx-tabs` was deleted precisely so nobody
+   would reach for that component in here again. */
+.bb__panetabs {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
 }
-.bb__part {
-  position: relative;
-  display: inline-flex; align-items: center; gap: 6px; min-width: 0;
-  height: 26px; padding: 0 8px;
-  border: none; border-radius: var(--radius-md); background: none;
-  font-family: inherit; font-size: var(--fs-xs); color: var(--text-tertiary);
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+.bb__panetabs > button {
+  height: 34px; padding: 0 var(--space-3);
+  border: none; background: none;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  font-family: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium);
+  color: var(--text-tertiary); cursor: pointer;
 }
-.bb__part > svg { flex: none; color: var(--text-muted); }
-.bb__part__k { flex: none; font-weight: var(--fw-medium); color: var(--text-secondary); }
-.bb__part__v { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bb__part.is-dim .bb__part__v { color: var(--text-muted); }
-.bb__part:hover { background: var(--surface-sunken); color: var(--text-primary); }
-.bb__part:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-/* The card's own selection language rather than a fill or the decision tone —
-   that colour is spoken for by the Then value. At rest the canvas shows nine
-   plain rows and exactly one ringed chip, on the card that owns the panel. */
-.bb__part.is-open {
-  background: var(--surface-inset, var(--surface-sunken));
-  box-shadow: inset 0 0 0 1px var(--bb-ring);
-  color: var(--text-primary);
-}
-.bb__part.is-open > svg,
-.bb__part.is-open .bb__part__k { color: var(--text-primary); }
+.bb__panetabs > button:hover { color: var(--text-primary); }
+.bb__panetabs > button.is-on { color: var(--text-primary); border-bottom-color: var(--brand); }
+.bb__panetabs > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
 
 /* A labelled row inside the card: WHEN / THEN. */
 .bb__row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
@@ -1996,14 +1983,12 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__act,
 .bb__ifact,
 .bb__secact,
-.bb__part,
 button.bb__idx { position: relative; }
 
 .bb__act::after,
 .bb__ifact::after,
 .bb__secact::after,
 .bb__link__add::after,
-.bb__part::after,
 button.bb__idx::after {
   content: '';
   position: absolute; left: 50%; top: 50%;
@@ -2205,14 +2190,43 @@ button.bb__idx::after {
   font-size: var(--fs-xs); color: var(--text-secondary); cursor: default;
 }
 
-/* Round, one letter, tinted from the name so the same group is the same colour
-   wherever it appears without a colour having to be stored on anything. */
+/* One colour, two states.
+
+   The tint used to be derived from the name, which gave a list of twenty-four
+   people twenty-four pastel circles carrying no meaning — and spent the one
+   thing colour is for on this screen. Quiet until picked, brand once it is, so
+   the list and the chosen row above it say the same thing the same way.
+
+   Size comes from the component: the card draws these smaller than the panel
+   does. */
 .bb__avatar {
   flex: none; display: grid; place-items: center;
-  width: 18px; height: 18px; border-radius: 50%;
-  font-size: 10px; font-weight: var(--fw-semibold); line-height: 1;
+  border-radius: 50%;
+  background: var(--surface-sunken); color: var(--text-tertiary);
+  font-weight: var(--fw-semibold); line-height: 1;
 }
-.bb__avatar.is-all { background: var(--surface-sunken); color: var(--text-tertiary); }
+.bb__avatar.is-on { background: var(--brand-subtle-bg); color: var(--brand-active); }
+.bb__avatar.is-all { width: 18px; height: 18px; }
+
+/* --- The stack: the same width at five names and at five thousand ------------
+
+   The card's `who` row drew one named chip per person, which wrapped to four
+   lines at eighteen and would be unreadable at a real tenant's numbers. Five
+   marks, the first name in words, and a count — fixed size, whatever it holds.
+
+   Overlapped with a ring in the card's own background colour, which is what
+   makes a row of circles read as one group of people rather than five separate
+   marks. */
+.bb__stack { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.bb__stack__faces { display: inline-flex; align-items: center; }
+.bb__stack__faces .bb__avatar + .bb__avatar { margin-left: -6px; }
+.bb__stack__faces .bb__avatar { box-shadow: 0 0 0 1.5px var(--surface-raised); }
+.bb__stack__lead {
+  min-width: 0; font-size: var(--fs-xs); color: var(--text-body);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bb__stack__more { flex: none; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bb__stack__none { font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* --- The two lists, one at a time -------------------------------------------- */
 
@@ -2238,7 +2252,6 @@ button.bb__idx::after {
   background: var(--brand-subtle-bg); color: var(--brand-active);
   font-size: 10px; font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums;
 }
-.bb__whoop { margin-left: auto; }
 
 .bb__whorows {
   display: flex; flex-direction: column;
@@ -2296,6 +2309,27 @@ button.bb__idx::after {
 
 .bb__whohint { margin: 0; padding: var(--space-4); font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
 .bb__who > .bb__whohint { padding: 0; }
+/* An exclusion this pane can no longer build, but must not misdraw. */
+.bb__whohint.is-warn {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--fb-notice-border); border-radius: var(--radius-sm);
+  background: var(--fb-notice-bg); color: var(--fb-notice-fg);
+}
+.bb__whohint.is-warn b { font-weight: var(--fw-semibold); }
+
+/* The note is asked for, not offered — a two-row textarea sat under every
+   rule's name, empty on most of them, pushing the question the panel exists to
+   answer below the fold. */
+.bb__addnote {
+  align-self: start;
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 24px; padding: 0 8px 0 6px;
+  border: 1px dashed var(--border-default); border-radius: var(--radius-sm);
+  background: none; font-family: inherit; font-size: var(--fs-xs);
+  color: var(--text-tertiary); cursor: pointer;
+}
+.bb__addnote:hover { border-style: solid; border-color: var(--border-strong); color: var(--text-primary); }
+.bb__addnote:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
 /* The stand-down. Not an error and not styled as one: an OR-shaped rule is a
    legitimate rule, and this pane is explaining where its who actually lives. */

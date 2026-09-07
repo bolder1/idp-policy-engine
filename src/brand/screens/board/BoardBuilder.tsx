@@ -109,7 +109,16 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
      several minutes ago, and no way to say "all of them" except by finding and
      unfolding each one. A chain-wide control that cannot actually reach the
      whole chain is not worth having. */
-  const [density, setDensity] = useState<'outline' | 'detailed'>('detailed')
+  /* Outline, not detailed.
+
+     The first question a policy answers is what order it decides in, and the
+     chain is the only surface that shows it. Opening every card fully meant a
+     four-rule policy did not fit on a screen — so the thing the canvas exists
+     to show was the thing you had to scroll to see, and the conditions, which
+     the panel edits properly anyway, were what filled the space.
+
+     Unfolding is one click on a card, or one on the toolbar for all of them. */
+  const [density, setDensity] = useState<'outline' | 'detailed'>('outline')
   const [folds, setFolds] = useState<Record<string, boolean>>({})
   const expandedOf = (ruleId: string) => folds[ruleId] ?? density === 'detailed'
   const toggleExpand = (ruleId: string) => setFolds((f) => ({ ...f, [ruleId]: !expandedOf(ruleId) }))

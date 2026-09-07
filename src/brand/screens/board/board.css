@@ -262,6 +262,13 @@ button.bb__idx svg { display: none; }
    With the hide scoped to the grip button they have nothing left to correct. */
 
 .bb__title { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+/* The name and the state on one line, the description under both. The state is
+   a fact about the rule, so it lives beside the rule's name rather than at the
+   head of the row of buttons on the right — where it read as the first of
+   them, and got pressed. */
+.bb__titlerow { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.bb__titlerow .bb__titlebtn { width: auto; min-width: 0; flex: 0 1 auto; }
+.bb__titlerow .bb__state { flex: none; }
 .bb__title strong {
   font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -314,8 +321,23 @@ button.bb__idx svg { display: none; }
 .bb__card.is-open .bb__fold--sum { grid-template-rows: 0fr; }
 
 /* The chevron turns to point the way the fold will go. */
-.bb__fold__btn svg { transition: transform 0.26s var(--ease-standard); }
-.bb__card.is-open .bb__fold__btn svg { transform: rotate(180deg); }
+/* The fold is not one more grey glyph in a row of grey glyphs.
+
+   It sat among four bare icon buttons of the same size and colour, so the one
+   control that opens the card read as a fifth action. It is tinted and it keeps
+   a faint ground, which is enough to separate it from the actions without
+   making it louder than the rule's own name.
+
+   The rotation has gone with the chevron. `ChevronsUpDown` swaps to
+   `ChevronsDownUp` when the card opens — the icon states the direction rather
+   than miming it, so there is nothing to animate and nothing to misread at the
+   halfway point. */
+.bb__fold__btn {
+  color: var(--fb-info-fg);
+  background: var(--fb-info-bg);
+}
+.bb__fold__btn:hover { background: var(--fb-info-bg); filter: brightness(0.96); color: var(--fb-info-fg); }
+.bb__fold__btn.is-open { background: var(--surface-inset, var(--surface-sunken)); color: var(--text-secondary); }
 
 /* The folded card's one line. Same grammar as the block it replaces — the
    branch mark, what is tested, an arrow, what is decided — so folding changes
@@ -1129,7 +1151,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   .bb__start .bb__pulse::after { animation: none; }
   .bb__card, .bb__link::before, .bb__dot, .bb__decide > button { transition: none; }
   /* The fold still folds — it just arrives. */
-  .bb__fold, .bb__fold__btn svg { transition: none; }
+  .bb__fold { transition: none; }
   /* The condition row's silencer is NOT here — it sits beside the declaration
      it has to beat, at the foot of this file. A media query adds no
      specificity, so `.bb__cond.is-new { animation: none }` here (0,2,0) and

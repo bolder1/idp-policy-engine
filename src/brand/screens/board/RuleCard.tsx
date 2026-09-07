@@ -1,6 +1,6 @@
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { motion } from 'motion/react'
-import { ArrowDown, ArrowRight, ArrowUp, ChevronDown, Copy, GripVertical, Home, Lock, Split, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, ChevronsDownUp, ChevronsUpDown, Copy, GripVertical, Home, Lock, Split, Trash2 } from 'lucide-react'
 
 import { Toggle } from '../../kit'
 import { type Rule } from '../../data'
@@ -188,23 +188,32 @@ export function RuleCard({
             other control on the card. `aria-expanded` because pressing it opens
             the panel that edits this rule. */}
         <div className="bb__title">
-          <button
-            type="button"
-            id={titleId}
-            className="bb__titlebtn"
-            aria-expanded={selected}
-            onClick={(e) => {
-              e.stopPropagation()
-              onSelect()
-            }}
-          >
-            <strong>{rule.name || 'Untitled rule'}</strong>
-          </button>
+          <span className="bb__titlerow">
+            <button
+              type="button"
+              id={titleId}
+              className="bb__titlebtn"
+              aria-expanded={selected}
+              onClick={(e) => {
+                e.stopPropagation()
+                onSelect()
+              }}
+            >
+              <strong>{rule.name || 'Untitled rule'}</strong>
+            </button>
+            {/* The state belongs to the rule, so it sits with the rule's name.
+
+                It was the first item in the meta cluster on the right, which
+                put a read-only INDICATOR at the head of a row of controls —
+                between the title and the buttons, reading as the first of them.
+                People pressed it. Beside the name it is what it is: a fact
+                about this rule, next to the thing it is a fact about. */}
+            <span className={`bb__state ${rule.enabled ? `is-${state}` : 'is-off'}`}>{rule.enabled ? STATE_LABEL[state] : 'Off'}</span>
+          </span>
           {rule.description ? <em>{rule.description}</em> : null}
         </div>
 
         <div className="bb__cardmeta" onClick={(e) => e.stopPropagation()}>
-          <span className={`bb__state ${rule.enabled ? `is-${state}` : 'is-off'}`}>{rule.enabled ? STATE_LABEL[state] : 'Off'}</span>
           {/* The fold, on the card rather than only on the toolbar.
 
               The toolbar switch sets the whole chain, which is the right
@@ -213,16 +222,26 @@ export function RuleCard({
               the two rules you are comparing. So the card carries its own, and
               the host remembers it as an override of whatever the toolbar last
               said. `aria-expanded` names the region it opens. */}
+          {/* A two-headed arrow, not a chevron.
+
+              A lone chevron on a card means one of three things depending on
+              where you have seen it — a dropdown, a sort, or a disclosure — and
+              this one sat beside four other bare icon buttons of the same size
+              and colour, so it read as a fifth action rather than the control
+              that opens the card. `ChevronsUpDown` says "this grows and
+              shrinks" and nothing else, it swaps to its own opposite when open,
+              and it carries a tint so it is not one more grey glyph in a row of
+              grey glyphs. */}
           <button
             type="button"
-            className="bb__act bb__fold__btn"
+            className={`bb__act bb__fold__btn ${expanded ? 'is-open' : ''}`}
             aria-expanded={expanded}
             aria-controls={`bb-rule-${rule.id}-body`}
             aria-label={expanded ? `Hide what rule ${index + 1} checks` : `Show what rule ${index + 1} checks`}
-            title={expanded ? 'Fold' : 'Unfold'}
+            title={expanded ? 'Fold this rule' : 'Show what it checks'}
             onClick={onToggleExpand}
           >
-            <ChevronDown size={13} strokeWidth={2} />
+            {expanded ? <ChevronsDownUp size={14} strokeWidth={2.2} /> : <ChevronsUpDown size={14} strokeWidth={2.2} />}
           </button>
           <span className="bb__acts">
             <button type="button" className="bb__act" aria-label="Move up" disabled={!canUp} onClick={() => onMove(-1)}>
@@ -379,17 +398,17 @@ export function TerminalCard({
               did not hear the instruction. */}
           <button
             type="button"
-            className="bb__act bb__fold__btn"
+            className={`bb__act bb__fold__btn ${expanded ? 'is-open' : ''}`}
             aria-expanded={expanded}
             aria-controls="bb-terminal-body"
             aria-label={expanded ? 'Hide what the default does' : 'Show what the default does'}
-            title={expanded ? 'Fold' : 'Unfold'}
+            title={expanded ? 'Fold this rule' : 'Show what it does'}
             onClick={(e) => {
               e.stopPropagation()
               onToggleExpand()
             }}
           >
-            <ChevronDown size={13} strokeWidth={2} />
+            {expanded ? <ChevronsDownUp size={14} strokeWidth={2.2} /> : <ChevronsUpDown size={14} strokeWidth={2.2} />}
           </button>
         </div>
       </div>

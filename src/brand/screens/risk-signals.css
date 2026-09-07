@@ -68,14 +68,19 @@
 }
 .brs__search input::-webkit-search-cancel-button { cursor: pointer; }
 
-/* --- The table ------------------------------------------------------------- */
-.brs__cat { margin: 0 0 var(--space-6); }
-.brs__cat__head {
-  display: flex; align-items: baseline; gap: var(--space-3);
-  margin: 0 0 var(--space-2);
-  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-.brs__cat__head em { font-style: normal; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-tertiary); }
+/* --- The table -------------------------------------------------------------
+
+   `.brs__cat` was the per-category SECTION here — `margin: 0 0 16px` — with
+   `.brs__cat__head` for its heading. Both are gone with the five tables they
+   wrapped, and leaving them was not harmless: the name got reused for the
+   category PILL on each row, and a 16px bottom margin meant for a section
+   arrived on a 16px pill. That doubled the name line to 32px and pushed the
+   pill 8px above the name it belongs to.
+
+   The third time this file's family has done it — `.bb__step` collapsed a
+   dialog to the height of a chip, `.bb__cond` gave every editor row the box of
+   a read-only one. A class name is a global; a dead rule with a plausible name
+   is a trap set for whoever next needs that name. Deleted, not commented. */
 
 .brs__table {
   border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
@@ -104,10 +109,21 @@
 .brs__row.is-off .brs__col { opacity: 0.5; }
 
 /* The mark, then the text — two cells, so every row's name starts at the same
-   left edge whatever the width of its glyph. */
+   left edge whatever the width of its glyph.
+
+   ONE 20px line at the top of the row, shared by the mark, the name and the
+   category pill, with all three centred in it. It was three heights arrived at
+   independently — a 22px mark nudged down 1px, a name whose height came from
+   its font, a pill whose height came from its padding — and measured in the
+   running page they sat 4.5px and 8px out of true. At this size that reads as
+   three things floating near each other rather than one line. Nothing here is
+   centred against anything else now; all three are centred against the same
+   20px, so the alignment cannot drift when one of them changes. */
 .brs__sig { display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; }
-.brs__sigtext { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.brs__sig b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
+.brs__sigtext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* An explicit 20px rather than the font's own 1.5 — the mark is 20px and this
+   has to match it exactly, not approximately. */
+.brs__sig b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); line-height: 20px; }
 .brs__sig em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.4; }
 
 /* Tinted by the signal's family, and unboxed.
@@ -123,7 +139,7 @@
    hit came from. */
 .brs__mark {
   display: grid; place-items: center;
-  width: 22px; height: 22px; flex: none; margin-top: 1px;
+  width: 20px; height: 20px; flex: none;
   color: var(--sig-fg, var(--text-tertiary));
 }
 .brs__mark.is-info { --sig-fg: var(--fb-info-fg); }
@@ -137,12 +153,16 @@
    heading said it the rest of the time. There are no headings now — and it
    turns out the information was always wanted per row: a signal's family is
    what tells you whether "Not collected" on iOS is expected or surprising. */
-.brs__name { display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex-wrap: wrap; }
+.brs__name { display: flex; align-items: center; gap: var(--space-2); min-height: 20px; min-width: 0; flex-wrap: wrap; }
 .brs__cat {
   flex: none;
+  /* An explicit height and `line-height: 1`, so the pill centres on the shared
+     20px line rather than on whatever its padding and font happen to add up
+     to. Measured before this, it sat 8px above the name beside it. */
+  display: inline-flex; align-items: center; height: 16px;
   font-style: normal; font-size: 10px; font-weight: var(--fw-medium);
-  letter-spacing: 0.01em;
-  padding: 1px 6px; border-radius: var(--radius-full);
+  line-height: 1; letter-spacing: 0.01em;
+  padding: 0 7px; border-radius: var(--radius-full);
   background: var(--sig-bg, var(--fb-neutral-bg));
   color: var(--sig-fg, var(--fb-neutral-fg));
 }

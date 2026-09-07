@@ -1,20 +1,23 @@
 import { useMemo, useState } from 'react'
 import {
   Activity,
+  AppWindow,
   Bug,
   Copy,
   Crosshair,
-  EyeOff,
+  Eye,
   FileWarning,
+  House,
   Info,
   MonitorSmartphone,
-  Network,
+  Puzzle,
+  Route,
   Search,
-  ServerCog,
+  Server,
   ShieldOff,
   Smartphone,
-  SplitSquareHorizontal,
   Unlock,
+  Waypoints,
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
@@ -53,25 +56,36 @@ import './risk-signals.css'
    Never `negative`. Red means danger in this kit, and every one of these
    signals is about danger — if they were all red the tone would carry nothing,
    and the two that genuinely warrant alarm (a rooted handset, a known attack
-   source) would stop standing out. The severity is the weight column's job. */
+   source) would stop standing out. The severity is the weight column's job.
+
+   Sixteen distinct glyphs, and the distinctness is the point rather than a
+   flourish. The first pass reused one for both emulator and simulator, one for
+   both rooted and jailbroken, and one for both VPN and residential proxy —
+   three pairs that a reader scanning the column would have taken for the same
+   thing twice. Those are exactly the pairs worth telling apart: they differ by
+   platform, and the platform is the next column along. */
 const SIGNAL_ICON: Record<string, LucideIcon> = {
-  emulator: MonitorSmartphone,
-  simulator: MonitorSmartphone,
+  // Device integrity — the handset is not what it claims to be.
+  emulator: MonitorSmartphone, // a handset drawn on a desktop
+  simulator: AppWindow, // Xcode's window
   rooted: Unlock,
-  jailbroken: Unlock,
+  jailbroken: ShieldOff,
   cloned: Copy,
   'dev-mode': Wrench,
 
-  hooking: SplitSquareHorizontal,
+  // Instrumentation — something is interfering with the running app.
+  hooking: Puzzle, // a piece slotted into the app as it runs
   debugger: Bug,
   'tampered-request': FileWarning,
-  mitm: EyeOff,
+  mitm: Eye, // something is reading the traffic
 
-  tor: ShieldOff,
-  datacenter: ServerCog,
-  'residential-proxy': Network,
-  vpn: Network,
+  // Network origin — where the connection actually came from.
+  tor: Waypoints, // relayed through nodes
+  datacenter: Server,
+  'residential-proxy': House, // somebody else's home address
+  vpn: Route, // a tunnel
 
+  // The last two.
   'known-attacker': Crosshair,
   'high-activity': Activity,
 }

@@ -326,20 +326,16 @@ export const DECISION_CAPTION: Record<AccessDecision, string> = {
 export interface Rule {
   id: string
   name: string
-  /* Why this rule exists, in the author's words.
+  /* `description` has gone from a rule.
 
-     A name says what a rule does; it cannot say what it is for. "Off-network
-     finance access" tells the next administrator the predicate and nothing
-     about the decision behind it — whether it exists because of a regulator,
-     because of an incident, or because somebody was experimenting in March.
-     Those three have completely different answers to "can I delete this".
+     It was an optional sentence under the name - "what is this for? a
+     regulator, an incident, an audit finding" - and it earned its place while
+     the panel had room for it. It does not now: the panel asks two questions,
+     and the note was the largest control above both of them, present on every
+     rule and filled on almost none.
 
-     The framework doc's third persona is defined by wanting exactly this:
-     "every rule needs a name, a description, a rationale". Two of the three
-     had nowhere to live. Optional rather than required, because forcing a
-     sentence out of somebody mid-edit produces "asdf" and teaches everyone
-     afterwards that the field is noise. */
-  description?: string
+     The rationale it carried has a better home than a free-text box nobody
+     fills: the rule's NAME, which every surface already prints. */
   enabled: boolean
   /* The audience used to live here, as `appliesTo: string[]`.
 
@@ -910,7 +906,6 @@ export const policies: Policy[] = [
       }),
       rule({
         name: 'Off-network finance access',
-        description: 'Required by the FY26 audit finding on remote access to ledger systems. The 09:00–17:00 window is the auditor’s, not ours — check with Compliance before widening it.',
         when: when(
           card(cond('group', 'in', ['finance']), cond('zone', 'not in zone', ['office']), cond('time', 'between', ['09:00', '17:00'])),
           card(cond('group', 'in', ['finance']), cond('device-type', 'is', ['Mobile', 'Tablet'])),
@@ -969,14 +964,12 @@ export const policies: Policy[] = [
     rules: [
       rule({
         name: 'Block anonymised sources',
-        description: 'No legitimate sign-in to this app has ever arrived from a Tor exit or a hosting ASN. Written after the March access review; delete only if a customer is genuinely behind one of these networks.',
         when: when(card(cond('zone', 'in zone', ['anon']))),
         decision: 'deny',
         matchEstimate: 31,
       }),
       rule({
         name: 'Block accounts with no second factor',
-        description: 'A challenge nobody can complete is a lockout dressed as security. Refusing the sign-in outright sends the user to enrolment instead of to the help desk.',
         when: when(card(cond('auth-state', 'is', ['No MFA configured']))),
         decision: 'deny',
         matchEstimate: 6,
@@ -998,7 +991,6 @@ export const policies: Policy[] = [
          one moment an account is worth binding to a person. */
       rule({
         name: 'Verify first login and resets',
-        description: 'Redundant against the unmanaged-device rule above for most people, and kept deliberately: a first login from a managed device is still the one moment an account is worth binding to a person.',
         when: when(
           card(cond('auth-state', 'is', ['First time login'])),
           card(cond('auth-state', 'is', ['MFA recently reset'])),
@@ -1055,7 +1047,6 @@ export const policies: Policy[] = [
          is a warning nobody trusts. */
       rule({
         name: 'External risk verdict',
-        description: 'The risk platform sees payment history this console never will. Owner is the risk team; changes to the threshold happen there, not here.',
         when: when(card(cond('webhook', 'returns true', ['hk-fraud']))),
         decision: 'deny',
         matchEstimate: 3,
@@ -1103,7 +1094,7 @@ export const policies: Policy[] = [
     modifiedBy: 'Mehak Garg',
     audience: audienceOf(['engineering']),
     rules: [
-      rule({ name: 'Require corporate ASN', description: 'Written during the VPN migration and never revisited. Engineering now works from home two days a week, so this may be denying more than it was meant to.',when: when(card(cond('zone', 'not in zone', ['asn']))), decision: 'deny', matchEstimate: 310 }),
+      rule({ name: 'Require corporate ASN', when: when(card(cond('zone', 'not in zone', ['asn']))), decision: 'deny', matchEstimate: 310 }),
       rule({ name: 'Known device',when: when(card(cond('device-reg', 'is', ['Registered']))), decision: '1fa', matchEstimate: 280 }),
       rule({ name: 'Everything else',decision: '2fa', matchEstimate: 30 }),
     ],

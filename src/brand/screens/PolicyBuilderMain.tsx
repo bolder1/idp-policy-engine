@@ -13,7 +13,6 @@ import {
   Filter,
   Info,
   Home,
-  MessageSquare,
   MoreHorizontal,
   PanelLeftOpen,
   Plus,
@@ -793,42 +792,12 @@ function TerminalCard({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule
 /** Which half of a rule the card is showing. */
 type Pane = 'when' | 'then'
 
-/* The rationale, closed until it is wanted.
+/* `RuleWhy` stood here — the collapsed "why this rule exists" note.
 
-   Open, it is 68px at the top of every rule — above the pane switch, above the
-   work — for a field most rules never fill in. Closed it is one line that
-   still shows what was written, so a rule that HAS a rationale never hides it;
-   only the empty invitation folds away. */
-function RuleWhy({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const box = useRef<HTMLTextAreaElement | null>(null)
+   It is gone with `Rule.description`. A rule explains itself with its name;
+   an optional free-text box, present on every rule and filled on almost none,
+   was the largest control above the two questions that decide sign-ins. */
 
-  useEffect(() => {
-    if (open) box.current?.focus()
-  }, [open])
-
-  if (!open) {
-    return (
-      <button type="button" className={`bf__whyshut ${value ? 'has-text' : ''}`} onClick={() => setOpen(true)}>
-        <MessageSquare size={12} strokeWidth={1.9} aria-hidden />
-        {value || 'Why does this rule exist?'}
-      </button>
-    )
-  }
-
-  return (
-    <textarea
-      ref={box}
-      className="bf__rulewhy"
-      aria-label="Why this rule exists"
-      rows={2}
-      placeholder="Why does this rule exist? The next person will read this before changing it."
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={() => setOpen(false)}
-    />
-  )
-}
 
 /* -----------------------------------------------------------------------------
    One rule, one card.
@@ -966,14 +935,10 @@ function RuleCard({
             transition={{ duration: reduce ? 0 : 0.22, ease: [0.2, 0, 0, 1] }}
           >
             <div className="bf__ruleinner">
-              {/* The rationale, collapsed to its first line.
-
-                  It is rule-level, so it sits above the pane switch rather than
-                  inside either half — but as an always-open textarea it cost 68
-                  vertical pixels of every screen, at the top, above the work,
-                  on a field most rules never fill in. Closed it is a line; open
-                  it is the same textarea it always was. */}
-              <RuleWhy value={rule.description ?? ''} onChange={(v) => onPatch({ description: v })} />
+              {/* `RuleWhy` has gone with `Rule.description`. A rule explains itself
+                  with its name; a free-text box present on every rule and
+                  filled on almost none was the largest control above the two
+                  questions that matter. */}
 
               {/* WHEN and THEN, one at a time.
 

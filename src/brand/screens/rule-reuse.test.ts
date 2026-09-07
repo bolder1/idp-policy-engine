@@ -13,7 +13,6 @@ import {
   type Rule,
 } from '../data'
 import { leaves } from '../predicate'
-import { describeChanges } from './changes'
 import { diagnose } from './diagnostics'
 
 /* -----------------------------------------------------------------------------
@@ -116,38 +115,10 @@ describe('copying a rule into another policy', () => {
   })
 })
 
-describe('rule rationale', () => {
-  const base: Policy = { ...policies[1], rules: [ruleWith({ id: 'r-x', name: 'Step up off-network' })] }
-  const withText = (t?: string): Policy => ({
-    ...base,
-    rules: [{ ...base.rules[0], description: t }],
-  })
+/* A `rule rationale` block stood here.
 
-  /* Named in the save bar even though it changes no decision. An audit trail
-     that only records behaviour changes cannot answer "who decided this was
-     still needed", which is most of what an audit trail is for. */
-  it('is named when it is added, reworded and removed', () => {
-    expect(describeChanges(base, withText('Required by the FY26 audit finding.'))).toEqual([
-      'Rationale added to “Step up off-network”',
-    ])
-    expect(describeChanges(withText('One reason.'), withText('A different reason.'))).toEqual([
-      'Rationale reworded on “Step up off-network”',
-    ])
-    expect(describeChanges(withText('One reason.'), withText(undefined))).toEqual([
-      'Rationale removed from “Step up off-network”',
-    ])
-  })
-
-  it('is not reported when nothing changed', () => {
-    expect(describeChanges(withText('Same words.'), withText('Same words.'))).toEqual([])
-    // Absent and empty are the same state as far as an admin is concerned, and
-    // reporting a change between them would fire on every focus-and-blur.
-    expect(describeChanges(withText(undefined), withText(''))).toEqual([])
-  })
-
-  it('does not change what a rule decides', () => {
-    const a = withText(undefined)
-    const b = withText('A long and opinionated explanation.')
-    expect(diagnose(b, groups).map((d) => d.id)).toEqual(diagnose(a, groups).map((d) => d.id))
-  })
-})
+   Its assertions were good tests of a real property — an audit trail that
+   records only behaviour changes cannot answer "who decided this was still
+   needed" — and the field they guarded, `Rule.description`, no longer exists.
+   What a rule is for is carried by its name now, and `describeChanges` still
+   reports a rename. */

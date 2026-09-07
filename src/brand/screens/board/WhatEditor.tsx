@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { AlertTriangle, Check, Plus, ShieldAlert, Sparkles, UserCheck, X, XCircle } from 'lucide-react'
+import { AlertTriangle, Check, Plus, ShieldAlert, UserCheck, X, XCircle } from 'lucide-react'
 
 import { Toggle } from '../../kit'
 import { Picker } from '../../picker'
@@ -41,7 +41,11 @@ import { Prop } from './Section'
 const TILES: { id: AccessDecision | 'soon'; label: string; tone: string; icon: typeof UserCheck; hint: string }[] = [
   { id: '1fa', label: 'Allow', tone: 'allow', icon: UserCheck, hint: 'Let the sign-in through, after the steps below.' },
   { id: 'deny', label: 'Deny', tone: 'deny', icon: ShieldAlert, hint: 'Refuse it. No prompt and no way round.' },
-  { id: 'soon', label: 'Coming soon', tone: 'soon', icon: Sparkles, hint: 'A third outcome is on the way. Not decided yet.' },
+  /* A third tile said "Coming soon · Not decided yet". It was a placeholder
+     for an outcome nobody has specified, taking a third of the width of the
+     one control on this pane that matters, permanently disabled — and now that
+     nothing is selected by default it sat beside two real choices looking like
+     the reason none of them was picked. A promise is not a control. */
 ]
 
 /* How a second step is proved, as four choices rather than a mode plus a mode's

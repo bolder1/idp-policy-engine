@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import { Maximize2, Plus, X } from 'lucide-react'
 
@@ -283,28 +283,6 @@ function RuleHead({
   focus?: boolean
   onPatch: (p: Partial<Rule>) => void
 }) {
-  /* The note is asked for, not offered.
-
-     It was a two-row textarea sitting under the name on every rule, empty on
-     most of them, carrying a placeholder that had to explain what the field was
-     even for — "What is this for? A regulator, an incident, an audit finding…".
-     That is a lot of permanent furniture for an optional field, and it put the
-     largest control in the panel above the question the panel exists to answer:
-     on a 400px column the Who list started below the fold because of an empty
-     box nobody had asked for.
-
-     So: a button until somebody wants it. Once there is a note the field is
-     simply there, because then it is content rather than an invitation — and a
-     note that hid itself again after being written would be a note you could
-     not find.
-
-     Opened state is local and deliberately not derived from focus or
-     selection: it is a fact about what this person is doing right now, and it
-     should not survive them moving to another rule. */
-  const [writing, setWriting] = useState(false)
-  const note = useRef<HTMLTextAreaElement>(null)
-  const shown = writing || Boolean(rule.description)
-
   return (
     <div className={`bb__insphead ${focus ? 'is-focus' : ''}`}>
       <span className={`bb__idx is-${TONE[rule.decision]}`} aria-hidden>
@@ -312,34 +290,6 @@ function RuleHead({
       </span>
       <div className="bb__inspname">
         <input className="bb__input bb__input--title" aria-label="Rule name" value={rule.name} placeholder="Name this rule" onChange={(e) => onPatch({ name: e.target.value })} />
-        {shown ? (
-          <textarea
-            ref={note}
-            className="bb__input bb__input--desc"
-            rows={focus ? 1 : 2}
-            aria-label="What this rule is for"
-            placeholder="A regulator, an incident, an audit finding…"
-            value={rule.description ?? ''}
-            /* Emptying it puts the button back, because `description` becomes
-               undefined and `writing` is only true while this visit opened it.
-               Clearing the box IS how you remove the note. */
-            onChange={(e) => onPatch({ description: e.target.value || undefined })}
-          />
-        ) : (
-          <button
-            type="button"
-            className="bb__addnote"
-            onClick={() => {
-              setWriting(true)
-              /* After the paint that mounts it. Focusing in the same tick
-                 focuses a textarea that does not exist yet. */
-              requestAnimationFrame(() => note.current?.focus())
-            }}
-          >
-            <Plus size={12} strokeWidth={2.4} aria-hidden />
-            Add a note
-          </button>
-        )}
       </div>
       <Toggle checked={rule.enabled} onChange={(enabled) => onPatch({ enabled })} label={rule.enabled ? 'On' : 'Off'} size="sm" />
     </div>

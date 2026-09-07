@@ -128,7 +128,6 @@ export function PolicyOverview({
                     <p>
                       When <em>{predicate(policy, i, resolve)}</em>
                     </p>
-                    {r.description && <p className="bov__why">{r.description}</p>}
                   </div>
                   <DecisionChip decision={r.decision} size="sm" />
                 </button>

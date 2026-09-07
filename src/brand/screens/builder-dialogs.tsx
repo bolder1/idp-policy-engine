@@ -165,7 +165,6 @@ export function ReviewDialog({
                   </span>
                   <DecisionChip decision={rule.decision} size="sm" />
                 </p>
-                {rule.description && <p className="bdlg-rev__why">{rule.description}</p>}
                 <p className="bdlg-rev__prose">
                   <span className="bdlg-rev__key">IF:</span> {iff}
                 </p>

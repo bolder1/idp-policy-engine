@@ -296,7 +296,6 @@ export function RuleCard({
                 about this rule, next to the thing it is a fact about. */}
             <span className={`bb__state ${rule.enabled ? `is-${state}` : 'is-off'}`}>{rule.enabled ? STATE_LABEL[state] : 'Off'}</span>
           </span>
-          {rule.description ? <em>{rule.description}</em> : null}
         </div>
 
         <div className="bb__cardmeta" onClick={(e) => e.stopPropagation()}>

@@ -1534,51 +1534,22 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    hold six operators where the model holds two.
 
    The run joiner lives in the joiner column, once per run. The trunk joiner
-   lives once, in the foot, and says what it governs — see `.bb__trunksel`. */
+   lives on the row after the one that opens it. The trunk joiner has no
+   control at all any more — it is drawn read-only on the card and nowhere
+   else. */
 
-/* The joiner, on the seam between two alternatives.
+/* The seam's joiner is gone, and so is the foot's before it.
 
-   It lived at the foot of the block in a row with the two add buttons, all
-   three wearing one dashed outline — so the control that changes how the whole
-   rule READS was dressed as a third way to add something. On the seam it is
-   beside the thing it governs and nowhere near the AND column inside the
-   frames, which is what the head-of-each-alternative version got wrong.
+   Four attempts, each the same operator in a different place: a word you could
+   not press, a full-width divider, a pill at the head of every alternative, a
+   chip on the seam. The fourth was still one operator too many — a group and
+   the conditions beside it read as one bracket governed by one and/or, and a
+   second control between the brackets asks somebody to hold two levels of
+   joining in their head to answer "all of these, or any of them?".
 
-   One value, every seam. Each button shows and sets the same `join`, and its
-   label says so, which is the honest version of "one setting as N controls":
-   the repetition is a READING of the predicate and the control is the same
-   control wherever you press it. */
-.bb__iftrunk {
-  display: flex; align-items: center; gap: var(--space-3);
-  margin: 3px 0;
-}
-/* The rules either side make it a seam rather than a chip floating in a gap —
-   it is a JOIN, and a join is drawn as the thing between two things. */
-.bb__iftrunk::before,
-.bb__iftrunk::after {
-  content: ''; flex: 1; height: 1px; background: var(--border-subtle);
-}
-
-.bb__trunksel {
-  flex: none;
-  display: inline-flex; align-items: center; gap: 4px;
-  height: 22px; padding: 0 6px 0 8px;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-pill);
-  background: var(--surface-raised);
-  font-family: inherit; font-size: 11px; color: var(--text-secondary);
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
-}
-.bb__trunksel b {
-  font-weight: var(--fw-semibold); text-transform: uppercase; letter-spacing: 0.04em;
-}
-.bb__trunksel svg { opacity: 0.55; }
-/* Solid rather than dashed now. Dashed means "this will add something" on this
-   surface and nothing else, which is the whole point of the separation. */
-.bb__trunksel.is-or { color: var(--fb-notice-fg); border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
-.bb__trunksel.is-and { color: var(--fb-info-fg); border-color: var(--fb-info-border); background: var(--fb-info-bg); }
-.bb__trunksel:hover { border-color: currentColor; }
-.bb__trunksel:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+   `.bb__ifkw.is-or` still styles the word where the CARD prints it read-only,
+   which is the one place a trunk join should be visible: as a reading, not as
+   a control. */
 
 /* A frame means a group, and a group is something the author made.
 

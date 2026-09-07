@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 import { Maximize2, Minus, Plus, Split } from 'lucide-react'
 
@@ -100,6 +100,7 @@ export function Board({
     zoomLabel,
     panning,
     fit,
+    glide,
     zoomBy,
     onPointerDown,
     onPointerMove,
@@ -199,6 +200,39 @@ export function Board({
   /* Render order during a drag: the dragged card is shown at its target slot
      so the others make room; the card itself follows the pointer. */
   const order = policy.rules.map((_, i) => i)
+  const empty = policy.rules.length === 0
+
+  /* An empty policy is one panel, so it is PLACED rather than fitted.
+
+     `fitTo` fits the WIDTH — right for a chain, which is read top to bottom and
+     panned down, and wrong for a single 420px card: it would blow the panel up
+     to fill the stage and pin it to the top edge, which is the one thing an
+     empty state must not do. Centred on both axes instead, at a fixed 90%, so
+     it sits where the eye lands and reads as the whole of what is there rather
+     than as something zoomed into.
+
+     After the hook's own mount fit, deliberately. Its `useLayoutEffect` is
+     registered first because the hook is called above this, so its frame is
+     queued first and this one lands on top of it — one paint, no flash of a
+     wrongly-fitted panel. */
+  useLayoutEffect(() => {
+    if (!empty) return
+    const id = requestAnimationFrame(() => {
+      const s = stage.current
+      const w = world.current
+      if (!s || !w) return
+      /* The PANEL's centre, not the world's. The world carries the padding
+         that gives the canvas somewhere to pan into, so centring it put the
+         panel a hundred and thirty pixels high — visually off, and measurably
+         so. Its offset inside the world is the thing to line up. */
+      const el = w.querySelector<HTMLElement>('.bb__blank')
+      const cx = el ? el.offsetLeft + el.offsetWidth / 2 : w.offsetWidth / 2
+      const cy = el ? el.offsetTop + el.offsetHeight / 2 : w.offsetHeight / 2
+      const z = 0.9
+      glide({ x: s.clientWidth / 2 - cx * z, y: s.clientHeight / 2 - cy * z, z }, 0)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [empty, glide, stage, world])
   /* What the empty policy actually does today, named rather than described.
      `terminal` is resolved below for the card; this reads the same rule, so the
      sentence and the card cannot disagree about the outcome. */

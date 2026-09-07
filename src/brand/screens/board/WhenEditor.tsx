@@ -79,7 +79,12 @@ export function WhenEditor({
   const write = (next: Predicate) => onPatch({ when: next })
 
   const flipCardJoin = (id: string) => write(ops.flipBranchJoin(rule.when, id))
-  const flipTopJoin = () => write(ops.flipTrunkJoin(rule.when))
+  /* `flipTrunkJoin` has no caller any more — this was the last one, and the
+     trail never had one. It stays in `when-ops` with its round-trip test
+     rather than being deleted, because the FIELD is still live: `topJoin` is
+     read by the evaluator, the prose read-back and the card, and a predicate
+     arriving with `join: 'and'` still evaluates and still says so. What has
+     gone is the way to author one here, not the way to hold one. */
 
   /* Still three destinations, because there are still three things a person can
      mean by "add": into this group, into the loose run at the end, or into a
@@ -141,56 +146,22 @@ export function WhenEditor({
         ) : (
           cards.map((k, i) => (
             <Fragment key={k.id}>
-              {/* The joiner, on the seam it governs.
+              {/* No joiner control on the seam, and none in the foot.
 
-                  It sat in the footer, in a row with "Add condition" and "Add
-                  group" — three dissimilar things wearing one dashed outline,
-                  where the two that ADD something sat beside one that changes
-                  how the whole rule reads. Nothing about that row said which of
-                  the three would restructure the rule.
+                  It has been four things now — a word you could not press, a
+                  full-width divider, a pill at the head of every alternative, a
+                  chip on the seam — and the fourth was still one operator too
+                  many. A group and the conditions beside it read as one bracket
+                  governed by one and/or; putting a second operator between the
+                  brackets asks somebody to hold two levels of joining in their
+                  head to answer a question that is really "all of these, or any
+                  of them?".
 
-                  So it moves to where the alternatives actually meet. `join` is
-                  still ONE value for the whole predicate and this is still one
-                  setting: every seam shows the same word, pressing any seam
-                  flips all of them, and the label says so rather than leaving
-                  it to be discovered by pressing one and watching the others
-                  change.
-
-                  That is the correction to the version this replaces — a pill
-                  at the HEAD of each alternative, which sat directly above each
-                  run's own joiner so the block appeared to hold six operators
-                  where the model holds two. On a seam BETWEEN two frames it is
-                  nowhere near the AND column, and the two levels stop being
-                  confusable by adjacency. */}
-              {i > 0 && (
-                <div className="bb__iftrunk">
-                  <button
-                    type="button"
-                    className={`bb__trunksel is-${topJoin(rule.when)}`}
-                    aria-label={`Alternatives are joined by ${topJoin(rule.when).toUpperCase()} — one setting for the whole rule. Switch to ${topJoin(rule.when) === 'or' ? 'AND' : 'OR'}.`}
-                    title={
-                      topJoin(rule.when) === 'or'
-                        ? 'Any one alternative is enough. One setting for every seam — click for AND.'
-                        : 'Every alternative must match. One setting for every seam — click for OR.'
-                    }
-                    onClick={flipTopJoin}
-                  >
-                    <b>{topJoin(rule.when)}</b>
-                    <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
-                  </button>
-                </div>
-              )}
-              {/* The operator between two runs is IN the first row of the
-                  second one, not on a band of its own.
-
-                  It was a full-width divider carrying the pill, which put the
-                  one joiner that is not in the joiner column on a line with no
-                  condition on it — so a block of five conditions drew six rows,
-                  and the two levels of operator sat in two different places.
-                  Both are pills in the same column now: the trunk's on the row
-                  that opens an alternative, the run's on the row after the one
-                  that opens it. */}
-
+                  `Predicate.join` is untouched and still means what it meant:
+                  alternatives are ORed, which is the default and the only value
+                  this editor now produces. What remains editable is the joiner
+                  INSIDE a run — one control, in the joiner column, where the
+                  conditions it joins are. */}
               {/* Framed only once a group actually exists.
 
                   Every condition lives in a card because a card IS an
@@ -350,11 +321,11 @@ export function WhenEditor({
               <Plus size={11} strokeWidth={2.4} aria-hidden />
               Add group
             </button>
-            {/* The joiner used to sit here as a third button. It governs how
-                the rule READS rather than adding anything to it, so it has
-                moved to the seams between the alternatives it joins — see the
-                note above `.bb__iftrunk`. What is left in this row is the two
-                controls that add, which is now the only thing a dashed outline
+            {/* The joiner used to sit here as a third button, then on the
+                seams between the alternatives, and now nowhere: one bracket,
+                one and/or, and that one lives in the joiner column beside the
+                conditions it joins. What is left in this row is the two
+                controls that ADD, which is now the only thing a dashed outline
                 means on this surface. */}
           </div>
         )}

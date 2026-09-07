@@ -230,9 +230,15 @@
 .bb__idx.is-allow, .bb__reach.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-dot: var(--fb-positive-dot, #128f43); }
 
 .bb__cardhead {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-4);
+  /* Four columns now: the index, the fold, the title, and the right-hand
+     cluster. The fold moved to the leading edge because on the right it was
+     stranded mid-head by the hover actions, which reserve their width at zero
+     opacity — see RuleCard. A tighter gap after the index, because those two
+     are one group. */
+  display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-4);
   padding: var(--space-4) var(--space-5) var(--space-3) var(--space-4);
 }
+.bb__cardhead > .bb__idx + .bb__fold__btn { margin-left: calc(var(--space-4) * -1 + var(--space-2)); }
 .bb__idx {
   display: inline-grid; place-items: center;
   width: 30px; height: 30px; border-radius: var(--radius-md);
@@ -2022,13 +2028,33 @@ button.bb__idx::after {
    rather than anything about where it sat. A name is a global in CSS. */
 .bb__ask { display: block; }
 .bb__ask__head { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3); }
-.bb__ask__n {
-  display: inline-grid; place-items: center; flex: none;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--fb-info-bg); color: var(--fb-info-fg);
-  font-size: 11px; font-weight: var(--fw-semibold);
-  align-self: center;
-}
+/* `.bb__ask__n` — a numeral in a filled circle before each heading — is gone.
+
+   It was there to say there are two halves and which comes first. The words
+   already do that: `If` and `Then` are a sequence in English, they sit side by
+   side in reading order, and each carries a caption saying what it asks. A
+   number in front of a word that is already an ordinal is the form explaining
+   how to read two words — and it took the heading's whole left edge, so `If`
+   started further right than every control under it. Deleted, not left dead. */
 .bb__ask__head p { flex-basis: 100%; }
 .bb__ask__head h3 { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bb__ask__head p { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* --- WHO: the people a rule is about ------------------------------------------
+
+   Its own step, above the circumstances, because that is the order a rule gets
+   written in. What it edits are the `group` and `user` conditions the rule
+   could always hold — see audience-ops.ts — so nothing here is a second place
+   to store an audience. */
+.bb__who { display: grid; gap: var(--space-2); }
+.bb__whorow { display: grid; grid-template-columns: 20px 54px minmax(0, 1fr); align-items: center; gap: var(--space-2); }
+.bb__whorow__mark { display: grid; place-items: center; color: var(--text-tertiary); }
+.bb__whorow__label { font-size: var(--fs-xs); color: var(--text-secondary); }
+.bb__whorow .cp__pill { width: 100%; }
+/* One sentence, and only when it is true: a rule that names nobody covers
+   everyone the POLICY governs, not everyone in the tenant. That is what
+   somebody needs before deciding whether leaving it blank is safe. */
+.bb__whonote { margin: 2px 0 0; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
+/* The second question sits under the first with a rule between them, so the two
+   read as one form in two parts rather than two unrelated blocks. */
+.bb__ask--next { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }

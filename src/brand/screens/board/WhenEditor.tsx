@@ -13,6 +13,7 @@ import {
   type ZoneScope,
 } from '../../data'
 import * as ops from '../../when-ops'
+import { isWho, whoEditable } from '../../audience-ops'
 import { useBrand, useNameLookup } from '../../store'
 import { predicateParts } from '../predicate-prose'
 import { ConditionPicker } from '../rule-form'
@@ -164,7 +165,19 @@ export function WhenEditor({
                   second card appears; only then does either wear a frame,
                   because only then is there a bracket to show. */}
               <div className={k.grouped ? 'bb__ifgroup' : 'bb__ifplain'}>
-                {k.conditions.map((c, j) => (
+                {/* The who-conditions are not drawn here.
+
+                    They ARE conditions and the model holds them exactly as it
+                    holds the rest — but the WHO step above owns them, and one
+                    fact with two controls on one screen is the thing this panel
+                    has spent its life removing. Editing either place writes the
+                    same condition; only one place draws it.
+
+                    Only when that step is actually editing them. On a predicate
+                    with two alternatives it stands down and says so, and then
+                    these rows are the only way to reach them, so they must
+                    show. */}
+                {(whoEditable(rule.when) ? k.conditions.filter((c) => !isWho(c)) : k.conditions).map((c, j) => (
                   <ConditionRow
                     key={c.id}
                     c={c}

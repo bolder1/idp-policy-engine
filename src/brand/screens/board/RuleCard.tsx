@@ -181,6 +181,45 @@ export function RuleCard({
           <GripVertical size={14} strokeWidth={2} aria-hidden />
         </button>
 
+        {/* The fold, at the LEADING edge, beside the index.
+
+            The toolbar switch sets the whole chain, which is the right control
+            for "show me the order" and the wrong one for "show me THIS one" —
+            the common move is to fold everything and then open the two rules
+            you are comparing. So the card carries its own.
+
+            It sat in the meta cluster on the right, and measured on a 560px
+            card that put it at x=601 with the hover actions occupying 631–733
+            at zero opacity and the toggle at the far edge: a control stranded
+            in the middle of the head by 102px of space it was not using and
+            could not see. Moving it here fixes that without making the head
+            reflow on hover — which is what removing the reserved space would
+            have done, jumping the toggle sideways every time the pointer
+            crossed a card.
+
+            It also belongs here. This and the index are the two structural
+            controls — where the rule sits, and how much of it you can see —
+            and a disclosure at the start of a row is where every tree, table
+            and accordion puts one. The right edge stays what it was: the
+            actions, then the switch that turns the rule off.
+
+            A two-headed arrow rather than a chevron, because a lone chevron
+            means a dropdown, a sort or a disclosure depending on where you
+            last saw one. `ChevronsUpDown` says "this grows and shrinks" and
+            swaps to its own opposite when open. */}
+        <button
+          type="button"
+          className={`bb__act bb__fold__btn ${expanded ? 'is-open' : ''}`}
+          aria-expanded={expanded}
+          aria-controls={`bb-rule-${rule.id}-body`}
+          aria-label={expanded ? `Hide what rule ${index + 1} checks` : `Show what rule ${index + 1} checks`}
+          title={expanded ? 'Fold this rule' : 'Show what it checks'}
+          onClick={onToggleExpand}
+        >
+          {expanded ? <ChevronsDownUp size={14} strokeWidth={2.2} /> : <ChevronsUpDown size={14} strokeWidth={2.2} />}
+        </button>
+
+
         {/* The title is the keyboard path to the rule.
 
             One real button, in the tab order, whose accessible name is the rule
@@ -214,35 +253,6 @@ export function RuleCard({
         </div>
 
         <div className="bb__cardmeta" onClick={(e) => e.stopPropagation()}>
-          {/* The fold, on the card rather than only on the toolbar.
-
-              The toolbar switch sets the whole chain, which is the right
-              control for "show me the order" and the wrong one for "show me
-              THIS one" — the common move is to fold everything and then open
-              the two rules you are comparing. So the card carries its own, and
-              the host remembers it as an override of whatever the toolbar last
-              said. `aria-expanded` names the region it opens. */}
-          {/* A two-headed arrow, not a chevron.
-
-              A lone chevron on a card means one of three things depending on
-              where you have seen it — a dropdown, a sort, or a disclosure — and
-              this one sat beside four other bare icon buttons of the same size
-              and colour, so it read as a fifth action rather than the control
-              that opens the card. `ChevronsUpDown` says "this grows and
-              shrinks" and nothing else, it swaps to its own opposite when open,
-              and it carries a tint so it is not one more grey glyph in a row of
-              grey glyphs. */}
-          <button
-            type="button"
-            className={`bb__act bb__fold__btn ${expanded ? 'is-open' : ''}`}
-            aria-expanded={expanded}
-            aria-controls={`bb-rule-${rule.id}-body`}
-            aria-label={expanded ? `Hide what rule ${index + 1} checks` : `Show what rule ${index + 1} checks`}
-            title={expanded ? 'Fold this rule' : 'Show what it checks'}
-            onClick={onToggleExpand}
-          >
-            {expanded ? <ChevronsDownUp size={14} strokeWidth={2.2} /> : <ChevronsUpDown size={14} strokeWidth={2.2} />}
-          </button>
           <span className="bb__acts">
             <button type="button" className="bb__act" aria-label="Move up" disabled={!canUp} onClick={() => onMove(-1)}>
               <ArrowUp size={13} strokeWidth={2} />

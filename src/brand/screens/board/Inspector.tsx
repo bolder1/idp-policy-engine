@@ -7,6 +7,7 @@ import { fallbackRule, type Policy, type Rule } from '../../data'
 import { TONE, type Selection } from './model'
 import { WhatEditor } from './WhatEditor'
 import { WhenEditor } from './WhenEditor'
+import { WhoEditor } from './WhoEditor'
 
 /* -----------------------------------------------------------------------------
    The inspector — the right pane, for whatever is selected on the board.
@@ -184,24 +185,44 @@ function RulePane({
           the conditions above and the outcome below, in the order they are
           read. In focus mode the grid puts them side by side instead; same
           editors either way. */}
-      {/* Two questions, numbered, with a rail between them.
+      {/* Two questions, and the numbers on them have gone.
 
-          It was one header reading "If and then" over an undivided body, which
-          names both halves in one breath and then leaves the reader to find
-          where one stops. Numbering them says there are two and says which
-          comes first, and the caption under each says what it is asking — so
-          nothing on the form has to be inferred from the shape of the controls
-          below it. */}
+          They were added to say there are two halves and which comes first.
+          The words already do that: `If` and `Then` are a sequence in English,
+          they sit side by side in reading order, and each carries a caption
+          saying what it asks. A numeral in a filled circle in front of a word
+          that is already an ordinal is the form telling you how to read two
+          words — and it cost the heading its whole left edge, so `If` started
+          further right than everything under it. */}
       <section className={`bb__rule ${focus ? 'is-focus' : ''}`}>
         <div className="bb__rulebody">
           <div className="bb__rulehalf">
+            {/* Who first, then the circumstances.
+
+                Writing a rule starts with a person — "for contractors, when
+                they are off the office network, ask for a second factor" — and
+                the form used to open on the second clause. Groups and people
+                were two attributes among twenty-eight in a catalogue, reached
+                the same way as Day of week, so the question everybody starts
+                with was the one you had to go looking for.
+
+                It is a VIEW, not a new field: it reads and writes the `group`
+                and `user` conditions the rule could always hold. See
+                `audience-ops.ts` for why that matters — an audience held beside
+                the conditions is a gate the linter and the simulator cannot
+                see, which is exactly why `Rule.appliesTo` was removed. */}
             <div className="bb__ask">
               <div className="bb__ask__head">
-                <span className="bb__ask__n" aria-hidden>
-                  1
-                </span>
+                <h3>Who</h3>
+                <p>Which people is this rule about?</p>
+              </div>
+              <WhoEditor rule={rule} onPatch={onPatch} />
+            </div>
+
+            <div className="bb__ask bb__ask--next">
+              <div className="bb__ask__head">
                 <h3>If</h3>
-                <p>When does this rule apply?</p>
+                <p>And in what circumstances?</p>
               </div>
               <WhenEditor rule={rule} onPatch={onPatch} openAt={openAt} />
             </div>
@@ -210,9 +231,6 @@ function RulePane({
           <div className="bb__rulehalf">
             <div className="bb__ask">
               <div className="bb__ask__head">
-                <span className="bb__ask__n" aria-hidden>
-                  2
-                </span>
                 <h3>Then</h3>
                 <p>What happens when it matches?</p>
               </div>

@@ -118,6 +118,7 @@ export function ConditionPopover({
   footer,
   onFooter,
   autoOpen,
+  hideAttribute,
 }: {
   c: Condition
   /** The chosen values, summarised for the pill's third segment. */
@@ -138,6 +139,15 @@ export function ConditionPopover({
   onFooter?: () => void
   /** A row that was just added: start it at the first UNANSWERED decision. */
   autoOpen?: boolean
+  /* Drop the attribute segment.
+
+     For the WHO step, where the attribute IS the step: that row is about
+     groups, and letting somebody retype it into Day of week would edit the
+     question out from under the heading it sits below. Everything else about
+     the pill stays, which is the point — choosing a group there and choosing
+     one in a condition are the same gesture over the same list, because they
+     write the same condition. */
+  hideAttribute?: boolean
 }) {
   const t = conditionType(c.typeId)
   /* `'op'`, not `'what'`.
@@ -167,15 +177,17 @@ export function ConditionPopover({
   return (
     <>
       <span className="cp__pill">
-        <Seg
-          ref={whatRef}
-          kind="what"
-          open={open === 'what'}
-          label={`Change what is checked. Currently ${t.label}.`}
-          onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
-        >
-          {t.label}
-        </Seg>
+        {!hideAttribute && (
+          <Seg
+            ref={whatRef}
+            kind="what"
+            open={open === 'what'}
+            label={`Change what is checked. Currently ${t.label}.`}
+            onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
+          >
+            {t.label}
+          </Seg>
+        )}
 
         <Seg
           ref={opRef}

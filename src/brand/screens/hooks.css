@@ -1,7 +1,18 @@
 /* ---------------------------------------------------------------------------
    External hooks. Shaped like the zones library, because a hook is the same
    kind of object — named once, referenced everywhere, dangerous to edit.
-   --------------------------------------------------------------------------- *.bhk__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-6); }
+   --------------------------------------------------------------------------- */
+
+/* The `*.` that closed this banner was not a close.
+
+   It ran to the next terminator thirty-six lines down, which put `.bhk__list`
+   and the whole of `.bhk__card` inside a comment — so the hook cards have had
+   no surface, no border and no padding for as long as the typo has been here,
+   and nothing could see it. `stylesheets.test.ts` counts braces and skips
+   comment bodies, so a swallowed rule balances perfectly; the build was clean
+   and the classes were still emitted. There is an assertion for it now, and it
+   is the one that found this. */
+.bhk__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-6); }
 
 .bhk__card {
   padding: var(--space-6);

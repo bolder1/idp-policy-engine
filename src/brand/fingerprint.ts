@@ -1,36 +1,42 @@
 /* -----------------------------------------------------------------------------
-   Device fingerprinting — the attribute master, and the two ways to use it.
+   Device profiles — the attribute master, and the two kinds of profile.
 
    Transcribed from "Adaptive MFA - Device Fingerprint v2.xlsx": the 38
    attributes on the *Devic Fingerprint* sheet, the weights and bands from
    *Sheet2*, and the outcome matrix from *Sheet9*.
 
-   The thing worth naming up front, because the old screen got it wrong: this is
-   not device *posture*. Posture asks "is this device healthy" — disk encrypted,
-   OS patched, MDM enrolled. Fingerprinting asks "is this the same device as
-   last time", by remembering a set of attribute values and comparing them on
-   the next sign-in. Different question, different data, different failure mode,
-   and the tab was named after the wrong one.
+   Two kinds, and the whole screen turns on which one you pick. They were called
+   "Attribute match" and "Risk score", which named the ARITHMETIC each one runs
+   — and an admin does not arrive wanting an arithmetic. They arrive wanting to
+   keep unpatched Androids out, or to recognise the machine somebody signed in
+   from last week. So the two are named after the QUESTION now:
 
-   Two ways to answer it, and the whole screen turns on which one you pick:
+   · **OS and version.** What must a device be running? A form factor, and a
+     version floor per platform: `Windows ≥ 10`, `Android ≥ 13`. Each one you
+     name is a condition, and they are ANDed. Everything it reads arrives with
+     the request, so there is nothing to install and nothing to decide about
+     collection — which is why this kind never asks the agent question.
+   · **Device attributes.** Is this the same machine as last time? Many weak
+     signals, each carrying a weight, and what changed since last time adds up
+     to a score. It is more expressive and considerably harder to reason about,
+     which is the honest trade. Half of what it can read needs software on the
+     machine, so this kind asks the agent question first — before the attributes,
+     because the answer decides which attributes exist at all.
 
-   · **Attribute match.** The chosen attributes either still match or they do
-     not. You set how many may drift before the device stops counting as known.
-     No arithmetic — which is the point, because a rule you can explain to an
-     auditor in one sentence is worth more than a rule that is slightly better
-     calibrated.
-   · **Risk score.** Every attribute carries a weight. Changed attributes add
-     their weight up, and the total lands in a band. It is more expressive and
-     considerably harder to reason about, which is the honest trade.
+   An earlier version of this comment said attribute-match let you "set how many
+   may drift before the device stops counting as known". No such control has
+   ever existed here — the only `tolerance` config in the file belongs to `time`,
+   which is a device attribute. What the OS catalogue holds is a set of
+   conditions, not a drift budget, and under its new name the old sentence would
+   have been actively misleading.
 
    Weights come from the sheet's own table rather than being invented: unique
    hardware identifiers 30, hardware specifications 20, browser and network 10,
-   software and configuration 5. Bands likewise — 0-30 allow, 31-70 challenge,
-   71-100 deny.
+   software and configuration 5.
    -------------------------------------------------------------------------- */
 
-/* Back, and only for the risk catalogue. See RISK_ATTRIBUTES below: the two
-   modes ask different questions and were never well served by one list. */
+/* Back, and only for the device catalogue. See DEVICE_ATTRIBUTES below: the two
+   kinds ask different questions and were never well served by one list. */
 export type AttrCategory = 'Hardware' | 'Browser' | 'Security' | 'Network' | 'Behaviour'
 
 export type Priority = 'High' | 'Medium' | 'Low'
@@ -92,6 +98,16 @@ export type AttrConfig =
       kind: 'version'
       label: string
       value: AttrRuleValue
+      /* The platform this compares, as a word rather than as something to
+         recover from the attribute's name.
+
+         It was derived — `name.replace(/ ?OS version$/, '')` — which turned
+         "iOS version" into "i", because the platform's own name ends in the
+         word being stripped. That is the general failure of parsing a label to
+         get back a fact somebody already knew when they wrote it. The overview
+         names the platforms a profile checks, so this is now read rather than
+         reconstructed. */
+      platform: string
       /** Real examples for THIS platform, since the formats genuinely differ. */
       placeholder: string
       hint: string
@@ -179,7 +195,7 @@ export const VERSION_OPS: VersionOp[] = [
 export const versionOp = (id: string): VersionOp =>
   VERSION_OPS.find((o) => o.id === id) ?? VERSION_OPS[0]
 
-export const MATCH_ATTRIBUTES: Attribute[] = [
+export const OS_ATTRIBUTES: Attribute[] = [
   {
     id: 'device-type', name: 'Device type',
     purpose: 'The form factor the request came from. A laptop and a phone are not the same risk, and some apps have no business being opened on one of them.',
@@ -200,6 +216,7 @@ export const MATCH_ATTRIBUTES: Attribute[] = [
     priority: 'High', weight: 20, phase: 1,
     config: {
       kind: 'version',
+      platform: 'Windows',
       label: 'Windows version',
       value: { op: 'gte', value: '10' },
       placeholder: '10, 11, 10.0.19045',
@@ -212,6 +229,7 @@ export const MATCH_ATTRIBUTES: Attribute[] = [
     priority: 'High', weight: 20, phase: 1,
     config: {
       kind: 'version',
+      platform: 'Android',
       label: 'Android version',
       value: { op: 'gte', value: '13' },
       placeholder: '13, 14, 15',
@@ -224,6 +242,7 @@ export const MATCH_ATTRIBUTES: Attribute[] = [
     priority: 'High', weight: 20, phase: 1,
     config: {
       kind: 'version',
+      platform: 'iOS',
       label: 'iOS version',
       value: { op: 'gte', value: '17' },
       placeholder: '17, 18.1, 18.1.2',
@@ -236,6 +255,7 @@ export const MATCH_ATTRIBUTES: Attribute[] = [
     priority: 'High', weight: 20, phase: 1,
     config: {
       kind: 'version',
+      platform: 'macOS',
       label: 'macOS version',
       value: { op: 'gte', value: '14' },
       placeholder: '14, 15.1, 15.1.1',
@@ -265,13 +285,27 @@ export const MATCH_ATTRIBUTES: Attribute[] = [
    This list was deleted when the master narrowed to five and is restored from
    `ba0e53d^` rather than retyped, so the weights and the purposes are the
    sheet's own rather than a paraphrase of them. */
-export const RISK_ATTRIBUTES: Attribute[] = [
+export const DEVICE_ATTRIBUTES: Attribute[] = [
   // --- Hardware -------------------------------------------------------------
+  /* No config, and it is the only row in either catalogue to have lost one.
+
+     It carried `Treat a change as → Significant / Minor / Ignore`, which is the
+     weight question asked a second time in different words: Significant and
+     Minor ARE High and Low, and Ignore is unticking the row. A device row now
+     shows its weight and, where it has one, its precision — and this was the
+     one attribute where those two controls would have been the same control
+     printed twice with disagreeing vocabularies.
+
+     It also settles something worse. `device-type` is the one id in both
+     catalogues, and the merged lookup that used to resolve it always returned
+     the OS copy — so a device profile asking for this row's configuration got
+     `Device type → Laptop / Mobile / Tablet`, which is a CONDITION, on a
+     profile that has no conditions. `attrOf(mode, id)` resolves by kind now,
+     and with the config gone the two rows differ only in what they are for. */
   {
     id: 'device-type', category: 'Hardware', name: 'Device type',
     purpose: 'Desktop, laptop, mobile or tablet. Different form factors carry different risk.',
     priority: 'Low', weight: 5, phase: 1,
-    config: { kind: 'choice', label: 'Treat a change as', value: 'Significant', options: ['Significant', 'Minor', 'Ignore'] },
   },
   {
     id: 'manufacturer', category: 'Hardware', name: 'Manufacturer and model',
@@ -486,29 +520,169 @@ export const CATEGORIES: { id: AttrCategory; label: string; blurb: string }[] = 
 
 /* Which catalogue a profile draws from. The two are disjoint in intent and
    overlap in one id — `device-type` is a sensible signal either way — so this
-   is a function of the MODE rather than a merged list with a flag on each row. */
-export const attributesFor = (mode: ProfileMode): Attribute[] =>
-  mode === 'risk' ? RISK_ATTRIBUTES : MATCH_ATTRIBUTES
+   is a function of the KIND rather than a merged list with a flag on each row.
 
-/* Kept for the places that hold an id and no mode — the seeds' validation, and
-   anything reading a stored value back. Searches match first, because that is
-   the smaller and more specific list. */
-export const ATTRIBUTES: Attribute[] = [
-  ...MATCH_ATTRIBUTES,
-  ...RISK_ATTRIBUTES.filter((r) => !MATCH_ATTRIBUTES.some((m) => m.id === r.id)),
-]
+   A `Record` rather than the ternary it replaced. `mode === 'risk' ? … : …` was
+   else-shaped: a mode added without a catalogue, or an id typed wrong, silently
+   returned the other list rather than failing. A total map cannot be
+   incomplete, and adding a third kind without a catalogue is a compile error. */
+export const CATALOGUE: Record<ProfileMode, Attribute[]> = {
+  os: OS_ATTRIBUTES,
+  device: DEVICE_ATTRIBUTES,
+}
+
+export const attributesFor = (mode: ProfileMode): Attribute[] => CATALOGUE[mode]
+
+/* One attribute, resolved BY KIND — and it replaces `byId`.
+
+   `byId` searched a merged list built as `[...OS, ...DEVICE.filter(not in OS)]`,
+   which de-duplicated on `device-type` by keeping the OS copy. So every device
+   profile that asked what `device-type` was got the OS catalogue's answer: a
+   different purpose, a different category, and until a moment ago a different
+   config entirely. Nothing noticed because nothing rendered a device row's
+   configuration — and the whole point of this pass is that now something does.
+
+   Nothing that calls this lacks a mode. That is the argument for the shape:
+   an id alone was never enough to identify an attribute, and pretending it was
+   is what let the wrong row through. */
+export const attrOf = (mode: ProfileMode, id: string): Attribute | undefined =>
+  CATALOGUE[mode].find((a) => a.id === id)
+
+/* Both lists, WITH the duplicate, and only for the transcription receipt.
+
+   `ATTRIBUTES` de-duplicated, which is exactly why the uniqueness assertion in
+   the test passed while one of the two `device-type` rows was unreachable. The
+   test now asserts uniqueness per catalogue, which is the property that
+   actually matters, and this list is what the weight and naming checks sweep. */
+export const ALL_ATTRIBUTES: Attribute[] = [...OS_ATTRIBUTES, ...DEVICE_ATTRIBUTES]
 
 /* --- Profiles ---------------------------------------------------------------- */
 
-export type ProfileMode = 'match' | 'risk'
+/* --- The two kinds ------------------------------------------------------------
+
+   `'match'` and `'risk'` before, which named the arithmetic. They are named
+   after the question now, and the ids moved with the labels rather than being
+   left behind — leaving `mode === 'risk'` to mean "device attributes" is how a
+   codebase ends up with two vocabularies for one thing, which is precisely the
+   state this file was in: the create dialog said "Attribute based" and every
+   other surface said "Attribute match", for the same profile, on the same day.
+
+   The tint is a FIELD here rather than the id interpolated into a class name.
+   `.bfp2__modechip.is-${p.mode}` meant a mode rename had to be mirrored in the
+   stylesheet, and a class that matches nothing renders an untinted chip — no
+   error, no failing test, just a chip that quietly stops saying anything. The
+   chip emits the tint, so this can never happen again. */
+export type ProfileMode = 'os' | 'device'
+
+export interface ModeMeta {
+  id: ProfileMode
+  label: string
+  blurb: string
+  /** The feedback ramp this kind wears, named for the ramp and not for itself. */
+  tint: 'info' | 'accent'
+}
+
+export const MODES: ModeMeta[] = [
+  {
+    id: 'os',
+    label: 'OS and version',
+    blurb:
+      'State what a device must be running — a form factor, and a version floor per platform. Everything it reads arrives with the request, so there is nothing to install.',
+    tint: 'info',
+  },
+  {
+    id: 'device',
+    label: 'Device attributes',
+    blurb:
+      'Recognise the machine itself. Each attribute carries a weight, what changed since last time adds up to a score, and the score picks the outcome.',
+    tint: 'accent',
+  },
+]
+
+export const MODE_META: Record<ProfileMode, ModeMeta> = Object.fromEntries(
+  MODES.map((m) => [m.id, m]),
+) as Record<ProfileMode, ModeMeta>
+
+/* The noun for a thing this kind holds. An OS profile's rows are CONDITIONS a
+   device has to satisfy; a device profile's rows are SIGNALS it watches. Both
+   were called "attributes", which is true of the catalogue and wrong about what
+   the profile does with them. */
+export const ITEM_NOUN: Record<ProfileMode, { one: string; many: string; verb: string }> = {
+  os: { one: 'requirement', many: 'requirements', verb: 'requires' },
+  device: { one: 'attribute', many: 'attributes', verb: 'watches' },
+}
+
+export const countLabel = (mode: ProfileMode, n: number) =>
+  `${n} ${n === 1 ? ITEM_NOUN[mode].one : ITEM_NOUN[mode].many}`
 
 /* The two ways a device can be identified, and the console's own split.
 
    Agentless is what a browser and the request itself give up. Agent-based adds
    everything only software running on the machine can read — the TPM, the disk,
    whether Secure Boot is on. Higher assurance, and it has a prerequisite an
-   admin has to satisfy before any of it works. */
+   admin has to satisfy before any of it works.
+
+   This is asked at CREATION now, and only of a device-attributes profile. It
+   used to be the first row of a panel on the detail page, which put it after
+   the attributes it governs: you chose eighteen signals and then discovered,
+   on a different surface, that half of them never arrive. A question whose
+   answer decides what the next question can even offer belongs before it.
+
+   An OS-and-version profile is never asked, because for that catalogue there is
+   nothing to decide — see `offeredAttributes`. It still carries the field, and
+   carries `'agentless'`, because that is what the five OS attributes actually
+   need: they arrive with the request. Nothing reads it on an OS profile. */
 export type ProfileReach = 'agentless' | 'agent'
+
+export interface ReachMeta {
+  id: ProfileReach
+  label: string
+  blurb: string
+  /* The console puts "Windows only" in a callout that appears AFTER agent-based
+     has been chosen, which is one screen too late to be a decision input. A
+     platform limit is a property of the choice, so it travels on the card. */
+  note?: string
+}
+
+export const REACHES: ReachMeta[] = [
+  {
+    id: 'agentless',
+    label: 'Agentless',
+    blurb:
+      'Browser, network and geolocation attributes establish device identity. Nothing to install.',
+  },
+  {
+    id: 'agent',
+    label: 'Agent-based',
+    blurb:
+      'An installed agent adds hardware identifiers — TPM, motherboard, disk — for high-assurance access.',
+    note: 'Windows only. Users without the agent cannot sign in.',
+  },
+]
+
+export const REACH_META: Record<ProfileReach, ReachMeta> = Object.fromEntries(
+  REACHES.map((r) => [r.id, r]),
+) as Record<ProfileReach, ReachMeta>
+
+export const reachLabel = (r: ProfileReach) => REACH_META[r].label
+
+/* What this kind, at this reach, may actually collect — and its complement.
+
+   `reach` is nullable because the wizard has not asked yet on the step before
+   it asks, and `null` reads as "no agent", which is the conservative half.
+
+   The reason the OS kind never asks the question is here rather than in a
+   comment: nothing in `OS_ATTRIBUTES` carries `needsAgent`, so
+   `offeredAttributes('os', anything)` is all five. Asking would be asking a
+   question with no consequence attached to either answer. */
+export const offeredAttributes = (mode: ProfileMode, reach: ProfileReach | null): Attribute[] =>
+  CATALOGUE[mode].filter((a) => !(a.needsAgent && reach !== 'agent'))
+
+export const blockedAttributes = (mode: ProfileMode, reach: ProfileReach | null): Attribute[] =>
+  CATALOGUE[mode].filter((a) => a.needsAgent && reach !== 'agent')
+
+/** Whether this kind of profile is ever asked the agent question. */
+export const asksReach = (mode: ProfileMode) => blockedAttributes(mode, 'agentless').length > 0
 
 /* How a device gets onto a person's list in the first place. The console's two,
    and they are a BRANCH rather than a menu: choosing a roster removes the
@@ -571,6 +745,121 @@ export interface FingerprintProfile {
   usedIn: number
 }
 
+/* --- Coherence, as functions rather than as care -------------------------------
+
+   Four things the screen used to get right by remembering to. Each one is a
+   state the model could previously express and nobody could see.
+   -------------------------------------------------------------------------- */
+
+/* Values for attributes the profile no longer enables.
+
+   `enabled` and `config` were written by different hands: dropping a row wrote
+   `enabled` and left `config['os-windows'] = { op: 'gte', value: '10' }` behind
+   forever. Invisible — no surface renders a value for a row that is not there —
+   and it came back the moment somebody re-ticked the attribute, restoring a
+   setting nobody had re-approved and nobody had been shown.
+
+   It mattered less when the only way to set a value was to open the profile and
+   type it. The wizard writes values now, so a profile can be created, have a
+   row removed, and be handed to somebody else still carrying it. */
+export function pruneValues<P extends FingerprintProfile>(p: P): P {
+  const live = new Set(p.enabled)
+  const keep = <T,>(rec: Record<string, T>) =>
+    Object.fromEntries(Object.entries(rec).filter(([id]) => live.has(id)))
+  return { ...p, config: keep(p.config), weights: keep(p.weights) }
+}
+
+/* The one writer for reach, wherever it is written.
+
+   It filters `enabled`, prunes what that orphans, and forces the registration
+   branch agentless cannot support — a roster is matched on MAC address, and MAC
+   is one of the eighteen things only an agent can read, so an agentless roster
+   matches nothing at all.
+
+   It lived inline in the restriction drawer as `setReach`, which is where the
+   pruning was missing: switching to agentless dropped the attributes and kept
+   their settings. */
+export function withReach(p: FingerprintProfile, reach: ProfileReach): FingerprintProfile {
+  const offered = offeredAttributes(p.mode, reach)
+  return pruneValues({
+    ...p,
+    reach,
+    enabled: p.enabled.filter((id) => offered.some((a) => a.id === id)),
+    registration: reach === 'agentless' ? 'self' : p.registration,
+    maxDevices: reach === 'agentless' ? (p.maxDevices ?? DEFAULT_MAX_DEVICES) : p.maxDevices,
+    roster: reach === 'agentless' ? null : p.roster,
+  })
+}
+
+/* A stored value as the string a row prints.
+
+   The overview states every configured value, and it states them as text rather
+   than as the control that set them — a page describing a profile should not be
+   a second copy of the editor. One function so the pill and the control cannot
+   disagree about what is stored, and it falls back to the master's own default
+   for exactly the reason `AttrControl` does: an untouched attribute IS at its
+   default, and printing nothing would say it was unset. */
+export function valueLabel(a: Attribute, v: AttrConfigValue | undefined): string {
+  const c = a.config
+  if (!c) return ''
+  if (c.kind === 'tolerance') return `${typeof v === 'number' ? v : c.value} ${c.unit}`
+  if (c.kind === 'choice') return typeof v === 'string' ? v : c.value
+  if (c.kind === 'list') return `${c.values.length} entries`
+  const r = isRuleValue(v) ? v : c.value
+  /* The symbol, not the id — `≥ 10`, which is how the row draws it. A `rule`
+     stores its operator as the word already, so it prints itself. */
+  return c.kind === 'version' ? `${versionOp(r.op).symbol} ${r.value}` : `${r.op} ${r.value}`
+}
+
+/* Which platforms an OS profile actually names.
+
+   The sharpest thing the overview says, and the screen could not say it before.
+   An OS profile holding only `device-type` checks no platform at all — a Mac
+   signing in passes every condition on it — and the old subtitle printed that
+   state as "Attribute match · 1 attribute", which reads like a configured
+   profile. */
+export const platformsNamed = (p: FingerprintProfile): string[] =>
+  CATALOGUE[p.mode]
+    .filter((a) => a.config?.kind === 'version' && p.enabled.includes(a.id))
+    .map((a) => (a.config as { platform: string }).platform)
+
+/* A roster keyed on an address the profile never reads.
+
+   The roster is matched on MAC. `fp-kiosk` shipped holding a roster of 24
+   machines and watching only `device-type`, so the roster matched nothing and
+   the screen said so nowhere. */
+export const rosterNeedsMac = (p: FingerprintProfile): boolean =>
+  p.registration === 'pre-approved' && !p.enabled.includes('mac')
+
+/* The page's one-line description of a whole profile.
+
+   Joined with ` · ` and never with "and": a list of facets is not a conjunction,
+   and the moment it reads as one somebody starts asking whether they all have to
+   be true.
+
+   The enrolment facet appears only once somebody has answered it, which is the
+   same claim `restrictionSet` exists to refuse — printed as one clause here
+   instead of as three rows. */
+export function describeProfile(p: FingerprintProfile): string {
+  const parts = [modeLabel(p)]
+  if (asksReach(p.mode)) parts.push(reachLabel(p.reach))
+  parts.push(countLabel(p.mode, p.enabled.length))
+  if (p.restrictionSet) parts.push(REGISTRATION_LABEL[p.registration])
+  return parts.join(' · ')
+}
+
+/* How many steps this kind of profile takes to create, and what each is called.
+
+   Words, not numerals. Two or three is few enough to name every step rather
+   than count them, which is the difference between a progress bar and a table
+   of contents — and the difference is the whole reason the OS kind is shorter:
+   it is not "the same wizard with one step skipped", it is a shorter question.
+
+   Derived from `asksReach` rather than written out, so a catalogue that gains
+   an agent-only attribute gains the step that governs it. */
+export const stepsFor = (mode: ProfileMode): string[] =>
+  asksReach(mode) ? ['Profile', 'Collector', 'Attributes'] : ['Profile', 'Requirements']
+
 /* --- The three weights a risk profile can give an attribute ---------------------
    The master carries four (5, 10, 20, 30) because the sheet does. A profile
    picks from three, because a person setting thirty-eight of these is choosing
@@ -585,10 +874,21 @@ export const TIER_WEIGHT: Record<Priority, number> = { High: 30, Medium: 20, Low
 export const tierOf = (weight: number): Priority =>
   weight >= 30 ? 'High' : weight >= 20 ? 'Medium' : 'Low'
 
-/* A profile's kind, in the two words a picker row has space for. */
-export const modeLabel = (p: { mode: 'match' | 'risk' }) => (p.mode === 'match' ? 'Attribute match' : 'Risk score')
+/* A profile's kind, in the words a picker row has space for.
 
-export const byId = (id: string) => ATTRIBUTES.find((a) => a.id === id)
+   Typed on `ProfileMode`, not on an inline union. The old signature spelled the
+   two ids out again — `{ mode: 'match' | 'risk' }` — so the ids and the thing
+   that labels them could drift apart without TypeScript noticing, which is one
+   of the two ways two vocabularies got in here.
+
+   The other way was that this function and the create dialog's `MODES` held
+   DIFFERENT strings for the same kind. There is one list now and this reads
+   from it. */
+export const modeLabel = (p: { mode: ProfileMode }) => MODE_META[p.mode].label
+
+/* `byId` stood here. See `attrOf` above: an id alone never identified an
+   attribute, because `device-type` is in both catalogues and the merged list
+   this searched always answered with the OS copy. */
 
 /* The score a profile would produce if `changed` attributes came back
    different. Weights are the profile's overrides falling back to the master,
@@ -596,7 +896,10 @@ export const byId = (id: string) => ATTRIBUTES.find((a) => a.id === id)
    scale — an uncapped total makes "71 and above" meaningless. */
 export function scoreOf(p: FingerprintProfile, changed: string[]): number {
   const live = changed.filter((id) => p.enabled.includes(id))
-  const raw = live.reduce((sum, id) => sum + (p.weights[id] ?? byId(id)?.weight ?? 0), 0)
+  /* `attrOf(p.mode, …)`, not a merged lookup. Scoring is a device-attributes
+     thing and the weight it must use is the device catalogue's — `device-type`
+     weighs 5 in both, but the next id to appear in both need not. */
+  const raw = live.reduce((sum, id) => sum + (p.weights[id] ?? attrOf(p.mode, id)?.weight ?? 0), 0)
   return Math.min(100, raw)
 }
 
@@ -612,7 +915,7 @@ export const seedProfiles: FingerprintProfile[] = [
   {
     id: 'fp-corp',
     name: 'Corporate managed',
-    mode: 'match',
+    mode: 'os',
     /* A managed Windows fleet: the form factor it should be, and a floor
        under the build. */
     enabled: ['device-type', 'os-windows'],
@@ -621,8 +924,11 @@ export const seedProfiles: FingerprintProfile[] = [
       'os-windows': { op: 'gte', value: '10' },
     },
     weights: {},
-    /* Every signal it names is one only an agent can read. */
-    reach: 'agent',
+    /* Agentless, and the comment here used to say the opposite — "every signal
+       it names is one only an agent can read" — about a profile naming a form
+       factor and a Windows build, neither of which needs one. An OS profile is
+       always agentless; that is why it is never asked. */
+    reach: 'agentless',
     registration: 'self',
     maxDevices: 3,
     roster: null,
@@ -632,10 +938,18 @@ export const seedProfiles: FingerprintProfile[] = [
   },
   {
     id: 'fp-byod',
-    name: 'BYOD risk scoring',
-    mode: 'risk',
-    /* Personal phones and tablets, so both mobile platforms are named and the
-       floor is the one the vendor still patches. */
+    name: 'BYOD phones and tablets',
+    /* This was `mode: 'risk'` holding `os-android` and `os-ios`, and neither id
+       exists in the device catalogue. It was not a risk profile that had drifted
+       — it was an OS profile filed under the wrong kind since the two lists
+       split: all three of its attributes and both of its version comparisons
+       live only in `OS_ATTRIBUTES`. The picker counted "3 of 38 selected" with
+       one row ticked, and "Clear all" deleted two entries nothing had drawn.
+
+       Converting it preserves every stored value, which is the tell that this
+       is a correction rather than a change. The name goes with it: it never
+       scored anything. */
+    mode: 'os',
     enabled: ['device-type', 'os-android', 'os-ios'],
     config: {
       'device-type': 'Mobile',
@@ -643,7 +957,6 @@ export const seedProfiles: FingerprintProfile[] = [
       'os-ios': { op: 'gte', value: '17' },
     },
     weights: {},
-    /* Personal machines, so nothing to install: browser and network only. */
     reach: 'agentless',
     registration: 'self',
     maxDevices: 5,
@@ -655,12 +968,18 @@ export const seedProfiles: FingerprintProfile[] = [
   {
     id: 'fp-kiosk',
     name: 'Shared kiosk',
-    mode: 'match',
-    enabled: ['device-type'],
-    config: { 'device-type': 'Laptop' },
+    /* Also re-filed, and for a harder reason than `fp-byod`.
+
+       It is a roster profile — 24 named machines, nobody else — and a roster is
+       matched on MAC address. It watched `device-type` and nothing else, so the
+       roster matched nothing: the one setting the whole profile exists for was
+       inert, and no surface said so. A roster needs MAC, MAC needs an agent, and
+       an agent-based profile that recognises specific machines is a device
+       profile. `rosterNeedsMac` now names that state wherever it occurs. */
+    mode: 'device',
+    enabled: ['mac', 'machine-sid', 'device-type'],
+    config: {},
     weights: {},
-    /* A kiosk is a known machine, and nobody should be able to enrol another
-       one by walking up to it. */
     reach: 'agent',
     registration: 'pre-approved',
     maxDevices: null,
@@ -668,5 +987,34 @@ export const seedProfiles: FingerprintProfile[] = [
     autoRegister: false,
     restrictionSet: true,
     usedIn: 1,
+  },
+  {
+    id: 'fp-unmanaged',
+    name: 'Unmanaged access',
+    /* The store held no agentless device profile, so the answer that gates half
+       the catalogue was never demonstrated by anything an admin could open — and
+       neither was a device row carrying both a weight and a precision setting.
+       This is that profile: six signals a browser gives up for free, four of them
+       tuned.
+
+       `restrictionSet: false` on purpose. The enrolment empty state is a real
+       state of the product and this is the only way to reach it without creating
+       something. */
+    mode: 'device',
+    enabled: ['browser', 'ip', 'geo', 'canvas', 'locale', 'vpn'],
+    config: {
+      browser: 'Family only',
+      ip: 'Subnet',
+      geo: 'Country',
+      vpn: 'Challenge',
+    },
+    weights: {},
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: DEFAULT_MAX_DEVICES,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: false,
+    usedIn: 0,
   },
 ]

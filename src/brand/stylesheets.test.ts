@@ -68,6 +68,42 @@ describe('the stylesheets', () => {
     expect(unbalanced).toEqual([])
   })
 
+  /* A rule that has stopped applying because a comment swallowed it.
+
+     The counter above cannot see this, and that is not a gap in it — it is the
+     mechanism. It SKIPS comment bodies, so a comment whose terminator was typed
+     with a full stop where the slash belonged reads all the way to the file's
+     NEXT terminator, and every rule in between stops counting. The braces
+     balance perfectly. Nothing else catches it either: the rules still parse as
+     comment text so the build is clean, and the classes are still emitted so
+     React is happy. The only symptom is a stylesheet that has quietly stopped
+     applying somewhere nobody has looked at recently.
+
+     Four of these were live when this test was written — three in
+     `device-fingerprint-v2.css` and one in `hooks.css` — and between them they
+     had swallowed a dozen rules, two section banners, and the layout of a
+     search bar that had been visibly broken ever since.
+
+     Counting openers against terminators was the first version and it is wrong:
+     CSS ignores an opener inside a comment, so prose that mentions one is not a
+     defect, and `kit.css` has a legitimate `interactive` + opener in a sentence
+     about semantic roles. So this asserts the thing that actually matters —
+     that no declaration block is sitting inside a comment — which names the
+     damage rather than a proxy for it. */
+  it('never swallows a rule inside a comment', () => {
+    const swallowed = Object.entries(SHEETS).flatMap(([path, css]) => {
+      const bodies = [...css.matchAll(/\/\*([\s\S]*?)\*\//g)].map((m) => m[1])
+      return bodies
+        /* A block with a declaration in it: braces around at least one
+           `property: value;`. Prose can hold a brace or a semicolon; it does
+           not hold both in that shape. */
+        .filter((b) => /\{[^{}]*:[^{}]*;[^{}]*\}/.test(b))
+        .map((b) => `${path}: ${b.replace(/\s+/g, ' ').trim().slice(-70)}`)
+    })
+
+    expect(swallowed).toEqual([])
+  })
+
   it('never leaves an at-rule with a wholly empty body', () => {
     /* The other half of the same delete. An `@media` whose rules have all been
        removed is dead weight, and the edit that empties it is one keystroke

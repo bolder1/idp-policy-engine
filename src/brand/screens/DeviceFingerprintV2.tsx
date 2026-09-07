@@ -9,11 +9,10 @@ import {
   Activity,
   Check,
   CircuitBoard,
-  Clock,
   Copy,
   Cpu,
   Eye,
-  Gauge,
+  Fingerprint,
   Wifi,
   Globe,
   Hash,
@@ -23,12 +22,15 @@ import {
   MapPin,
   Link2,
   Microchip,
+  ListChecks,
+  MonitorCog,
   MonitorSmartphone,
   Monitor,
   Network,
   Plus,
   RadioTower,
   Repeat,
+  ScrollText,
   Search,
   Server,
   ShieldCheck,
@@ -44,17 +46,34 @@ import { Button, Drawer, MenuButton, Modal, NumberStepper, TipDot, Toggle } from
 import { TierPick } from '../tier-pick'
 import {
   CATEGORIES,
-  RISK_ATTRIBUTES,
-  attributesFor,
-  VERSION_OPS,
-  versionOp,
   DEFAULT_MAX_DEVICES,
+  MODES,
+  MODE_META,
+  REACHES,
+  REACH_META,
   REGISTRATION_LABEL,
   TIER_WEIGHT,
-  byId,
+  VERSION_OPS,
+  asksReach,
+  attrOf,
+  attributesFor,
+  blockedAttributes,
+  ITEM_NOUN,
+  countLabel,
+  describeProfile,
   isRuleValue,
   modeLabel,
+  offeredAttributes,
+  platformsNamed,
+  pruneValues,
+  reachLabel,
+  rosterNeedsMac,
+  stepsFor,
   tierOf,
+  valueLabel,
+  versionOp,
+  withReach,
+  type AttrCategory,
   type Attribute,
   type AttrConfigValue,
   type AttrRuleValue,
@@ -242,19 +261,24 @@ function ProfileList({
                 {/* One cell, as on the zones table — the icon belongs to the
                     name rather than to a column of its own. */}
                 <span role="cell" className="bfp2__tname">
-                  <span className={`bfp2__tile bfp2__tile--sm is-${p.mode}`} aria-hidden>
-                    {p.mode === 'risk' ? (
-                      <Gauge size={13} strokeWidth={1.9} />
-                    ) : (
-                      <Sliders size={13} strokeWidth={1.9} />
-                    )}
+                  {/* No `is-${p.mode}` on the tile. It never had a rule — the
+                      tile is deliberately grey, because the chip beside it
+                      already names the kind in that kind's colour — so the
+                      class was a mode name emitted into the DOM for nothing,
+                      and one more place a rename could break. */}
+                  <span className="bfp2__tile bfp2__tile--sm" aria-hidden>
+                    {renderModeIcon(p.mode, 13)}
                   </span>
                   <button type="button" className="bfp2__gname" onClick={() => onOpen(p.id)}>
                     {p.name}
                   </button>
                 </span>
                 <span role="cell">
-                  <i className={`bfp2__modechip is-${p.mode}`}>{modeLabel(p)}</i>
+                  {/* The TINT, not the id. `is-${p.mode}` meant a rename had
+                      to be mirrored in the stylesheet, and a class matching
+                      nothing renders an untinted chip — no error, no failing
+                      test, a chip that quietly stops saying anything. */}
+                  <i className={`bfp2__modechip is-${MODE_META[p.mode].tint}`}>{modeLabel(p)}</i>
                 </span>
                 <span role="cell" className="bfp2__tnum">{p.enabled.length}</span>
                 {/* The count, and what is behind it — the same peek the zones
@@ -318,20 +342,32 @@ function ProfileList({
 
 /* --- Create ------------------------------------------------------------------- */
 
-const MODES: { id: ProfileMode; label: string; blurb: string; icon: typeof Sliders }[] = [
-  {
-    id: 'match',
-    label: 'Attribute based',
-    blurb: 'Compare the signals to last time. Too many changed and it is treated as a new device.',
-    icon: Sliders,
-  },
-  {
-    id: 'risk',
-    label: 'Risk based',
-    blurb: 'Each signal carries a weight. What changed adds up to a score, and the score picks the outcome.',
-    icon: Gauge,
-  },
-]
+/* The labels and blurbs live in `fingerprint.ts` now, and only the marks are
+   here — an icon is a rendering decision and a name is not.
+
+   They were declared in this file as `MODES`, with strings that did not match
+   `modeLabel`'s: a profile was called "Attribute based" while being created and
+   "Attribute match" everywhere afterwards, for the same profile, on the same
+   day. Two lists is how that happens, so there is one.
+
+   `MonitorCog` rather than `Sliders`: a screen with a setting on it, which is
+   what an OS-and-version profile names. `Sliders` said "settings" generically
+   and said nothing about an OS — and it is the mark this console uses for Edit
+   buttons two rows further down the same page.
+
+   `Fingerprint` rather than `Gauge`: this is the kind that actually
+   fingerprints. `Gauge` was right for "Risk score" and reads as SPEED under the
+   new name — and `Fingerprint` is already the mark the policy builder draws
+   these options with, so the two surfaces stop disagreeing. */
+const MODE_ICON: Record<ProfileMode, typeof Sliders> = {
+  os: MonitorCog,
+  device: Fingerprint,
+}
+
+const REACH_ICON: Record<ProfileReach, typeof Sliders> = {
+  agentless: Globe,
+  agent: Microchip,
+}
 
 /* `CAT_META` and `metaOf` — an icon and a tint per category — stood here, and
    went when the categories did. What is left is `ATTR_ICON`: a mark per
@@ -383,49 +419,104 @@ const CAT_META: Record<string, { tint: string; icon: typeof Cpu }> = {
 
 const metaOf = (id: string) => CAT_META[id] ?? { tint: 'slate', icon: Cpu }
 
-/* --- The risk picker, restored --------------------------------------------------
-   Risk scoring wants many weak signals, so its catalogue is thirty-eight and
-   filed into five categories. That needs a rail: a flat list of thirty-eight
-   checkboxes is a list you scroll rather than read, which is exactly the
-   argument that removed it when the master narrowed to five.
+/* --- The catalogue, as the step that picks from it -----------------------------
 
-   It came back because the two modes stopped sharing a catalogue. Attribute
-   match asks a handful of stated conditions and its five fit on one pane with
-   nothing above them; risk asks for a sum and needs the whole sheet. One picker
-   could not be right for both, and the flat one was right for the smaller list.
+   ONE component where there were two, and it is also where the values are now
+   set rather than only the rows chosen.
 
-   Lifted from `ba0e53d^` rather than rewritten, so the counts, the tints and
-   the select-all-acts-on-what-is-shown behaviour are the ones already reasoned
-   about. The one thing NOT brought back is the agentless refusal — see the
-   option row below.
+   `AttrPicker` (five rows, flat) and `RiskAttrPicker` (thirty-eight, railed)
+   were separate because the two catalogues are genuinely different sizes, and
+   that argument still holds — five things do not need a filing scheme and
+   thirty-eight do. What did not hold is everything else being duplicated with
+   it: two search boxes, two select-alls, two counts, two definitions of what a
+   row looks like, drifting. The rail is now a branch inside one component
+   instead of the reason for a second one.
+
+   Two things are new, and both come from the same requirement — that the wizard
+   leave you with a FINISHED profile rather than a scoped one:
+
+   · A ticked row opens its settings underneath itself. That is why the row is a
+     `<div>` with a `<button>` inside it rather than a `<button>`: a `<select>`
+     cannot be nested inside a button, so `.bfp2__opt` could never have grown a
+     control and stayed what it was. It is deleted rather than extended.
+   · Attributes an agent would be needed for are not rendered as greyed rows.
+     They were, over thirty-eight, on the argument that "why is TPM ID not in
+     the list" is a support ticket — which was right when the reach lived on
+     another screen and the refusal was unactionable from here. It is actionable
+     now: the reach was answered one step ago. So the blocked ones collapse to
+     one line per category that NAMES three of them and offers the way back.
    -------------------------------------------------------------------------- */
 
-function RiskAttrPicker({
+function AttrStep({
+  mode,
+  reach,
   picked,
   setPicked,
+  config,
+  weights,
+  onValue,
+  onWeight,
+  onBack,
 }: {
+  mode: ProfileMode
+  /** Null before the question has been asked; reads as "no agent", the safe half. */
+  reach: ProfileReach | null
   picked: string[]
   setPicked: (ids: string[]) => void
+  config: Record<string, AttrConfigValue>
+  weights: Record<string, number>
+  onValue: (id: string, v: AttrConfigValue) => void
+  onWeight: (id: string, w: number) => void
+  /** Absent on the detail page, where there is no step to go back to. */
+  onBack?: () => void
 }) {
   const [q, setQ] = useState('')
-  const [cat, setCat] = useState<string>(CATEGORIES[0]?.id ?? '')
+  const [cat, setCat] = useState<AttrCategory>(CATEGORIES[0].id)
+
+  const offered = offeredAttributes(mode, reach)
+  const blocked = blockedAttributes(mode, reach)
+  /* Counted against what is OFFERED, never against the whole catalogue. "6 of
+     38 selected" on an agentless profile names a denominator eighteen of whose
+     rows are not on the screen and cannot be reached from it. */
+  const chosen = picked.filter((id) => offered.some((a) => a.id === id))
 
   const needle = q.trim().toLowerCase()
-  const matches = (a: Attribute) =>
+  const hits = (a: Attribute) =>
     !needle ||
     a.name.toLowerCase().includes(needle) ||
     a.purpose.toLowerCase().includes(needle) ||
-    /* Optional on the type now, because the match catalogue does not file
-       its five. Every attribute in THIS list has one. */
     (a.category ?? '').toLowerCase().includes(needle)
 
   const toggle = (id: string) =>
     setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id])
 
-  /* One group while browsing, every group with a hit while searching. */
+  const row = (a: Attribute) => (
+    <AttrPickRow
+      key={a.id}
+      attr={a}
+      mode={mode}
+      on={picked.includes(a.id)}
+      config={config}
+      weights={weights}
+      onToggle={() => toggle(a.id)}
+      onValue={onValue}
+      onWeight={onWeight}
+    />
+  )
+
+  /* --- The small catalogue: no rail, no search, no counting -----------------
+
+     Five rows, all of them on screen, every one of them a condition somebody is
+     about to state. A search box over five rows is a control that can only ever
+     hide four of them. */
+  if (!asksReach(mode) && offered.length <= 8) {
+    return <div className="bfp2__pickrows">{offered.map(row)}</div>
+  }
+
   const groups = CATEGORIES.map((c) => ({
     cat: c,
-    rows: RISK_ATTRIBUTES.filter((a) => a.category === c.id && matches(a)),
+    rows: offered.filter((a) => a.category === c.id && hits(a)),
+    blocked: blocked.filter((a) => a.category === c.id),
   })).filter((g) => (needle ? g.rows.length > 0 : g.cat.id === cat))
 
   return (
@@ -436,15 +527,19 @@ function RiskAttrPicker({
           <input
             type="search"
             value={q}
-            placeholder={`Search all ${RISK_ATTRIBUTES.length} attributes…`}
+            placeholder={`Search all ${offered.length} attributes…`}
             aria-label="Search attributes"
             onChange={(e) => setQ(e.target.value)}
           />
         </label>
-        <span className={`bfp2__pickcount ${picked.length ? 'is-on' : ''}`}>
-          {picked.length} of {RISK_ATTRIBUTES.length} selected
+        <span className={`bfp2__pickcount ${chosen.length ? 'is-on' : ''}`}>
+          {chosen.length} of {offered.length} selected
         </span>
-        {picked.length > 0 && (
+        {/* No select-all here. Each category header carries its own, acting on
+            what that category is showing — two select-alls on one pane, one
+            scoped to the group and one to everything visible, is a pair nobody
+            can tell apart at a glance. */}
+        {chosen.length > 0 && (
           <button type="button" className="bfp2__clear" onClick={() => setPicked([])}>
             Clear all
           </button>
@@ -454,12 +549,10 @@ function RiskAttrPicker({
       <div className="bfp2__pickbody">
         <nav className="bfp2__rail" aria-label="Attribute categories">
           {CATEGORIES.map((c) => {
-            const all = RISK_ATTRIBUTES.filter((a) => a.category === c.id)
+            const all = offered.filter((a) => a.category === c.id)
             const on = all.filter((a) => picked.includes(a.id)).length
-            /* The count is always progress and never hit count, so it means
-               the same thing whether or not a search is running. A category the
-               search cannot reach is dimmed rather than re-labelled. */
-            const dim = needle ? !all.some(matches) : false
+            const locked = all.length === 0
+            const dim = needle ? !all.some(hits) : false
             const here = !needle && cat === c.id
             const { tint, icon: Icon } = metaOf(c.id)
             return (
@@ -467,19 +560,21 @@ function RiskAttrPicker({
                 key={c.id}
                 type="button"
                 aria-current={here || undefined}
-                /* The blurb stays on the tip rather than the row: available if
-                   you want it, not five paragraphs deep if you do not. */
                 title={c.blurb}
-                className={`bfp2__railitem is-${tint} ${here ? 'is-on' : ''} ${dim ? 'is-dim' : ''}`}
+                className={`bfp2__railitem is-${tint} ${here ? 'is-on' : ''} ${dim ? 'is-dim' : ''} ${locked ? 'is-locked' : ''}`}
                 onClick={() => {
                   setQ('')
                   setCat(c.id)
                 }}
               >
                 <span className="bfp2__railico" aria-hidden>
-                  <Icon size={15} strokeWidth={1.9} />
+                  {locked ? <Lock size={13} strokeWidth={2} /> : <Icon size={13} strokeWidth={1.9} />}
                 </span>
-                <strong>{c.label}</strong>
+                <span className="bfp2__raillabel">{c.label}</span>
+                {/* Progress, never hit count — so it means the same thing with
+                    a search running as without one. A category an agentless
+                    profile cannot reach at all reads 0/0 rather than 0/4, which
+                    is the honest denominator. */}
                 <span className={`bfp2__railcount ${on > 0 ? 'is-on' : ''}`}>
                   {on}/{all.length}
                 </span>
@@ -490,256 +585,245 @@ function RiskAttrPicker({
 
         <div className="bfp2__pane">
           {groups.length === 0 ? (
-            <p className="bfp2__none">No attribute matches “{q.trim()}”.</p>
+            <p className="bfp2__none">Nothing matches that.</p>
           ) : (
-            groups.map(({ cat: c, rows }) => {
-              const on = rows.filter((a) => picked.includes(a.id)).length
-              const full = on === rows.length
-              const { tint, icon: Icon } = metaOf(c.id)
-              return (
-                <section key={c.id} className={`bfp2__pang is-${tint}`}>
-                  <header className="bfp2__panghead">
-                    <Icon size={13} strokeWidth={2} aria-hidden />
-                    <h4>{c.label}</h4>
-                    <span>
-                      {on}/{rows.length}
-                    </span>
-                    {/* Select-all acts on what is visible, so with a search
-                        running it takes the matches rather than the whole
-                        category behind them. */}
-                    <button
-                      type="button"
-                      className="bfp2__selectall"
-                      onClick={() =>
-                        setPicked(
-                          full
-                            ? picked.filter((x) => !rows.some((a) => a.id === x))
-                            : [
-                                ...new Set([
-                                  ...picked,
-                                  /* Every row shown, since none of them is
-                                     refused any more. */
-                                  ...rows.map((a) => a.id),
-                                ]),
-                              ],
-                        )
-                      }
-                    >
-                      {full ? 'Clear these' : 'Select all'}
-                    </button>
-                  </header>
-
-                  <div className="bfp2__grid">
-                    {rows.map((a) => {
-                      const isOn = picked.includes(a.id)
-                      /* Nothing is refused here.
-
-                         The old version greyed out every agent-only attribute
-                         when the reach was agentless, on the argument that "why
-                         is TPM ID missing" is a support ticket. It answers that
-                         question by breaking a worse one: the reach is chosen on
-                         a different panel and often AFTER the attributes, so the
-                         picker was refusing a choice on the strength of a
-                         setting the person had not made yet. A profile that
-                         names an agent-only signal and then goes agentless is
-                         told so on the restriction panel, where the reach lives
-                         and where the warning can be acted on. */
-                      const AIcon = ATTR_ICON[a.id] ?? Icon
-                      return (
-                        <button
-                          key={a.id}
-                          type="button"
-                          aria-pressed={isOn}
-                          className={`bfp2__opt ${isOn ? 'is-on' : ''}`}
-                          /* The purpose is a tip rather than a second line. It
-                             is worth having, but thirty-eight of them on the
-                             page is a wall of prose in front of a choice you
-                             make from the names. */
-                          title={a.purpose}
-                          onClick={() => toggle(a.id)}
-                        >
-                          <span className="bfp2__optbox" aria-hidden>
-                            <Check size={11} strokeWidth={3.2} />
-                          </span>
-                          {/* Falls back to the category's mark, so an attribute
-                              added to the master without one still gets an icon
-                              rather than a hole in the column. */}
-                          <span className="bfp2__optico" aria-hidden>
-                            <AIcon size={14} strokeWidth={1.8} />
-                          </span>
-                          <span className="bfp2__optname">{a.name}</span>
-                          {/* Marked here rather than only on the inner page.
-                              Whether a signal is collected at all is part of
-                              deciding to include it, and learning it afterwards
-                              is learning it too late. */}
-                          {a.phase === 2 && (
-                            <span
-                              className="bfp2__soonico"
-                              role="img"
-                              aria-label="Not collected yet"
-                              title="Not collected yet"
-                            >
-                              <Clock size={12} strokeWidth={2} />
-                            </span>
-                          )}
-                          <i className={`bfp2__pri is-${a.priority.toLowerCase()}`}>{a.priority}</i>
-                        </button>
+            groups.map((g) => (
+              <section key={g.cat.id} className={`bfp2__pang is-${metaOf(g.cat.id).tint}`}>
+                <header className="bfp2__panghead">
+                  {(() => {
+                    const Ico = metaOf(g.cat.id).icon
+                    return <Ico size={13} strokeWidth={2} aria-hidden />
+                  })()}
+                  <h4>{g.cat.label}</h4>
+                  <span>
+                    {g.rows.filter((a) => picked.includes(a.id)).length}/{g.rows.length}
+                  </span>
+                  {/* Acts on what is VISIBLE, so with a search running it takes
+                      the matches rather than the whole category behind them. */}
+                  <button
+                    type="button"
+                    className="bfp2__selectall"
+                    onClick={() => {
+                      const ids = g.rows.map((a) => a.id)
+                      const full = ids.every((id) => picked.includes(id))
+                      setPicked(
+                        full
+                          ? picked.filter((x) => !ids.includes(x))
+                          : [...new Set([...picked, ...ids])],
                       )
-                    })}
-                  </div>
-                </section>
-              )
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
+                    }}
+                  >
+                    {g.rows.every((a) => picked.includes(a.id)) ? 'Clear these' : 'Select all'}
+                  </button>
+                </header>
+                {g.rows.length === 0 ? (
+                  <EmptyState
+                    compact
+                    icon={Lock}
+                    title="Nothing here without an agent"
+                    blurb={`${g.cat.label} is read by software on the machine. ${g.blocked
+                      .slice(0, 3)
+                      .map((a) => a.name)
+                      .join(', ')} all need one.`}
+                    action={
+                      onBack && (
+                        <Button variant="secondary" size="sm" onClick={onBack}>
+                          Change what it reads
+                        </Button>
+                      )
+                    }
+                  />
+                ) : (
+                  <div className="bfp2__pickrows">{g.rows.map(row)}</div>
+                )}
 
-function AttrPicker({
-  picked,
-  setPicked,
-  reach,
-}: {
-  picked: string[]
-  setPicked: (ids: string[]) => void
-  /* An agentless profile cannot collect five of these, and does not see them.
-
-     They used to be shown and refused — a greyed row carrying its reason, on the
-     argument that "why is TPM ID not in the list" is a support ticket. That was
-     the right trade over thirty-eight, where five more greyed rows cost nothing
-     you would otherwise be reading. Over fourteen it is a third of the list
-     rendered to be refused, and the refusal is not even actionable from here:
-     the answer is to change the reach, which is a different panel. A list where
-     five of fourteen cannot be picked reads as a broken list. */
-  reach: ProfileReach
-}) {
-  const [q, setQ] = useState('')
-
-  /* The five. `attributesFor('match')` rather than the constant, so the two
-     pickers name their catalogue the same way. */
-  const offered = attributesFor('match').filter((a) => !(reach === 'agentless' && a.needsAgent))
-  const needle = q.trim().toLowerCase()
-  const rows = offered.filter(
-    (a) =>
-      !needle ||
-      a.name.toLowerCase().includes(needle) ||
-      a.purpose.toLowerCase().includes(needle),
-  )
-
-  const toggle = (id: string) =>
-    setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id])
-
-  /* Acts on what is SHOWN, so with a search running it takes the matches
-     rather than everything behind them. */
-  const shownIds = rows.map((a) => a.id)
-  const allShownOn = shownIds.length > 0 && shownIds.every((id) => picked.includes(id))
-
-  return (
-    <div className="bfp2__pick">
-      <div className="bfp2__filter">
-        <label className="bfp2__search">
-          <Search size={14} strokeWidth={1.9} aria-hidden />
-          <input
-            type="search"
-            value={q}
-            placeholder={`Search all ${offered.length} attributes…`}
-            aria-label="Search attributes"
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </label>
-
-        <div className="bfp2__filteractions">
-          <span className={`bfp2__pickcount ${picked.length ? 'is-on' : ''}`}>
-            {picked.length} of {offered.length} selected
-          </span>
-          {shownIds.length > 0 && (
-            <button
-              type="button"
-              className="bfp2__selectall"
-              onClick={() =>
-                setPicked(
-                  allShownOn
-                    ? picked.filter((x) => !shownIds.includes(x))
-                    : [...new Set([...picked, ...shownIds])],
-                )
-              }
-            >
-              {allShownOn ? 'Clear these' : 'Select all shown'}
-            </button>
-          )}
-          {picked.length > 0 && (
-            <button type="button" className="bfp2__clear" onClick={() => setPicked([])}>
-              Clear all
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="bfp2__pickpane">
-        {rows.length === 0 ? (
-          <p className="bfp2__none">Nothing matches that.</p>
-        ) : (
-          <div className="bfp2__grid">
-            {rows.map((a) => {
-              const isOn = picked.includes(a.id)
-              const AIcon = ATTR_ICON[a.id] ?? ShieldCheck
-              return (
-                <button
-                  key={a.id}
-                  type="button"
-                  aria-pressed={isOn}
-                  className={`bfp2__opt ${isOn ? 'is-on' : ''}`}
-                  /* The purpose is a tip rather than a second line. Fourteen
-                     sentences stacked is still a wall of prose in front of a
-                     choice you make from the names. */
-                  title={a.purpose}
-                  onClick={() => toggle(a.id)}
-                >
-                  <span className="bfp2__optbox" aria-hidden>
-                    <Check size={11} strokeWidth={3.2} />
-                  </span>
-                  {/* Falls back to a generic mark, so an attribute added to the
-                      master without one gets an icon rather than a hole in the
-                      column. */}
-                  <span className="bfp2__optico" aria-hidden>
-                    <AIcon size={14} strokeWidth={1.8} />
-                  </span>
-                  <span className="bfp2__optname">{a.name}</span>
-                  {/* Marked here rather than only on the inner page. Whether a
-                      signal is collected at all is part of deciding to include
-                      it, and learning it afterwards is learning it too late. */}
-                  {a.phase === 2 && (
-                    <span
-                      className="bfp2__soonico"
-                      role="img"
-                      aria-label="Not collected yet"
-                      title="Not collected yet"
-                    >
-                      <Clock size={12} strokeWidth={2} />
+                {/* Named, not counted. "4 more need an agent" is a number you
+                    cannot act on; the names are what tell you whether the ones
+                    you are missing are ones you wanted. */}
+                {g.rows.length > 0 && g.blocked.length > 0 && (
+                  <p className="bfp2__locked">
+                    <Lock size={12} strokeWidth={2} aria-hidden />
+                    <span>
+                      {g.blocked.length} more need an agent —{' '}
+                      {g.blocked
+                        .slice(0, 3)
+                        .map((a) => a.name)
+                        .join(', ')}
+                      {g.blocked.length > 3 && ` and ${g.blocked.length - 3} others`}.
                     </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        )}
+                    {onBack && (
+                      <button type="button" className="bfp2__clear" onClick={onBack}>
+                        Change what it reads
+                      </button>
+                    )}
+                  </p>
+                )}
+              </section>
+            ))
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
-/* Two steps, because they are two different questions.
+/* One row in the catalogue: the tick, and — once ticked — what it is set to.
 
-   Step one is the profile itself — what it is called and which of the two
-   arithmetics it runs. Both answers are short, both are about the profile
-   rather than its contents, and neither needs more than a narrow dialog.
+   The settings render only when the row is on. A catalogue where every row
+   carries two controls is a form, not a list, and thirty-eight of them is a
+   form nobody reads to the bottom of. Ticking is what says "I want this one",
+   and it is the moment the question "set to what?" becomes worth asking.
 
-   Step two is the master, and it takes the full width. Thirty-eight attributes
-   shown a few at a time is a list you scroll rather than a set you choose, and
-   the sentence explaining each one only fits once the attributes have stopped
-   sharing a dialog with two unrelated questions. */
+   Nothing is WRITTEN on tick. `AttrControl` already falls back to the master's
+   own default, and storing that default would make "nobody has touched this"
+   indistinguishable from "somebody chose exactly the default" — which is the
+   distinction `restrictionSet` exists for one panel further down. It matters
+   here too: `pruneValues` can then tell a real setting from a ghost. */
+function AttrPickRow({
+  attr,
+  mode,
+  on,
+  config,
+  weights,
+  onToggle,
+  onValue,
+  onWeight,
+}: {
+  attr: Attribute
+  mode: ProfileMode
+  on: boolean
+  config: Record<string, AttrConfigValue>
+  weights: Record<string, number>
+  onToggle: () => void
+  onValue: (id: string, v: AttrConfigValue) => void
+  onWeight: (id: string, w: number) => void
+}) {
+  const Icon = ATTR_ICON[attr.id] ?? ShieldCheck
+  return (
+    <div className={`bfp2__pickrow ${on ? 'is-on' : ''}`}>
+      <button type="button" className="bfp2__picktoggle" aria-pressed={on} onClick={onToggle}>
+        <span className="bfp2__picktick" aria-hidden>
+          <Check size={11} strokeWidth={3.2} />
+        </span>
+        <span className="bfp2__pickico" aria-hidden>
+          <Icon size={15} strokeWidth={1.8} />
+        </span>
+        <span className="bfp2__pickmain">
+          <span className="bfp2__pickname">
+            {attr.name}
+            {/* Marked here rather than only on the inner page. Whether a signal
+                is collected at all is part of deciding to include it, and
+                learning it afterwards is learning it too late. */}
+            {attr.phase === 2 && <i className="bfp2__soon">Not collected yet</i>}
+          </span>
+          {/* On the row, not on a `title` tip. The tip was right when the pane
+              held thirty-eight rows in two columns and the sentences were a
+              wall of prose in front of a choice made from the names — but a
+              `title` is unreachable by keyboard, and with the rail showing one
+              category at a time there is room for the line that says what the
+              attribute IS. */}
+          <span className="bfp2__pickpurpose">{attr.purpose}</span>
+        </span>
+      </button>
+
+      {on && (
+        <div className="bfp2__pickvals">
+          {/* Both, on a device row, and they are not the same question.
+
+              The page argued for years that showing a weight AND a
+              configuration meant one of them was inert, and that argument was
+              right about the OS catalogue's configs — "at least Windows 10" is
+              a CONDITION, and a score has no conditions. It is wrong about the
+              device catalogue's, which are all precision: "Match on: Family
+              only" decides whether a Chrome update counts as a change at all.
+              One says whether something changed, the other says what that
+              costs. The one genuine duplicate — `device-type`'s "Treat a change
+              as" — is deleted from the catalogue rather than hidden here. */}
+          {mode === 'device' && (
+            <div className="bfp2__pickcfg">
+              <span>How much it counts</span>
+              <TierPick
+                value={tierOf(weights[attr.id] ?? attr.weight)}
+                label={`${attr.name} weight`}
+                onChange={(t) => onWeight(attr.id, TIER_WEIGHT[t])}
+              />
+            </div>
+          )}
+          {attr.config && (
+            <div className="bfp2__pickcfg">
+              <span>{attr.config.label}</span>
+              <AttrControl attr={attr} values={config} onChange={onValue} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* --- The mode mark, in one place ---------------------------------------------- */
+const renderModeIcon = (mode: ProfileMode, size: number) => {
+  const Ico = MODE_ICON[mode]
+  return <Ico size={size} strokeWidth={1.7} />
+}
+
+/* Where you are, and how much is left.
+
+   Words, not numerals. Two or three is few enough to name every step rather
+   than count them, which is the difference between a progress bar and a table
+   of contents — and it is the only honest way to draw a wizard whose LENGTH
+   depends on an answer inside it. A dot-counter would have to say "1 of 2" and
+   then "1 of 3" for the same screen.
+
+   No brand. This is orientation, not an affirmative choice, and the brand on
+   this screen is spent on the one pill per panel that states the profile's
+   kind. A stepper wearing it competes with the thing it is a frame around. */
+function WizSteps({ steps, at }: { steps: string[]; at: number }) {
+  return (
+    <>
+      <ol className="bfp2__wizsteps">
+        {steps.map((label, i) => (
+          <li
+            key={label}
+            className={`bfp2__wizstep ${i === at ? 'is-on' : ''} ${i < at ? 'is-done' : ''}`}
+          >
+            {i < at && <Check size={12} strokeWidth={2.6} aria-hidden />}
+            {label}
+          </li>
+        ))}
+      </ol>
+      {/* `Modal` moves focus once, when it opens (`kit.tsx`), so nothing else
+          announces a step change to a screen reader — the dialog's title is
+          re-rendered but not re-read. */}
+      <p className="u-sr-only" aria-live="polite">{`Step ${at + 1} of ${steps.length} — ${steps[at]}`}</p>
+    </>
+  )
+}
+
+/* --- Create ------------------------------------------------------------------
+
+   Two steps, or three, and which one you get is a property of the KIND rather
+   than a step somebody skips.
+
+   · **OS and version** — name it, then say what a device must be running. Two.
+     Everything this kind reads arrives with the request, so there is no
+     collection question to ask: `asksReach('os')` is false because nothing in
+     that catalogue carries `needsAgent`, and a question whose two answers lead
+     to the same list is not a question.
+   · **Device attributes** — name it, say what the collector can read, then pick
+     and tune. Three, and the middle one is load-bearing: it decides which
+     attributes EXIST at the step after it.
+
+   That middle step used to be the first row of a panel on the detail page,
+   which put it AFTER the attributes it governs. You chose eighteen signals and
+   discovered, on a different surface, that half of them never arrive — and the
+   picker had no way to say so, because the answer had not been given yet.
+
+   The last step now sets values as well as choosing rows, which is the other
+   half of the same idea: a wizard should hand back a finished profile. It used
+   to hand back a scoped one — ticked attributes, every value at its default,
+   and a detail page you had to visit to make it mean anything.
+   -------------------------------------------------------------------------- */
 function CreateModal({
   open,
   onClose,
@@ -749,197 +833,300 @@ function CreateModal({
   onClose: () => void
   onCreate: (p: FingerprintProfile) => void
 }) {
-  /* Two steps, restored.
-
-     The picker was moved out of here and the profile seeded with six agentless
-     defaults instead, on the argument that a new profile should arrive working.
-     It arrived working and wrong: six attributes nobody chose, on a profile
-     whose whole point is choosing what identifies a device. Naming a thing and
-     saying what it watches are two decisions, and the second one is the profile.
-
-     One requirement per step, which is also where the boundary is. */
-  const [step, setStep] = useState<1 | 2>(1)
+  const [at, setAt] = useState(0)
   const [name, setName] = useState('')
-  const [mode, setMode] = useState<ProfileMode>('match')
+  const [mode, setMode] = useState<ProfileMode>('os')
+  /* Null, not `'agentless'`. A default here would let the question be skipped,
+     and the whole reason it moved to a step of its own is that it is an answer
+     somebody gives rather than a setting that happens to have a value. */
+  const [reach, setReach] = useState<ProfileReach | null>(null)
   const [picked, setPicked] = useState<string[]>([])
+  const [config, setConfig] = useState<Record<string, AttrConfigValue>>({})
+  const [weights, setWeights] = useState<Record<string, number>>({})
 
   /* Cleared on the way IN, not on the way out.
 
      The dialog never unmounts, so something has to blank it between uses. Doing
      it on close means either a visible snap back to step one while the dialog
      is still animating away, or a timer to outlast the animation — and a timer
-     races the user: close on step two, re-open inside the delay, and the
+     races the user: close on the last step, re-open inside the delay, and the
      pending reset fires under an open dialog. Clearing on open has neither
-     problem. The copy of the form on its way out keeps showing what you left,
-     which is what it should show. */
+     problem. The copy on its way out keeps showing what you left, which is what
+     it should show. */
   useEffect(() => {
     if (!open) return
-    setStep(1)
+    setAt(0)
     setName('')
-    setMode('match')
+    setMode('os')
+    setReach(null)
     setPicked([])
+    setConfig({})
+    setWeights({})
   }, [open])
 
-  /* A rule names a profile, so a nameless one cannot be referred to. Nothing
-     ticked is not a profile either — it would watch no signals, and every
-     device would look identical to every other. */
+  const steps = stepsFor(mode)
+  const last = steps.length - 1
+
+  /* A permissive draft and a strict write.
+
+     `picked` is never filtered as you move between steps, so going back from
+     the attributes to the collector, flipping to agentless and returning HIDES
+     the agent-only rows and flipping back RESTORES them — which is what a Back
+     button is for. What gets written is `offeredPicked`, so no incoherent
+     profile can be created even transiently, and nothing is silently deleted
+     from under you on the way past. */
+  const offered = offeredAttributes(mode, reach)
+  const offeredPicked = picked.filter((id) => offered.some((a) => a.id === id))
+
   const named = name.trim().length > 0
-  const canSave = named && picked.length > 0
+  const canAdvance = at === 0 ? named : at === 1 && steps.length === 3 ? reach !== null : true
+  const canSave = named && offeredPicked.length > 0
 
   const save = () => {
     if (!canSave) return
-    onCreate({
-      id: `fp-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
-      name: name.trim(),
-      mode,
-      /* Exactly what was ticked. The profile arrives watching what you chose
-         and nothing else, which is the difference between a profile you made
-         and a profile that was made for you. */
-      enabled: picked,
-      config: {},
-      weights: {},
-      reach: 'agentless',
-      registration: 'self',
-      maxDevices: DEFAULT_MAX_DEVICES,
-      roster: null,
-      autoRegister: false,
-      /* The values above are defaults, not answers. Until somebody opens the
-         panel and says so, the section shows an empty state rather than
-         presenting "agentless, self-service, three devices" as a decision. */
-      restrictionSet: false,
-      usedIn: 0,
-    })
+    onCreate(
+      pruneValues({
+        id: `fp-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
+        name: name.trim(),
+        mode,
+        /* Exactly what was ticked, and exactly what was set — the difference
+           between a profile you made and a profile that was made for you. */
+        enabled: offeredPicked,
+        config,
+        weights,
+        /* Agentless on an OS profile is not a default nobody chose: it is what
+           those five attributes actually need. They arrive with the request. */
+        reach: reach ?? 'agentless',
+        registration: 'self',
+        maxDevices: DEFAULT_MAX_DEVICES,
+        roster: null,
+        autoRegister: false,
+        /* Enrolment is still unanswered — three questions this dialog does not
+           ask, and until somebody does the panel shows an empty state rather
+           than presenting "self-service, three devices" as a decision. */
+        restrictionSet: false,
+        usedIn: 0,
+      }),
+    )
   }
+
+  const footnote = () => {
+    if (at === 0) {
+      if (!named) return 'Name the profile to continue.'
+      return steps.length === 3
+        ? 'Next: what the collector can read.'
+        : 'Next: what a device must be running.'
+    }
+    if (at === 1 && steps.length === 3) {
+      if (reach === null) return 'Choose what the collector can read.'
+      const blocked = blockedAttributes(mode, reach)
+      return reach === 'agent'
+        ? `All ${attributesFor(mode).length} attributes are available. The agent is Windows only.`
+        : `${blocked.length} of ${attributesFor(mode).length} attributes need an agent and will not be offered.`
+    }
+    if (offeredPicked.length === 0) {
+      return mode === 'os'
+        ? 'Pick at least one. A profile that requires nothing lets every device through.'
+        : 'Pick at least one. A profile that watches nothing cannot tell one device from another.'
+    }
+    return `${countLabel(mode, offeredPicked.length)}. Everything set here is live the moment it is created.`
+  }
+
+  const title =
+    at === 0
+      ? 'Create a device profile'
+      : at === 1 && steps.length === 3
+        ? `What ${name.trim()} can read`
+        : mode === 'os'
+          ? `What a device must be running — ${name.trim()}`
+          : `What identifies a device — ${name.trim()}`
+
+  /* 620 for the two questions, wider for the catalogue — and 760 rather than
+     900 for the five. A row is a name, a sentence and a control now; at 900 the
+     control ends up a third of a screen from the name it belongs to. */
+  const width = at === 0 || (at === 1 && steps.length === 3) ? 620 : mode === 'os' ? 760 : 1000
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={step === 1 ? 'Create a device profile' : `What identifies a device — ${name.trim()}`}
-      width={step === 1 ? 620 : 900}
+      title={title}
+      width={width}
       footer={
         <>
-          <span className="bfp2__footnote">
-            {step === 1
-              ? named
-                ? 'Next: choose what it watches.'
-                : 'Name the profile to continue.'
-              : picked.length > 0
-                ? `${picked.length} attribute${picked.length === 1 ? '' : 's'} — the rest is set inside.`
-                : 'Pick at least one. A profile that watches nothing cannot tell devices apart.'}
-          </span>
-          {step === 1 ? (
-            <>
-              <Button variant="ghost" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button variant="brand" disabled={!named} onClick={() => setStep(2)}>
-                Next
-              </Button>
-            </>
+          <span className="bfp2__footnote">{footnote()}</span>
+          <Button variant="ghost" onClick={at === 0 ? onClose : () => setAt(at - 1)}>
+            {at === 0 ? 'Cancel' : 'Back'}
+          </Button>
+          {at === last ? (
+            <Button variant="brand" disabled={!canSave} onClick={save}>
+              Create profile
+            </Button>
           ) : (
-            <>
-              <Button variant="ghost" onClick={() => setStep(1)}>
-                Back
-              </Button>
-              <Button variant="brand" disabled={!canSave} onClick={save}>
-                Create profile
-              </Button>
-            </>
+            <Button variant="brand" disabled={!canAdvance} onClick={() => setAt(at + 1)}>
+              Next
+            </Button>
           )}
         </>
       }
     >
-      {step === 2 ? (
-        /* Agentless, because a profile being created has no reach yet and
-           agentless is what it will start as — so the picker greys the
-           attributes an agent would be needed for rather than offering them and
-           failing later.
+      <WizSteps steps={steps} at={at} />
 
-           Which picker depends on the mode chosen a step earlier: risk draws
-           from the thirty-eight and needs the category rail, match draws from
-           the five and does not. */
-        mode === 'risk' ? (
-          <RiskAttrPicker picked={picked} setPicked={setPicked} />
-        ) : (
-          <AttrPicker picked={picked} setPicked={setPicked} reach="agentless" />
-        )
-      ) : (
-      <div className="bfp2__form">
-        <label className="bfp2__field">
-          <span>Profile name</span>
-          <input
-            type="text"
-            value={name}
-            autoFocus
-            placeholder="Corporate laptops"
-            onChange={(e) => setName(e.target.value)}
-          />
-          <span className="bfp2__hint">
-            A policy rule names a profile the way it names a zone, so name it after the fleet it
-            describes.
-          </span>
-        </label>
+      {at === 0 && (
+        <div className="bfp2__form">
+          <label className="bfp2__field">
+            <span>Profile name</span>
+            <input
+              type="text"
+              value={name}
+              autoFocus
+              placeholder="Corporate laptops"
+              onChange={(e) => setName(e.target.value)}
+            />
+            <span className="bfp2__hint">
+              A policy rule names a profile the way it names a zone, so name it after the fleet it
+              describes.
+            </span>
+          </label>
 
-        <fieldset className="bfp2__modes">
-          <legend>How it decides</legend>
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              role="radio"
-              aria-checked={mode === m.id}
-              className={`bfp2__mode-card ${mode === m.id ? 'is-on' : ''}`}
-              onClick={() => setMode(m.id)}
-            >
-              <span className="bfp2__mode-ico" aria-hidden>
-                <m.icon size={17} strokeWidth={1.8} />
-              </span>
-              <span className="bfp2__mode-body">
-                <strong>{m.label}</strong>
-                <em>{m.blurb}</em>
-              </span>
-              {mode === m.id && (
-                <Check size={15} strokeWidth={2.6} className="bfp2__mode-tick" aria-hidden />
+          <fieldset className="bfp2__modes">
+            <legend>How it decides</legend>
+            {MODES.map((m) => {
+              const Ico = MODE_ICON[m.id]
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === m.id}
+                  className={`bfp2__mode-card ${mode === m.id ? 'is-on' : ''}`}
+                  onClick={() => {
+                    /* The two do not share a catalogue, so a ticked row cannot
+                       survive the switch — and neither can a value set against
+                       it. Clearing here rather than filtering at the end means
+                       the count in the footer is never briefly a lie. */
+                    setMode(m.id)
+                    setPicked([])
+                    setConfig({})
+                    setWeights({})
+                    setReach(null)
+                  }}
+                >
+                  <span className="bfp2__mode-ico" aria-hidden>
+                    <Ico size={17} strokeWidth={1.8} />
+                  </span>
+                  <span className="bfp2__mode-body">
+                    <strong>{m.label}</strong>
+                    <em>{m.blurb}</em>
+                    <i className="bfp2__mode-steps">
+                      {stepsFor(m.id).length} steps · {attributesFor(m.id).length} attributes
+                    </i>
+                  </span>
+                  {mode === m.id && (
+                    <Check size={15} strokeWidth={2.6} className="bfp2__mode-tick" aria-hidden />
+                  )}
+                </button>
+              )
+            })}
+          </fieldset>
+        </div>
+      )}
+
+      {at === 1 && steps.length === 3 && (
+        <div className="bfp2__form">
+          <p className="bfp2__stephint">
+            This decides which attributes exist at the next step. Hardware identifiers — the TPM,
+            the motherboard, the disk — need software running on the machine. Everything else
+            arrives with the request.
+          </p>
+
+          <fieldset className="bfp2__modes" aria-label="What the collector can read">
+            {REACHES.map((r) => {
+              const Ico = REACH_ICON[r.id]
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={reach === r.id}
+                  className={`bfp2__mode-card ${reach === r.id ? 'is-on' : ''}`}
+                  onClick={() => setReach(r.id)}
+                >
+                  <span className="bfp2__mode-ico" aria-hidden>
+                    <Ico size={17} strokeWidth={1.8} />
+                  </span>
+                  <span className="bfp2__mode-body">
+                    <strong>{r.label}</strong>
+                    <em>{r.blurb}</em>
+                    {r.note && (
+                      <i className="bfp2__mode-note">
+                        <AlertTriangle size={11} strokeWidth={2.2} aria-hidden />
+                        {r.note}
+                      </i>
+                    )}
+                  </span>
+                  {reach === r.id && (
+                    <Check size={15} strokeWidth={2.6} className="bfp2__mode-tick" aria-hidden />
+                  )}
+                </button>
+              )
+            })}
+          </fieldset>
+
+          {/* The size of the difference, as a number that moves when you click.
+              The card says what agent-based costs and the hint says what the
+              question decides; this says what the answer is worth — which is the
+              one thing the old panel could never show, because it was chosen on
+              the same surface as everything else and had no next step to
+              describe. */}
+          {reach && (
+            <p className="bfp2__reachstat">
+              <strong>{offered.length}</strong> of {attributesFor(mode).length} attributes available
+              {blockedAttributes(mode, reach).length > 0 && (
+                <em>{blockedAttributes(mode, reach).length} need an agent</em>
               )}
-            </button>
-          ))}
-        </fieldset>
-      </div>
+            </p>
+          )}
+        </div>
+      )}
+
+      {at === last && at > 0 && (
+        <>
+          <p className="bfp2__stephint">
+            {mode === 'os'
+              ? 'Each one you tick is a condition, and they all have to hold. A platform you do not name is not checked at all.'
+              : 'Tick what this profile watches, then say how much each one counts. A ticked attribute opens its settings under its name.'}
+          </p>
+          <AttrStep
+            mode={mode}
+            reach={reach}
+            picked={picked}
+            setPicked={setPicked}
+            config={config}
+            weights={weights}
+            onValue={(id, v) => setConfig((c) => ({ ...c, [id]: v }))}
+            onWeight={(id, w) => setWeights((c) => ({ ...c, [id]: w }))}
+            onBack={steps.length === 3 ? () => setAt(1) : undefined}
+          />
+        </>
       )}
     </Modal>
   )
 }
 
-/* --- The two reaches -------------------------------------------------------------
-   Blurbs are the console's own. The third line on the agent card is not: the
-   console puts "Windows only" in the third bullet of a callout that appears
-   AFTER agent-based has been chosen, which is one screen too late to be a
-   decision input. A platform limit is a property of the choice. */
+/* `REACHES` moved to `fingerprint.ts`.
 
-const REACHES: {
-  id: ProfileReach
-  label: string
-  blurb: string
-  note?: string
-  icon: typeof Globe
-}[] = [
-  {
-    id: 'agentless',
-    label: 'Agentless',
-    blurb:
-      'Browser, network and geolocation attributes establish device identity. Nothing to install.',
-    icon: Globe,
-  },
-  {
-    id: 'agent',
-    label: 'Agent-based',
-    blurb:
-      'An installed agent adds hardware identifiers — TPM, motherboard, disk — for high-assurance access.',
-    note: 'Windows only. Users without the agent cannot sign in.',
-    icon: Microchip,
-  },
-]
+   It is asked at creation now, of a device-attributes profile only, and the
+   thing that decides whether it is asked at all — whether this kind has any
+   attribute an agent is needed for — is a property of the catalogue. So the
+   cards live beside the catalogue, and `asksReach(mode)` is the question
+   answered from the data rather than from a branch in a dialog.
+
+   The copy travelled unchanged, including the reason "Windows only" sits on the
+   card rather than in a callout after the choice: a platform limit is a
+   property of the choice, and the console puts it one screen too late.
+
+*/
 
 /* --- The inner page ------------------------------------------------------------ */
 
@@ -956,9 +1143,19 @@ function ProfilePage({
 }) {
   const [adding, setAdding] = useState(false)
   const [restricting, setRestricting] = useState(false)
+  const [reaching, setReaching] = useState(false)
+  const [summarising, setSummarising] = useState(false)
   const [showUses, setShowUses] = useState(false)
-  const chosen = profile.enabled.map(byId).filter((a): a is Attribute => Boolean(a))
+  /* `attrOf(profile.mode, …)`, not a merged lookup. `device-type` is in both
+     catalogues and the merged list always answered with the OS copy, so a
+     device profile has been reading the wrong row's purpose and category since
+     the two lists split — invisible until something rendered a device row's
+     configuration, which the overview below now does. */
+  const chosen = profile.enabled
+    .map((id) => attrOf(profile.mode, id))
+    .filter((a): a is Attribute => Boolean(a))
   const users = policiesUsing('fingerprint', profile.id, policies)
+  const platforms = platformsNamed(profile)
 
   const setConfig = (id: string, v: AttrConfigValue) =>
     onChange({ ...profile, config: { ...profile.config, [id]: v } })
@@ -966,8 +1163,14 @@ function ProfilePage({
   const setWeight = (id: string, w: number) =>
     onChange({ ...profile, weights: { ...profile.weights, [id]: w } })
 
+  /* Through `pruneValues`, so removing a row removes what it was set to.
+
+     It used to write `enabled` alone, which left `config['os-windows']` behind
+     forever: invisible, because no surface draws a value for a row that is not
+     there, and back the moment somebody re-ticked the attribute — restoring a
+     setting nobody had re-approved and nobody had been shown. */
   const drop = (id: string) =>
-    onChange({ ...profile, enabled: profile.enabled.filter((x) => x !== id) })
+    onChange(pruneValues({ ...profile, enabled: profile.enabled.filter((x) => x !== id) }))
 
   return (
     <>
@@ -978,18 +1181,23 @@ function ProfilePage({
 
       <header className="bfp2__head">
         <div className="bfp2__pagehead">
-          <span className={`bfp2__tile bfp2__tile--lg is-${profile.mode}`} aria-hidden>
-            {profile.mode === 'risk' ? (
-              <Gauge size={24} strokeWidth={1.7} />
-            ) : (
-              <Sliders size={24} strokeWidth={1.7} />
-            )}
+          <span className="bfp2__tile bfp2__tile--lg" aria-hidden>
+            {renderModeIcon(profile.mode, 24)}
           </span>
           <div>
             <h1>{profile.name}</h1>
-            <p>
-              {modeLabel(profile)} · {chosen.length} attribute{chosen.length === 1 ? '' : 's'}
-            </p>
+            {/* No subtitle at all, which took two attempts to arrive at.
+
+                It was `modeLabel · N attributes`, then the whole of
+                `describeProfile`, then the kind as a chip — and every version
+                was the same information the Overview panel states sixty pixels
+                below it, as rows, with a tip on each one. A header that
+                summarises the thing directly beneath it is a header that has to
+                be kept in step with it for no reader's benefit.
+
+                The name is the identity and the tile carries the kind as a
+                mark. `describeProfile` has a home where there is no panel to
+                repeat: the summary's caption. */}
           </div>
         </div>
 
@@ -999,12 +1207,96 @@ function ProfilePage({
             Policies, not rules, matching the column on the list — a rule is not
             a thing anybody navigates to, and the two counts disagreeing on the
             same object is worse than either being wrong. */}
-        <Button variant="secondary" size="sm" onClick={() => setShowUses(true)}>
-          <Link2 size={14} strokeWidth={1.9} aria-hidden />
-          Used by
-          <i className="buse__count">{users.length}</i>
-        </Button>
+        <div className="bfp2__headacts">
+          {/* The whole profile, stated. Everything below this header is an
+              editor — the panels answer "what would I change" — and there is no
+              surface that answers "what does this thing DO", which is the
+              question you have before you touch it and the one you have to
+              answer to somebody else afterwards. */}
+          <Button variant="secondary" size="sm" onClick={() => setSummarising(true)}>
+            <ScrollText size={14} strokeWidth={1.9} aria-hidden />
+            Summary
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setShowUses(true)}>
+            <Link2 size={14} strokeWidth={1.9} aria-hidden />
+            Used by
+            <i className="buse__count">{users.length}</i>
+          </Button>
+        </div>
       </header>
+
+      {/* --- Overview ----------------------------------------------------------
+
+          The facts that decide how everything under them reads, and none of them
+          repeated from a panel below.
+
+          `Decides by` is the lead — it takes the one brand pill on the page —
+          because it settles the other two: it picks the catalogue, it picks the
+          arithmetic, and it decides whether the collector question exists at
+          all. Reach used to be the lead, on the argument that it decides what
+          can arrive; that is still true, and it is now true of only half the
+          profiles, which is exactly why it cannot be the thing everything else
+          follows from.
+
+          `Platforms named` is the sharpest row here and the screen could not
+          say it before. An OS profile holding only a form factor checks no
+          platform at all — a Mac signing in satisfies every condition on it —
+          and the old subtitle printed that state as "Attribute match · 1
+          attribute", which reads like a configured profile. */}
+      <div className="bfp2__panelhead bfp2__panelhead--page">
+        <h3>Overview</h3>
+      </div>
+      <section className="bfp2__panel">
+        <div className="bfp2__rows">
+          <DetailRow
+            icon={MODE_ICON[profile.mode]}
+            label="Decides by"
+            tip={`${MODE_META[profile.mode].blurb} A profile's kind is fixed: the two do not share a catalogue, so changing it would discard every attribute. Duplicate and re-create instead.`}
+            value={modeLabel(profile)}
+            lead
+          />
+
+          {asksReach(profile.mode) && (
+            <DetailRow
+              icon={REACH_ICON[profile.reach]}
+              label="What it can read"
+              tip={`${REACH_META[profile.reach].blurb}${REACH_META[profile.reach].note ? ` ${REACH_META[profile.reach].note}` : ''}`}
+              value={reachLabel(profile.reach)}
+              action={
+                <Button variant="secondary" size="sm" onClick={() => setReaching(true)}>
+                  Change
+                </Button>
+              }
+            />
+          )}
+
+          {profile.mode === 'os' && (
+            <DetailRow
+              icon={MonitorSmartphone}
+              label="Platforms named"
+              tip="A platform this profile does not name is not checked. Nothing stops a device running it from signing in."
+              value={platforms.length > 0 ? platforms.join(', ') : 'None'}
+              warn={platforms.length === 0}
+            />
+          )}
+
+          <DetailRow
+            icon={ListChecks}
+            label={profile.mode === 'os' ? 'Requires' : 'Watches'}
+            tip={
+              chosen.some((a) => a.phase === 2)
+                ? 'Attributes marked “Not collected yet” are modelled but not gathered, so they never mismatch and never move the score.'
+                : 'Everything this profile checks on every sign-in that reaches it.'
+            }
+            value={
+              countLabel(profile.mode, chosen.length) +
+              (chosen.filter((a) => a.phase === 2).length > 0
+                ? ` · ${chosen.filter((a) => a.phase === 2).length} not collected yet`
+                : '')
+            }
+          />
+        </div>
+      </section>
 
       {/* Device restriction — the console's own panel, and the half of this
           feature the screen never had.
@@ -1053,27 +1345,31 @@ function ProfilePage({
               screen already puts the sentence you want once and not every
               time. */}
           <div className="bfp2__rows">
-            <DetailRow
-              icon={profile.reach === 'agent' ? Microchip : Globe}
-              label="What it can read"
-              tip={
-                profile.reach === 'agent'
-                  ? 'An installed agent adds hardware identifiers — TPM, motherboard, disk. Windows only, and users without the agent cannot sign in.'
-                  : 'Browser, network and geolocation only. Nothing to install, and the five hardware attributes never arrive.'
-              }
-              value={profile.reach === 'agent' ? 'Agent-based' : 'Agentless'}
-              lead
-            />
-
+            {/* The reach row has gone up to Overview. It is ANSWERED at
+                creation now, and an answered question printed inside a panel
+                that shows an empty state when its own questions are unanswered
+                is the incoherence `restrictionSet` exists to prevent. */}
             <DetailRow
               icon={UserRound}
+              lead
               label="How devices register"
+              tip="Either people enrol their own machines, or only the ones on an uploaded roster may sign in."
+              value={REGISTRATION_LABEL[profile.registration]}
+            />
+
+            {/* Its own row, at last. It was visible only as a change in ANOTHER
+                row's tip text — so a security-relevant boolean was hidden
+                behind a hover, on a label it does not belong to. */}
+            <DetailRow
+              icon={Repeat}
+              label="Silent enrolment"
               tip={
                 profile.autoRegister
                   ? 'The first sign-in from a new machine enrols it silently — convenient, and it means an attacker\u2019s machine registers itself.'
                   : 'A new machine is challenged before it is trusted.'
               }
-              value={REGISTRATION_LABEL[profile.registration]}
+              value={profile.autoRegister ? 'On' : 'Off'}
+              warn={profile.autoRegister}
             />
 
             {/* One row or the other, never both — a roster REPLACES the
@@ -1109,7 +1405,7 @@ function ProfilePage({
             compact
             icon={ShieldOff}
             title="Nothing decided yet"
-            blurb="What this profile may read, how a device gets registered, and how many each person may keep."
+            blurb="How a device gets registered, whether the first sign-in enrols it silently, and how many each person may keep."
             action={
               <Button variant="secondary" size="sm" onClick={() => setRestricting(true)}>
                 <Sliders size={14} strokeWidth={2} aria-hidden />
@@ -1128,79 +1424,105 @@ function ProfilePage({
       />
 
       <div className="bfp2__panelhead bfp2__panelhead--page">
-        <h3>Attributes</h3>
+        <h3>{profile.mode === 'os' ? 'What it requires' : 'What it watches'}</h3>
         <Button variant="secondary" size="sm" onClick={() => setAdding(true)}>
           <Plus size={14} strokeWidth={2.2} aria-hidden />
-          Add attributes
+          Edit {ITEM_NOUN[profile.mode].many}
         </Button>
       </div>
 
       {chosen.length === 0 ? (
         <p className="bfp2__none">
-          Every attribute has been removed. A profile with none watches nothing — add at least one.
+          {profile.mode === 'os'
+            ? 'Every requirement has been removed. A profile that requires nothing lets every device through — add at least one.'
+            : 'Every attribute has been removed. A profile that watches nothing cannot tell one device from another — add at least one.'}
         </p>
       ) : (
         <section className="bfp2__panel">
           <div className="bfp2__rows">
             {chosen.map((a) => {
-                  const AIcon = ATTR_ICON[a.id] ?? ShieldCheck
-                  return (
-                    <div className="bfp2__attrow" key={a.id}>
-                      <span className="bfp2__attico" aria-hidden>
-                        <AIcon size={15} strokeWidth={1.8} />
-                      </span>
+              const AIcon = ATTR_ICON[a.id] ?? ShieldCheck
+              return (
+                <div className="bfp2__attrow" key={a.id}>
+                  <span className="bfp2__attico" aria-hidden>
+                    <AIcon size={15} strokeWidth={1.8} />
+                  </span>
 
-                      <div className="bfp2__attmain">
-                        <span className="bfp2__attname">
-                          {a.name}
-                          {a.phase === 2 && <i className="bfp2__soon">Not collected yet</i>}
-                        </span>
-                        <span className="bfp2__attpurpose">{a.purpose}</span>
-                      </div>
+                  <div className="bfp2__attmain">
+                    <span className="bfp2__attname">
+                      {a.name}
+                      {a.phase === 2 && <i className="bfp2__soon">Not collected yet</i>}
+                    </span>
+                    <span className="bfp2__attpurpose">{a.purpose}</span>
+                  </div>
 
-                      {/* One control, and which one depends on what the
-                          profile is FOR.
+                  {/* Both controls on a device row, where there are two to
+                      show — and this reverses an argument that stood here for a
+                      long time.
 
-                          A risk profile asks one question per attribute — how
-                          much does this one count — and it asks it of all
-                          fourteen. Putting the match configuration beside it
-                          offered a second question that scoring never reads: a
-                          weighted profile does not care whether the OS is at
-                          least Windows 10, it cares that the OS changed and by
-                          how much that should move the number. Two controls
-                          where one is inert is the row telling you to set
-                          something that does nothing.
+                      It said a weight and a configuration on one row meant one
+                      of them was inert, because "a weighted profile does not
+                      care whether the OS is at least Windows 10". That is
+                      right, and it is right about the OS catalogue's configs:
+                      a version floor is a CONDITION and a score has no
+                      conditions. It is wrong about the device catalogue's,
+                      which are all precision — "Match on: Family only" decides
+                      whether a Chrome update counts as a change at all. One
+                      says whether something changed; the other says what that
+                      costs. Neither answers the other.
 
-                          So: risk gets the weight, match gets the
-                          configuration, and neither gets the other's. */}
-                      <div className="bfp2__attctl">
-                        {profile.mode === 'risk' ? (
-                          <TierPick
-                  value={tierOf(profile.weights[a.id] ?? a.weight)}
-                  label={`${a.name} weight`}
-                  onChange={(t) => setWeight(a.id, TIER_WEIGHT[t])}
-                />
-                        ) : a.config ? (
-                          <AttrControl attr={a} profile={profile} onChange={setConfig} />
-                        ) : (
-                          <span className="bfp2__nocfg">Nothing to tune</span>
-                        )}
-                      </div>
+                      The one row where the two really were the same question —
+                      `device-type`'s "Treat a change as: Significant / Minor /
+                      Ignore", which is High / Low / untick in different words —
+                      has had its config deleted from the catalogue rather than
+                      hidden here. */}
+                  <div className="bfp2__attctl">
+                    {profile.mode === 'device' && (
+                      <TierPick
+                        value={tierOf(profile.weights[a.id] ?? a.weight)}
+                        label={`${a.name} weight`}
+                        onChange={(t) => setWeight(a.id, TIER_WEIGHT[t])}
+                      />
+                    )}
+                    {a.config ? (
+                      <AttrControl attr={a} values={profile.config} onChange={setConfig} />
+                    ) : profile.mode === 'os' ? (
+                      <span className="bfp2__nocfg">Nothing to tune</span>
+                    ) : null}
+                  </div>
 
-                      <button
-                        type="button"
-                        className="bfp2__drop"
-                        aria-label={`Remove ${a.name}`}
-                        onClick={() => drop(a.id)}
-                      >
-                        <Trash2 size={14} strokeWidth={1.9} />
-                      </button>
-                    </div>
-                  )
+                  <button
+                    type="button"
+                    className="bfp2__drop"
+                    /* Says what else goes. Removing a row now removes what it
+                       was set to, which is the right behaviour and the kind of
+                       thing a label has to admit to. */
+                    aria-label={`Remove ${a.name} and its settings`}
+                    onClick={() => drop(a.id)}
+                  >
+                    <Trash2 size={14} strokeWidth={1.9} />
+                  </button>
+                </div>
+              )
             })}
           </div>
         </section>
       )}
+
+      <ReachDialog
+        open={reaching}
+        profile={profile}
+        onChange={onChange}
+        onClose={() => setReaching(false)}
+      />
+
+      <SummaryDrawer
+        open={summarising}
+        profile={profile}
+        chosen={chosen}
+        platforms={platforms}
+        onClose={() => setSummarising(false)}
+      />
 
       {/* "Used by" is a panel now, not a section — the same move zones made,
           for the same reason. It is the question you ask BEFORE editing
@@ -1230,8 +1552,8 @@ function ProfilePage({
         open={adding}
         profile={profile}
         onClose={() => setAdding(false)}
-        onSave={(ids) => {
-          onChange({ ...profile, enabled: ids })
+        onSave={(next) => {
+          onChange(next)
           setAdding(false)
         }}
       />
@@ -1252,15 +1574,21 @@ function ProfilePage({
 
 function AttrControl({
   attr,
-  profile,
+  values,
   onChange,
 }: {
   attr: Attribute
-  profile: FingerprintProfile
+  /* A bag of values, not a profile.
+
+     The wizard sets values now and it has no profile to hand — building a
+     half-real one, with a fake id and a `restrictionSet` it has no opinion
+     about, would be a state the model should not be able to express. So the
+     control takes the only thing it ever read. */
+  values: Record<string, AttrConfigValue>
   onChange: (id: string, v: AttrConfigValue) => void
 }) {
   const c = attr.config!
-  const raw = profile.config[attr.id]
+  const raw = values[attr.id]
 
   if (c.kind === 'tolerance') {
     return (
@@ -1417,17 +1745,27 @@ function DetailRow({
   tip,
   value,
   lead,
+  warn,
+  action,
 }: {
   icon: typeof Sliders
   label: string
   tip: string
   value: string
-  /* The one answer the others follow from. Reach decides which attributes can
-     arrive at all — an agentless profile cannot hold five of the fourteen, and
-     cannot use a roster — so it is the first thing to read and the only one
-     that gets the brand. Spending it on all four would be spending it on
-     none. */
+  /* The one answer the others follow from, and the only pill on its panel that
+     takes the brand. Spending it on all four would be spending it on none.
+
+     It was the reach, which decided what could arrive at all. It is the KIND
+     now: the reach is asked of only half the profiles, and the thing everything
+     follows from cannot be a thing that is sometimes absent. */
   lead?: boolean
+  /* A stated value that is worth a second look — no platform named, silent
+     enrolment on. Not an error: both are legitimate, and both are states people
+     arrive in without meaning to. */
+  warn?: boolean
+  /* The rare row that can still be changed from here. Two of the seven can;
+     the rest are stated because they are answered somewhere with more room. */
+  action?: React.ReactNode
 }) {
   return (
     <div className="bfp2__attrow">
@@ -1441,7 +1779,10 @@ function DetailRow({
         </span>
       </div>
       <div className="bfp2__attctl">
-        <strong className={`bfp2__detailval ${lead ? 'is-lead' : ''}`}>{value}</strong>
+        <strong className={`bfp2__detailval ${lead ? 'is-lead' : ''} ${warn ? 'is-warn' : ''}`}>
+          {value}
+        </strong>
+        {action}
       </div>
     </div>
   )
@@ -1543,27 +1884,16 @@ function RestrictionDrawer({
   onClose: () => void
 }) {
   /* A roster is matched on MAC address, and MAC is one of the eighteen things
-     only an agent can read. On an agentless profile it would match nothing, so
-     it is refused rather than warned about. */
-  const rosterPossible = profile.reach === 'agent'
+     only an agent can read — and it is in the device catalogue only. So an
+     OS-and-version profile cannot use a roster either, for the same reason and
+     one step earlier: it has no MAC to match on at any reach.
 
-  /* Switching to agentless drops the attributes that can no longer arrive.
-     Keeping them would leave the profile reading as stronger than it is —
-     watching a TPM that never reports is watching nothing. */
-  const setReach = (reach: ProfileReach) => {
-    const enabled =
-      reach === 'agentless' ? profile.enabled.filter((id) => !byId(id)?.needsAgent) : profile.enabled
-    onChange({
-      ...profile,
-      reach,
-      enabled,
-      registration: reach === 'agentless' ? 'self' : profile.registration,
-      maxDevices:
-        reach === 'agentless' ? (profile.maxDevices ?? DEFAULT_MAX_DEVICES) : profile.maxDevices,
-    })
-  }
-
-  const wouldDrop = profile.enabled.filter((id) => byId(id)?.needsAgent).length
+     `setReach` and `wouldDrop` have gone with the section above. The writer is
+     `withReach` in the model now, called from `ReachDialog` — and it does the
+     half this copy missed, which was pruning the VALUES of the attributes it
+     dropped. Switching to agentless removed MAC from `enabled` and left its
+     weight behind, so switching back restored a tier nobody re-approved. */
+  const rosterPossible = profile.mode === 'device' && profile.reach === 'agent'
 
   return (
     <Drawer
@@ -1592,64 +1922,18 @@ function RestrictionDrawer({
       }
     >
       <div className="bfp2__restform">
-        <section>
-          <h4 id="bfp2-reach">
-            What it can read
-            {/* Why this question comes first. True, and not needed at a glance —
-                the two cards below are the decision and they explain
-                themselves. */}
-            <TipDot
-              label="What it can read"
-              text="Hardware identifiers need something installed on the machine. This decides which attributes can arrive at all, so it is first."
-            />
-          </h4>
-          {/* The section's own <h4> is the visible heading, so the legend would
-              print it twice. Removed rather than hidden: `aria-labelledby` on
-              the fieldset points at the heading that is already there, which is
-              one label in the accessibility tree instead of two saying the same
-              words. */}
-          <fieldset className="bfp2__modes" aria-labelledby="bfp2-reach">
-            {REACHES.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                role="radio"
-                aria-checked={profile.reach === r.id}
-                className={`bfp2__mode-card ${profile.reach === r.id ? 'is-on' : ''}`}
-                onClick={() => setReach(r.id)}
-              >
-                <span className="bfp2__mode-ico" aria-hidden>
-                  <r.icon size={17} strokeWidth={1.8} />
-                </span>
-                <span className="bfp2__mode-body">
-                  <strong>{r.label}</strong>
-                  <em>{r.blurb}</em>
-                  {r.note && (
-                    <i className="bfp2__mode-note">
-                      <AlertTriangle size={11} strokeWidth={2.2} aria-hidden />
-                      {r.note}
-                    </i>
-                  )}
-                </span>
-                {profile.reach === r.id && (
-                  <Check size={15} strokeWidth={2.6} className="bfp2__mode-tick" aria-hidden />
-                )}
-              </button>
-            ))}
-          </fieldset>
+        {/* The reach section stood here.
 
-          {/* Said before it happens, not after. */}
-          {profile.reach === 'agent' && wouldDrop > 0 && (
-            <p className="bfp2__prereq">
-              <AlertTriangle size={13} strokeWidth={2} aria-hidden />
-              <span>
-                Switching to agentless would drop {wouldDrop} attribute
-                {wouldDrop === 1 ? '' : 's'} that only an agent can read.
-              </span>
-            </p>
-          )}
-        </section>
+            It is asked at CREATION now, and changed from the Overview panel's
+            own control — which is the whole point of moving it. It was the
+            first question on this panel because it decides what the others can
+            be, and being first on a panel is not the same as being first: the
+            attributes were already chosen by the time anybody opened this.
 
+            It also could not state its own cost here. Flipping to agentless
+            deleted attributes the moment you clicked the card, and the warning
+            beside it described the OTHER direction. `ReachDialog` holds the
+            change until it has said what it will take. */}
         <section>
           <h4>How devices register</h4>
           {/* Only where it explains something the screen cannot: why the roster
@@ -1658,8 +1942,9 @@ function RestrictionDrawer({
               options in the dropdown directly below it, read aloud. */}
           {!rosterPossible && (
             <p className="bfp2__stephint">
-              An agentless profile cannot use a roster: a roster is matched on MAC address, and MAC
-              is one of the attributes only an agent can read.
+              {profile.mode === 'os'
+                ? 'An OS and version profile cannot use a roster: a roster is matched on MAC address, which is not one of the things it reads.'
+                : 'An agentless profile cannot use a roster: a roster is matched on MAC address, and MAC is one of the attributes only an agent can read.'}
             </p>
           )}
           <div className="bfp2__rows bfp2__rows--form">
@@ -1785,34 +2070,309 @@ function AddModal({
   open: boolean
   profile: FingerprintProfile
   onClose: () => void
-  onSave: (ids: string[]) => void
+  onSave: (p: FingerprintProfile) => void
 }) {
+  /* A draft of the three fields the picker writes, not of the profile.
+
+     It held only `enabled`, which is why re-opening this dialog and saving used
+     to drop nothing and change nothing else — the values were somewhere the
+     dialog could not see. Now that a row carries its settings, the dialog has
+     to carry them too, or ticking an attribute here and setting it here would
+     write one and discard the other. */
   const [picked, setPicked] = useState<string[]>(profile.enabled)
+  const [config, setConfig] = useState(profile.config)
+  const [weights, setWeights] = useState(profile.weights)
+
+  /* On `open` alone, deliberately — the same argument as `CreateModal`'s reset.
+     A draft that re-synced while the dialog was open would throw away what you
+     had just ticked every time the page behind it re-rendered. */
+  useEffect(() => {
+    if (!open) return
+    setPicked(profile.enabled)
+    setConfig(profile.config)
+    setWeights(profile.weights)
+  }, [open])
+
+  const noun = ITEM_NOUN[profile.mode]
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Attributes in this profile"
-      width={1000}
+      title={`What ${profile.name} ${noun.verb}`}
+      width={profile.mode === 'os' ? 760 : 1000}
       footer={
         <>
-          <span className="bfp2__footnote">{picked.length} selected</span>
+          <span className="bfp2__footnote">
+            {picked.length === 0
+              ? `Pick at least one. A profile with no ${noun.many} decides nothing.`
+              : countLabel(profile.mode, picked.length)}
+          </span>
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="brand" disabled={picked.length === 0} onClick={() => onSave(picked)}>
+          <Button
+            variant="brand"
+            disabled={picked.length === 0}
+            onClick={() =>
+              /* Through `pruneValues`, so unticking a row here takes its
+                 settings with it rather than leaving them for the next time
+                 somebody ticks it back on. */
+              onSave(pruneValues({ ...profile, enabled: picked, config, weights }))
+            }
+          >
             Save
           </Button>
         </>
       }
     >
-      {profile.mode === 'risk' ? (
-        <RiskAttrPicker picked={picked} setPicked={setPicked} />
-      ) : (
-        <AttrPicker picked={picked} setPicked={setPicked} reach={profile.reach} />
+      <AttrStep
+        mode={profile.mode}
+        reach={profile.reach}
+        picked={picked}
+        setPicked={setPicked}
+        config={config}
+        weights={weights}
+        onValue={(id, v) => setConfig((c) => ({ ...c, [id]: v }))}
+        onWeight={(id, w) => setWeights((c) => ({ ...c, [id]: w }))}
+      />
+    </Modal>
+  )
+}
+
+/* --- Changing the reach afterwards ---------------------------------------------
+
+   The one destructive edit on this page, and the only one held behind a
+   confirmation.
+
+   Not un-editable: an admin who rolls the agent out to their fleet has to be
+   able to upgrade a profile, and refusing that means "duplicate it, re-pick
+   twenty attributes, re-tune eight, and re-point every policy rule".
+
+   Not inline either, which is what the restriction panel did — two radio cards
+   that deleted attributes on click, with a warning underneath describing the
+   direction you had not chosen. A control that destroys has to say what it will
+   take BEFORE it takes it, and it has to name the casualties rather than count
+   them: "4 attributes" is a number you cannot act on; the names are what tell
+   you whether the ones going are ones you wanted. */
+function ReachDialog({
+  open,
+  profile,
+  onChange,
+  onClose,
+}: {
+  open: boolean
+  profile: FingerprintProfile
+  onChange: (p: FingerprintProfile) => void
+  onClose: () => void
+}) {
+  /* Held, not written. The whole point of this dialog is that the change does
+     not happen until it has said what it will take — so `pending` is local, and
+     it syncs from the profile on open only. */
+  const [pending, setPending] = useState<ProfileReach>(profile.reach)
+  useEffect(() => {
+    if (open) setPending(profile.reach)
+  }, [open])
+
+  const dropped = profile.enabled
+    .map((id) => attrOf(profile.mode, id))
+    .filter((a): a is Attribute => Boolean(a?.needsAgent && pending !== 'agent'))
+  const changed = pending !== profile.reach
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`What ${profile.name} can read`}
+      width={560}
+      footer={
+        <>
+          <span className="bfp2__footnote">
+            {!changed
+              ? 'Nothing changes.'
+              : dropped.length > 0
+                ? `${countLabel(profile.mode, dropped.length)} and their settings will be removed.`
+                : `All ${attributesFor(profile.mode).length} attributes become available.`}
+          </span>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant={dropped.length > 0 ? 'danger' : 'brand'}
+            disabled={!changed}
+            onClick={() => {
+              onChange(withReach(profile, pending))
+              onClose()
+            }}
+          >
+            {pending === 'agentless' ? 'Switch to agentless' : 'Switch to agent-based'}
+          </Button>
+        </>
+      }
+    >
+      <p className="bfp2__stephint">
+        This decides which attributes can arrive at all. Hardware identifiers — the TPM, the
+        motherboard, the disk — need software running on the machine.
+      </p>
+
+      <fieldset className="bfp2__modes" aria-label="What it can read">
+        {REACHES.map((r) => {
+          const Ico = REACH_ICON[r.id]
+          return (
+            <button
+              key={r.id}
+              type="button"
+              role="radio"
+              aria-checked={pending === r.id}
+              className={`bfp2__mode-card ${pending === r.id ? 'is-on' : ''}`}
+              onClick={() => setPending(r.id)}
+            >
+              <span className="bfp2__mode-ico" aria-hidden>
+                <Ico size={17} strokeWidth={1.8} />
+              </span>
+              <span className="bfp2__mode-body">
+                <strong>{r.label}</strong>
+                <em>{r.blurb}</em>
+                {r.note && (
+                  <i className="bfp2__mode-note">
+                    <AlertTriangle size={11} strokeWidth={2.2} aria-hidden />
+                    {r.note}
+                  </i>
+                )}
+              </span>
+              {pending === r.id && (
+                <Check size={15} strokeWidth={2.6} className="bfp2__mode-tick" aria-hidden />
+              )}
+            </button>
+          )
+        })}
+      </fieldset>
+
+      {dropped.length > 0 && (
+        <p className="bfp2__prereq">
+          <AlertTriangle size={13} strokeWidth={2} aria-hidden />
+          <span>
+            Removes {dropped.map((a) => a.name).join(', ')} and everything they are set to.
+            {profile.registration === 'pre-approved' &&
+              ' The approved roster is matched on MAC address, so it will stop matching anything.'}
+          </span>
+        </p>
       )}
     </Modal>
+  )
+}
+
+/* --- The whole profile, stated ------------------------------------------------
+
+   Everything else on this page is an editor. Each panel answers "what would I
+   change here", and between them they answer it completely — and none of them
+   answers the question you actually have before you touch anything, which is
+   what this profile DOES. That question has an audience beyond the person
+   editing: it is what you paste into a change request, and what somebody who
+   did not build it reads before deciding whether it covers their fleet.
+
+   So: no controls, in reading order, kind first and then every row with what it
+   is set to. `valueLabel` is what prints a stored value, so this and the
+   controls beside it cannot disagree about what is stored — the failure that
+   makes a summary worse than no summary at all. */
+function SummaryDrawer({
+  open,
+  profile,
+  chosen,
+  platforms,
+  onClose,
+}: {
+  open: boolean
+  profile: FingerprintProfile
+  chosen: Attribute[]
+  platforms: string[]
+  onClose: () => void
+}) {
+  const facts: [string, string][] = [
+    ['Decides by', modeLabel(profile)],
+    ...(asksReach(profile.mode)
+      ? ([['What it can read', reachLabel(profile.reach)]] as [string, string][])
+      : []),
+    ...(profile.mode === 'os'
+      ? ([['Platforms named', platforms.length ? platforms.join(', ') : 'None']] as [string, string][])
+      : []),
+    ...(profile.restrictionSet
+      ? ([
+          ['How devices register', REGISTRATION_LABEL[profile.registration]],
+          ['Silent enrolment', profile.autoRegister ? 'On' : 'Off'],
+          profile.registration === 'pre-approved'
+            ? ['Approved roster', profile.roster ? `${profile.roster.fileName} · ${profile.roster.rows} devices` : 'None uploaded']
+            : ['Devices per person', String(profile.maxDevices ?? DEFAULT_MAX_DEVICES)],
+        ] as [string, string][])
+      : []),
+  ]
+
+  return (
+    <Drawer open={open} onClose={onClose} title={profile.name} caption={describeProfile(profile)} width={520}>
+      <div className="bfp2__sum">
+        <dl className="bfp2__sumfacts">
+          {facts.map(([k, v]) => (
+            <div key={k}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+
+        {/* Said outright rather than left to be inferred from an empty section.
+            A profile nobody has answered the enrolment questions for is running
+            on defaults, and defaults are not decisions. */}
+        {!profile.restrictionSet && (
+          <p className="bfp2__sumnote">
+            Nobody has answered how devices register on this profile, so it is running on the
+            defaults: self-service, {DEFAULT_MAX_DEVICES} per person, no silent enrolment.
+          </p>
+        )}
+
+        <h4 className="bfp2__sumhead">
+          {profile.mode === 'os' ? 'What it requires' : 'What it watches'}
+          <i>{countLabel(profile.mode, chosen.length)}</i>
+        </h4>
+
+        {chosen.length === 0 ? (
+          <p className="bfp2__sumnote">Nothing. Every device satisfies this profile.</p>
+        ) : (
+          <ul className="bfp2__sumlist">
+            {chosen.map((a) => {
+              const set = valueLabel(a, profile.config[a.id])
+              return (
+                <li key={a.id}>
+                  <span className="bfp2__sumname">
+                    {a.name}
+                    {a.phase === 2 && <i className="bfp2__soon">Not collected yet</i>}
+                  </span>
+                  <span className="bfp2__sumval">
+                    {set && <strong>{set}</strong>}
+                    {profile.mode === 'device' && (
+                      <em>{tierOf(profile.weights[a.id] ?? a.weight)}</em>
+                    )}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        {/* A finding rather than a fact, and the only one this drawer makes.
+            `fp-kiosk` shipped holding a roster of 24 machines and reading only
+            the form factor, so the roster matched nothing — the one setting the
+            profile existed for was inert and no surface said so. */}
+        {rosterNeedsMac(profile) && (
+          <p className="bfp2__sumwarn">
+            <AlertTriangle size={13} strokeWidth={2} aria-hidden />
+            <span>
+              The approved roster is matched on MAC address, and this profile does not read MAC —
+              so nothing on the roster can be recognised.
+            </span>
+          </p>
+        )}
+      </div>
+    </Drawer>
   )
 }
 

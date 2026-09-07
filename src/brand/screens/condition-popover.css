@@ -8,10 +8,16 @@
    -------------------------------------------------------------------------- */
 
 /* --- The pill ----------------------------------------------------------------
-   The whole condition, as a sentence you press: what is checked, how, and
-   against what. It replaced three separate controls sitting side by side. */
+
+   The whole condition as a sentence you can press — and press in three places.
+   Each part opens its own menu, so changing an operator does not mean opening a
+   panel that also holds the attribute and the values.
+
+   One border round the three with hairlines between them. Three separately
+   bordered controls is what this replaced; three parts of one control is what
+   it is. */
 .cp__pill {
-  display: flex;
+  display: inline-flex;
   align-items: stretch;
   min-width: 0;
   border: 1px solid var(--border-default);
@@ -23,69 +29,59 @@
 .cp__pill:hover { border-color: var(--border-strong); }
 .cp__pill:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
 
-.cp__pill__main {
-  flex: 1;
-  min-width: 0;
+.cp__seg {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 4px;
+  min-width: 0;
   height: 32px;
-  padding: 0 6px 0 10px;
+  padding: 0 7px;
   border: 0;
+  border-left: 1px solid var(--border-subtle);
   background: none;
   font-family: inherit;
+  font-size: var(--fs-xs);
   text-align: left;
   color: var(--text-primary);
   cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard);
 }
-.cp__pill__main:focus-visible { outline: none; }
-/* The attribute. It anchors the sentence, so it keeps the weight; the operator
-   beside it is the quiet connective and the value is what changes. */
-.cp__pill__main > b {
-  flex: none;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-medium);
-  white-space: nowrap;
+.cp__seg:first-child { border-left: 0; padding-left: 10px; }
+.cp__seg:hover { background: var(--surface-sunken); }
+.cp__seg:focus-visible { outline: none; background: var(--surface-sunken); box-shadow: inset 0 0 0 2px var(--focus-ring); }
+/* The open one stays lit, so it is obvious which of the three the panel below
+   belongs to — three carets in a row and one floating panel is otherwise a
+   guess. */
+.cp__seg.is-open { background: var(--surface-inset, var(--surface-sunken)); }
+.cp__seg > svg { flex: none; opacity: 0.45; }
+.cp__seg:hover > svg, .cp__seg.is-open > svg { opacity: 0.8; }
+.cp__seg__text {
+  min-width: 0; display: inline-flex; align-items: center; gap: 5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.cp__pill__main > em {
-  flex: none;
-  font-style: normal;
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
-  white-space: nowrap;
-}
-/* The value gets the room, because it is the part that grows and the part
-   somebody is scanning for. It elides rather than pushing the delete off the
-   end — `min-width: 0` on the flex item is what actually permits that. */
-.cp__pill__val {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-medium);
-  color: var(--brand);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.cp__pill__main.is-unset { border-color: transparent; }
-.cp__pill__main.is-unset .cp__pill__val { color: var(--fb-negative-fg); font-style: italic; }
-/* Dashed when the condition has no value: it never matches, which the linter
-   also reports — this is the same fact said where the value would be. */
+
+/* The attribute anchors the sentence, so it keeps the weight. */
+.cp__seg.is-what .cp__seg__text { font-weight: var(--fw-medium); }
+/* The operator is the quiet connective between the two things that matter, and
+   it never needs to grow. */
+.cp__seg.is-op { flex: none; color: var(--text-tertiary); }
+/* The value is what changes and what somebody scans for, so it takes the room
+   and the brand colour. `min-width: 0` on the flex item is what actually lets
+   it elide rather than pushing the delete off the end. */
+.cp__seg.is-val { flex: 1; min-width: 0; }
+.cp__seg.is-val .cp__seg__text { font-weight: var(--fw-medium); color: var(--brand); }
+/* A condition with no value never matches, which the linter also reports — this
+   is the same fact said where the value would be. */
+.cp__seg.is-val.is-unset .cp__seg__text { color: var(--fb-negative-fg); font-style: italic; }
 .cp__pill:has(.is-unset) { border-style: dashed; border-color: var(--fb-negative-border); }
-.cp__pill__main > svg { flex: none; opacity: 0.5; }
-/* Which half of a zone, when it is narrower than the zone as written. Absent
-   for "both", because that is what the zone already means. */
-.cp__pill__scope {
+
+/* Which half of a zone, when it is narrower than the zone as written. */
+.cp__scopetag {
   flex: none;
-  font-style: normal;
-  font-size: 10px;
-  font-weight: var(--fw-medium);
-  letter-spacing: 0.02em;
-  padding: 1px 5px;
-  border-radius: var(--radius-full);
-  background: var(--fb-info-bg);
-  color: var(--fb-info-fg);
-  white-space: nowrap;
+  display: inline-flex; align-items: center; height: 15px;
+  font-style: normal; font-size: 10px; font-weight: var(--fw-medium); line-height: 1;
+  padding: 0 5px; border-radius: var(--radius-full);
+  background: var(--fb-info-bg); color: var(--fb-info-fg);
 }
 
 .cp__pill__x {
@@ -127,19 +123,25 @@
 /* What is checked and how, stacked in the order they depend on each other —
    the attribute decides which operators exist, and the operator decides what
    the values mean. */
-.cp__head {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--border-subtle);
-}
-.cp__head .bx-picker { width: 100%; }
+/* `.cp__head` — the attribute and operator selects stacked at the top of one
+   combined panel — is gone with that panel. Each has its own menu now, opened
+   from its own part of the pill. */
+
+/* A single-select marks its choice with a bare check; a multi-select gets a
+   tick BOX. The shape is what says whether choosing this one unchooses the
+   last, which is the difference between picking an operator and picking a
+   fourth group. */
+.cp__pickmark { display: grid; place-items: center; width: 15px; flex: none; color: var(--brand); }
 
 .cp__scope {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
-  padding: var(--space-3) var(--space-3) 0;
+  /* A rule under it now that it opens the value menu rather than sitting in the
+     middle of a taller combined panel — it is a different question from "which
+     zones", and the two need telling apart. */
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
 }
 .cp__scope > button {
   display: inline-flex;

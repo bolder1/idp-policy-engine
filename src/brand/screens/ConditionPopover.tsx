@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Fingerprint, Globe, Layers, MapPin, Network, Search, UserRound, Users, Webhook, X, type LucideIcon } from 'lucide-react'
 
-import { Picker } from '../picker'
 import { modeLabel } from '../fingerprint'
 import type { BrandStore } from '../store'
 import type { NameLookup } from './predicate-prose'
@@ -22,34 +21,36 @@ import {
 import './condition-popover.css'
 
 /* -----------------------------------------------------------------------------
-   A condition, as ONE control.
+   A condition: one pill, three parts, three menus.
 
-   It was three: an attribute picker, an operator picker and a value trigger,
-   side by side in a grid. Three controls is three decisions laid out as though
-   they were independent, and they are not — the operators a condition can take
-   come from the attribute, and the values come from the operator. Reading a
-   row meant assembling one sentence out of three boxes, and changing a
-   condition meant visiting them in order.
+   The pill reads as the sentence — `Group Membership · in · Finance` — and each
+   of the three parts is its own hit target opening its own menu. Jira's filter
+   chip is the reference, and this is the half of it that matters: pressing the
+   operator gives you the operators, pressing the values gives you the values,
+   and neither makes you walk past the other.
 
-   So the row is a pill that reads as the sentence — `Network Zone · not in
-   zone · Office Network +1` — and pressing it opens one panel holding all
-   three, in the order they depend on each other. Jira's filter bar is the
-   reference and it is right for a reason worth stating: a filter there is one
-   chip you press, and everything about that filter is inside what opens. The
-   chip is what you read; the panel is where you decide.
+   It was one panel holding all three stacked, which is the version you reach
+   for when you think of a condition as a form. It is not a form, it is a
+   sentence, and a sentence is edited a word at a time: somebody changing `in`
+   to `not in` had to open a panel containing the attribute they did not want to
+   change and a list of groups they did not want to change, and find the middle
+   row of it.
 
-   Anchored, not centred. A dialog in the middle of the screen for "which
-   zones" makes the panel the subject and the rule the background, when the
-   whole point is that you are editing one row of a rule you can still see. The
-   panel opens under the pill it belongs to and the rest of the form stays put.
+   Three menus also make the FIRST pass progressive, which one panel could not.
+   A new condition has nothing in it, so choosing the attribute opens the
+   operators and choosing an operator opens the values — the order they depend
+   on each other in, one decision at a time, without the next two sitting there
+   waiting on a choice that has not been made.
+
+   Only one is ever open. The three sit on one line and drop into the same space
+   below it, so two at once would be two panels fighting over one anchor.
 
    The positioning is `Picker`'s, deliberately — portalled to `document.body`
-   and `position: fixed`, which is this codebase's proven un-clippable pattern,
-   with the same flip-only-when-there-is-no-room rule, the same horizontal
-   clamp, the same `capture: true` scroll listener so a nested scroller moves it
-   too, and the same "stay hidden until measured" so nothing is ever seen at
-   0,0. The inspector body IS a nested scroller, so that last part is not
-   theoretical.
+   and `position: fixed`, this codebase's proven un-clippable pattern: flip only
+   when the near side genuinely lacks room, clamp horizontally, follow scroll
+   with `capture: true` so a nested scroller moves it too, cap the height to the
+   room there is, and stay hidden until measured so nothing is ever seen at 0,0.
+   The inspector body IS a nested scroller, so none of that is theoretical.
    -------------------------------------------------------------------------- */
 
 const GAP = 6
@@ -88,9 +89,9 @@ export function zoneShape(z: Zone): string {
   return 'Constrains nothing — this zone matches everything'
 }
 
-/* What the pill says on its right: one name, or one name and a count.
+/* What the pill says for its values: one name, or one name and a count.
 
-   Never a run of names. "Finance, Engineering, Contractors" in a 200px pill
+   Never a run of names. "Finance, Engineering, Contractors" in a 200px segment
    elides to "Finance, Engi…", which reads as a truncated single value rather
    than as three. "Finance +2" is the same information and cannot be misread. */
 export function summarise(names: string[], placeholder: string): string {
@@ -98,6 +99,9 @@ export function summarise(names: string[], placeholder: string): string {
   if (names.length === 1) return names[0]
   return `${names[0]} +${names.length - 1}`
 }
+
+/** Which of the three menus is open. Never two: they share one anchor line. */
+type Part = 'what' | 'op' | 'val'
 
 export function ConditionPopover({
   c,
@@ -116,7 +120,7 @@ export function ConditionPopover({
   autoOpen,
 }: {
   c: Condition
-  /** The chosen values, summarised for the pill. */
+  /** The chosen values, summarised for the pill's third segment. */
   summary: string
   /** The pickable values, when the kind has any. Empty for text/time/range. */
   options: ValueOption[]
@@ -132,64 +136,230 @@ export function ConditionPopover({
   onRemove: () => void
   footer?: string
   onFooter?: () => void
-  /** Open on mount — a row that was just added has nothing in it yet. */
+  /** A row that was just added: start it at the first decision. */
   autoOpen?: boolean
 }) {
   const t = conditionType(c.typeId)
-  const [open, setOpen] = useState(!!autoOpen)
-  const [q, setQ] = useState('')
-  const [pos, setPos] = useState<{ top: number; left: number; width: number; maxH: number } | null>(null)
-  const anchor = useRef<HTMLButtonElement | null>(null)
-  const pop = useRef<HTMLDivElement | null>(null)
+  const [open, setOpen] = useState<Part | null>(autoOpen ? 'what' : null)
   const values = c.values.filter(Boolean)
+
+  const whatRef = useRef<HTMLButtonElement | null>(null)
+  const opRef = useRef<HTMLButtonElement | null>(null)
+  const valRef = useRef<HTMLButtonElement | null>(null)
+  const anchorFor: Record<Part, RefObject<HTMLButtonElement | null>> = { what: whatRef, op: opRef, val: valRef }
+
+  const toggle = (v: string) =>
+    onValues(single ? [v] : values.includes(v) ? values.filter((x) => x !== v) : [...values, v])
+
+  const close = useCallback(() => setOpen(null), [])
+
+  return (
+    <>
+      <span className="cp__pill">
+        <Seg
+          ref={whatRef}
+          kind="what"
+          open={open === 'what'}
+          label={`Change what is checked. Currently ${t.label}.`}
+          onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
+        >
+          {t.label}
+        </Seg>
+
+        <Seg
+          ref={opRef}
+          kind="op"
+          open={open === 'op'}
+          label={`Change how ${t.label} is compared. Currently ${c.operator}.`}
+          onOpen={() => setOpen((o) => (o === 'op' ? null : 'op'))}
+        >
+          {c.operator}
+        </Seg>
+
+        <Seg
+          ref={valRef}
+          kind="val"
+          open={open === 'val'}
+          unset={unset}
+          label={`Change what ${t.label} is compared against. Currently ${
+            unset ? 'nothing chosen' : names.length > 1 ? `${names[0]} and ${names.length - 1} more` : names[0] || summary
+          }.`}
+          onOpen={() => setOpen((o) => (o === 'val' ? null : 'val'))}
+        >
+          {summary}
+          {/* Which half of a zone, when it is narrower than the zone as written.
+              Absent for "both", because that is what the zone means already. */}
+          {c.scope && <i className="cp__scopetag">{c.scope === 'ip' ? 'network' : 'map'}</i>}
+        </Seg>
+
+        <button type="button" className="cp__pill__x" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
+          <X size={12} strokeWidth={2.4} />
+        </button>
+      </span>
+
+      {open && (
+        <Pop
+          anchor={anchorFor[open]}
+          onClose={() => {
+            setOpen(null)
+            anchorFor[open].current?.focus()
+          }}
+          /* Re-measure whenever what is inside can change size — a retype swaps
+             the whole body, an operator change can swap it too. */
+          watch={`${open}:${c.typeId}:${c.operator}`}
+        >
+          {open === 'what' && (
+            <OptionList
+              searchLabel="Search attributes"
+              items={[...CONDITION_CATALOGUE]
+                .sort((a, b) => conditionRank(a.id) - conditionRank(b.id))
+                .map((x) => ({ value: x.id, label: x.label, meta: x.group, note: x.hint }))}
+              picked={[c.typeId]}
+              single
+              /* Progressive, and only forwards. Choosing an attribute opens the
+                 operators; choosing an operator opens the values. It does not
+                 run backwards: re-opening the operator menu on a finished
+                 condition to change `in` to `not in` should leave you where you
+                 were, not drag you into a list of groups you did not ask about. */
+              onPick={(id) => {
+                onRetype(id)
+                setOpen('op')
+              }}
+            />
+          )}
+
+          {open === 'op' && (
+            <OptionList
+              items={t.operators.map((o) => ({ value: o, label: o }))}
+              picked={[c.operator]}
+              single
+              /* No search over two to four words. */
+              onPick={(o) => {
+                onOperator(o)
+                setOpen('val')
+              }}
+            />
+          )}
+
+          {open === 'val' && (
+            <ValueBody
+              c={c}
+              options={options}
+              single={single}
+              values={values}
+              toggle={toggle}
+              onValues={onValues}
+              onScope={onScope}
+              footer={footer}
+              onFooter={onFooter}
+              close={close}
+            />
+          )}
+        </Pop>
+      )}
+    </>
+  )
+}
+
+/* --- One segment of the pill --------------------------------------------------
+
+   A button, not a span. Each of the three is its own access point, and what
+   makes that legible is that each highlights on hover and each carries its own
+   caret; `aria-haspopup="dialog"` and `aria-expanded` say the rest. */
+function Seg({
+  ref,
+  kind,
+  open,
+  unset,
+  label,
+  onOpen,
+  children,
+}: {
+  ref: RefObject<HTMLButtonElement | null>
+  kind: Part
+  open: boolean
+  unset?: boolean
+  label: string
+  onOpen: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      className={`cp__seg is-${kind} ${open ? 'is-open' : ''} ${unset ? 'is-unset' : ''}`}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      /* The whole state of this part, because `aria-label` REPLACES a button's
+         text — naming it after the field alone would announce the control and
+         hide the value it is showing. */
+      aria-label={label}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowDown' && !open) {
+          e.preventDefault()
+          onOpen()
+        }
+      }}
+    >
+      <span className="cp__seg__text">{children}</span>
+      <ChevronDown size={11} strokeWidth={2.2} aria-hidden />
+    </button>
+  )
+}
+
+/* --- The anchored panel -------------------------------------------------------
+   One implementation, used by all three menus. */
+function Pop({
+  anchor,
+  onClose,
+  watch,
+  children,
+}: {
+  anchor: RefObject<HTMLButtonElement | null>
+  onClose: () => void
+  /** Anything that changes the panel's size, so it re-measures. */
+  watch: string
+  children: ReactNode
+}) {
+  const pop = useRef<HTMLDivElement | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; width: number; maxH: number } | null>(null)
 
   const place = useCallback(() => {
     const a = anchor.current?.getBoundingClientRect()
     if (!a) return
     const p = pop.current?.getBoundingClientRect()
-    const w = Math.max(a.width, p?.width ?? 300)
+    const w = Math.max(a.width, p?.width ?? 240)
     const h = p?.height ?? 0
     const below = window.innerHeight - a.bottom
     const above = a.top
-    /* Flip only when below genuinely lacks room AND above has more, which is
-       the rule that stops a panel jumping sides as its own list is filtered. */
+    /* Flip only when below genuinely lacks room AND above has more — the rule
+       that stops a panel jumping sides as its own list is filtered. */
     const up = below < h + GAP + MARGIN && above > below
-    /* Cap the height to the room on the side it opened, and let the LIST
-       scroll inside it.
-
-       Without this a tall panel opening from a pill low in the inspector had
-       nowhere to fit: below was short, above was short, and the clamp to
-       `MARGIN` pushed it up over the console header — a dropdown covering the
-       whole screen to show six zones. The floor is 220 so it never collapses
-       to a sliver on a very short window; below that, overlapping a little is
-       better than being unusable. */
+    /* Cap to the room on the side it opened and let the LIST scroll. Without
+       this a tall panel from a segment low in the inspector had nowhere to fit
+       and clamped to the viewport edge, covering the console header to show six
+       options. */
     const room = (up ? above : below) - GAP - MARGIN
+    const maxH = Math.max(200, room)
     setPos({
-      top: up ? Math.max(MARGIN, a.top - Math.min(h, Math.max(220, room)) - GAP) : a.bottom + GAP,
+      top: up ? Math.max(MARGIN, a.top - Math.min(h, maxH) - GAP) : a.bottom + GAP,
       left: Math.max(MARGIN, Math.min(a.left, window.innerWidth - w - MARGIN)),
       width: w,
-      maxH: Math.max(220, room),
+      maxH,
     })
-  }, [])
+  }, [anchor])
+
+  // Before paint, so the panel is never seen at its unplaced position.
+  useLayoutEffect(place, [place, watch])
 
   useEffect(() => {
-    if (!open) {
-      setPos(null)
-      setQ('')
-      return
-    }
-    place()
     window.addEventListener('scroll', place, true)
     window.addEventListener('resize', place)
     const onDown = (e: MouseEvent) => {
       const n = e.target as Node
-      /* Not `pop.current.contains` alone: the attribute and operator selects
-         inside this panel are `Picker`s, which portal their own popup to the
-         body — so a click on one of their options is outside BOTH refs and used
-         to close this panel out from under the choice being made. */
       if (anchor.current?.contains(n) || pop.current?.contains(n)) return
-      if ((n as HTMLElement).closest?.('.bx-picker__pop')) return
-      setOpen(false)
+      onClose()
     }
     document.addEventListener('mousedown', onDown)
     return () => {
@@ -197,207 +367,186 @@ export function ConditionPopover({
       window.removeEventListener('resize', place)
       document.removeEventListener('mousedown', onDown)
     }
-  }, [open, place])
+  }, [place, anchor, onClose])
 
-  // The list shrinks as you search, so the panel has to be re-placed under it.
-  useEffect(() => {
-    if (open) place()
-  }, [q, open, place, c.typeId, c.operator])
+  return createPortal(
+    <div
+      ref={pop}
+      className="cp__pop"
+      role="dialog"
+      style={pos ? { top: pos.top, left: pos.left, minWidth: pos.width, maxHeight: pos.maxH } : { opacity: 0, pointerEvents: 'none' }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation()
+          onClose()
+        }
+      }}
+    >
+      {children}
+    </div>,
+    document.body,
+  )
+}
 
+/* --- A list of options ---------------------------------------------------------
+   The attribute menu and the operator menu are the same shape; only the
+   attribute menu is long enough to want a search field. */
+function OptionList({
+  items,
+  picked,
+  single,
+  searchLabel,
+  onPick,
+}: {
+  items: ValueOption[]
+  picked: string[]
+  single?: boolean
+  /** Present when the list is long enough to want searching. */
+  searchLabel?: string
+  onPick: (v: string) => void
+}) {
+  const [q, setQ] = useState('')
   const shown = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    if (!needle) return options
-    return options.filter((o) => `${o.label} ${o.meta ?? ''} ${o.note ?? ''}`.toLowerCase().includes(needle))
-  }, [options, q])
-
-  const toggle = (v: string) =>
-    onValues(single ? [v] : values.includes(v) ? values.filter((x) => x !== v) : [...values, v])
-
-  const close = () => {
-    setOpen(false)
-    anchor.current?.focus()
-  }
+    const n = q.trim().toLowerCase()
+    if (!n) return items
+    return items.filter((o) => `${o.label} ${o.meta ?? ''} ${o.note ?? ''}`.toLowerCase().includes(n))
+  }, [items, q])
 
   return (
     <>
-      <span className="cp__pill">
-        <button
-          ref={anchor}
-          type="button"
-          className={`cp__pill__main ${unset ? 'is-unset' : ''} ${open ? 'is-open' : ''}`}
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          /* The whole sentence. `aria-label` REPLACES a button's text, so
-             naming it after the attribute alone would announce the control and
-             hide everything it is showing. */
-          aria-label={[t.label, c.operator, unset ? 'nothing chosen' : names.length > 1 ? `${names[0]} and ${names.length - 1} more` : names[0] || summary, c.scope ? ZONE_SCOPE_LABEL[c.scope] : '']
-            .filter(Boolean)
-            .join(', ')}
-          onClick={() => setOpen((v) => !v)}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowDown' && !open) {
-              e.preventDefault()
-              setOpen(true)
-            }
-          }}
-        >
-          <b>{t.label}</b>
-          <em>{c.operator}</em>
-          <span className="cp__pill__val">{summary}</span>
-          {c.scope && <i className="cp__pill__scope">{c.scope === 'ip' ? 'network' : 'map'}</i>}
-          <ChevronDown size={12} strokeWidth={2.2} aria-hidden />
-        </button>
-        <button type="button" className="cp__pill__x" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
-          <X size={12} strokeWidth={2.4} />
-        </button>
-      </span>
-
-      {open &&
-        createPortal(
-          <div
-            ref={pop}
-            className="cp__pop"
-            role="dialog"
-            aria-label={`${t.label} condition`}
-            /* Hidden until measured. Rendering at 0,0 for one frame is a panel
-               seen in the corner of the screen on every open. */
-            style={pos ? { top: pos.top, left: pos.left, minWidth: pos.width, maxHeight: pos.maxH } : { opacity: 0, pointerEvents: 'none' }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                e.stopPropagation()
-                close()
-              }
-            }}
-          >
-            {/* The three decisions, in the order they depend on each other:
-                what is being checked, how, and against what. The attribute is
-                first because changing it resets the other two. */}
-            <div className="cp__head">
-              <Picker
-                label="What to check"
-                width="fill"
-                searchable
-                value={c.typeId}
-                options={[...CONDITION_CATALOGUE]
-                  .sort((a, b) => conditionRank(a.id) - conditionRank(b.id))
-                  .map((x) => ({ value: x.id, label: x.label, meta: x.group }))}
-                onChange={onRetype}
-              />
-              <Picker
-                label={`${t.label} operator`}
-                width="fill"
-                value={c.operator}
-                options={t.operators.map((o) => ({ value: o, label: o }))}
-                onChange={onOperator}
-              />
-            </div>
-
-            {/* A zone's two halves. It is a property of the CONDITION, not of
-                any one zone, so it is asked once above the list rather than
-                once per row with no way to answer it once. */}
-            {t.valueKind === 'zone' && (
-              <div className="cp__scope" role="radiogroup" aria-label="Which half of the zone to match on">
-                {SCOPES.map((s, i) => {
-                  const on = s.id === (c.scope ?? 'both')
-                  const Ico = s.icon
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      tabIndex={on ? 0 : -1}
-                      className={on ? 'is-on' : ''}
-                      title={s.hint}
-                      onClick={() => onScope(s.id)}
-                      onKeyDown={(e) => {
-                        const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
-                        if (!d) return
-                        e.preventDefault()
-                        onScope(SCOPES[(i + d + SCOPES.length) % SCOPES.length].id)
-                      }}
-                    >
-                      <Ico size={13} strokeWidth={2} aria-hidden />
-                      {ZONE_SCOPE_LABEL[s.id]}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-
-            <ValueBody
-              c={c}
-              options={options}
-              shown={shown}
-              q={q}
-              setQ={setQ}
-              single={single}
-              values={values}
-              toggle={toggle}
-              onValues={onValues}
-            />
-
-            {(options.length > 0 || footer) && (
-              <div className="cp__foot">
-                {options.length > 0 && (
-                  <span className="cp__count">
-                    {shown.length === options.length ? `${options.length} of ${options.length}` : `${shown.length} of ${options.length}`}
-                  </span>
-                )}
-                {footer &&
-                  (onFooter ? (
-                    <button type="button" className="cp__manage" onClick={onFooter}>
-                      {footer} →
-                    </button>
-                  ) : (
-                    <span className="cp__hint">{footer}</span>
-                  ))}
-              </div>
-            )}
-          </div>,
-          document.body,
-        )}
+      {searchLabel && <SearchField value={q} onChange={setQ} label={searchLabel} />}
+      <List items={shown} picked={picked} single={single} onPick={onPick} q={q} />
+      {searchLabel && (
+        <div className="cp__foot">
+          <span className="cp__count">
+            {shown.length} of {items.length}
+          </span>
+        </div>
+      )}
     </>
   )
 }
 
-/* The value, by kind. Everything that can hold more than one thing is a
-   searchable checkbox list; the three that are genuinely one control — a time
-   window, a number with a unit, a line of text — are that control. */
+/* The search field, focused through a callback ref rather than `autoFocus` or
+   an effect: the panel is portalled and mounts in the same commit the state
+   flips, so the ref callback is the one moment the node is certainly in the
+   document. `armed` stops it grabbing focus back on every later re-render,
+   which mid-typing is worse than never having taken it. */
+function SearchField({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+  const armed = useRef(false)
+  return (
+    <div className="cp__search">
+      <Search size={14} strokeWidth={2} aria-hidden />
+      <input
+        ref={(el) => {
+          if (!el || armed.current) return
+          armed.current = true
+          el.focus()
+        }}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={label}
+        aria-label={label}
+      />
+    </div>
+  )
+}
+
+function List({
+  items,
+  picked,
+  single,
+  onPick,
+  q,
+}: {
+  items: ValueOption[]
+  picked: string[]
+  single?: boolean
+  onPick: (v: string) => void
+  q: string
+}) {
+  return (
+    <div className="cp__list" role={single ? 'listbox' : 'group'}>
+      {items.length === 0 ? (
+        <p className="cp__none">Nothing matches “{q}”.</p>
+      ) : (
+        items.map((o) => {
+          const on = picked.includes(o.value)
+          const Ico = o.icon
+          return (
+            <button
+              key={o.value}
+              type="button"
+              className={`cp__opt ${on ? 'is-on' : ''} ${single ? 'is-single' : ''}`}
+              role={single ? 'option' : 'checkbox'}
+              aria-selected={single ? on : undefined}
+              aria-checked={single ? undefined : on}
+              onClick={() => onPick(o.value)}
+            >
+              {/* A tick box for a multi-select, a bare check for a single one.
+                  The shape is what says whether choosing this unchooses the
+                  last — which is the difference between picking an operator and
+                  picking a fourth group. */}
+              {single ? (
+                <span className="cp__pickmark" aria-hidden>
+                  {on && <Check size={12} strokeWidth={3} />}
+                </span>
+              ) : (
+                <span className="cp__tick" aria-hidden>
+                  {on && <Check size={11} strokeWidth={3} />}
+                </span>
+              )}
+              {Ico && (
+                <i className="cp__icon" aria-hidden>
+                  <Ico size={13} strokeWidth={2} />
+                </i>
+              )}
+              <span className="cp__text">
+                <b>{o.label}</b>
+                {o.meta && <em>{o.meta}</em>}
+                {o.note && <small>{o.note}</small>}
+              </span>
+            </button>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
+/* --- The value menu -------------------------------------------------------------
+   Everything that can hold more than one thing is a searchable checkbox list;
+   the three that are genuinely one control — a time window, a number with a
+   unit, a line of text — are that control. */
 function ValueBody({
   c,
   options,
-  shown,
-  q,
-  setQ,
   single,
   values,
   toggle,
   onValues,
+  onScope,
+  footer,
+  onFooter,
+  close,
 }: {
   c: Condition
   options: ValueOption[]
-  shown: ValueOption[]
-  q: string
-  setQ: (v: string) => void
   single?: boolean
   values: string[]
   toggle: (v: string) => void
   onValues: (v: string[]) => void
+  onScope: (s: 'both' | ZoneScope) => void
+  footer?: string
+  onFooter?: () => void
+  close: () => void
 }) {
   const t = conditionType(c.typeId)
-  const field = useRef<HTMLInputElement | null>(null)
+  const [q, setQ] = useState('')
   const armed = useRef(false)
-
-  /* Focus lands in the panel, through a callback ref rather than `autoFocus` or
-     an effect. The panel is portalled and mounts in the same commit the state
-     flips, so a ref callback is the one moment the node is certainly there —
-     and `armed` stops the field grabbing focus back on every later re-render,
-     which mid-typing is worse than never having taken it. */
   const take = (el: HTMLInputElement | null) => {
     if (!el || armed.current) return
     armed.current = true
-    field.current = el
     el.focus()
   }
 
@@ -428,58 +577,76 @@ function ValueBody({
     )
   }
 
+  const shown = q.trim()
+    ? options.filter((o) => `${o.label} ${o.meta ?? ''} ${o.note ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()))
+    : options
+
   return (
     <>
-      <div className="cp__search">
-        <Search size={14} strokeWidth={2} aria-hidden />
-        <input ref={take} value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${t.label}`} aria-label={`Search ${t.label}`} />
-      </div>
-      <div className="cp__list" role={single ? 'listbox' : 'group'} aria-label={t.label}>
-        {shown.length === 0 ? (
-          <p className="cp__none">Nothing matches “{q}”.</p>
-        ) : (
-          shown.map((o) => {
-            const on = values.includes(o.value)
-            const Ico = o.icon
+      {/* A zone's two halves. A property of the CONDITION, not of any one zone,
+          so it is asked once above the list rather than once per row with no way
+          to answer it once. */}
+      {t.valueKind === 'zone' && (
+        <div className="cp__scope" role="radiogroup" aria-label="Which half of the zone to match on">
+          {SCOPES.map((s, i) => {
+            const on = s.id === (c.scope ?? 'both')
+            const Ico = s.icon
             return (
               <button
-                key={o.value}
+                key={s.id}
                 type="button"
-                className={`cp__opt ${on ? 'is-on' : ''}`}
-                role={single ? 'option' : 'checkbox'}
-                aria-selected={single ? on : undefined}
-                aria-checked={single ? undefined : on}
-                onClick={() => toggle(o.value)}
+                role="radio"
+                aria-checked={on}
+                tabIndex={on ? 0 : -1}
+                className={on ? 'is-on' : ''}
+                title={s.hint}
+                onClick={() => onScope(s.id)}
+                onKeyDown={(e) => {
+                  const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
+                  if (!d) return
+                  e.preventDefault()
+                  onScope(SCOPES[(i + d + SCOPES.length) % SCOPES.length].id)
+                }}
               >
-                <span className="cp__tick" aria-hidden>
-                  {on && <Check size={11} strokeWidth={3} />}
-                </span>
-                {Ico && (
-                  <i className="cp__icon" aria-hidden>
-                    <Ico size={13} strokeWidth={2} />
-                  </i>
-                )}
-                <span className="cp__text">
-                  <b>{o.label}</b>
-                  {o.meta && <em>{o.meta}</em>}
-                  {o.note && <small>{o.note}</small>}
-                </span>
+                <Ico size={13} strokeWidth={2} aria-hidden />
+                {ZONE_SCOPE_LABEL[s.id]}
               </button>
             )
-          })
-        )}
+          })}
+        </div>
+      )}
+
+      <SearchField value={q} onChange={setQ} label={`Search ${t.label}`} />
+      <List
+        items={shown}
+        picked={values}
+        single={single}
+        q={q}
+        onPick={(v) => {
+          toggle(v)
+          /* A single-value kind is finished the moment it is chosen; a
+             multi-value one is not, and closing under somebody about to tick a
+             second group is the whole reason a multi-select stays open. */
+          if (single) close()
+        }}
+      />
+
+      <div className="cp__foot">
+        <span className="cp__count">
+          {shown.length} of {options.length}
+        </span>
+        {footer &&
+          (onFooter ? (
+            <button type="button" className="cp__manage" onClick={onFooter}>
+              {footer} →
+            </button>
+          ) : (
+            <span className="cp__hint">{footer}</span>
+          ))}
       </div>
     </>
   )
 }
-
-/** A row's leading keyword or joiner, kept out of the pill. */
-export function condPlaceholder(): ReactNode {
-  return null
-}
-
-/* The pill's right-hand text, by kind. Shared so the two builders cannot
-   describe one condition two ways. */
 export function condSummary(t: ConditionType, c: Condition, names: string[]): string {
   const values = c.values.filter(Boolean)
   if (t.valueKind === 'time') return `${c.values[0] ?? '09:00'} – ${c.values[1] ?? '17:00'}`

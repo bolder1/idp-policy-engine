@@ -178,7 +178,16 @@
   width: 2px; background: var(--bb-link);
   transition: background-color 0.25s ease;
 }
-.bb__link.is-lit::before { background: var(--brand); }
+/* Grey, not brand.
+
+   The lit connector marked the path a rehearsal took, and on a canvas of nine
+   rules that meant an orange line running the height of the chain beside an
+   orange selection ring, orange switches and orange decision chips. Colour on
+   this surface has one job — saying what a rule DECIDES — and everything else
+   competing for it is what made the board tiring to look at. A darker line is
+   enough to say "this one"; it does not need to be the loudest thing on
+   screen. */
+.bb__link.is-lit::before { background: var(--border-strong); }
 .bb__link.is-dead::before { background: var(--border-subtle); }
 /* A bare `+` on the line, and a button only when you reach for it.
 
@@ -208,8 +217,9 @@
 .bb__link__add:focus-visible,
 .bb__link:hover .bb__link__add {
   transform: translateY(-50%) scale(1.12);
-  background: var(--brand); color: #fff;
-  box-shadow: 0 2px 8px -2px rgba(235, 84, 36, 0.5);
+  /* Ink, not brand. It is a place to put a rule, not a decision about one. */
+  background: var(--text-primary); color: var(--surface-raised);
+  box-shadow: 0 2px 8px -3px rgba(20, 30, 40, 0.45);
   outline: none;
 }
 .bb__link__add:focus-visible { box-shadow: 0 0 0 2px var(--focus-ring); }
@@ -272,9 +282,17 @@
    away from the stage. Declaring the vars on the badge's own tone class fixes
    both call sites without touching the card, which carries no tone class here
    and so keeps inheriting from `.bb__card.is-*` exactly as before. */
-.bb__idx.is-deny, .bb__reach.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-dot: var(--fb-negative-dot, #d01243); }
-.bb__idx.is-mfa, .bb__reach.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-dot: var(--fb-notice-dot, #b07a00); }
-.bb__idx.is-allow, .bb__reach.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-dot: var(--fb-positive-dot, #128f43); }
+/* The BADGE is a position; only `.bb__reach` keeps the verdict tones.
+
+   `1` in a green tile and `2` in a red one made every card a different colour
+   at rest, so a chain of nine read as nine categories — and the number is not
+   the decision, it is where the rule sits in the order. The decision chip two
+   lines below says the decision, once, in colour, and is now the only thing on
+   a card that does. */
+.bb__idx { --tone-bg: var(--surface-sunken); --tone-fg: var(--text-secondary); }
+.bb__reach.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-dot: var(--fb-negative-dot, #d01243); }
+.bb__reach.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-dot: var(--fb-notice-dot, #b07a00); }
+.bb__reach.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-dot: var(--fb-positive-dot, #128f43); }
 
 .bb__cardhead {
   /* Four columns now: the index, the fold, the title, and the right-hand
@@ -488,14 +506,26 @@ button.bb__idx svg { display: none; }
    colour and wants no box at all. The dead half goes; the grid row keeps the
    name. */
 
-/* Component tones — one per catalogue group, never negative. */
-.is-tone-info { --cond-bg: var(--fb-info-bg); --cond-fg: var(--fb-info-fg); }
-.is-tone-lime { --cond-bg: var(--fb-lime-bg); --cond-fg: var(--fb-lime-fg); }
-.is-tone-accent { --cond-bg: var(--fb-accent-bg); --cond-fg: var(--fb-accent-fg); }
-.is-tone-notice { --cond-bg: var(--fb-notice-bg); --cond-fg: var(--fb-notice-fg); }
-.is-tone-magenta { --cond-bg: var(--fb-magenta-bg); --cond-fg: var(--fb-magenta-fg); }
-.is-tone-positive { --cond-bg: var(--fb-positive-bg); --cond-fg: var(--fb-positive-fg); }
-.is-tone-neutral { --cond-bg: var(--fb-neutral-bg); --cond-fg: var(--fb-neutral-fg); }
+/* One tone for every condition family, and the family is carried by the ICON.
+
+   There were seven — info, lime, accent, notice, magenta, positive, neutral —
+   one per catalogue group, so a rule with five conditions was five different
+   colours in a row and a chain of nine rules was a paint chart. None of it was
+   a signal: knowing that Network is blue and Location is green tells you
+   nothing you cannot read from the word "Network", and it spent the whole
+   palette on a distinction nobody acts on.
+
+   The glyphs stay and still differ per family, which is the part that helps at
+   a glance. The classes stay too rather than being deleted from three call
+   sites, so the distinction can be brought back by editing seven lines here if
+   it ever earns its place. */
+.is-tone-info,
+.is-tone-lime,
+.is-tone-accent,
+.is-tone-notice,
+.is-tone-magenta,
+.is-tone-positive,
+.is-tone-neutral { --cond-bg: var(--fb-neutral-bg); --cond-fg: var(--text-secondary); }
 
 /* THEN, as the journey. */
 .bb__then { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }

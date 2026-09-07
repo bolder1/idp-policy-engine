@@ -7,7 +7,7 @@ import type { AccessDecision, Policy } from '../../data'
 import type { Diagnostic } from '../diagnostics'
 import { LANES, SITUATIONS, badges, compare, sweep, type Lane, type Situation } from '../impact-arena'
 import { SIM_USERS, PLACES, walk, type SimContext, type SimEnv } from '../simulate'
-import { CLOCKS, DECISION_SHORT, TONE, shortAuth, shortDevice, shortPlace, type Selection } from './model'
+import { CLOCKS, DECISION_SHORT, TONE, ruleAt, shortAuth, shortDevice, shortPlace, type Selection } from './model'
 import { Section, Seg } from './Section'
 
 /* -----------------------------------------------------------------------------
@@ -86,7 +86,8 @@ export function ImpactTab({
   const visible = (s: Situation) => (!who || s.userId === who) && (!where || s.place === where)
 
   const jump = (i: number) => {
-    onSelect({ kind: 'rule', id: draft.rules[i].id })
+    // "This rule now decides it" is a statement about the outcome.
+    onSelect(ruleAt(draft.rules[i].id, 'then'))
     onClose()
   }
 

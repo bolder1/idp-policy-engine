@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
-import { Maximize2, X } from 'lucide-react'
+import { Maximize2, Plus, X } from 'lucide-react'
 
 import { Modal, Toggle } from '../../kit'
-import { fallbackRule, type Policy, type Rule } from '../../data'
-import { TONE, type Selection } from './model'
+import { restConditions } from '../../audience-ops'
+import { fallbackRule, type Audience, type Policy, type Rule } from '../../data'
+import { TONE, type Part, type Selection } from './model'
+import { PART_LABEL } from './parts'
 import { WhatEditor } from './WhatEditor'
 import { WhenEditor } from './WhenEditor'
 import { WhoEditor } from './WhoEditor'
@@ -34,12 +36,18 @@ export function Inspector({
   selection,
   onPatchRule,
   onPatchFallback,
+  onOpenPart,
   onClose,
 }: {
   draft: Policy
   selection: Selection
   onPatchRule: (i: number, p: Partial<Rule>) => void
   onPatchFallback: (p: Partial<Rule>) => void
+  /* The one part-changing control the PANEL owns, and it exists for exactly
+     one state: a Who pane that has stood down on an OR-shaped rule has to be
+     able to hand you to the pane that can do the job. It is not a switcher —
+     one button, one condition, one direction. */
+  onOpenPart: (part: Part) => void
   onClose: () => void
 }) {
   /* Resolved once. `at` is -1 when the selected rule is gone — undone, deleted,
@@ -47,32 +55,34 @@ export function Inspector({
      the -1 is a guard rather than a state anybody sees. */
   const at = selection.kind === 'rule' ? draft.rules.findIndex((r) => r.id === selection.id) : -1
   const rule = at >= 0 ? draft.rules[at] : undefined
-  const key = `${selection.kind}:${rule?.id ?? ''}`
-  /* Focus mode. The panel is 400px because a condition row needs a mark, an
-     operator and a value side by side; a rule with two groups of four outgrows
-     that, and the answer to "this is cramped" should not be "drag the handle
-     every time". Same panes, given a room. */
+  const part = selection.kind === 'rule' ? selection.part : null
+  /* The whole rule, in a room. The panel is 400px because a condition row needs
+     a mark, an operator and a value side by side; the three parts are separate
+     panes here, and this is the one surface that shows all of them at once. */
   const [focus, setFocus] = useState(false)
+  const patch = (p: Partial<Rule>) => onPatchRule(at, p)
 
-  const body = (inFocus: boolean) =>
-    rule ? (
-      <RulePane rule={rule} index={at} focus={inFocus} onPatch={(p) => onPatchRule(at, p)} />
+  /* Two names, because the panel and the room are showing different things.
+     The panel shows one part and says which; the room shows all three. */
+  const what = rule && part ? `Rule ${at + 1} · ${PART_LABEL[part]}` : 'The default'
+  const roomTitle = rule ? `Rule ${at + 1}` : 'The default'
+
+  const pane =
+    !rule || !part ? null : part === 'who' ? (
+      <WhoPane rule={rule} audience={draft.audience} onPatch={patch} onOpenPart={onOpenPart} />
+    ) : part === 'when' ? (
+      <ConditionPane rule={rule} onPatch={patch} />
     ) : (
-      /* `?? fallbackRule()` rather than a truthiness gate: the default is drawn
-         on the stage whether or not the policy has ever stored one, so
-         selecting it has to open its panel too. Gating on `draft.fallback` sent
-         every un-edited policy somewhere else, which read as the click having
-         missed. */
-      <FallbackPane rule={draft.fallback ?? fallbackRule()} onPatch={onPatchFallback} />
+      <ThenPane rule={rule} onPatch={patch} />
     )
-
-  const what = rule ? `Rule ${at + 1}` : 'The default'
 
   return (
     <aside className="bb__insp" aria-label="Inspector">
       <div className="bb__inspbar">
         <b>{what}</b>
-        <button type="button" className="bb__act" aria-label="Open in focus mode" title="Focus mode" onClick={() => setFocus(true)}>
+        {/* Not a wider version of this panel any more — it is a different view,
+            and the label says which. */}
+        <button type="button" className="bb__act" aria-label="Open the whole rule" title="Whole rule" onClick={() => setFocus(true)}>
           <Maximize2 size={14} strokeWidth={2} />
         </button>
         <button type="button" className="bb__act" aria-label="Close the panel" title="Close" onClick={onClose}>
@@ -83,49 +93,219 @@ export function Inspector({
       {/* Full-bleed, not a wider box.
 
           It was a 1100px dialog centred on the board, which is the shape you
-          reach for when a form is long — and this is not a long form, it is two
-          halves of one sentence that were being squeezed into a column each. At
-          1100 the conditions wrapped, the time fields stacked, and the right
-          half ran out of content two thirds of the way down. Giving it the
-          screen lets the halves be the width they actually need and puts the
-          rule's own name at the top of it rather than in a box inside a box. */}
-      <Modal open={focus} onClose={() => setFocus(false)} title={what} width={2400}>
-        <div className="bb__focus">{body(true)}</div>
+          reach for when a form is long — and this is not a long form, it is
+          three questions that were being squeezed into a column each. At 1100
+          the conditions wrapped, the time fields stacked, and the right half
+          ran out of content two thirds of the way down. Giving it the screen
+          lets the halves be the width they actually need. */}
+      <Modal open={focus} onClose={() => setFocus(false)} title={roomTitle} width={2400}>
+        <div className="bb__focus">
+          {rule ? (
+            <WholeRulePane rule={rule} index={at} openOn={part} audience={draft.audience} onPatch={patch} onOpenPart={onOpenPart} />
+          ) : (
+            <FallbackPane rule={draft.fallback ?? fallbackRule()} onPatch={onPatchFallback} />
+          )}
+        </div>
       </Modal>
 
-      <div className="bb__inspbody">
-        {/* Keyed, so a change of subject fades the new panel in. No exit
-            animation, deliberately: a presence-managed exit that gets
-            interrupted can strand the old panel at 2% opacity and never mount
-            the new one, and nobody misses a 130ms fade-out of a panel. */}
-        {
-          <motion.div key={key} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
-            {/* Not rendered while focus mode is open — two live copies of one
-                editor is two sets of inputs writing the same rule. */}
-            {focus ? <p className="bb__secnote">Open in focus mode.</p> : body(false)}
+      {/* `id` because the card's three part buttons carry
+          `aria-controls="bb-insp-body"` — they open this. */}
+      <div className="bb__inspbody" id="bb-insp-body">
+        {focus ? (
+          /* Not rendered while the whole-rule view is open — two live copies of
+             one editor is two sets of inputs writing the same rule. */
+          <p className="bb__secnote">Open in the whole-rule view.</p>
+        ) : rule && part ? (
+          <>
+            {/* The identity block is NOT one of the parts, and it is NOT inside
+                the part's key.
+
+                What the rule is called, what it is for and whether it is on are
+                the same facts whichever third you are editing. Re-fading them
+                on a part switch would be the panel announcing a change of
+                subject that did not happen — and it would remount a controlled
+                text input under somebody's cursor.
+
+                So: two keys. Changing rule fades both; changing part fades only
+                the form, which is the only thing that changed. The old single
+                key omitted the part entirely and still COMPILES with one on the
+                selection, so Who to Condition would have been the one change of
+                subject on this surface that does not fade — the behavioural
+                break the type checker cannot catch. */}
+            <motion.div key={`head:${rule.id}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
+              <RuleHead rule={rule} index={at} onPatch={patch} />
+            </motion.div>
+            <motion.div key={`pane:${rule.id}:${part}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
+              {pane}
+            </motion.div>
+          </>
+        ) : selection.kind === 'fallback' ? (
+          /* Branching on `kind`, not on `rule` being truthy. The old test sent
+             a selection of `none` into the fallback pane and was saved only by
+             the board declining to mount this at all. */
+          <motion.div key="fallback" initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
+            <FallbackPane rule={draft.fallback ?? fallbackRule()} onPatch={onPatchFallback} />
           </motion.div>
-        }
+        ) : null}
       </div>
     </aside>
   )
 }
 
-/* --- A rule, as sections ------------------------------------------------------ */
+/* --- The three panes ---------------------------------------------------------
 
-function RulePane({
+   Three different forms, not one form with two thirds hidden. A two-list picker
+   with its own operators; a predicate builder with an add button in its header;
+   a decision and a numbered ladder at full height with nothing above them
+   competing for the room.
+
+   And they are separately MOUNTED, which is the point rather than a side
+   effect: leaving Condition throws away the catalogue you left half open, and
+   it should. */
+
+function WhoPane({
+  rule,
+  audience,
+  onPatch,
+  onOpenPart,
+}: {
+  rule: Rule
+  audience: Audience
+  onPatch: (p: Partial<Rule>) => void
+  onOpenPart: (part: Part) => void
+}) {
+  return (
+    <div className="bb__ask bb__ask--pane">
+      <div className="bb__ask__head">
+        <h3>Who</h3>
+        <p>Which people is this rule about?</p>
+      </div>
+      <WhoEditor rule={rule} audience={audience} onPatch={onPatch} onOpenPart={onOpenPart} />
+    </div>
+  )
+}
+
+function ConditionPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
+  /* `openAt` gets its setter back.
+
+     It was threaded DEAD from here — `const [openAt] = useState(null)`, never
+     anything but null — so the effect in `WhenEditor` that opens the catalogue
+     could never fire. It was written for a section header's `+` that went with
+     the accordion. A pane of its own has a header again, and this is what it
+     is for. */
+  const [openAt, setOpenAt] = useState<{ nonce: number } | null>(null)
+  const n = restConditions(rule.when).length
+  return (
+    <div className="bb__ask bb__ask--pane">
+      <div className="bb__ask__head">
+        <h3>Condition</h3>
+        {n > 0 && <span className="bb__count">{n}</span>}
+        <button
+          type="button"
+          className="bb__secact"
+          aria-label="Add a condition"
+          title="Add a condition"
+          onClick={() => setOpenAt({ nonce: Date.now() })}
+        >
+          <Plus size={15} strokeWidth={2} />
+        </button>
+        <p>And in what circumstances?</p>
+      </div>
+      <WhenEditor rule={rule} onPatch={onPatch} openAt={openAt} />
+    </div>
+  )
+}
+
+function ThenPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
+  return (
+    <div className="bb__ask bb__ask--pane">
+      <div className="bb__ask__head">
+        <h3>Then</h3>
+        <p>What happens when it matches?</p>
+      </div>
+      <WhatEditor rule={rule} onPatch={onPatch} />
+    </div>
+  )
+}
+
+/* The identity block: what this rule is called, and what it is for.
+
+   The description used to be a collapsible section of its own, headed "Why
+   this rule exists" and carrying two sentences explaining why the field was
+   there. Three lines of chrome around one textarea — and it sat below the
+   name, separated by a section border, so the two halves of the rule's
+   identity read as unrelated things.
+
+   They are one thing. The name is what every other surface prints; the
+   description is what the next person reads before deciding whether they are
+   allowed to delete it. So they share a block, the heading is gone, and the
+   placeholder does the explaining. Both save as typed.
+
+   In the whole-rule view it is one line. The panel needs the name and the note
+   stacked because it is 400px wide; full screen it does not, and a two-row
+   textarea across 2400px is a field with a paragraph of empty space in it. */
+function RuleHead({
   rule,
   index,
-  onPatch,
   focus,
+  onPatch,
 }: {
   rule: Rule
   index: number
-  onPatch: (p: Partial<Rule>) => void
-  /** In the wide dialog rather than the 400px column: IF and THEN sit side by
-      side instead of one under the other. */
   focus?: boolean
+  onPatch: (p: Partial<Rule>) => void
 }) {
+  return (
+    <div className={`bb__insphead ${focus ? 'is-focus' : ''}`}>
+      <span className={`bb__idx is-${TONE[rule.decision]}`} aria-hidden>
+        {index + 1}
+      </span>
+      <div className="bb__inspname">
+        <input className="bb__input bb__input--title" aria-label="Rule name" value={rule.name} placeholder="Name this rule" onChange={(e) => onPatch({ name: e.target.value })} />
+        <textarea
+          className="bb__input bb__input--desc"
+          rows={focus ? 1 : 2}
+          aria-label="What this rule is for"
+          placeholder="What is this for? A regulator, an incident, an audit finding…"
+          value={rule.description ?? ''}
+          onChange={(e) => onPatch({ description: e.target.value || undefined })}
+        />
+      </div>
+      <Toggle checked={rule.enabled} onChange={(enabled) => onPatch({ enabled })} label={rule.enabled ? 'On' : 'Off'} size="sm" />
+    </div>
+  )
+}
+
+/* --- A rule, as sections ------------------------------------------------------ */
+
+function WholeRulePane({
+  rule,
+  index,
+  openOn,
+  audience,
+  onPatch,
+  onOpenPart,
+}: {
+  rule: Rule
+  index: number
+  /** Which part the panel was showing, so the room opens where you were. */
+  openOn: Part | null
+  audience: Audience
+  onPatch: (p: Partial<Rule>) => void
+  onOpenPart: (part: Part) => void
+}) {
+  /* Still dead here, and honestly so: the live one lives in `ConditionPane`,
+     which has a header with a `+` in it. This view has no such header — it
+     shows all three parts at once and adds nothing above them. */
   const [openAt] = useState<{ nonce: number } | null>(null)
+
+  /* It opens where you were. The card is the navigation and this covers the
+     board, so inside here the card is unreachable — which is exactly why this
+     is the one surface showing all three parts at once. Asking for more room
+     should not cost you your place. */
+  useEffect(() => {
+    if (openOn) document.getElementById(`bb-ask-${openOn}`)?.scrollIntoView({ block: 'start' })
+  }, [openOn])
   /* The rule that catches whatever this one lets through was resolved here and
      handed to THEN, which printed it as a sentence: "everyone else falls to
      rule 3, Executive step-up". It is the arrow the chain draws on the canvas,
@@ -154,23 +334,7 @@ function RulePane({
           halves — the part somebody opened focus mode to see — below the fold.
           The note becomes a single line that grows only if there is something
           in it. */}
-      <div className={`bb__insphead ${focus ? 'is-focus' : ''}`}>
-        <span className={`bb__idx is-${TONE[rule.decision]}`} aria-hidden>
-          {index + 1}
-        </span>
-        <div className="bb__inspname">
-          <input className="bb__input bb__input--title" aria-label="Rule name" value={rule.name} placeholder="Name this rule" onChange={(e) => onPatch({ name: e.target.value })} />
-          <textarea
-            className="bb__input bb__input--desc"
-            rows={focus ? 1 : 2}
-            aria-label="What this rule is for"
-            placeholder="What is this for? A regulator, an incident, an audit finding…"
-            value={rule.description ?? ''}
-            onChange={(e) => onPatch({ description: e.target.value || undefined })}
-          />
-        </div>
-        <Toggle checked={rule.enabled} onChange={(enabled) => onPatch({ enabled })} label={rule.enabled ? 'On' : 'Off'} size="sm" />
-      </div>
+      <RuleHead rule={rule} index={index} focus onPatch={onPatch} />
 
       {/* One block, and no accordion on it.
 
@@ -194,7 +358,7 @@ function RulePane({
           that is already an ordinal is the form telling you how to read two
           words — and it cost the heading its whole left edge, so `If` started
           further right than everything under it. */}
-      <section className={`bb__rule ${focus ? 'is-focus' : ''}`}>
+      <section className="bb__rule is-focus">
         <div className="bb__rulebody">
           <div className="bb__rulehalf">
             {/* Who first, then the circumstances.
@@ -211,17 +375,20 @@ function RulePane({
                 `audience-ops.ts` for why that matters — an audience held beside
                 the conditions is a gate the linter and the simulator cannot
                 see, which is exactly why `Rule.appliesTo` was removed. */}
-            <div className="bb__ask">
+            <div className="bb__ask" id="bb-ask-who">
               <div className="bb__ask__head">
                 <h3>Who</h3>
                 <p>Which people is this rule about?</p>
               </div>
-              <WhoEditor rule={rule} onPatch={onPatch} />
+              <WhoEditor rule={rule} audience={audience} onPatch={onPatch} onOpenPart={onOpenPart} />
             </div>
 
-            <div className="bb__ask bb__ask--next">
+            <div className="bb__ask bb__ask--next" id="bb-ask-when">
               <div className="bb__ask__head">
-                <h3>If</h3>
+                {/* `Condition` here too, so the room and the card say one word
+                    for one question. The `if` the block below prints is the
+                    predicate's own grammar and stays. */}
+                <h3>Condition</h3>
                 <p>And in what circumstances?</p>
               </div>
               <WhenEditor rule={rule} onPatch={onPatch} openAt={openAt} />
@@ -229,7 +396,7 @@ function RulePane({
           </div>
 
           <div className="bb__rulehalf">
-            <div className="bb__ask">
+            <div className="bb__ask" id="bb-ask-then">
               <div className="bb__ask__head">
                 <h3>Then</h3>
                 <p>What happens when it matches?</p>
@@ -254,7 +421,10 @@ function FallbackPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule
       <div className="bb__insphead">
         <div style={{ minWidth: 0, flex: 1 }}>
           <h2>Nothing else matched</h2>
-          <p>The default at the bottom. Its name and place are fixed; what it does is yours.</p>
+          <p>
+            The default at the bottom. Its name and place are fixed; what it does is yours. It has no Who and no
+            Condition — it is what happens when nothing else matched.
+          </p>
         </div>
       </div>
       <section className="bb__rule">

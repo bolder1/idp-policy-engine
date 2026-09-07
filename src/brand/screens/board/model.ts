@@ -21,8 +21,71 @@ import type { SimContext, TraceResult } from '../simulate'
 
    An id needs no arithmetic. It survives reordering because it travels with
    the rule, and when the rule goes the id resolves to nothing, which is
-   already the "show the library" case. */
-export type Selection = { kind: 'none' } | { kind: 'rule'; id: string } | { kind: 'fallback' }
+   already the "show the library" case.
+
+   The PART rides here too, and it is worth saying why it is not a `useState`
+   in the Inspector instead.
+
+   Which third of a rule you are editing is not a fact about the panel; it is
+   half of what you clicked. Pressing Condition on rule 3 names a rule AND a
+   question in one gesture, and the two have to travel together or they come
+   apart in the four places that already move a selection without the panel's
+   help: ↑/↓ walks to the next rule, "Open rule 5" arrives from the sheet, the
+   palette jumps, and a delete clears. Worse, the panel is UNMOUNTED whenever
+   it has no subject, so any state it owned about which part is open would be
+   destroyed by ⌘\ and rebuilt from a default — the panel would forget where
+   you were every time you hid it to read the chain.
+
+   It is also the only place the CARD can read it from. The card draws the open
+   part as a ring on one of its three buttons, and the card is not inside the
+   panel.
+
+   Beside the `kind`, never inside it. `kind: 'rule-who' | 'rule-when' |
+   'rule-then'` would fold a second question into the discriminator that
+   already answers identity, and force every `kind === 'rule'` test in the
+   builder to widen with it — which is how a discriminator stops
+   discriminating.
+
+   And on the `rule` member ONLY. The default at the bottom has no Who and no
+   If: the evaluator reads `p.fallback?.decision` and nothing else, yet
+   `fallbackRule()` goes through `rule()` and carries a real `Predicate` that
+   `whoEditable` would accept. A Who form mounted against it would cheerfully
+   write `group in […]` into a predicate no evaluator, linter, gauntlet or
+   sweep will ever read — precisely the invisible gate `Rule.appliesTo` was
+   deleted to prevent. Making the fallback partless is not a hidden button; it
+   is a value that cannot be spelt. */
+export type Selection = { kind: 'none' } | { kind: 'rule'; id: string; part: Part } | { kind: 'fallback' }
+
+/* The three questions a rule answers, in the order it is written.
+
+   The union is derived from the tuple rather than declared beside it, so the
+   type and the ordered list cannot drift — `nextPart` steps through the same
+   array the panel and the card render from.
+
+   `'when'`, not `'condition'`: the model field is `rule.when`, the writer is
+   `when-ops.ts`, the editor is `WhenEditor`. There are already three names for
+   that one thing and a fourth id would be exactly the drift this file's
+   comments spend their life undoing. The SCREEN says Condition — see
+   `PART_LABEL` in `parts.ts`. Ids follow the model; labels follow the person. */
+export const PARTS = ['who', 'when', 'then'] as const
+export type Part = (typeof PARTS)[number]
+
+/* The one constructor, so the default part is written down once.
+
+   Navigation lands on Who — a new rule, the palette's "Go to rule 3", a click
+   on the card body — because a rule is written starting from a person, which
+   is the argument the inspector already records. A FINDING names its own part
+   at its own call site; see CheckTab and ImpactTab. */
+export const ruleAt = (id: string, part: Part = 'who'): Selection => ({ kind: 'rule', id, part })
+
+/* Step to the next or previous part, wrapping.
+
+   Wrapping rather than clamping, because `[` and `]` are the only route
+   between parts on the keyboard and a `]` on Then that does nothing is a key
+   that appears broken. The card's three buttons are peers on one row and read
+   as a ring; ↑/↓ on the chain clamps instead, because a chain has ends and a
+   rule before rule 1 does not exist. */
+export const nextPart = (p: Part, dir: -1 | 1): Part => PARTS[(PARTS.indexOf(p) + dir + PARTS.length) % PARTS.length]
 
 /* The sheet's two tabs.
 

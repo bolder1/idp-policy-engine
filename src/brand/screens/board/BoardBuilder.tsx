@@ -14,7 +14,7 @@ import { canRedo, canUndo, commit, historyKey, historyOf, redo, undo, type Histo
 import { walk, type SimEnv } from '../simulate'
 import { Board } from './Board'
 import { Inspector } from './Inspector'
-import type { Selection, Tab, Trace } from './model'
+import { nextPart, ruleAt, type Part, type Selection, type Tab, type Trace } from './model'
 
 import './board.css'
 
@@ -35,8 +35,9 @@ import './board.css'
    Keeping the two adjacent is the cheapest guard short of generating one from
    the other. */
 const SHORTCUTS: [string, string][] = [
-  ['↑ ↓', 'Select the previous or next rule'],
+  ['↑ ↓', 'Select the previous or next rule, staying on the part you are on'],
   ['⌥↑ ⌥↓', 'Move the selected rule up or down'],
+  ['[ ]', 'Who, Condition or Then, on the selected rule'],
   ['⌘D', 'Duplicate the selected rule'],
   ['Del', 'Delete the selected rule'],
   ['E', 'Switch the selected rule on or off'],
@@ -267,12 +268,19 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
     const cmd = e.metaKey || e.ctrlKey
     const rules = draft.rules
     const at = selection.kind === 'rule' ? rules.findIndex((r) => r.id === selection.id) : -1
+    /* Arrowing down the chain KEEPS the part: rule 3's Condition steps to rule
+       4's Condition. The panel becomes a lens you slide down the chain — "what
+       does each of these check?" — which is the reading that makes a
+       column-wise arrow model worth having. From nothing selected there is no
+       part to keep, and `ruleAt` supplies Who.
+
+       Through `select`, not `setSelection` plus its own `setInspOpen`. That
+       was this function open-coding the one door, and it now has a default to
+       apply as well — doing that in two places is how the two disagree. */
+    const partNow: Part = selection.kind === 'rule' ? selection.part : 'who'
     const pick = (i: number) => {
       const r = rules[i]
-      if (r) {
-        setSelection({ kind: 'rule', id: r.id })
-        setInspOpen(true)
-      }
+      if (r) select(ruleAt(r.id, partNow))
     }
 
     /* ⌘K — the palette the trail has had all along. */
@@ -321,6 +329,24 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
            keyboard has a way in that does not require a click first. */
         pick(at < 0 ? (dir === 1 ? 0 : rules.length - 1) : Math.min(Math.max(at + dir, 0), rules.length - 1))
       }
+      return
+    }
+
+    /* [ and ] — the previous or next part of the selected rule.
+
+       Not ← / →, and the reason is mechanical rather than aesthetic. Two
+       focused controls on this surface already handle the horizontal arrows
+       and neither calls `stopPropagation`, so this window listener would fire
+       as well: the resize grip below, and — worse — `Seg`, which is the
+       operator control inside the Who panel this feature exists to build.
+       Pressing ← there would flip `in`/`not in` AND switch the part,
+       unmounting the form mid-edit.
+
+       `[` and `]` are the standard previous/next-pane idiom, are unbound here,
+       and ⌘[ / ⌘] (browser back and forward) are excluded by `!cmd`. */
+    if ((e.key === '[' || e.key === ']') && !cmd && selection.kind === 'rule' && at >= 0) {
+      e.preventDefault()
+      select({ ...selection, part: nextPart(selection.part, e.key === ']' ? 1 : -1) })
       return
     }
 
@@ -443,7 +469,10 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
     const rules = [...draft.rules]
     rules.splice(at, 0, rule)
     commitDraft({ ...draft, rules })
-    setSelection({ kind: 'rule', id: rule.id })
+    /* Through `select`, which is the only door — this line has bypassed it
+       since it was written, so inserting a rule with the panel collapsed gave
+       you a selected card and no panel. */
+    select(ruleAt(rule.id))
   }
 
   /* No selection fix-up. The selection names the rule, so moving the rule
@@ -637,6 +666,11 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
           selection={selection}
           onPatchRule={patchRule}
           onPatchFallback={patchFallback}
+          /* The one part-changing control the panel owns: the stood-down Who
+             pane handing you to the one that can do the job. */
+          onOpenPart={(part) => {
+            if (selection.kind === 'rule') select({ ...selection, part })
+          }}
           onClose={() => setInspOpen(false)}
         />
       )}
@@ -664,7 +698,7 @@ export function BoardBuilder({ policyId }: { policyId: string }) {
             else if (id === 'del' && selAt >= 0) remove(selAt)
             else if (id.startsWith('rule:')) {
               const r = draft.rules[Number(id.slice(5))]
-              if (r) select({ kind: 'rule', id: r.id })
+              if (r) select(ruleAt(r.id))
             }
           }}
         />

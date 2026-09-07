@@ -1,4 +1,4 @@
-import { cond, type Condition, type Predicate } from './data'
+import { cond, type Audience, type Condition, type Predicate, type User } from './data'
 import { cardJoin } from './predicate'
 import * as ops from './when-ops'
 
@@ -95,4 +95,36 @@ export function whoOperator(p: Predicate, kind: WhoType): string {
 export function setWhoOperator(p: Predicate, kind: WhoType, operator: string): Predicate {
   const c = p.cards.flatMap((k) => k.conditions).find((x) => x.typeId === kind)
   return c ? ops.patchCondition(p, c.id, { operator }) : p
+}
+
+/* The chosen groups and people this POLICY does not govern.
+
+   Nothing catches this today. The scope diagnostics are policy-level and the
+   reach finding reads the stored `matchEstimate` rather than the who, so a
+   list that cheerfully offers all five groups will let somebody build a
+   permanently dead rule — one naming Contractors inside a policy that governs
+   Finance — and say nothing at all.
+
+   So it is badged in the picker, where the decision is being made. Kept pure
+   and kept here so that a future diagnostic and the badge read one
+   implementation rather than growing two that disagree.
+
+   `everyone` reports nothing, because it governs everyone. And a named person
+   whose GROUP is governed is not outside — that is the case that would
+   otherwise put a warning on every deliberate exception somebody named. */
+export function outsideAudience(
+  a: Audience,
+  groupIds: string[],
+  userIds: string[],
+  directory: User[],
+): { groups: string[]; users: string[] } {
+  if (a.everyone) return { groups: [], users: [] }
+  return {
+    groups: groupIds.filter((id) => !a.groupIds.includes(id)),
+    users: userIds.filter((id) => {
+      if (a.userIds.includes(id)) return false
+      const u = directory.find((x) => x.id === id)
+      return u ? !a.groupIds.includes(u.groupId) : false
+    }),
+  }
 }

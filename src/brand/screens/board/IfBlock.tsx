@@ -1,6 +1,7 @@
 import { Fragment, type MouseEvent, type ReactNode } from 'react'
 import { ArrowRight, CornerDownRight, Split } from 'lucide-react'
 
+import { isWho, whoEditable } from '../../audience-ops'
 import { conditionType, type Condition, type Rule } from '../../data'
 import { cardJoin, topJoin } from '../../predicate'
 import type { NameLookup } from '../predicate-prose'
@@ -191,7 +192,26 @@ export function ElseRow({ next, onJump }: { next: NextRule; onJump?: (i: number)
 /* --- The read-only block, for the card ------------------------------------- */
 
 export function IfBlock({ rule, next, resolve, token, terminal }: { rule: Rule; next: NextRule; resolve: NameLookup; token?: ReactNode; terminal?: boolean }) {
-  const cards = rule.when.cards
+  /* The who-conditions are drawn by the card's own `Who` button now, not here
+     among the circumstances.
+
+     This is the correctness fix the split owes. `WhenEditor` has hidden them
+     from the If list since groups became a step of their own, while this went
+     on drawing them as conditions — one rule described two ways, on two
+     surfaces that are on screen together, which is the exact thing the comment
+     below says a card must never do.
+
+     Same predicate, so the card, the Condition editor and the Who pane cannot
+     disagree about which rows belong to which question. On an OR predicate they
+     come back, because then this is the only place they can be seen — and a
+     card left with no conditions at all is dropped rather than drawn as an
+     empty bracket. `whoEditable` is only true for a single AND-run, so the
+     filtering can never renumber an alternative's letter. */
+  const cards = whoEditable(rule.when)
+    ? rule.when.cards
+        .map((k) => ({ ...k, conditions: k.conditions.filter((c) => !isWho(c)) }))
+        .filter((k) => k.conditions.length > 0)
+    : rule.when.cards
   const top = topJoin(rule.when)
   if (terminal)
     return (

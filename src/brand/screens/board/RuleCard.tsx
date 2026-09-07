@@ -1,4 +1,4 @@
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { motion } from 'motion/react'
 import { ArrowDown, ArrowRight, ArrowUp, ChevronsDownUp, ChevronsUpDown, Copy, GripVertical, Home, Lock, Split, Trash2 } from 'lucide-react'
 
@@ -7,7 +7,8 @@ import { type Rule } from '../../data'
 import type { NameLookup } from '../predicate-prose'
 import type { StepKind } from '../simulate'
 import type { RuleState } from '../rule-form'
-import { DECISION_NAME, TONE } from './model'
+import { DECISION_NAME, PARTS, TONE, type Part } from './model'
+import { PART_HINT, PART_ICON, PART_LABEL, partSummary } from './parts'
 import { IfBlock, IfChip, type NextRule } from './IfBlock'
 
 /* -----------------------------------------------------------------------------
@@ -67,7 +68,7 @@ export function RuleCard({
   rule,
   index,
   next,
-  selected,
+  openPart,
   state,
   traceKind,
   traceReason,
@@ -78,7 +79,7 @@ export function RuleCard({
   resolve,
   canUp,
   canDown,
-  onSelect,
+  onOpen,
   onToggleExpand,
   onToggle,
   onMove,
@@ -91,7 +92,11 @@ export function RuleCard({
   rule: Rule
   index: number
   next: NextRule
-  selected: boolean
+  /* Which part of this rule the panel is showing, or null when this card does
+     not own the panel. One prop rather than a boolean and a part: `selected`
+     is derived from it below, so nothing in the render path can claim the card
+     is selected while naming no part. */
+  openPart: Part | null
   state: RuleState
   traceKind: StepKind | null
   traceReason: string | null
@@ -104,7 +109,7 @@ export function RuleCard({
   resolve: NameLookup
   canUp: boolean
   canDown: boolean
-  onSelect: () => void
+  onOpen: (part: Part) => void
   onToggleExpand: () => void
   onToggle: (on: boolean) => void
   onMove: (dir: -1 | 1) => void
@@ -116,6 +121,15 @@ export function RuleCard({
 }) {
   const tone = TONE[rule.decision]
   const titleId = `bb-rule-${rule.id}-title`
+  const selected = openPart !== null
+  const partsRow = useRef<HTMLDivElement>(null)
+  /* Which button the roving tabindex is parked on. Follows the open part when
+     there is one, so tabbing into a card whose Condition pane is showing lands
+     on Condition rather than at the start of the row. */
+  const [focusPart, setFocusPart] = useState<Part>('who')
+  useEffect(() => {
+    if (openPart) setFocusPart(openPart)
+  }, [openPart])
   const kindClass = traceKind === 'hit' ? 'is-hit' : traceKind === 'miss' ? 'is-miss' : traceKind === 'unreached' || traceKind === 'off' ? 'is-unreached' : ''
 
   return (
@@ -150,7 +164,10 @@ export function RuleCard({
          arrowing through the region. */
       role="group"
       aria-labelledby={titleId}
-      onClick={onSelect}
+      /* Clicking the card opens Who. It is what was asked for, and it is what
+         the panel already argues for itself: writing a rule starts with a
+         person, and the form used to open on the second clause. */
+      onClick={() => onOpen('who')}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       data-index={index}
@@ -167,12 +184,19 @@ export function RuleCard({
             onGrip(e)
           }}
           onClick={(e) => e.stopPropagation()}
+          /* `window` owns the arrows on this board, so a control that handles
+             one has to stop it as well as prevent it. Without the stop this
+             fired `onMove` AND the board's own `pick` on a single keypress —
+             the rule moved and the selection walked to the rule it had just
+             swapped with. */
           onKeyDown={(e) => {
             if (e.key === 'ArrowUp' && canUp) {
               e.preventDefault()
+              e.stopPropagation()
               onMove(-1)
             } else if (e.key === 'ArrowDown' && canDown) {
               e.preventDefault()
+              e.stopPropagation()
               onMove(1)
             }
           }}
@@ -214,7 +238,15 @@ export function RuleCard({
           aria-controls={`bb-rule-${rule.id}-body`}
           aria-label={expanded ? `Hide what rule ${index + 1} checks` : `Show what rule ${index + 1} checks`}
           title={expanded ? 'Fold this rule' : 'Show what it checks'}
-          onClick={onToggleExpand}
+          /* Stopping it now, and it was a latent bug before: this is the one
+             control in the head with no `stopPropagation`, so folding a card
+             also selected it. Harmless while selection meant one thing; wrong
+             now that it would also snap the panel back to Who while you were
+             reading Then. `TerminalCard`'s equivalent already stops it. */
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleExpand()
+          }}
         >
           {expanded ? <ChevronsDownUp size={14} strokeWidth={2.2} /> : <ChevronsUpDown size={14} strokeWidth={2.2} />}
         </button>
@@ -233,9 +265,12 @@ export function RuleCard({
               id={titleId}
               className="bb__titlebtn"
               aria-expanded={selected}
+              /* The same place the body click goes. This is the keyboard path
+                 to the rule, and a keyboard path landing somewhere different
+                 from the pointer path is a second model to learn. */
               onClick={(e) => {
                 e.stopPropagation()
-                onSelect()
+                onOpen('who')
               }}
             >
               <strong>{rule.name || 'Untitled rule'}</strong>
@@ -271,31 +306,101 @@ export function RuleCard({
         </div>
       </div>
 
-      {/* Two folds, opposite ways round.
+      {/* The three questions a rule answers, as the three ways into it.
 
-          The summary shrinks as the body grows, so the card never shows both
-          readings of itself at once and never jumps: one grid row goes 1fr→0fr
-          while the other goes 0fr→1fr, on the same curve, and the height
-          between them is continuous.
+          This is the line that used to sit in the summary fold saying
+          "3 conditions → Let in": the same two facts, plus the one it never
+          said — who the rule is about — and each third of it is now the door to
+          the panel that edits it. It REPLACES that line rather than joining it,
+          so a folded card is the height it has always been.
 
-          Both stay MOUNTED at zero height rather than being conditionally
+          A sibling of the head, not a fifth child of it. The head is a
+          four-column grid and a fifth child would land in an implicit column
+          and break the negative margin that tucks the fold button against the
+          index. It is also never hover-gated and never conditionally rendered,
+          which is what keeps it clear of the reflow-on-hover hazard the head
+          comment warns about.
+
+          Ghost buttons, not a segmented control. `.bb__seg` is right there and
+          wrong twice: its rules size everything at 26px with no room for a
+          value, and `role="radiogroup"` says one of these is the rule's current
+          VALUE. A part is not a value of the rule — it is which third of it you
+          are looking at, which is navigation. Hence `role="toolbar"`, a roving
+          tabindex, and `aria-expanded` pointing at the panel body it opens.
+
+          One tab stop per card, not three: without the roving tabindex this
+          would cost twenty-seven tab stops between the canvas and anything
+          after it. */}
+      <div
+        ref={partsRow}
+        className="bb__parts"
+        role="toolbar"
+        aria-orientation="horizontal"
+        aria-label={`Rule ${index + 1} - open a part`}
+        /* Exactly what the meta cluster does, and not optional. React runs this
+           row's button handler first and the card's own `onClick` second; both
+           set the selection, both batch into one tick, and the card's whole-rule
+           Who would overwrite the part you just asked for with nothing on
+           screen to say why. */
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+          if (!d) return
+          e.preventDefault()
+          /* The window owns `[` and `]` for the board; inside this row the
+             arrows move focus and must not escape to it. */
+          e.stopPropagation()
+          const to = PARTS[(PARTS.indexOf(focusPart) + d + PARTS.length) % PARTS.length]
+          partsRow.current?.querySelector<HTMLButtonElement>(`[data-part="${to}"]`)?.focus()
+        }}
+      >
+        {PARTS.map((p) => {
+          const s = partSummary(rule, p, resolve)
+          const on = openPart === p
+          const Ico = PART_ICON[p]
+          return (
+            <button
+              key={p}
+              type="button"
+              data-part={p}
+              className={`bb__part ${on ? 'is-open' : ''} ${s.dim ? 'is-dim' : ''}`}
+              aria-expanded={on}
+              aria-controls="bb-insp-body"
+              aria-label={`${PART_LABEL[p]} - ${PART_HINT[p]}`}
+              title={PART_HINT[p]}
+              tabIndex={(openPart ?? 'who') === p ? 0 : -1}
+              onFocus={() => setFocusPart(p)}
+              onClick={() => onOpen(p)}
+            >
+              <Ico size={12} strokeWidth={2} aria-hidden />
+              <span className="bb__part__k">{PART_LABEL[p]}</span>
+              <span className="bb__part__v">{s.text}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* One fold now, and the counterweight has gone with the summary.
+
+          There were two: the summary shrank 1fr→0fr as the body grew 0fr→1fr,
+          so the card never showed both readings of itself and the height
+          between them was continuous. The summary is no longer a reading of the
+          card — it is the parts row, permanent, above both — so one disclosure
+          is left and it animates alone. Still continuous, still nothing
+          measured; the card simply grows, which is what a disclosure does.
+
+          It stays MOUNTED at zero height rather than being conditionally
           rendered. `grid-template-rows` has nothing to animate from if the
-          content arrives in the same frame as the class, so unmounting the
-          folded half would make the first press of the chevron jump and every
-          press after it glide. Mounted, hidden by `overflow` and taken out of
-          the tab order by `inert`, both directions animate identically.
+          content arrives in the same frame as the class, so unmounting it would
+          make the first press of the chevron jump and every press after it
+          glide.
 
-          `inert={expanded}` — a real boolean. Written as `inert: ''` first,
+          `inert={!expanded}` — a real boolean. Written as `inert: ''` first,
           which React 19 reports as "an empty string for a boolean attribute"
           and treats as FALSE, so the folded half kept every one of its buttons
           in the tab order: Tab walked into a zero-height region and focus went
           somewhere invisible. The cast that silenced the type error was the
           tell that the value was wrong. */}
-      <div className="bb__fold bb__fold--sum" aria-hidden={expanded} inert={expanded}>
-        <div>
-          <CardSummary rule={rule} />
-        </div>
-      </div>
       <div className="bb__fold bb__fold--body" id={`bb-rule-${rule.id}-body`} inert={!expanded}>
         <div>
           <div className="bb__cardbody">

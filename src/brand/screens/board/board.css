@@ -356,6 +356,54 @@ button.bb__idx svg { display: none; }
 .bb__cardsum svg { color: var(--text-muted); flex: none; }
 .bb__cardsum__n { font-size: var(--fs-sm); color: var(--text-secondary); }
 
+/* --- The parts row: the card is the navigation --------------------------------
+
+   This was `.bb__cardsum`, a read-only line inside the summary fold saying
+   "3 conditions → Let in". It is the same line, plus the fact it was missing —
+   who — and each third of it is now the way into the panel that edits it. The
+   rule card no longer draws the summary; the DEFAULT still does, because the
+   default has one part and a row of three buttons on it would be two lies and
+   a truth.
+
+   Ghost buttons, not a segmented control. `.bb__seg` is right there and wrong
+   twice: its `> button` rules size everything at 26px with no room for a value,
+   and `role="radiogroup"` says one of these is the rule's current VALUE. A part
+   is not a value of the rule — it is which third of it you are looking at,
+   which is navigation.
+
+   The padding is `.bb__cardsum`'s, so the row lands where the line it replaces
+   landed and aligns to the card's left edge rather than optically under the
+   title: it is a fact about the whole card. */
+.bb__parts {
+  display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
+  padding: 0 var(--space-5) var(--space-4) var(--space-4);
+}
+.bb__part {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0;
+  height: 26px; padding: 0 8px;
+  border: none; border-radius: var(--radius-md); background: none;
+  font-family: inherit; font-size: var(--fs-xs); color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.bb__part > svg { flex: none; color: var(--text-muted); }
+.bb__part__k { flex: none; font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bb__part__v { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bb__part.is-dim .bb__part__v { color: var(--text-muted); }
+.bb__part:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bb__part:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+/* The card's own selection language rather than a fill or the decision tone —
+   that colour is spoken for by the Then value. At rest the canvas shows nine
+   plain rows and exactly one ringed chip, on the card that owns the panel. */
+.bb__part.is-open {
+  background: var(--surface-inset, var(--surface-sunken));
+  box-shadow: inset 0 0 0 1px var(--bb-ring);
+  color: var(--text-primary);
+}
+.bb__part.is-open > svg,
+.bb__part.is-open .bb__part__k { color: var(--text-primary); }
+
 /* A labelled row inside the card: WHEN / THEN. */
 .bb__row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
 .bb__row > dt {
@@ -677,13 +725,28 @@ button.bb__idx svg { display: none; }
 .bb__sechead > button:first-child:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-xs); }
 .bb__sechead .bb__chev { color: var(--text-muted); transition: transform 0.18s ease; }
 .bb__sec.is-closed .bb__chev { transform: rotate(-90deg); }
-.bb__sechead .bb__count { font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.bb__sechead .bb__secact {
+/* The pane headers use the same count and the same `+` in the same shape.
+
+   EXTENDING the selector lists rather than promoting `.bb__count` and
+   `.bb__secact` to bare single-class rules. This is the file whose comments
+   record three separate bugs caused by exactly that kind of global, and a
+   fourth is not needed to make the point. */
+.bb__sechead .bb__count,
+.bb__ask__head .bb__count { font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bb__sechead .bb__secact,
+.bb__ask__head .bb__secact {
   display: grid; place-items: center; width: 26px; height: 26px; border-radius: var(--radius-sm);
   border: none; background: none; color: var(--text-tertiary); cursor: pointer;
 }
-.bb__sechead .bb__secact:hover { background: var(--surface-sunken); color: var(--brand); }
-.bb__sechead .bb__secact:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__sechead .bb__secact:hover,
+.bb__ask__head .bb__secact:hover { background: var(--surface-sunken); color: var(--brand); }
+.bb__sechead .bb__secact:focus-visible,
+.bb__ask__head .bb__secact:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+/* Same arrangement `.bb__rulehead` already makes: the count sits with the
+   heading, the action goes to the far edge. */
+.bb__ask__head .bb__count { margin-right: auto; }
+.bb__ask__head .bb__secact { margin-left: auto; }
+.bb__ask__head .bb__count + .bb__secact { margin-left: 0; }
 .bb__secbody { padding: var(--space-2) var(--space-4) var(--space-5); }
 .bb__sec.is-closed .bb__secbody { display: none; }
 .bb__secnote { margin: 0 0 var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
@@ -1881,12 +1944,14 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__act,
 .bb__ifact,
 .bb__secact,
+.bb__part,
 button.bb__idx { position: relative; }
 
 .bb__act::after,
 .bb__ifact::after,
 .bb__secact::after,
 .bb__link__add::after,
+.bb__part::after,
 button.bb__idx::after {
   content: '';
   position: absolute; left: 50%; top: 50%;
@@ -2046,11 +2111,108 @@ button.bb__idx::after {
    written in. What it edits are the `group` and `user` conditions the rule
    could always hold — see audience-ops.ts — so nothing here is a second place
    to store an audience. */
-.bb__who { display: grid; gap: var(--space-2); }
-.bb__whorow { display: grid; grid-template-columns: 20px 54px minmax(0, 1fr); align-items: center; gap: var(--space-2); }
-.bb__whorow__mark { display: grid; place-items: center; color: var(--text-tertiary); }
-.bb__whorow__label { font-size: var(--fs-xs); color: var(--text-secondary); }
-.bb__whorow .cp__pill { width: 100%; }
+/* Two rows of pills stood here. They were the right size for a third of a
+   shared column and the wrong shape for the question — choosing who a rule is
+   about meant opening a floating layer twice, once per kind, and reading a list
+   you could not see beside the rest of the form. Given a panel of its own the
+   lists are simply on screen. */
+.bb__who { display: flex; flex-direction: column; gap: var(--space-5); }
+
+.bb__wholist { display: flex; flex-direction: column; gap: var(--space-3); }
+.bb__wholist__head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.bb__wholist__head h4 {
+  display: flex; align-items: center; gap: 6px; margin: 0;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bb__wholist__head h4 svg { color: var(--text-tertiary); }
+/* Pushed to the far edge, so the count reads as a fact about the list below
+   rather than as part of the operator control beside it. */
+.bb__whocount { margin-left: auto; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.bb__whorows {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.bb__whoitem {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 7px var(--space-4);
+  border: none; border-top: 1px solid var(--border-subtle); background: none;
+  font-family: inherit; text-align: left; cursor: pointer; min-width: 0;
+}
+.bb__whoitem:first-child { border-top: none; }
+.bb__whoitem:hover { background: var(--surface-sunken); }
+.bb__whoitem:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.bb__whoitem.is-on { background: var(--brand-subtle-bg); }
+.bb__whoitem b {
+  min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-body);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bb__whoitem.is-on b { font-weight: var(--fw-medium); color: var(--text-primary); }
+/* The meta goes to the right edge and never competes with the name for it. */
+.bb__whoitem em {
+  margin-left: auto; flex: none; padding-left: var(--space-3);
+  font-style: normal; font-size: var(--fs-xs); color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bb__whotick {
+  flex: none; display: grid; place-items: center;
+  width: 15px; height: 15px; border-radius: 4px;
+  border: 1px solid var(--border-default); background: var(--surface-raised);
+  color: #fff;
+}
+.bb__whoitem.is-on .bb__whotick { background: var(--brand); border-color: var(--brand); }
+
+/* Both badges inform and neither blocks — there are no disabled rows here,
+   because a redundant or unusual selection is legal and sometimes deliberate. */
+.bb__whotag {
+  flex: none; padding: 1px 6px; border-radius: var(--radius-pill);
+  background: var(--fb-neutral-bg); border: 1px solid var(--fb-neutral-border);
+  color: var(--fb-neutral-fg); font-size: 10px; white-space: nowrap;
+}
+.bb__whotag.is-warn { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+
+/* Inside the box, under the chosen, above the results — so what you have
+   picked is never hidden by what you are typing. */
+.bb__whosearch { padding: var(--space-3); border-top: 1px solid var(--border-subtle); }
+.bb__whorows > .bb__whosearch:first-child { border-top: none; }
+.bb__whosearch input {
+  width: 100%; height: var(--ctl-height-sm); padding: 0 var(--space-3);
+  background: var(--surface-inset); border: 1px solid transparent; border-radius: var(--radius-sm);
+  font-family: inherit; font-size: var(--fs-md); color: var(--text-primary);
+}
+.bb__whosearch input:focus-visible { outline: none; border-color: var(--brand); }
+
+.bb__whohint { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
+/* The ceiling: what the POLICY governs, which is the number this form can only
+   ever narrow. Said once, at the top, because it is the frame for everything
+   below it. */
+.bb__whoceil { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.55; }
+
+.bb__whofoot {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  padding-top: var(--space-4); border-top: 1px solid var(--border-subtle);
+}
+.bb__whofoot p { margin: 0; flex: 1; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
+
+/* The stand-down. Not an error and not styled as one: an OR-shaped rule is a
+   legitimate rule, and this pane is explaining where its who actually lives. */
+.bb__whodown { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+.bb__whodown h4 { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bb__whodown p { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.55; }
+.bb__whodown__lead { color: var(--text-secondary) !important; }
+.bb__whodown__list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: var(--space-2); }
+.bb__whodown__list li {
+  display: flex; align-items: baseline; gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-sunken); border-radius: var(--radius-sm);
+  font-size: var(--fs-xs); color: var(--text-body);
+}
+/* The same letters the brackets and the If block use for an alternative. */
+.bb__whodown__letter { flex: none; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
 /* One sentence, and only when it is true: a rule that names nobody covers
    everyone the POLICY governs, not everyone in the tenant. That is what
    somebody needs before deciding whether leaving it blank is safe. */
@@ -2058,3 +2220,6 @@ button.bb__idx::after {
 /* The second question sits under the first with a rule between them, so the two
    read as one form in two parts rather than two unrelated blocks. */
 .bb__ask--next { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+/* `.bb__ask` was a block inside a shared column; as a pane it IS the panel
+   body and has to carry its own room. */
+.bb__ask--pane { padding: var(--space-4) var(--space-5) var(--space-5); }

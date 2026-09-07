@@ -330,7 +330,12 @@ export function Board({
                       rule={r}
                       index={ri}
                       next={nextOf(ri)}
-                      selected={selection.kind === 'rule' && selection.id === r.id}
+                      /* One prop, not two. `selected` was a boolean the card
+                         derived nothing from; `openPart` is null when this card
+                         does not own the panel and the part when it does, so
+                         the card cannot claim to be selected while naming no
+                         part. */
+                      openPart={selection.kind === 'rule' && selection.id === r.id ? selection.part : null}
                       state={ruleState(diagsFor(ri))}
                       traceKind={stepKind(ri)}
                       traceReason={trace?.result.steps[ri]?.reason ?? null}
@@ -342,7 +347,7 @@ export function Board({
                       resolve={resolve}
                       canUp={ri > 0}
                       canDown={ri < policy.rules.length - 1}
-                      onSelect={() => onSelect({ kind: 'rule', id: r.id })}
+                      onOpen={(part) => onSelect({ kind: 'rule', id: r.id, part })}
                       onToggle={(on) => onToggle(ri, on)}
                       onMove={(dir) => onMove(ri, ri + dir)}
                       onDuplicate={() => onDuplicate(ri)}

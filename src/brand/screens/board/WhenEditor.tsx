@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from 'react'
 import { ArrowUpToLine, ChevronDown, Fingerprint, Globe, Plus, Split, UserRound, Users, Webhook, X } from 'lucide-react'
 
 import { modeLabel } from '../../fingerprint'
-import { cardJoin, cardLetter, ckey, duplicatedAcrossCards, topJoin } from '../../predicate'
+import { cardJoin, cardLetter, ckey, duplicatedAcrossCards } from '../../predicate'
 import {
   conditionType,
   type Condition,
@@ -15,7 +15,6 @@ import {
 import * as ops from '../../when-ops'
 import { isWho, restConditions, whoEditable } from '../../audience-ops'
 import { useBrand, useNameLookup } from '../../store'
-import { predicateParts } from '../predicate-prose'
 import { ConditionPicker } from '../rule-form'
 import { ConditionPopover, summarise, zoneShape, type ValueOption } from '../ConditionPopover'
 
@@ -124,7 +123,6 @@ export function WhenEditor({
   const addGroup = () => write(ops.addBranch(rule.when))
 
   const dupes = duplicatedAcrossCards(rule.when)
-  const parts = predicateParts(rule.when, resolve)
   const openCatalogue = (cardId: string | 'new') => () => setAdding({ cardId })
 
   /* Counted the way the list DRAWS it: the who-conditions are hidden here
@@ -351,60 +349,23 @@ export function WhenEditor({
         )}
       </div>
 
-      {/* Folded, and shut by default.
+            {/* A "Reads as" disclosure stood here, restating the rows above it as a
+          sentence: "This rule matches when Group Membership in Finance or
+          Engineering or Contractors or Executives."
 
-          It restates in a paragraph what the rows directly above it already
-          say in a structure — which is worth having when a predicate has grown
-          brackets and you want to check you meant it, and is noise the rest of
-          the time. Read open, it grew with every condition: five conditions
-          across two groups is three lines of prose sitting between the editor
-          and the outcome, pushing THEN off the screen precisely when the rule
-          is complicated enough that you want to see both.
+          It was written for a predicate you could not otherwise be sure of,
+          and the rows now say it better than the prose did — each condition on
+          its own line, each joiner in its own column, the brackets drawn as
+          brackets. What the paragraph added was a second rendering of the same
+          predicate that had to be kept in step with the first, and it grew
+          with every condition: five conditions across two groups pushed THEN
+          off the screen exactly when the rule was complicated enough to want
+          both on one page.
 
-          A `<details>`, so it costs one line closed and no JavaScript. */}
-      {cards.length > 0 && (
-        <details className="bb__reads">
-          <summary>
-            <ChevronDown size={13} strokeWidth={2} aria-hidden />
-            Reads as
-          </summary>
-          {/* The words come from the predicate, not from the shape it used to
-              have. This printed a hardcoded `or` between groups and joined each
-              group's clauses with `and`, which was right only while those were
-              the only joiners the model could hold. `predicateParts` reports
-              each group's own joiner now. */}
-          <p className="bb__readback">
-            This rule matches when{' '}
-            {parts.map((part, i) => (
-              <Fragment key={part.id}>
-                {i > 0 && (
-                  <>
-                    {' '}
-                    <b>{topJoin(rule.when)}</b>{' '}
-                  </>
-                )}
-                {part.label && cards.length > 1 ? <b>{part.label}: </b> : null}
-                {/* An empty group is not nothing — it matches everything, which
-                    is precisely what makes it dangerous. Printing its clauses
-                    gave "… or ." and left a dangling joiner; dropping it
-                    altogether would have been worse, because the sentence would
-                    then describe a narrower rule than the one that would run.
-                    So it says the thing it does. */}
-                {part.clauses.length === 0 ? (
-                  <em>anything</em>
-                ) : (
-                  <>
-                    {part.clauses.length > 1 && cards.length > 1 ? '(' : ''}
-                    {part.clauses.map((c) => c.text).join(part.join === 'or' ? ' or ' : ' and ')}
-                    {part.clauses.length > 1 && cards.length > 1 ? ')' : ''}
-                  </>
-                )}
-              </Fragment>
-            ))}
-            .
-          </p>
-        </details>
-      )}
+          `predicateSentence` and `predicateParts` are untouched in
+          `predicate-prose.ts` — the read-only card, the review dialog and the
+          change log all still speak. This was the one place the sentence sat
+          beside the thing it described. */}
 
       <ConditionPicker
         open={adding !== null}

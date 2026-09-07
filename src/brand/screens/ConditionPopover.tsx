@@ -1,8 +1,38 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, Fingerprint, Globe, Layers, MapPin, Network, Search, UserRound, Users, Webhook, X, type LucideIcon } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  Ban,
+  Check,
+  ChevronDown,
+  CircleCheck,
+  Fingerprint,
+  Globe,
+  Layers,
+  MapPin,
+  Network,
+  Search,
+  UserRound,
+  Users,
+  Webhook,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
+
+/* What an operator IS, as a glyph.
+
+   Every operator in the catalogue is one of three things: it asserts, it
+   negates, or it spans. Drawing the distinction is worth a mark; drawing nine
+   different marks for nine spellings of those three would be decoration.
+
+   Read with `includes('not')`, which is the same substring test the evaluator
+   uses — so the glyph and the decision cannot disagree about which operator is
+   a negation. */
+const operatorIcon = (o: string): LucideIcon =>
+  o.includes('not') ? Ban : o === 'between' ? ArrowLeftRight : CircleCheck
 
 import { modeLabel } from '../fingerprint'
+import { groupIcon } from './board/tones'
 import type { BrandStore } from '../store'
 import type { NameLookup } from './predicate-prose'
 import {
@@ -236,7 +266,12 @@ export function ConditionPopover({
               searchLabel="Search attributes"
               items={[...CONDITION_CATALOGUE]
                 .sort((a, b) => conditionRank(a.id) - conditionRank(b.id))
-                .map((x) => ({ value: x.id, label: x.label, meta: x.group, note: x.hint }))}
+                /* The family's own glyph, the same one the card and the
+                   editor draw. Twenty-eight rows of three grey lines each is a
+                   list you read linearly; a mark per family is what lets you
+                   jump to the four Device rows without reading the
+                   twenty-four that are not. */
+                .map((x) => ({ value: x.id, label: x.label, meta: x.group, note: x.hint, icon: groupIcon(x.group) }))}
               picked={[c.typeId]}
               single
               /* Progressive, and only forwards. Choosing an attribute opens the
@@ -253,7 +288,12 @@ export function ConditionPopover({
 
           {open === 'op' && (
             <OptionList
-              items={t.operators.map((o) => ({ value: o, label: o }))}
+              /* Two marks, not nine. An operator list is `in` / `not in`, or
+                 `is` / `is not` — a pair whose whole content is whether it is
+                 the affirmative or the negation, so that is what the glyph
+                 says. `between` is the one worth drawing separately: it is
+                 neither, it is a range. */
+              items={t.operators.map((o) => ({ value: o, label: o, icon: operatorIcon(o) }))}
               picked={[c.operator]}
               single
               /* No search over two to four words. */

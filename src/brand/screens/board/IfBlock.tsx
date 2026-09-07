@@ -1,7 +1,7 @@
 import { Fragment, type MouseEvent, type ReactNode } from 'react'
-import { ArrowRight, CornerDownRight, Split } from 'lucide-react'
+import { ArrowRight, CornerDownRight, Split, Users } from 'lucide-react'
 
-import { isWho, whoEditable } from '../../audience-ops'
+import { isWho, whoEditable, whoIds } from '../../audience-ops'
 import { conditionType, type Condition, type Rule } from '../../data'
 import { cardJoin, topJoin } from '../../predicate'
 import type { NameLookup } from '../predicate-prose'
@@ -227,8 +227,43 @@ export function IfBlock({ rule, next, resolve, token, terminal }: { rule: Rule; 
       </div>
     )
 
+  /* The who, as the first row of the reading.
+
+     The card printed `if … then … else` and never said who the rule was about,
+     because the who-conditions were being drawn among the circumstances — where
+     they read as one more thing to check rather than as the subject. Filtering
+     them out of the `if` list left the card silent about them, which is worse:
+     the fact did not move, it vanished.
+
+     So it gets a row of its own, in the same shape as `if` and `then`, above
+     both. Only when the pane can own it — on an OR-shaped rule the who belongs
+     to each alternative and is drawn inside them, exactly as it was. */
+  const whoNames = whoEditable(rule.when)
+    ? [
+        ...whoIds(rule.when, 'group').map((id) => resolve('group', id) ?? id),
+        ...whoIds(rule.when, 'user').map((id) => resolve('user', id) ?? id),
+      ]
+    : []
+
   return (
     <div className="bb__if">
+      {whoEditable(rule.when) && (
+        <div className="bb__ifrow is-cond bb__ifwho">
+          <span className="bb__ifbranch" aria-hidden>
+            <Users size={12} strokeWidth={2} />
+          </span>
+          <span className="bb__ifkw">who</span>
+          {whoNames.length === 0 ? (
+            <IfChip muted>everyone</IfChip>
+          ) : (
+            whoNames.map((n) => (
+              <IfChip key={n} tone="info">
+                {n}
+              </IfChip>
+            ))
+          )}
+        </div>
+      )}
       {cards.length === 0 ? (
         <div className="bb__ifrow">
           <span className="bb__ifbranch" aria-hidden>

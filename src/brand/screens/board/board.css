@@ -1578,6 +1578,12 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 
    A single run of conditions draws bare (`.bb__ifplain`). Press "Add group" and
    a second appears; the frame arrives with the bracket it represents. */
+/* The who row: same shape as `if`, above it, one notch quieter — it is the
+   subject of the sentence rather than a test in it. */
+.bb__ifwho .bb__ifkw { color: var(--text-tertiary); }
+.bb__ifwho + .bb__ifplain,
+.bb__ifwho + .bb__ifgroup { margin-top: 2px; }
+
 .bb__ifplain { display: grid; gap: 1px; }
 .bb__ifgroup {
   display: grid; gap: 1px;
@@ -2157,34 +2163,93 @@ button.bb__idx::after {
    written in. What it edits are the `group` and `user` conditions the rule
    could always hold — see audience-ops.ts — so nothing here is a second place
    to store an audience. */
-/* Two rows of pills stood here. They were the right size for a third of a
-   shared column and the wrong shape for the question — choosing who a rule is
-   about meant opening a floating layer twice, once per kind, and reading a list
-   you could not see beside the rest of the form. Given a panel of its own the
-   lists are simply on screen. */
-.bb__who { display: flex; flex-direction: column; gap: var(--space-5); }
+/* Two rows of pills stood here, then two stacked lists under three paragraphs
+   of prose. The pills were the right size for a third of a shared column and
+   the wrong shape for the question; the prose was true and unread, which is
+   what a form's first screenful of explanation always is.
 
-.bb__wholist { display: flex; flex-direction: column; gap: var(--space-3); }
-.bb__wholist__head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-.bb__wholist__head h4 {
-  display: flex; align-items: center; gap: 6px; margin: 0;
-  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+   One list at a time behind two tabs, and what is chosen rides above them as
+   faces — visible whichever tab is open, which is the thing two stacked
+   sections could never do. */
+.bb__who { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* --- What is chosen, as faces ------------------------------------------------ */
+
+.bb__whochosen {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+  min-height: 30px;
 }
-.bb__wholist__head h4 svg { color: var(--text-tertiary); }
-/* Pushed to the far edge, so the count reads as a fact about the list below
-   rather than as part of the operator control beside it. */
-.bb__whocount { margin-left: auto; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bb__whochosen.is-empty { color: var(--text-tertiary); gap: var(--space-3); }
+.bb__whochosen.is-empty b { font-size: var(--fs-md); font-weight: var(--fw-regular); }
+
+/* A chosen one is a chip you can press to take off, so the whole thing is the
+   target rather than a small x inside it. */
+.bb__whoface {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 24px; padding: 0 8px 0 3px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  font-family: inherit; font-size: var(--fs-xs); color: var(--text-body);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+}
+.bb__whoface:hover { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bb__whoface:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__whoface.is-warn { border-color: var(--fb-notice-border); }
+
+/* The overflow is a COUNT, not more faces. A row that grows with the selection
+   stops being a summary at about seven. */
+.bb__whomore {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 8px;
+  border-radius: var(--radius-pill); background: var(--surface-sunken);
+  font-size: var(--fs-xs); color: var(--text-secondary); cursor: default;
+}
+
+/* Round, one letter, tinted from the name so the same group is the same colour
+   wherever it appears without a colour having to be stored on anything. */
+.bb__avatar {
+  flex: none; display: grid; place-items: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  font-size: 10px; font-weight: var(--fw-semibold); line-height: 1;
+}
+.bb__avatar.is-all { background: var(--surface-sunken); color: var(--text-tertiary); }
+
+/* --- The two lists, one at a time -------------------------------------------- */
+
+.bb__whotabs {
+  display: flex; align-items: center; gap: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bb__whotabs > button {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 var(--space-3);
+  border: none; background: none;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  font-family: inherit; font-size: var(--fs-md); color: var(--text-tertiary);
+  cursor: pointer;
+}
+.bb__whotabs > button:hover { color: var(--text-primary); }
+.bb__whotabs > button.is-on { color: var(--text-primary); border-bottom-color: var(--brand); }
+.bb__whotabs > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.bb__whotabs > button svg { opacity: 0.75; }
+/* The count on the tab, so the closed list still says how much is in it. */
+.bb__whotabs > button b {
+  min-width: 16px; padding: 0 4px; border-radius: var(--radius-pill);
+  background: var(--brand-subtle-bg); color: var(--brand-active);
+  font-size: 10px; font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums;
+}
+.bb__whoop { margin-left: auto; }
 
 .bb__whorows {
   display: flex; flex-direction: column;
   border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
   background: var(--surface-raised);
-  overflow: hidden;
+  max-height: 260px; overflow-y: auto;
 }
 
 .bb__whoitem {
   display: flex; align-items: center; gap: var(--space-3);
-  padding: 7px var(--space-4);
+  padding: 6px var(--space-4);
   border: none; border-top: 1px solid var(--border-subtle); background: none;
   font-family: inherit; text-align: left; cursor: pointer; min-width: 0;
 }
@@ -2197,13 +2262,14 @@ button.bb__idx::after {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .bb__whoitem.is-on b { font-weight: var(--fw-medium); color: var(--text-primary); }
-/* The meta goes to the right edge and never competes with the name for it. */
 .bb__whoitem em {
   margin-left: auto; flex: none; padding-left: var(--space-3);
   font-style: normal; font-size: var(--fs-xs); color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
+/* A real tick box, because this is a multi-select and the shape is what says
+   so — a check with no box reads as "the current one". */
 .bb__whotick {
   flex: none; display: grid; place-items: center;
   width: 15px; height: 15px; border-radius: 4px;
@@ -2212,8 +2278,8 @@ button.bb__idx::after {
 }
 .bb__whoitem.is-on .bb__whotick { background: var(--brand); border-color: var(--brand); }
 
-/* Both badges inform and neither blocks — there are no disabled rows here,
-   because a redundant or unusual selection is legal and sometimes deliberate. */
+/* Informs, never blocks. There are no disabled rows here, because a redundant
+   or unusual selection is legal and sometimes deliberate. */
 .bb__whotag {
   flex: none; padding: 1px 6px; border-radius: var(--radius-pill);
   background: var(--fb-neutral-bg); border: 1px solid var(--fb-neutral-border);
@@ -2221,10 +2287,6 @@ button.bb__idx::after {
 }
 .bb__whotag.is-warn { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
 
-/* Inside the box, under the chosen, above the results — so what you have
-   picked is never hidden by what you are typing. */
-.bb__whosearch { padding: var(--space-3); border-top: 1px solid var(--border-subtle); }
-.bb__whorows > .bb__whosearch:first-child { border-top: none; }
 .bb__whosearch input {
   width: 100%; height: var(--ctl-height-sm); padding: 0 var(--space-3);
   background: var(--surface-inset); border: 1px solid transparent; border-radius: var(--radius-sm);
@@ -2232,17 +2294,8 @@ button.bb__idx::after {
 }
 .bb__whosearch input:focus-visible { outline: none; border-color: var(--brand); }
 
-.bb__whohint { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
-/* The ceiling: what the POLICY governs, which is the number this form can only
-   ever narrow. Said once, at the top, because it is the frame for everything
-   below it. */
-.bb__whoceil { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.55; }
-
-.bb__whofoot {
-  display: flex; align-items: flex-start; gap: var(--space-4);
-  padding-top: var(--space-4); border-top: 1px solid var(--border-subtle);
-}
-.bb__whofoot p { margin: 0; flex: 1; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
+.bb__whohint { margin: 0; padding: var(--space-4); font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
+.bb__who > .bb__whohint { padding: 0; }
 
 /* The stand-down. Not an error and not styled as one: an OR-shaped rule is a
    legitimate rule, and this pane is explaining where its who actually lives. */

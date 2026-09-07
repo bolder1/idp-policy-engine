@@ -3,7 +3,7 @@ import { Check, UserRound, Users } from 'lucide-react'
 
 import { Button } from '../../kit'
 import { useBrand, useNameLookup } from '../../store'
-import { conditionType, reach, type Audience, type Predicate, type Rule } from '../../data'
+import { conditionType, type Audience, type Predicate, type Rule } from '../../data'
 import { cardLetter } from '../../predicate'
 import {
   isWho,
@@ -34,39 +34,36 @@ import type { Part } from './model'
    back. Nothing downstream changes: the linter still subsumes them, the
    simulator still evaluates them, the read-back still says them.
 
-   The two are edited separately because they answer differently. Groups follow
-   whoever is in them on the day; a named person is a person somebody has to
-   remember to remove. A rule can use either, both, or neither.
+   ONE LIST AT A TIME, BEHIND TWO TABS.
 
-   IT IS A FORM NOW, NOT TWO PILLS.
+   It was two stacked sections, each with a heading, an operator, a list and a
+   count, under three paragraphs of prose explaining what the form was for. All
+   of that was true and almost none of it was being read: a form whose first
+   screenful is explanation is a form that has decided you will not understand
+   it. Groups and people are answered one at a time, so they are a tab each, and
+   what is chosen rides above the tabs as avatars — visible whichever list is
+   open, which is the thing two stacked sections could never do.
 
-   Two `ConditionPopover` pills were the right size for a third of a shared
-   column and the wrong shape for the question: choosing who a rule is about
-   meant opening a floating layer, reading a list you could not see beside the
-   rest of the form, and closing it again — twice, once per kind. Given a panel
-   of its own the lists are simply on screen, which is what makes "who does this
-   cover" answerable at a glance rather than by opening two menus.
-
-   The `nonce` remount went with the popover it existed for. Removing the last
-   id DELETES the condition, and the popover's open state was keyed to a
-   condition that no longer existed — a floating-layer problem. The checkboxes
-   here derive from `whoIds` on every render, an empty list is just an empty
-   list, and remounting would blow away the search box mid-type.
+   The two are still edited separately because they answer differently. Groups
+   follow whoever is in them on the day; a named person is a person somebody has
+   to remember to remove.
    -------------------------------------------------------------------------- */
 
 /* "Any of these" / "None of these" rather than `in` / `not in`.
 
    That is what the operators MEAN about a list, and this is a list. The raw
-   string round-trips untouched, which matters more than it looks: the
-   evaluator tests `c.operator.includes('not')` as a substring and nothing
-   validates these strings anywhere, so the words are a label and never a
-   value. */
+   string round-trips untouched, which matters more than it looks: the evaluator
+   tests `c.operator.includes('not')` as a substring and nothing validates these
+   strings anywhere, so the words are a label and never a value. */
 const OP_WORD: Record<string, string> = {
   in: 'Any of these',
   'not in': 'None of these',
   is: 'Any of these',
   'is not': 'None of these',
 }
+
+/** How many avatars are drawn before the rest become a count. */
+const AVATAR_CAP = 6
 
 export function WhoEditor({
   rule,
@@ -75,7 +72,7 @@ export function WhoEditor({
   onOpenPart,
 }: {
   rule: Rule
-  /** The policy's own audience, for the ceiling line. Never written here. */
+  /** The policy's own audience, for the out-of-scope badge. Never written here. */
   audience: Audience
   onPatch: (p: Partial<Rule>) => void
   onOpenPart: (part: Part) => void
@@ -84,25 +81,24 @@ export function WhoEditor({
   const resolve = useNameLookup()
   const write = (next: Predicate) => onPatch({ when: next })
 
+  const [tab, setTab] = useState<WhoType>('group')
+  const [q, setQ] = useState('')
+
   /* The operator the form intends, for while there is no condition to hold it.
 
-     Two traps the pills hid and a visible list makes reachable in one gesture.
+     Two traps a visible list makes reachable in one gesture. The exclusion is
+     lost on a round trip through empty: `not in [contractors]` → untick the
+     last one → the condition is DELETED → `whoOperator` falls back to the
+     default `in` → tick a group → you have built a narrowing where an exclusion
+     was, and the only visible change was a checkbox. And `setWhoOperator` is a
+     no-op when nothing is picked, so above an empty list "None of these" was a
+     visibly dead button.
 
-     The exclusion is lost on a round trip through empty: `not in [contractors]`
-     → untick the last one → the condition is DELETED → `whoOperator` falls back
-     to the default `in` → tick a group → you have built a narrowing where an
-     exclusion was, and the only visible change was a checkbox.
-
-     And `setWhoOperator` is a no-op when nothing is picked, so above an empty
-     list "None of these" was a visibly dead button.
-
-     Both are answered here rather than in `setWho`, which is pure and stateless
-     by design and has nowhere to keep a remembered operator. The model wins
+     Answered here rather than in `setWho`, which is pure and stateless by
+     design and has nowhere to keep a remembered operator. The model wins
      whenever it has an opinion: this is read only while there is no condition,
-     so an undo that restores `not in` shows immediately instead of being
-     overwritten by a stale segment. */
+     so an undo that restores `not in` shows immediately. */
   const [pending, setPending] = useState<Record<WhoType, string>>({ group: 'in', user: 'is' })
-  const [q, setQ] = useState('')
 
   if (!whoEditable(rule.when)) return <WhoStandDown rule={rule} onOpenPart={onOpenPart} />
 
@@ -110,229 +106,223 @@ export function WhoEditor({
   const userIds = whoIds(rule.when, 'user')
   const opFor = (k: WhoType) => (whoIds(rule.when, k).length > 0 ? whoOperator(rule.when, k) : pending[k])
   const outside = outsideAudience(audience, groupIds, userIds, store.users)
-
-  const OPS: Record<WhoType, string[]> = {
-    group: conditionType('group').operators,
-    user: conditionType('user').operators,
-  }
+  const ids = tab === 'group' ? groupIds : userIds
 
   /* Always passing the operator on the tick path: omitting it is only correct
      while the condition already exists, and the first tick is exactly when it
      does not. `new Set` because `whoIds` filters falsy and nothing else — the
      de-duplication is this form's job. */
-  const toggleGroup = (id: string, on: boolean) =>
-    write(setWho(rule.when, 'group', on ? [...new Set([...groupIds, id])] : groupIds.filter((x) => x !== id), opFor('group')))
-
-  const togglePerson = (id: string, on: boolean) =>
-    write(setWho(rule.when, 'user', on ? [...new Set([...userIds, id])] : userIds.filter((x) => x !== id), opFor('user')))
-
-  const flip = (k: WhoType, o: string) => {
-    setPending((p) => ({ ...p, [k]: o }))
-    write(setWhoOperator(rule.when, k, o))
+  const toggle = (kind: WhoType, id: string, on: boolean) => {
+    const now = whoIds(rule.when, kind)
+    write(setWho(rule.when, kind, on ? [...new Set([...now, id])] : now.filter((x) => x !== id), opFor(kind)))
   }
 
-  const chosenPeople = userIds.map((id) => ({ id, user: store.users.find((u) => u.id === id) }))
+  const flip = (o: string) => {
+    setPending((p) => ({ ...p, [tab]: o }))
+    write(setWhoOperator(rule.when, tab, o))
+  }
+
+  /* Everything chosen, both kinds, in one row above the tabs — which is the
+     whole reason the lists became tabs. Two stacked sections could only ever
+     show you the half you were looking at. */
+  const chosen = [
+    ...groupIds.map((id) => ({ kind: 'group' as WhoType, id, name: resolve('group', id) ?? `deleted · ${id}` })),
+    ...userIds.map((id) => ({ kind: 'user' as WhoType, id, name: resolve('user', id) ?? `deleted · ${id}` })),
+  ]
+
   const query = q.trim().toLowerCase()
-  const results = query
-    ? store.users.filter(
-        (u) => !userIds.includes(u.id) && (u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query)),
-      )
-    : []
-  const nothing = groupIds.length === 0 && userIds.length === 0
+  const rows =
+    tab === 'group'
+      ? store.groups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          meta: `${g.memberCount.toLocaleString()} members`,
+          empty: g.memberCount === 0,
+        }))
+      : store.users
+          .filter((u) => !query || u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query))
+          .map((u) => ({ id: u.id, name: u.name, meta: u.email, empty: false }))
 
   return (
     <div className="bb__who">
-      {/* Said first, because it is the thing most likely to be assumed wrong.
-          A form that looks like the policy's audience picker, inside a rule,
-          has to say which of the two it is before anything else. */}
-      <p className="bb__whonote">This rule only — the policy's audience and every other rule are untouched.</p>
-      <p className="bb__whoceil">
-        This policy governs about {reach(audience, store.groups, store.users).toLocaleString()} people. Narrowing here
-        changes which sign-ins this rule decides — everyone else it lets past falls through to the rules below.
-      </p>
+      {/* What is chosen, as faces. Round, one letter, and the overflow says how
+          many more rather than growing the row — the same thing an avatar stack
+          does anywhere else, for the same reason. */}
+      <WhoChosen chosen={chosen} outside={outside} onRemove={(k, id) => toggle(k, id, false)} />
 
-      {/* --- Groups: exhaustive, no search, and it ENDS ---------------------
-          That is the whole difference between a group picker and a people
-          picker, and they must not be drawn as one control. There is no "all
-          groups" row and there must not be: a synthetic one beside Finance let
-          a picker build "All AND Finance", which reads narrower than it is. */}
-      <section className="bb__wholist">
-        <header className="bb__wholist__head">
-          <h4>
-            <Users size={13} strokeWidth={2} aria-hidden /> Groups
-          </h4>
+      <div className="bb__whotabs" role="tablist" aria-label="What this rule is about">
+        <button
+          role="tab"
+          type="button"
+          aria-selected={tab === 'group'}
+          className={tab === 'group' ? 'is-on' : ''}
+          onClick={() => {
+            setTab('group')
+            setQ('')
+          }}
+        >
+          <Users size={13} strokeWidth={2} aria-hidden />
+          Groups
+          {groupIds.length > 0 && <b>{groupIds.length}</b>}
+        </button>
+        <button
+          role="tab"
+          type="button"
+          aria-selected={tab === 'user'}
+          className={tab === 'user' ? 'is-on' : ''}
+          onClick={() => {
+            setTab('user')
+            setQ('')
+          }}
+        >
+          <UserRound size={13} strokeWidth={2} aria-hidden />
+          People
+          {userIds.length > 0 && <b>{userIds.length}</b>}
+        </button>
+
+        {/* The operator belongs to the list it governs, so it rides on the tab
+            strip and changes meaning with the tab. */}
+        <span className="bb__whoop">
           <Seg
-            value={opFor('group')}
-            options={OPS.group.map((o) => ({ value: o, label: OP_WORD[o] ?? o }))}
-            onChange={(o) => flip('group', o)}
-            label="How the groups are matched"
+            value={opFor(tab)}
+            options={conditionType(tab).operators.map((o) => ({ value: o, label: OP_WORD[o] ?? o }))}
+            onChange={flip}
+            label={tab === 'group' ? 'How the groups are matched' : 'How the people are matched'}
           />
-          {groupIds.length > 0 && (
-            <span className="bb__whocount">
-              {groupIds.length} of {store.groups.length} chosen
-            </span>
-          )}
-        </header>
+        </span>
+      </div>
 
-        <div className="bb__whorows" role="group" aria-label="Groups this rule is about">
-          {store.groups.map((g) => {
-            const on = groupIds.includes(g.id)
-            return (
-              <button
-                key={g.id}
-                type="button"
-                role="checkbox"
-                aria-checked={on}
-                className={`bb__whoitem ${on ? 'is-on' : ''}`}
-                onClick={() => toggleGroup(g.id, !on)}
-              >
-                <span className="bb__whotick" aria-hidden>
-                  {on && <Check size={12} strokeWidth={3} />}
-                </span>
-                <b>{g.name}</b>
-                <em>{g.memberCount.toLocaleString()} members</em>
-                {/* Both badges inform, never block. No disabled rows and no
-                    auto-untick: a redundant or unusual selection is legal and
-                    is sometimes deliberate. */}
-                {g.memberCount === 0 && (
-                  <small className="bb__whotag" title="Nobody is in this group today, so a rule that names it decides nothing.">
-                    Empty
-                  </small>
-                )}
-                {outside.groups.includes(g.id) && (
-                  <small
-                    className="bb__whotag is-warn"
-                    title="This policy does not govern this group, so this rule can never decide a sign-in from it."
-                  >
-                    Outside this policy
-                  </small>
-                )}
-              </button>
-            )
-          })}
+      {/* People are a directory and groups are a list that ends — so only one
+          of them gets a search box. */}
+      {tab === 'user' && store.users.length > 0 && (
+        <div className="bb__whosearch">
+          <input
+            type="search"
+            value={q}
+            placeholder={`Search the ${store.users.length} people listed`}
+            aria-label="Search people"
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
+      )}
 
-        {groupIds.length === 0 && opFor('group') === 'not in' && (
-          <p className="bb__whohint">None of these — choose the groups to exclude.</p>
-        )}
-      </section>
-
-      {/* --- People: chosen first, then search, then an honest count -------- */}
-      <section className="bb__wholist">
-        <header className="bb__wholist__head">
-          <h4>
-            <UserRound size={13} strokeWidth={2} aria-hidden /> People
-          </h4>
-          <Seg
-            value={opFor('user')}
-            options={OPS.user.map((o) => ({ value: o, label: OP_WORD[o] ?? o }))}
-            onChange={(o) => flip('user', o)}
-            label="How the people are matched"
-          />
-          {userIds.length > 0 && <span className="bb__whocount">{userIds.length} chosen</span>}
-        </header>
-
-        <div className="bb__whorows" role="group" aria-label="People this rule is about">
-          {/* Rendered unconditionally — even off-query, even when the id no
-              longer resolves. What you have picked must never be hidden by a
-              filter; that is how somebody removes a person by accident. */}
-          {chosenPeople.map(({ id, user }) => {
-            const inGroup = user && groupIds.includes(user.groupId) ? resolve('group', user.groupId) : null
-            return (
-              <button
-                key={id}
-                type="button"
-                role="checkbox"
-                aria-checked
-                className="bb__whoitem is-on"
-                onClick={() => togglePerson(id, false)}
-              >
-                <span className="bb__whotick" aria-hidden>
-                  <Check size={12} strokeWidth={3} />
-                </span>
-                {/* The informative fallback the rest of the condition surface
-                    already uses, rather than printing a bare slug. */}
-                <b>{user?.name ?? `deleted · ${id}`}</b>
-                {user && <em>{user.email}</em>}
-                {inGroup && (
-                  <small
-                    className="bb__whotag"
-                    title="Already covered by a group you chose. Kept, because a named person survives somebody editing the group."
-                  >
-                    In {inGroup}
-                  </small>
-                )}
-              </button>
-            )
-          })}
-
-          {store.users.length > 0 && (
-            <div className="bb__whosearch">
-              <input
-                type="search"
-                value={q}
-                placeholder={`Search the ${store.users.length} people listed`}
-                aria-label="Search people"
-                onChange={(e) => setQ(e.target.value)}
-              />
-            </div>
-          )}
-
-          {/* Results only once something is typed. With no query this renders
-              nothing at all, rather than a scrolling directory with a filter
-              bolted on top of it. */}
-          {query && results.length === 0 && <p className="bb__whohint">Nobody listed matches that.</p>}
-          {results.map((u) => (
+      <div className="bb__whorows" role="group" aria-label={tab === 'group' ? 'Groups' : 'People'}>
+        {rows.length === 0 && <p className="bb__whohint">Nobody listed matches that.</p>}
+        {rows.map((r) => {
+          const on = ids.includes(r.id)
+          const flagged = tab === 'group' ? outside.groups.includes(r.id) : outside.users.includes(r.id)
+          return (
             <button
-              key={u.id}
+              key={r.id}
               type="button"
               role="checkbox"
-              aria-checked={false}
-              className="bb__whoitem"
-              onClick={() => togglePerson(u.id, true)}
+              aria-checked={on}
+              className={`bb__whoitem ${on ? 'is-on' : ''}`}
+              onClick={() => toggle(tab, r.id, !on)}
             >
-              <span className="bb__whotick" aria-hidden />
-              <b>{u.name}</b>
-              <em>{u.email}</em>
+              <span className="bb__whotick" aria-hidden>
+                {on && <Check size={12} strokeWidth={3} />}
+              </span>
+              <Avatar name={r.name} />
+              <b>{r.name}</b>
+              <em>{r.meta}</em>
+              {/* Both badges inform and neither blocks — no disabled rows,
+                  because a redundant or unusual selection is legal and is
+                  sometimes deliberate. */}
+              {r.empty && (
+                <small className="bb__whotag" title="Nobody is in this group today, so a rule that names it decides nothing.">
+                  Empty
+                </small>
+              )}
+              {flagged && (
+                <small
+                  className="bb__whotag is-warn"
+                  title="This policy does not govern them, so this rule can never decide one of their sign-ins."
+                >
+                  Outside
+                </small>
+              )}
             </button>
-          ))}
-        </div>
+          )
+        })}
+      </div>
 
-        {/* The fiction, recorded rather than hidden: `unlistedUsers` is a count
-            with no rows behind it, so the search can only ever reach the loaded
-            rows. The placeholder says "the people listed" and this says where
-            the rest are — a knowing prototype limit, not a design. A
-            neighbouring screen says "Search to find someone", which promises a
-            directory search it cannot perform. */}
+      {/* The one line of prose that survived, and only on the tab it is true
+          of: `unlistedUsers` is a count with no rows behind it, so the search
+          can only ever reach the loaded rows. Saying so is not decoration. */}
+      {tab === 'user' && store.unlistedUsers > 0 && (
         <p className="bb__whohint">
-          {store.users.length === 0
-            ? 'No one in the directory yet. Choose a group instead.'
-            : `${store.users.length} of ${(store.users.length + store.unlistedUsers).toLocaleString()} people are listed here. The rest can be named on the group they are in.`}
+          {store.users.length} of {(store.users.length + store.unlistedUsers).toLocaleString()} listed. The rest can be
+          reached by the group they are in.
         </p>
+      )}
+    </div>
+  )
+}
 
-        {userIds.length === 0 && opFor('user') === 'is not' && (
-          <p className="bb__whohint">None of these — choose the people to exclude.</p>
-        )}
-      </section>
+/* A round mark with one letter.
 
-      {nothing ? (
-        <p className="bb__whonote">Everyone this policy governs. Narrow it by choosing groups or people.</p>
-      ) : (
-        <div className="bb__whofoot">
-          <p>
-            Only these people reach this rule. Everyone else the policy governs falls through to the rules below.
-          </p>
-          {/* Composed, never two `onPatch` calls in one handler — both would
-              read the pre-patch predicate and the second would win, dropping
-              the first. */}
-          <Button
-            size="sm"
-            onClick={() => write(setWho(setWho(rule.when, 'group', []), 'user', []))}
-            title="Clear every group and person on this rule"
+   Deliberately not initials from two words: half these names are one word, and
+   a stack where some marks carry one letter and some two reads as two kinds of
+   thing. The tint is derived from the name so the same group is the same colour
+   everywhere it appears, without a colour having to be stored on anything. */
+function Avatar({ name }: { name: string }) {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360
+  return (
+    <span className="bb__avatar" style={{ background: `hsl(${h} 62% 92%)`, color: `hsl(${h} 58% 32%)` }} aria-hidden>
+      {name.slice(0, 1).toUpperCase()}
+    </span>
+  )
+}
+
+function WhoChosen({
+  chosen,
+  outside,
+  onRemove,
+}: {
+  chosen: { kind: WhoType; id: string; name: string }[]
+  outside: { groups: string[]; users: string[] }
+  onRemove: (kind: WhoType, id: string) => void
+}) {
+  if (chosen.length === 0) {
+    return (
+      <div className="bb__whochosen is-empty">
+        <span className="bb__avatar is-all" aria-hidden>
+          <Users size={13} strokeWidth={2} />
+        </span>
+        <b>Everyone this policy governs</b>
+      </div>
+    )
+  }
+
+  const shown = chosen.slice(0, AVATAR_CAP)
+  const rest = chosen.length - shown.length
+
+  return (
+    <div className="bb__whochosen">
+      {shown.map((c) => {
+        const flagged = c.kind === 'group' ? outside.groups.includes(c.id) : outside.users.includes(c.id)
+        return (
+          <button
+            key={`${c.kind}:${c.id}`}
+            type="button"
+            className={`bb__whoface ${flagged ? 'is-warn' : ''}`}
+            title={`${c.name} — remove`}
+            aria-label={`Remove ${c.name}`}
+            onClick={() => onRemove(c.kind, c.id)}
           >
-            Clear all
-          </Button>
-        </div>
+            <Avatar name={c.name} />
+            <span>{c.name}</span>
+          </button>
+        )
+      })}
+      {/* The overflow is a count, not more faces. A row that grows with the
+          selection stops being a summary at about seven. */}
+      {rest > 0 && (
+        <span className="bb__whomore" title={chosen.slice(AVATAR_CAP).map((c) => c.name).join(', ')}>
+          +{rest} more
+        </span>
       )}
     </div>
   )
@@ -354,17 +344,14 @@ function WhoStandDown({ rule, onOpenPart }: { rule: Rule; onOpenPart: (part: Par
           that would make the rule broader. */}
       <p>
         This rule has more than one way in, so who it covers belongs to each alternative rather than to the rule.
-        Choosing people here would add a third way in — the rule would fire for them whatever the circumstances.
+        Choosing people here would add a third way in.
       </p>
 
-      {/* What is actually there, read-only, per alternative. The difference
-          between an explanation and an assertion. */}
-      <p className="bb__whodown__lead">Today, in the alternatives:</p>
       <ul className="bb__whodown__list">
         {rule.when.cards.map((k, i) => {
           /* `isWho`, not a second copy of the typeId test. Filtered per card
-              rather than with `whoConditions`, which flattens across cards and
-              would lose the very grouping this read-back exists to show. */
+             rather than with `whoConditions`, which flattens across cards and
+             would lose the very grouping this read-back exists to show. */
           const who = k.conditions.filter(isWho)
           return (
             <li key={k.id}>

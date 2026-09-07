@@ -7,8 +7,8 @@ import { type Rule } from '../../data'
 import type { NameLookup } from '../predicate-prose'
 import type { StepKind } from '../simulate'
 import type { RuleState } from '../rule-form'
-import { DECISION_NAME, PARTS, TONE, type Part } from './model'
-import { PART_HINT, PART_ICON, PART_LABEL, partSummary } from './parts'
+import { DECISION_NAME, TONE, type Part } from './model'
+import { CARD_PARTS, PART_HINT, PART_ICON, PART_LABEL, partSummary } from './parts'
 import { IfBlock, IfChip, type NextRule } from './IfBlock'
 
 /* -----------------------------------------------------------------------------
@@ -128,7 +128,7 @@ export function RuleCard({
      on Condition rather than at the start of the row. */
   const [focusPart, setFocusPart] = useState<Part>('who')
   useEffect(() => {
-    if (openPart) setFocusPart(openPart)
+    if (openPart === 'who' || openPart === 'when') setFocusPart(openPart)
   }, [openPart])
   const kindClass = traceKind === 'hit' ? 'is-hit' : traceKind === 'miss' ? 'is-miss' : traceKind === 'unreached' || traceKind === 'off' ? 'is-unreached' : ''
 
@@ -350,11 +350,11 @@ export function RuleCard({
           /* The window owns `[` and `]` for the board; inside this row the
              arrows move focus and must not escape to it. */
           e.stopPropagation()
-          const to = PARTS[(PARTS.indexOf(focusPart) + d + PARTS.length) % PARTS.length]
+          const to = CARD_PARTS[(CARD_PARTS.indexOf(focusPart as (typeof CARD_PARTS)[number]) + d + CARD_PARTS.length) % CARD_PARTS.length]
           partsRow.current?.querySelector<HTMLButtonElement>(`[data-part="${to}"]`)?.focus()
         }}
       >
-        {PARTS.map((p) => {
+        {CARD_PARTS.map((p) => {
           const s = partSummary(rule, p, resolve)
           const on = openPart === p
           const Ico = PART_ICON[p]
@@ -368,7 +368,10 @@ export function RuleCard({
               aria-controls="bb-insp-body"
               aria-label={`${PART_LABEL[p]} - ${PART_HINT[p]}`}
               title={PART_HINT[p]}
-              tabIndex={(openPart ?? 'who') === p ? 0 : -1}
+              /* Parked on the open part when the row draws it, and on Who
+                 otherwise — including when the panel is showing Then, which
+                 this row has no button for. */
+              tabIndex={(openPart === 'when' ? 'when' : 'who') === p ? 0 : -1}
               onFocus={() => setFocusPart(p)}
               onClick={() => onOpen(p)}
             >

@@ -24,6 +24,19 @@ import { DECISION_SHORT, type Part } from './model'
    the person asking for it used. The id underneath is still `'when'`. */
 export const PART_LABEL: Record<Part, string> = { who: 'Who', when: 'Condition', then: 'Then' }
 
+/* The two the CARD offers a door to.
+
+   Three buttons was one per pane, which is tidy and wrong: the card already
+   READS its outcome — "then Deny · Refused, no prompt" is right there in the
+   body — so a third button to go and look at what is printed under it was a
+   door to a room you are standing in. Who and Condition are the two that need
+   opening, because the card states them in a phrase and editing them is where
+   the work is.
+
+   Then keeps its pane, reached with `]` from Condition or by opening the whole
+   rule. It is not reachable from the card, and that is the trade. */
+export const CARD_PARTS = ['who', 'when'] as const
+
 export const PART_HINT: Record<Part, string> = {
   who: 'Which people is this rule about?',
   when: 'And in what circumstances?',

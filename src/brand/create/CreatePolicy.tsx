@@ -1,12 +1,11 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Suspense, forwardRef, lazy, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowRight, Check, Plus, Search, Store, Upload, UserRound, Users, Wand2, X } from 'lucide-react'
+import { ArrowDown, ArrowRight, Plus, Store, Upload, Wand2, X } from 'lucide-react'
 
 import { Button, DecisionChip } from '../kit'
-import { Picker } from '../picker'
-import { AppLogo } from '../logos/AppLogo'
-import { blankPolicy, conditionType, scenarios, type Audience, type Scenario } from '../data'
+import { EVERYONE, blankPolicy, conditionType, scenarios, type Audience, type Scenario } from '../data'
 import { useBrand } from '../store'
+import { ApplicationField } from '../screens/scope-fields'
 import { leaves } from '../predicate'
 import { TemplateCard, TemplatePreview, type CardModel } from './TemplateCard'
 
@@ -48,11 +47,19 @@ export function CreatePolicy() {
   const [, setBlank] = useState(false)
   const [name, setName] = useState('')
   const [appId, setAppId] = useState<string | null>(null)
-  /* Asked on the form rather than defaulted in the builder, and it starts
-     empty rather than at "everyone". A policy that arrives governing the whole
-     directory is a policy somebody has to remember to narrow, and nobody
-     remembers to narrow something that already looks finished. */
-  const [audience, setAudience] = useState<Audience>({ everyone: false, groupIds: [], userIds: [] })
+  /* Not asked on this form any more, and not empty.
+
+     It was a required question here, starting at nobody, on the reasoning that
+     a policy arriving with the whole directory is one somebody has to remember
+     to narrow. The narrowing happens per RULE now — the Who step writes it as
+     the `group` and `user` conditions the rule already held — so the policy
+     keeps `blankPolicy`'s own default, whose comment makes the opposite half of
+     the same argument: nobody is worse, because a policy that governs nobody
+     silently does nothing.
+
+     The state stays because a template can carry an audience and the interview
+     composes one; both still write through here. */
+  const [audience] = useState<Audience>(EVERYONE)
   const [market, setMarket] = useState(false)
   const templatesRef = useRef<HTMLDivElement>(null)
 
@@ -153,8 +160,6 @@ export function CreatePolicy() {
           ) : (
             <NameStep
               picked={picked}
-              audience={audience}
-              setAudience={setAudience}
               name={name}
               setName={setName}
               appId={appId}
@@ -545,85 +550,12 @@ function Card({ s, onUse, onPreview }: { s: Scenario; onUse: () => void; onPrevi
    was. Collapsing was never the part doing that work. The list fills whatever
    height the column has and scrolls inside itself, so the page still does not.
    -------------------------------------------------------------------------- */
-export function AppList({ chosen, onChange }: { chosen: string | null; onChange: (id: string | null) => void }) {
-  const store = useBrand()
-  const [q, setQ] = useState('')
-  const matches = store.apps.filter((a) => !q || a.name.toLowerCase().includes(q.toLowerCase()))
+/* `AppList` stood here — a resident, searchable radiogroup of ten applications,
+   rendered inline by this form and by Policy details, 475px of list to answer
+   one question.
 
-  return (
-    <div className="bapps">
-      <div className="bapps__search">
-        <Search size={14} strokeWidth={1.9} aria-hidden />
-        <input
-          type="text"
-          value={q}
-          placeholder={`Search ${store.apps.length} applications…`}
-          aria-label="Search applications"
-          onChange={(e) => setQ(e.target.value)}
-        />
-        {q && (
-          <button type="button" className="bapps__clearq" aria-label="Clear search" onClick={() => setQ('')}>
-            <X size={13} strokeWidth={2.2} />
-          </button>
-        )}
-      </div>
-
-      {/* radiogroup, not a list of buttons: one of these is true and the rest
-          are false, which is exactly what a radio group means to a screen
-          reader. */}
-      <div className="bapps__list" role="radiogroup" aria-label="Application this policy protects">
-        {matches.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            role="radio"
-            aria-checked={chosen === a.id}
-            className={`bapps__row ${chosen === a.id ? 'is-on' : ''}`}
-            /* Clicking the chosen one again clears it, so there is a way back
-               to "no application" without hunting for a separate control. */
-            onClick={() => onChange(chosen === a.id ? null : a.id)}
-          >
-            <AppLogo appId={a.id} name={a.name} size={22} />
-            <span className="bapps__name">{a.name}</span>
-            <span className="bapps__proto">{a.protocol}</span>
-            <span className="bapps__mark" aria-hidden>
-              {chosen === a.id && <Check size={13} strokeWidth={3} />}
-            </span>
-          </button>
-        ))}
-        {matches.length === 0 && <p className="bapps__none">No application matches “{q}”.</p>}
-      </div>
-    </div>
-  )
-}
-
-/* The sentinel for "no application".
-
-   `Picker` speaks in strings and the model's absence is `null`, so the two need
-   one agreed token between them. A named constant rather than `''`, because an
-   empty string is also what a cleared search field holds and the two would be
-   indistinguishable at the call site. */
-const NO_APP = '__none__'
-
-/* Toggle one id in the audience, without the caller knowing which list it
-   belongs to.
-
-   `Picker` emits one id and does not care what kind of thing it is; the model
-   keeps groups and people apart. Looking the id up against the group list is
-   what bridges them — and it is the reason the picker can offer both kinds in
-   one flat, searchable list, which is what let the Groups/People TABS go. A tab
-   is a mode, and a mode exists here only because five groups and twenty-four
-   people would not fit in a 340px box. In a panel as tall as the room below the
-   trigger they both fit under headings, and one search crosses both. */
-function toggleAudience(a: Audience, id: string, groups: { id: string }[]): Audience {
-  const isGroup = groups.some((g) => g.id === id)
-  const list = isGroup ? a.groupIds : a.userIds
-  const next = list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
-  /* `everyone: false` on every write. A policy that names somebody does not
-     also govern everyone, and leaving the flag set would make the two disagree
-     — see the note on `Audience`. */
-  return isGroup ? { ...a, everyone: false, groupIds: next } : { ...a, everyone: false, userIds: next }
-}
+   Both use `ApplicationField` now: one control that states the current answer
+   and opens a picker. See screens/scope-fields.tsx. */
 
 function NameStep({
   picked,
@@ -631,8 +563,6 @@ function NameStep({
   setName,
   appId,
   setAppId,
-  audience,
-  setAudience,
   onBack,
   onCreate,
   onGuided,
@@ -642,59 +572,15 @@ function NameStep({
   setName: (v: string) => void
   appId: string | null
   setAppId: (v: string | null) => void
-  audience: Audience
-  setAudience: (a: Audience) => void
   onBack: () => void
   onCreate: () => void
   /* Absent in lite: the guided build is withheld, and a button that opens
      nothing is worse than no button. */
   onGuided?: () => void
 }) {
-  const store = useBrand()
-  /* A required field, like the name. It is one of the three facts that make a
-     policy a policy, and the two ways to get it wrong — govern nobody, or
-     govern everyone by accident — are both worse than being asked. */
-  const noAudience = !audience.everyone && audience.groupIds.length === 0 && audience.userIds.length === 0
-
-  /* Groups first, then people, each under a heading — `Picker` emits one
-     whenever `group` CHANGES, so the caller owns the order and an unsorted list
-     would print "Groups, People, Groups". A person already inside a chosen
-     group says so rather than being refused: the union is deliberate, and an
-     exception you want to survive somebody editing the group is a real thing to
-     want. */
-  const audienceOptions = useMemo(
-    () => [
-      ...store.groups.map((g) => ({
-        value: g.id,
-        label: g.name,
-        meta: `${g.memberCount.toLocaleString()} members`,
-        group: 'Groups',
-        icon: Users,
-      })),
-      ...store.users.map((u) => ({
-        value: u.id,
-        label: u.name,
-        meta: audience.groupIds.includes(u.groupId) ? `${u.email} · already in ${store.groups.find((g) => g.id === u.groupId)?.name ?? 'a chosen group'}` : u.email,
-        group: 'People',
-        icon: UserRound,
-      })),
-    ],
-    [store.groups, store.users, audience.groupIds],
-  )
-
-  /* What the closed control says. Names up to three, then a count — never a
-     bare "N selected", and never a run of five names in a row that would
-     elide mid-word. The empty state states the size of the pool, so the
-     control says something even before it has an answer. */
-  const audienceSummary = useMemo(() => {
-    const names = [
-      ...audience.groupIds.map((id) => store.groups.find((g) => g.id === id)?.name ?? id),
-      ...audience.userIds.map((id) => store.users.find((u) => u.id === id)?.name ?? id),
-    ]
-    if (names.length === 0) return `Nobody yet — ${store.groups.length} groups and ${store.users.length} people to choose from`
-    if (names.length <= 3) return names.join(', ')
-    return `${names.slice(0, 3).join(', ')} +${names.length - 3}`
-  }, [audience, store.groups, store.users])
+  /* The two things a policy cannot be created without. The audience is not one
+     of them any more — see the note in the form below. */
+  const noApp = appId === null
 
   return (
     <section className={`bname2 ${picked ? 'has-preview' : ''}`}>
@@ -738,48 +624,26 @@ function NameStep({
           />
         </div>
 
-        {/* Required before optional. Who a policy governs is what makes it a
-            policy; what it protects is the part you are allowed to defer, and
-            it used to come first. */}
-        <div className="bname2__field">
-          <span className="bname2__label">
-            Applies to <i>*</i>
-          </span>
-          <Picker
-            label="Who this policy governs"
-            width="fill"
-            size="md"
-            multiple
-            searchable
-            value={[...audience.groupIds, ...audience.userIds]}
-            /* Names, not a count. `${n} selected` is the one thing a closed
-               control must not say — see `Picker.summary`. */
-            summary={audienceSummary}
-            options={audienceOptions}
-            onChange={(id) => setAudience(toggleAudience(audience, id, store.groups))}
-          />
-        </div>
+        {/* Two questions, and the second is not optional.
 
+            "Applies to" has gone from this form. It was a required question on
+            the POLICY, answered with a tabbed list of groups and people, and it
+            is answered per RULE now by the Who step — which reads and writes
+            the `group` and `user` conditions the rule already held.
+            `blankPolicy` has always defaulted a new policy to `EVERYONE` with
+            the reason written beside it, "a new policy governs everyone until
+            somebody narrows it", so asking for the narrowing here was asking
+            for a decision the model was happy to defer and the rules are better
+            placed to make.
+
+            The application became required in the same move. A policy exists to
+            govern access TO something; one that names nothing is a set of rules
+            no sign-in can ever reach. */}
         <div className="bname2__field">
           <span className="bname2__label">
-            Application <em>Optional</em>
+            Application <i>*</i>
           </span>
-          <Picker
-            label="Application this policy protects"
-            width="fill"
-            size="md"
-            searchable
-            value={appId ?? NO_APP}
-            /* A statement of the current answer, not an instruction. "No
-               application" is a legitimate answer to an optional question, and
-               a placeholder reading "Choose…" would make it look unfinished. */
-            summary={appId ? (store.apps.find((a) => a.id === appId)?.name ?? appId) : 'No application'}
-            options={[
-              { value: NO_APP, label: 'No application', meta: 'The rules are saved, but nothing reaches them until one is attached.' },
-              ...store.apps.map((a) => ({ value: a.id, label: a.name, meta: a.protocol })),
-            ]}
-            onChange={(id) => setAppId(id === NO_APP ? null : id)}
-          />
+          <ApplicationField appId={appId} onChange={setAppId} />
         </div>
       </div>
 
@@ -841,11 +705,9 @@ function NameStep({
         <p className="bbar__note">
           {!name.trim()
             ? 'Give the policy a name to continue.'
-            : noAudience
-              ? 'Choose at least one group or person for this policy to govern.'
-              : appId === null
-                ? 'Created switched off, with no application attached. You can choose one from Edit details.'
-                : 'Created switched off. Nothing changes for users until you turn it on.'}
+            : noApp
+              ? 'Choose the application this policy protects.'
+              : 'Created switched off. Nothing changes for users until you turn it on.'}
         </p>
         <div className="bbar__acts">
           <Button variant="ghost" onClick={onBack}>
@@ -871,7 +733,7 @@ function NameStep({
           </button>
           )}
 
-          <Button variant="brand" onClick={onCreate} disabled={!name.trim() || noAudience}>
+          <Button variant="brand" onClick={onCreate} disabled={!name.trim() || noApp}>
             Create policy
           </Button>
         </div>

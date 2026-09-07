@@ -2,10 +2,9 @@ import { useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 
 import { Button } from '../kit'
-import { reach, type Audience } from '../data'
+import { EVERYONE, reach, type Audience } from '../data'
 import { useBrand } from '../store'
-import { AudiencePicker } from './audience-drawer'
-import { AppList } from '../create/CreatePolicy'
+import { ApplicationField } from './scope-fields'
 
 import '../create/create.css'
 import './policy-details.css'
@@ -31,9 +30,11 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
 
   const [name, setName] = useState(saved?.name ?? '')
   const [appId, setAppId] = useState<string | null>(saved?.appId ?? null)
-  const [audience, setAudience] = useState<Audience>(
-    saved?.audience ?? { everyone: false, groupIds: [], userIds: [] },
-  )
+  /* Carried, not edited. The form no longer asks who the policy governs — the
+     Who step on each rule does — so this holds whatever the policy already had
+     and writes it back unchanged, rather than a save silently narrowing or
+     widening a policy through a field that is not on screen. */
+  const [audience] = useState<Audience>(saved?.audience ?? EVERYONE)
 
   if (!saved) {
     return (
@@ -43,7 +44,7 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
     )
   }
 
-  const noAudience = !audience.everyone && audience.groupIds.length === 0 && audience.userIds.length === 0
+  const noApp = appId === null
   const dirty =
     name !== saved.name ||
     appId !== (saved.appId ?? null) ||
@@ -82,24 +83,20 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
             />
           </div>
 
-          <div className="bname2__field bname2__field--fill">
-            <span className="bname2__label">
-              Application <em>Optional</em>
-            </span>
-            <AppList chosen={appId} onChange={setAppId} />
-          </div>
+          {/* Two questions, matching the create form exactly.
 
-          <div className="bname2__field bname2__field--fill">
+              Both were resident scrolling lists — ten applications and a
+              tabbed roster of groups and people, 475px each. "Applies to" is
+              gone: it is answered per RULE now by the Who step, which writes
+              the `group` and `user` conditions the rule already held, and a
+              policy-level audience asked in two places was two chances for the
+              two to disagree. The application is required, because a policy
+              that names nothing is a set of rules no sign-in can reach. */}
+          <div className="bname2__field">
             <span className="bname2__label">
-              Applies to <em>Groups and people</em>
+              Application <i>*</i>
             </span>
-            <AudiencePicker
-              audience={audience}
-              groups={store.groups}
-              users={store.users}
-              unlisted={store.unlistedUsers}
-              onChange={setAudience}
-            />
+            <ApplicationField appId={appId} onChange={setAppId} />
           </div>
         </div>
       </section>
@@ -108,8 +105,8 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
         <p className="bbar__note">
           {!name.trim()
             ? 'A policy needs a name.'
-            : noAudience
-              ? 'Choose at least one group or person for this policy to govern.'
+            : noApp
+              ? 'Choose the application this policy protects.'
               : dirty
                 ? `About ${reach(audience, store.groups, store.users).toLocaleString()} people will be governed by this policy.`
                 : 'Nothing changed.'}
@@ -120,7 +117,7 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
           </Button>
           <Button
             variant="brand"
-            disabled={!name.trim() || noAudience || !dirty}
+            disabled={!name.trim() || noApp || !dirty}
             onClick={() => {
               /* Saved straight through rather than staged into the builder's
                  undo stack. These are policy facts, not rule edits, and mixing

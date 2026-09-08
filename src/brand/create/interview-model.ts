@@ -75,7 +75,12 @@ export const QUESTIONS: Question[] = [
       { id: 'unmanaged', label: 'Devices we do not manage', caption: 'Personal laptops and phones' },
       { id: 'offsite', label: 'Sign-ins from outside the network', caption: 'Anywhere that is not an office' },
       { id: 'risky', label: 'Sessions the risk engine flags', caption: 'Impossible travel, new fingerprints' },
-      { id: 'newuser', label: 'Accounts with no second factor yet', caption: 'First logins and MFA resets' },
+      /* A fourth option — "Accounts with no second factor yet" — stood here and
+         composed a rule on `auth-state`. That condition is gone from the
+         catalogue, so the option would have produced a rule the builder cannot
+         draw and the simulator cannot decide. Removed rather than left pointing
+         at nothing: `compose()` calls `card()` with whatever the threat maps
+         to, and `card()` throws when handed nothing. */
     ],
   },
   {
@@ -126,7 +131,6 @@ const SEEDS: { q: QuestionId; option: string; words: RegExp }[] = [
   { q: 'threat', option: 'unmanaged', words: /\bunmanaged|personal device|byod|not enrolled|unenrolled|mdm\b/i },
   { q: 'threat', option: 'offsite', words: /\bremote|off.?site|outside|home|travel|abroad|public wifi\b/i },
   { q: 'threat', option: 'risky', words: /\brisk|suspicious|anomal|threat|compromis|attack\b/i },
-  { q: 'threat', option: 'newuser', words: /\bnew (user|joiner|hire)|first login|onboard|no mfa|reset\b/i },
 
   { q: 'response', option: 'deny', words: /\bblock|deny|refuse|stop|prevent|ban\b/i },
   { q: 'response', option: 'strong', words: /\bphishing.?resistant|webauthn|fido|passkey|security key|hardware\b/i },
@@ -159,7 +163,7 @@ export function nameFor(text: string, answers: Answers): string {
   }
   const t = answers.threat
   const what =
-    t === 'unmanaged' ? 'device trust' : t === 'offsite' ? 'off-network access' : t === 'risky' ? 'risk step-up' : t === 'newuser' ? 'enrolment' : 'access'
+    t === 'unmanaged' ? 'device trust' : t === 'offsite' ? 'off-network access' : t === 'risky' ? 'risk step-up' : 'access'
   return `${who} — ${what}`
 }
 
@@ -172,17 +176,23 @@ function make(over: Partial<Rule> & Pick<Rule, 'name'>): Rule {
 }
 
 const THREAT_CONDITION: Record<string, () => ReturnType<typeof cond>> = {
-  unmanaged: () => cond('mdm', 'is', ['Not enrolled']),
+  /* A device profile, because there is no MDM condition. `fp-corp` is the
+     profile the seed treats as "ours", so not matching it is the closest this
+     catalogue gets to "we do not manage this". */
+  unmanaged: () => cond('fingerprint', 'does not match', ['fp-corp']),
   offsite: () => cond('zone', 'not in zone', ['office']),
-  risky: () => cond('ml-risk', 'is', ['High', 'Medium']),
-  newuser: () => cond('auth-state', 'is', ['No MFA configured']),
+  /* `device-risk` and not `ml-risk`. The ML score is listed as coming soon and
+     cannot be authored, so an interview that produced one would produce a rule
+     nobody can edit afterwards. 30 is the threshold that catches Medium (48)
+     and High (86) on the shipped scale and leaves Low (12) alone — the same two
+     bands the enum form named. */
+  risky: () => cond('device-risk', 'above', ['30']),
 }
 
 const THREAT_NAME: Record<string, string> = {
   unmanaged: 'Unmanaged devices',
   offsite: 'Off-network sign-ins',
   risky: 'Flagged sessions',
-  newuser: 'Accounts without a second factor',
 }
 
 /* Who the composed POLICY governs.
@@ -259,9 +269,8 @@ export function narrate(rules: Rule[]): string[] {
 function describe(r: Rule): string {
   const c = leaves(r.when)[0]
   if (!c) return 'anyone still unmatched'
-  if (c.typeId === 'mdm') return 'a device we do not manage'
+  if (c.typeId === 'fingerprint') return c.operator === 'matches' ? 'a device we recognise' : 'a device we do not recognise'
   if (c.typeId === 'zone') return c.operator === 'in zone' ? 'a sign-in from the office network' : 'a sign-in from outside the office network'
-  if (c.typeId === 'ml-risk') return 'a session the risk engine flagged'
-  if (c.typeId === 'auth-state') return 'an account with no second factor'
+  if (c.typeId === 'device-risk') return 'a session the risk engine flagged'
   return 'a matching sign-in'
 }

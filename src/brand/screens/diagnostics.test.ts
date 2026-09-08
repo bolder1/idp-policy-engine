@@ -67,7 +67,7 @@ const ids = (p: Policy) => diagnose(p, groups).map((d) => d.id.split('-')[0])
 
 describe('unreachable rules', () => {
   it('flags a rule sitting under a conditionless rule', () => {
-    const p = policy([rule({ when: anySignIn() }), rule({ when: when(card(cond('country', 'is', ['India']))) })])
+    const p = policy([rule({ when: anySignIn() }), rule({ when: when(card(cond('day', 'is', ['Monday']))) })])
     const d = diagnose(p, groups).find((x) => x.id.startsWith('unreachable'))
     expect(d).toBeDefined()
     expect(d!.ruleIndex).toBe(1)
@@ -78,8 +78,8 @@ describe('unreachable rules', () => {
   it('stays quiet when the earlier rule HAS conditions — it might not match', () => {
     // The whole soundness argument: a conditional rule above proves nothing.
     const p = policy([
-      rule({ when: when(card(cond('country', 'is', ['India']))) }),
-      rule({ when: when(card(cond('device-type', 'is', ['Mobile'])))}),
+      rule({ when: when(card(cond('day', 'is', ['Monday']))) }),
+      rule({ when: when(card(cond('fingerprint', 'matches', ['fp-corp'])))}),
     ])
     expect(ids(p)).not.toContain('unreachable')
   })
@@ -91,7 +91,7 @@ describe('unreachable rules', () => {
        nothing. Same silence, sounder reason. */
     const p = policy([
       rule({ when: when(card(cond('group', 'in', ['finance']))) }),
-      rule({ when: when(card(cond('country', 'is', ['India']))) }),
+      rule({ when: when(card(cond('day', 'is', ['Monday']))) }),
     ])
     expect(ids(p)).not.toContain('unreachable')
   })
@@ -106,7 +106,7 @@ describe('unreachable rules', () => {
   })
 
   it('ignores a disabled catch-all — a switched-off rule blocks nothing', () => {
-    const p = policy([rule({ enabled: false }), rule({ when: when(card(cond('country', 'is', ['India']))) })])
+    const p = policy([rule({ enabled: false }), rule({ when: when(card(cond('day', 'is', ['Monday']))) })])
     expect(ids(p)).not.toContain('unreachable')
   })
 })
@@ -114,7 +114,7 @@ describe('unreachable rules', () => {
 describe('contradictory conditions', () => {
   it('flags is / is not on the same value inside one card', () => {
     const p = policy([
-      rule({ when: when(card(cond('country', 'is', ['India']), cond('country', 'is not', ['India']))) }),
+      rule({ when: when(card(cond('day', 'is', ['Monday']), cond('day', 'is not', ['Monday']))) }),
     ])
     const d = diagnose(p, groups).find((x) => x.id.startsWith('contradiction'))
     expect(d).toBeDefined()
@@ -124,7 +124,7 @@ describe('contradictory conditions', () => {
   it('stays quiet when the pair sits in two cards — either alternative can satisfy it', () => {
     const p = policy([
       rule({
-        when: when(card(cond('country', 'is', ['India'])), card(cond('country', 'is not', ['India']))),
+        when: when(card(cond('day', 'is', ['Monday'])), card(cond('day', 'is not', ['Monday']))),
       }),
     ])
     expect(ids(p)).not.toContain('contradiction')
@@ -132,7 +132,7 @@ describe('contradictory conditions', () => {
 
   it('stays quiet when the values do not overlap', () => {
     const p = policy([
-      rule({ when: when(card(cond('country', 'is', ['India']), cond('country', 'is not', ['Germany']))) }),
+      rule({ when: when(card(cond('day', 'is', ['Monday']), cond('day', 'is not', ['Tuesday']))) }),
     ])
     expect(ids(p)).not.toContain('contradiction')
   })
@@ -171,10 +171,10 @@ describe('contradictory conditions', () => {
      not symmetric. */
   it('reads the pair in either authoring order', () => {
     const covered = policy([
-      rule({ when: when(card(cond('country', 'is not', ['India', 'Germany']), cond('country', 'is', ['India']))) }),
+      rule({ when: when(card(cond('day', 'is not', ['Monday', 'Tuesday']), cond('day', 'is', ['Monday']))) }),
     ])
     const partial = policy([
-      rule({ when: when(card(cond('country', 'is not', ['India']), cond('country', 'is', ['India', 'Germany']))) }),
+      rule({ when: when(card(cond('day', 'is not', ['Monday']), cond('day', 'is', ['Monday', 'Tuesday']))) }),
     ])
     expect(ids(covered)).toContain('contradiction')
     expect(ids(partial)).not.toContain('contradiction')
@@ -240,7 +240,7 @@ describe('contradictory conditions', () => {
     const p = policy([
       rule({
         when: {
-          cards: [{ ...card(cond('country', 'is', ['India']), cond('country', 'is not', ['India'])), join: 'or' }],
+          cards: [{ ...card(cond('day', 'is', ['Monday']), cond('day', 'is not', ['Monday'])), join: 'or' }],
         },
       }),
     ])
@@ -253,7 +253,7 @@ describe('contradictory conditions', () => {
   it('reports a repeat whose values were typed in the other order', () => {
     const p = policy([
       rule({
-        when: when(card(cond('country', 'is', ['India', 'Germany']), cond('country', 'is', ['Germany', 'India']))),
+        when: when(card(cond('day', 'is', ['Monday', 'Tuesday']), cond('day', 'is', ['Tuesday', 'Monday']))),
       }),
     ])
     expect(ids(p)).toContain('duplicate')
@@ -261,7 +261,7 @@ describe('contradictory conditions', () => {
 
   it('reports an exact repeat as info, not an error — it is redundant, not broken', () => {
     const p = policy([
-      rule({ when: when(card(cond('country', 'is', ['India']), cond('country', 'is', ['India']))) }),
+      rule({ when: when(card(cond('day', 'is', ['Monday']), cond('day', 'is', ['Monday']))) }),
     ])
     const d = diagnose(p, groups).find((x) => x.id.startsWith('duplicate'))
     expect(d?.severity).toBe('info')
@@ -278,7 +278,7 @@ describe('shadowing is reported on the cause', () => {
   })
 
   it('says nothing when the catch-all is last, which is the correct place for one', () => {
-    const p = policy([rule({ when: when(card(cond('country', 'is', ['India']))) }), rule({ when: anySignIn() })])
+    const p = policy([rule({ when: when(card(cond('day', 'is', ['Monday']))) }), rule({ when: anySignIn() })])
     expect(ids(p)).not.toContain('catchall')
   })
 })
@@ -355,7 +355,7 @@ describe('impact', () => {
 
   it('never reports a share above 100%, however the estimate was seeded', () => {
     const p = policy(
-      [rule({ when: when(card(cond('country', 'is', ['India']))), matchEstimate: 9999 })],
+      [rule({ when: when(card(cond('day', 'is', ['Monday']))), matchEstimate: 9999 })],
       audienceOf(['executives']),
     )
     expect(impactOf(p, 0, groups).share).toBe(100)
@@ -383,9 +383,9 @@ describe('outcome split', () => {
 describe('subsumption and duplication', () => {
   it('flags a rule made more specific than one above it', () => {
     const p = policy([
-      rule({ when: when(card(cond('mdm', 'is', ['Not enrolled']))) }),
+      rule({ when: when(card(cond('zone', 'in zone', ['office']))) }),
       rule({
-        when: when(card(cond('mdm', 'is', ['Not enrolled']), cond('ml-risk', 'is', ['High']))),
+        when: when(card(cond('zone', 'in zone', ['office']), cond('ml-risk', 'is', ['High']))),
       }),
     ])
     const d = diagnose(p, groups).find((x) => x.id.startsWith('subsumed'))
@@ -395,8 +395,8 @@ describe('subsumption and duplication', () => {
 
   it('stays quiet when the later rule is BROADER, which is reachable', () => {
     const p = policy([
-      rule({ when: when(card(cond('mdm', 'is', ['Not enrolled']), cond('ml-risk', 'is', ['High']))) }),
-      rule({ when: when(card(cond('mdm', 'is', ['Not enrolled']))) }),
+      rule({ when: when(card(cond('zone', 'in zone', ['office']), cond('ml-risk', 'is', ['High']))) }),
+      rule({ when: when(card(cond('zone', 'in zone', ['office']))) }),
     ])
     expect(ids(p)).not.toContain('subsumed')
   })
@@ -412,13 +412,13 @@ describe('subsumption and duplication', () => {
   })
 
   it('flags an exact duplicate as unreachable', () => {
-    const c = () => when(card(cond('user-type', 'is', ['Contractor'])))
+    const c = () => when(card(cond('group', 'in', ['contractors'])))
     const p = policy([rule({ when: c() }), rule({ when: c() })], audienceOf(['contractors']))
     expect(ids(p)).toContain('dupe')
   })
 
   it('calls out a same-predicate rule with a DIFFERENT outcome as a contradiction', () => {
-    const c = () => when(card(cond('user-type', 'is', ['Contractor'])))
+    const c = () => when(card(cond('group', 'in', ['contractors'])))
     const p = policy(
       [rule({ when: c(), decision: '1fa' }), rule({ when: c(), decision: '2fa' })],
       audienceOf(['contractors']),
@@ -430,8 +430,8 @@ describe('subsumption and duplication', () => {
 
   it('ignores value ordering when comparing predicates', () => {
     const p = policy([
-      rule({ when: when(card(cond('device-type', 'is', ['Mobile', 'Tablet']))) }),
-      rule({ when: when(card(cond('device-type', 'is', ['Tablet', 'Mobile']))) }),
+      rule({ when: when(card(cond('fingerprint', 'matches', ['fp-corp', 'fp-byod']))) }),
+      rule({ when: when(card(cond('fingerprint', 'matches', ['fp-byod', 'fp-corp']))) }),
     ])
     expect(ids(p)).toContain('dupe')
   })
@@ -439,10 +439,10 @@ describe('subsumption and duplication', () => {
   it('ignores card ordering too — the same alternatives written the other way round', () => {
     const p = policy([
       rule({
-        when: when(card(cond('country', 'is', ['India'])), card(cond('device-type', 'is', ['Mobile']))),
+        when: when(card(cond('day', 'is', ['Monday'])), card(cond('fingerprint', 'matches', ['fp-corp']))),
       }),
       rule({
-        when: when(card(cond('device-type', 'is', ['Mobile'])), card(cond('country', 'is', ['India']))),
+        when: when(card(cond('fingerprint', 'matches', ['fp-corp'])), card(cond('day', 'is', ['Monday']))),
       }),
     ])
     expect(ids(p)).toContain('dupe')
@@ -451,7 +451,7 @@ describe('subsumption and duplication', () => {
 
 describe('configuration that contradicts itself', () => {
   it('flags a rule with no value to compare against', () => {
-    const p = policy([rule({ when: when(card(cond('country', 'is', []))) })])
+    const p = policy([rule({ when: when(card(cond('day', 'is', []))) })])
     const d = diagnose(p, groups).find((x) => x.id.startsWith('blank'))
     expect(d?.severity).toBe('error')
   })
@@ -480,7 +480,7 @@ describe('configuration that contradicts itself', () => {
       rule({
         when: when(
           card(cond('zone', 'not in zone', ['office']), cond('time', 'between', ['09:00', '17:00'])),
-          card(cond('device-type', 'is', ['Mobile'])),
+          card(cond('fingerprint', 'matches', ['fp-corp'])),
         ),
       }),
     ])
@@ -515,7 +515,7 @@ describe('impact honesty', () => {
 
   it('marks the estimate stale once the conditions have been edited', () => {
     const before = policy([
-      rule({ when: when(card(cond('country', 'is', ['India']))), matchEstimate: 108 }),
+      rule({ when: when(card(cond('day', 'is', ['Monday']))), matchEstimate: 108 }),
     ])
     const after: Policy = {
       ...before,
@@ -526,7 +526,7 @@ describe('impact honesty', () => {
 
     const narrowed: Policy = {
       ...before,
-      rules: [{ ...before.rules[0], when: when(card(cond('country', 'is', ['Germany']))) }],
+      rules: [{ ...before.rules[0], when: when(card(cond('day', 'is', ['Tuesday']))) }],
     }
     expect(impactOf(narrowed, 0, groups, before).basis).toBe('stale')
   })
@@ -540,9 +540,9 @@ describe('impact honesty', () => {
       rule({
         when: when(
           card(
-            cond('mdm', 'is', ['Not enrolled']),
+            cond('zone', 'in zone', ['office']),
             cond('ml-risk', 'is', ['High']),
-            cond('country', 'is', ['India']),
+            cond('day', 'is', ['Monday']),
           ),
         ),
         matchEstimate: 108,
@@ -554,8 +554,8 @@ describe('impact honesty', () => {
         {
           ...before.rules[0],
           when: when(
-            card(cond('mdm', 'is', ['Not enrolled']), cond('ml-risk', 'is', ['High'])),
-            card(cond('country', 'is', ['India'])),
+            card(cond('zone', 'in zone', ['office']), cond('ml-risk', 'is', ['High'])),
+            card(cond('day', 'is', ['Monday'])),
           ),
         },
       ],
@@ -564,7 +564,7 @@ describe('impact honesty', () => {
   })
 
   it('is a plain estimate when nothing has been touched', () => {
-    const p = policy([rule({ when: when(card(cond('country', 'is', ['India']))) })])
+    const p = policy([rule({ when: when(card(cond('day', 'is', ['Monday']))) })])
     expect(impactOf(p, 0, groups, p).basis).toBe('estimate')
   })
 })
@@ -576,7 +576,7 @@ describe('shadowedBy — the canvas beam', () => {
   })
 
   it('returns nothing for a rule that has conditions — it may not match', () => {
-    const p = policy([rule({ when: when(card(cond('country', 'is', ['India']))) }), rule({})])
+    const p = policy([rule({ when: when(card(cond('day', 'is', ['Monday']))) }), rule({})])
     expect(shadowedBy(p, 0)).toEqual([])
   })
 

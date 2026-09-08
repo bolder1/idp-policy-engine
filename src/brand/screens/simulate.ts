@@ -206,7 +206,14 @@ export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: 
   })
   const unknown = (detail: string): { state: CondState; detail: string } => ({ state: 'unknown', detail })
 
-  switch (t.id) {
+  /* On `c.typeId`, not on `t.id`, and the difference is a wrong answer.
+
+     `t` is the RESOLVED type, so a condition naming an attribute the catalogue
+     no longer has used to arrive here wearing the sentinel's id — or, before
+     the sentinel existed, wearing `zone`'s. Switching on the stored id means an
+     attribute this evaluator does not know falls to `default` and says so,
+     which is the one thing the trace has to be able to do. */
+  switch (c.typeId) {
     case 'zone': {
       if (!place.zonesIn) return unknown('“Any location” does not fix an origin, so zone membership is undecided')
       /* The half the condition asked about, and nothing wider. A rule scoped to

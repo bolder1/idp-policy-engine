@@ -88,7 +88,7 @@ describe('partSummary', () => {
        the card must say two, because the group is reported by the Who button
        directly beside it. */
     const r = ruleWith(
-      when(card(cond('group', 'in', ['finance']), cond('country', 'is', ['IN']), cond('time', 'between', ['09:00', '17:00']))),
+      when(card(cond('group', 'in', ['finance']), cond('day', 'is', ['Monday']), cond('time', 'between', ['09:00', '17:00']))),
     )
     expect(partSummary(r, 'when', resolve).text).toBe('2 conditions → Let in')
   })
@@ -100,7 +100,7 @@ describe('partSummary', () => {
   })
 
   it('singularises one condition', () => {
-    expect(partSummary(ruleWith(when(card(cond('country', 'is', ['IN'])))), 'when', resolve).text).toBe(
+    expect(partSummary(ruleWith(when(card(cond('day', 'is', ['Monday'])))), 'when', resolve).text).toBe(
       '1 condition → Let in',
     )
   })
@@ -126,12 +126,12 @@ describe('partSummary', () => {
        rule, so no single phrase is true of it. The button stays and says so —
        a control that vanishes when a rule grows an OR is a card changing shape
        for a reason nobody can see. */
-    const r = ruleWith(when(card(cond('group', 'in', ['finance'])), card(cond('country', 'is', ['IN']))))
+    const r = ruleWith(when(card(cond('group', 'in', ['finance'])), card(cond('day', 'is', ['Monday']))))
     expect(partSummary(r, 'who', resolve)).toEqual({ text: 'Per alternative', dim: true })
   })
 
   it('still counts the conditions of an OR-shaped rule across every alternative', () => {
-    const r = ruleWith(when(card(cond('group', 'in', ['finance'])), card(cond('country', 'is', ['IN']))))
+    const r = ruleWith(when(card(cond('group', 'in', ['finance'])), card(cond('day', 'is', ['Monday']))))
     expect(partSummary(r, 'when', resolve).text).toBe('1 condition → Let in')
   })
 })

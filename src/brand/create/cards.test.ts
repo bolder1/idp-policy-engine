@@ -53,7 +53,18 @@ describe('template card content budgets', () => {
 
   it('carries multi-rule templates, so the scrolling back face is actually exercised', () => {
     const deep = scenarios.filter((s) => s.rules.length >= 4)
-    expect(deep.length, 'templates with 4+ rules').toBeGreaterThanOrEqual(3)
+    /* Two, and it was three. The condition catalogue shrank and two templates
+       went with it: `s-firstlogin` was one rule gated on `auth-state`, which no
+       longer exists, and `s-contractor-life` lost the same rule and dropped
+       from four to three.
+
+       The number is a census of the fixture rather than the thing being
+       protected — what this test is for is that SOME template is deep enough to
+       need the back face to scroll, and the assertion below still pins a
+       five-rule one. Lowering the census to match the fixture keeps that;
+       inventing a fourth rule to keep the number at three would be padding the
+       fixture to satisfy a count. */
+    expect(deep.length, 'templates with 4+ rules').toBeGreaterThanOrEqual(2)
     expect(Math.max(...scenarios.map((s) => s.rules.length))).toBeGreaterThanOrEqual(5)
   })
 

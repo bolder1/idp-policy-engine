@@ -156,20 +156,17 @@
    them. The glyph keeps the colour and loses the container, which is the call
    the condition block's category mark arrived at too.
 
-   The tone carries the CATEGORY, and that is what earns the mark rather than
-   making it decoration: searching flattens the list, and once the heading is
-   off screen a 10px line of muted text was the only thing saying which family a
-   hit came from. */
+   The tone is gone and the glyph stays. Five hues down a column of sixteen,
+   beside a tinted tag and two tinted weight controls, was four coloured objects
+   per row — and colour that appears on every row is not marking anything. The
+   SHAPE still distinguishes the signals, which is the half that was doing the
+   work: sixteen distinct glyphs, chosen apart on purpose (see the note beside
+   `SIGNAL_ICON`), read as sixteen different things in one ink perfectly well. */
 .brs__mark {
   display: grid; place-items: center;
   width: 20px; height: 20px; flex: none;
-  color: var(--sig-fg, var(--text-tertiary));
+  color: var(--text-tertiary);
 }
-.brs__mark.is-info { --sig-fg: var(--fb-info-fg); }
-.brs__mark.is-accent { --sig-fg: var(--fb-accent-fg); }
-.brs__mark.is-magenta { --sig-fg: var(--fb-magenta-fg); }
-.brs__mark.is-notice { --sig-fg: var(--fb-notice-fg); }
-.brs__mark.is-lime { --sig-fg: var(--fb-lime-fg); }
 /* The name and its category on one line, the sentence under both.
 
    The pill used to render only while searching, on the reasoning that the
@@ -186,16 +183,9 @@
   font-style: normal; font-size: 10px; font-weight: var(--fw-medium);
   line-height: 1; letter-spacing: 0.01em;
   padding: 0 7px; border-radius: var(--radius-full);
-  background: var(--sig-bg, var(--fb-neutral-bg));
-  color: var(--sig-fg, var(--fb-neutral-fg));
+  background: var(--fb-neutral-bg);
+  color: var(--fb-neutral-fg);
 }
-/* Same tone as the mark to its left, so the two read as one statement about the
-   row rather than two marks competing. */
-.brs__cat.is-info { --sig-bg: var(--fb-info-bg); --sig-fg: var(--fb-info-fg); }
-.brs__cat.is-accent { --sig-bg: var(--fb-accent-bg); --sig-fg: var(--fb-accent-fg); }
-.brs__cat.is-magenta { --sig-bg: var(--fb-magenta-bg); --sig-fg: var(--fb-magenta-fg); }
-.brs__cat.is-notice { --sig-bg: var(--fb-notice-bg); --sig-fg: var(--fb-notice-fg); }
-.brs__cat.is-lime { --sig-bg: var(--fb-lime-bg); --sig-fg: var(--fb-lime-fg); }
 
 .brs__col { display: flex; align-items: center; gap: var(--space-3); }
 /* Enough room for a 13px mark and its name to sit as one label rather than as

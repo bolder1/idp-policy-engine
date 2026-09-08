@@ -47,7 +47,14 @@ function everyCombination(): Answers[] {
 describe('the interview', () => {
   it('produces a policy the linter cannot fault, for every possible set of answers', () => {
     const combos = everyCombination()
-    expect(combos).toHaveLength(576)
+    /* 432, and it was 576. The threat question lost its fourth option — the
+       one that composed a rule on `auth-state`, which is no longer a condition
+       — so the product of the five questions is 6 x 3 x 3 x 2 x 4.
+
+       Asserted rather than derived from QUESTIONS on purpose: a question
+       silently losing an option is exactly what this number is here to
+       notice. */
+    expect(combos).toHaveLength(432)
 
     const broken = combos
       .map((a) => ({ a, errors: diagnose(shell(a), groups).filter((d) => d.severity === 'error') }))
@@ -75,7 +82,7 @@ describe('the interview', () => {
 
   it('puts the guard above the relief, because first match wins', () => {
     const rules = compose({ audience: 'finance', threat: 'unmanaged', response: 'mfa', relief: 'yes', remember: '30' })
-    const guard = rules.findIndex((r) => leaves(r.when).some((c) => c.typeId === 'mdm'))
+    const guard = rules.findIndex((r) => leaves(r.when).some((c) => c.typeId === 'fingerprint'))
     const relief = rules.findIndex((r) =>
       leaves(r.when).some((c) => c.typeId === 'zone' && c.operator === 'in zone'),
     )

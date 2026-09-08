@@ -300,3 +300,68 @@
 .cp__manage:hover { text-decoration: underline; }
 .cp__manage:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: 2px; }
 .cp__hint { font-size: 11px; color: var(--text-tertiary); }
+
+/* --- The catalogue, inline ------------------------------------------------------
+
+   Six rows in the panel that is already open, rather than a dialog over it.
+   Boxed and inset so it reads as a thing that has opened INSIDE the bracket —
+   the rows below it are conditions, and this is not one yet. */
+.cp__cat {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+.cp__cathead {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: 7px 8px 7px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary);
+}
+.cp__cathead > span { flex: 1; min-width: 0; }
+.cp__catx {
+  display: grid; place-items: center; width: 20px; height: 20px; flex: none;
+  border: 0; border-radius: var(--radius-sm); background: none;
+  color: var(--text-tertiary); cursor: pointer;
+}
+.cp__catx:hover { background: var(--surface-raised); color: var(--text-primary); }
+.cp__catx:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+
+/* Two lines and a mark. The name is the thing; the hint is why you would pick
+   it, and it wraps rather than truncating — six rows can afford the height, and
+   a sentence cut mid-word is a sentence nobody finishes reading. */
+.cp__catrow {
+  display: grid; grid-template-columns: 15px minmax(0, 1fr); gap: 2px var(--space-3);
+  align-items: start; text-align: left;
+  padding: 9px 10px;
+  border: 0; border-top: 1px solid var(--border-subtle); background: none;
+  font: inherit; cursor: pointer;
+}
+.cp__catrow:first-of-type { border-top: 0; }
+.cp__catrow > svg { grid-row: 1 / span 2; margin-top: 1px; color: var(--text-tertiary); }
+.cp__catrow:hover { background: var(--surface-sunken); }
+.cp__catrow:focus-visible { outline: none; background: var(--surface-sunken); box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.cp__catname {
+  display: flex; align-items: center; gap: var(--space-2); min-width: 0;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
+}
+.cp__cathint { font-size: var(--fs-xs); line-height: 1.45; color: var(--text-tertiary); }
+.cp__catsoon {
+  flex: none; font-style: normal; font-size: 10px; font-weight: var(--fw-medium);
+  line-height: 1; padding: 3px 6px; border-radius: var(--radius-full);
+  background: var(--fb-neutral-bg); color: var(--fb-neutral-fg);
+}
+/* Dimmed, still readable, and not pressable. The row is here to say the shape
+   is going to grow, so hiding its sentence would defeat the point of listing
+   it. */
+.cp__catrow.is-soon { cursor: default; }
+.cp__catrow.is-soon:hover { background: none; }
+.cp__catrow.is-soon .cp__catname { color: var(--text-tertiary); }
+.cp__catrow.is-soon > svg { opacity: 0.5; }
+
+/* Listed and not choosable, in the pill's own attribute menu — same meaning as
+   `.cp__catrow.is-soon`, different list. */
+.cp__opt.is-soon { cursor: default; opacity: 0.55; }
+.cp__opt.is-soon:hover { background: none; }

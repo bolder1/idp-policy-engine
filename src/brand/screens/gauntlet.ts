@@ -91,11 +91,18 @@ export interface Challenge {
 /* The deck.
 
    Chosen to cover the axes the condition catalogue actually models — network
-   zone, device fingerprint, MDM, registration, trust age, risk signal, auth state,
-   user type, time of day — with at least one hostile and one ordinary card on
-   most of them. A deck that was all attacks would score a policy that denies
-   everything as perfect, which is why half of these are people trying to do
-   their jobs. */
+   zone, device profile, risk score, day and time of day, group membership —
+   with at least one hostile and one ordinary card on most of them. A deck that
+   was all attacks would score a policy that denies everything as perfect, which
+   is why half of these are people trying to do their jobs.
+
+   That list used to be longer: MDM state, device registration, trust age, auth
+   state and user type were axes too. The cards that TEST them are still here —
+   a card is a situation, and an account with no second factor is still a
+   situation the product has to handle — but three of them no longer carry a
+   `fix`, because there is no longer a condition that closes them. A suggestion
+   that cannot be built is worse than none: the preview would show it working
+   and the button would produce a rule that never fires. */
 export const DECK: Challenge[] = [
   {
     id: 'tor-exec',
@@ -133,11 +140,9 @@ export const DECK: Challenge[] = [
     userId: 'devon', place: 'Outside all zones', device: 'New / unknown', authState: 'No MFA configured', risk: 'High',  at: '23:05',
     want: 'deny',
     why: 'Asking for a second factor the account cannot produce is the same as asking for nothing. Enrolment has to happen before access, not instead of it.',
-    fix: {
-      name: 'Block accounts with no second factor',
-      conditions: [{ typeId: 'auth-state', operator: 'is', values: ['No MFA configured'] }],
-      why: 'Asking for a factor the account cannot produce is the same as asking for nothing. Enrolment has to happen before access, not instead of it.',
-    },
+    /* No fix. `auth-state` is gone from the catalogue and nothing replaces it,
+       so this card can be diagnosed and cannot be closed. The card stays: the
+       situation is real and a policy that lets it through is still wrong. */
   },
   {
     id: 'expired-trust',
@@ -148,9 +153,9 @@ export const DECK: Challenge[] = [
     want: '2fa',
     why: 'Expired trust is not the same as a hostile device — re-verify it, do not lock the person out of their work.',
     fix: {
-      name: 'Verify unmanaged devices',
-      conditions: [{ typeId: 'mdm', operator: 'is', values: ['Not enrolled'] }],
-      why: 'Enrolment is the durable signal here. Trust age drifts as devices come and go; MDM state does not.',
+      name: 'Verify devices we do not recognise',
+      conditions: [{ typeId: 'fingerprint', operator: 'does not match', values: ['fp-managed'] }],
+      why: 'Recognition is the durable signal here. Trust age drifts as devices come and go; whether the profile still matches does not.',
     },
   },
   {
@@ -163,8 +168,12 @@ export const DECK: Challenge[] = [
     why: 'Odd hours alone are weak evidence — plenty of people work late. Verify, do not accuse.',
     fix: {
       name: 'Verify contractors',
-      conditions: [{ typeId: 'user-type', operator: 'is', values: ['Contractor'] }],
-      why: 'Written against who they are rather than the hour, because the hour is weak evidence and the contract status is not.',
+      /* `user-type` is gone; `group` is the only survivor that says who somebody
+         is. It is a WHO rather than a WHEN, and it is offered here anyway
+         because the card's argument is precisely that the rule should be about
+         who they are rather than the hour. */
+      conditions: [{ typeId: 'group', operator: 'in', values: ['contractors'] }],
+      why: 'Written against who they are rather than the hour, because the hour is weak evidence and group membership is not.',
     },
   },
   {
@@ -177,7 +186,11 @@ export const DECK: Challenge[] = [
     why: 'A trusted network is not a trusted session. If the office is a free pass, an attacker only has to get inside it once.',
     fix: {
       name: 'Verify elevated risk',
-      conditions: [{ typeId: 'ml-risk', operator: 'is', values: ['High'] }],
+      /* `device-risk`, not `ml-risk`. The ML score is listed as coming soon
+         and cannot be authored, so proposing it would hand somebody a rule they
+         cannot open afterwards. 69 catches High (86) alone on the shipped
+         scale. */
+      conditions: [{ typeId: 'device-risk', operator: 'above', values: ['69'] }],
       why: 'A trusted network is not a trusted session. Without this, an attacker only has to get inside the office once.',
     },
   },
@@ -190,8 +203,8 @@ export const DECK: Challenge[] = [
     want: '2fa',
     why: 'Non-employees on their own hardware are the standard step-up case. Blocking them outright usually just moves the work somewhere unmanaged.',
     fix: {
-      name: 'Verify unmanaged devices',
-      conditions: [{ typeId: 'mdm', operator: 'is', values: ['Not enrolled'] }],
+      name: 'Verify devices we do not recognise',
+      conditions: [{ typeId: 'fingerprint', operator: 'does not match', values: ['fp-managed'] }],
       why: 'Covers every unmanaged device, not only contractors — an employee on personal hardware is the same exposure.',
     },
   },
@@ -223,9 +236,13 @@ export const DECK: Challenge[] = [
     want: '2fa',
     why: 'Off-network access to regulated data is worth one extra step. It is not worth a denial — that is how shadow IT starts.',
     fix: {
-      name: 'Verify unmanaged devices',
-      conditions: [{ typeId: 'mdm', operator: 'is', values: ['Not enrolled'] }],
-      why: 'Off-network is the obvious reading, but enrolment is the better one: it catches the same sign-in without punishing a managed laptop for being at home.',
+      /* Was enrolment, on the argument that it catches this sign-in without
+         punishing a managed laptop for being at home. That argument needed an
+         MDM condition and there is not one. Off-network is what is left, and it
+         is the reading this card's own `why` calls the obvious one. */
+      name: 'Step up off the office network',
+      conditions: [{ typeId: 'zone', operator: 'not in zone', values: ['office'] }],
+      why: 'Off-network access to regulated data is worth one extra step, wherever the device came from.',
     },
   },
   {
@@ -236,11 +253,7 @@ export const DECK: Challenge[] = [
     userId: 'priya', place: 'Office Network', device: 'New / unknown', authState: 'First time login', risk: 'Low', at: '09:05',
     want: '2fa',
     why: 'First login is the one moment an account is worth binding to a person. Skipping it means the first real verification never happens.',
-    fix: {
-      name: 'Verify first login and resets',
-      conditions: [{ typeId: 'auth-state', operator: 'is', values: ['First time login'] }],
-      why: 'First login is the one moment an account is worth binding to a person. Skip it and the first real verification never happens.',
-    },
+    /* No fix — see the note on `no-mfa`. */
   },
   {
     id: 'after-reset',
@@ -250,11 +263,7 @@ export const DECK: Challenge[] = [
     userId: 'arun', place: 'Office Network', device: 'Known < 90 days', authState: 'MFA recently reset', risk: 'Low', at: '13:40',
     want: '2fa',
     why: 'A help-desk reset is the most impersonated event in identity. Re-verifying here is what stops a phone call from becoming an account takeover.',
-    fix: {
-      name: 'Verify first login and resets',
-      conditions: [{ typeId: 'auth-state', operator: 'is', values: ['MFA recently reset'] }],
-      why: 'A help-desk reset is the most impersonated event in identity. This is what stops a phone call becoming an account takeover.',
-    },
+    /* No fix — see the note on `no-mfa`. */
   },
   {
     id: 'roaming-unknown-origin',
@@ -264,11 +273,15 @@ export const DECK: Challenge[] = [
     userId: 'arun', place: 'Any location', device: 'Known > 90 days', authState: 'Normal returning user', risk: 'Low', at: '17:15',
     want: '2fa',
     why: 'When the origin cannot be established, zone rules decide nothing. Something else has to, or the sign-in falls through to the default unexamined.',
-    fix: {
-      name: 'Verify unmanaged devices',
-      conditions: [{ typeId: 'mdm', operator: 'is', values: ['Not enrolled'] }],
-      why: 'Zone rules decide nothing when the origin cannot be placed, so the rule has to read something that is always known. Enrolment always is.',
-    },
+    /* No fix, and that IS this card's lesson now.
+
+       It used to propose an enrolment rule, on the grounds that when the origin
+       cannot be placed the rule has to read something that is always known.
+       Enrolment always was; it is not a condition any more. Every survivor that
+       could stand in — a zone, a device profile, a clock — either needs the
+       origin this card cannot supply or is not "always known" in the sense the
+       argument needs. So the card diagnoses and stops, rather than offering a
+       repair that would not repair it. */
   },
 ]
 

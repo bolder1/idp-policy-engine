@@ -89,7 +89,7 @@ const windowInside = (aff: string[], neg: string[]): boolean => {
 const NEGATIONS: Record<string, string> = {
   'is not': 'is',
   'not in zone': 'in zone',
-  'not recognised by': 'recognised by',
+  'does not match': 'matches',
   'not between': 'between',
   'not in': 'in',
 }

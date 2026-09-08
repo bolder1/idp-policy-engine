@@ -424,6 +424,7 @@ function AttrStep({
   weights,
   onValue,
   onWeight,
+  settings,
   onBack,
 }: {
   mode: ProfileMode
@@ -435,7 +436,21 @@ function AttrStep({
   weights: Record<string, number>
   onValue: (id: string, v: AttrConfigValue) => void
   onWeight: (id: string, w: number) => void
-  /** Absent on the detail page, where there is no step to go back to. */
+  /* Whether a ticked row opens its settings underneath it.
+
+     Off while the profile is being CREATED, on once it exists. Choosing what a
+     profile watches and tuning what each signal is worth are two jobs, and the
+     wizard step was doing both: every tick unfolded a weight dropdown and a
+     configuration control, so a person picking eight attributes answered
+     sixteen questions they had not asked for, in a list that grew under them
+     as they worked.
+
+     The defaults are not lost by hiding them — an untouched attribute keeps the
+     weight and the precision the catalogue gives it, which is the same value
+     the wizard would have written. So the wizard says WHAT is watched, and the
+     profile's own Attributes panel says how much each one counts. */
+  settings: boolean
+  /* Absent on the detail page, where there is no step to go back to. */
   onBack?: () => void
 }) {
   const [q, setQ] = useState('')
@@ -474,6 +489,7 @@ function AttrStep({
       on={a.always || picked.includes(a.id)}
       config={config}
       weights={weights}
+      settings={settings}
       onToggle={() => toggle(a.id)}
       onValue={onValue}
       onWeight={onWeight}
@@ -667,6 +683,7 @@ function AttrPickRow({
   on,
   config,
   weights,
+  settings,
   onToggle,
   onValue,
   onWeight,
@@ -676,6 +693,8 @@ function AttrPickRow({
   on: boolean
   config: Record<string, AttrConfigValue>
   weights: Record<string, number>
+  /** See `AttrStep`: off while creating, on once the profile exists. */
+  settings: boolean
   onToggle: () => void
   onValue: (id: string, v: AttrConfigValue) => void
   onWeight: (id: string, w: number) => void
@@ -684,9 +703,11 @@ function AttrPickRow({
      a disabled button rather than a live one with a handler that refuses.
 
      `disabled` and not `aria-disabled`: there is nothing to announce and
-     nothing to explain on press. The row still opens its settings — those are
-     the part a profile decides — so the control that is dead is exactly the
-     one with no decision behind it. */
+     nothing to explain on press. Where settings are shown at all, the row still
+     opens them — what a profile decides about an always-collected signal is not
+     WHETHER it is read but how much it counts, which is the more interesting
+     half — so the control that is dead is exactly the one with no decision
+     behind it. */
   const fixed = Boolean(attr.always)
   return (
     <div className={`bfp2__pickrow ${on ? 'is-on' : ''} ${fixed ? 'is-fixed' : ''}`}>
@@ -734,7 +755,7 @@ function AttrPickRow({
         </span>
       </button>
 
-      {on && (
+      {on && settings && (
         <div className="bfp2__pickvals">
           {/* Both, on a device row, and they are not the same question.
 
@@ -1224,7 +1245,7 @@ function CreateDrawer({
               text={
                 mode === 'os'
                   ? 'Each one you tick is a condition, and they all have to hold. A platform you do not name is not checked at all.'
-                  : 'Tick what this profile watches, then say how much each one counts. A ticked attribute opens its settings under its name.'
+                  : 'Tick what this profile watches. Each one starts at the weight the catalogue gives it — open the profile afterwards to change any of them.'
               }
             />
           </h4>
@@ -1237,6 +1258,7 @@ function CreateDrawer({
             weights={weights}
             onValue={(id, v) => setConfig((c) => ({ ...c, [id]: v }))}
             onWeight={(id, w) => setWeights((c) => ({ ...c, [id]: w }))}
+            settings={false}
             onBack={asksReach(mode) ? () => setAt(1) : undefined}
           />
         </section>
@@ -2360,6 +2382,7 @@ function AttributesDrawer({
         weights={weights}
         onValue={(id, v) => setConfig((c) => ({ ...c, [id]: v }))}
         onWeight={(id, w) => setWeights((c) => ({ ...c, [id]: w }))}
+        settings
       />
     </Drawer>
   )

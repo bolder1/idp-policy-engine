@@ -17,6 +17,7 @@ import {
 import { seedProfiles, type FingerprintProfile } from './fingerprint'
 import { seedHooks, type Hook } from './hooks'
 import { AUTH_METHODS, type AuthMethod } from './methods'
+import { leaves } from './predicate'
 
 /* -----------------------------------------------------------------------------
    How much is in the tenant — derived from who is looking.
@@ -206,9 +207,30 @@ export function policiesAt(depth: Depth): Policy[] {
 export function zonesAt(depth: Depth): Zone[] {
   // Nothing ships by default any more, so a day-one tenant gets the empty state.
   if (depth === 'none') return []
-  // One office network is what a small tenant has. The ASN zone, the geo zone
-  // and the anonymiser list are things somebody had to know to want.
-  if (depth === 'small') return seedZones.filter((z) => z.id === 'office')
+  /* Derived from what the small tenant's own policies name, not listed.
+
+     It was `z.id === 'office'`, on the reasoning that one office network is
+     what a small tenant has and the ASN zone, the geo zone and the anonymiser
+     list are things somebody had to know to want. That reasoning was sound and
+     the list stopped being true the moment a zone became the ONLY way to say
+     anything about a network: `uc3-country-allowlist` names `home-countries`
+     and `s9-finance` names `office-cidr`, so a Delegator's tenant held two
+     policies pointing at zones their tenant did not have — dangling references,
+     which fail silently by never matching.
+
+     Derived so it cannot drift again. Add a policy to `keep` above and its
+     zones come with it. */
+  if (depth === 'small') {
+    const named = new Set(
+      policiesAt('small').flatMap((p) =>
+        [...p.rules, p.fallback].flatMap((r) =>
+          r ? leaves(r.when).filter((c) => c.typeId === 'zone').flatMap((c) => c.values) : [],
+        ),
+      ),
+    )
+    named.add('office')
+    return seedZones.filter((z) => named.has(z.id))
+  }
   if (depth === 'medium') return seedZones
 
   /* The bulk case made literal. The doc calls seven hundred ranges a task mode
@@ -252,7 +274,11 @@ export function hooksAt(depth: Depth): Hook[] {
 
 export function fingerprintsAt(depth: Depth): FingerprintProfile[] {
   if (depth === 'none') return []
-  if (depth === 'small') return seedProfiles.slice(0, 1)
+  /* Named, not sliced. `seedProfiles.slice(0, 1)` was positional, so appending
+     five profiles to the seed was safe and inserting one before `fp-corp` would
+     silently have changed which profile a small tenant gets — a fixture that
+     depends on the order of a list nobody thinks of as ordered. */
+  if (depth === 'small') return seedProfiles.filter((p) => p.id === 'fp-corp')
   return seedProfiles
 }
 

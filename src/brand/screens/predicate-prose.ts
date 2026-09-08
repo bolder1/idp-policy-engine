@@ -97,7 +97,6 @@ export function conditionSentence(c: Condition, resolve?: NameLookup): string {
      zone's own meaning, and a clause restating a default is noise. */
   if (t.valueKind === 'zone') return `${c.operator} ${value}${c.scope ? (c.scope === 'ip' ? ', on the network only' : ', by location only') : ''}`
   if (t.valueKind === 'fingerprint') return `${c.operator} ${value}`
-  if (t.valueKind === 'hook') return `${value} ${c.operator}`
   return `${t.label} ${c.operator} ${value}`
 }
 

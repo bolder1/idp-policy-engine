@@ -134,7 +134,7 @@ describe('the profile decides what a rule catches', () => {
     nowMinutes: 570,
   }
 
-  /* "Device Risk Score above 60", against a High-risk sign-in. Under the
+  /* "Risk score above 60", against a High-risk sign-in. Under the
      shipped scale High is 86, so it fires. */
   const rule = { when: when(card(cond('device-risk', 'above', ['60']))) }
 

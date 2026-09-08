@@ -1080,4 +1080,140 @@ export const seedProfiles: FingerprintProfile[] = [
     restrictionSet: false,
     usedIn: 0,
   },
+  /* --- The profiles the rules used to spell out inline -----------------------
+
+     Five, and every one of them exists because a condition that used to say the
+     thing directly no longer can. `os is Windows`, `mdm is Enrolled`, `mac is
+     00:1B:44:…` and `posture passes Disk encryption` are gone from the
+     condition catalogue; a rule reaches the device through a profile now, so
+     the profiles have to be able to say what those rules said.
+
+     THREE OF THEM CANNOT, AND THIS IS THE HONEST PLACE TO SAY SO.
+
+     There is no MDM attribute in either catalogue. There is no disk-encryption,
+     screen-lock, antivirus or firewall attribute — the Security category is
+     `root`, `vm`, `secure-boot` and `app-integrity`, which are integrity
+     signals rather than posture checks. And `browser` is a match-PRECISION
+     choice ("Exact version" / "Major version" / "Family only"), not a browser
+     allowlist. So:
+
+       · `fp-managed` uses `domain` — directory-joined — as a stand-in for MDM
+         enrolment. Those are not the same fact. A domain-joined laptop with no
+         MDM agent satisfies this profile and did not satisfy the condition it
+         replaces. The name says "MDM-managed" because that is what the rules
+         using it mean; the attribute list is the closest this model can get.
+       · Posture checks have no stand-in at all. `fp-patched` carries the one
+         posture check with a real home — "OS up to date" is an OS floor, which
+         is exactly what an OS profile is — and disk encryption and screen lock
+         are simply dropped from the rules that named them.
+       · Browser allowlists are dropped.
+
+     Recorded rather than smoothed over, because a profile whose name promises
+     more than its attributes deliver is the failure mode this consolidation was
+     supposed to remove, and here it is reintroduced in one place under its own
+     name. Adding `mdm` and a posture group to `DEVICE_ATTRIBUTES` is the fix;
+     it is a separate change with its own catalogue argument.
+
+     `usedIn: 0` on all five. They are referenced by seeded policies the moment
+     this lands, so the number is wrong the way every other `usedIn` in this
+     file is wrong — stated, not derived. The Device profiles screen counts the
+     truth. */
+  {
+    id: 'fp-managed',
+    name: 'MDM-managed corporate device',
+    mode: 'device',
+    /* The four always-collected, plus the two that come closest to "this
+       machine is under management": directory membership and a verified boot
+       chain. */
+    enabled: ['device-type', 'os', 'browser', 'ip', 'domain', 'secure-boot'],
+    config: {},
+    weights: {},
+    reach: 'agent',
+    registration: 'self',
+    maxDevices: 3,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: true,
+    usedIn: 0,
+  },
+  {
+    id: 'fp-apple',
+    name: 'Managed Apple · iOS 17, macOS 14',
+    mode: 'os',
+    enabled: ['os-ios', 'os-macos'],
+    config: {
+      'os-ios': { op: 'gte', value: '17' },
+      'os-macos': { op: 'gte', value: '14' },
+    },
+    weights: {},
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: 3,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: true,
+    usedIn: 0,
+  },
+  {
+    id: 'fp-win-android',
+    name: 'Managed Android and Windows',
+    mode: 'os',
+    enabled: ['os-android', 'os-windows'],
+    config: {
+      'os-android': { op: 'gte', value: '13' },
+      'os-windows': { op: 'gte', value: '10' },
+    },
+    weights: {},
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: 3,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: true,
+    usedIn: 0,
+  },
+  /* The three MAC addresses that used to sit in the trading-floor rule are
+     three rows of a roster now. Worth knowing what that costs: they were
+     readable in the rule and they are not readable anywhere in this prototype —
+     no surface renders a roster's contents. `mac` is enabled so
+     `rosterNeedsMac` is satisfied; a roster profile that does not read MAC is
+     the exact inert state that function exists to name. */
+  {
+    id: 'fp-floor',
+    name: 'Trading floor terminals',
+    mode: 'device',
+    enabled: ['device-type', 'os', 'browser', 'ip', 'mac'],
+    config: {},
+    weights: {},
+    reach: 'agent',
+    registration: 'pre-approved',
+    maxDevices: null,
+    roster: { fileName: 'floor-terminals.csv', rows: 3, uploadedAt: '12 Aug 2026' },
+    autoRegister: false,
+    restrictionSet: true,
+    usedIn: 0,
+  },
+  /* Every platform named, each with a floor. An OS profile checks the platforms
+     it names and leaves the rest alone, so naming all four is "whatever you are
+     on, be current" — which is what "OS up to date" meant. */
+  {
+    id: 'fp-patched',
+    name: 'Current OS builds',
+    mode: 'os',
+    enabled: ['os-windows', 'os-macos', 'os-ios', 'os-android'],
+    config: {
+      'os-windows': { op: 'gte', value: '11' },
+      'os-macos': { op: 'gte', value: '15' },
+      'os-ios': { op: 'gte', value: '18' },
+      'os-android': { op: 'gte', value: '14' },
+    },
+    weights: {},
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: 3,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: true,
+    usedIn: 0,
+  },
 ]

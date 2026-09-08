@@ -39,7 +39,6 @@ import {
   tierKey,
   type RiskProfile,
   type RiskSignal,
-  type SignalCategory,
 } from '../risk-signals'
 
 import './risk-signals.css'
@@ -91,14 +90,6 @@ const SIGNAL_ICON: Record<string, LucideIcon> = {
   'high-activity': Activity,
 }
 
-const CATEGORY_TONE: Record<SignalCategory, string> = {
-  'Device integrity': 'accent',
-  Instrumentation: 'magenta',
-  'Network origin': 'info',
-  'Address reputation': 'notice',
-  Behaviour: 'lime',
-}
-
 /** The glyph for a signal, falling back rather than rendering nothing. */
 const signalIcon = (id: string): LucideIcon => SIGNAL_ICON[id] ?? Smartphone
 
@@ -111,7 +102,7 @@ const signalIcon = (id: string): LucideIcon => SIGNAL_ICON[id] ?? Smartphone
    report the same things with the same confidence.
 
    The thing that makes this a settings page rather than a decoration is at the
-   top of it: the scale. `device-risk` — "Device Risk Score above 60" — is the
+   top of it: the scale. `device-risk` — "Risk score above 60" — is the
    one condition in the product that compares a rule's threshold against a
    number, and that number now comes from here. So the strip is not a summary of
    the page, it is the page's output, and it moves while you edit.
@@ -187,7 +178,7 @@ export function RiskSignals() {
         <div className="brs__scale__what">
           <b>What a risk verdict scores</b>
           <em>
-            Rules compare against these with <strong>Device Risk Score</strong>. {onCount} of {RISK_SIGNALS.length} signals on.
+            Rules compare against these with <strong>Risk score</strong>, the one risk condition. {onCount} of {RISK_SIGNALS.length} signals on.
           </em>
         </div>
         <dl className="brs__bands">
@@ -307,7 +298,7 @@ function SignalTable({
               {/* Outside the text column, so the name and the sentence keep one
                   left edge down the whole table. Inside it, every row's text
                   would start wherever that row's glyph happened to end. */}
-              <i className={`brs__mark is-${CATEGORY_TONE[s.category]}`} aria-hidden>
+              <i className="brs__mark" aria-hidden>
                 {(() => {
                   const Ico = signalIcon(s.id)
                   return <Ico size={15} strokeWidth={1.9} />
@@ -316,9 +307,21 @@ function SignalTable({
               <span className="brs__sigtext">
                 <span className="brs__name">
                   <b>{s.name}</b>
-                  {/* The heading, per row. Same tone as the mark beside it, so
-                      the two say one thing rather than two. */}
-                  <i className={`brs__cat is-${CATEGORY_TONE[s.category]}`}>{s.category}</i>
+                  {/* The heading, per row, in neutral.
+
+                      It carried a hue per category, one of five, matched to the
+                      mark on its left — and the argument for that was sound in
+                      isolation: searching flattens the list, so once the
+                      heading is off screen the tag is the only thing saying
+                      which family a hit came from.
+
+                      It does not survive the page. Sixteen rows times a tinted
+                      glyph, a tinted tag and two tinted weight controls is four
+                      coloured objects per row and five hues down the column,
+                      and at that density a hue stops being a signal and becomes
+                      the texture of the table. The tag still says the category —
+                      in words, which is what it was always reading as. */}
+                  <i className="brs__cat">{s.category}</i>
                 </span>
                 <em>{s.purpose}</em>
               </span>

@@ -83,11 +83,20 @@ describe('the evaluator grades a zone on the half the condition asked about', ()
     expect(evalCond(cond('zone', 'in zone', ['pune-hq'], 'location'), ctx('Office Network')).state).toBe('pass')
   })
 
-  /* And the contradiction that went with it: "Known proxy" answered PASS to
-     "Country is Germany" and FAIL to "in zone EU Countries" in one trace. */
-  it('agrees with the country test on the same origin', () => {
-    expect(evalCond(cond('country', 'is', ['Germany']), ctx('Known proxy')).state).toBe('pass')
+  /* This asserted a contradiction was gone: "Known proxy" once answered PASS
+     to `Country is Germany` and FAIL to `in zone EU Countries` in the same
+     trace, because `zonesIn` had been written by hand and was wrong about the
+     two origins that reach a zone by geography alone.
+
+     There is no `country` condition any more, so the two answers that could
+     disagree are down to one and the contradiction is unreachable by
+     construction. What is still worth pinning is the half of it that did the
+     work: "Known proxy" geolocates to Germany, `eu` is Germany and France with
+     an empty — therefore ANY — network section, so the origin is inside it. If
+     `PLACE_FACTS` is ever hand-edited back to the old values, this fails. */
+  it('places an origin inside a zone it reaches by geography alone', () => {
     expect(evalCond(cond('zone', 'in zone', ['eu']), ctx('Known proxy')).state).toBe('pass')
+    expect(PLACE_FACTS['Known proxy'].zonesByLocation).toContain('eu')
   })
 
   /* The detail is built from the half that was tested, not from the origin's
@@ -115,7 +124,11 @@ describe('the read-back tells the two halves apart', () => {
      requirements — described a narrower rule than the one that would run. */
   it('joins several values with “or”, which is what the evaluator does', () => {
     expect(conditionSentence(cond('zone', 'in zone', ['office', 'eu']))).toBe('in zone Office Network or EU Countries')
-    expect(conditionSentence(cond('country', 'is', ['India', 'Germany']))).toBe('Country is India or Germany')
+    /* `day`, because `country` is gone and this is now the LAST test of the
+       labelled branch of `conditionSentence`. Only two attributes still reach
+       it — `day` and `ml-risk` — since zone and device-profile conditions take
+       the branch above, which drops the label deliberately. */
+    expect(conditionSentence(cond('day', 'is', ['Monday', 'Tuesday']))).toBe('Day of week is Monday or Tuesday')
   })
 })
 

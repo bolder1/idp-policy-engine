@@ -33,7 +33,7 @@ import {
 
 const A = cond('zone', 'in zone', ['a'])
 const B = cond('zone', 'in zone', ['b'])
-const C = cond('country', 'is', ['India'])
+const C = cond('day', 'is', ['Monday'])
 
 describe('nothing drops the joiners', () => {
   /* The trail wrote `{ cards: next }` on every edit. Every operation in this
@@ -43,7 +43,7 @@ describe('nothing drops the joiners', () => {
     const w: Predicate = { join: 'and', cards: [card(A, B), card(C)] }
     const k0 = w.cards[0].id
     const ops: Predicate[] = [
-      addCondition(w, k0, cond('country', 'is', ['Germany'])),
+      addCondition(w, k0, cond('day', 'is', ['Tuesday'])),
       removeCondition(w, A.id),
       moveCondition(w, C.id, k0, 0),
       splitOut(w, A.id),
@@ -132,7 +132,7 @@ describe('merging branches', () => {
     const w = when(card(A, B), card(dupe, C))
     const next = mergeBranches(w, w.cards[1].id, w.cards[0].id)
     expect(next.cards).toHaveLength(1)
-    expect(next.cards[0].conditions.map((c) => c.typeId + c.values.join())).toEqual(['zonea', 'zoneb', 'countryIndia'])
+    expect(next.cards[0].conditions.map((c) => c.typeId + c.values.join())).toEqual(['zonea', 'zoneb', 'dayMonday'])
   })
 
   it('keeps the joiner of the branch being merged into', () => {
@@ -270,7 +270,7 @@ describe('the meaning survives a regrouping that changes the shape', () => {
    where the flat drawing would be a lie (`drawsAsBracket`).
    -------------------------------------------------------------------------- */
 
-const D = cond('device-type', 'is', ['Mobile'])
+const D = cond('fingerprint', 'matches', ['fp-corp'])
 
 describe('outerJoin — the operator a person actually sees', () => {
   it("is the run's own joiner while the run is all there is", () => {

@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Braces, ChevronDown, Fingerprint, Globe, Plus, Split, Ungroup, UserRound, Users, Webhook, X } from 'lucide-react'
+import { Braces, ChevronDown, Plus, Split, Ungroup, X } from 'lucide-react'
 
-import { modeLabel } from '../../fingerprint'
 import { cardJoin, cardLetter, ckey, drawsAsBracket, duplicatedAcrossCards, outerJoin } from '../../predicate'
 import {
   conditionType,
   type Condition,
   type ConditionCard,
-  type ConditionType,
   type Joiner,
   type Predicate,
   type Rule,
@@ -16,8 +14,7 @@ import {
 import * as ops from '../../when-ops'
 import { isWho, whoEditable } from '../../audience-ops'
 import { useBrand, useNameLookup } from '../../store'
-import { ConditionPicker } from '../rule-form'
-import { ConditionPopover, summarise, zoneShape, type ValueOption } from '../ConditionPopover'
+import { ConditionList, ConditionPopover, summarise, valueSource } from '../ConditionPopover'
 
 /* -----------------------------------------------------------------------------
    WHEN — the conditional, editable.
@@ -219,16 +216,20 @@ export function WhenEditor({
             </span>
             <h4>No conditions yet</h4>
             <p>Every sign-in that reaches this rule matches it. Add a condition to narrow that.</p>
-            <div className="bb__ifblank__acts">
-              <button type="button" className="bb__ifadd" onClick={openCatalogue('loose')}>
-                <Plus size={11} strokeWidth={2.4} aria-hidden />
-                Add condition
-              </button>
-              <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
-                <Plus size={11} strokeWidth={2.4} aria-hidden />
-                Add group
-              </button>
-            </div>
+            {adding ? (
+              <ConditionList label="Add a condition" onPick={add} onCancel={() => setAdding(null)} />
+            ) : (
+              <div className="bb__ifblank__acts">
+                <button type="button" className="bb__ifadd" onClick={openCatalogue('loose')}>
+                  <Plus size={11} strokeWidth={2.4} aria-hidden />
+                  Add condition
+                </button>
+                <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
+                  <Plus size={11} strokeWidth={2.4} aria-hidden />
+                  Add group
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           /* ONE bracket, drawn as one.
@@ -305,6 +306,9 @@ export function WhenEditor({
                   store={store}
                   resolve={resolve}
                   onAdd={openCatalogue(m.card.id)}
+                  picking={adding?.cardId === m.card.id}
+                  onPick={add}
+                  onCancelPick={() => setAdding(null)}
                   onUngroup={() => ungroup(m.card.id)}
                   onRemove={() => removeGroup(m.card.id)}
                   onFlipJoin={() => flipCardJoin(m.card.id)}
@@ -323,26 +327,29 @@ export function WhenEditor({
                 adds a member to this bracket in the one place that does not
                 look like part of it — and it read as a footer for the pane
                 rather than for the thing above it. */}
-            <div className="bb__iffoot">
-              <button type="button" className="bb__ifadd" onClick={openCatalogue('loose')}>
-                <Plus size={12} strokeWidth={2.4} aria-hidden />
-                Add condition
-              </button>
-              <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
-                <Braces size={12} strokeWidth={2.2} aria-hidden />
-                Add group
-              </button>
-            </div>
+            {/* The list opens IN the foot, in place of the buttons that
+                opened it — so the thing you are choosing appears where the
+                thing you chose is about to land, and the bracket does not
+                change height twice. */}
+            {adding?.cardId === 'loose' ? (
+              <div className="bb__ifpick">
+                <ConditionList label="Add a condition" onPick={add} onCancel={() => setAdding(null)} />
+              </div>
+            ) : (
+              <div className="bb__iffoot">
+                <button type="button" className="bb__ifadd" onClick={openCatalogue('loose')}>
+                  <Plus size={12} strokeWidth={2.4} aria-hidden />
+                  Add condition
+                </button>
+                <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
+                  <Braces size={12} strokeWidth={2.2} aria-hidden />
+                  Add group
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
-
-      <ConditionPicker
-        open={adding !== null}
-        title={adding?.cardId === 'group' ? 'Start a group' : 'Add a condition'}
-        onClose={() => setAdding(null)}
-        onPick={add}
-      />
     </div>
   )
 }
@@ -372,6 +379,9 @@ function GroupMember({
   store,
   resolve,
   onAdd,
+  picking,
+  onPick,
+  onCancelPick,
   onUngroup,
   onRemove,
   onFlipJoin,
@@ -394,6 +404,10 @@ function GroupMember({
   store: ReturnType<typeof useBrand>
   resolve: ReturnType<typeof useNameLookup>
   onAdd: () => void
+  /** This group is the one the catalogue is open for. */
+  picking: boolean
+  onPick: (typeId: string) => void
+  onCancelPick: () => void
   onUngroup: () => void
   onRemove: () => void
   onFlipJoin: () => void
@@ -456,7 +470,19 @@ function GroupMember({
             empty frame somebody has to guess the purpose of. The linter reports
             the same fact as PE320 at the same moment, so this is the friendly
             half of a finding that also blocks publishing. */}
-        {rows.length === 0 && <p className="bb__ifempty">Nothing in this group yet — it matches everything until you add a condition.</p>}
+        {rows.length === 0 && !picking && (
+          <p className="bb__ifempty">Nothing in this group yet — it matches everything until you add a condition.</p>
+        )}
+
+        {/* Inside the frame, above the foot. A group is a bracket, and what you
+            are adding is going inside it — opening the list anywhere else would
+            leave the destination to be inferred from which button was last
+            pressed. */}
+        {picking && (
+          <div className="bb__ifpick">
+            <ConditionList label={`Add to ${name}`} onPick={onPick} onCancel={onCancelPick} />
+          </div>
+        )}
 
         <div className="bb__ifgroupfoot">
           {/* Adding on the left, restructuring on the right, and the two no
@@ -639,7 +665,15 @@ function ConditionRow({
   /* Every value, not `values[0]`. The stale check only ever looked at the
      first, so a zone deleted from the library sitting at index 1 rendered as
      perfectly valid. */
-  const stale = options.length > 0 && values.some((id) => !options.some((o) => o.value === id))
+  /* `values.length`, not `options.length`.
+
+     Guarding on the OPTIONS meant that emptying the library stopped every
+     condition naming it from being marked stale — delete your last zone and
+     every zone condition in the tenant quietly looks fine again, at exactly the
+     moment all of them have broken. The question is whether this condition
+     names something that is not there, and a condition with no values does not
+     name anything. */
+  const stale = values.length > 0 && values.some((id) => !options.some((o) => o.value === id))
 
   const summary =
     t.valueKind === 'time'
@@ -695,60 +729,14 @@ function ConditionRow({
   )
 }
 
-/* Where a condition's choices come from, by kind — one place, so the pill's
-   summary and the panel's list can never be built from different lists.
+/* `valueSource` was here, byte-for-byte the same function as the one in
+   ConditionPopover.tsx, and it is now imported from there instead.
 
-   The three kinds that have no list (a time window, a number, a line of text)
-   return none, and the panel renders the control they need instead. */
-function valueSource(
-  t: ConditionType,
-  values: string[],
-  store: ReturnType<typeof useBrand>,
-  resolve: ReturnType<typeof useNameLookup>,
-): { options: ValueOption[]; names: string[]; single?: boolean; footer?: string; onFooter?: () => void } {
-  if (t.valueKind === 'zone' || t.valueKind === 'fingerprint' || t.valueKind === 'hook') {
-    const kind = t.valueKind
-    const options: ValueOption[] =
-      kind === 'zone'
-        ? store.zones.map((z) => ({
-            value: z.id,
-            label: z.name,
-            meta: zoneShape(z),
-            note: z.usedIn ? `Used by ${z.usedIn} rule${z.usedIn === 1 ? '' : 's'}` : undefined,
-            icon: Globe,
-          }))
-        : kind === 'fingerprint'
-          ? store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p), icon: Fingerprint }))
-          : store.hooks.filter((h) => h.mode === 'sync').map((h) => ({ value: h.id, label: h.name, meta: `Answers within ${h.timeoutMs}ms`, icon: Webhook }))
-    return {
-      options,
-      names: values.map((id) => resolve(kind, id) ?? `deleted · ${id}`),
-      /* A hook holds one. `diagnostics` reads `values[0]` to check the endpoint
-         still exists, and a rule consulting two services would have to say what
-         happens when they disagree. */
-      single: kind === 'hook',
-      footer: kind === 'zone' ? 'Manage zones' : kind === 'fingerprint' ? 'Manage device profiles' : 'Manage hooks',
-      onFooter: () => store.go({ name: kind === 'zone' ? 'zones' : kind === 'fingerprint' ? 'fingerprint' : 'hooks' } as never),
-    }
-  }
-
-  if (t.valueKind === 'group' || t.valueKind === 'user') {
-    const kind = t.valueKind
-    const options: ValueOption[] =
-      kind === 'group'
-        ? store.groups.map((g) => ({ value: g.id, label: g.name, meta: `${g.memberCount.toLocaleString()} people`, icon: Users }))
-        : store.users.map((u) => ({ value: u.id, label: u.name, meta: u.email, icon: UserRound }))
-    return {
-      options,
-      names: values.map((id) => resolve(kind, id) ?? `deleted · ${id}`),
-      footer: kind === 'user' && store.unlistedUsers > 0 ? `${store.unlistedUsers.toLocaleString()} more in the directory` : undefined,
-    }
-  }
-
-  if (t.options?.length) return { options: t.options.map((o) => ({ value: o, label: o })), names: values }
-
-  return { options: [], names: values }
-}
+   Two copies of "where does a zone list come from" is the drift this file's
+   own header warns about one paragraph up, in the same words, about a
+   different thing. It had already started: the copy here still built a hook
+   list and offered "Manage hooks" after the hook condition was cut, so the two
+   would have disagreed about what a condition can even be. */
 
 /* The catalogue is the trail's dialog, not a popover of its own.
 

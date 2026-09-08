@@ -91,7 +91,7 @@ function valueChips(c: Condition, resolve: NameLookup): { text: string; unset: b
   const vals = c.values.filter(Boolean)
   if (vals.length === 0) return [{ text: 'no value', unset: true }]
   if (t.valueKind === 'time') return [{ text: `${c.values[0] ?? '09:00'} – ${c.values[1] ?? '17:00'}`, unset: false }]
-  if (t.valueKind === 'zone' || t.valueKind === 'fingerprint' || t.valueKind === 'hook' || t.valueKind === 'group' || t.valueKind === 'user')
+  if (t.valueKind === 'zone' || t.valueKind === 'fingerprint' || t.valueKind === 'group' || t.valueKind === 'user')
     return vals.map((v) => ({ text: resolve(t.valueKind as 'zone', v) ?? v, unset: false }))
   return vals.map((v) => ({ text: v, unset: false }))
 }

@@ -219,7 +219,7 @@ describe('badges', () => {
        should then hold, and they should not hold for an empty policy. */
     const guarded = policy([
       rule({ when: when(card(cond('zone', 'in zone', ['anon']))), decision: 'deny' }),
-      rule({ when: when(card(cond('fingerprint', 'not recognised by', ['fp-corp']))), decision: 'deny' }),
+      rule({ when: when(card(cond('fingerprint', 'does not match', ['fp-corp']))), decision: 'deny' }),
     ])
     const got = badges(guarded, sweep(guarded, env, noon), null, 0)
     expect(got.find((b) => b.id === 'anon-gated')?.earned).toBe(true)
@@ -298,7 +298,7 @@ describe('proposeFix', () => {
        rule already decides the card would change nothing at all. */
     const p = policy([
       rule({ name: 'Everyone in on one factor', decision: '1fa' }),
-      rule({ name: 'Filler', when: when(card(cond('country', 'is', ['India']))), decision: '2fa' }),
+      rule({ name: 'Filler', when: when(card(cond('day', 'is', ['Monday']))), decision: '2fa' }),
     ])
     const r = runGauntlet(p, rawEnv)
     const leak = r.rounds.find((x) => x.outcome === 'breach' && x.hitIndex === 0)!
@@ -318,7 +318,9 @@ describe('a fix must not create a policy that cannot be published', () => {
     const p = policy([
       rule({
         name: 'Contractor baseline',
-        when: when(card(cond('user-type', 'is', ['Contractor']))),
+        // The same predicate the `nightshift` fix now proposes, so the fix has
+        // a twin to re-aim rather than a gap to insert into.
+        when: when(card(cond('group', 'in', ['contractors']))),
         decision: '1fa',
       }),
     ])

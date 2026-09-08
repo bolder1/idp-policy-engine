@@ -98,132 +98,161 @@ export interface ConditionType {
   group: string
   hint: string
   operators: string[]
-  /** Where the value comes from: a library object, a fixed list, or free text. */
-  valueKind: 'zone' | 'fingerprint' | 'hook' | 'group' | 'user' | 'list' | 'text' | 'range' | 'time'
+  /** Where the value comes from: a library object, a fixed list, or a clock. */
+  valueKind: 'zone' | 'fingerprint' | 'group' | 'user' | 'list' | 'range' | 'time'
   options?: string[]
-  /* True when only an installed agent can read this.
+  /* In the catalogue, and NOT in the When list.
 
-     Not a preference — a hard limit on what the browser can see. A page cannot
-     read a MAC address or an OS build number, so a rule that tests one on an
-     agentless estate is not misconfigured, it is inert: the value never
-     arrives, so it never matches. Marked on the attribute so the picker can say
-     so before the row is added rather than after it never fires. */
-  agent?: true
+     `group` and `user` are the WHO step's vocabulary. `audience-ops.ts` is a
+     view over exactly these two conditions — read them out of the predicate,
+     write them back — so they have to exist here or `conditionType('group')`
+     falls through to `CONDITION_CATALOGUE[0]` and every surface that draws an
+     audience labels it "Network zone". A wrong label, silently, on the one
+     part of a rule that says who it is about.
+
+     They are still not offered beside the circumstances, because who a rule is
+     for is asked once, on its own step, and offering it twice is how a policy
+     grows a second place to say the same thing. */
+  who?: true
+  /* Listed, described, and not addable.
+
+     There is a standing argument in this codebase against placeholder controls
+     — `WhatEditor` deleted a third "Coming soon" outcome tile on the grounds
+     that "a promise is not a control". That argument holds for a control that
+     competes for space with real ones. It does not hold here: the risk section
+     has exactly one live attribute, and a section of one reads as finished. The
+     greyed row is what says the shape is going to grow. */
+  soon?: true
 }
 
-/* The nine major components the condition catalogue is organised by.
+/* The components that remain, and the four that do not.
 
-   The old picker's top level was the twenty-four types, with every zone and
-   every fingerprint profile listed beside them as if each were its own
-   condition. That put the CONTENTS of a library in the place where its NAME
-   belongs — a zone is a value, "Network Zone" is the condition — and it meant
-   the list grew every time somebody saved a zone. */
-export const CONDITION_GROUPS = [
-  'Network',
-  'Location',
-  'Time',
-  'Device',
-  'Risk',
-  'User',
-  'Group',
-  'Custom attributes',
-  'Webhooks',
-] as const
+   This catalogue was twenty-four attributes in nine components. It is six rows
+   in four, and the cut is not a simplification — it is a rule about where a
+   value is allowed to live.
 
-/* The order the picker leads with, chosen rather than derived.
+   **A value that a library object already holds cannot be typed into a rule.**
 
-   Everything else in the catalogue is filed by component — Network, Location,
-   Device — which is the right taxonomy for finding a thing you already know the
-   name of, and the wrong one for the first row of a new rule. The question a
-   rule opens with is nearly always "who is this for", and the answers to it sit
-   in three different components.
+   The old catalogue let you write `IP address is 203.0.113.0/24` directly onto
+   a condition. It also let you save a Zone containing 203.0.113.0/24. Those are
+   two places to say one thing, and they go stale independently: the use-case
+   document's finding #12 is exactly this — inline value lists copied into every
+   rule that needs them, drifting apart, with nothing able to tell you which
+   rules meant the office. So `ip`, `country`, `state`, `city` and `coords` are
+   gone, and a rule reaches the network and the map through a Zone or not at
+   all.
 
-   So these seven come first, in this order, above the categories. It is a
-   stated order and not a usage statistic: nothing here counts clicks, and a
-   list that reordered itself as people used it would move the row somebody was
-   reaching for. */
-export const CONDITION_ORDER = [
-  'group',
-  'user',
-  'user-role',
-  'user-attr',
-  'group-attr',
-  'zone',
-  'webhook',
-] as const
+   The same argument, the same shape, for the device: `device-type`, `mac`,
+   `os`, `mdm`, `browser`, `device-count`, `device-reg` and `posture` are gone,
+   and a rule reaches the device through a Device profile. That library exists
+   to hold exactly these signals and to weigh them; a rule that tested `os is
+   Windows` on the side was a second opinion about the same handset.
 
-/** Where an id sits in the lead order, or past the end when it is not in it. */
-export const conditionRank = (id: string) => {
-  const i = (CONDITION_ORDER as readonly string[]).indexOf(id)
-  return i === -1 ? CONDITION_ORDER.length : i
-}
+   What that costs, said plainly rather than buried: you can no longer write a
+   one-off rule without first creating the library object it points at. That is
+   the trade — one more step to author, one place to change, and a "used by"
+   count that is true.
+
+   Gone for a different reason, and worth naming separately: `user-type`,
+   `user-role`, `auth-state`, `trust-age`, `user-attr`, `group-attr` and
+   `webhook` are not consolidated anywhere. They are simply not offered. The
+   hooks library still exists and the Hooks screen still runs — but no rule can
+   reference a hook now, so it is a library nothing reads. That is a real
+   regression and it is deliberate, not an oversight. */
+export const CONDITION_GROUPS = ['Network', 'Time', 'Device', 'Risk', 'Group', 'User'] as const
 
 export const CONDITION_CATALOGUE: ConditionType[] = [
-  /* One condition, four forms.
+  /* The only way to say anything about where a request came from.
 
-     The parameter sheet lists IPv4 single, IPv4 range, IPv4 CIDR and IPv6 range
-     as four rows, and they are four ways of writing one thing rather than four
-     decisions — the same argument that keeps VPN detection from being five
-     dials. Each is a value this accepts, and the comment column's "multiple
-     should be supported" is what makes it multi-valued rather than what makes
-     it four conditions. */
-  { id: 'ip', label: 'IP address', group: 'Network', hint: 'A single address, a range, a CIDR block, or IPv6', operators: ['is', 'is not'], valueKind: 'text' },
-  { id: 'zone', label: 'Network Zone', group: 'Network', hint: 'Match by named zone from your library', operators: ['in zone', 'not in zone'], valueKind: 'zone' },
-
-  { id: 'country', label: 'Country', group: 'Location', hint: 'Match by country', operators: ['is', 'is not'], valueKind: 'list', options: ['India', 'United States', 'United Kingdom', 'Germany', 'Singapore'] },
-  { id: 'state', label: 'State / Province', group: 'Location', hint: 'Match by state or region', operators: ['is', 'is not'], valueKind: 'list', options: ['Maharashtra', 'Karnataka', 'California', 'Texas'] },
-  { id: 'city', label: 'City', group: 'Location', hint: 'Match by city', operators: ['is', 'is not'], valueKind: 'list', options: ['Pune', 'Bengaluru', 'London', 'Austin'] },
-  { id: 'coords', label: 'Coordinates', group: 'Location', hint: 'Match within a geographic radius', operators: ['within'], valueKind: 'range' },
+     `scope` is what makes one condition enough for what used to be six. A zone
+     is an AND of a network half and a geographic half, and the condition can
+     name either half or both — so "in the office, by address" and "in the EU,
+     by country" are the same attribute asked two ways, rather than an IP
+     condition and a Country condition that can contradict each other. See
+     `ZoneScope`. */
+  { id: 'zone', label: 'Network zone', group: 'Network', hint: 'Match a zone from your Zones library — addresses, ASNs and places, named once', operators: ['in zone', 'not in zone'], valueKind: 'zone' },
 
   { id: 'time', label: 'Time of day', group: 'Time', hint: 'A window in the tenant’s timezone', operators: ['between', 'not between'], valueKind: 'time' },
   /* Separate from the window, because they answer different questions and get
      asked separately: "office hours" is a time, "not at the weekend" is a day,
      and a rule usually wants one or the other rather than a single control that
-     means both. */
+     means both. The parameter sheet lists them as two rows for the same
+     reason. */
   { id: 'day', label: 'Day of week', group: 'Time', hint: 'Match particular days', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
 
-  { id: 'device-type', label: 'Device Type', group: 'Device', hint: 'Mobile, PC, tablet, etc.', operators: ['is', 'is not'], valueKind: 'list', options: ['Mobile', 'PC', 'Tablet', 'Other'] },
-  { id: 'mac', label: 'MAC address', group: 'Device', hint: 'Match device MAC addresses', operators: ['is', 'is not'], valueKind: 'text', agent: true },
-  { id: 'os', label: 'Operating system', group: 'Device', hint: 'Match OS name and version', operators: ['is', 'is not'], valueKind: 'list', options: ['Windows', 'macOS', 'iOS', 'Android', 'Linux', 'ChromeOS'], agent: true },
-  { id: 'mdm', label: 'MDM Managed', group: 'Device', hint: 'Require MDM enrollment', operators: ['is', 'is not'], valueKind: 'list', options: ['Enrolled', 'Not enrolled'] },
-  { id: 'browser', label: 'Browser', group: 'Device', hint: 'Match browser name and version', operators: ['is', 'is not'], valueKind: 'list', options: ['Chrome', 'Edge', 'Safari', 'Firefox'] },
-  { id: 'device-risk', label: 'Device Risk Score', group: 'Risk', hint: 'Device risk management score', operators: ['above', 'below'], valueKind: 'range' },
-  { id: 'ml-risk', label: 'ML Risk Score', group: 'Risk', hint: 'AI-derived overall risk score', operators: ['is', 'is not'], valueKind: 'list', options: ['Low', 'Medium', 'High'] },
-  { id: 'device-count', label: 'Number of Devices', group: 'Device', hint: 'Limit registered devices per user', operators: ['above', 'below'], valueKind: 'range' },
-  { id: 'device-reg', label: 'Device Registration', group: 'Device', hint: 'Registered, pending, or unregistered', operators: ['is', 'is not'], valueKind: 'list', options: ['Registered', 'Pending', 'Unregistered'] },
-  /* Replaced the old Device Posture Policy condition. Posture asked whether a
-     device was healthy; this asks whether it is the same device as last time,
-     which is what the fingerprint profiles actually decide. */
-  { id: 'fingerprint', label: 'Device fingerprint', group: 'Device', hint: 'Match by saved fingerprint profile from your library', operators: ['recognised by', 'not recognised by'], valueKind: 'fingerprint' },
-  /* Posture is back, and it is not the fingerprint.
+  /* The only way to say anything about the device.
 
-     It was removed once, on the argument that "posture asked whether a device
-     was healthy, which is a different question from whether it is the same
-     device". That argument was right and it is the reason these are two
-     attributes rather than one: the fingerprint says it is the same handset,
-     posture says the handset is in a state you are willing to accept. A
-     recognised device with disk encryption switched off is both. */
-  { id: 'posture', label: 'Device posture', group: 'Device', hint: 'Checks an MDM reports about the device’s state', operators: ['passes', 'fails'], valueKind: 'list', options: ['Disk encryption', 'Screen lock', 'OS up to date', 'Antivirus running', 'Firewall on'], agent: true },
+     "Matches", not "recognised by", and the word had to change with the scope.
+     A profile used to mean one thing — is this the same handset as last time —
+     and `recognised by` was exactly right for it. A profile now also carries
+     the OS, the browser, MDM enrolment and the posture checks, because those
+     conditions no longer exist on their own. So the question is whether the
+     device matches the profile as written, which is wider than recognition and
+     is what the word now says. */
+  { id: 'fingerprint', label: 'Device profile', group: 'Device', hint: 'Match a profile from your Device profiles library — OS, browser, MDM and posture, configured once', operators: ['matches', 'does not match'], valueKind: 'fingerprint' },
 
-  { id: 'group', label: 'Group Membership', group: 'Group', hint: "Match by the user's group", operators: ['in', 'not in'], valueKind: 'group' },
-  { id: 'user', label: 'Specific people', group: 'User', hint: 'Match named individuals from the directory', operators: ['is', 'is not'], valueKind: 'user' },
-  { id: 'user-type', label: 'User Type', group: 'User', hint: 'Employee, contractor, or partner', operators: ['is', 'is not'], valueKind: 'list', options: ['Employee', 'Contractor', 'Partner'] },
-  { id: 'user-role', label: 'User Role', group: 'User', hint: 'Match by assigned user role', operators: ['is', 'is not'], valueKind: 'list', options: ['Admin', 'Manager', 'Member', 'Auditor'] },
-  { id: 'auth-state', label: 'Auth State', group: 'User', hint: 'First login, MFA reset, preferred method', operators: ['is'], valueKind: 'list', options: ['First time login', 'MFA recently reset', 'No MFA configured', 'Normal returning user'] },
-  { id: 'trust-age', label: 'Device Trust Age', group: 'User', hint: 'Known device trust duration', operators: ['under', 'over'], valueKind: 'range' },
+  /* One risk attribute, and it is the one this console actually computes.
 
-  { id: 'group-attr', label: 'Group Attribute', group: 'Group', hint: "Match by group's custom attributes", operators: ['is', 'is not'], valueKind: 'text' },
-  { id: 'user-attr', label: 'User Attribute', group: 'Custom attributes', hint: 'Match email, designation, age, and more', operators: ['is', 'is not', 'contains'], valueKind: 'text' },
-  /* Was a free-text box. It is now a reference to a Hook, for the same reason
-     the network condition references a Zone rather than carrying a CIDR: every
-     rule that consults the fraud service consults the same fraud service, and
-     an endpoint written into each condition makes rotating a URL an audit of
-     every policy in the tenant. See hooks.ts. */
-  { id: 'webhook', label: 'External hook', group: 'Webhooks', hint: 'Ask an external endpoint, and use its answer as a condition', operators: ['returns true', 'returns false'], valueKind: 'hook' },
+     The id is historical and the label is not: `device-risk` is the score the
+     Risk signals screen derives from the signals a tenant collects and how it
+     weighs them, handed to the evaluator on the env as `riskScale`. Keeping it
+     is what keeps that screen reachable — a weighting page no condition can
+     read is configuration nothing consults. */
+  { id: 'device-risk', label: 'Risk score', group: 'Risk', hint: 'The score from your Risk signals profile, as a threshold', operators: ['above', 'below'], valueKind: 'range' },
+  /* Not built. Listed because the risk section is going to have two rows and
+     saying so now is cheaper than explaining a new one later.
+
+     `evalCond` still has a working case for it, deliberately. If this becomes
+     real it is a flag flip, not a re-implementation — and a coming-soon row
+     that would return "undecided" the day it shipped is worse than no row. */
+  { id: 'ml-risk', label: 'ML risk score', group: 'Risk', hint: 'An AI-derived verdict across every signal. Not available yet.', operators: ['is', 'is not'], valueKind: 'list', options: ['Low', 'Medium', 'High'], soon: true },
+
+  /* The two the Who step is a view over. See `who` above. */
+  { id: 'group', label: 'Group Membership', group: 'Group', hint: "Match by the user's group", operators: ['in', 'not in'], valueKind: 'group', who: true },
+  { id: 'user', label: 'Specific people', group: 'User', hint: 'Match named individuals from the directory', operators: ['is', 'is not'], valueKind: 'user', who: true },
 ]
 
+/* What the When list offers: everything that is not the Who step's, in
+   catalogue order.
+
+   Catalogue order, and no lead order any more. `CONDITION_ORDER` named seven
+   attributes that answered "who is this for, and where from" and floated them
+   above the taxonomy, because the taxonomy scattered them across five
+   components in a list of twenty-four. Four rows do not scatter. The order
+   below is the order they are read in — where from, when, on what, how risky —
+   and it is short enough to be the whole answer. */
+export const WHEN_CONDITIONS = CONDITION_CATALOGUE.filter((c) => !c.who)
+
+/** Addable right now. `soon` rows are drawn from `WHEN_CONDITIONS` and refused. */
+export const isOfferable = (c: ConditionType) => !c.who && !c.soon
+
+/* What an id that is not in the catalogue resolves to.
+
+   The fallback used to be `CONDITION_CATALOGUE[0]`, and for as long as [0] was
+   `IP address` that was merely untidy. It is `zone` now, and untidy became
+   dangerous: `evalCond` switched on the RESOLVED type, so a condition naming a
+   deleted attribute did not reach the arm that says "this simulation does not
+   model that" — it entered `case 'zone'`, looked its value up in the zone
+   pools, found nothing, and returned FAIL with the sentence "this sign-in is in
+   another zone". A wrong verdict with a confident explanation, in the trace, in
+   the gauntlet grade, in the impact sweep and on the card.
+
+   A sentinel with no operators and no options instead. Nothing can be authored
+   against it, `evalCond` reaches its honest default, and the label says what
+   the row is. `unknown` is not a pass, so a rule holding one goes quiet rather
+   than silently widening. */
+export const UNKNOWN_CONDITION: ConditionType = {
+  id: 'unknown',
+  label: 'Unknown attribute',
+  group: 'Unknown',
+  hint: 'This attribute is no longer in the catalogue. Replace or remove the condition.',
+  operators: [],
+  valueKind: 'list',
+  options: [],
+}
+
 export function conditionType(id: string): ConditionType {
-  return CONDITION_CATALOGUE.find((c) => c.id === id) ?? CONDITION_CATALOGUE[0]
+  return CONDITION_CATALOGUE.find((c) => c.id === id) ?? UNKNOWN_CONDITION
 }
 
 /* Which half of a zone a condition tests.
@@ -946,6 +975,138 @@ export const zones: Zone[] = [
     },
     usedIn: 1,
   },
+
+  /* --- The zones the rules used to carry inline ------------------------------
+
+     Nine, and every one of them is a value that used to be typed into a
+     condition. `cond('ip', 'is', ['203.0.113.0/24'])` and `cond('country',
+     'is', ['India', 'United States'])` are gone from the catalogue, so the
+     addresses and the countries they held had to land somewhere — and a zone is
+     this engine's only named-list primitive. This is that landing.
+
+     Naming: each one says what it CONTAINS, not what it is for. "Office egress ·
+     203.0.113.0/24" survives a policy being renamed; "HR portal allowlist" does
+     not survive the same block being used by a second policy, which is the
+     stale-copy problem the whole consolidation exists to fix.
+
+     `japan` is not new work — data.ts already had a rule reading `in zone
+     ['japan']` against a zone that has never existed. It matched nothing and
+     nothing said so, because a dangling zone reference just quietly fails. It
+     is load-bearing now, so it is here.
+
+     Three reuses that look right and are wrong, on the record so nobody tries
+     them: `office` holds 198.51.100.0/24 AND 10/8, 192.168.1.0/24, 172.16.0.0/12
+     and a v6 block — using it for an office CIDR widens the rule fivefold.
+     `corp-network` looks like 198.51.100.0/24 but is a RANGE excluding .0 and
+     .255, and it also carries 203.0.113.0/26. `eu` is Germany AND France, so it
+     cannot stand in for Germany. `office-cidr` genuinely is exactly
+     203.0.113.0/24 and is reused unchanged, seven times.
+
+     `usedIn` is a stated number here as it is everywhere else in this array —
+     the Zones screen derives the truth from `policiesUsing`, and this field is
+     the seed's claim, not a computation. */
+  {
+    id: 'japan',
+    kind: 'custom',
+    name: 'Japan',
+    ip: [],
+    asn: [],
+    location: { countries: ['Japan'], states: [], cities: [] },
+    usedIn: 1,
+  },
+  {
+    id: 'india',
+    kind: 'allowed',
+    name: 'India',
+    ip: [],
+    asn: [],
+    location: { countries: ['India'], states: [], cities: [] },
+    usedIn: 2,
+  },
+  {
+    id: 'home-countries',
+    kind: 'allowed',
+    name: 'Home countries · India and United States',
+    ip: [],
+    asn: [],
+    location: { countries: ['India', 'United States'], states: [], cities: [] },
+    usedIn: 2,
+  },
+  {
+    id: 'ma-countries',
+    kind: 'custom',
+    name: 'Integration countries · India and Germany',
+    ip: [],
+    asn: [],
+    location: { countries: ['India', 'Germany'], states: [], cities: [] },
+    usedIn: 2,
+  },
+  /* Split out of `office-vpn` so the hybrid-work rule keeps its shape. That
+     rule is the fixture that demonstrates (A OR B) AND (C OR D) — folding its
+     two address legs into one zone would have left a group of one and quietly
+     deleted the only example of the form in the seed. */
+  {
+    id: 'vpn-egress',
+    kind: 'allowed',
+    name: 'VPN egress · 198.51.100.0/24',
+    ip: ['198.51.100.0/24'],
+    asn: [],
+    location: emptyLocation(),
+    usedIn: 1,
+  },
+  {
+    id: 'office-vpn',
+    kind: 'allowed',
+    name: 'Office and VPN egress',
+    ip: ['203.0.113.0/24', '198.51.100.0/24'],
+    asn: [],
+    location: emptyLocation(),
+    usedIn: 3,
+  },
+  /* One host, and it must stay one host. The break-glass rule confines
+     emergency access to the war-room terminal; `office-cidr` would widen that
+     to 256 addresses and `office` names 203.0.113.5, which is a DIFFERENT
+     machine. */
+  {
+    id: 'war-room',
+    kind: 'allowed',
+    name: 'War-room terminal · 203.0.113.10',
+    ip: ['203.0.113.10'],
+    asn: [],
+    location: emptyLocation(),
+    usedIn: 1,
+  },
+  /* Three offices, each an address block AND a country, which is the pairing a
+     zone is for. Each replaces a two-condition card — `country is India` AND
+     `ip is 203.0.113.0/24` — with one unscoped zone condition that means
+     exactly the same conjunction, because a zone's halves are ANDed. */
+  {
+    id: 'in-office',
+    kind: 'allowed',
+    name: 'India office · 203.0.113.0/24',
+    ip: ['203.0.113.0/24'],
+    asn: [],
+    location: { countries: ['India'], states: [], cities: [] },
+    usedIn: 1,
+  },
+  {
+    id: 'de-office',
+    kind: 'allowed',
+    name: 'Germany office · 198.51.100.0/24',
+    ip: ['198.51.100.0/24'],
+    asn: [],
+    location: { countries: ['Germany'], states: [], cities: [] },
+    usedIn: 1,
+  },
+  {
+    id: 'us-office',
+    kind: 'allowed',
+    name: 'US office · 192.0.2.0/24',
+    ip: ['192.0.2.0/24'],
+    asn: [],
+    location: { countries: ['United States'], states: [], cities: [] },
+    usedIn: 1,
+  },
 ]
 
 /** Known operators, so an ASN can be shown as more than a number. */
@@ -1186,7 +1347,7 @@ export const policies: Policy[] = [
           namedCard(
             'On the rotation, on a managed device',
             cond('group', 'in', ['on-call']),
-            cond('mdm', 'is', ['Enrolled']),
+            cond('fingerprint', 'matches', ['fp-managed']),
           ),
         ),
         decision: '2fa',
@@ -1225,61 +1386,24 @@ export const policies: Policy[] = [
     audience: EVERYONE,
     rules: [
       rule({
-        name: 'Confirmed FTE, probation cleared',
-        when: when(
-          namedCard(
-            'FTE past probation',
-            /* THE ATTRIBUTE NAME IS NOT A FIELD. `Condition` is
-               { id, typeId, operator, values, scope? } — there is nowhere to say
-               WHICH custom attribute. The `key=value` string below is a
-               convention I am inventing in this document; the engine defines
-               nothing of the kind and no reader parses it. See 22-G1. */
-            cond('user-attr', 'is', ['employment_type=FTE']),
-            /* UNREPRESENTABLE. `user-attr` operators are ['is','is not','contains'].
-               There is no `<`, no date type, and no `today`. The string below is a
-               placeholder that compiles and means nothing. See 22-G2, 22-G3. */
-            cond('user-attr', 'is', ['probation_until<today']),
-          ),
-        ),
-        decision: '1fa',
-        firstFactor: 'Password',
-        secondFactor: 'any',
-        // SetRememberMfaTimeout(30d) on a chain with NO second factor. See 22-G6.
-        rememberMfa: true,
-        rememberDays: 30,
-        allowDisable2fa: false,
-        matchEstimate: 780,
-      }),
-      rule({
-        name: 'Probationary FTE',
-        when: when(
-          namedCard('FTE, probation not yet cleared',
-            cond('user-attr', 'is', ['employment_type=FTE']),
-          ),
-        ),
-        decision: '2fa',
-        firstFactor: 'Password',
-        secondFactor: 'specific',
-        secondFactorMethods: ['Google Authenticator'],
-        rememberMfa: true,
-        rememberDays: 7,
-        allowDisable2fa: false,
-        matchEstimate: 190,
-      }),
-      rule({
         name: 'Intern, office hours only',
         when: when(
           namedCard(
             'Intern on the office network in working hours',
-            cond('user-attr', 'is', ['employment_type=INTERN']),
+            /* `user-attr is employment_type=INTERN` stood here. The two rules
+               above this one — 'FTE past probation' and 'Probationary FTE' —
+               were built on nothing else and are deleted; this one survives on
+               its hours and its network, and now catches every employee rather
+               than only the interns. The policy no longer distinguishes
+               employment types at all. */
             cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
             cond('time', 'between', ['09:00', '18:00']),   // no `Asia/Kolkata`
-            /* The literal CIDR, because NO SEEDED ZONE CONTAINS IT. The `office`
-               zone (data.ts:659) holds the single address `203.0.113.5`, not the
-               /24. Using `cond('zone','in zone',['office'])` would silently widen
-               this to 10.0.0.0/8 + 192.168.1.0/24 + 198.51.100.0/24 + 172.16/12
-               + 2001:db8::/32. See 22-G8. */
-            cond('ip', 'is', ['203.0.113.0/24']),
+            /* `office-cidr` holds exactly 203.0.113.0/24 and nothing else, so
+               this is the same block it always was. The note that used to sit
+               here argued for the inline CIDR because no zone contained it —
+               that was true, and the answer was to make the zone rather than to
+               keep typing the block into rules. */
+            cond('zone', 'in zone', ['office-cidr'], 'ip'),
           ),
         ),
         decision: '2fa',
@@ -1316,39 +1440,18 @@ export const policies: Policy[] = [
     audience: audienceOf(['legal']),
     rules: [
       rule({
-        name: 'Senior counsel, cleared, on matter',
-        when: when(
-          namedCard(
-            'Role, matter and clearance all agree',
-            /* `user-role` is a CLOSED enum: ['Admin','Manager','Member','Auditor']
-               (data.ts:211). LEGAL_COUNSEL and GENERAL_COUNSEL are not in it and
-               cannot be added per-tenant. The two values below are a substitution,
-               not a translation. See 23-G3. */
-            cond('user-role', 'is', ['Admin', 'Manager']),
-            cond('group', 'in', ['matter-acme']),
-            /* UNREPRESENTABLE twice over: no attribute key, and no `>=`.
-               See 23-G4. */
-            cond('user-attr', 'is', ['clearance_level>=3']),
-          ),
-        ),
-        decision: '2fa',
-        firstFactor: 'Password',
-        secondFactor: 'specific',
-        secondFactorMethods: ['miniOrange Push'],
-        // SetReAuthFrequency(4h) HAS NO HOME. See 23-G5.
-        rememberMfa: false,
-        allowDisable2fa: false,
-        matchEstimate: 6,
-      }),
-      rule({
         name: 'Paralegal, cleared, on matter, from the office',
         when: when(
           namedCard(
             'Paralegal on the matter, on the office network',
-            cond('user-role', 'is', ['Member']),      // PARALEGAL is not an option
+            /* `user-role` and `user-attr` are both gone from the catalogue, and
+               with them the clearance ladder this policy was built on. What is
+               left is the matter and the office. The rule above this one —
+               'Role, matter and clearance all agree' — is deleted rather than
+               emptied: without clearance it was `group in matter-acme`, which
+               is strictly broader than this rule and sat in front of it. */
             cond('group', 'in', ['matter-acme']),
-            cond('user-attr', 'is', ['clearance_level>=2']),   // UNREPRESENTABLE
-            cond('ip', 'is', ['203.0.113.0/24']),              // inlined again, 22-G8
+            cond('zone', 'in zone', ['office-cidr'], 'ip'),
           ),
         ),
         decision: '2fa',
@@ -1418,8 +1521,10 @@ export const policies: Policy[] = [
         when: when(
           card(
             cond('zone', 'in zone', ['office-cidr'], 'ip'),
-            cond('device-reg', 'is', ['Registered']),
-            cond('mdm', 'is', ['Enrolled']),
+            /* One condition where there were two. "Registered" and "MDM
+               enrolled" were two ways of saying the device is a known managed
+               one, and a profile is where that is decided now. */
+            cond('fingerprint', 'matches', ['fp-managed']),
           ),
         ),
         decision: '2fa',
@@ -1488,8 +1593,7 @@ export const policies: Policy[] = [
       rule({
         name: 'Managed Apple',
         when: when(card(
-          cond('mdm', 'is', ['Enrolled']),
-          cond('os', 'is', ['iOS', 'macOS']),   // multi-value list == IN
+          cond('fingerprint', 'matches', ['fp-apple']),
         )),
         decision: '1fa',
         firstFactor: 'Specific',
@@ -1500,8 +1604,7 @@ export const policies: Policy[] = [
       rule({
         name: 'Managed Android and Windows',
         when: when(card(
-          cond('mdm', 'is', ['Enrolled']),
-          cond('os', 'is', ['Android', 'Windows']),
+          cond('fingerprint', 'matches', ['fp-win-android']),
         )),
         decision: '2fa',
         firstFactor: 'Password',
@@ -1545,8 +1648,9 @@ export const policies: Policy[] = [
       rule({
         name: 'Known mobile',
         when: when(card(
-          cond('device-type', 'is', ['Mobile']),
-          cond('device-reg', 'is', ['Registered']),
+          /* `fp-byod` IS "mobile, and registered" — form factor plus the
+             enrolment rules, in the profile that already says both. */
+          cond('fingerprint', 'matches', ['fp-byod']),
         )),
         decision: '2fa',
         firstFactor: 'Password',
@@ -1580,26 +1684,18 @@ export const policies: Policy[] = [
     modifiedBy: 'Ravi Menon',
     rules: [
       rule({
-        name: 'Super admin',
-        // SUPER_ADMIN does not exist in the user-role enum. 'Admin' is the nearest.
-        when: when(card(cond('user-role', 'is', ['Admin']))),
+        /* Was 'Super admin', gated on `user-role is Admin`. `user-role` is
+           gone from the catalogue and nothing replaces it, so what is left is
+           the policy's own audience — everybody in IT admins. The rule below it
+           ('Helpdesk admin', `user-role is Member`) is deleted: with no role
+           condition the two were the same rule twice. */
+        name: 'Anyone in IT admins',
+        when: anySignIn(),
         decision: '2fa',
         firstFactor: 'Password',
         secondFactor: 'specific',
         secondFactorMethods: ['miniOrange Push'],
         matchEstimate: 3,
-      }),
-      rule({
-        name: 'Helpdesk admin',
-        /* HELPDESK has NO counterpart in ['Admin','Manager','Member','Auditor'].
-           'Member' is written here and it is a rename, not a mapping: it catches
-           every ordinary member of it-admins. */
-        when: when(card(cond('user-role', 'is', ['Member']))),
-        decision: '2fa',
-        firstFactor: 'Password',
-        secondFactor: 'specific',
-        secondFactorMethods: ['Google Authenticator'],
-        matchEstimate: 1,
       }),
     ],
     /* ALLOW → CHAIN [1F: Password, 2F: ALLOW_ANY (2-factor type)]
@@ -1706,8 +1802,11 @@ export const policies: Policy[] = [
         name: 'War-room terminal only',
         when: when(
           card(
-            cond('ip', 'is', ['203.0.113.10']),
-            cond('device-reg', 'is', ['Registered']),
+            /* `war-room` holds this single address. NOT `office-cidr`, which
+               would widen emergency access from one terminal to 256, and not
+               `office`, which names 203.0.113.5 — a different machine. */
+            cond('zone', 'in zone', ['war-room'], 'ip'),
+            cond('fingerprint', 'matches', ['fp-kiosk']),
           ),
         ),
         decision: '1fa',
@@ -1751,7 +1850,7 @@ export const policies: Policy[] = [
         name: 'Office, business hours only',
         when: when(
           card(
-            cond('ip', 'is', ['203.0.113.0/24']),
+            cond('zone', 'in zone', ['office-cidr'], 'ip'),
             cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
             /* Time 09:00–18:00 Asia/Kolkata. The TIMEZONE IS DROPPED — `time` is
                documented as "A window in the tenant's timezone", one tenant-wide
@@ -1796,7 +1895,7 @@ export const policies: Policy[] = [
         name: 'Office, business hours only',
         when: when(
           card(
-            cond('ip', 'is', ['203.0.113.0/24']),
+            cond('zone', 'in zone', ['office-cidr'], 'ip'),
             cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
             cond('time', 'between', ['09:00', '18:00']),
           ),
@@ -1840,7 +1939,7 @@ export const policies: Policy[] = [
                and any option-driven renderer shows an unknown value. Zone form
                used instead — the only loadable encoding. */
             cond('zone', 'in zone', ['japan'], 'location'),
-            cond('device-reg', 'is', ['Registered']),
+            cond('fingerprint', 'matches', ['fp-corp']),
             /* Risk score < 60. `device-risk` is the numeric one; `ml-risk` is the
                AI one and is a 3-value enum with no numbers in it. The parameter
                sheet has ONE attribute ("Risk score (Device Score / Device Trust)
@@ -1861,9 +1960,9 @@ export const policies: Policy[] = [
       }),
       rule({
         name: 'Home countries normal',
-        /* Country in [IN, US] — implicit multi-value IN on the `is` operator.
-           Both values ARE in the option list, so this one is loadable literally. */
-        when: when(card(cond('country', 'is', ['India', 'United States']))),
+        /* Country in [IN, US] — a zone now, because a country list is a list
+           and this engine keeps lists in one place. */
+        when: when(card(cond('zone', 'in zone', ['home-countries'], 'location'))),
         decision: '2fa',
         firstFactor: 'Password',
         secondFactor: 'specific',
@@ -1922,8 +2021,8 @@ export const policies: Policy[] = [
           cards: [
             {
               ...card(
-                cond('ip', 'is', ['203.0.113.0/24']),
-                cond('ip', 'is', ['198.51.100.0/24']),
+                cond('zone', 'in zone', ['office-cidr'], 'ip'),
+                cond('zone', 'in zone', ['vpn-egress'], 'ip'),
               ),
               join: 'or',
               grouped: true,
@@ -1931,8 +2030,8 @@ export const policies: Policy[] = [
             },
             {
               ...card(
-                cond('device-reg', 'is', ['Registered']),
-                cond('mdm', 'is', ['Enrolled']),
+                cond('fingerprint', 'matches', ['fp-corp']),
+                cond('fingerprint', 'matches', ['fp-managed']),
               ),
               join: 'or',
               grouped: true,
@@ -1961,8 +2060,8 @@ export const policies: Policy[] = [
           cards: [
             {
               ...card(
-                cond('ip', 'is', ['203.0.113.0/24', '198.51.100.0/24']),
-                cond('mdm', 'is', ['Enrolled']),
+                cond('zone', 'in zone', ['office-vpn'], 'ip'),
+                cond('fingerprint', 'matches', ['fp-managed']),
               ),
               join: 'or',
               grouped: true,
@@ -2022,16 +2121,13 @@ export const policies: Policy[] = [
                    There is no >=. `above ['79']` is an OFF-BY-ONE HACK that is
                    wrong for any non-integer score. */
                 cond('device-risk', 'above', ['79']),
-                /* webhook(hr-system).status = 'suspended'. The engine can only ask
-                   "returns true". The comparison has moved into the hook above and
-                   the rule no longer says what it tests. */
-                cond('webhook', 'returns true', ['hk-hr-suspended']),
-                /* Posture: jailbroken = true. THE OPTION DOES NOT EXIST — posture
-                   offers [Disk encryption, Screen lock, OS up to date, Antivirus
-                   running, Firewall on]. THIS IS NOT THE SCENARIO'S CONDITION; it
-                   is the nearest row in the list, and it does not detect a
-                   jailbreak. The red flag is LOST. */
-                cond('posture', 'fails', ['OS up to date']),
+                /* Two more red flags stood here and are GONE, not migrated:
+                   `webhook returns true hk-hr-suspended` (an HR suspension) and
+                   a posture check. Neither has a condition any more, so this
+                   group is down to two legs — the sanctioned-country zone and
+                   the risk threshold — and a suspended privileged user is no
+                   longer stopped by it. That is a security-relevant loss and it
+                   is recorded rather than smoothed over. */
               ),
               join: 'or',
               grouped: true,
@@ -2044,8 +2140,7 @@ export const policies: Policy[] = [
         name: 'Clean request',
         when: when(
           card(
-            cond('mdm', 'is', ['Enrolled']),
-            cond('device-reg', 'is', ['Registered']),
+            cond('fingerprint', 'matches', ['fp-managed']),
           ),
         ),
         decision: '2fa',
@@ -2091,12 +2186,12 @@ export const policies: Policy[] = [
         name: 'Full posture',
         when: when(
           card(
-            cond('mdm', 'is', ['Enrolled']),
-            cond('posture', 'passes', ['Disk encryption']),
-            cond('posture', 'passes', ['Screen lock']),
-            // Stands in for `os_patch_age_days < 30`. The catalogue has a boolean
-            // 'OS up to date' and no numeric patch age.
-            cond('posture', 'passes', ['OS up to date']),
+            cond('fingerprint', 'matches', ['fp-managed']),
+            /* Two of the three posture checks are GONE, not migrated. There is
+               no disk-encryption and no screen-lock attribute in the device
+               catalogue, so nothing can carry them. "OS up to date" survives
+               because an OS floor is exactly what an OS profile is. */
+            cond('fingerprint', 'matches', ['fp-patched']),
           ),
         ),
         decision: '2fa',
@@ -2107,7 +2202,10 @@ export const policies: Policy[] = [
       }),
       rule({
         name: 'Posture degraded',
-        when: when(card(cond('mdm', 'is', ['Enrolled']), cond('posture', 'passes', ['Disk encryption']))),
+        /* Narrower than the rule above it only in that it does not require a
+           current build — the disk-encryption leg that used to distinguish them
+           has no home. */
+        when: when(card(cond('fingerprint', 'matches', ['fp-managed']))),
         decision: '2fa',
         firstFactor: 'Password',
         secondFactor: 'specific',
@@ -2140,20 +2238,11 @@ export const policies: Policy[] = [
     audience: audienceOf(['contractors']),
     rules: [
       rule({
-        name: 'Contract expired',
-        // Doc: webhook(`hr-system`).contract_status = `expired`.
-        // No `hr-system` hook; `hk-entitlement` is the closest sync boolean hook.
-        // The field comparison lives in the hook's responsePath, not here.
-        when: when(card(cond('webhook', 'returns false', ['hk-hr-contract']))),
-        decision: 'deny',
-        matchEstimate: 18,
-      }),
-      rule({
         name: 'Active, office',
         when: when(
           card(
-            cond('webhook', 'returns true', ['hk-hr-contract']),
-            cond('ip', 'is', ['203.0.113.0/24']),
+            // The contract-status hook leg is gone with the webhook condition.
+            cond('zone', 'in zone', ['office-cidr'], 'ip'),
           ),
         ),
         decision: '2fa',
@@ -2161,15 +2250,6 @@ export const policies: Policy[] = [
         secondFactor: 'specific',
         secondFactorMethods: ['Google Authenticator'],
         matchEstimate: 96,
-      }),
-      rule({
-        name: 'Active, remote',
-        when: when(card(cond('webhook', 'returns true', ['hk-hr-contract']))),
-        decision: '2fa',
-        firstFactor: 'Password',
-        secondFactor: 'specific',
-        secondFactorMethods: ['Google Authenticator'],
-        matchEstimate: 40,
       }),
     ],
     fallback: rule({
@@ -2198,13 +2278,13 @@ export const policies: Policy[] = [
         // (risk < 30) AND (registered OR mdm-managed) — DNF requires the risk
         // leaf to be duplicated into both cards.
         when: when(
-          namedCard('Registered device',
+          namedCard('Recognised device',
             cond('device-risk', 'below', ['30']),
-            cond('device-reg', 'is', ['Registered']),
+            cond('fingerprint', 'matches', ['fp-corp']),
           ),
           namedCard('MDM-managed device',
             cond('device-risk', 'below', ['30']),
-            cond('mdm', 'is', ['Enrolled']),
+            cond('fingerprint', 'matches', ['fp-managed']),
           ),
         ),
         // Doc: CHAIN [1F: Password, StepUpIfRiskAbove(70) -> 2F: miniOrange Push].
@@ -2259,24 +2339,17 @@ export const policies: Policy[] = [
     audience: audienceOf(['traders']),
     rules: [
       rule({
-        name: 'Training lapsed',
-        // Doc: custom_attr(`compliance_training_expiry`) < today.
-        // `user-attr` has no attribute-name field, no `<`, no date type and no
-        // `today`. The attribute name is smuggled into the value string; the
-        // date comparison is pre-computed outside the engine and reduced to a
-        // string equality. This is a convention, not a feature.
-        when: when(card(cond('user-attr', 'is', ['compliance_training_expiry:lapsed']))),
-        decision: 'deny',
-        matchEstimate: 4,
-      }),
-      rule({
         name: 'Floor terminal',
         when: when(
           card(
             // Doc: MacAddress in allowlist [floor-terminals] — a named list
             // object. Inlined, because no such object exists.
-            cond('mac', 'is', ['00:1B:44:11:3A:B7', '00:1B:44:11:3A:B8', '00:1B:44:11:3A:B9']),
-            cond('browser', 'is', ['Chrome', 'Edge']),
+            /* The three MAC addresses are three rows of `fp-floor`'s roster
+               now. They were readable here and they are readable nowhere —
+               no surface in this prototype renders a roster's contents.
+               The browser allowlist is dropped outright: `browser` in a device
+               profile is a match-PRECISION setting, not a list of browsers. */
+            cond('fingerprint', 'matches', ['fp-floor']),
           ),
         ),
         decision: '1fa',
@@ -2286,11 +2359,12 @@ export const policies: Policy[] = [
         matchEstimate: 22,
       }),
       rule({
-        name: 'Office, approved browser',
+        // Was 'Office, approved browser'. There is no browser condition to
+        // approve one with, so the name stops claiming there is.
+        name: 'Office network',
         when: when(
           card(
-            cond('ip', 'is', ['203.0.113.0/24']),
-            cond('browser', 'is', ['Chrome', 'Edge']),
+            cond('zone', 'in zone', ['office-cidr'], 'ip'),
           ),
         ),
         decision: '2fa',
@@ -2330,8 +2404,9 @@ export const policies: Policy[] = [
         name: 'India office hours',
         when: when(
           card(
-            cond('country', 'is', ['India']),
-            cond('ip', 'is', ['203.0.113.0/24']),
+            /* One unscoped zone condition, which tests BOTH halves — the
+               same conjunction the two conditions expressed. */
+            cond('zone', 'in zone', ['in-office']),
             cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
             // The doc pins this to Asia/Kolkata. `time` has no timezone field —
             // it evaluates in one implicit tenant-wide zone.
@@ -2348,8 +2423,9 @@ export const policies: Policy[] = [
         name: 'Germany office hours',
         when: when(
           card(
-            cond('country', 'is', ['Germany']),
-            cond('ip', 'is', ['198.51.100.0/24']),
+            /* One unscoped zone condition, which tests BOTH halves — the
+               same conjunction the two conditions expressed. */
+            cond('zone', 'in zone', ['de-office']),
             cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
             // Europe/Berlin in the doc. Same implicit zone as the rule above.
             cond('time', 'between', ['08:00', '18:00']),
@@ -2365,8 +2441,9 @@ export const policies: Policy[] = [
         name: 'US office hours',
         when: when(
           card(
-            cond('country', 'is', ['United States']),
-            cond('ip', 'is', ['192.0.2.0/24']),
+            /* One unscoped zone condition, which tests BOTH halves — the
+               same conjunction the two conditions expressed. */
+            cond('zone', 'in zone', ['us-office']),
             cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
             // America/New_York in the doc.
             cond('time', 'between', ['08:00', '18:00']),
@@ -2380,7 +2457,7 @@ export const policies: Policy[] = [
       }),
       rule({
         name: 'After-hours, managed device',
-        when: when(card(cond('mdm', 'is', ['Enrolled']), cond('device-reg', 'is', ['Registered']))),
+        when: when(card(cond('fingerprint', 'matches', ['fp-managed']))),
         decision: '2fa',
         firstFactor: 'Password',
         secondFactor: 'specific',
@@ -2413,23 +2490,12 @@ export const policies: Policy[] = [
     audience: audienceOf(['acquired']),
     rules: [
       rule({
-        name: 'Not yet in HR sync',
-        // Doc: webhook(`legacy-hr`).employee_status != `active`.
-        // No `legacy-hr` hook. `hk-hrms` is the right system but is
-        // mode:'attribute-sync' with an empty responsePath, so it cannot answer a
-        // rule condition. `hk-entitlement` is the closest usable sync boolean.
-        when: when(card(cond('webhook', 'returns false', ['hk-hr-contract']))),
-        decision: 'deny',
-        matchEstimate: 31,
-      }),
-      rule({
         name: 'Migrated and compliant',
         when: when(
           card(
-            cond('webhook', 'returns true', ['hk-hr-contract']),
-            cond('mdm', 'is', ['Enrolled']),
-            cond('posture', 'passes', ['Disk encryption']),
-            cond('country', 'is', ['India', 'Germany']),
+            // Webhook and posture legs dropped — neither has a condition now.
+            cond('fingerprint', 'matches', ['fp-managed']),
+            cond('zone', 'in zone', ['ma-countries'], 'location'),
           ),
         ),
         decision: '2fa',
@@ -2440,30 +2506,10 @@ export const policies: Policy[] = [
         matchEstimate: 62,
       }),
       rule({
-        name: 'Migrated device, posture pending',
-        when: when(
-          card(
-            cond('webhook', 'returns true', ['hk-hr-contract']),
-            cond('mdm', 'is', ['Enrolled']),
-            cond('country', 'is', ['India', 'Germany']),
-          ),
-        ),
-        decision: '2fa',
-        firstFactor: 'Password',
-        secondFactor: 'specific',
-        secondFactorMethods: ['Google Authenticator'],
-        // Doc: + SetReAuthFrequency(4h) + SetRememberMfaTimeout(0).
-        // Only the second half is expressible.
-        rememberMfa: false,
-        forceMfaEachLogin: true,
-        matchEstimate: 28,
-      }),
-      rule({
         name: 'Unmigrated device, office only',
         when: when(
           card(
-            cond('webhook', 'returns true', ['hk-hr-contract']),
-            cond('ip', 'is', ['203.0.113.0/24']),
+            cond('zone', 'in zone', ['office-cidr'], 'ip'),
             cond('device-risk', 'below', ['50']),
           ),
         ),
@@ -2502,7 +2548,7 @@ export const policies: Policy[] = [
            predicate-prose.ts:64 — "A condition holds when ANY of its values
            match — the evaluator is `vals.some(...)`". But the OPERATOR is `is`,
            not `in`, so this reads "IP address is A or B". */
-        when: when(card(cond('ip', 'is', ['203.0.113.0/24', '198.51.100.0/24']))),
+        when: when(card(cond('zone', 'in zone', ['office-vpn'], 'ip'))),
         decision: '1fa',
         firstFactor: 'Password',
         matchEstimate: 291,
@@ -2574,9 +2620,10 @@ export const policies: Policy[] = [
     rules: [
       rule({
         name: 'Allowed countries',
-        /* Multi-value = OR. Both values exist in the hardcoded five-item option
-           list; a sixth country could not be named at all. See gap 3.3. */
-        when: when(card(cond('country', 'is', ['India', 'United States']))),
+        /* A zone, so a sixth country is a zone edit rather than a change to
+           the condition catalogue's hardcoded option list — which is the gap
+           3.3 this used to be annotated with. */
+        when: when(card(cond('zone', 'in zone', ['home-countries'], 'location'))),
         decision: '2fa',
         firstFactor: 'Password',
         /* The one clean mapping in all four scenarios:
@@ -2619,8 +2666,8 @@ export const policies: Policy[] = [
            This is the ONE predicate-shape requirement in S1–S4 and the model
            carries it natively. */
         when: when(
-          namedCard('Registered with IAM', cond('device-reg', 'is', ['Registered'])),
-          namedCard('Enrolled in MDM', cond('mdm', 'is', ['Enrolled'])),
+          namedCard('Recognised by Corporate managed', cond('fingerprint', 'matches', ['fp-corp'])),
+          namedCard('Enrolled in MDM', cond('fingerprint', 'matches', ['fp-managed'])),
         ),
         decision: '2fa',
         firstFactor: 'Password',
@@ -2650,11 +2697,11 @@ export const templates: Template[] = [
     rules: [{ name: 'Require MFA', ifText: 'All users, every login', decision: '2fa' }],
   },
   {
-    id: 't-device', name: 'Adaptive device trust (90-day)', category: 'Device-based',
+    id: 't-device', name: 'Adaptive device trust', category: 'Device-based',
     description: 'Known devices skip extra auth; new devices verify.', ruleCount: 2,
     author: 'Mehak Garg', when: '1 week ago',
     rules: [
-      { name: 'Trusted device', ifText: 'Known device trusted < 90 days', decision: '1fa' },
+      { name: 'Trusted device', ifText: 'Recognised by Corporate managed', decision: '1fa' },
       { name: 'New or expired device', ifText: 'New, unrecognized, or expired device', decision: '2fa' },
     ],
   },
@@ -2737,7 +2784,7 @@ export const scenarios: Scenario[] = [
     audience: audienceOf(['contractors']),
     rules: [{
       name: 'Contractor step-up', ifText: 'User type is Contractor', decision: '2fa',
-      build: () => rule({ name: 'Contractor step-up',when: when(card(cond('user-type', 'is', ['Contractor']))), decision: '2fa', matchEstimate: 154 }),
+      build: () => rule({ name: 'Contractor step-up',when: anySignIn(), decision: '2fa', matchEstimate: 154 }),
     }],
   },
   {
@@ -2750,17 +2797,17 @@ export const scenarios: Scenario[] = [
     }],
   },
   {
-    id: 's-trust', provided: true, reviewed: { by: 'miniOrange Security', on: '2026-01' }, name: 'Adaptive device trust (90-day)', category: 'Device-based', tag: 'Device', badge: 'Recommended for SIB/HRS',
+    id: 's-trust', provided: true, reviewed: { by: 'miniOrange Security', on: '2026-01' }, name: 'Adaptive device trust', category: 'Device-based', tag: 'Device', badge: 'Recommended for SIB/HRS',
     description: 'Known devices skip extra auth. New or expired devices require full verification.',
     audience: EVERYONE,
     rules: [
       {
-        name: 'Trusted device', ifText: 'Known device trusted < 90 days', decision: '1fa',
-        build: () => rule({ name: 'Trusted device',when: when(card(cond('trust-age', 'under', ['90']))), decision: '1fa', matchEstimate: 980 }),
+        name: 'Trusted device', ifText: 'Recognised by Corporate managed', decision: '1fa',
+        build: () => rule({ name: 'Trusted device',when: when(card(cond('fingerprint', 'matches', ['fp-corp']))), decision: '1fa', matchEstimate: 980 }),
       },
       {
         name: 'New or expired device', ifText: 'New, unrecognized, or expired device', decision: '2fa',
-        build: () => rule({ name: 'New or expired device',when: when(card(cond('device-reg', 'is', ['Unregistered']))), decision: '2fa', matchEstimate: 260 }),
+        build: () => rule({ name: 'New or expired device',when: when(card(cond('fingerprint', 'does not match', ['fp-corp']))), decision: '2fa', matchEstimate: 260 }),
       },
     ],
   },
@@ -2770,7 +2817,7 @@ export const scenarios: Scenario[] = [
     audience: EVERYONE,
     rules: [{
       name: 'Block compromised devices', ifText: 'Not recognised by Corporate managed', decision: 'deny',
-      build: () => rule({ name: 'Block compromised devices',when: when(card(cond('fingerprint', 'not recognised by', ['fp-corp']))), decision: 'deny', matchEstimate: 108 }),
+      build: () => rule({ name: 'Block compromised devices',when: when(card(cond('fingerprint', 'does not match', ['fp-corp']))), decision: 'deny', matchEstimate: 108 }),
     }],
   },
   {
@@ -2779,7 +2826,7 @@ export const scenarios: Scenario[] = [
     audience: EVERYONE,
     rules: [{
       name: 'MDM enrolled only', ifText: 'MDM Managed is Not enrolled', decision: 'deny',
-      build: () => rule({ name: 'MDM enrolled only',when: when(card(cond('mdm', 'is', ['Not enrolled']))), decision: 'deny', matchEstimate: 210 }),
+      build: () => rule({ name: 'MDM enrolled only',when: when(card(cond('fingerprint', 'does not match', ['fp-managed']))), decision: 'deny', matchEstimate: 210 }),
     }],
   },
   {
@@ -2787,8 +2834,8 @@ export const scenarios: Scenario[] = [
     description: 'Challenge users when behavioral signals indicate elevated risk.',
     audience: EVERYONE,
     rules: [{
-      name: 'Elevated risk', ifText: 'ML Risk Score is High', decision: '2fa',
-      build: () => rule({ name: 'Elevated risk',when: when(card(cond('ml-risk', 'is', ['High']))), decision: '2fa', matchEstimate: 64 }),
+      name: 'Elevated risk', ifText: 'Risk score above 69', decision: '2fa',
+      build: () => rule({ name: 'Elevated risk',when: when(card(cond('device-risk', 'above', ['69']))), decision: '2fa', matchEstimate: 64 }),
     }],
   },
   {
@@ -2806,16 +2853,7 @@ export const scenarios: Scenario[] = [
     audience: EVERYONE,
     rules: [{
       name: 'Unfamiliar country', ifText: 'Country is not India', decision: '2fa',
-      build: () => rule({ name: 'Unfamiliar country',when: when(card(cond('country', 'is not', ['India']))), decision: '2fa', matchEstimate: 88 }),
-    }],
-  },
-  {
-    id: 's-firstlogin', author: 'Mehak Garg', when: '1 week ago', name: 'First login enforcement', category: 'Compliance', tag: 'Identity', badge: 'SIB/HRS',
-    description: 'First-time users and users with reset MFA must complete a specific auth chain.',
-    audience: EVERYONE,
-    rules: [{
-      name: 'First login chain', ifText: 'Auth state is First time login', decision: '2fa',
-      build: () => rule({ name: 'First login chain',when: when(card(cond('auth-state', 'is', ['First time login']))), decision: '2fa', secondFactor: 'chain', matchEstimate: 42 }),
+      build: () => rule({ name: 'Unfamiliar country',when: when(card(cond('zone', 'not in zone', ['india'], 'location'))), decision: '2fa', matchEstimate: 88 }),
     }],
   },
   {
@@ -2824,7 +2862,7 @@ export const scenarios: Scenario[] = [
     audience: audienceOf(['contractors']),
     rules: [{
       name: 'Contractor session cap', ifText: 'User type is Contractor', decision: '2fa',
-      build: () => rule({ name: 'Contractor session cap',when: when(card(cond('user-type', 'is', ['Contractor']))), decision: '2fa', matchEstimate: 154 }),
+      build: () => rule({ name: 'Contractor session cap',when: anySignIn(), decision: '2fa', matchEstimate: 154 }),
     }],
   },
 
@@ -2837,15 +2875,15 @@ export const scenarios: Scenario[] = [
     audience: EVERYONE,
     rules: [
       { name: 'Block unrecognised devices', ifText: 'Device not recognised by Corporate managed', decision: 'deny',
-        build: () => rule({ name: 'Block unrecognised devices',when: when(card(cond('fingerprint', 'not recognised by', ['fp-corp']))), decision: 'deny', matchEstimate: 108 }) },
+        build: () => rule({ name: 'Block unrecognised devices',when: when(card(cond('fingerprint', 'does not match', ['fp-corp']))), decision: 'deny', matchEstimate: 108 }) },
       { name: 'Block anonymised sources', ifText: 'Connection is Tor, VPN or a known proxy', decision: 'deny',
         build: () => rule({ name: 'Block anonymised sources',when: when(card(cond('zone', 'in zone', ['anon']))), decision: 'deny', matchEstimate: 31 }) },
-      { name: 'Trusted office device', ifText: 'On Office Network and device registered', decision: '1fa',
-        build: () => rule({ name: 'Trusted office device',when: when(card(cond('zone', 'in zone', ['office']), cond('device-reg', 'is', ['Registered']))), decision: '1fa', matchEstimate: 820 }) },
+      { name: 'Trusted office device', ifText: 'On Office Network', decision: '1fa',
+        build: () => rule({ name: 'Trusted office device',when: when(card(cond('zone', 'in zone', ['office']))), decision: '1fa', matchEstimate: 820 }) },
       { name: 'Off-network step-up', ifText: 'Outside Office Network', decision: '2fa',
         build: () => rule({ name: 'Off-network step-up',when: when(card(cond('zone', 'not in zone', ['office']))), decision: '2fa', matchEstimate: 340 }) },
-      { name: 'Elevated risk', ifText: 'ML Risk Score is High', decision: '2fa',
-        build: () => rule({ name: 'Elevated risk',when: when(card(cond('ml-risk', 'is', ['High']))), decision: '2fa', matchEstimate: 64 }) },
+      { name: 'Elevated risk', ifText: 'Risk score above 69', decision: '2fa',
+        build: () => rule({ name: 'Elevated risk',when: when(card(cond('device-risk', 'above', ['69']))), decision: '2fa', matchEstimate: 64 }) },
     ],
   },
   {
@@ -2854,13 +2892,13 @@ export const scenarios: Scenario[] = [
     audience: audienceOf(['finance']),
     rules: [
       { name: 'Deny unmanaged devices', ifText: 'MDM Managed is Not enrolled', decision: 'deny',
-        build: () => rule({ name: 'Deny unmanaged devices',when: when(card(cond('mdm', 'is', ['Not enrolled']))), decision: 'deny', matchEstimate: 42 }) },
+        build: () => rule({ name: 'Deny unmanaged devices',when: when(card(cond('fingerprint', 'does not match', ['fp-managed']))), decision: 'deny', matchEstimate: 42 }) },
       { name: 'Deny outside approved countries', ifText: 'Country is not India', decision: 'deny',
-        build: () => rule({ name: 'Deny outside approved countries',when: when(card(cond('country', 'is not', ['India']))), decision: 'deny', matchEstimate: 18 }) },
+        build: () => rule({ name: 'Deny outside approved countries',when: when(card(cond('zone', 'not in zone', ['india'], 'location'))), decision: 'deny', matchEstimate: 18 }) },
       { name: 'Out-of-hours verification', ifText: 'Outside 09:00–18:00', decision: '2fa',
         build: () => rule({ name: 'Out-of-hours verification',when: when(card(cond('time', 'not between', ['09:00', '18:00']))), decision: '2fa', matchEstimate: 51 }) },
       { name: 'New device verification', ifText: 'Device trust age under 30 days', decision: '2fa',
-        build: () => rule({ name: 'New device verification',when: when(card(cond('trust-age', 'under', ['30']))), decision: '2fa', matchEstimate: 26 }) },
+        build: () => rule({ name: 'New device verification',when: when(card(cond('fingerprint', 'does not match', ['fp-corp']))), decision: '2fa', matchEstimate: 26 }) },
       { name: 'Everything else in-office', ifText: 'On Office Network', decision: '1fa',
         build: () => rule({ name: 'Everything else in-office',when: when(card(cond('zone', 'in zone', ['office']))), decision: '1fa', matchEstimate: 86 }) },
     ],
@@ -2870,14 +2908,12 @@ export const scenarios: Scenario[] = [
     description: 'Tighter treatment for non-employees across first login, device state, hours and session length.',
     audience: audienceOf(['contractors']),
     rules: [
-      { name: 'First login chain', ifText: 'Auth state is First time login', decision: '2fa',
-        build: () => rule({ name: 'First login chain',when: when(card(cond('auth-state', 'is', ['First time login']))), decision: '2fa', secondFactor: 'chain', matchEstimate: 22 }) },
       { name: 'Unregistered device', ifText: 'Device Registration is Unregistered', decision: 'deny',
-        build: () => rule({ name: 'Unregistered device',when: when(card(cond('device-reg', 'is', ['Unregistered']))), decision: 'deny', matchEstimate: 37 }) },
+        build: () => rule({ name: 'Unregistered device',when: when(card(cond('fingerprint', 'does not match', ['fp-corp']))), decision: 'deny', matchEstimate: 37 }) },
       { name: 'Outside contract hours', ifText: 'Outside 09:00–18:00 Mon–Fri', decision: '2fa',
         build: () => rule({ name: 'Outside contract hours',when: when(card(cond('time', 'not between', ['09:00', '18:00']))), decision: '2fa', matchEstimate: 64 }) },
       { name: 'Standard contractor access', ifText: 'User type is Contractor', decision: '2fa',
-        build: () => rule({ name: 'Standard contractor access',when: when(card(cond('user-type', 'is', ['Contractor']))), decision: '2fa', matchEstimate: 154 }) },
+        build: () => rule({ name: 'Standard contractor access',when: anySignIn(), decision: '2fa', matchEstimate: 154 }) },
     ],
   },
 ]

@@ -14,7 +14,6 @@ import {
   Search,
   UserRound,
   Users,
-  Webhook,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -31,14 +30,14 @@ import {
 const operatorIcon = (o: string): LucideIcon =>
   o.includes('not') ? Ban : o === 'between' ? ArrowLeftRight : CircleCheck
 
+import { EmptyState } from '../empty'
 import { modeLabel } from '../fingerprint'
 import { groupIcon } from './board/tones'
 import type { BrandStore } from '../store'
 import type { NameLookup } from './predicate-prose'
 import {
-  CONDITION_CATALOGUE,
   ZONE_SCOPE_LABEL,
-  conditionRank,
+  WHEN_CONDITIONS,
   conditionType,
   ipSectionEmpty,
   locationEmpty,
@@ -94,6 +93,14 @@ export interface ValueOption {
   /** A third, quieter line: what this option would actually match on. */
   note?: string
   icon?: LucideIcon
+  /* Shown, and not choosable.
+
+     Only one thing uses it today — the ML risk row, which is listed so the
+     risk section reads as a section that is going to grow. `disabled` on the
+     button rather than `aria-disabled`: there is no explanation to announce on
+     press and nothing happens if you try, so the control that is dead is dead
+     to the keyboard too. */
+  disabled?: boolean
 }
 
 /* The two halves of a zone.
@@ -263,15 +270,33 @@ export function ConditionPopover({
         >
           {open === 'what' && (
             <OptionList
-              searchLabel="Search attributes"
-              items={[...CONDITION_CATALOGUE]
-                .sort((a, b) => conditionRank(a.id) - conditionRank(b.id))
-                /* The family's own glyph, the same one the card and the
-                   editor draw. Twenty-eight rows of three grey lines each is a
-                   list you read linearly; a mark per family is what lets you
-                   jump to the four Device rows without reading the
-                   twenty-four that are not. */
-                .map((x) => ({ value: x.id, label: x.label, meta: x.group, note: x.hint, icon: groupIcon(x.group) }))}
+              /* No search, and the sort is gone with it.
+
+                 Both existed for a twenty-four row list scattered across nine
+                 components: you searched because you could not see the row you
+                 wanted, and `conditionRank` floated seven rows above the
+                 taxonomy because the taxonomy had put them five components
+                 apart. Four rows are all on screen. A search field over four
+                 rows can only ever hide three of them, and a lead order over
+                 four is an order nobody can perceive.
+
+                 `WHEN_CONDITIONS` and not the catalogue: `group` and `user` are
+                 in the catalogue for the Who step to resolve its labels
+                 through, and retyping a circumstance into an audience here
+                 would put the audience in two places. */
+              items={WHEN_CONDITIONS
+                /* The family's own glyph, the same one the card and the editor
+                   draw. Four rows do not need finding, but the mark is what
+                   tells you at a glance that two of them are about the same
+                   thing. */
+                .map((x) => ({
+                  value: x.id,
+                  label: x.label,
+                  meta: x.group,
+                  note: x.soon ? `${x.hint} · Coming soon` : x.hint,
+                  icon: groupIcon(x.group),
+                  disabled: x.soon,
+                }))}
               picked={[c.typeId]}
               single
               /* Progressive, and only forwards. Choosing an attribute opens the
@@ -551,10 +576,11 @@ function List({
             <button
               key={o.value}
               type="button"
-              className={`cp__opt ${on ? 'is-on' : ''} ${single ? 'is-single' : ''}`}
+              className={`cp__opt ${on ? 'is-on' : ''} ${single ? 'is-single' : ''} ${o.disabled ? 'is-soon' : ''}`}
               role={single ? 'option' : 'checkbox'}
               aria-selected={single ? on : undefined}
               aria-checked={single ? undefined : on}
+              disabled={o.disabled}
               onClick={() => onPick(o.value)}
             >
               {/* A tick box for a multi-select, a bare check for a single one.
@@ -643,10 +669,49 @@ function ValueBody({
     )
   }
 
+  /* An empty list is an empty LIBRARY now, and that changes what belongs here.
+
+     This was a free-text box, and the guard is `options.length === 0` rather
+     than `valueKind === 'text'` — which was fine while `ip`, `mac` and
+     `user-attr` existed, because those kinds genuinely had no list and a typed
+     value was the whole point of them.
+
+     Those kinds are gone. The only way to reach this branch now is a tenant
+     with no zones or no device profiles, and the box would let somebody type a
+     raw string into a zone condition's `values` — the exact capability the
+     catalogue was shrunk to remove, surviving through the back door, and
+     producing a condition that names a zone that does not exist and therefore
+     never matches.
+
+     It is not hypothetical: the `first-run` persona boots at depth `none`, and
+     `zonesAt('none')` returns `[]`.
+
+     So: the empty state, and the way out of it. The footer's "Manage zones →"
+     already exists and already navigates — it just never rendered in the one
+     case where it is the only useful control on the panel. */
   if (options.length === 0) {
+    const lib = t.valueKind === 'zone' ? 'zone' : t.valueKind === 'fingerprint' ? 'device profile' : null
     return (
-      <div className="cp__body cp__body--inline">
-        <input ref={take} className="cp__input is-text" aria-label={t.label} placeholder="Type a value…" value={values[0] ?? ''} onChange={(e) => onValues([e.target.value])} />
+      <div className="cp__body">
+        <EmptyState
+          compact
+          icon={t.valueKind === 'fingerprint' ? Fingerprint : Globe}
+          title={lib ? `No ${lib}s yet` : 'Nothing to choose'}
+          blurb={
+            lib === 'zone'
+              ? 'A zone is the only way a rule can name a network or a place. Create one, then come back to this condition.'
+              : lib === 'device profile'
+                ? 'A device profile is the only way a rule can name a device. Create one, then come back to this condition.'
+                : 'This attribute has no values to offer.'
+          }
+          action={
+            onFooter ? (
+              <button type="button" className="cp__manage" onClick={onFooter}>
+                {footer} →
+              </button>
+            ) : undefined
+          }
+        />
       </div>
     )
   }
@@ -740,7 +805,15 @@ export function valueSource(
   store: BrandStore,
   resolve: NameLookup,
 ): { options: ValueOption[]; names: string[]; single?: boolean; footer?: string; onFooter?: () => void } {
-  if (t.valueKind === 'zone' || t.valueKind === 'fingerprint' || t.valueKind === 'hook') {
+  /* The two library kinds, and they are the only way to say what they say.
+
+     A zone and a device profile are no longer one option among several for
+     describing a network or a device — since the inline attributes went, they
+     are the ONLY way. Which raises the stakes on the footer: a tenant with no
+     zones cannot write a network rule at all, so "Manage zones →" is not a
+     convenience link here, it is the route out of a dead end. `EMPTY` below is
+     what the list says when it has nothing to offer. */
+  if (t.valueKind === 'zone' || t.valueKind === 'fingerprint') {
     const kind = t.valueKind
     const options: ValueOption[] =
       kind === 'zone'
@@ -751,18 +824,12 @@ export function valueSource(
             note: z.usedIn ? `Used by ${z.usedIn} rule${z.usedIn === 1 ? '' : 's'}` : undefined,
             icon: Globe,
           }))
-        : kind === 'fingerprint'
-          ? store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p), icon: Fingerprint }))
-          : store.hooks.filter((h) => h.mode === 'sync').map((h) => ({ value: h.id, label: h.name, meta: `Answers within ${h.timeoutMs}ms`, icon: Webhook }))
+        : store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p), icon: Fingerprint }))
     return {
       options,
       names: values.map((id) => resolve(kind, id) ?? `deleted · ${id}`),
-      /* A hook holds one. `diagnostics` reads `values[0]` to check the endpoint
-         still exists, and a rule consulting two services would have to say what
-         happens when they disagree. */
-      single: kind === 'hook',
-      footer: kind === 'zone' ? 'Manage zones' : kind === 'fingerprint' ? 'Manage device profiles' : 'Manage hooks',
-      onFooter: () => store.go({ name: kind === 'zone' ? 'zones' : kind === 'fingerprint' ? 'fingerprint' : 'hooks' } as never),
+      footer: kind === 'zone' ? 'Manage zones' : 'Manage device profiles',
+      onFooter: () => store.go({ name: kind === 'zone' ? 'zones' : 'fingerprint' } as never),
     }
   }
 
@@ -784,3 +851,82 @@ export function valueSource(
   return { options: [], names: values }
 }
 
+
+/* -----------------------------------------------------------------------------
+   The catalogue, as a list and nothing else.
+
+   Six rows. That is the whole reason this replaces an 800px two-column dialog
+   with a category rail down the left, a search field that spanned every
+   component, an arrow-key cursor and a per-category count.
+
+   Each of those existed to solve a problem twenty-four attributes across nine
+   components had. You searched because you could not see the row you wanted;
+   the rail existed because nine components do not fit above a list; the lead
+   order existed because the taxonomy scattered the seven rows people actually
+   reached for; the cursor existed because a list you search is a list you
+   navigate. None of those problems survive at six rows, and each control that
+   outlives its problem is a thing to operate before you can do the thing you
+   came to do.
+
+   Inline, not a dialog and not a popover — and there is a scar here worth
+   naming, because the trail's own header records it. An inline catalogue was
+   tried before and was reverted: "an inline panel inside the only scroller on
+   the screen is clipped by it, so the list opened a few rows tall at the bottom
+   of a rule and the rest of it could only be reached by scrolling the thing the
+   list was pinned to."
+
+   That was true, and it was true of twenty-four rows. Six rows is roughly
+   200px; if the bottom of it is below the fold, the thing you scroll to reach
+   it is the panel it is already part of, and it does not move under you while
+   you do — which is exactly what the portalled version could not promise. So
+   the flip-and-clamp machinery in `Pop` above is not used here at all: nothing
+   to flip, nothing to clamp, nothing to re-measure on scroll.
+   -------------------------------------------------------------------------- */
+
+export function ConditionList({
+  label,
+  onPick,
+  onCancel,
+}: {
+  /** What is being added, and to where. The heading, and the group's name. */
+  label: string
+  onPick: (typeId: string) => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="cp__cat" role="group" aria-label={label}>
+      <p className="cp__cathead">
+        <span>{label}</span>
+        <button type="button" className="cp__catx" onClick={onCancel} aria-label="Cancel">
+          <X size={13} strokeWidth={2.2} />
+        </button>
+      </p>
+
+      {WHEN_CONDITIONS.map((t) => {
+        const Ico = groupIcon(t.group)
+        return (
+          <button
+            key={t.id}
+            type="button"
+            className={`cp__catrow ${t.soon ? 'is-soon' : ''}`}
+            disabled={t.soon}
+            onClick={() => onPick(t.id)}
+          >
+            <Ico size={15} strokeWidth={1.9} aria-hidden />
+            <span className="cp__catname">
+              {t.label}
+              {/* The one placeholder, and it says which. `WhatEditor` deleted a
+                  "Coming soon" tile on the argument that a promise is not a
+                  control — the difference is that this one is a row in a list
+                  rather than a third of the width of the only control on a
+                  pane, and the section it is in would otherwise read as
+                  finished at one row. */}
+              {t.soon && <i className="cp__catsoon">Coming soon</i>}
+            </span>
+            <span className="cp__cathint">{t.hint}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}

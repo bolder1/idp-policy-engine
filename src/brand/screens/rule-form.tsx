@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Check,
@@ -13,7 +13,6 @@ import {
   MonitorSmartphone,
   MoreHorizontal,
   Plus,
-  Search,
   ShieldAlert,
   Users,
   Webhook,
@@ -22,14 +21,11 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { Counter, MenuButton, Modal, Tip, TipDot, Toggle, type MenuItem } from '../kit'
+import { Counter, MenuButton, Tip, TipDot, Toggle, type MenuItem } from '../kit'
 import { Picker } from '../picker'
 import { cardJoin, cardLetter, ckey, duplicatedAcrossCards, topJoin } from '../predicate'
 import { predicateParts, type NameLookup } from './predicate-prose'
 import {
-  CONDITION_CATALOGUE,
-  CONDITION_GROUPS,
-  conditionRank,
   card,
   cond,
   conditionType,
@@ -39,7 +35,7 @@ import {
   type Policy,
   type Rule,
 } from '../data'
-import { ConditionPopover, condSummary, valueSource } from './ConditionPopover'
+import { ConditionList, ConditionPopover, condSummary, valueSource } from './ConditionPopover'
 import { useBrand, useNameLookup } from '../store'
 import { ruleSentence } from './builder-dialogs'
 import { impactOf, type Diagnostic } from './diagnostics'
@@ -71,18 +67,10 @@ const GROUP_ICON: Record<string, LucideIcon> = {
   Webhooks: Webhook,
 }
 
-/* What the catalogue's top level CALLS each component.
-
-   "Device" is the catalogue's internal group name; "Device profiles" is what
-   the console's own navigation calls the library those conditions reach into,
-   and the brief asks for the major components by the names the product already
-   uses for them. */
-const GROUP_LABEL: Record<string, string> = {
-  Device: 'Device profiles',
-  Webhooks: 'External hooks',
-  Group: 'Groups',
-  User: 'People',
-}
+/* `GROUP_LABEL` was here — a second name for four of the nine components,
+   because a rail heading reading "Device" wanted to say "Device profiles". The
+   rail is gone with the dialog, and the four attributes name themselves now:
+   the row IS "Device profile". */
 /* One feedback triad per condition category. Eight groups, seven distinct tones
    and neutral for the rest — and never `negative`, because red means danger in
    this kit and a network condition is not a danger. */
@@ -98,7 +86,10 @@ const GROUP_TONE: Record<string, string> = {
   Webhooks: 'neutral',
 }
 
-const METHOD_GROUPS = new Set(['Phishing-Resistant', 'Standard MFA', 'Fallback & Recovery'])
+/* `METHOD_GROUPS` was here, filtering three groups out of the condition pool.
+   It had already stopped doing anything — no catalogue entry has carried those
+   groups for some time — and the pool it filtered is `WHEN_CONDITIONS` now,
+   which is filtered on the model rather than by a name match here. */
 
 /* Two outcomes, not three.
 
@@ -692,7 +683,15 @@ function ConditionRow({
      exactly how this row and the board's came to disagree about what a zone
      condition could hold. */
   const { options, names, single, footer, onFooter } = valueSource(t, c.values.filter(Boolean), store, resolve)
-  const stale = options.length > 0 && c.values.filter(Boolean).some((id) => !options.some((o) => o.value === id))
+  /* `values.length`, not `options.length`.
+
+     Guarding on the OPTIONS meant that emptying the library stopped every
+     condition naming it from being marked stale — delete your last zone and
+     every zone condition in the tenant quietly looks fine again, at exactly the
+     moment all of them have broken. The question is whether this condition
+     names something that is not there, and a condition with no values does not
+     name anything. */
+  const stale = c.values.filter(Boolean).some((id) => !options.some((o) => o.value === id))
 
 
   /* Every condition type, grouped by major component, so changing a row's field
@@ -848,10 +847,18 @@ function Readback({ rule, resolve }: { rule: Rule; resolve: NameLookup }) {
 
 /* --- The catalogue -------------------------------------------------------------- */
 
-/* Nine major components at the top level, and the types inside each one behind
-   them. Zones, device profiles and hook endpoints are NOT here — they are
+/* The button, and the list it becomes.
+
+   Zones, device profiles and the values inside them are NOT here — they are
    values, reached from the row's value control, which is where the brief's
-   "showcase the major option, not what is inside" lands. */
+   "showcase the major option, not what is inside" lands. That separation is
+   the whole shape of the catalogue now: four attributes, two of which are a
+   pointer at a library.
+
+   Open, the button is REPLACED rather than covered. A dialog could sit over
+   the trail because it was its own layer; an inline list cannot, and a list
+   that pushed the page down while leaving a live "Add condition" button above
+   it would offer to do again the thing it is in the middle of doing. */
 function CatalogueButton({
   open,
   onToggle,
@@ -865,283 +872,46 @@ function CatalogueButton({
   label: string
   variant?: 'dashed' | 'solid' | 'or'
 }) {
+  if (open) {
+    return (
+      <div className={`bf__addwrap is-${variant} is-open`}>
+        <ConditionList
+          label={label}
+          onCancel={onToggle}
+          onPick={(id) => {
+            onPick(id)
+            onToggle()
+          }}
+        />
+      </div>
+    )
+  }
   return (
     <div className={`bf__addwrap is-${variant}`}>
       <button type="button" className={`bf__add is-${variant}`} onClick={onToggle}>
         <Plus size={13} strokeWidth={2.4} aria-hidden />
         {label}
       </button>
-      <ConditionPicker
-        open={open}
-        title={label}
-        onClose={onToggle}
-        onPick={(id) => {
-          onPick(id)
-          onToggle()
-        }}
-      />
     </div>
   )
 }
 
-/* --- The catalogue -------------------------------------------------------------
+/* --- The catalogue ----------------------------------------------------------
 
-   A panel of its own, over the work.
+   `ConditionPicker` was here: a 780px modal, a rail of nine components with
+   counts down the left, a search field that spanned every component and
+   ignored the selected one, arrow keys and Enter from the field, and section
+   headings whenever the pane held more than one component.
 
-   It has been three things. First a two-pane drill — a "Common" strip of preset
-   inserts, a rail of nine components, a pane of types — which was three levels
-   of furniture around a list of twenty-four names. Then a flat list inline in
-   the card, which fixed the furniture and broke everything else: an inline
-   panel inside the only scroller on the screen is clipped by it, so the list
-   opened a few rows tall at the bottom of a rule and the rest of it could only
-   be reached by scrolling the thing the list was pinned to.
+   Every one of those was earned. The catalogue was twenty-four attributes and
+   the search, the rail and the lead order were what made it findable. It is six
+   attributes now, and a control that solves a problem the list no longer has is
+   a control you have to operate before you can do the thing you came for.
 
-   So: a dialog. Room to show every attribute is the whole point of the thing,
-   and a dialog is the one place on this screen where room is not competing with
-   anything.
-
-   Two columns, which is what every builder that does this well converged on —
-   Zapier, Height and Attio all put the categories down one side and the fields
-   down the other. The categories are the major components rather than their
-   contents: "Network Zone" is the attribute, and the zones themselves are
-   values chosen later on the row. Search spans everything and ignores the
-   selected category, because somebody typing "mac" wants the MAC address row
-   whether or not they know it is filed under devices. */
-
-const ALL = '__all'
-
-export function ConditionPicker({
-  open,
-  title,
-  onClose,
-  onPick,
-}: {
-  open: boolean
-  title: string
-  onClose: () => void
-  onPick: (typeId: string) => void
-}) {
-  const [q, setQ] = useState('')
-  const [group, setGroup] = useState<string>(ALL)
-  const [cursor, setCursor] = useState(0)
-  const listEl = useRef<HTMLDivElement | null>(null)
-
-  /* Reset on every open. A dialog that reopens on the search somebody typed
-     last week is a dialog keeping state nobody asked it to keep. */
-  useEffect(() => {
-    if (open) {
-      setQ('')
-      setGroup(ALL)
-      setCursor(0)
-    }
-  }, [open])
-
-  const pool = useMemo(() => CONDITION_CATALOGUE.filter((c) => !METHOD_GROUPS.has(c.group)), [])
-
-  const counts = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const c of pool) m.set(c.group, (m.get(c.group) ?? 0) + 1)
-    return m
-  }, [pool])
-
-  /* Only components that actually have attributes. A rail row reading
-     "Webhooks 0" is a category that exists for the rail's benefit. */
-  const groups = useMemo(
-    () => (CONDITION_GROUPS as readonly string[]).filter((g) => (counts.get(g) ?? 0) > 0),
-    [counts],
-  )
-
-  /* Searching leaves the category behind, deliberately: a query that matches
-     nothing in the selected component would otherwise show an empty pane with
-     the answer sitting one click away. */
-  const searching = q.trim().length > 0
-  /* The lead order applies only when the whole catalogue is on screen — the
-     "All" pane, or a search, which already leaves the category behind. */
-  const leading = searching || group === ALL
-
-  const shown = useMemo(() => {
-    const n = q.trim().toLowerCase()
-    const rank = (g: string) => {
-      const i = (CONDITION_GROUPS as readonly string[]).indexOf(g)
-      return i === -1 ? CONDITION_GROUPS.length : i
-    }
-    return pool
-      .filter((c) => (searching ? true : group === ALL || c.group === group))
-      .filter(
-        (c) =>
-          !n ||
-          c.label.toLowerCase().includes(n) ||
-          c.group.toLowerCase().includes(n) ||
-          (GROUP_LABEL[c.group] ?? '').toLowerCase().includes(n) ||
-          c.hint.toLowerCase().includes(n),
-      )
-      .slice()
-      /* The lead order first, then the component order.
-
-         Seven attributes answer the question a rule usually opens with — who is
-         this for, and where from — and they sit in five different components,
-         so no category order can put them together. They are named in
-         `CONDITION_ORDER` and come first; everything else keeps the taxonomy.
-
-         Only while the whole catalogue is on screen. Inside a chosen category
-         the lead order would shuffle that category's own rows for a reason the
-         reader cannot see, so there it sorts by nothing and keeps catalogue
-         order. */
-      .sort((x, y) => {
-        if (leading) {
-          const d = conditionRank(x.id) - conditionRank(y.id)
-          if (d !== 0) return d
-        }
-        return rank(x.group) - rank(y.group)
-      })
-  }, [pool, q, group, searching, leading])
-
-  /* Section headings only where the pane spans more than one component. Inside
-     a single category they would repeat its name down the page. */
-  const sectioned = searching || group === ALL
-
-  useEffect(() => setCursor(0), [q, group])
-
-  const move = (d: number) => {
-    if (shown.length === 0) return
-    setCursor((i) => {
-      const next = (i + d + shown.length) % shown.length
-      const el = listEl.current?.querySelectorAll('.bf__catitem')[next] as HTMLElement | undefined
-      el?.scrollIntoView({ block: 'nearest' })
-      return next
-    })
-  }
-
-  /* Arrows and Enter from the search field, so picking never means letting go
-     of the one control the dialog opens on. */
-  const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      move(1)
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      move(-1)
-    } else if (e.key === 'Enter' && shown[cursor]) {
-      e.preventDefault()
-      onPick(shown[cursor].id)
-    }
-  }
-
-  let last = ''
-
-  return (
-    <Modal open={open} onClose={onClose} title={title} width={800} padded={false}>
-      <div className="bf__cat">
-        <div className="bf__catbar">
-          <Search size={15} strokeWidth={2} aria-hidden />
-          <input
-            autoFocus
-            aria-label="Search attributes"
-            placeholder="Search every attribute…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={onKey}
-          />
-          {q && (
-            <button type="button" className="bf__catclear" onClick={() => setQ('')} aria-label="Clear the search">
-              <X size={13} strokeWidth={2.2} aria-hidden />
-            </button>
-          )}
-        </div>
-
-        <div className="bf__catbody">
-          {/* The major components, not their contents. A saved zone is a value,
-              not a thing you can check — so "Network Zone" is here and the
-              zones themselves are on the row. */}
-          <nav className="bf__catrail" aria-label="Attribute categories">
-            <button
-              type="button"
-              className={`bf__catcat ${!searching && group === ALL ? 'is-on' : ''}`}
-              onClick={() => {
-                setQ('')
-                setGroup(ALL)
-              }}
-            >
-              <span className="bf__cationic is-neutral" aria-hidden>
-                <ListFilter size={13} strokeWidth={1.8} />
-              </span>
-              Everything
-              <em>{pool.length}</em>
-            </button>
-
-            {groups.map((g) => {
-              const Ico = GROUP_ICON[g] ?? ListFilter
-              return (
-                <button
-                  key={g}
-                  type="button"
-                  className={`bf__catcat ${!searching && group === g ? 'is-on' : ''}`}
-                  onClick={() => {
-                    setQ('')
-                    setGroup(g)
-                  }}
-                >
-                  <span className={`bf__cationic is-${GROUP_TONE[g] ?? 'neutral'}`} aria-hidden>
-                    <Ico size={13} strokeWidth={1.8} />
-                  </span>
-                  {GROUP_LABEL[g] ?? g}
-                  <em>{counts.get(g)}</em>
-                </button>
-              )
-            })}
-          </nav>
-
-          <div className="bf__catitems" ref={listEl} role="listbox" aria-label="Attributes">
-            {shown.length === 0 ? (
-              <p className="bf__catempty">
-                Nothing matches “{q}”.
-                <button type="button" onClick={() => setQ('')}>
-                  Clear the search
-                </button>
-              </p>
-            ) : (
-              shown.map((c, i) => {
-                const Ico = GROUP_ICON[c.group] ?? ListFilter
-                const head = sectioned && c.group !== last
-                last = c.group
-                return (
-                  <Fragment key={c.id}>
-                    {head && <p className="bf__catsec">{GROUP_LABEL[c.group] ?? c.group}</p>}
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={i === cursor}
-                      className={`bf__catitem ${i === cursor ? 'is-cursor' : ''}`}
-                      onMouseEnter={() => setCursor(i)}
-                      onClick={() => onPick(c.id)}
-                    >
-                      <span className={`bf__cationic is-${GROUP_TONE[c.group] ?? 'neutral'}`} aria-hidden>
-                        <Ico size={14} strokeWidth={1.8} />
-                      </span>
-                      <span className="bf__catlabel">
-                        <strong>
-                          {c.label}
-                          {/* Said before the row is added, not after it never
-                              fires. A page cannot read a MAC address or an OS
-                              build, so on an agentless estate these arrive
-                              empty and the condition simply never matches —
-                              which looks like a rule that does not work rather
-                              than one that cannot. */}
-                          {c.agent && <i className="bf__catagent">Needs the agent</i>}
-                        </strong>
-                        <em>{c.hint}</em>
-                      </span>
-                    </button>
-                  </Fragment>
-                )
-              })
-            )}
-          </div>
-        </div>
-      </div>
-    </Modal>
-  )
-}
+   `ConditionList` in ConditionPopover.tsx replaces it, inline, in both
+   builders — which is the property worth keeping from the dialog. Two pickers
+   over one catalogue drift; one component means the trail and the board cannot
+   disagree about what an attribute is. */
 
 /* --- THEN: the outcome, and everything behind it -------------------------------- */
 

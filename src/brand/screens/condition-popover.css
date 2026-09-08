@@ -377,14 +377,15 @@
    they depend on each other. Boxed and padded so the three belong to each
    other: without the box, a column of fields in a panel that also holds a
    joiner chip and a group frame has no edge saying where one condition stops. */
-.cp__stack {
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 10px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-}
-.cp__stack.is-unset { border-color: var(--fb-negative-border); border-style: dashed; }
+/* No box. The three fields have borders of their own, and a fourth border
+   around them was a line drawn to say something the SPACING already says:
+   6px between the rows of one condition, and a joiner row between two of them.
+
+   Counting the lines it removed is the argument. Four conditions in a group
+   used to be four boxes inside a fifth, each holding three bordered fields —
+   twenty-one rectangles to draw four things. The frame that survives is the one
+   that carries a second operator, which is the only nesting this model has. */
+.cp__stack { display: flex; flex-direction: column; gap: 6px; }
 
 /* The attribute and the way out of it. The delete sits with the attribute
    rather than with the value, because what it deletes is the whole condition

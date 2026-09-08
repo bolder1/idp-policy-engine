@@ -248,7 +248,6 @@ function ConditionPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
       <div className="bb__ask bb__ask--next">
         <div className="bb__ask__head">
           <h3>Then</h3>
-          <p>What happens when it matches?</p>
         </div>
         <WhatEditor rule={rule} onPatch={onPatch} />
       </div>
@@ -419,8 +418,7 @@ function WholeRulePane({
             <div className="bb__ask" id="bb-ask-then">
               <div className="bb__ask__head">
                 <h3>Then</h3>
-                <p>What happens when it matches?</p>
-              </div>
+                    </div>
               {/* `focus` and `next` are gone from its props along with the two
                   paragraphs that needed them. `next` fed a sentence naming the
                   rule that catches whatever this one lets past — which is the

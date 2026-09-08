@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { AlertTriangle, Check, Plus, ShieldAlert, UserCheck, X, XCircle } from 'lucide-react'
+import { AlertTriangle, Plus, ShieldAlert, Trash2, UserCheck, X, XCircle } from 'lucide-react'
 
 import { Toggle } from '../../kit'
 import { Picker } from '../../picker'
@@ -39,8 +39,8 @@ import { Prop } from './Section'
    greyed third says the shape is going to grow, which is true and is cheaper to
    say now than to explain later when a row appears where nobody expected one. */
 const TILES: { id: AccessDecision | 'soon'; label: string; tone: string; icon: typeof UserCheck; hint: string }[] = [
-  { id: '1fa', label: 'Allow', tone: 'allow', icon: UserCheck, hint: 'Let the sign-in through, after the steps below.' },
-  { id: 'deny', label: 'Deny', tone: 'deny', icon: ShieldAlert, hint: 'Refuse it. No prompt and no way round.' },
+  { id: '1fa', label: 'Allow', tone: 'allow', icon: UserCheck, hint: 'Sign-in proceeds through the factors below.' },
+  { id: 'deny', label: 'Deny', tone: 'deny', icon: ShieldAlert, hint: 'Sign-in refused. No fallback path.' },
   /* A third tile said "Coming soon · Not decided yet". It was a placeholder
      for an outcome nobody has specified, taking a third of the width of the
      one control on this pane that matters, permanently disabled — and now that
@@ -48,13 +48,13 @@ const TILES: { id: AccessDecision | 'soon'; label: string; tone: string; icon: t
      the reason none of them was picked. A promise is not a control. */
 ]
 
-/* How a second step is proved, as four choices rather than a mode plus a mode's
-   settings. Each carries what it needs underneath it and nothing else. */
+/* How the second factor is proved. Four modes, named the way an IdP names
+   them — a sentence per option was a sentence read four times to choose one. */
 const SECOND: { value: Rule['secondFactor']; label: string }[] = [
-  { value: 'any', label: 'Any method they have enrolled' },
-  { value: 'specific', label: 'One of these methods' },
-  { value: 'chain', label: 'Every one of these, in order' },
-  { value: 'preferred', label: 'Whichever they prefer' },
+  { value: 'any', label: 'Any enrolled method' },
+  { value: 'specific', label: 'One of these' },
+  { value: 'chain', label: 'All of these, in order' },
+  { value: 'preferred', label: 'User preference' },
 ]
 
 export function WhatEditor({
@@ -189,7 +189,7 @@ export function WhatEditor({
             <p className="bb__diag is-error" role="alert">
               <XCircle size={13} strokeWidth={2} aria-hidden />
               <span>
-                <b>Nobody can complete this.</b> No method is chosen for the second step.
+                <b>No method selected.</b> Nobody can satisfy this rule.
               </span>
             </p>
           )}
@@ -208,7 +208,7 @@ export function WhatEditor({
                 1
               </span>
               <span className="bb__rung__body">
-                <b>First step</b>
+                <b>First factor</b>
                 <Picker
                   label="First step"
                   width="fill"
@@ -218,9 +218,9 @@ export function WhatEditor({
                      answer, and the row it revealed asked the same question
                      again one line down. The methods are in this list. */
                   options={[
-                    { value: 'Password', label: 'Password', meta: 'The usual first step' },
-                    { value: 'Any', label: 'Any method they have enrolled' },
-                    ...METHODS.map((m) => ({ value: m, label: m, group: 'A specific method' })),
+                    { value: 'Password', label: 'Password' },
+                    { value: 'Any', label: 'Any enrolled method' },
+                    ...METHODS.map((m) => ({ value: m, label: m, group: 'Specific method' })),
                   ]}
                   onChange={(v) =>
                     v === 'Password' || v === 'Any'
@@ -237,7 +237,7 @@ export function WhatEditor({
                   2
                 </span>
                 <span className="bb__rung__body">
-                  <b>Second step</b>
+                  <b>Second factor</b>
                   <Picker
                     label="Second step"
                     width="fill"
@@ -249,8 +249,8 @@ export function WhatEditor({
                 <button
                   type="button"
                   className="bb__rung__drop"
-                  aria-label="Remove the second step"
-                  title="Remove the second step — this becomes a one-step rule"
+                  aria-label="Remove the second factor"
+                  title="Remove the second factor — this becomes single-factor"
                   onClick={() => onPatch({ decision: '1fa', ...noSecondStep })}
                 >
                   <X size={13} strokeWidth={2.2} />
@@ -260,68 +260,48 @@ export function WhatEditor({
               <li className="bb__rung is-add">
                 <button type="button" className="bb__addrung" onClick={() => onPatch({ decision: '2fa' })}>
                   <Plus size={13} strokeWidth={2.4} aria-hidden />
-                  Add a second step
+                  Add second factor
                 </button>
               </li>
             )}
 
-            {twoStep && rule.secondFactor === 'specific' && (
-              <li className="bb__rung is-sub">
-                <span className="bb__chips" role="group" aria-label="Methods allowed for the second step">
-                  {METHODS.map((m) => {
-                    const on = methods.includes(m)
-                    return (
-                      <button
-                        key={m}
-                        type="button"
-                        className={`bb__chip ${on ? 'is-on' : ''}`}
-                        aria-pressed={on}
-                        onClick={() => onPatch({ secondFactorMethods: on ? methods.filter((x) => x !== m) : [...methods, m] })}
-                      >
-                        {on && <Check size={11} strokeWidth={2.6} aria-hidden />}
-                        {m}
-                      </button>
-                    )
-                  })}
-                </span>
-              </li>
-            )}
+            {/* One editor for both list modes: a row of dropdowns, and a way to
+                add another.
 
-            {twoStep && rule.secondFactor === 'chain' && (
+                `specific` was a wall of twenty-one toggle chips — every method
+                the catalogue holds, rendered whether or not anybody wanted it,
+                in a 400px panel. It does not scale, and it did not match
+                `chain` one line below it, which asked the same question
+                (which methods, in what order) with a list that grows.
+
+                The two modes differ in what the list MEANS — any one of these
+                versus all of these in order — and that difference is already
+                said by the mode above. It has no business also being said by
+                two different controls. */}
+            {twoStep && (rule.secondFactor === 'specific' || rule.secondFactor === 'chain') && (
               <li className="bb__rung is-sub">
-                <div className="bb__chain2">
-                  {chain.map((step, si) => (
-                    <div className="bb__chainrow" key={si}>
-                      <b>{si + 1}</b>
-                      <Picker
-                        label={`Chain step ${si + 1}`}
-                        width="fill"
-                        value={step}
-                        options={['Password', ...METHODS].map((m) => ({ value: m, label: m }))}
-                        onChange={(v) => {
-                          const next = [...chain]
-                          next[si] = v
-                          onPatch({ methodChain: next })
-                        }}
-                      />
-                      <button type="button" className="bb__act is-danger" aria-label={`Remove step ${si + 1}`} onClick={() => onPatch({ methodChain: chain.filter((_, n) => n !== si) })}>
-                        <X size={12} strokeWidth={2.2} />
-                      </button>
-                    </div>
-                  ))}
-                  <button type="button" className="bb__addrow" onClick={() => onPatch({ methodChain: [...chain, 'miniOrange Push'] })}>
-                    <Plus size={12} strokeWidth={2.4} aria-hidden />
-                    Add a method
-                  </button>
-                </div>
+                <MethodList
+                  ordered={rule.secondFactor === 'chain'}
+                  values={rule.secondFactor === 'chain' ? chain : methods}
+                  onChange={(next) =>
+                    onPatch(rule.secondFactor === 'chain' ? { methodChain: next } : { secondFactorMethods: next })
+                  }
+                />
               </li>
             )}
 
             {twoStep && rule.secondFactor === 'preferred' && (
               <li className="bb__rung is-sub">
-                <Prop label="If they set no preference" indent>
-                  <Picker label="Fallback method" value={rule.preferredFallback ?? ''} options={METHODS.map((m) => ({ value: m, label: m }))} onChange={(preferredFallback) => onPatch({ preferredFallback })} />
-                </Prop>
+                <span className="bb__subrow">
+                  <b>Fallback</b>
+                  <Picker
+                    label="Fallback method"
+                    width="fill"
+                    value={rule.preferredFallback ?? ''}
+                    options={METHODS.map((m) => ({ value: m, label: m }))}
+                    onChange={(preferredFallback) => onPatch({ preferredFallback })}
+                  />
+                </span>
               </li>
             )}
           </ol>
@@ -345,6 +325,72 @@ export function WhatEditor({
   )
 }
 
+/* The methods a second factor accepts — one dropdown per method, and a way to
+   add another.
+
+   It replaces two controls that asked one question two ways: a wall of
+   twenty-one toggle chips for "one of these", and a list of dropdowns for "all
+   of these, in order". The chips do not scale — every method in the catalogue
+   is rendered whether or not anybody wants it, and the twenty-second would have
+   made it worse — and having two shapes for one question meant switching mode
+   changed the CONTROL rather than the meaning.
+
+   `ordered` is the only difference the shapes have any business showing: a
+   chain is walked in sequence, so its rows are numbered. Which methods count is
+   the same question either way.
+
+   `nextFree` rather than a fixed default: pressing Add twice used to add the
+   same method twice, which for "one of these" is a row that means nothing. */
+function MethodList({
+  ordered,
+  values,
+  onChange,
+}: {
+  ordered: boolean
+  values: string[]
+  onChange: (next: string[]) => void
+}) {
+  /* Password is a first factor everywhere else in this pane, and a chain is the
+     one place it can legitimately appear as a later step. */
+  const pool = ordered ? ['Password', ...METHODS] : METHODS
+  const nextFree = pool.find((m) => !values.includes(m)) ?? pool[0]
+
+  return (
+    <div className="bb__methods">
+      {values.map((m, i) => (
+        <div className="bb__methodrow" key={i}>
+          {ordered && (
+            <b className="bb__methodn" aria-hidden>
+              {i + 1}
+            </b>
+          )}
+          <Picker
+            label={ordered ? `Step ${i + 1}` : `Method ${i + 1}`}
+            width="fill"
+            value={m}
+            options={pool.map((x) => ({ value: x, label: x }))}
+            onChange={(v) => onChange(values.map((old, n) => (n === i ? v : old)))}
+          />
+          <button
+            type="button"
+            className="bb__act is-danger"
+            aria-label={`Remove ${m}`}
+            title="Remove"
+            onClick={() => onChange(values.filter((_, n) => n !== i))}
+          >
+            <Trash2 size={13} strokeWidth={2} />
+          </button>
+        </div>
+      ))}
+
+      <button type="button" className="bb__addrow" onClick={() => onChange([...values, nextFree])}>
+        <Plus size={12} strokeWidth={2.4} aria-hidden />
+        Add method
+      </button>
+    </div>
+  )
+}
+
 /* Remembering a device, folded into one row that grows.
 
    Three property rows — a toggle, a number, a second toggle — for a setting
@@ -354,12 +400,12 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
   const [days, setDays] = useState(rule.rememberDays ?? 30)
   return (
     <div className="bb__after">
-      <Prop label="Skip the second step on a device that already passed">
+      <Prop label="Remember this device">
         <Toggle checked={rule.rememberMfa} onChange={(rememberMfa) => onPatch({ rememberMfa })} label="Remember this device" size="sm" />
       </Prop>
       {rule.rememberMfa && (
         <>
-          <Prop label="For how long" indent>
+          <Prop label="For" indent>
             <span>
               <input
                 type="number"
@@ -381,12 +427,12 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
               <span className="bb__unit">days</span>
             </span>
           </Prop>
-          <Prop label="Ask every time anyway" indent>
-            <Toggle checked={rule.forceMfaEachLogin ?? false} onChange={(forceMfaEachLogin) => onPatch({ forceMfaEachLogin })} label="Ask every time anyway" size="sm" />
+          <Prop label="Force at every sign-in" indent>
+            <Toggle checked={rule.forceMfaEachLogin ?? false} onChange={(forceMfaEachLogin) => onPatch({ forceMfaEachLogin })} label="Force at every sign-in" size="sm" />
           </Prop>
         </>
       )}
-      <Prop label="Let people switch their own second step off">
+      <Prop label="Allow user opt-out">
         <Toggle checked={rule.allowDisable2fa} onChange={(allowDisable2fa) => onPatch({ allowDisable2fa })} label="Let users disable their second factor" size="sm" />
       </Prop>
       {rule.allowDisable2fa && (
@@ -396,7 +442,7 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
               and the tone says nothing. */}
           <AlertTriangle size={13} strokeWidth={2} aria-hidden />
           <span>
-            <b>Users may opt out.</b> Anyone who does is no longer covered by this rule.
+            <b>Opt-outs leave coverage.</b> This rule stops applying to them.
           </span>
         </p>
       )}

@@ -868,7 +868,11 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__seg--block > button { flex: 1; justify-content: center; }
 
 /* Decision choice: three tiles, one row, each in its tone when chosen. */
-.bb__decide { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
+/* `auto-columns`, not `repeat(3, …)`. The third tile — a permanently disabled
+   "Coming soon" — was deleted a while ago and the track count was not, so two
+   tiles sat in two thirds of the panel with an empty third beside them. The
+   grid takes its column count from what is actually in it now. */
+.bb__decide { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
 .bb__decide > button {
   display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
   padding: var(--space-3) var(--space-3);
@@ -951,10 +955,13 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__rung.is-sub > * { grid-column: 2; }
 .bb__rung.is-add { grid-template-columns: 22px minmax(0, 1fr); }
 .bb__rung.is-add > * { grid-column: 2; justify-self: start; }
+/* No dashed rectangle. Same reason as the condition pane's adders: a dotted box
+   is the loudest thing on a pane whose problem was boxes, and "add one more of
+   these" is a text button with a mark in front of it everywhere else here. */
 .bb__addrung {
   display: inline-flex; align-items: center; gap: 6px;
-  height: 30px; padding: 0 var(--space-3);
-  border: 1px dashed var(--border-default); border-radius: var(--radius-md);
+  height: 30px; padding: 0 var(--space-2);
+  border: 0; border-radius: var(--radius-sm);
   background: none; font-family: inherit;
   font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary);
   cursor: pointer;
@@ -1699,24 +1706,30 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    between two members now — so a member is just the next block in the column
    and needs no wrapper at all. */
 
-/* Told apart by material and by name, NOT by a second pair of bracket marks.
+/* A tint, and nothing else.
 
-   Nesting the same glyph one level in was the first attempt and it was worse
-   than either alternative: two `[ ]` pairs a few pixels apart read as one
-   thicker bracket, and the thing that actually needs to be obvious — that this
-   frame is a member of the frame around it, with its own operator — was said
-   twice in the same voice.
+   It was raised off the ground, edged all round, and carrying a 3px accent down
+   its left side — three separate marks saying one thing. On a pane where every
+   condition also had a box, the group's edge had to shout to be heard over
+   them; with the boxes gone it does not.
 
-   So the outer bracket is notation, and a group is a THING: raised off the
-   ground, edged, and carrying its name. Different means for the two levels,
-   which is what makes them tellable apart at a glance. */
+   So: a panel of quiet grey, rounded, no border and no accent. It is the only
+   surface change on the pane, which is what makes it read as the only nesting —
+   and a group inside the tint is legible for exactly the reason a box was not,
+   because a tint has no edges to add up. */
 .bb__if.is-editable .bb__ifgroup {
   position: relative;
   display: grid; gap: var(--space-1);
-  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-4);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default);
-  border-left: 3px solid var(--bb-ring);
+  padding: var(--space-3) var(--space-4);
+  /* `--surface-inset`, not `--surface-sunken`. Sunken is #f8f9fa, which is a
+     tint you can measure and cannot see against a white panel — it was doing
+     the job the deleted border used to do, invisibly. Inset is the token for a
+     recessed panel and is the one that actually reads as one. */
+  background: var(--surface-inset, var(--surface-sunken));
+  /* Explicitly none: the read-only `.bb__ifgroup` above carries a border for
+     the card, and overriding the background without the border left a hairline
+     round the tint — the exact extra line this pass is removing. */
+  border: 0;
   border-radius: var(--radius-md);
 }
 
@@ -1739,7 +1752,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifgroupname svg { flex: none; opacity: 0.7; }
 .bb__ifgroupjoin { font-size: var(--fs-xs); color: var(--text-secondary); opacity: 0.8; }
 
-.bb__ifgroupfoot { display: flex; align-items: center; gap: 6px; margin-top: var(--space-3); }
+.bb__ifgroupfoot { display: flex; align-items: center; gap: 6px; margin-top: var(--space-2); }
 /* Housekeeping, gathered at the far end.
 
    The remove `×` used to carry `margin-left: auto` on its own, which left it
@@ -1750,10 +1763,20 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    thing. */
 .bb__ifgroupacts { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; }
 
-/* Quiet, labelled, and never dashed — these change what is already here. */
+/* Quiet, and marks rather than words.
+
+   They were labelled, on an argument that is worth keeping in view: a bare
+   glyph is a poor home for the one control here that cannot be undone by
+   pressing it again. Two things answered it. The words sat on the same row as
+   "Add condition" in a 400px panel and were most of what made the group's foot
+   look busy; and the board has undo, which is the real answer to a destructive
+   press.
+
+   Both carry a title and an aria-label naming the group by name, so nothing is
+   guessable-only. */
 .bb__ifutil {
-  display: inline-flex; align-items: center; gap: 4px;
-  height: 26px; padding: 0 8px;
+  display: grid; place-items: center;
+  width: 26px; height: 26px; padding: 0;
   border: none; border-radius: var(--radius-sm); background: none;
   font-family: inherit; font-size: 11px; color: var(--text-secondary);
   cursor: pointer;
@@ -1769,21 +1792,25 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    It used to mean that AND "merge these two groups" AND "change how the whole
    rule reads", because three unrelated controls shared the outline. The other
    two have their own clothes now. */
+/* No outline at all now, dashed or otherwise. `+ Add condition` is a text
+   button with a mark in front of it, which is what the rest of this console
+   uses for "one more of these" and is one fewer rectangle on a pane whose whole
+   problem was rectangles. */
 .bb__ifadd,
 .bb__ifaddgroup {
   display: inline-flex; align-items: center; gap: 5px;
-  height: 28px; padding: 0 11px; border-radius: var(--radius-sm);
-  border: 1px dashed var(--border-default); background: none; cursor: pointer;
+  height: 28px; padding: 0 8px; border-radius: var(--radius-sm);
+  border: 0; background: none; cursor: pointer;
   font-size: 11px; font-weight: var(--fw-medium); color: var(--text-secondary);
   transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
-.bb__ifadd:hover { border-style: solid; border-color: var(--fb-info-fg); background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.bb__ifadd:hover { background: var(--fb-info-bg); color: var(--fb-info-fg); }
 .bb__ifadd:focus-visible, .bb__ifaddgroup:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 /* Adding a group adds an OR branch, so it wears the OR colour on hover — the
    same tie between a control and the operator it produces that the two
    junctions have. */
 .bb__ifaddgroup { margin-top: 6px; align-self: start; }
-.bb__ifaddgroup:hover { border-style: solid; border-color: var(--fb-accent-fg); background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
+.bb__ifaddgroup:hover { background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
 
 /* `.bb__ifdrop` has gone. It was the group's bare-glyph remove button, stranded
    at the far edge by its own `margin-left: auto`; it is a labelled
@@ -2560,3 +2587,35 @@ button.bb__idx::after {
 /* `.bb__ask` was a block inside a shared column; as a pane it IS the panel
    body and has to carry its own room. */
 .bb__ask--pane { padding: var(--space-4) var(--space-5) var(--space-5); }
+
+
+/* --- The second factor's methods, as rows ------------------------------------
+
+   One dropdown per method, numbered when the order is walked. Indented under
+   the rung it belongs to, and quiet: the rung above already said what this list
+   means, so the list itself only has to be legible and easy to lengthen. */
+.bb__methods { display: grid; gap: 4px; min-width: 0; }
+.bb__methodrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  align-items: center; gap: var(--space-2);
+  min-width: 0;
+}
+.bb__methodrow:has(> .bb__methodn) { grid-template-columns: 16px minmax(0, 1fr) 26px; }
+.bb__methodn {
+  font-size: 11px; font-weight: var(--fw-semibold); color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.bb__methodrow .bx-picker { width: 100%; }
+/* Always visible, not on hover. A row here is one of two or three the author
+   put in deliberately, and a delete that appears only under the pointer makes a
+   short list feel like it cannot be shortened. */
+.bb__methodrow .bb__act { opacity: 1; }
+
+/* A label and a control on one line, for a rung's single sub-setting. */
+.bb__subrow {
+  display: grid; grid-template-columns: minmax(0, 88px) minmax(0, 1fr);
+  align-items: center; gap: var(--space-3); min-width: 0;
+}
+.bb__subrow > b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bb__subrow .bx-picker { width: 100%; }

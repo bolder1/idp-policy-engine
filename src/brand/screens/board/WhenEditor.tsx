@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { Braces, ChevronDown, Plus, Split, Ungroup, X } from 'lucide-react'
+import { Braces, ChevronDown, Plus, Split, Trash2, Ungroup } from 'lucide-react'
 
 import { cardJoin, cardLetter, ckey, drawsAsBracket, duplicatedAcrossCards, outerJoin } from '../../predicate'
 import {
@@ -333,9 +333,12 @@ export function WhenEditor({
                   icon={Plus}
                   size="sm"
                   align="start"
+                  /* No captions. Two items whose labels are the whole
+                     explanation — a second line under each doubled the height
+                     of the menu to restate them. */
                   items={[
-                    { id: 'cond', label: 'Add condition', icon: Plus, hint: 'One more thing that has to hold' },
-                    { id: 'group', label: 'Add condition group', icon: Braces, hint: 'A bracket with its own AND or OR inside it' },
+                    { id: 'cond', label: 'Add condition', icon: Plus },
+                    { id: 'group', label: 'Add condition group', icon: Braces },
                   ]}
                   onSelect={(id) => (id === 'group' ? addGroup() : openCatalogue('loose')())}
                 />
@@ -486,11 +489,14 @@ function GroupMember({
               title="Dissolve this bracket — its conditions join the ones around it"
               onClick={onUngroup}
             >
-              <Ungroup size={12} strokeWidth={2.2} aria-hidden />
-              Ungroup
+              <Ungroup size={13} strokeWidth={2} aria-hidden />
             </button>
-            {/* Labelled. It was a bare glyph, which is the one control here
-                that cannot be undone by pressing it again. */}
+            {/* A trash rather than the word. It was labelled, on the argument
+                that a bare glyph is a poor home for the one control here that
+                cannot be undone by pressing it again — see the note on
+                `.bb__ifutil`. The board has undo, the title says what it takes
+                with it, and two words on this row were most of what made the
+                group's foot look busy. */}
             <button
               type="button"
               className="bb__ifutil is-danger"
@@ -498,8 +504,7 @@ function GroupMember({
               title="Remove this group and the conditions in it"
               onClick={onRemove}
             >
-              <X size={12} strokeWidth={2.2} aria-hidden />
-              Remove
+              <Trash2 size={13} strokeWidth={2} aria-hidden />
             </button>
           </span>
         </div>

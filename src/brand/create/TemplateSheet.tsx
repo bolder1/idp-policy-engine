@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Store, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 
 import { Button } from '../kit'
 import { Picker } from '../picker'
@@ -93,19 +93,12 @@ export function TemplateSheet({
   /** How many of this category are sitting on the OTHER shelf. */
   const elsewhere = cat === 'All' ? 0 : (shelf === 'mine' ? PROVIDED : MINE).filter((s) => s.category === cat).length
 
-  /* The band blooms once as the sheet springs in rather than arriving already
-     coloured. `@property` transitions do not fire on first computed style, so
-     the tone is withheld for one frame and the initial grey is what it
-     transitions FROM. */
-  const [tone, setTone] = useState<string | null>(null)
-  useEffect(() => {
-    if (!open) {
-      setTone(null)
-      return
-    }
-    const id = requestAnimationFrame(() => setTone(toneOf(shelf, cat)))
-    return () => cancelAnimationFrame(id)
-  }, [open, shelf, cat])
+  /* Derived, not stored. It withheld the tone for one frame so the band would
+     bloom from grey as the sheet sprang in — a nice trick and one more thing
+     moving on a surface being scanned, so it went with the drift and the
+     breathe. Transitions do not fire on first computed style anyway: the band
+     simply opens in the right colour. */
+  const tone = toneOf(shelf, cat)
 
   useEffect(() => {
     if (!open) return
@@ -184,15 +177,23 @@ export function TemplateSheet({
                 looking a place to stand. Centred, on the page grey, with the
                 search at the width a template name actually needs — and
                 nothing else in it. */}
-            <header className="bmarket__hero" data-tone={tone ?? undefined}>
-              {/* A storefront, briefly. This is a shelf of things somebody else
-                  wrote — the one surface in the product where you are choosing
-                  between other people's work rather than editing your own — and
-                  a mark, a big centred search and counts on every shelf are how
-                  a catalogue says so. */}
-              <span className="bmarket__mark" aria-hidden>
-                <Store size={20} strokeWidth={1.7} />
-              </span>
+            <header className="bmarket__hero" data-tone={tone}>
+              {/* Four shelves, in rail order, and the lit one is the shelf you
+                  are on.
+
+                  It was a 40px tile with a shopfront glyph in it: a literal
+                  drawing of a shop, on a surface that is not one, at a size that
+                  made it the first thing you saw. This is the abstract version
+                  of the same idea and it carries something the glyph could not —
+                  which category is filtering the grid. The band behind it runs
+                  the same four colours at a twelfth of the strength, so the
+                  atmosphere and the fact can never disagree. */}
+              <svg className="bmarket__mark" viewBox="0 0 24 24" role="img" aria-label="Category filter">
+                <rect className="bmarket__quad is-a" x="1" y="1" width="10" height="10" rx="3" />
+                <rect className="bmarket__quad is-b" x="13" y="1" width="10" height="10" rx="3" />
+                <rect className="bmarket__quad is-c" x="1" y="13" width="10" height="10" rx="3" />
+                <rect className="bmarket__quad is-d" x="13" y="13" width="10" height="10" rx="3" />
+              </svg>
               {/* The heading and the search, and nothing between them.
 
                   A lede counting the two shelves stood here, and a note under

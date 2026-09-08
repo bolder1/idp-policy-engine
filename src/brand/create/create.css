@@ -608,169 +608,128 @@ html[data-theme='dark'] .bguided__sheen {
    loses its brand tint with the move, because a storefront badge is not an
    action. */
 
-/* --- The storefront band, and the lattice ---------------------------------------
+/* --- The storefront band ---------------------------------------------------------
 
-   A dedicated space at the top for the question and the one control that answers
-   it fastest, and nothing else in it.
+   Five treatments of this strip, and four of them were wrong in the same way, so
+   the record is worth keeping: two brand blobs, then four fields of light, then
+   six at double the depth with a drift on them, then a ruled lattice with twelve
+   filled cells. Every one treated colour as scattered MARKS. Marks have edges,
+   edges invite comparison, and comparison is why each landed as either invisible
+   or loud with nothing in between — and each time the fix reached for strength,
+   which was never the dial that was wrong.
 
-   THE COLOUR IS A READOUT, AND NOW IT HAS EDGES. Two passes tried a soft mesh —
-   four, then six fields of light blurring into one another — and both had the
-   same problem at the same moment: a wash has no structure, so making it visible
-   meant making it deep, and deep is where a console starts to look like a
-   consumer app. A grid solves it the other way round. Twelve small cells filled
-   on a 44px lattice are unmistakable at a fraction of the strength, because what
-   makes them read is not saturation, it is that they have corners.
+   What was actually wrong is that the band was 211px of chrome, in a modal
+   somebody is in for ten seconds, and I kept decorating it instead of shrinking
+   it. It is ~160 now: less padding, a smaller mark, and the heading and the
+   search closer together.
 
-   The lattice is also this product's own idiom. The board's canvas is a dot
-   grid, its rules are a chain of boxes, and its conditions are a stack of rows —
-   a ruled surface with a few cells lit is what this application looks like when
-   you squint at it.
+   WHAT IS LEFT, and what each part is for.
 
-   FOUR HUES, ONE PER CATEGORY, the same four the cards' pills wear. The cells
-   are laid out once and never move: "All" fills them from all four, choosing a
-   category refills every cell in values of that one, and the tenant's shelf
-   fills them with slate. The band never says anything the filter is not already
-   saying.
+   · The MARK is the readout. Four cells in a two-by-two, one per category, in
+     rail order — Quick, Device, Risk, Compliance. "All" lights all four; a
+     category lights its own and greys the rest; the tenant's shelf greys them
+     all. Twenty-six pixels of colour that say precisely what is being filtered,
+     which is what a legend is, and it cannot compete with anything at that size.
+   · The BAND is atmosphere. One gradient, edge to edge, at 12% mixed into the
+     page surface — a continuous field has no internal edge, so it reads at a
+     third of the chroma the marks needed. It is driven by the SAME four
+     properties as the mark, which is what makes a single-category state fall out
+     for free: three of the four go neutral, so the hue sits at one end and
+     dissolves into plain grey across the rest, in the same corner the lit cell
+     is in.
 
-   Depths run 16-30% mixed into the page surface, down from 52% when this was a
-   wash. It reads stronger at a third of the strength, which is the whole
-   argument for the shape.
-
-   HOW IT MOVES. `background-image` cannot be transitioned between two gradients,
-   so the four fills are `@property`-registered colour properties and one
-   `data-tone` attribute swaps the lot — in oklab, with 40ms of stagger, so the
-   lattice refills rather than flicking. Under that, the cell layer breathes on
-   opacity alone, nine seconds a cycle: compositor-only, no repaint, and it never
-   breaks alignment with the lines the way a drifting layer would.
-
-   The registered properties must inherit: the cells are painted by `::before`,
-   and a pseudo-element takes the INITIAL value of a non-inheriting registered
-   property no matter what its originator holds. */
-@property --tone-a { syntax: '<color>'; inherits: true; initial-value: #eef1f4; }
-@property --tone-b { syntax: '<color>'; inherits: true; initial-value: #eef1f4; }
-@property --tone-c { syntax: '<color>'; inherits: true; initial-value: #eef1f4; }
-@property --tone-d { syntax: '<color>'; inherits: true; initial-value: #eef1f4; }
+   MOTION: one, and it means something. The restain when the filter changes,
+   220ms, mark and band together. Everything else has been deleted — a drifting
+   mesh, a nine-second opacity breathe, an entrance bloom. This is a picker being
+   scanned, not a page being admired, and a surface that moves while you read it
+   is competing with you. `background-image` cannot be transitioned between two
+   gradients, which is why the stops are `@property`-registered colours; they
+   must inherit, or the `::before` painting them takes the initial value. */
+@property --quad-a { syntax: '<color>'; inherits: true; initial-value: #7e8b9a; }
+@property --quad-b { syntax: '<color>'; inherits: true; initial-value: #7e8b9a; }
+@property --quad-c { syntax: '<color>'; inherits: true; initial-value: #7e8b9a; }
+@property --quad-d { syntax: '<color>'; inherits: true; initial-value: #7e8b9a; }
 
 .bmarket__hero {
-  --cell: 44px;
   flex: none;
   position: relative;
   isolation: isolate;
   overflow: hidden;
   display: flex; flex-direction: column; align-items: center; text-align: center;
-  padding: 36px 24px 30px;
+  padding: 20px 24px 22px;
   background: var(--surface-page);
   border-bottom: 1px solid var(--border-subtle);
   transition:
-    --tone-a 360ms var(--ease-tone),
-    --tone-b 360ms var(--ease-tone) 40ms,
-    --tone-c 360ms var(--ease-tone) 80ms,
-    --tone-d 360ms var(--ease-tone) 120ms;
+    --quad-a 220ms var(--ease-tone),
+    --quad-b 220ms var(--ease-tone),
+    --quad-c 220ms var(--ease-tone),
+    --quad-d 220ms var(--ease-tone);
 }
 
-/* The filled cells. Twelve solid squares on the lattice — `linear-gradient(c 0 0)`
-   is the shortest way to say "one flat colour" as a background layer — anchored
-   from the left and the right in turn so they stay spread at any sheet width
-   rather than bunching against one edge. */
+/* The wash. Four stops in rail order across the full width, mixed down to a
+   whisper — and a scrim over it so the bottom of the band is flat page grey
+   under the search field and the seam into the catalogue is invisible. */
 .bmarket__hero::before {
-  content: '';
-  position: absolute; inset: 0;
-  z-index: -2;
-  background:
-    linear-gradient(var(--tone-a) 0 0) 0 var(--cell),
-    linear-gradient(var(--tone-b) 0 0) var(--cell) 0,
-    linear-gradient(var(--tone-c) 0 0) calc(var(--cell) * 2) calc(var(--cell) * 2),
-    linear-gradient(var(--tone-d) 0 0) calc(var(--cell) * 3) var(--cell),
-    linear-gradient(var(--tone-b) 0 0) calc(var(--cell) * 4) calc(var(--cell) * 3),
-    linear-gradient(var(--tone-c) 0 0) right calc(var(--cell) * 10) top 0,
-    linear-gradient(var(--tone-a) 0 0) right calc(var(--cell) * 9) top calc(var(--cell) * 2),
-    linear-gradient(var(--tone-d) 0 0) right calc(var(--cell) * 6) top var(--cell),
-    linear-gradient(var(--tone-b) 0 0) right calc(var(--cell) * 5) top calc(var(--cell) * 3),
-    linear-gradient(var(--tone-a) 0 0) right calc(var(--cell) * 3) top 0,
-    linear-gradient(var(--tone-c) 0 0) right calc(var(--cell) * 2) top calc(var(--cell) * 2),
-    linear-gradient(var(--tone-d) 0 0) right 0 top var(--cell);
-  background-size: var(--cell) var(--cell);
-  background-repeat: no-repeat;
-  animation: bb-cells 9s ease-in-out infinite;
-}
-@keyframes bb-cells {
-  0%, 100% { opacity: 0.82; }
-  50% { opacity: 1; }
-}
-
-/* The lattice itself, over the cells so the ruling reads across them, and the
-   scrim over both. One element, three layers, first is topmost: the scrim pins
-   the bottom of the band to untinted surface so the search field always sits on
-   flat ground and the seam into the catalogue below is invisible. */
-.bmarket__hero::after {
   content: '';
   position: absolute; inset: 0;
   z-index: -1;
   background:
-    linear-gradient(180deg, transparent 0%, transparent 42%, var(--surface-page) 92%),
-    repeating-linear-gradient(90deg, var(--lattice) 0 1px, transparent 1px var(--cell)),
-    repeating-linear-gradient(180deg, var(--lattice) 0 1px, transparent 1px var(--cell));
+    linear-gradient(180deg, transparent 0%, transparent 52%, var(--surface-page) 96%),
+    linear-gradient(
+      100deg,
+      color-mix(in oklab, var(--quad-a) 12%, var(--surface-page)) 0%,
+      color-mix(in oklab, var(--quad-b) 12%, var(--surface-page)) 34%,
+      color-mix(in oklab, var(--quad-c) 12%, var(--surface-page)) 67%,
+      color-mix(in oklab, var(--quad-d) 12%, var(--surface-page)) 100%
+    );
 }
 
-/* The six states. `color-mix` against the page surface rather than literal
-   hexes, so one declaration carries both themes: the dot hues are defined in
-   light and dark, the page surface inverts, and the mix follows. Depths run
-   16 / 30 / 24 / 20% — enough that four filled cells are four colours, not
-   enough that any of them competes with a template card. */
-.bmarket__hero {
-  --lattice: color-mix(in srgb, var(--border-strong) 26%, transparent);
+/* The six states. One set of four colours drives the mark and the band, so they
+   can never disagree about what is selected. `-dot` hues rather than a mix,
+   because the mark wants them at full strength; the band does its own mixing at
+   the point of use. */
+.bmarket__hero[data-tone='mine'],
+.bmarket__hero:not([data-tone]) {
+  --quad-a: var(--fb-neutral-dot); --quad-b: var(--fb-neutral-dot);
+  --quad-c: var(--fb-neutral-dot); --quad-d: var(--fb-neutral-dot);
 }
-.bmarket__hero[data-tone='mine'] {
-  --tone-a: color-mix(in oklab, var(--fb-neutral-dot) 16%, var(--surface-page));
-  --tone-b: color-mix(in oklab, var(--fb-neutral-dot) 30%, var(--surface-page));
-  --tone-c: color-mix(in oklab, var(--fb-neutral-dot) 24%, var(--surface-page));
-  --tone-d: color-mix(in oklab, var(--fb-neutral-dot) 20%, var(--surface-page));
-}
-/* All four at once, in rail order — the one state where the band is literally a
-   picture of the thing it is filtering. */
 .bmarket__hero[data-tone='all'] {
-  --tone-a: color-mix(in oklab, var(--fb-lime-dot) 26%, var(--surface-page));
-  --tone-b: color-mix(in oklab, var(--fb-accent-dot) 28%, var(--surface-page));
-  --tone-c: color-mix(in oklab, var(--fb-info-dot) 26%, var(--surface-page));
-  --tone-d: color-mix(in oklab, var(--fb-magenta-dot) 24%, var(--surface-page));
+  --quad-a: var(--fb-lime-dot); --quad-b: var(--fb-accent-dot);
+  --quad-c: var(--fb-info-dot); --quad-d: var(--fb-magenta-dot);
 }
 .bmarket__hero[data-tone='quick'] {
-  --tone-a: color-mix(in oklab, var(--fb-lime-dot) 16%, var(--surface-page));
-  --tone-b: color-mix(in oklab, var(--fb-lime-dot) 30%, var(--surface-page));
-  --tone-c: color-mix(in oklab, var(--fb-lime-dot) 24%, var(--surface-page));
-  --tone-d: color-mix(in oklab, var(--fb-lime-dot) 20%, var(--surface-page));
+  --quad-a: var(--fb-lime-dot); --quad-b: var(--fb-neutral-dot);
+  --quad-c: var(--fb-neutral-dot); --quad-d: var(--fb-neutral-dot);
 }
 .bmarket__hero[data-tone='device'] {
-  --tone-a: color-mix(in oklab, var(--fb-accent-dot) 16%, var(--surface-page));
-  --tone-b: color-mix(in oklab, var(--fb-accent-dot) 30%, var(--surface-page));
-  --tone-c: color-mix(in oklab, var(--fb-accent-dot) 24%, var(--surface-page));
-  --tone-d: color-mix(in oklab, var(--fb-accent-dot) 20%, var(--surface-page));
+  --quad-a: var(--fb-neutral-dot); --quad-b: var(--fb-accent-dot);
+  --quad-c: var(--fb-neutral-dot); --quad-d: var(--fb-neutral-dot);
 }
 .bmarket__hero[data-tone='risk'] {
-  --tone-a: color-mix(in oklab, var(--fb-info-dot) 16%, var(--surface-page));
-  --tone-b: color-mix(in oklab, var(--fb-info-dot) 30%, var(--surface-page));
-  --tone-c: color-mix(in oklab, var(--fb-info-dot) 24%, var(--surface-page));
-  --tone-d: color-mix(in oklab, var(--fb-info-dot) 20%, var(--surface-page));
+  --quad-a: var(--fb-neutral-dot); --quad-b: var(--fb-neutral-dot);
+  --quad-c: var(--fb-info-dot); --quad-d: var(--fb-neutral-dot);
 }
 .bmarket__hero[data-tone='compliance'] {
-  --tone-a: color-mix(in oklab, var(--fb-magenta-dot) 16%, var(--surface-page));
-  --tone-b: color-mix(in oklab, var(--fb-magenta-dot) 30%, var(--surface-page));
-  --tone-c: color-mix(in oklab, var(--fb-magenta-dot) 24%, var(--surface-page));
-  --tone-d: color-mix(in oklab, var(--fb-magenta-dot) 20%, var(--surface-page));
+  --quad-a: var(--fb-neutral-dot); --quad-b: var(--fb-neutral-dot);
+  --quad-c: var(--fb-neutral-dot); --quad-d: var(--fb-magenta-dot);
 }
 
-/* The mark stands in front of the lattice, so it gets a surface of its own
-   rather than a tint. It was brand-orange briefly, which was a fifth hue in a
-   band already carrying four. */
+/* The mark. It was a 40px tile with a lucide shopfront in it — a literal
+   drawing of a shop, on a surface that is not one, at a size that made it the
+   first thing you saw. Four cells in a grid is the abstract version of the same
+   idea and it carries information the glyph could not: which shelf you are
+   looking at. */
 .bmarket__mark {
-  flex: none; width: 40px; height: 40px; border-radius: 12px;
-  display: grid; place-items: center; margin-bottom: 14px;
-  background: var(--surface-raised); color: var(--text-secondary);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--el-low);
+  flex: none; width: 26px; height: 26px;
+  display: block; margin-bottom: 10px;
 }
+.bmarket__quad { transition: fill 220ms var(--ease-tone); }
+.bmarket__quad.is-a { fill: var(--quad-a); }
+.bmarket__quad.is-b { fill: var(--quad-b); }
+.bmarket__quad.is-c { fill: var(--quad-c); }
+.bmarket__quad.is-d { fill: var(--quad-d); }
 .bmarket__hero h2 {
-  font-size: var(--fs-2xl); font-weight: var(--fw-semibold); letter-spacing: -0.015em;
+  font-size: var(--fs-xl); font-weight: var(--fw-semibold); letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 .bmarket__lede { margin-top: 5px; font-size: var(--fs-md); color: var(--text-tertiary); }
@@ -778,8 +737,8 @@ html[data-theme='dark'] .bguided__sheen {
 /* The search, at the width a template name actually needs. */
 .bmarket__searchbox {
   position: relative;
-  width: min(460px, 100%);
-  margin-top: 18px;
+  width: min(440px, 100%);
+  margin-top: 12px;
 }
 .bmarket__searchbox > svg {
   position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
@@ -890,12 +849,11 @@ html[data-theme='dark'] .bguided__sheen {
 /* The band arrives at its colour instead of travelling to it, and the mesh
    holds still. Every state still paints exactly right — the restain snaps, the
    light stops drifting, and neither is information anybody loses. */
-/* The band arrives at its colour instead of travelling to it, and the cells
-   stop breathing. Every state still paints exactly right — the refill snaps and
-   the lattice holds still. */
+/* The band and the mark arrive at their colour instead of travelling to it.
+   That is the whole of what motion does here now, so this is the whole of the
+   guard. */
 @media (prefers-reduced-motion: reduce) {
-  .bmarket__hero { transition: none; }
-  .bmarket__hero::before { animation: none; opacity: 1; }
+  .bmarket__hero, .bmarket__quad { transition: none; }
 }
 
 @media (max-width: 720px) {

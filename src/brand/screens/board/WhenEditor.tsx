@@ -15,7 +15,7 @@ import { MenuButton } from '../../kit'
 import * as ops from '../../when-ops'
 import { isWho, whoEditable } from '../../audience-ops'
 import { useBrand, useNameLookup } from '../../store'
-import { ConditionList, ConditionPopover, summarise, valueSource } from '../ConditionPopover'
+import { ConditionList, ConditionPopover, ConditionSelect, summarise, valueSource } from '../ConditionPopover'
 
 /* -----------------------------------------------------------------------------
    WHEN — the conditional, editable.
@@ -113,18 +113,26 @@ export function WhenEditor({
   /* Still three destinations, because there are still three things a person can
      mean by "add": into this group, into the run at the end, or into a group of
      its own. */
-  const add = (typeId: string) => {
-    if (!adding) return
+  /* The destination is an ARGUMENT, not state read back.
+
+     It used to be `if (!adding) return` — the caller opened the list, which set
+     `adding`, and the pick read it. That works for a control that has to be
+     opened first and silently does nothing for one that does not: the empty
+     state's select is on screen from the start, so `adding` is null when it
+     fires and every pick was dropped. Passing the destination in makes the two
+     callers say where the row goes, which is the thing they actually differ
+     about. */
+  const addTo = (cardId: string | 'loose' | 'group', typeId: string) => {
     const t = conditionType(typeId)
     const c = ops.freshCondition(typeId, t.operators[0])
 
-    if (adding.cardId === 'group') {
+    if (cardId === 'group') {
       /* A group starts empty of everything that came before it. Adding one used
          to leave the existing conditions where they were and draw a frame round
          them too, so making a NEW group visually swallowed the old ones. */
       const next = ops.addCondition(rule.when, 'new', c)
       restructure(ops.setGrouped(next, next.cards[next.cards.length - 1].id, true))
-    } else if (adding.cardId === 'loose') {
+    } else if (cardId === 'loose') {
       /* Join the last card when it is loose, and start a new run when it is a
          group — so a condition added from the button below a group lands after
          it rather than jumping to the top. Either way it is a member of the
@@ -134,12 +142,15 @@ export function WhenEditor({
       const last = cards[cards.length - 1]
       restructure(last && !last.grouped ? ops.addCondition(rule.when, last.id, c) : ops.addCondition(rule.when, 'new', c))
     } else {
-      restructure(ops.addCondition(rule.when, adding.cardId, c))
+      restructure(ops.addCondition(rule.when, cardId, c))
     }
 
     setAdding(null)
     setFresh(c.id)
   }
+
+  /** What the opened list picks with: wherever it was opened for. */
+  const add = (typeId: string) => addTo(adding?.cardId ?? 'loose', typeId)
 
   const removeCondition = (conditionId: string) => write(ops.removeCondition(rule.when, conditionId))
   const patchCondition = (conditionId: string, next: Partial<Condition>) => write(ops.patchCondition(rule.when, conditionId, next))
@@ -217,20 +228,23 @@ export function WhenEditor({
             </span>
             <h4>No conditions yet</h4>
             <p>Every sign-in that reaches this rule matches it. Add a condition to narrow that.</p>
-            {adding ? (
-              <ConditionList label="Add a condition" onPick={add} onCancel={() => setAdding(null)} />
-            ) : (
-              <div className="bb__ifblank__acts">
-                <button type="button" className="bb__ifadd" onClick={openCatalogue('loose')}>
-                  <Plus size={11} strokeWidth={2.4} aria-hidden />
-                  Add condition
-                </button>
-                <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
-                  <Plus size={11} strokeWidth={2.4} aria-hidden />
-                  Add group
-                </button>
-              </div>
-            )}
+            {/* One control, full width, and no two-step.
+
+                It was two buttons that revealed the nine-row list in place —
+                which is right in the foot, where the list opens where the row
+                will land, and wrong here: an empty pane's single call to action
+                should not be a button that produces a control. The select IS
+                the control.
+
+                `adding` is not consulted. Nothing else can be open on an empty
+                pane, so there is no state for this branch to reflect. */}
+            <div className="bb__ifblank__acts">
+              <ConditionSelect label="Add a condition" onPick={(id) => addTo('loose', id)} />
+              <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
+                <Plus size={11} strokeWidth={2.4} aria-hidden />
+                Add group
+              </button>
+            </div>
           </div>
         ) : (
           /* ONE bracket, drawn as one.

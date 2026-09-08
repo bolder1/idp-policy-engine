@@ -2078,7 +2078,16 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 }
 .bb__ifblank h4 { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bb__ifblank p { margin: 0; max-width: 38ch; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.6; }
-.bb__ifblank__acts { display: flex; gap: var(--space-3); margin-top: var(--space-2); }
+/* Full width, and stacked. It was a row of two buttons centred under a centred
+   sentence, which is fine for two words each and wrong the moment one of them
+   became the pane's only real control: the select is where the work happens, so
+   it gets the width, and "Add group" sits under it as the quieter of the two. */
+.bb__ifblank__acts {
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: var(--space-2); margin-top: var(--space-2);
+  width: 100%; max-width: 320px;
+}
+.bb__ifblank__acts .bb__ifaddgroup { align-self: center; }
 /* Inside the state the adders are the point, so they lose the `align-self` the
    footer version carries. */
 .bb__ifblank__acts .bb__ifaddgroup { margin-top: 0; }

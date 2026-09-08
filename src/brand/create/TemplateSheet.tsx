@@ -193,10 +193,15 @@ export function TemplateSheet({
               <span className="bmarket__mark" aria-hidden>
                 <Store size={20} strokeWidth={1.7} />
               </span>
+              {/* The heading and the search, and nothing between them.
+
+                  A lede counting the two shelves stood here, and a note under
+                  the search explaining that taking a template writes its rules
+                  into the policy. Both were true and neither was being read:
+                  the counts are on the rail beside the shelves they count, and
+                  what taking one does is answered by doing it — the rules
+                  arrive, the toast says so, and undo is one keystroke. */}
               <h2>Start from a template</h2>
-              <p className="bmarket__lede">
-                {MINE.length} written by your team, {PROVIDED.length} from miniOrange — free with your licence
-              </p>
               <div className="bmarket__searchbox">
                 <Search size={16} strokeWidth={2} aria-hidden />
                 <input
@@ -208,9 +213,6 @@ export function TemplateSheet({
                   onChange={(e) => setQ(e.target.value)}
                 />
               </div>
-              <p className="bmarket__note">
-                Taking one writes its rules into this policy. Nothing is saved until you publish, and undo puts it back.
-              </p>
             </header>
 
             <div className="bmarket__work">

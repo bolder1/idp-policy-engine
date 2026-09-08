@@ -608,64 +608,59 @@ html[data-theme='dark'] .bguided__sheen {
    loses its brand tint with the move, because a storefront badge is not an
    action. */
 
-/* --- The storefront band, and the four fields of light -------------------------
+/* --- The storefront band, and the mesh that lights it --------------------------
 
-   A dedicated space at the top for the question and the one control that
-   answers it fastest, and nothing else in it. The heading, the provenance line
-   and the close used to share a 24px header row with the filters crammed
-   underneath, so the catalogue began sixty pixels from the top of the sheet.
-   Somebody opening this is looking for one of fourteen things: give the looking
-   somewhere to stand.
+   A dedicated space at the top for the question and the one control that answers
+   it fastest, and nothing else in it. It carried a lede counting the two shelves
+   and a note explaining what taking a template does; both were true, neither was
+   being read, and losing them is what let the colour get bolder — see below.
 
-   THE COLOUR IS A READOUT, NOT A MOOD. Every serious template gallery — Vercel,
-   ClickUp's Template Center, Fibery, Semrush's App Center — ships an unstained
-   white or grey header; the ones that stain are consumer creative tools. So the
-   band is allowed exactly one job: to say which shelf and which category you
-   are looking at, in the same four hues the cards' own pills use. Four fields
-   of light along the top edge, one per category, geometry constant across every
-   state. "All" is a horizon of four; choosing one collapses it to four values
-   of that hue; the tenant's shelf collapses it to slate.
+   THE COLOUR IS A READOUT. Six fields of light drawn from four hues, one per
+   category — the same four the cards' pills wear. Geometry is constant across
+   every state, so "All" is a mesh of four hues, choosing one restains the whole
+   mesh in values of that hue, and the tenant's shelf collapses it to slate. The
+   band never says anything the filter is not already saying.
 
-   The ceiling, so the next person knows where it is: stops are the hue mixed no
-   more than 30% into the page surface; colour occupies the top ~40% of the band
-   and 0% of the card grid; four hues, never five; 360ms, never past 400.
+   HOW BOLD IT IS ALLOWED TO BE, and why that changed. The first pass capped the
+   stops at 30% mixed into the page surface, because two paragraphs of
+   `--text-tertiary` sat on this band and tertiary on a deeper tint fails AA.
+   Both are gone. What is left on the colour is one heading in `--text-primary`
+   and a white search field carrying its own shadow, and primary ink clears
+   5.9:1 even over the deepest stop here. So the ceiling moved to 52%: the
+   constraint was never the colour, it was the two lines of grey sitting in it.
 
-   HOW IT MOVES. `background-image` cannot be transitioned between two
-   gradients — writing `transition: background` here looks right in the diff and
-   hard-cuts in the browser. The four stops are `@property`-registered `<color>`
-   custom properties instead, so the browser interpolates them in oklab and one
-   `data-tone` attribute swaps the whole band. Registered properties feeding a
-   gradient repaint per frame rather than compositing, which is nothing for one
-   360ms run per click and is the second reason this never loops.
+   HOW IT MOVES, twice over.
 
-   Where `@property` is missing the states still render exactly right; they just
-   snap. */
-@property --tone-a { syntax: '<color>'; inherits: false; initial-value: #eef1f4; }
-@property --tone-b { syntax: '<color>'; inherits: false; initial-value: #eef1f4; }
-@property --tone-c { syntax: '<color>'; inherits: false; initial-value: #eef1f4; }
-@property --tone-d { syntax: '<color>'; inherits: false; initial-value: #eef1f4; }
+   On a filter change, the four stops interpolate. `background-image` cannot be
+   transitioned between two gradients — writing a transition on background looks
+   right in the diff and hard-cuts in the browser — so the stops are
+   `@property`-registered colour properties and one `data-tone` attribute swaps
+   the lot, in oklab, with 40ms of stagger across the four.
+
+   And it drifts. The mesh lives on a pseudo-element inset well past the band's
+   edges so it can move without ever showing one, and what animates is a
+   transform — compositor-only, no repaint, unlike animating the gradient
+   itself. Twenty-four seconds for one cycle, which is slow enough to read as
+   light rather than as motion.
+
+   The registered properties must inherit here: the gradients are painted by
+   `::before`, and a pseudo-element takes the INITIAL value of a non-inheriting
+   registered property no matter what its originator holds. That one keyword is
+   the difference between a living mesh and a flat grey box. */
+@property --tone-a { syntax: '<color>'; inherits: true; initial-value: #eef1f4; }
+@property --tone-b { syntax: '<color>'; inherits: true; initial-value: #eef1f4; }
+@property --tone-c { syntax: '<color>'; inherits: true; initial-value: #eef1f4; }
+@property --tone-d { syntax: '<color>'; inherits: true; initial-value: #eef1f4; }
 
 .bmarket__hero {
   flex: none;
   position: relative;
   isolation: isolate;
+  overflow: hidden;
   display: flex; flex-direction: column; align-items: center; text-align: center;
-  padding: 36px 24px 28px;
-  /* The FIRST layer is the topmost, and the scrim is first because it is
-     load-bearing: it pins everything below 62% of the band to the untinted page
-     surface, which is what lets the fields run at 30% up top while the lede,
-     the search and the note keep byte-identical contrast in all six states. */
-  background:
-    linear-gradient(180deg, transparent 0%, transparent 24%, var(--surface-page) 62%),
-    radial-gradient(46% 66% at 11% -10%, var(--tone-a) 0%, transparent 72%),
-    radial-gradient(46% 66% at 37% -14%, var(--tone-b) 0%, transparent 72%),
-    radial-gradient(46% 66% at 63% -14%, var(--tone-c) 0%, transparent 72%),
-    radial-gradient(46% 66% at 89% -10%, var(--tone-d) 0%, transparent 72%),
-    var(--surface-page);
+  padding: 36px 24px 30px;
+  background: var(--surface-page);
   border-bottom: 1px solid var(--border-subtle);
-  /* 40ms of stagger across the four, so the horizon restains left to right
-     rather than all at once. Past about 60ms the last field visibly lags and it
-     reads as broken rather than as choreographed. */
   transition:
     --tone-a 360ms var(--ease-tone),
     --tone-b 360ms var(--ease-tone) 40ms,
@@ -673,52 +668,85 @@ html[data-theme='dark'] .bguided__sheen {
     --tone-d 360ms var(--ease-tone) 120ms;
 }
 
-/* The six states. `color-mix` against the page surface rather than literal
-   hexes, so one declaration carries both themes: the `-dot` hues are defined in
-   light and dark, `--surface-page` inverts, and the mix follows. Depths run
-   20 / 30 / 24 / 14% so even a single-hue horizon has some fall to it. */
-.bmarket__hero[data-tone='mine'] {
-  --tone-a: color-mix(in oklab, var(--fb-neutral-dot) 20%, var(--surface-page));
-  --tone-b: color-mix(in oklab, var(--fb-neutral-dot) 30%, var(--surface-page));
-  --tone-c: color-mix(in oklab, var(--fb-neutral-dot) 24%, var(--surface-page));
-  --tone-d: color-mix(in oklab, var(--fb-neutral-dot) 14%, var(--surface-page));
+/* The mesh. Six fields from four hues — two of them appear twice, lower and
+   smaller, which is what turns a row of blooms into something with depth in it.
+   Inset -30% so a three-degree rotation never brings an edge into view. */
+.bmarket__hero::before {
+  content: '';
+  position: absolute; inset: -30%;
+  z-index: -1;
+  background:
+    radial-gradient(38% 46% at 14% 34%, var(--tone-a) 0%, transparent 66%),
+    radial-gradient(34% 42% at 37% 26%, var(--tone-b) 0%, transparent 64%),
+    radial-gradient(40% 48% at 62% 30%, var(--tone-c) 0%, transparent 68%),
+    radial-gradient(36% 44% at 87% 25%, var(--tone-d) 0%, transparent 66%),
+    radial-gradient(28% 34% at 74% 44%, var(--tone-b) 0%, transparent 70%),
+    radial-gradient(26% 32% at 27% 46%, var(--tone-d) 0%, transparent 70%);
+  animation: bb-mesh 24s ease-in-out infinite;
+  will-change: transform;
 }
-/* All four categories at once, in rail order — the one state where the band is
-   literally a picture of the thing it is filtering. */
-.bmarket__hero[data-tone='all'] {
-  --tone-a: color-mix(in oklab, var(--fb-lime-dot) 24%, var(--surface-page));
-  --tone-b: color-mix(in oklab, var(--fb-accent-dot) 26%, var(--surface-page));
-  --tone-c: color-mix(in oklab, var(--fb-info-dot) 24%, var(--surface-page));
-  --tone-d: color-mix(in oklab, var(--fb-magenta-dot) 22%, var(--surface-page));
-}
-.bmarket__hero[data-tone='quick'] {
-  --tone-a: color-mix(in oklab, var(--fb-lime-dot) 20%, var(--surface-page));
-  --tone-b: color-mix(in oklab, var(--fb-lime-dot) 30%, var(--surface-page));
-  --tone-c: color-mix(in oklab, var(--fb-lime-dot) 24%, var(--surface-page));
-  --tone-d: color-mix(in oklab, var(--fb-lime-dot) 14%, var(--surface-page));
-}
-.bmarket__hero[data-tone='device'] {
-  --tone-a: color-mix(in oklab, var(--fb-accent-dot) 20%, var(--surface-page));
-  --tone-b: color-mix(in oklab, var(--fb-accent-dot) 30%, var(--surface-page));
-  --tone-c: color-mix(in oklab, var(--fb-accent-dot) 24%, var(--surface-page));
-  --tone-d: color-mix(in oklab, var(--fb-accent-dot) 14%, var(--surface-page));
-}
-.bmarket__hero[data-tone='risk'] {
-  --tone-a: color-mix(in oklab, var(--fb-info-dot) 20%, var(--surface-page));
-  --tone-b: color-mix(in oklab, var(--fb-info-dot) 30%, var(--surface-page));
-  --tone-c: color-mix(in oklab, var(--fb-info-dot) 24%, var(--surface-page));
-  --tone-d: color-mix(in oklab, var(--fb-info-dot) 14%, var(--surface-page));
-}
-.bmarket__hero[data-tone='compliance'] {
-  --tone-a: color-mix(in oklab, var(--fb-magenta-dot) 20%, var(--surface-page));
-  --tone-b: color-mix(in oklab, var(--fb-magenta-dot) 30%, var(--surface-page));
-  --tone-c: color-mix(in oklab, var(--fb-magenta-dot) 24%, var(--surface-page));
-  --tone-d: color-mix(in oklab, var(--fb-magenta-dot) 14%, var(--surface-page));
+@keyframes bb-mesh {
+  0%, 100% { transform: translate3d(-1.5%, -1%, 0) scale(1.04) rotate(0deg); }
+  50% { transform: translate3d(1.5%, 1.2%, 0) scale(1.1) rotate(3.5deg); }
 }
 
-/* The mark is neutral again. It was brand-tinted to keep an earlier pair of
-   brand blooms from reading as a printing fault; the band carries four hues of
-   its own now, and an orange badge sitting in front of them is a fifth. */
+/* The scrim, over the mesh and under the content. It pins the bottom of the
+   band to the untinted page surface, so the search field always sits on flat
+   ground and the seam into the catalogue below is invisible whatever hue is
+   running. */
+.bmarket__hero::after {
+  content: '';
+  position: absolute; inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, transparent 0%, transparent 46%, var(--surface-page) 88%);
+}
+
+/* The six states. `color-mix` against the page surface rather than literal
+   hexes, so one declaration carries both themes: the dot hues are defined in
+   light and dark, the page surface inverts, and the mix follows. Depths run
+   34 / 52 / 44 / 28% so even a single-hue mesh has fall to it. */
+.bmarket__hero[data-tone='mine'] {
+  --tone-a: color-mix(in oklab, var(--fb-neutral-dot) 30%, var(--surface-page));
+  --tone-b: color-mix(in oklab, var(--fb-neutral-dot) 44%, var(--surface-page));
+  --tone-c: color-mix(in oklab, var(--fb-neutral-dot) 38%, var(--surface-page));
+  --tone-d: color-mix(in oklab, var(--fb-neutral-dot) 24%, var(--surface-page));
+}
+/* All four at once, in rail order — the one state where the band is literally a
+   picture of the thing it is filtering. */
+.bmarket__hero[data-tone='all'] {
+  --tone-a: color-mix(in oklab, var(--fb-lime-dot) 42%, var(--surface-page));
+  --tone-b: color-mix(in oklab, var(--fb-accent-dot) 46%, var(--surface-page));
+  --tone-c: color-mix(in oklab, var(--fb-info-dot) 44%, var(--surface-page));
+  --tone-d: color-mix(in oklab, var(--fb-magenta-dot) 40%, var(--surface-page));
+}
+.bmarket__hero[data-tone='quick'] {
+  --tone-a: color-mix(in oklab, var(--fb-lime-dot) 34%, var(--surface-page));
+  --tone-b: color-mix(in oklab, var(--fb-lime-dot) 52%, var(--surface-page));
+  --tone-c: color-mix(in oklab, var(--fb-lime-dot) 44%, var(--surface-page));
+  --tone-d: color-mix(in oklab, var(--fb-lime-dot) 28%, var(--surface-page));
+}
+.bmarket__hero[data-tone='device'] {
+  --tone-a: color-mix(in oklab, var(--fb-accent-dot) 34%, var(--surface-page));
+  --tone-b: color-mix(in oklab, var(--fb-accent-dot) 52%, var(--surface-page));
+  --tone-c: color-mix(in oklab, var(--fb-accent-dot) 44%, var(--surface-page));
+  --tone-d: color-mix(in oklab, var(--fb-accent-dot) 28%, var(--surface-page));
+}
+.bmarket__hero[data-tone='risk'] {
+  --tone-a: color-mix(in oklab, var(--fb-info-dot) 34%, var(--surface-page));
+  --tone-b: color-mix(in oklab, var(--fb-info-dot) 52%, var(--surface-page));
+  --tone-c: color-mix(in oklab, var(--fb-info-dot) 44%, var(--surface-page));
+  --tone-d: color-mix(in oklab, var(--fb-info-dot) 28%, var(--surface-page));
+}
+.bmarket__hero[data-tone='compliance'] {
+  --tone-a: color-mix(in oklab, var(--fb-magenta-dot) 34%, var(--surface-page));
+  --tone-b: color-mix(in oklab, var(--fb-magenta-dot) 52%, var(--surface-page));
+  --tone-c: color-mix(in oklab, var(--fb-magenta-dot) 44%, var(--surface-page));
+  --tone-d: color-mix(in oklab, var(--fb-magenta-dot) 28%, var(--surface-page));
+}
+
+/* The mark stands in front of the mesh, so it gets a surface of its own rather
+   than a tint. It was brand-orange briefly, which was a fifth hue in a band
+   already carrying four. */
 .bmarket__mark {
   flex: none; width: 40px; height: 40px; border-radius: 12px;
   display: grid; place-items: center; margin-bottom: 14px;
@@ -844,11 +872,12 @@ html[data-theme='dark'] .bguided__sheen {
 }
 .bmarket__elsewhere > button:hover { text-decoration: underline; }
 
-/* The band arrives at its colour instead of travelling to it. The four
-   `@property` stops are what animates, so pinning them is one declaration —
-   every state still paints exactly right, it just snaps. */
+/* The band arrives at its colour instead of travelling to it, and the mesh
+   holds still. Every state still paints exactly right — the restain snaps, the
+   light stops drifting, and neither is information anybody loses. */
 @media (prefers-reduced-motion: reduce) {
   .bmarket__hero { transition: none; }
+  .bmarket__hero::before { animation: none; }
 }
 
 @media (max-width: 720px) {

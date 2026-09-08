@@ -27,7 +27,6 @@ function templateCard(t: Template): CardModel {
     badge: t.provided ? 'Xecurify' : undefined,
     category: t.category,
     signals: [t.category],
-    reviewed: t.reviewed,
     meta: `${t.author} · ${t.when}`,
     rules: t.rules,
   }

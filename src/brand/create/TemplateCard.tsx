@@ -1,5 +1,4 @@
 import {
-  BadgeCheck,
   Clock,
   Fingerprint,
   Globe,
@@ -66,17 +65,10 @@ export interface CardModel {
      anything it does not recognise. */
   category?: string
   meta: string
-  /** A dated, attributable review — deliberately not a rating. */
-  reviewed?: { by: string; on: string }
 }
 
-/** "2026-01" → "Jan 2026". Always the real date, never "recently" — an old
-    review date is the informative case, so it is not softened. */
-function monthOf(iso: string) {
-  const [y, m] = iso.split('-')
-  const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${names[Number(m) - 1] ?? ''} ${y}`.trim()
-}
+/* `monthOf` stood here — "2026-01" into "Jan 2026", for the review line in the
+   card's footer. Both are gone; the seed data still carries the dates. */
 
 const DEC_WORD: Record<AccessDecision, string> = { deny: 'Deny', '2fa': 'MFA', '1fa': 'Allow' }
 const DEC_KEY: Record<AccessDecision, string> = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' }
@@ -308,19 +300,19 @@ export function TemplateCard({
       </div>
 
       <footer className="bgcard__foot">
-        {/* The signals-and-author line is gone. The signals were already stated
-            by the rules in the thumbnail above, and an author with a relative
-            date told you who last touched the file, not whether the template is
-            any good. A dated review claim is the one fact here that does — so
-            it stays, and cards without one simply lead with the action. */}
-        <span className="bgcard__meta">
-          {m.reviewed && (
-            <span className="bgcard__reviewed" title={`Last reviewed ${monthOf(m.reviewed.on)}`}>
-              <BadgeCheck size={13} strokeWidth={1.9} aria-hidden />
-              Reviewed {monthOf(m.reviewed.on)}
-            </span>
-          )}
-        </span>
+        {/* One control, and nothing beside it.
+
+            This row has now lost three things in turn: a signal-and-author line
+            (the signals were already drawn by the rules in the thumbnail above),
+            then the author itself (who last touched the file is not whether the
+            template is any good), and now the dated review claim — which was the
+            one fact here that DID speak to quality, and still lost, because it
+            was a second thing to read on a row whose job is to be pressed.
+
+            `Scenario.reviewed` and `Template.reviewed` are still seeded in
+            data.ts with the reasoning for a dated attribution over a rating. The
+            model no longer carries it; if it is ever wanted again, that is where
+            it comes from. */}
         <button type="button" className="bgcard__cta" onClick={onUse}>
           {useLabel}
         </button>
@@ -473,9 +465,6 @@ export function scenarioCard(s: Scenario): CardModel {
     category: s.category,
     // A template with no conditions applies to everyone, which is worth saying.
     signals: signals.length > 0 ? signals : ['Everyone'],
-    // On the tenant's own templates the useful fact is who wrote it and when;
-    // on Xecurify's it is how many people the thing would reach.
-    reviewed: s.reviewed,
     /* "~340 people" not "340 people". matchEstimate is seed data that never
        recomputes, and the builder's impact panel already labels the same figure
        an estimate — the card was the one place stating it as a bare fact. */

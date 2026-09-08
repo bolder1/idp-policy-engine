@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Check, Copy, Keyboard, ListChecks, ListOrdered, PanelRightClose, PanelRightOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Activity, Check, Copy, Keyboard, ListChecks, ListOrdered, Maximize2, Minimize2, PanelRightClose, PanelRightOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
 import { Button, Modal } from '../../kit'
 import { fallbackRule, reidRule, blankRule, type Policy, type Rule } from '../../data'
@@ -53,7 +53,19 @@ const SHORTCUTS: [string, string][] = [
    render for a tenant that has overruled nothing. */
 const NO_OVERRIDES: Record<string, never> = {}
 
-export function BoardBuilder({ policyId, openSheet }: { policyId: string; openSheet?: Tab }) {
+export function BoardBuilder({
+  policyId,
+  openSheet,
+  focus,
+  onToggleFocus,
+}: {
+  policyId: string
+  openSheet?: Tab
+  /* Focus mode: the policy bar is away and the canvas has the whole region.
+     Owned by `BoardPage`, because it governs the bar as well as this. */
+  focus?: boolean
+  onToggleFocus?: () => void
+}) {
   const store = useBrand()
   const { registerLeaveGuard } = store
   /* The edition, which this surface ignored entirely.
@@ -531,7 +543,14 @@ export function BoardBuilder({ policyId, openSheet }: { policyId: string; openSh
   }
 
   return (
-    <div ref={shell} className={`bb ${panelShown ? '' : 'is-insp-closed'} ${gripping ? 'is-gripping' : ''}`} style={{ '--bb-insp': `${inspW}px` } as React.CSSProperties}>
+    <div
+      ref={shell}
+      /* `is-bared` says the policy bar is floating above this region, so the
+         corner toolbars step down past it. Focus mode drops the class and the
+         canvas reclaims the strip — which is the whole point of it. */
+      className={`bb ${panelShown ? '' : 'is-insp-closed'} ${gripping ? 'is-gripping' : ''} ${focus ? '' : 'is-bared'}`}
+      style={{ '--bb-insp': `${inspW}px` } as React.CSSProperties}
+    >
       <Board
         policy={draft}
         selection={selection}
@@ -584,6 +603,26 @@ export function BoardBuilder({ policyId, openSheet }: { policyId: string; openSh
         </div>
 
         <div className="bb__float bb__float--tl" role="toolbar" aria-label="History and view">
+          {/* The one control here that is not history, and it belongs in this
+              cluster because the cluster is already named for both. Pressed, the
+              policy bar slides off the top and the canvas stops leaving room for
+              it — so the board is the whole region rather than the region minus
+              a header. */}
+          {onToggleFocus && (
+            <>
+              <button
+                type="button"
+                className="bb__act"
+                aria-label={focus ? 'Show the policy header' : 'Hide the policy header'}
+                aria-pressed={focus}
+                title={focus ? 'Show the header' : 'Focus mode — hide the header'}
+                onClick={onToggleFocus}
+              >
+                {focus ? <Minimize2 size={14} strokeWidth={2} /> : <Maximize2 size={14} strokeWidth={2} />}
+              </button>
+              <span className="bb__float__sep" />
+            </>
+          )}
           <button type="button" className="bb__act" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo(hist)} onClick={() => setHist(undo)}>
             <Undo2 size={14} strokeWidth={2} />
           </button>

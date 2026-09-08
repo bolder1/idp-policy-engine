@@ -201,6 +201,11 @@
 .bshell__main {
   grid-area: main; overflow-y: auto; min-width: 0;
   display: flex; flex-direction: column;
+  /* The containing block for anything a screen floats over its whole region —
+     today that is the board's policy bar, which lifts out of this column so the
+     canvas below it gets the full height. Without this the bar would anchor to
+     the viewport and sit over the shell's own top strip. */
+  position: relative;
 }
 
 .bshell__toast {

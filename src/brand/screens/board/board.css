@@ -56,6 +56,20 @@
   /* Absolute and full-bleed, because the panel no longer takes a column out of
      the grid — it floats on top. The stage is the whole region again. */
   position: absolute; inset: 0;
+  /* …except for the strip the policy bar is standing on, and only while it is.
+
+     The bar floats over this region, so without this the chain's first node —
+     "A sign-in arrives", the thing that says where the order starts — laid out
+     underneath it and could only be reached by panning. Insetting the stage
+     rather than padding the world, because the world is transform-scaled: 76px
+     of padding there is 51px at 67% zoom, which clears a 76px bar at exactly
+     one zoom level.
+
+     Nothing is lost by it. The bar is opaque and covers this strip exactly, so
+     while it is shown the canvas looks as full-bleed as it did before — and in
+     focus mode `--bb-top` is 0 and the stage takes the strip back, which is the
+     whole point of the mode. */
+  top: var(--bb-top);
   min-width: 0; min-height: 0;
   /* `clip`, not `hidden`, and the difference is the whole bug.
 
@@ -734,8 +748,22 @@
   border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
   background: var(--surface-raised); box-shadow: var(--el-mid);
 }
-.bb__float--tl { left: var(--space-5); top: var(--space-5); }
-.bb__float--tr { right: var(--space-5); top: var(--space-5); }
+/* The two top toolbars step DOWN past the policy bar, which floats over this
+   region rather than sitting above it.
+
+   `--bb-top` is 0 unless the bar is there. `is-bared` is set by `BoardBuilder`
+   from the same state that shows the bar, so the two cannot disagree about
+   whether the strip is occupied — and in focus mode the class goes, the offset
+   goes with it, and the toolbars rise into the space the bar has vacated.
+
+   The value is the bar's own `--bpbar-h`, read through a fallback rather than
+   inherited: the bar is a SIBLING of this element, not an ancestor, so its
+   custom property does not cascade here. The fallback is the number to keep in
+   step if the bar's height ever changes — see policy-bar.css. */
+.bb { --bb-top: 0px; }
+.bb.is-bared { --bb-top: var(--bpbar-h, 76px); }
+.bb__float--tl { left: var(--space-5); top: calc(var(--space-5) + var(--bb-top)); }
+.bb__float--tr { right: var(--space-5); top: calc(var(--space-5) + var(--bb-top)); }
 .bb__float--br { right: var(--space-5); bottom: var(--space-5); }
 /* The two right-hand toolbars step aside for the panel.
 
@@ -818,7 +846,11 @@
    diagram underneath. */
 .bb__insp {
   position: absolute; z-index: 5;
-  top: var(--space-3); right: var(--space-3); bottom: var(--space-3);
+  /* Down past the floating policy bar, same as the corner toolbars. Without
+     this the panel's own header — the rule number, its name and the close —
+     sits under the bar, which is the one part of the panel you have to be able
+     to reach to get out of it. */
+  top: calc(var(--space-3) + var(--bb-top)); right: var(--space-3); bottom: var(--space-3);
   width: var(--bb-insp);
   display: flex; flex-direction: column; min-height: 0; min-width: 0;
   border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);

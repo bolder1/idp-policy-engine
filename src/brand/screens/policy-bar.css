@@ -22,6 +22,41 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/* --- Floating, for the canvas ---------------------------------------------
+
+   The trail is a scrolling column, so a bar above it costs one band of a page
+   that scrolls anyway. The board is a canvas, and a canvas has no natural
+   height — every pixel the chrome takes is a rule you cannot see without
+   panning. Out of the column and over the work, so the region below is the
+   whole region.
+
+   `--bpbar-h` is the strip it covers, and the board reads it back to step its
+   corner toolbars down past the bar. Declared here because this is the element
+   that knows how tall it is, and it is the one number the two files share. */
+.bpbar.is-float {
+  --bpbar-h: 76px;
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 6;
+  transition: transform 0.24s var(--ease-standard), opacity 0.18s var(--ease-standard);
+}
+
+/* Focus mode: off the top, and nothing left behind.
+
+   `translateY(-101%)` rather than `display: none`, so it animates out and back,
+   and `visibility: hidden` at the end of it so nothing in there is tabbable
+   while it is gone — a bar you cannot see but can still tab into is worse than
+   one that is simply absent. `aria-hidden` is set on the element too; see
+   `policy-bar.tsx`. */
+.bpbar.is-away {
+  transform: translateY(-101%);
+  opacity: 0;
+  visibility: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bpbar.is-float { transition: none; }
+}
+
 .bpbar__id { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
 .bpbar__back {
   flex: none; display: grid; place-items: center; width: 28px; height: 28px;

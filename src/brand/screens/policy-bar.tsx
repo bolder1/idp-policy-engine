@@ -29,7 +29,7 @@ import './policy-bar.css'
    every time somebody adds a group.
    -------------------------------------------------------------------------- */
 
-export function PolicyBar({ policy }: { policy: Policy }) {
+export function PolicyBar({ policy, floating, away }: { policy: Policy; floating?: boolean; away?: boolean }) {
   const store = useBrand()
 
   const { everyone, groupIds, userIds } = policy.audience
@@ -54,7 +54,11 @@ export function PolicyBar({ policy }: { policy: Policy }) {
   const app = policy.appId ? store.appById(policy.appId) : null
 
   return (
-    <header className="bpbar">
+    /* `floating` lifts the bar out of the column and over the canvas below it;
+       `away` slides it off the top. Two props rather than one because they are
+       two facts: the trail wants neither, the board wants the first always and
+       the second only in focus mode. */
+    <header className={`bpbar ${floating ? 'is-float' : ''} ${away ? 'is-away' : ''}`} aria-hidden={away || undefined}>
       <div className="bpbar__id">
         {/* With the heading, not in a toolbar of its own. The builder's top bar
             is about the rules; leaving `back` there meant a bar that existed

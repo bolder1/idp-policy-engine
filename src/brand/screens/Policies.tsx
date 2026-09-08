@@ -225,9 +225,14 @@ export function Policies() {
                 </button>
               </div>
             )}
-            <Button variant="ghost" onClick={() => store.go({ name: 'templates' })}>
-              Manage templates
-            </Button>
+            {/* "Manage templates" stood here, beside "New policy".
+
+                It is a second destination in the one place on this page that
+                should carry a single action — and it is a destination the left
+                rail already lists, one item below "All Policies". A header
+                action that duplicates a nav item spends the page's most
+                valuable position on a shortcut to somewhere you can already
+                see. */}
             <Button variant="brand" onClick={() => store.go({ name: 'create' })}>
               New policy
             </Button>

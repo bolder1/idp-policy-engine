@@ -161,32 +161,18 @@ export function PolicyBar({ policy }: { policy: Policy }) {
       </dl>
 
       <div className="bpbar__acts">
-        {/* Two builders over one policy — the board and the trail. The switch
-            lives on this bar because the bar is the one thing both share, and
-            a layout choice belongs beside the policy rather than inside either
-            layout's own toolbar.
+        {/* The Board / Trail switch stood here and is hidden, not deleted.
 
-            Board first, because it is where a policy opens from everywhere
-            now. The order of a two-way switch is a claim about which one is
-            the default, and it was making the wrong one. */}
-        <div className="bpbar__view" role="group" aria-label="Builder layout">
-          <button
-            type="button"
-            className={store.screen.name === 'board' ? 'is-on' : ''}
-            aria-pressed={store.screen.name === 'board'}
-            onClick={() => store.go({ name: 'board', policyId: policy.id })}
-          >
-            Board
-          </button>
-          <button
-            type="button"
-            className={store.screen.name === 'builder' ? 'is-on' : ''}
-            aria-pressed={store.screen.name === 'builder'}
-            onClick={() => store.go({ name: 'builder', policyId: policy.id })}
-          >
-            Trail
-          </button>
-        </div>
+            Two builders over one policy is a real thing this prototype argues
+            for, and the trail still works — `BuilderPage` is mounted, the route
+            resolves, and `/policies`' row menu still has "Open in trail" for
+            anybody who needs to see it. What has gone is the switch that
+            offered the choice on every policy, because offering it makes the
+            second shape look like a setting somebody has to have an opinion
+            about before they can start.
+
+            Board is the one way in now, which it already was everywhere except
+            here. Restoring the switch is uncommenting this block. */}
 
         {/* One button for all three facts. Three separate affordances — rename
             here, apps behind a dialog, audience in a drawer — was three places

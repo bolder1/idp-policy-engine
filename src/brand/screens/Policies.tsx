@@ -196,18 +196,25 @@ export function Policies() {
         caption="Every sign-in is checked against the policies on the app being opened."
         actions={
           <>
-            <div className="bviewswitch" role="tablist" aria-label="Policy view">
-              <button
-                role="tab"
-                aria-selected={view === 'list'}
-                className={view === 'list' ? 'is-on' : ''}
-                onClick={() => setView('list')}
-              >
-                List
-              </button>
-              {/* Two tabs or none. A tablist with one tab is a label with a
-                  border round it. */}
-              {store.features.coverage && (
+            {/* Two tabs or none, and the gate is on the LIST rather than on
+                the second tab.
+
+                That sentence was already written here, one line above the
+                second tab, and the code did not do it: hiding Coverage left the
+                switch behind with "List" alone in it — a tablist with one tab,
+                which is a label with a border round it and a `role="tablist"`
+                announcing a choice that does not exist. Now the whole control
+                comes and goes with the thing it would switch to. */}
+            {store.features.coverage && (
+              <div className="bviewswitch" role="tablist" aria-label="Policy view">
+                <button
+                  role="tab"
+                  aria-selected={view === 'list'}
+                  className={view === 'list' ? 'is-on' : ''}
+                  onClick={() => setView('list')}
+                >
+                  List
+                </button>
                 <button
                   role="tab"
                   aria-selected={view === 'coverage'}
@@ -216,8 +223,8 @@ export function Policies() {
                 >
                   Coverage
                 </button>
-              )}
-            </div>
+              </div>
+            )}
             <Button variant="ghost" onClick={() => store.go({ name: 'templates' })}>
               Manage templates
             </Button>

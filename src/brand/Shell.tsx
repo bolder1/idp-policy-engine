@@ -24,7 +24,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { EditionBar } from './EditionBar'
+// `EditionBar` is not imported while the bar is hidden — see the note at its
+// call site below. The component and its stylesheet are untouched.
 import { ProfileMenu } from './ProfileMenu'
 import { PersonaBar } from './PersonaBar'
 import { useBrand, useToast, type BrandScreen } from './store'
@@ -283,7 +284,19 @@ export function Shell({ children }: { children: ReactNode }) {
               The edition switch changes what the product CAN do; the persona
               switch changes who is looking and what is in their tenant. */}
           <PersonaBar />
-          <EditionBar />
+          {/* `<EditionBar />` stood here: the Lite / Full switch and the
+              "N things this cannot answer" button beside it.
+
+              Hidden, not deleted. The edition machinery is untouched —
+              `featuresOf`, every `features.*` gate, the whole `edition.ts`
+              catalogue of what each one answers — and the store still holds an
+              edition, so every screen keeps reading the flags rather than the
+              name. What has gone is the control that let somebody flip it, and
+              the count of open questions beside it: both are about how this
+              prototype was built, and neither is a thing the product does.
+
+              `lite` is the default now — see `store.tsx`. Restoring the bar is
+              uncommenting this line. */}
           <button
             className="bshell__icon"
             onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}

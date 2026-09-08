@@ -295,7 +295,15 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [apps, setApps] = useState<App[]>(() => appsAt('medium'))
   const [groups, setGroups] = useState<Group[]>(() => groupsAt('medium'))
   const [directory, setDirectory] = useState(() => usersAt('medium'))
-  const [edition, setEdition] = useState<Edition>('full')
+  /* `lite`, and nothing on screen changes it.
+
+     It was `'full'` — everything this prototype argues for, switchable from a
+     bar in the shell. The bar is hidden, so the initial value is now the only
+     value, and it is the scope as requested rather than the scope as argued
+     for. `setEdition` stays wired: the state, the flags and every gate that
+     reads them are unchanged, so putting the switch back is a one-line edit in
+     `Shell.tsx` and nothing else. */
+  const [edition, setEdition] = useState<Edition>('lite')
   const [persona, setPersonaId] = useState<PersonaId>('manager')
   const [role, setRoleState] = useState<Role>('admin')
 

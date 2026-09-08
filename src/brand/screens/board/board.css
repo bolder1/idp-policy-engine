@@ -225,26 +225,63 @@
 /* The stage colour rather than transparent: the connector runs behind the
    glyph, and a 2px line through the middle of a `+` makes it a `✚` nobody
    drew. It masks the line without drawing a disc. */
+
+/* Hover is a ripple and a colour change, not a filled disc.
+
+   It used to invert: a solid ink circle with a white `+` and a drop shadow.
+   That reads as a button that is already pressed, and at 20px it is a heavy
+   object appearing under the pointer on a canvas where nothing else does.
+
+   The ripple says the same thing with nothing solid — a ring leaving the glyph
+   and fading, which is the one animation on this surface and is only ever
+   playing under the pointer. The `+` and its label take the brand at the same
+   moment, so the mark you are about to press is the only coloured thing in
+   view. */
 .bb__link__add:hover,
 .bb__link__add:focus-visible,
 .bb__link:hover .bb__link__add {
-  transform: translateY(-50%) scale(1.12);
-  /* Ink, not brand. It is a place to put a rule, not a decision about one. */
-  background: var(--text-primary); color: var(--surface-raised);
-  box-shadow: 0 2px 8px -3px rgba(20, 30, 40, 0.45);
+  transform: translateY(-50%) scale(1.06);
+  color: var(--brand);
   outline: none;
 }
 .bb__link__add:focus-visible { box-shadow: 0 0 0 2px var(--focus-ring); }
 
-/* The label, as a tooltip rather than as a note beside the line.
+/* `::before`, because `::after` on this button is the 32px hit area — see the
+   block near the foot of this file. Two pseudo-elements, two jobs, and the one
+   that animates is not the one that catches the pointer. */
+.bb__link__add::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--brand);
+  opacity: 0;
+  pointer-events: none;
+}
+.bb__link:hover .bb__link__add::before,
+.bb__link__add:focus-visible::before {
+  animation: bb-ripple 1.1s var(--ease-standard) infinite;
+}
+@keyframes bb-ripple {
+  0% { transform: scale(0.75); opacity: 0.5; }
+  70% { opacity: 0; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
 
-   Dark on light, the way every canvas labels a hover target — it has to read
-   over the dot grid and over a card edge, and muted grey text does neither. */
+/* The label, beside the line, in the same brand the glyph takes.
+
+   It was a dark tooltip pill — white on `--shell-bg` — which is how a canvas
+   labels a hover target when the label has to survive being drawn over
+   anything. This one does not: it sits in the gutter left of the cards, over
+   the dot grid and nothing else. The pill was a second solid object arriving
+   with the first, and both of them have gone.
+
+   Brand, with the `+`, so the two read as one thing lighting up rather than as
+   a glyph and a caption. */
 .bb__link__hint {
   position: absolute; left: 20px; top: 50%;
-  padding: 4px 9px; border-radius: var(--radius-sm);
-  background: var(--shell-bg); color: #fff;
-  font-size: 11px; font-weight: var(--fw-medium); white-space: nowrap;
+  padding: 4px 2px;
+  background: none; color: var(--brand);
+  font-size: 11px; font-weight: var(--fw-semibold); white-space: nowrap;
   opacity: 0; transform: translateY(-50%) translateX(-4px);
   transition: opacity 0.16s var(--ease-standard), transform 0.16s var(--ease-standard);
   pointer-events: none;
@@ -1379,6 +1416,11 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 @media (prefers-reduced-motion: reduce) {
   .bb__start .bb__pulse::after { animation: none; }
   .bb__card, .bb__link::before, .bb__dot, .bb__decide > button { transition: none; }
+  /* The ripple is the one thing on this surface that repeats, which makes it
+     the one somebody who asked for no motion would notice most. The colour
+     change carries the whole message without it. */
+  .bb__link:hover .bb__link__add::before,
+  .bb__link__add:focus-visible::before { animation: none; }
   /* The fold still folds — it just arrives. */
   .bb__fold { transition: none; }
   /* The condition row's silencer is NOT here — it sits beside the declaration
@@ -2037,28 +2079,26 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    Three corrections: the connector, the selection, and the panel's edge.
    --------------------------------------------------------------------------- */
 
-/* --- The connector, in the brand rather than in the border colour -----------
+/* --- The connector, in ink -------------------------------------------------
 
-   `--bb-link` was `--border-default` — #d3dae1 on a #f6f7f9 stage, about 1.2:1.
-   It is the one line on this canvas that carries meaning (this rule falls to
-   that one), and it was the faintest thing drawn. The `+` inherited the same
-   value, so the affordance for inserting a rule was invisible until hovered,
-   which only works if you already know it is there.
+   It was the brand: a 40% orange line with a solid orange `+` on it. That was
+   an answer to a real problem — `--border-default` is #d3dae1 on a #f6f7f9
+   stage, about 1.2:1, so the one line on this canvas that carries meaning was
+   the faintest thing drawn — and it solved it with the wrong ink. Nine rules is
+   nine orange lines and nine orange glyphs running the height of the chain,
+   beside an orange selection ring, orange switches and orange decision chips.
+   On this surface colour has one job, which is saying what a rule DECIDES.
 
-   Tinted rather than solid brand: eight connectors at full #EB5424 would out-
-   shout the cards. The line is the brand at 40%, the glyph is the brand
-   outright — the mark you are looking for is the one that is fully coloured. */
+   `--border-strong` is #7E8B9A: about 2.6:1 on the stage, twice the contrast
+   the line had before the brand was reached for, and no colour at all. The
+   glyph goes a step darker still, because it is the one thing here you can
+   press.
+
+   The brand is not gone from the connector — it moves to hover, where it means
+   "this is the one you are about to use" rather than "there are nine of me". */
 .bb {
-  --bb-link: rgba(235, 84, 36, 0.4);
-  --bb-plus: var(--brand);
-}
-:root[data-theme='dark'] .bb,
-:root:not([data-theme='light']) .bb {
-  /* Brand on a near-black stage needs more alpha to reach the same presence. */
-  --bb-link: rgba(235, 84, 36, 0.55);
-}
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']) .bb { --bb-link: rgba(235, 84, 36, 0.4); }
+  --bb-link: var(--border-strong);
+  --bb-plus: var(--text-tertiary);
 }
 
 .bb__link::before { width: 2px; }

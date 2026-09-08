@@ -1,5 +1,5 @@
 import { Fragment, type MouseEvent, type ReactNode } from 'react'
-import { ArrowRight, Braces, CornerDownRight, Split, Users } from 'lucide-react'
+import { ArrowRight, Braces, Split, Users } from 'lucide-react'
 
 import { isWho, whoEditable, whoIds } from '../../audience-ops'
 import { AvatarStack } from './Avatar'
@@ -79,16 +79,26 @@ export function IfChip({
   )
 }
 
-/** A row indented under a keyword, with the └ connector. */
+/* Everything that belongs UNDER a keyword.
+
+   The card used to run its keywords inline with their content: `if` opened the
+   first condition's row, `who` opened the avatar stack, and only `then` stood on
+   a line of its own with its outcome indented beneath it. So of the three parts
+   a rule has, one was drawn as a heading over a body and two were drawn as the
+   first words of a sentence — and a five-condition rule read as five sibling
+   lines with no sign that four of them were arguments to the first word on the
+   first one.
+
+   `then` had it right. All three do it now: the keyword takes a line, and what
+   answers it is indented under a guide, so the shape of a rule is visible before
+   any of it is read.
+
+   The `└` elbow that used to mark the single indented row has gone with the
+   change. It reads as "one thing follows"; the guide reads as "everything here
+   belongs to the word above", which is what is true of all three sections and
+   was never true of just the outcome. */
 export function IfSub({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={`bb__ifsub ${className ?? ''}`}>
-      <span className="bb__ifelbow" aria-hidden>
-        <CornerDownRight size={12} strokeWidth={2} />
-      </span>
-      {children}
-    </div>
-  )
+  return <div className={`bb__ifbody ${className ?? ''}`}>{children}</div>
 }
 
 /** The value(s) of a condition, as chips. */
@@ -276,21 +286,34 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
         </div>
       )}
       {hasWho && (
-        <div className="bb__ifrow is-cond bb__ifwho">
-          <span className="bb__ifbranch" aria-hidden>
-            <Users size={12} strokeWidth={2} />
-          </span>
-          <span className="bb__ifkw">who</span>
+        <>
+          <div className="bb__ifrow">
+            <span className="bb__ifbranch" aria-hidden>
+              <Users size={12} strokeWidth={2} />
+            </span>
+            <span className="bb__ifkw">who</span>
+          </div>
           {/* A stack, not a chip per name. It was one chip each, which is four
               lines of them at eighteen people inside a rule somebody is trying
               to read at a glance — and a real tenant has thousands. Five marks,
               the first name in words and a count: the same width whatever it
               holds. */}
-          <AvatarStack names={whoNames} />
+          <IfSub className="bb__ifwho">
+            <AvatarStack names={whoNames} />
+          </IfSub>
+        </>
+      )}
+      {hasIf && (
+        <div className="bb__ifrow">
+          <span className="bb__ifbranch" aria-hidden>
+            <Split size={12} strokeWidth={2} />
+          </span>
+          <IfKw>if</IfKw>
         </div>
       )}
       {hasIf && (
-        cards.map((k, i) => {
+        <div className="bb__ifbody">
+        {cards.map((k, i) => {
           /* Read, not assumed.
 
              These were the literals 'or' between cards and 'and' inside one,
@@ -355,28 +378,19 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
                  11px it is easy to lose. A rule per row makes the count
                  readable at a glance, which is the whole job of the card. */
               <div key={c.id} className="bb__ifrow is-cond">
-                {j === 0 ? (
-                  /* `if` opens the sentence once, on the very first row of the
-                     whole block. A member after the first is introduced by the
-                     operator row above it, not by a keyword of its own. */
-                  i === 0 && (
-                    <>
-                      <span className="bb__ifbranch" aria-hidden>
-                        <Split size={12} strokeWidth={2} />
-                      </span>
-                      <IfKw>if</IfKw>
-                    </>
-                  )
-                ) : (
-                  <IfKw tone={join}>{join}</IfKw>
-                )}
+                {/* `if` used to open this row when it was the first of the
+                    whole block. It has a line of its own above the body now, so
+                    the first condition starts with the condition — and a member
+                    after the first is still introduced by its operator. */}
+                {j > 0 && <IfKw tone={join}>{join}</IfKw>}
                 <CondReadout c={c} resolve={resolve} />
               </div>
             ))}
           </div>
           </Fragment>
           )
-        })
+        })}
+        </div>
       )}
       {/* The outcome, last, and only once there is something above it to be
           the outcome OF. */}

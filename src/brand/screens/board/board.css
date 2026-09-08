@@ -1903,20 +1903,45 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__ifkw.is-and { background: var(--fb-info-bg); color: var(--fb-info-fg); }
 .bb__ifkw.is-or { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
 .bb__ifkw.is-op { font-weight: var(--fw-regular); color: var(--if-muted); min-width: 0; }
-/* The `or` keyword sits where `if` sat — it opens a group of its own. The
-   indent is a margin now rather than padding, so it does not stretch the pill. */
-.bb__ifkw.is-and, .bb__ifkw.is-or { margin-left: 16px; }
-.bb__ifgroup + .bb__ifgroup .bb__ifrow:first-child .bb__ifkw.is-or,
-.bb__ifrow > .bb__ifkw.is-or:first-child { margin-left: 16px; }
+/* The 16px indent these carried has gone with the reason for it. It existed so
+   an operator lined up with the conditions on the row `if` had opened; the
+   body is indented as a whole now, so an operator that keeps its own margin
+   sits 16px further in than the conditions it joins. */
 
 
-.bb__ifsub {
+/* --- What belongs under a keyword ---------------------------------------------
+
+   The card ran its keywords inline with their content: `if` opened the first
+   condition's row and `who` opened the avatar stack, so of the three parts a
+   rule has, only `then` was drawn as a heading over a body. A five-condition
+   rule came out as five sibling lines with nothing saying that four of them
+   were arguments to the first word on the first one.
+
+   All three sections are a keyword on its own line now, with everything that
+   answers it indented under a guide. The guide is the hierarchy: one look tells
+   you how many conditions there are and where they stop, before a word of it is
+   read.
+
+   The `└` elbow that marked the old single indented row has gone. It reads as
+   "one thing follows", which was true of the outcome and of nothing else; the
+   guide reads as "all of this belongs to the word above", which is true of all
+   three. */
+.bb__ifbody {
   position: relative;
+  padding-left: 14px;
+  margin-left: 5px;
+}
+/* Drawn as a border rather than a `::before`, so it takes the block's real
+   height including any group frame inside it and cannot fall out of step with
+   the content the way an absolutely positioned line does. */
+.bb__ifbody { border-left: 1px solid var(--if-line); }
+/* The action is one row, so it keeps the row's alignment rather than becoming a
+   column. */
+.bb__ifaction {
   display: flex; align-items: center; flex-wrap: wrap;
   gap: 4px 6px; min-height: 26px;
-  padding-left: 24px;
 }
-.bb__ifelbow { position: absolute; left: 6px; top: 50%; transform: translateY(-50%); display: grid; color: var(--if-line); }
+.bb__ifwho { display: flex; align-items: center; min-height: 26px; }
 
 .bb__ifchip {
   display: inline-flex; align-items: center; gap: 5px; max-width: 100%;

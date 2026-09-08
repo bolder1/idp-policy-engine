@@ -135,6 +135,16 @@
 .bx-picker__opt.is-on { color: var(--text-primary); }
 .bx-picker__opt.is-off { opacity: 0.45; cursor: not-allowed; }
 .bx-picker__opt svg { flex: none; color: var(--text-muted); }
+/* The tick, in the brand, and it needs the extra selector to get there.
+
+   `.bx-picker__tick` sets `color: var(--brand)` on the wrapper and has done
+   since it was written — but the rule directly above paints every `svg` inside
+   an option `--text-muted`, at equal specificity and later in the file, so the
+   check inherited grey and the chosen row was marked in the same ink as the
+   icons beside it. One selector deeper, and the one glyph in the popup that
+   says "this is the one you are on" says it in the colour this console reserves
+   for exactly that. */
+.bx-picker__opt .bx-picker__tick svg { color: var(--brand); }
 
 /* A logo or avatar, sized by whatever the caller put in it. */
 .bx-picker__art {

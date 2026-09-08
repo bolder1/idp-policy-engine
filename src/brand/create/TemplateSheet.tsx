@@ -1,11 +1,11 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search, Store, X } from 'lucide-react'
 
 import { Button } from '../kit'
 import { Picker } from '../picker'
 import { scenarios, type Scenario } from '../data'
-import { TemplateCard, TemplatePreview, catKey, scenarioCard } from './TemplateCard'
+import { TemplateCard, TemplatePreview, scenarioCard } from './TemplateCard'
 
 /* -----------------------------------------------------------------------------
    The template picker.
@@ -49,14 +49,14 @@ function hit(s: Scenario, q: string) {
   return s.name.toLowerCase().includes(t) || s.description.toLowerCase().includes(t)
 }
 
-/* Which state the header band paints. One word, because the band takes exactly
-   one `data-tone` and the CSS holds one rule per value. The tenant's shelf is
-   `mine` whatever the filter says — its two templates do not need a taxonomy
-   between them. */
-function toneOf(shelf: Shelf, cat: Cat | 'All') {
-  if (shelf === 'mine') return 'mine'
-  return cat === 'All' ? 'all' : catKey(cat)
-}
+/* `toneOf` stood here, mapping the shelf and the filter onto one of six words
+   for the header band to paint itself with. The band paints one colour now —
+   see the note on `.bmarket__hero` — so there is nothing to map.
+
+   The category's colour did not go anywhere: it is on the cards, in
+   `.bgcard__cat`, which is the surface the category is actually about.
+
+*/
 
 export function TemplateSheet({
   open,
@@ -93,12 +93,6 @@ export function TemplateSheet({
   /** How many of this category are sitting on the OTHER shelf. */
   const elsewhere = cat === 'All' ? 0 : (shelf === 'mine' ? PROVIDED : MINE).filter((s) => s.category === cat).length
 
-  /* Derived, not stored. It withheld the tone for one frame so the band would
-     bloom from grey as the sheet sprang in — a nice trick and one more thing
-     moving on a surface being scanned, so it went with the drift and the
-     breathe. Transitions do not fire on first computed style anyway: the band
-     simply opens in the right colour. */
-  const tone = toneOf(shelf, cat)
 
   useEffect(() => {
     if (!open) return
@@ -177,31 +171,16 @@ export function TemplateSheet({
                 looking a place to stand. Centred, on the page grey, with the
                 search at the width a template name actually needs — and
                 nothing else in it. */}
-            <header className="bmarket__hero" data-tone={tone}>
-              {/* Four shelves, in rail order, and the lit one is the shelf you
-                  are on.
-
-                  It was a 40px tile with a shopfront glyph in it: a literal
-                  drawing of a shop, on a surface that is not one, at a size that
-                  made it the first thing you saw. This is the abstract version
-                  of the same idea and it carries something the glyph could not —
-                  which category is filtering the grid. The band behind it runs
-                  the same four colours at a twelfth of the strength, so the
-                  atmosphere and the fact can never disagree. */}
-              <svg className="bmarket__mark" viewBox="0 0 24 24" role="img" aria-label="Category filter">
-                <rect className="bmarket__quad is-a" x="1" y="1" width="10" height="10" rx="3" />
-                <rect className="bmarket__quad is-b" x="13" y="1" width="10" height="10" rx="3" />
-                <rect className="bmarket__quad is-c" x="1" y="13" width="10" height="10" rx="3" />
-                <rect className="bmarket__quad is-d" x="13" y="13" width="10" height="10" rx="3" />
-              </svg>
-              {/* The heading and the search, and nothing between them.
-
-                  A lede counting the two shelves stood here, and a note under
-                  the search explaining that taking a template writes its rules
-                  into the policy. Both were true and neither was being read:
-                  the counts are on the rail beside the shelves they count, and
-                  what taking one does is answered by doing it — the rules
-                  arrive, the toast says so, and undo is one keystroke. */}
+            <header className="bmarket__hero">
+              {/* The shopfront, back and smaller. It was briefly a two-by-two
+                  of the four category hues — a legend for the filter — which
+                  was the last of six attempts to make this band say which
+                  category was selected. It said it accurately and it was still
+                  a second readout for something the dropdown states in words
+                  and the cards state in pills. */}
+              <span className="bmarket__mark" aria-hidden>
+                <Store size={17} strokeWidth={1.8} />
+              </span>
               <h2>Start from a template</h2>
               <div className="bmarket__searchbox">
                 <Search size={16} strokeWidth={2} aria-hidden />

@@ -610,46 +610,26 @@ html[data-theme='dark'] .bguided__sheen {
 
 /* --- The storefront band ---------------------------------------------------------
 
-   Five treatments of this strip, and four of them were wrong in the same way, so
-   the record is worth keeping: two brand blobs, then four fields of light, then
-   six at double the depth with a drift on them, then a ruled lattice with twelve
-   filled cells. Every one treated colour as scattered MARKS. Marks have edges,
-   edges invite comparison, and comparison is why each landed as either invisible
-   or loud with nothing in between — and each time the fix reached for strength,
-   which was never the dial that was wrong.
+   One colour, and it is the brand's.
 
-   What was actually wrong is that the band was 211px of chrome, in a modal
-   somebody is in for ten seconds, and I kept decorating it instead of shrinking
-   it. It is ~160 now: less padding, a smaller mark, and the heading and the
-   search closer together.
+   Six treatments came before this and every one of them was a variation on the
+   same idea — that the band should say which category is filtering the grid.
+   Two brand blobs, four fields of light, six at double the depth with a drift on
+   them, a ruled lattice of filled cells, a four-stop spectrum, and finally four
+   `@property`-registered colours driving a mark and a wash together. The
+   mechanism worked; the idea did not. A header that restains itself is a second
+   readout for something the dropdown already states in words and the cards
+   already state in pills, and six passes of tuning could not make a redundant
+   signal feel like anything but decoration.
 
-   WHAT IS LEFT, and what each part is for.
+   So the band stops signalling. It is one soft fall of brand orange into the
+   page surface, which is what the top of a sheet in this console looks like, and
+   the category lives where it belongs: in the filter that sets it and on the
+   cards it selects.
 
-   · The MARK is the readout. Four cells in a two-by-two, one per category, in
-     rail order — Quick, Device, Risk, Compliance. "All" lights all four; a
-     category lights its own and greys the rest; the tenant's shelf greys them
-     all. Twenty-six pixels of colour that say precisely what is being filtered,
-     which is what a legend is, and it cannot compete with anything at that size.
-   · The BAND is atmosphere. One gradient, edge to edge, at 12% mixed into the
-     page surface — a continuous field has no internal edge, so it reads at a
-     third of the chroma the marks needed. It is driven by the SAME four
-     properties as the mark, which is what makes a single-category state fall out
-     for free: three of the four go neutral, so the hue sits at one end and
-     dissolves into plain grey across the rest, in the same corner the lit cell
-     is in.
-
-   MOTION: one, and it means something. The restain when the filter changes,
-   220ms, mark and band together. Everything else has been deleted — a drifting
-   mesh, a nine-second opacity breathe, an entrance bloom. This is a picker being
-   scanned, not a page being admired, and a surface that moves while you read it
-   is competing with you. `background-image` cannot be transitioned between two
-   gradients, which is why the stops are `@property`-registered colours; they
-   must inherit, or the `::before` painting them takes the initial value. */
-@property --quad-a { syntax: '<color>'; inherits: true; initial-value: #7e8b9a; }
-@property --quad-b { syntax: '<color>'; inherits: true; initial-value: #7e8b9a; }
-@property --quad-c { syntax: '<color>'; inherits: true; initial-value: #7e8b9a; }
-@property --quad-d { syntax: '<color>'; inherits: true; initial-value: #7e8b9a; }
-
+   The colour is gone from here, not from the product. `.bgcard__cat` still wears
+   the four category hues — lime, accent, info, magenta — and the reasoning for
+   which is which is with the map in TemplateCard.tsx. */
 .bmarket__hero {
   flex: none;
   position: relative;
@@ -657,77 +637,27 @@ html[data-theme='dark'] .bguided__sheen {
   overflow: hidden;
   display: flex; flex-direction: column; align-items: center; text-align: center;
   padding: 20px 24px 22px;
-  background: var(--surface-page);
+  /* Deepest at the top edge and flat well before the search field, so the input
+     and the seam into the catalogue below both sit on plain surface. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--brand) 13%, var(--surface-page)) 0%,
+    color-mix(in oklab, var(--brand) 5%, var(--surface-page)) 44%,
+    var(--surface-page) 86%
+  );
   border-bottom: 1px solid var(--border-subtle);
-  transition:
-    --quad-a 220ms var(--ease-tone),
-    --quad-b 220ms var(--ease-tone),
-    --quad-c 220ms var(--ease-tone),
-    --quad-d 220ms var(--ease-tone);
 }
 
-/* The wash. Four stops in rail order across the full width, mixed down to a
-   whisper — and a scrim over it so the bottom of the band is flat page grey
-   under the search field and the seam into the catalogue is invisible. */
-.bmarket__hero::before {
-  content: '';
-  position: absolute; inset: 0;
-  z-index: -1;
-  background:
-    linear-gradient(180deg, transparent 0%, transparent 52%, var(--surface-page) 96%),
-    linear-gradient(
-      100deg,
-      color-mix(in oklab, var(--quad-a) 12%, var(--surface-page)) 0%,
-      color-mix(in oklab, var(--quad-b) 12%, var(--surface-page)) 34%,
-      color-mix(in oklab, var(--quad-c) 12%, var(--surface-page)) 67%,
-      color-mix(in oklab, var(--quad-d) 12%, var(--surface-page)) 100%
-    );
-}
-
-/* The six states. One set of four colours drives the mark and the band, so they
-   can never disagree about what is selected. `-dot` hues rather than a mix,
-   because the mark wants them at full strength; the band does its own mixing at
-   the point of use. */
-.bmarket__hero[data-tone='mine'],
-.bmarket__hero:not([data-tone]) {
-  --quad-a: var(--fb-neutral-dot); --quad-b: var(--fb-neutral-dot);
-  --quad-c: var(--fb-neutral-dot); --quad-d: var(--fb-neutral-dot);
-}
-.bmarket__hero[data-tone='all'] {
-  --quad-a: var(--fb-lime-dot); --quad-b: var(--fb-accent-dot);
-  --quad-c: var(--fb-info-dot); --quad-d: var(--fb-magenta-dot);
-}
-.bmarket__hero[data-tone='quick'] {
-  --quad-a: var(--fb-lime-dot); --quad-b: var(--fb-neutral-dot);
-  --quad-c: var(--fb-neutral-dot); --quad-d: var(--fb-neutral-dot);
-}
-.bmarket__hero[data-tone='device'] {
-  --quad-a: var(--fb-neutral-dot); --quad-b: var(--fb-accent-dot);
-  --quad-c: var(--fb-neutral-dot); --quad-d: var(--fb-neutral-dot);
-}
-.bmarket__hero[data-tone='risk'] {
-  --quad-a: var(--fb-neutral-dot); --quad-b: var(--fb-neutral-dot);
-  --quad-c: var(--fb-info-dot); --quad-d: var(--fb-neutral-dot);
-}
-.bmarket__hero[data-tone='compliance'] {
-  --quad-a: var(--fb-neutral-dot); --quad-b: var(--fb-neutral-dot);
-  --quad-c: var(--fb-neutral-dot); --quad-d: var(--fb-magenta-dot);
-}
-
-/* The mark. It was a 40px tile with a lucide shopfront in it — a literal
-   drawing of a shop, on a surface that is not one, at a size that made it the
-   first thing you saw. Four cells in a grid is the abstract version of the same
-   idea and it carries information the glyph could not: which shelf you are
-   looking at. */
+/* The mark, back to the shopfront it was, and staying at the smaller size the
+   shrunken band asked for. Brand-tinted rather than neutral now that the band
+   under it is brand too — a grey badge in a warm band reads as an oversight. */
 .bmarket__mark {
-  flex: none; width: 26px; height: 26px;
-  display: block; margin-bottom: 10px;
+  flex: none; width: 32px; height: 32px; border-radius: 10px;
+  display: grid; place-items: center; margin-bottom: 10px;
+  background: var(--surface-raised); color: var(--brand-active);
+  border: 1px solid var(--brand-subtle-border);
+  box-shadow: var(--el-low);
 }
-.bmarket__quad { transition: fill 220ms var(--ease-tone); }
-.bmarket__quad.is-a { fill: var(--quad-a); }
-.bmarket__quad.is-b { fill: var(--quad-b); }
-.bmarket__quad.is-c { fill: var(--quad-c); }
-.bmarket__quad.is-d { fill: var(--quad-d); }
 .bmarket__hero h2 {
   font-size: var(--fs-xl); font-weight: var(--fw-semibold); letter-spacing: -0.01em;
   color: var(--text-primary);
@@ -849,12 +779,9 @@ html[data-theme='dark'] .bguided__sheen {
 /* The band arrives at its colour instead of travelling to it, and the mesh
    holds still. Every state still paints exactly right — the restain snaps, the
    light stops drifting, and neither is information anybody loses. */
-/* The band and the mark arrive at their colour instead of travelling to it.
-   That is the whole of what motion does here now, so this is the whole of the
-   guard. */
-@media (prefers-reduced-motion: reduce) {
-  .bmarket__hero, .bmarket__quad { transition: none; }
-}
+/* The band's own reduced-motion guard has gone with the thing it guarded: it
+   does not move, restain or breathe any more. The card hover above still has
+   one, at the top of this file. */
 
 @media (max-width: 720px) {
   .bmarket { padding: 0; }

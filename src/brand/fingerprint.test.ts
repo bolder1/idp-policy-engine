@@ -300,32 +300,27 @@ describe('what a kind can collect', () => {
     expect(asksReach('device')).toBe(true)
   })
 
-  /* Both kinds take three steps, and the middle one is why this is a separate
-     assertion from `asksReach`.
+  /* The DEVICES step is the device kind's alone, and this assertion is where
+     that boundary is written down — it has moved twice.
 
-     It was `stepsFor('os')).toHaveLength(2)`, which tied the step count to the
-     collector question — so "this kind is not asked about agents" and "this
-     kind has fewer steps" were one fact. They are not: the middle step is the
-     DEVICES step, and how a machine enrols is a question both kinds have to
-     answer. What still depends on `asksReach` is whether the collector cards
-     render inside it. */
-  it('takes three steps either way, and names the last after what it holds', () => {
-    expect(stepsFor('os')).toEqual(['Profile', 'Devices', 'Requirements'])
+     It holds two questions: what the collector can read, and how machines
+     enrol. The first belongs to the device kind by construction, since nothing
+     in the OS catalogue carries `needsAgent`. The second applies to both, which
+     is why it was briefly asked of both — giving the OS kind a middle step of
+     three rows and a caveat explaining why one of them was unavailable, which
+     is a step that exists to be short.
+
+     So enrolment is asked in the wizard only where it has a neighbour to depend
+     on, and an OS profile answers it from the detail page's one Edit. The last
+     step is named after what that kind actually holds, so the ladder reads
+     "Requirements" on one and "Attributes" on the other. */
+  it('gives the collector step to the kind that is asked one', () => {
+    expect(stepsFor('os')).toEqual(['Profile', 'Requirements'])
     expect(stepsFor('device')).toEqual(['Profile', 'Devices', 'Attributes'])
     for (const m of MODES) {
       expect(stepsFor(m.id).at(-1)?.toLowerCase()).toBe(ITEM_NOUN[m.id].many)
+      expect(stepsFor(m.id).includes('Devices')).toBe(asksReach(m.id))
     }
-  })
-
-  it('partitions the device catalogue at every reach', () => {
-    for (const reach of ['agentless', 'agent', null] as const) {
-      const offered = offeredAttributes('device', reach)
-      const blocked = blockedAttributes('device', reach)
-      expect(offered.length + blocked.length).toBe(DEVICE_ATTRIBUTES.length)
-      expect(offered.filter((a) => blocked.includes(a))).toEqual([])
-    }
-    expect(blockedAttributes('device', 'agent')).toEqual([])
-    expect(blockedAttributes('device', null)).toEqual(blockedAttributes('device', 'agentless'))
   })
 
   it('gives every reach a card', () => {

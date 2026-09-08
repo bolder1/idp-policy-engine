@@ -694,6 +694,18 @@ export const REGISTRATION_LABEL: Record<Registration, string> = {
   'pre-approved': 'Pre-approved devices only',
 }
 
+/* The same two answers in the two words a stated column has room for.
+
+   The sentences above are what a dropdown needs — an option has to say what
+   choosing it does. A fact in a 260px rail is a different job: "Users register
+   their own devices" wraps to three ragged right-aligned lines there, which is
+   a paragraph pretending to be a value. The sentence is not lost; it is on the
+   tip beside the label, where this page already puts the thing you want once. */
+export const REGISTRATION_SHORT: Record<Registration, string> = {
+  self: 'Self-service',
+  'pre-approved': 'Roster only',
+}
+
 /** An uploaded roster of approved devices. Keyed on MAC, so it needs an agent. */
 export interface Roster {
   fileName: string
@@ -855,21 +867,25 @@ export function describeProfile(p: FingerprintProfile): string {
    — and the last one is named after what that kind actually holds, so the
    ladder says "Requirements" on one and "Attributes" on the other.
 
-   Both kinds take three now, and the middle one is why. It was the collector
-   question, which only the device kind is asked, so the OS kind had two. It is
-   the DEVICES step: how a machine gets onto a person's list, and how many they
-   may keep — questions both kinds have to answer. The collector cards sit
-   inside it for the kind that is asked them, above the enrolment rows they
-   constrain, because a roster needs MAC and MAC needs an agent.
+   The DEVICES step is the device kind's alone, and this is the second time
+   that boundary has moved, so it is worth writing down where it settled.
 
-   `asksReach` still decides whether the cards render. What has gone is the idea
-   that "this kind is not asked about agents" and "this kind has fewer steps"
-   are the same fact. */
-export const stepsFor = (mode: ProfileMode): string[] => [
-  'Profile',
-  'Devices',
-  ITEM_NOUN[mode].many.replace(/^./, (c) => c.toUpperCase()),
-]
+   That step holds two questions: what the collector can read, and how machines
+   enrol. The first is the device kind's by construction — nothing in the OS
+   catalogue carries `needsAgent`, so the question has no consequence there. The
+   second applies to both, which is why it was briefly asked of both, giving the
+   OS kind a middle step of three rows and a caveat explaining why one of them
+   was unavailable. That is a step that exists to be short: it interrupts a
+   two-question flow to ask something with no dependency on either side of it.
+
+   So enrolment is asked HERE only where it has a neighbour to depend on — a
+   roster needs MAC, MAC needs an agent — and an OS profile answers it from the
+   detail page's one Edit instead. `restrictionSet` records the difference
+   honestly: false on a new OS profile, because nobody asked. */
+export const stepsFor = (mode: ProfileMode): string[] =>
+  asksReach(mode)
+    ? ['Profile', 'Devices', 'Attributes']
+    : ['Profile', ITEM_NOUN[mode].many.replace(/^./, (c) => c.toUpperCase())]
 
 /* --- The three weights a risk profile can give an attribute ---------------------
    The master carries four (5, 10, 20, 30) because the sheet does. A profile

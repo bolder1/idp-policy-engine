@@ -16,7 +16,7 @@
   margin: 5px 0 0; max-width: 72ch;
   font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55;
 }
-.bfp2__pagehead { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.bfp2__pagehead { display: flex; align-items: center; gap: 12px; min-width: 0; }
 
 .bfp2__back {
   align-self: flex-start;
@@ -164,29 +164,22 @@
 
 /* --- Inner page ------------------------------------------------------------------ */
 
-.bfp2__panel {
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  padding: 16px 18px;
-}
-.bfp2__panel h3 {
-  margin: 0 0 4px; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
-}
-.bfp2__panelhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
-.bfp2__panelhead h3 { margin: 0; }
-
 .bfp2__rows { display: flex; flex-direction: column; }
 .bfp2__attrow {
-  display: flex; align-items: center; gap: 18px;
+  display: flex; align-items: center; gap: 12px;
   padding: 12px 0; border-bottom: 1px solid var(--border-subtle);
 }
 .bfp2__attrow:last-child { border-bottom: none; }
 .bfp2__attmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-/* Truncation lands on the words, so the mark beside them never leaves. */
-/* `.bfp2__attname` is declared once, below, where the row that owns it is.
-   This was a second copy adding an ellipsis the flex rules there already
-   arrange for. */
+/* Truncation lands on the WORDS, so the mark beside them never leaves.
+
+   A rule doing this was deleted from here as a duplicate, on the reasoning that
+   the flex rules further down already arranged it. They did not, and could not:
+   `text-overflow` has no effect on a bare text node inside a flex container,
+   because the node becomes an anonymous flex item. The name overflowed in
+   silence until the row had two controls and a narrow column, and then it
+   collided with them. It is a span now, and this is the rule. */
+.bfp2__attword { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* One line, and the tip stays on it.
 
    `flex-wrap: wrap` let the name break and then dropped the `?` onto a line of
@@ -251,31 +244,7 @@
    The categories are the landmarks the picker already taught you, so the page
    you configure on is organised the way the page you chose on was — same five
    tints, same order. */
-.bfp2__panelhead--page { padding: 0 2px; }
 
-/* --- The restriction, in the page's own rows -------------------------------------
-   The answer sits where an attribute's control sits, so the two halves of the
-   page share a column. It replaces a two-column definition list with small-caps
-   labels and a line of consequence under every value — three type sizes and a
-   set of capitals nothing else on the screen used. The consequence is on a tip
-   now, which is where this page already puts a sentence you want once. */
-.bfp2__detailval {
-  display: inline-flex; align-items: center;
-  padding: 3px 11px; border-radius: var(--radius-pill);
-  background: var(--surface-inset);
-  border: 1px solid var(--border-subtle);
-  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
-  white-space: nowrap;
-}
-/* Brand on exactly one of the four. Reach is the answer the rest follow from —
-   it decides which attributes can arrive and whether a roster is possible — so
-   it reads first. Four brand pills would be four things shouting the same
-   volume, which is the same as none of them shouting. */
-.bfp2__detailval.is-lead {
-  background: var(--brand-subtle-bg);
-  border-color: var(--brand-subtle-border);
-  color: var(--brand-active);
-}
 
 /* --- An operator and a value, read as one line ------------------------------------
    The attribute's name is already to the left of these, so the row runs as a
@@ -743,36 +712,60 @@
    THE CREATE WIZARD, AND THE CATALOGUE AS A STEP IN IT
    ========================================================================== */
 
-/* Where you are, and how much is left.
+/* Where you are, how far in, and how much is left.
 
-   Words, not numerals, and it is the only honest way to draw this particular
-   wizard: its LENGTH depends on an answer inside it. An OS-and-version profile
-   takes two steps and a device-attributes profile takes three, so a counter
-   would have to say "1 of 2" and then "1 of 3" about the same screen.
+   Numbered and named. It was words alone, and the argument for that — three is
+   few enough to name every step, and naming is the difference between a
+   progress bar and a table of contents — was right about the labels and was
+   never an argument against the numerals. A contents page has page numbers.
 
-   No brand on the current step. This is orientation, not an affirmative
-   choice — the brand on this screen is spent on the one pill per panel that
-   states a profile's kind, and a stepper wearing it competes with the thing it
-   is a frame around. The predecessor of this rule used `--brand-subtle-bg` and
-   sat half inside an unterminated comment for long enough that nobody noticed
-   the control it styled had been deleted. */
+   The connector is a fixed length, and the ladder sits left rather than
+   spanning the panel. Letting the steps grow was the first attempt and it makes
+   the ladder's proportions depend on how many steps there are: with three the
+   connectors are 60px, with two the single connector is 500px and the two
+   labels are pushed to opposite ends of the panel like a progress bar at 50%.
+   A fixed 56px reads identically at both lengths.
+
+   The brand appears once, on the step you are standing in. That is the one
+   thing on this ladder worth finding without reading it; every other state is
+   carried by weight and grey. */
 .bfp2__wizsteps {
-  display: flex; align-items: center; gap: 8px;
-  list-style: none; margin: 0 0 18px; padding: 0;
+  display: flex; align-items: center;
+  list-style: none; margin: 0 0 var(--space-7); padding: 0;
 }
 .bfp2__wizstep {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: var(--fs-sm); color: var(--text-muted);
+  display: inline-flex; align-items: center; gap: var(--space-3); flex: none;
+  min-width: 0;
+  font-size: var(--fs-md); color: var(--text-muted);
 }
-/* The connector, drawn by the step rather than between steps — a separate
-   element per gap is one more thing to keep in step with the count. */
 .bfp2__wizstep:not(:last-child)::after {
-  content: ''; width: 18px; height: 1px; margin-left: 3px;
+  content: ''; flex: none; width: 56px; height: 1px;
+  margin: 0 var(--space-4);
   background: var(--border-default);
 }
+
+.bfp2__wizstep__n {
+  flex: none;
+  display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--border-default);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
 .bfp2__wizstep.is-done { color: var(--text-secondary); }
-.bfp2__wizstep.is-done svg { color: var(--fb-positive-fg); }
+.bfp2__wizstep.is-done .bfp2__wizstep__n {
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+}
+
 .bfp2__wizstep.is-on { color: var(--text-primary); font-weight: var(--fw-medium); }
+.bfp2__wizstep.is-on .bfp2__wizstep__n {
+  border-color: var(--brand);
+  background: var(--brand-subtle-bg);
+  color: var(--brand-active);
+}
 
 /* The third line on a mode card: how long this kind takes, and how much it
    holds. Both are facts about the choice and neither is guessable from the
@@ -864,8 +857,6 @@
   color: var(--surface-raised);
 }
 
-.bfp2__pickico { flex: none; margin-top: 1px; display: grid; place-items: center; color: var(--text-muted); }
-.bfp2__pickrow.is-on .bfp2__pickico { color: var(--cat-fg, var(--brand-active)); }
 
 .bfp2__pickmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .bfp2__pickname {
@@ -886,6 +877,9 @@
    Indented to sit under the NAME rather than under the tick — the controls
    belong to the attribute, and a column that starts at the checkbox reads as a
    second list rather than as this row's own detail. */
+/* 26px was the tick plus the attribute mark; the mark has gone, so the indent
+   is the tick alone. The settings still line up under the NAME rather than
+   under the checkbox — a column starting at the box reads as a second list. */
 .bfp2__pickvals {
   display: flex; flex-direction: column; gap: 10px;
   margin: 0 12px; padding: 11px 0 12px 26px;
@@ -979,22 +973,17 @@
    With no display of its own a second child sat UNDER the first, which is what
    a device row's weight-and-precision pair and the overview's value-and-Change
    pair would both have done. */
-.bfp2__attctl { flex: none; display: flex; align-items: center; gap: 8px; }
+/* Wraps. Two controls, a name and a delete button do not fit across the main
+   column of a two-column page at every width, and the alternative to wrapping
+   is truncating the name down to three characters to protect a dropdown. */
+.bfp2__attctl { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 /* Nothing in the slot is elastic, and the two controls a device row carries get
    a width each. The kit gives a bare `<select>` `width: 100%` at zero
    specificity — correct in a form column, and here it meant the precision
    dropdown ate the row and squeezed the weight beside it down to "Mi…". */
 .bfp2__attctl > * { flex: none; }
-.bfp2__attctl .bx-tierpick { width: 104px; }
+.bfp2__attctl .bx-tierpick { width: 96px; }
 .bfp2__attctl .bfp2__select { width: auto; min-width: 128px; }
-
-/* A stated value worth a second look: no platform named, silent enrolment on.
-   Not an error — both are legitimate — so it takes the notice ramp rather than
-   the negative one, and it is the only thing on the panel that does. */
-.bfp2__detailval.is-warn {
-  background: var(--fb-notice-bg); border-color: var(--fb-notice-border);
-  color: var(--fb-notice-fg);
-}
 
 /* --- The summary --------------------------------------------------------------
 
@@ -1058,10 +1047,15 @@
    shape of the form is honest before you touch anything, and a section that
    appeared out of nowhere on a press would read as a step that grew. */
 .bfp2__wizsection { display: flex; flex-direction: column; gap: var(--space-4); }
+/* The heading carries the step's explanation on a mark, so it is a flex row
+   rather than a bare line of text — and the mark is baseline-aligned with the
+   words rather than centred on them, which is where a footnote marker sits. */
 .bfp2__wizsection > h4 {
   margin: 0;
+  display: flex; align-items: center; gap: 6px;
   font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
 }
+.bfp2__restform h4 { display: flex; align-items: center; gap: 6px; }
 .bfp2__wizsection > .bfp2__stephint { margin: 0; }
 /* Waiting on the answer above it. Dimmed rather than hidden, and not disabled —
    there is nothing in it to disable yet, only a line saying what it is waiting
@@ -1089,3 +1083,150 @@
   border-color: var(--fb-notice-border);
   background: var(--fb-notice-bg);
 }
+
+
+/* =============================================================================
+   THE DETAIL PAGE, IN TWO COLUMNS
+   ========================================================================== */
+
+/* A page of stated facts and one editable list.
+
+   It was three stacked full-width cards holding six one-row facts between them,
+   each with its own heading floating above it. At 1200px that put a label at
+   the far left of a 950px row and its value at the far right, six times over,
+   with nothing in between — a form with the fields taken out.
+
+   The shape every console with this job converges on is two columns: the thing
+   you came to change in the main one, everything the page merely STATES in a
+   narrow rail beside it. A fact needs its label and its value near each other;
+   an editor needs room. One column cannot give both, and the facts are the half
+   that suffers, because they are the half made of short strings.
+
+   260px, which is eleven characters between a label and its value at this type
+   size — and enough for "Users register their own devices" to wrap to two lines
+   rather than three. */
+.bfp2__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: var(--space-7);
+  align-items: start;
+}
+.bfp2__main { min-width: 0; display: flex; flex-direction: column; gap: var(--space-6); }
+.bfp2__aside { display: flex; flex-direction: column; gap: var(--space-7); min-width: 0; }
+
+/* Below 1100 the rail goes ON TOP, not underneath.
+
+   Underneath is what `grid-template-columns: 1fr` gives for free and it is the
+   wrong answer: these facts are what you read to understand the list, so
+   putting them after it means scrolling past the thing they explain to reach
+   the explanation. `order` costs nothing and says the right thing. */
+@media (max-width: 1100px) {
+  .bfp2__cols { grid-template-columns: minmax(0, 1fr); }
+  .bfp2__aside { order: -1; flex-direction: row; flex-wrap: wrap; gap: var(--space-6); }
+  .bfp2__aside > .bfp2__facts { flex: 1 1 260px; }
+}
+
+/* --- The card in the main column ------------------------------------------------
+
+   The heading is INSIDE it, on a line with its count and its action. It was
+   above, floating over the panel it named — a fine pattern for a page of
+   several sections and a wasted line for a page with one. */
+.bfp2__card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.bfp2__cardhead {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bfp2__cardhead h2 {
+  margin: 0; flex: none;
+  font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+/* The count beside the name rather than as a row of its own in the rail. It is
+   a property of THIS list, and a list that says how long it is at the top of
+   itself does not need a fact stating the same number elsewhere. */
+.bfp2__cardcount {
+  flex: 1; min-width: 0;
+  font-size: var(--fs-sm); color: var(--text-tertiary);
+}
+.bfp2__cardcount i { font-style: normal; color: var(--fb-notice-fg); }
+.bfp2__card > .bfp2__rows { padding: 0 var(--space-6); }
+.bfp2__card > .bx-empty { padding: var(--space-7) var(--space-6); }
+
+/* --- The rail --------------------------------------------------------------------
+
+   No pills. Six of them, two in the brand colour, is what this page had — and a
+   brand pill means "look at this", which is not true of "OS and version". Plain
+   text carries a fact; the tint is spent on the two or three that are worth a
+   second look, which is a warning about the profile rather than a decoration on
+   it. */
+.bfp2__facts { display: flex; flex-direction: column; }
+.bfp2__facts h3 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.bfp2__fact {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bfp2__fact:last-child { border-bottom: 0; }
+.bfp2__factlabel {
+  flex: none; display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-sm); color: var(--text-tertiary);
+}
+.bfp2__factval {
+  min-width: 0; text-align: right;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
+  /* Numbers line up down the column, which is most of what a rail of facts is
+     for — and three of these are numbers. */
+  font-variant-numeric: tabular-nums;
+}
+/* Not a badge. A word in the notice colour, which is as much weight as "the
+   first sign-in enrols silently" needs when the tip beside it says why. */
+.bfp2__factval.is-warn { color: var(--fb-notice-fg); }
+button.bfp2__factval {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  font-family: inherit; color: var(--text-link);
+}
+button.bfp2__factval:hover { text-decoration: underline; }
+button.bfp2__factval:focus-visible {
+  outline: none; border-radius: var(--radius-xs);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.bfp2__factsnone {
+  margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.6;
+}
+.bfp2__factsnone .bfp2__clear { display: block; margin-top: var(--space-2); }
+
+/* --- The agent prerequisite ------------------------------------------------------
+
+   Informational, so it takes the info ramp rather than the notice one: nothing
+   is wrong, there is something to do. The console's own version of this panel
+   is the same shape and the same colour, which is the point — an admin who has
+   seen the old console should recognise it. */
+.bfp2__prereqbox {
+  display: flex; gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--fb-info-border); border-radius: var(--radius-md);
+  background: var(--fb-info-bg);
+}
+.bfp2__prereqico { flex: none; display: grid; place-items: center; width: 20px; height: 20px; color: var(--fb-info-fg); }
+.bfp2__prereqbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; }
+.bfp2__prereqbody strong {
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bfp2__prereqbody ul { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); }
+.bfp2__prereqbody li { font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.55; }
+
+/* The rail's one action, separated from the facts above it by air rather than
+   by a rule — a rule would make it look like another fact with the label
+   missing. */
+.bfp2__factact { padding: var(--space-4) 0 var(--space-2); }

@@ -476,21 +476,3 @@
 /* A typed value fills the row, the way a chosen one does. */
 .cp__fldinput.is-text { width: 100%; }
 .cp__fldinput::placeholder { color: var(--text-muted); }
-
-/* The catalogue as one control, for a pane with nothing on it yet.
-
-   Sized like a primary action rather than like a field: taller than
-   `.cp__fldsel`, and carrying the brand on its edge, because on an empty pane
-   this is the only thing to do and every other select on the screen is a
-   setting on something that already exists. */
-.cp__catsel {
-  width: 100%; min-width: 0; min-height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--border-strong); border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium);
-  color: var(--text-primary);
-  cursor: pointer;
-}
-.cp__catsel:hover { border-color: var(--brand); color: var(--brand); }
-.cp__catsel:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--focus-ring); }

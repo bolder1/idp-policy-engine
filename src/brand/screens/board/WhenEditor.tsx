@@ -15,7 +15,7 @@ import { MenuButton } from '../../kit'
 import * as ops from '../../when-ops'
 import { isWho, whoEditable } from '../../audience-ops'
 import { useBrand, useNameLookup } from '../../store'
-import { ConditionList, ConditionPopover, ConditionSelect, summarise, valueSource } from '../ConditionPopover'
+import { ConditionList, ConditionPopover, summarise, valueSource } from '../ConditionPopover'
 
 /* -----------------------------------------------------------------------------
    WHEN — the conditional, editable.
@@ -116,12 +116,12 @@ export function WhenEditor({
   /* The destination is an ARGUMENT, not state read back.
 
      It used to be `if (!adding) return` — the caller opened the list, which set
-     `adding`, and the pick read it. That works for a control that has to be
-     opened first and silently does nothing for one that does not: the empty
-     state's select is on screen from the start, so `adding` is null when it
-     fires and every pick was dropped. Passing the destination in makes the two
-     callers say where the row goes, which is the thing they actually differ
-     about. */
+     `adding`, and the pick read it back. That couples "where does this row go"
+     to "is a list open", which are two different questions, and it fails
+     silently rather than loudly for any caller that is on screen without having
+     opened anything. Every caller today does open first, so this is a guard
+     rather than a fix — but it is the guard that turns a dropped click into a
+     compile error. */
   const addTo = (cardId: string | 'loose' | 'group', typeId: string) => {
     const t = conditionType(typeId)
     const c = ops.freshCondition(typeId, t.operators[0])
@@ -228,23 +228,33 @@ export function WhenEditor({
             </span>
             <h4>No conditions yet</h4>
             <p>Every sign-in that reaches this rule matches it. Add a condition to narrow that.</p>
-            {/* One control, full width, and no two-step.
+            {/* The same list the foot opens, at the pane's full width.
 
-                It was two buttons that revealed the nine-row list in place —
-                which is right in the foot, where the list opens where the row
-                will land, and wrong here: an empty pane's single call to action
-                should not be a button that produces a control. The select IS
-                the control.
+                A native select stood here for one commit and was the wrong
+                answer to the right complaint. The complaint was that the list
+                was 250px wide and centred under a wider sentence, which looks
+                like something that failed to load. The answer to that is the
+                width, not a different control — a select drops the marks, and
+                the marks are what tell nine rows apart at a glance.
 
-                `adding` is not consulted. Nothing else can be open on an empty
-                pane, so there is no state for this branch to reflect. */}
-            <div className="bb__ifblank__acts">
-              <ConditionSelect label="Add a condition" onPick={(id) => addTo('loose', id)} />
-              <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
-                <Plus size={11} strokeWidth={2.4} aria-hidden />
-                Add group
-              </button>
-            </div>
+                So: a button, then the list, exactly as the foot does it. One
+                catalogue, one component, two places that open it. */}
+            {adding ? (
+              <div className="bb__ifblank__pick">
+                <ConditionList label="Add a condition" onPick={add} onCancel={() => setAdding(null)} />
+              </div>
+            ) : (
+              <div className="bb__ifblank__acts">
+                <button type="button" className="bb__ifadd" onClick={openCatalogue('loose')}>
+                  <Plus size={11} strokeWidth={2.4} aria-hidden />
+                  Add condition
+                </button>
+                <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
+                  <Plus size={11} strokeWidth={2.4} aria-hidden />
+                  Add group
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           /* ONE bracket, drawn as one.

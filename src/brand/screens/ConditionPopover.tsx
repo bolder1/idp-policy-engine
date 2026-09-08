@@ -1133,42 +1133,13 @@ export function valueSource(
    to flip, nothing to clamp, nothing to re-measure on scroll.
    -------------------------------------------------------------------------- */
 
-/* The same catalogue, as a single control.
+/* `ConditionSelect` stood here for one commit: the nine as a native `<select>`,
+   for the empty state. It was the wrong answer to a real complaint — the list
+   there was 250px wide under a wider sentence, which reads as something that
+   failed to load. The fix for a width is a width. A select also drops the
+   marks, and at nine rows the mark is most of what tells them apart.
 
-   For the empty state, which centres a heading and a sentence and then has to
-   put something under them. `ConditionList` there was a 250px card of nine rows
-   floating in the middle of a 400px panel, narrower than the sentence above it
-   and taller than everything else on the pane put together — a list is the
-   right shape in the foot, where it opens where the row will land, and the
-   wrong one as the single call to action of an empty pane.
-
-   A native `<select>`, not a second picker: it reads `WHEN_CONDITIONS`, so the
-   two controls cannot disagree about what an attribute is or which of them is
-   offerable. The drift this codebase keeps warning about is two PICKERS with
-   two contents; one array behind two form controls is not that.
-
-   No icons, because a native option cannot carry one — which is the trade for
-   a control that is one line tall and behaves like every other select in the
-   console. */
-export function ConditionSelect({ label, onPick }: { label: string; onPick: (typeId: string) => void }) {
-  return (
-    <select
-      className="cp__catsel"
-      aria-label={label}
-      value=""
-      onChange={(e) => e.target.value && onPick(e.target.value)}
-    >
-      <option value="">{label}…</option>
-      {WHEN_CONDITIONS.map((t) => (
-        <option key={t.id} value={t.id} disabled={t.soon}>
-          {t.label}
-          {t.soon ? ' · Coming soon' : ''}
-        </option>
-      ))}
-    </select>
-  )
-}
-
+   One catalogue, one component. */
 export function ConditionList({
   label,
   onPick,

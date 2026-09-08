@@ -1,11 +1,10 @@
-import { Activity, ChevronLeft, ChevronRight, ListChecks, Pencil, Users } from 'lucide-react'
+import { Activity, ChevronLeft, ChevronRight, ListChecks, Pencil } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { Button, StatusPill } from '../../kit'
-import { audienceSummary, initials, type Policy } from '../../data'
+import type { Policy } from '../../data'
 import { AppLogo } from '../../logos/AppLogo'
 import { useBrand } from '../../store'
-import { Peek } from '../peek'
 
 /* -----------------------------------------------------------------------------
    The board's top row.
@@ -40,9 +39,11 @@ import { Peek } from '../peek'
      and a 16px mark with a name after it says that without a label.
    · `policy.type` goes. "App Access" is true of almost every policy here and
      is not a thing anybody navigates by; it is one click away in Edit details.
-   · The two 10px uppercase `dt` labels go with it. A glyph carries "governs"
-     for a sighted reader and the button's own `aria-label` carries it for
-     everyone else.
+   · The audience goes too. It was the last labelled fact standing, and it is
+     the one thing in the row that is neither where you are nor what you can do
+     to the draft — a reading, in a bar whose job is to be quiet. Edit details
+     holds it, and each rule's Who pane says who that rule covers, which is
+     where the narrowing is actually done.
    -------------------------------------------------------------------------- */
 
 export function BoardBar({
@@ -56,7 +57,6 @@ export function BoardBar({
   actions?: ReactNode
 }) {
   const store = useBrand()
-  const { label, total, showTotal, nobody } = audienceSummary(policy.audience, store.groups, store.users)
   /* The system policy is the one that has no application and covers all of
      them — every other policy protects exactly one. */
   const app = policy.appId ? store.appById(policy.appId) : null
@@ -73,26 +73,20 @@ export function BoardBar({
 
         <ChevronRight size={13} strokeWidth={2} className="bbtop__sl" aria-hidden />
 
-        {/* The application, as the crumb the policy hangs off.
+        {/* One crumb, not two, and the mark is what merged them.
 
-            The empty case keeps its warning and its colour. A policy naming no
-            application is a set of rules no sign-in can ever reach, which is
-            the one fact in this bar worth interrupting for — so it is never
-            the thing that gets truncated. */}
-        {policy.isSystem ? (
-          <span className="bbtop__crumb is-static">Every application</span>
-        ) : app ? (
-          <span className="bbtop__crumb is-static">
-            <AppLogo appId={app.id} size={16} />
-            {app.name}
-          </span>
-        ) : (
-          <span className="bbtop__crumb is-warn">Not chosen — these rules never run</span>
-        )}
+            The application had a crumb of its own — a 16px mark, its name, and
+            a chevron before the policy — on the argument that a policy hangs
+            off the thing it protects. True, and it read as a stutter, because
+            most policies here are NAMED after the application they govern:
+            "Production Monitoring › Production Monitoring — On-Call Override"
+            is one word said twice with a chevron between the halves.
 
-        <ChevronRight size={13} strokeWidth={2} className="bbtop__sl" aria-hidden />
-
-        {/* The policy itself, and the way to change what it IS.
+            So the mark comes across onto the policy's own chip and the crumb
+            goes. The mark is the application: it carries its name as a title,
+            it is the same glyph the policy list and the picker use, and the
+            place that spells the application out in words is one click away
+            behind this very chip.
 
             One control for all three standing facts — the name, the
             application, the audience — because they are one idea: what this
@@ -107,100 +101,36 @@ export function BoardBar({
         <button
           type="button"
           className="bbtop__name"
-          title="Edit the policy's name, application and audience"
+          title={app ? `${app.name} — edit the policy's name, application and audience` : "Edit the policy's name, application and audience"}
           onClick={() => store.go({ name: 'policy-details', policyId: policy.id, from: 'board' })}
         >
+          {app && <AppLogo appId={app.id} name={app.name} size={16} />}
           <b>{policy.name}</b>
           <Pencil size={12} strokeWidth={2} aria-hidden />
         </button>
 
+        {/* The two cases the mark cannot draw, kept as words after the name.
+
+            A policy naming no application is a set of rules no sign-in can ever
+            reach — the one fact in this bar worth interrupting for, so it keeps
+            its red and it never truncates. The system policy is the opposite
+            case and needs saying for the same reason: it is the only one here
+            that is not about a single application. */}
+        {policy.isSystem && <span className="bbtop__crumb is-static">Every application</span>}
+        {!policy.isSystem && !app && <span className="bbtop__crumb is-warn">No application — these rules never run</span>}
+
         <StatusPill status={policy.status} />
       </nav>
 
-      {/* Who it governs — a glyph, a phrase and a count, with the list behind
-          it. `Peek` portals its panel and measures its own placement, so a
-          48px bar is no different to it than the 88px strip it used to hang
-          under. */}
-      <span className={`bbtop__gov ${nobody ? 'is-warn' : ''}`}>
-        {nobody ? (
-          <>
-            <Users size={13} strokeWidth={1.9} aria-hidden />
-            Governs nobody — these rules cannot run
-          </>
-        ) : policy.audience.everyone ? (
-          /* Nothing to look inside. "Everyone" has no list behind it, so it
-             does not pretend to be a control. */
-          <>
-            <Users size={13} strokeWidth={1.9} aria-hidden />
-            Everyone
-            <em>{total.toLocaleString()} people</em>
-          </>
-        ) : (
-          <Peek
-            className="bbtop__peek"
-            label={
-              <>
-                <Users size={13} strokeWidth={1.9} aria-hidden />
-                {label}
-                {showTotal && <em>{total.toLocaleString()} people</em>}
-              </>
-            }
-          >
-            <AudienceList policy={policy} />
-          </Peek>
-        )}
-      </span>
+      {/* Who it governs stood here — a glyph, a phrase, a count and a hover
+          panel listing the groups. Removed: it is the one thing in this row
+          that is neither where you are nor what you can do to the draft, and
+          the bar is meant to be quiet. It is still a click away behind the
+          name chip, and the rules themselves say who they cover on the Who
+          pane, per rule, which is where the narrowing actually happens. */}
 
       <div className="bbtop__acts">{actions}</div>
     </header>
-  )
-}
-
-function AudienceList({ policy }: { policy: Policy }) {
-  const store = useBrand()
-  const { groupIds, userIds } = policy.audience
-  return (
-    <>
-      {groupIds.length > 0 && (
-        <>
-          <p className="brpk__head">Groups</p>
-          <ul className="bpbar__alist">
-            {groupIds.map((id) => {
-              const g = store.groupById(id)
-              return (
-                <li key={id}>
-                  <span className="bpbar__ai" aria-hidden>
-                    <Users size={11} strokeWidth={2} />
-                  </span>
-                  <strong>{g.name}</strong>
-                  <em>{g.memberCount.toLocaleString()}</em>
-                </li>
-              )
-            })}
-          </ul>
-        </>
-      )}
-
-      {userIds.length > 0 && (
-        <>
-          <p className="brpk__head">Named people</p>
-          <ul className="bpbar__alist">
-            {userIds.map((id) => {
-              const u = store.userById(id)
-              return (
-                <li key={id}>
-                  <span className="bpbar__ai is-person" aria-hidden>
-                    {initials(u?.name ?? id)}
-                  </span>
-                  <strong>{u?.name ?? id}</strong>
-                  {u && <em>{store.groupById(u.groupId).name}</em>}
-                </li>
-              )
-            })}
-          </ul>
-        </>
-      )}
-    </>
   )
 }
 

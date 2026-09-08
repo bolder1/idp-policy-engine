@@ -30,7 +30,7 @@
 
   flex: 1 1 auto;
   min-height: 0;
-  /* Two tracks: the canvas, and the config panel beside it.
+  /* Two tracks with a gutter, on a ground of their own.
 
      It was `display: block` with the stage absolutely positioned at `inset: 0`
      and the panel floating on top — which gave the canvas the whole box and
@@ -41,18 +41,34 @@
      A grid does the subtracting once. The stage is the first track, the panel
      is the second, and neither has to know about the other.
 
+     The padding and the gap are the second half of that. Flush against each
+     other and against the bar, the three regions met along bare 1px lines and
+     the eye had to be told where one ended — so each becomes a bounded card
+     with a rounded edge, standing on the console's own page grey. The gap
+     between them is also where the resize handle lives, which is the first time
+     it has had somewhere to be rather than something to sit on top of.
+
      `min()` rather than the bare token: `--bb-insp` is written INLINE on this
      element by the grip drag, so a media query lowering it for narrow screens
      could never win. Clamping the track against the region's own width does the
      same job from inside the declaration, at every width, with no breakpoint. */
+  --bb-gap: var(--space-4);
   display: grid;
   grid-template-columns: minmax(0, 1fr) min(var(--bb-insp), 46%);
   grid-template-rows: minmax(0, 1fr);
-  background: var(--surface-raised);
-  /* Still the containing block for the grip and the sheet, which lie across the
-     seam between the two tracks rather than inside either of them. */
+  gap: var(--bb-gap);
+  padding: var(--bb-gap);
+  background: var(--surface-page);
+  /* Still the containing block for anything that has to be placed against the
+     region as a whole. */
   position: relative;
 }
+/* Placed, not auto-placed. The grip is an explicit grid item in the panel's
+   own column — see the note where it is styled — and sparse auto-placement
+   would then push the panel it belongs to onto a second row. */
+.bb__stage { grid-column: 1; grid-row: 1; }
+.bb__insp,
+.bb__grip { grid-column: 2; grid-row: 1; }
 /* An explicitly-sized track outlives the item in it. The inspector is
    UNMOUNTED when it closes — deliberately; see the note in BoardBuilder — so
    without this, closing the panel would leave 560px of empty gutter where it
@@ -136,7 +152,9 @@
    A chip rather than a bare heading: it is the one crumb you can act on, and a
    pencil that appears on hover would be a control nobody finds. `min-width: 0`
    with the ellipsis on the inner `b`, so a long policy name gives way before
-   anything else in the row does. */
+   anything else in the row does — and the mark, which is the application, is
+   `flex: none` inside it for the same reason: a truncated policy name is
+   readable, a half-drawn logo is a smudge. */
 .bbtop__name {
   min-width: 0; display: inline-flex; align-items: center; gap: var(--space-3);
   height: 26px; padding: 0 var(--space-3);
@@ -145,6 +163,7 @@
   color: var(--text-tertiary);
   transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
 }
+.bbtop__name > .applogo { flex: none; }
 .bbtop__name > b {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
@@ -152,29 +171,10 @@
 .bbtop__name:hover { background: var(--surface-sunken); border-color: var(--border-subtle); color: var(--text-secondary); }
 .bbtop__name:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
-/* Who it governs. A glyph carries the word for a sighted reader; the Peek
-   button's own label carries it for everyone else. */
-.bbtop__gov {
-  flex: none;
-  display: inline-flex; align-items: center; gap: var(--space-3);
-  padding-left: var(--space-5);
-  border-left: 1px solid var(--border-subtle);
-  font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap;
-}
-.bbtop__gov > svg { color: var(--text-tertiary); }
-.bbtop__gov em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.bbtop__gov.is-warn { color: var(--fb-negative-fg); }
-.bbtop__gov.is-warn > svg { color: var(--fb-negative-fg); }
-.bbtop__peek {
-  display: inline-flex; align-items: center; gap: var(--space-3);
-  padding: 0; border: 0; background: none;
-  font: inherit; color: inherit; cursor: default;
-  text-decoration: underline dotted var(--border-strong);
-  text-underline-offset: 4px;
-}
-.bbtop__peek:hover,
-.bbtop__peek.is-open { text-decoration-color: var(--brand); }
-.bbtop__peek:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-xs); }
+/* `.bbtop__gov` and `.bbtop__peek` stood here: the audience as a glyph, a
+   phrase, a count and a hover panel. Gone with the markup — see BoardBar.tsx.
+   The hairline that separated it from the crumbs went too, which is why the
+   crumbs and the verbs are now the row's only two children. */
 
 /* The verbs, hard right. `margin-left: auto` rather than a spacer element, so
    the row collapses correctly when the crumbs are long. */
@@ -193,11 +193,6 @@
 @media (max-width: 1000px) {
   .bbtop { gap: var(--space-4); padding: 0 var(--space-5); }
   .bbtop .bb__pip, .bbtop__sep { display: none; }
-}
-/* Below 800 the audience goes too — its list is one click away in Edit
-   details, and the crumb trail is what tells you where you are. */
-@media (max-width: 800px) {
-  .bbtop__gov { display: none; }
 }
 
 /* --- The stage ------------------------------------------------------------- */
@@ -239,6 +234,12 @@
      card visible is then a real job rather than a side effect, and Board does
      it by panning the view. */
   overflow: clip;
+  /* A bounded artboard rather than the whole region. The radius is what makes
+     the dotted ground read as a surface you are working ON, and `clip` — which
+     is here for a different and much worse reason, see above — rounds the
+     world with it for free. */
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
   background-color: var(--bb-stage);
   background-image: radial-gradient(circle, var(--bb-dot) 1px, transparent 1.4px);
   background-size: calc(22px * var(--bb-z, 1)) calc(22px * var(--bb-z, 1));
@@ -1054,12 +1055,14 @@
    panel closes its track collapses and the canvas gets the space back for real
    rather than by revealing more of something that was always there.
 
-   Flush, not floating: no radius, no shadow, no inset. One border down the left
-   edge, and a white panel against the canvas's grey. That seam is the whole
-   point — three regions that you can see are three regions. */
+   A card, not a flyover and not a flush pane. It was flush first — one border
+   down its left edge, white against the canvas's grey — and that is a seam
+   rather than a separation: two regions touching along a hairline read as one
+   region with a line drawn in it. Given its own edges and a gutter to stand in,
+   it is plainly a second thing, and closing it plainly gives the space back. */
 .bb__insp {
   display: flex; flex-direction: column; min-height: 0; min-width: 0;
-  border: 0; border-left: 1px solid var(--border-subtle); border-radius: 0;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
   background: var(--surface-raised);
   overflow: hidden;
 }
@@ -1669,7 +1672,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
      above. */
   .bb { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 54%; }
   .bb.is-insp-closed { grid-template-rows: minmax(0, 1fr); }
-  .bb__insp { border-left: 0; border-top: 1px solid var(--border-subtle); }
+  .bb__insp { grid-column: 1; grid-row: 2; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2215,28 +2218,64 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 
 /* --- The divider you can drag ------------------------------------------------
 
-   6px of hit area sitting on the 1px seam between the stage and the panel,
-   filled with the brand on hover so it can be grabbed without aiming. It is a
-   `separator` with a value, so the arrow keys move it and a screen reader can
-   say where it is — a divider that only answers to a drag is one a keyboard
-   user cannot move at all.
+   A short lever in the middle of the gutter, and nothing at all until you go
+   looking for it.
 
-   Full height, and against the seam rather than against a floating panel's
-   rounded edge: the two regions meet along the whole of it now, so a grip that
-   stopped 12px short at each end would be a handle with two dead spots on the
-   line it is meant to move. `right` reads the same clamp the track does, or the
-   handle and the edge it drags disagree the moment the region is narrow enough
-   for the clamp to bite. */
+   It was the full height of the region and it filled with the BRAND when you
+   came near — a 798px orange bar between the canvas and the panel, thrown by
+   a mouse merely passing between them. Two things wrong with that. Brand is
+   this console's "press this to publish" colour and a divider is not an
+   action; and a handle the height of the screen announces itself as a piece of
+   structure when it is a small adjustment you make once.
+
+   So the LEVER is 4×28 and the HIT AREA is not: the target keeps the full
+   height of the gutter, three pixels wider than the gap on each side, because
+   a control you have to aim at is worse than one you cannot see. Grey, a shade
+   darker than the borders it sits between, and it fades in on hover, on
+   keyboard focus, and for the whole of a drag — `is-gripping` is already on
+   `.bb` for exactly that window, so the lever does not vanish under the cursor
+   the moment the pointer leaves the six pixels it started in.
+
+   It is a `separator` with a value, so the arrow keys move it and a screen
+   reader can say where it is — a divider that only answers to a drag is one a
+   keyboard user cannot move at all.
+
+   Placed by the grid rather than measured against it. It is an item in the
+   PANEL's column, pinned to that column's leading edge and pulled back half the
+   gap, so it lands exactly in the middle of the gutter at every width. The
+   arithmetic version — `right: calc(min(var(--bb-insp), 46%) …)` — could not be
+   made exact: a percentage inside `grid-template-columns` resolves against the
+   content box and the same percentage inside `right` resolves against the
+   padding box, so the handle drifted off its own edge by half the padding
+   whenever the clamp bit. */
 .bb__grip {
-  position: absolute;
-  top: 0; bottom: 0;
-  right: calc(min(var(--bb-insp), 46%) - 3px);
-  width: 6px; z-index: 6;
+  justify-self: start;
+  margin-left: calc(var(--bb-gap) / -2 - 5px);
+  width: 10px; height: 100%; z-index: 6;
+  display: grid; place-items: center;
   cursor: col-resize; touch-action: none;
   background: none;
-  transition: background var(--dur-fast) var(--ease-standard);
 }
-.bb__grip:hover, .bb__grip:focus-visible { background: var(--brand); outline: none; }
+.bb__grip::before {
+  content: '';
+  width: 4px; height: 28px; border-radius: var(--radius-pill);
+  background: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+}
+.bb__grip:hover::before,
+.bb__grip:focus-visible::before,
+.bb.is-gripping .bb__grip::before { opacity: 1; }
+.bb__grip:active::before,
+.bb.is-gripping .bb__grip::before { background: var(--text-secondary); }
+/* The ring would be drawn round a 10px column of nothing. The lever appearing
+   IS the focus indicator — it is the only thing on this control that can be
+   seen at all — so the outline goes and the `:focus-visible` rule above does
+   the work. */
+.bb__grip:focus-visible { outline: none; }
+@media (prefers-reduced-motion: reduce) {
+  .bb__grip::before { transition: none; }
+}
 @media (max-width: 900px) { .bb__grip { display: none; } }
 
 /* --- The rule, as one block ---------------------------------------------------
@@ -2550,9 +2589,18 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    the situation field and the round list, not so much that the chain it is
    talking about disappears. */
 .bb__sheet {
-  position: absolute; z-index: 6;
-  left: var(--space-3); bottom: var(--space-3);
-  right: var(--space-3);
+  /* In the canvas's cell, not floating against the region.
+
+     It was absolutely positioned against `.bb` and inset by 12px, which was
+     right while `.bb` and the canvas were the same box. They are not any more —
+     the region has a gutter — so an absolute sheet would have hung in the
+     margin, over the canvas's rounded corner and out into the ground. Placed in
+     column 1 it is bounded by the canvas by construction, and `58%` finally
+     means 58% of the canvas rather than 58% of the region. */
+  grid-column: 1; grid-row: 1;
+  align-self: end;
+  position: relative; z-index: 6;
+  margin: var(--space-3);
   height: min(58%, 520px);
   display: flex; flex-direction: column; min-height: 0;
   border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);

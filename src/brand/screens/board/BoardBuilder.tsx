@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Copy, Keyboard, ListOrdered, PanelRightClose, PanelRightOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Check, Copy, Keyboard, ListOrdered, PanelRightClose, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
 import { Button, Modal } from '../../kit'
 import { fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
@@ -171,6 +171,20 @@ export function BoardBuilder({
     shell.current?.style.setProperty('--bb-insp', `${next}px`)
     return next
   }, [])
+
+  /* The two ends the panel's own button steps between, and the test that says
+     which end you are at.
+
+     560 is the width a condition row needs to stay on one line — see the note
+     on `inspW`. 380 is under the 430px container query, so the narrow state is
+     genuinely a different shape rather than a squeezed one: the rows fold to
+     two deliberate lines and the panel becomes a column you can still read
+     beside a canvas you are arranging.
+
+     `> NARROW` rather than `=== WIDE`, because the grip can leave the width
+     anywhere in 320–720 and the button still has to know which way to go. */
+  const NARROW = 380
+  const wide = inspW > NARROW
 
   const onGrab = useCallback(
     (e: React.PointerEvent) => {
@@ -629,33 +643,14 @@ export function BoardBuilder({
            step back through what you did, then how much of each rule. */
         tools={
           <>
-            {/* Show or hide the config panel.
+            {/* A panel toggle stood here, and before that in the publishing
+                cluster. It is gone from both.
 
-                It was in the top-right publishing cluster, beside Discard and
-                Review & publish — a control that changes what you can SEE,
-                filed with the two that change what is SAVED. It is a view
-                control, so it lives with the view controls; and it is the only
-                way back once the panel is closed, which is a poor thing to
-                leave to a keyboard shortcut.
-
-                Absent, not disabled, when nothing is selected: there is no
-                panel to show or hide until a card is chosen, and a greyed-out
-                button in a toolbar invites somebody to work out why. */}
-            {hasSubject && (
-              <>
-                <button
-                  type="button"
-                  className="bb__act"
-                  aria-label={inspOpen ? 'Hide the panel' : 'Show the panel'}
-                  aria-pressed={inspOpen}
-                  title={inspOpen ? 'Hide the panel (⌘\)' : 'Show the panel (⌘\)'}
-                  onClick={() => setInspOpen((v) => !v)}
-                >
-                  {inspOpen ? <PanelRightClose size={14} strokeWidth={2} /> : <PanelRightOpen size={14} strokeWidth={2} />}
-                </button>
-                <span className="bb__float__sep" />
-              </>
-            )}
+                The panel has one way out — the × in its own bar, on the thing
+                being closed — and three ways back: click a card, arrow to one,
+                or ⌘\. A fourth control, on the far side of the canvas from the
+                panel it acts on, was a second door for a room that was not
+                short of them. */}
             <button type="button" className="bb__act" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo(hist)} onClick={() => setHist(undo)}>
               <Undo2 size={14} strokeWidth={2} />
             </button>
@@ -746,6 +741,8 @@ export function BoardBuilder({
             if (selection.kind === 'rule') select({ ...selection, part })
           }}
           onClose={() => setInspOpen(false)}
+          wide={wide}
+          onToggleWidth={() => setInspW(setW(wide ? NARROW : 560))}
         />
       )}
 

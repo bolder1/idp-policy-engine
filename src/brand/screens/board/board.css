@@ -1096,34 +1096,17 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* --- Focus mode ---------------------------------------------------------------
+/* --- The whole-rule room ------------------------------------------------------
 
-   A plain block, and it has to be. This was a two-column grid, from when IF
-   and THEN were two sibling sections that needed placing side by side. They
-   are one section now and `.bb__rulebody` does that split itself — so the
-   outer grid was splitting the wrong thing: the identity block spanned both
-   columns, the rule landed in column one at 550px of an 1100px dialog, and the
-   entire right half was empty. Opening focus mode made the editor NARROWER
-   than the panel it came from.
+   `.bb__focus` and the scrim overrides that made its Modal full-bleed stood
+   here. The room is gone: it was a third editor for a rule that already has
+   two, opened by a button in the panel's bar that read as "make this bigger"
+   and did something else. That button is a width toggle now — see
+   Inspector.tsx — and the panel is the one place a rule is edited.
 
-   One column here; the halves divide inside the rule. */
-/* Full-bleed rather than a centred box.
+   `.bb__alt.is-focus` further down is unrelated: a different element, a
+   different meaning of the word, and still live. */
 
-   The Modal takes its width as an inline pixel value and caps it at 100%, so a
-   number larger than any screen makes it fill the scrim, and the scrim's own
-   padding becomes the margin. Nothing in the kit changes; the dialog is simply
-   asked for more than there is. */
-.bx-scrim--center:has(.bb__focus) { padding: var(--space-4); }
-.bx-scrim--center:has(.bb__focus) .bx-modal { max-height: 94vh; width: 100%; }
-
-.bb__focus { display: block; }
-.bb__focus > * { min-width: 0; }
-/* No border under the identity block in the dialog — the modal's own head is
-   directly above it, and two rules a few pixels apart read as a mistake. */
-.bb__focus > .bb__insphead { padding-left: 0; padding-right: 0; }
-.bb__focus > .bb__rule { border-bottom: 0; }
-.bb__focus .bb__rulehead, .bb__focus .bb__rulebody { padding-left: 0; padding-right: 0; }
-@media (max-width: 1000px) { .bb__focus { grid-template-columns: minmax(0, 1fr); } }
 .bb__insp .bx-tabs { padding: 0 var(--space-4); border-bottom: 1px solid var(--border-subtle); }
 .bb__insphead {
   /* Centred, and the note that used to argue the opposite is why this drifted.
@@ -2300,49 +2283,15 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__rulehead .bb__count + .bb__secact { margin-left: 0; }
 .bb__rulebody { display: grid; gap: var(--space-4); padding: 0 var(--space-5) var(--space-5); }
 .bb__rulehalf { min-width: 0; }
-/* The keyword between the halves, aligned with the `if` inside the block above
-   so the two read down one edge. */
-.bb__rulekw { margin: 0 0 var(--space-2); }
+/* `.bb__rule.is-focus` — the room's two-column split of a rule, with the
+   conditions given the wider half, and the note about why the halves did not
+   scroll independently — stood here. Gone with the room; the panel draws one
+   part at a time and has nothing to split. */
 
-/* Focus mode puts the halves side by side rather than stacked — the reason to
-   open it is a rule whose conditions have outgrown the column. */
-/* Two columns, and the conditions get the wider one.
+/* `.bb__rulekw` and `.bb__halfhead` went with the room too — the keyword drawn
+   between its two halves, and the caption at the top of each column. Neither
+   has had markup since the two-column split did. */
 
-   It was 1.15fr to 1fr, which is nearly even — and the two halves are not
-   nearly even. A condition row carries a mark, an attribute, an operator and a
-   value and wants every pixel; the outcome is three tiles and a handful of
-   settings that were rendering at half a screen wide with the right two thirds
-   empty. Capping the outcome column stops the settings sprawling and gives the
-   conditions the rest. */
-.bb__rule.is-focus .bb__rulebody {
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 440px);
-  gap: var(--space-8);
-  align-items: start;
-}
-/* The halves do NOT scroll independently.
-
-   They did, briefly, on the reasoning that a long predicate should not push the
-   outcome off the bottom. It collapsed both columns to a single row: a grid
-   item that is a scroll container has an automatic minimum size of zero, so the
-   auto row sized to the tallest thing that could not shrink — the 26px step
-   number — and every column clipped to it. The modal body already scrolls, and
-   one scrollbar for one dialog is the right number anyway. */
-.bb__rule.is-focus .bb__rulehalf { padding-right: var(--space-2); }
-
-/* The two questions, said once each at the top of their column. */
-.bb__halfhead {
-  margin: 0 0 var(--space-3);
-  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-
-/* One line for the note, full screen. It grows if there is something in it and
-   takes no room when there is not — where the panel's two-row box is a
-   paragraph of empty space across a screen's width. */
-/* `.bb__insphead.is-focus { align-items: center }` stood here to undo the
-   top-alignment for the room view. The bar centres everywhere now, so the
-   override has nothing left to correct. */
-.bb__insphead.is-focus .bb__input--desc { min-height: 30px; resize: vertical; }
-@media (max-width: 1000px) { .bb__rule.is-focus .bb__rulebody { grid-template-columns: minmax(0, 1fr); } }
 
 /* --- Name and description, in one block ---------------------------------------
    The description is no longer a section of its own; it sits under the name it

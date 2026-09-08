@@ -2115,8 +2115,20 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   width: 40px; height: 40px; border-radius: 50%;
   background: var(--surface-sunken); color: var(--text-tertiary);
 }
-.bb__ifblank h4 { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bb__ifblank p { margin: 0; max-width: 38ch; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.6; }
+/* `>` on both, and the child combinator is the whole point.
+
+   `.bb__ifblank p` was written for the empty state's own sentence and reached
+   into everything the state hosts. The catalogue's header is a `<p>`, so it
+   inherited `max-width: 38ch` — the list's rows ran the full width of the pane
+   and its heading stopped two thirds of the way across, which looks like a
+   background that failed to paint.
+
+   A descendant selector on a bare element inside a container that renders other
+   components is a rule with no boundary: it styles whatever anybody nests
+   there, forever, and the breakage surfaces in the component rather than
+   here. */
+.bb__ifblank > h4 { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bb__ifblank > p { margin: 0; max-width: 38ch; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.6; }
 .bb__ifblank__acts { display: flex; gap: var(--space-3); margin-top: var(--space-2); }
 
 /* The catalogue, at the pane's width rather than at its own.

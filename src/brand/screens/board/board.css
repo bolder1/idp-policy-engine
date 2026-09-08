@@ -328,7 +328,7 @@
   transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard),
     transform var(--dur-fast) var(--ease-standard);
 }
-.bb__start2:hover { border-color: var(--border-strong); box-shadow: var(--el-mid); transform: translateY(-2px); }
+.bb__start2:hover { border-color: var(--brand); box-shadow: var(--el-mid); transform: translateY(-2px); }
 .bb__start2:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--focus-ring); }
 .bb__start2 strong { font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
 /* One line each, and short enough to stay one at every width the two cards are
@@ -363,6 +363,20 @@
   transition: transform 0.34s var(--ease-standard), opacity 0.34s var(--ease-standard);
   transition-delay: calc(var(--i, 0) * 55ms);
 }
+
+/* The one colour, and only while you are pointing at it.
+
+   Both pictures are grey at rest — a card sitting still has nothing to say that
+   a colour would say better. Hover is the moment it does: the card's own edge
+   and the first line inside it take the brand together, so the picture and the
+   thing you are about to press light up as one object rather than as a border
+   and a decoration.
+
+   One hue, and it is the product's. The first pass had a cool accent line
+   sitting there permanently, which made a resting card look like it was already
+   telling you something. */
+.bb__art__line { transition: fill 0.22s var(--ease-standard), opacity 0.22s var(--ease-standard); }
+.bb__start2:hover .bb__art__line.is-lead { fill: var(--brand); opacity: 1; }
 /* The deck, fanned from the bottom edge so it opens like a hand of cards rather
    than sliding apart. `--i` is the card's depth; 0 is the face, which stays
    put and lets the two behind it come out. */
@@ -375,7 +389,7 @@
 .bb__start2:hover .bb__art__todo { opacity: 1; transform: none; }
 .bb__art__ants { transition: stroke 0.34s var(--ease-standard); }
 .bb__start2:hover .bb__art__ants {
-  stroke: var(--border-strong);
+  stroke: var(--brand);
   animation: bb-art-ants 1.6s linear infinite;
 }
 @keyframes bb-art-ants {

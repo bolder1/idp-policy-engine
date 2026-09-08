@@ -94,15 +94,21 @@ function ArtCard({ dashed }: { dashed?: boolean }) {
   )
 }
 
-/** A rule, as a line on a card. `tone` is the one place any colour appears. */
-function ArtLine({ i, w, tone }: { i: number; w: number; tone?: boolean }) {
+/* A rule, as a line on a card.
+
+   All grey at rest — the whole picture is, deliberately. `lead` marks the first
+   line, which is the one that takes the brand when you point at the card: one
+   colour, on hover, in the one place that says "this is the rule you get
+   first". Set in CSS rather than here, because the rest state and the hover
+   state are the same element and only the stylesheet can hold both. */
+function ArtLine({ i, w, lead }: { i: number; w: number; lead?: boolean }) {
   return (
     <rect
-      className="bb__art__line"
+      className={`bb__art__line ${lead ? 'is-lead' : ''}`}
       style={{ '--i': i } as CSSProperties}
       x="12" y={16 + i * 13} width={w} height="5" rx="2.5"
-      fill={tone ? 'var(--fb-info-fg)' : 'var(--border-strong)'}
-      opacity={tone ? 0.5 : 0.32}
+      fill="var(--border-strong)"
+      opacity={lead ? 0.45 : 0.28}
     />
   )
 }
@@ -132,7 +138,7 @@ function TemplateArt() {
           <ArtCard />
           {/* Three rules, because three is what a template card's thumbnail
               caps at, and the widths differ because rule names do. */}
-          <ArtLine i={0} w={48} tone />
+          <ArtLine i={0} w={48} lead />
           <ArtLine i={1} w={36} />
           <ArtLine i={2} w={42} />
         </g>
@@ -157,7 +163,7 @@ function ScratchArt() {
           <rect x="6" y="6" width="72" height="46" rx="3" fill="url(#bb-art-dots)" />
           {/* One line written, two still to come — they draw themselves in when
               you point at the card. */}
-          <ArtLine i={0} w={48} tone />
+          <ArtLine i={0} w={48} lead />
           <g className="bb__art__todo">
             <ArtLine i={1} w={36} />
             <ArtLine i={2} w={42} />

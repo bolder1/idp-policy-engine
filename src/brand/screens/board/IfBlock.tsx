@@ -1,10 +1,10 @@
 import { Fragment, type MouseEvent, type ReactNode } from 'react'
-import { ArrowRight, CornerDownRight, Split, Users } from 'lucide-react'
+import { ArrowRight, Braces, CornerDownRight, Split, Users } from 'lucide-react'
 
 import { isWho, whoEditable, whoIds } from '../../audience-ops'
 import { AvatarStack } from './Avatar'
 import { conditionType, type Condition, type Rule } from '../../data'
-import { cardJoin, topJoin } from '../../predicate'
+import { cardJoin, cardLetter, topJoin } from '../../predicate'
 import type { NameLookup } from '../predicate-prose'
 import { DECISION_NAME, TONE, journeyOf } from './model'
 import { GROUP_TONE, groupIcon } from './tones'
@@ -35,6 +35,7 @@ export function IfKw({ children, tone }: { children: ReactNode; tone?: 'and' | '
 export function IfChip({
   icon,
   tone,
+  variant,
   muted,
   unset,
   title,
@@ -44,6 +45,11 @@ export function IfChip({
 }: {
   icon?: ReactNode
   tone?: string
+  /* Which half of the sentence this is. The attribute names the axis and the
+     value is the answer, and the editor already draws them at two weights —
+     the card was drawing both identically, so a row of three chips gave no
+     clue which one you would go and change. */
+  variant?: 'attr' | 'val'
   muted?: boolean
   unset?: boolean
   title?: string
@@ -57,7 +63,7 @@ export function IfChip({
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void
   children: ReactNode
 }) {
-  const cls = `bb__ifchip ${tone ? `is-tone-${tone}` : ''} ${muted ? 'is-muted' : ''} ${unset ? 'is-unset' : ''}`
+  const cls = `bb__ifchip ${tone ? `is-tone-${tone}` : ''} ${variant ? `is-${variant}` : ''} ${muted ? 'is-muted' : ''} ${unset ? 'is-unset' : ''}`
   if (onClick)
     return (
       <button type="button" className={cls} title={title} aria-label={ariaLabel} onClick={onClick}>
@@ -103,12 +109,12 @@ export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup 
   const tone = GROUP_TONE[t.group] ?? 'neutral'
   return (
     <>
-      <IfChip tone={tone} icon={<Ico size={9} strokeWidth={2.2} />} title={t.group}>
+      <IfChip tone={tone} variant="attr" icon={<Ico size={9} strokeWidth={2.2} />} title={t.group}>
         {t.label}
       </IfChip>
       <IfKw tone="op">{c.operator}</IfKw>
       {valueChips(c, resolve).map((v, i) => (
-        <IfChip key={i} unset={v.unset}>
+        <IfChip key={i} variant="val" unset={v.unset}>
           {v.text}
         </IfChip>
       ))}
@@ -305,7 +311,22 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
 
              `grouped` is the field that says which is which, and it is exactly
              what it is for. */
-          <div key={k.id} className={k.grouped ? 'bb__ifgroup' : 'bb__ifplain'} title={k.label}>
+          <div key={k.id} className={k.grouped ? 'bb__ifgroup' : 'bb__ifplain'}>
+            {/* The group's name, on the card, in words.
+
+                It was a `title` attribute — invisible, unreachable by keyboard,
+                and gone on touch. Meanwhile the editor beside this card draws
+                the same group with a visible heading and its operator in
+                words, so the two surfaces described one group two ways and
+                only one of them could be read. `Group A` is the fallback the
+                linter and the change log already use. */}
+            {k.grouped && (
+              <div className="bb__ifgrouptag">
+                <Braces size={10} strokeWidth={2.2} aria-hidden />
+                <b>{k.label?.trim() || `Group ${cardLetter(i)}`}</b>
+                {k.conditions.length > 1 && <span>{join === 'and' ? 'all must match' : 'any one matches'}</span>}
+              </div>
+            )}
             {k.conditions.map((c, j) => (
               /* Each condition is its own row with its own edge, rather than a
                  line in an undivided block. Reading a five-condition rule off

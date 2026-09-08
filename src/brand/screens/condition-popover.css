@@ -332,22 +332,25 @@
 /* Two lines and a mark. The name is the thing; the hint is why you would pick
    it, and it wraps rather than truncating — six rows can afford the height, and
    a sentence cut mid-word is a sentence nobody finishes reading. */
+/* One line per row now. The second line was a sentence explaining a name that
+   explains itself — "Time of day: a window in the tenant's timezone" — and six
+   of them doubled the height of a list whose whole point is that it is short
+   enough to read at once. */
 .cp__catrow {
-  display: grid; grid-template-columns: 15px minmax(0, 1fr); gap: 2px var(--space-3);
-  align-items: start; text-align: left;
+  display: flex; align-items: center; gap: var(--space-3);
+  text-align: left;
   padding: 9px 10px;
   border: 0; border-top: 1px solid var(--border-subtle); background: none;
   font: inherit; cursor: pointer;
 }
 .cp__catrow:first-of-type { border-top: 0; }
-.cp__catrow > svg { grid-row: 1 / span 2; margin-top: 1px; color: var(--text-tertiary); }
+.cp__catrow > svg { flex: none; color: var(--text-tertiary); }
 .cp__catrow:hover { background: var(--surface-sunken); }
 .cp__catrow:focus-visible { outline: none; background: var(--surface-sunken); box-shadow: inset 0 0 0 2px var(--focus-ring); }
 .cp__catname {
   display: flex; align-items: center; gap: var(--space-2); min-width: 0;
   font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
 }
-.cp__cathint { font-size: var(--fs-xs); line-height: 1.45; color: var(--text-tertiary); }
 .cp__catsoon {
   flex: none; font-style: normal; font-size: 10px; font-weight: var(--fw-medium);
   line-height: 1; padding: 3px 6px; border-radius: var(--radius-full);

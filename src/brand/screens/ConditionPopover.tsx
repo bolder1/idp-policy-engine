@@ -411,7 +411,7 @@ export function ConditionPopover({
                   value: x.id,
                   label: x.label,
                   meta: x.group,
-                  note: x.soon ? `${x.hint} · Coming soon` : x.hint,
+                  note: x.soon ? 'Coming soon' : undefined,
                   icon: groupIcon(x.group),
                   disabled: x.soon,
                 }))}
@@ -1088,7 +1088,6 @@ export function ConditionList({
                   finished at one row. */}
               {t.soon && <i className="cp__catsoon">Coming soon</i>}
             </span>
-            <span className="cp__cathint">{t.hint}</span>
           </button>
         )
       })}

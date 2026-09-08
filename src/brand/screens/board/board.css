@@ -1412,12 +1412,14 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
    A hairline and a little air, not a box each — four boxes inside a box is a
    heavier drawing of the same information, and the frame is already spoken for:
    it means a group somebody made. */
+/* No rule between rows. Each condition opens with its own operator and a
+   group sits in its own tint, so a hairline in every gap was a third mark for
+   a boundary already stated twice — and on a five-condition card it was four
+   more lines than the card had anything to say with. */
 .bb__ifrow.is-cond { padding: 4px 0; }
-.bb__ifrow.is-cond + .bb__ifrow.is-cond { border-top: 1px solid var(--if-line); }
 /* Inside a group the rows are already bracketed together, so the hairline is
    doing less work and the frame's own padding gives them the air. */
 .bb__ifgroup > .bb__ifrow.is-cond { padding: 3px 0; }
-.bb__ifgroup > .bb__ifrow.is-cond + .bb__ifrow.is-cond { border-top-style: dashed; }
 
 /* Two alternatives still have to read as two.
 
@@ -1463,8 +1465,11 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   font-size: 10px; font-weight: var(--fw-semibold);
   letter-spacing: 0.04em; text-transform: uppercase;
 }
+/* Notice, not accent. It was violet here and amber in the editor's OR chip —
+   one operator, two colours, on two surfaces that are on screen together
+   showing the same rule. AND already agreed; this is the half that did not. */
 .bb__ifkw.is-and { background: var(--fb-info-bg); color: var(--fb-info-fg); }
-.bb__ifkw.is-or { background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
+.bb__ifkw.is-or { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
 .bb__ifkw.is-op { font-weight: var(--fw-regular); color: var(--if-muted); min-width: 0; }
 /* The `or` keyword sits where `if` sat — it opens a group of its own. The
    indent is a margin now rather than padding, so it does not stretch the pill. */
@@ -1656,13 +1661,26 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifwho + .bb__ifgroup { margin-top: 2px; }
 
 .bb__ifplain { display: grid; gap: 1px; }
+/* A tint, not a frame — the same material the editor's group wears, so the
+   card and the panel are describing the same object. */
 .bb__ifgroup {
   display: grid; gap: 1px;
   padding: 6px 8px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
+  background: var(--surface-inset, var(--surface-sunken));
+  border: 0;
   border-radius: var(--radius-md);
 }
+/* The name, and what its operator means, said in the group rather than hidden
+   in a `title`. Small and quiet: it is a caption on a thing you are reading,
+   not a control. */
+.bb__ifgrouptag {
+  display: flex; align-items: center; gap: 5px;
+  padding: 1px 0 3px;
+  font-size: 10px; color: var(--text-tertiary);
+}
+.bb__ifgrouptag svg { flex: none; opacity: 0.7; }
+.bb__ifgrouptag b { font-weight: var(--fw-semibold); color: var(--text-secondary); letter-spacing: 0.01em; }
+.bb__ifgrouptag span::before { content: '· '; }
 .bb__ifgroup + .bb__ifgroup { margin-top: 0; }
 
 /* --- The bracket, drawn as a bracket ------------------------------------------
@@ -2619,3 +2637,19 @@ button.bb__idx::after {
 }
 .bb__subrow > b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
 .bb__subrow .bx-picker { width: 100%; }
+
+
+/* --- The two halves of a condition, on the card --------------------------------
+
+   The same weighting the editor gives its three fields: the attribute names the
+   axis and is quiet, the value is the answer and carries the brand. Drawn
+   identically — which is how this was — a row of three chips said which was
+   which only by reading order, and the one you would go and change looked
+   exactly like the one you would not. */
+.bb__ifchip.is-attr {
+  background: transparent; border-color: transparent;
+  color: var(--text-secondary); font-weight: var(--fw-regular);
+  padding-left: 0;
+}
+.bb__ifchip.is-val { color: var(--brand); }
+.bb__ifchip.is-val.is-unset { color: var(--fb-negative-fg); }

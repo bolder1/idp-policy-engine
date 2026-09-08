@@ -2,9 +2,8 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { Store, X } from 'lucide-react'
 
-import { Button } from '../kit'
+import { Button, Chip } from '../kit'
 import { scenarios, type Scenario } from '../data'
-import { useBrand } from '../store'
 import { TemplateCard, TemplatePreview, scenarioCard } from './TemplateCard'
 
 /* -----------------------------------------------------------------------------
@@ -71,7 +70,6 @@ export function TemplateSheet({
   /** Hands back the chosen template. What is done with its rules is the host's. */
   onChoose: (s: Scenario) => void
 }) {
-  const store = useBrand()
   const [cat, setCat] = useState<Category>('All')
   const [q, setQ] = useState('')
   const [preview, setPreview] = useState<Scenario | null>(null)
@@ -154,58 +152,47 @@ export function TemplateSheet({
               </button>
             </header>
 
-            {/* Apollo's shape: the filter is a left rail rather than a tab
-                strip. Six categories in a horizontal row is a row that wraps on
-                a laptop and truncates its counts; the same six down the side
-                are a fixed index that the grid scrolls independently of, which
-                is why every gallery of any size ends up here. Search sits at
-                the top of the rail because it filters the same thing the rail
-                filters. */}
-            <div className="bmarket__work">
-              <aside className="bmarket__rail">
-                <input
-                  type="search"
-                  className="bmarket__search"
-                  placeholder="Search templates"
-                  aria-label="Search the gallery"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                />
+            {/* The filters are a row, and they are the SAME row the Templates
+                page uses — `Chip`, active state, count and all.
 
-                <div className="bmarket__cats" role="tablist" aria-label="Template categories">
-                  {CATEGORIES.map((c) => {
-                    const n = scenarios.filter((s) => inCategory(s, c)).length
-                    return (
-                      <button
-                        key={c}
-                        role="tab"
-                        aria-selected={cat === c}
-                        className={`bmarket__cat ${cat === c ? 'is-on' : ''}`}
-                        onClick={() => setCat(c)}
-                      >
-                        {cat === c && (
-                          <motion.span
-                            layoutId="marketcat"
-                            className="bmarket__catbg"
-                            transition={{ type: 'spring', stiffness: 600, damping: 44 }}
-                          />
-                        )}
-                        <span>{LABEL[c]}</span>
-                        <em>{n}</em>
-                      </button>
-                    )
-                  })}
-                </div>
-              </aside>
+                They were a 236px left rail, which is the shape a gallery of any
+                size ends up with and is the wrong one here twice over. Six
+                categories do not need a fixed index: at 236px wide and 750px
+                tall the rail was six rows and six hundred pixels of nothing,
+                and it took a fifth of the sheet from the grid it was filtering.
+                And the console already filters this exact catalogue with a chip
+                row on the Templates page — two shapes for one control is how
+                the two drift.
 
-              <div className="bmarket__body">
-                <div className="bmarket__intro">
-                  <h3>{LABEL[cat]}</h3>
-                  <p>
-                    Taking one writes its rules into this policy. Nothing is saved until you publish, and undo puts it
-                    back.
-                  </p>
-                </div>
+                Search sits at the end of the same row, because it filters the
+                same thing. */}
+            <div className="bmarket__filters">
+              <div className="bmarket__cats" role="tablist" aria-label="Template categories">
+                {CATEGORIES.map((c) => (
+                  <Chip
+                    key={c}
+                    active={cat === c}
+                    count={scenarios.filter((x) => inCategory(x, c)).length}
+                    onClick={() => setCat(c)}
+                  >
+                    {LABEL[c]}
+                  </Chip>
+                ))}
+              </div>
+              <input
+                type="search"
+                className="bmarket__search"
+                placeholder="Search templates"
+                aria-label="Search the gallery"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </div>
+
+            <div className="bmarket__body">
+              <p className="bmarket__intro">
+                Taking one writes its rules into this policy. Nothing is saved until you publish, and undo puts it back.
+              </p>
 
                 {mine.length > 0 && (
                   <>
@@ -248,20 +235,16 @@ export function TemplateSheet({
                     </Button>
                   </div>
                 )}
-              </div>
             </div>
           </motion.div>
 
           {/* The live preview draws the rules a template will create before it
-              is chosen. Withheld in lite, so a card commits on its name and its
-              one-line description — which is the v0 behaviour. */}
-          {store.features.templateHero && (
-            <TemplatePreview
-              m={preview ? scenarioCard(preview) : null}
-              onClose={() => setPreview(null)}
-              onUse={() => preview && take(preview)}
-            />
-          )}
+              is chosen. Ungated: see the note on the card's face. */}
+          <TemplatePreview
+            m={preview ? scenarioCard(preview) : null}
+            onClose={() => setPreview(null)}
+            onUse={() => preview && take(preview)}
+          />
         </motion.div>
       )}
     </AnimatePresence>

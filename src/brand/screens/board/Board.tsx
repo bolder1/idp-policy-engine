@@ -1,13 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
-import { LayoutTemplate, Maximize2, Minus, PencilRuler, Plus } from 'lucide-react'
+import { Maximize2, Minus, Plus } from 'lucide-react'
 
 import { fallbackRule, type Policy } from '../../data'
 import { useCanvasView } from '../canvas-view'
 import type { Diagnostic } from '../diagnostics'
 import type { NameLookup } from '../predicate-prose'
 import { ruleState } from '../rule-form'
-import { DECISION_NAME, type Selection, type Trace } from './model'
+import type { Selection, Trace } from './model'
 import { RuleCard, TerminalCard } from './RuleCard'
 
 /* -----------------------------------------------------------------------------
@@ -40,7 +40,6 @@ export function Board({
   onHover,
   expandedOf,
   onToggleExpand,
-  onUseTemplate,
   tools,
   aside,
 }: {
@@ -61,16 +60,11 @@ export function Board({
   /** Whether this rule's body is unfolded. Held by the host so it survives reorder. */
   expandedOf: (ruleId: string) => boolean
   onToggleExpand: (ruleId: string) => void
-  /* Opens the template catalogue. Only the empty board offers it, and the host
-     mounts the sheet — applying a template is a write to the draft, and the
-     draft has one door.
-
-     `reserveOnOpen` stood here: a width to hold back on the opening Fit, for a
+  /* `reserveOnOpen` stood here: a width to hold back on the opening Fit, for a
      panel that floated over the stage and would otherwise cover the right-hand
      end of a chain that had just been centred without it. The panel is a column
      now, so the stage's own width already excludes it and there is nothing to
      reserve. */
-  onUseTemplate?: () => void
   /* View controls the host contributes INSIDE the centre toolbar, which this
      component owns because the zoom half of it lives here. They arrive before
      the zoom controls and a separator is drawn between the two. */
@@ -107,7 +101,6 @@ export function Board({
     zoomLabel,
     panning,
     fit,
-    glide,
     zoomBy,
     onPointerDown,
     onPointerMove,
@@ -200,93 +193,13 @@ export function Board({
   /* Render order during a drag: the dragged card is shown at its target slot
      so the others make room; the card itself follows the pointer. */
   const order = policy.rules.map((_, i) => i)
-  const empty = policy.rules.length === 0
+  /* Two effects stood here: one that PLACED the empty state at a fixed 0.9 by
+     measuring `.bb__blank` inside the world, and one that re-fitted the chain
+     when the policy stopped being empty. Both are gone with the empty state
+     itself — it is a screen of its own now (BoardEmpty.tsx), so this component
+     only ever mounts with rules to draw, and the hook's own mount fit is the
+     right and only fit. */
 
-  /* An empty policy is one panel, so it is PLACED rather than fitted.
-
-     `fitTo` fits the WIDTH — right for a chain, which is read top to bottom and
-     panned down, and wrong for a single 420px card: it would blow the panel up
-     to fill the stage and pin it to the top edge, which is the one thing an
-     empty state must not do. Centred on both axes instead, at a fixed 90%, so
-     it sits where the eye lands and reads as the whole of what is there rather
-     than as something zoomed into.
-
-     After the hook's own mount fit, deliberately. Its `useLayoutEffect` is
-     registered first because the hook is called above this, so its frame is
-     queued first and this one lands on top of it — one paint, no flash of a
-     wrongly-fitted panel. */
-  useLayoutEffect(() => {
-    if (!empty) return
-    const id = requestAnimationFrame(() => {
-      const s = stage.current
-      const w = world.current
-      if (!s || !w) return
-      /* The PANEL's centre, not the world's. The world carries the padding
-         that gives the canvas somewhere to pan into, so centring it put the
-         panel a hundred and thirty pixels high — visually off, and measurably
-         so. Its offset inside the world is the thing to line up. */
-      const el = w.querySelector<HTMLElement>('.bb__blank')
-      const cx = el ? el.offsetLeft + el.offsetWidth / 2 : w.offsetWidth / 2
-      const cy = el ? el.offsetTop + el.offsetHeight / 2 : w.offsetHeight / 2
-      const z = 0.9
-      glide({ x: s.clientWidth / 2 - cx * z, y: s.clientHeight / 2 - cy * z, z }, 0)
-    })
-    return () => cancelAnimationFrame(id)
-  }, [empty, glide, stage, world])
-
-  /* …and out of it, which the placement above cannot do.
-
-     The chooser is placed at a fixed 0.9 on a 660px block. Answer it with "use
-     a template" and five rules arrive in a 560px chain several times its
-     height, at a zoom chosen for something else — so the board's first sight of
-     its own rules would be a view framed for the question rather than the
-     answer. Fit, animated, so the change reads as the chain arriving rather
-     than as the canvas jumping.
-
-     Guarded on the TRANSITION, not on `empty`: refitting whenever the policy is
-     non-empty would fight every pan and zoom somebody makes afterwards. */
-  /* The flag is cleared by the FIT, not by the effect that schedules it.
-
-     Clearing it on entry looks equivalent and is not: StrictMode mounts every
-     effect twice in development — run, clean up, run again — so the second run
-     would find the flag already down and schedule nothing. Written this way the
-     cleanup cancels the frames and the remount schedules them afresh, which is
-     what a cleanup is supposed to mean. */
-  const wasEmpty = useRef(empty)
-  useEffect(() => {
-    if (empty) {
-      wasEmpty.current = true
-      return
-    }
-    if (!wasEmpty.current) return
-    /* Two frames, and the second one is not padding.
-
-       Answering the chooser does two things at once: the rules arrive, and —
-       because applying a template selects rule 1 — the config panel mounts,
-       which narrows the stage. The browser runs animation-frame callbacks
-       BEFORE it broadcasts resize observations, so a fit scheduled on the first
-       frame starts a glide that the stage's own resize compensation then
-       cancels a moment later, leaving the view at the zoom the chooser was
-       placed at. Measured: 90%, on a chain that wanted 100.
-
-       On the second frame the panel is mounted, the compensation has run, and
-       `fitTo` measures the width the chain is actually being fitted into. */
-    let inner = 0
-    const outer = requestAnimationFrame(() => {
-      inner = requestAnimationFrame(() => {
-        wasEmpty.current = false
-        fit()
-      })
-    })
-    return () => {
-      cancelAnimationFrame(outer)
-      cancelAnimationFrame(inner)
-    }
-  }, [empty, fit])
-  /* What the empty policy actually does today, named rather than described.
-     `terminal` is resolved below for the card; this reads the same rule, so the
-     sentence and the card cannot disagree about the outcome. */
-  const fallbackName = DECISION_NAME[(policy.fallback ?? fallbackRule()).decision]
   if (drag && drag.over !== drag.from) {
     order.splice(drag.from, 1)
     order.splice(drag.over, 0, drag.from)
@@ -382,58 +295,18 @@ export function Board({
               moves worth making. The chain comes back the moment there is a
               rule to draw, which is the same view, arrived at rather than sat
               in. */}
-          {policy.rules.length === 0 ? (
-            <div className="bb__blank">
-              <h2>How would you like to start?</h2>
-              {/* The consequence, not a definition. Somebody looking at an
-                  empty policy needs to know it is not inert — it is already
-                  deciding sign-ins, with the default, and that is the thing a
-                  blank canvas hides.
+          {/* The empty policy is not drawn here any more.
 
-                  The decision keeps its capital: "falls through to let in" is
-                  a sentence with a verb where a noun belongs, and reads as a
-                  typo. "falls through to the default — Let in" names the thing
-                  the chain draws at the bottom, in the words the chain uses. */}
-              <p>
-                This policy is already running. Until you add a rule, every sign-in falls straight through to the
-                default — <strong>{fallbackName}</strong>.
-              </p>
+              It used to be a `.bb__blank` panel inside `.bb__world` — which
+              meant the first thing anybody met on a new policy could be panned
+              off screen, zoomed to 50%, and wheel-scrolled by a handler that
+              calls preventDefault unconditionally. A canvas is the right
+              surface for a chain of rules and the wrong one for a question with
+              two answers.
 
-              {/* Two ways in, side by side, sized the same.
-
-                  This used to be one brand button reading "Add your first
-                  rule", and the other way in — a catalogue of ready-made
-                  policies — was a PAGE you passed through before the policy
-                  existed. That is the wrong order: you were choosing a template
-                  for something unnamed, and once you were here the catalogue
-                  was gone for good.
-
-                  So both offers stand at the moment the question is actually
-                  asked, and neither is dressed as the primary: a template is
-                  the faster road and scratch is the honest one, and which is
-                  right depends entirely on whether anything in the catalogue
-                  fits. Taking a template writes its rules into THIS policy, so
-                  it is an edit like any other and ⌘Z puts it back. */}
-              <div className="bb__starts">
-                {onUseTemplate && (
-                  <button type="button" className="bb__start2" onClick={onUseTemplate}>
-                    <span className="bb__start2__mark" aria-hidden>
-                      <LayoutTemplate size={20} strokeWidth={1.7} />
-                    </span>
-                    <strong>Use a template</strong>
-                    <span>Ready-made rules for the situations most tenants protect first</span>
-                  </button>
-                )}
-                <button type="button" className="bb__start2" onClick={() => onInsert(0)}>
-                  <span className="bb__start2__mark" aria-hidden>
-                    <PencilRuler size={20} strokeWidth={1.7} />
-                  </span>
-                  <strong>Start from scratch</strong>
-                  <span>Write the first rule yourself — who it covers, and what happens</span>
-                </button>
-              </div>
-            </div>
-          ) : (
+              `BoardBuilder` renders `BoardEmpty` in this component's place
+              while there are no rules, so the canvas exists only once there is
+              something on it. See BoardEmpty.tsx. */}
           <div className="bb__chain">
             <div className="bb__start" aria-label="A sign-in arrives">
               {landedOn === null && trace && inAudience ? (
@@ -536,7 +409,6 @@ export function Board({
               cardRef={() => {}}
             />
           </div>
-          )}
         </LayoutGroup>
       </div>
 

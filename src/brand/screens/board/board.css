@@ -261,54 +261,66 @@
 
 /* --- The chain ------------------------------------------------------------- */
 
-/* The empty policy: a beginning, not a diagram of nothing.
+/* --- The empty policy: the canvas, standing still ------------------------------
 
-   The chain drew its full apparatus for a policy with no rules — arrival node,
-   connector, locked default — three pieces of machinery to say "a sign-in
-   arrives and nothing happens to it". The one action available was a 12px `+`
-   on a connector between two cards nobody put there.
+   Same surface, none of the machinery. It is the board's own dotted ground with
+   the board's own edges, so arriving at a new policy and arriving at one with
+   rules are plainly the same place — but there is no world transform on it, no
+   pan, no zoom dock and no fold switch, because there is nothing yet for any of
+   them to act on.
 
-   No box round it any more, and that is the change that made room for two
-   offers instead of one. It was a 460px dashed panel standing exactly where the
-   first card would stand — the right drawing for "press this and a card appears
-   here", and the wrong one for a question with two answers: two cards inside a
-   dashed card is three nested containers to say one thing.
-
-   So the block itself is bare, the cards inside it carry the edges, and the
-   width follows them. `.bb__blank` stays as the class name because Board.tsx
-   measures it to centre the view, and centring on the world instead put it
-   about 130px too high. */
-.bb__blank {
-  width: 660px;
-  display: flex; flex-direction: column; align-items: center; text-align: center;
+   That is the whole of the change. The chooser used to live INSIDE
+   `.bb__world`, which meant the first thing anybody met on a new policy could
+   be dragged off screen, zoomed to half size, and wheel-scrolled by a handler
+   that calls `preventDefault` unconditionally — and it needed a hand-placed 0.9
+   fit of its own to sit anywhere sensible. `BoardBuilder` mounts `BoardEmpty`
+   while the policy has no rules and `Board` once it has some; the controls
+   arrive with the rules they are for. */
+.bb__empty {
+  grid-column: 1; grid-row: 1;
+  min-width: 0; min-height: 0;
+  display: grid; place-items: center;
+  padding: var(--space-9) var(--space-8);
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  /* The dots at their true size, not `calc(22px * var(--bb-z))`: there is no
+     zoom here to follow, and reading a variable this surface does not set would
+     have quietly resolved to 22px anyway — by accident rather than on purpose. */
+  background-color: var(--bb-stage);
+  background-image: radial-gradient(circle, var(--bb-dot) 1px, transparent 1.4px);
+  background-size: 22px 22px;
 }
-.bb__blank h2 {
-  margin: 0 0 var(--space-3);
-  font-size: var(--fs-xl); font-weight: var(--fw-semibold); color: var(--text-primary);
+.bb__empty__inner {
+  width: min(720px, 100%);
+  display: flex; flex-direction: column; align-items: center;
 }
-/* Capped in CHARACTERS, not pixels: a centred paragraph is readable to about
-   forty-five and ragged past it, whatever the panel is wide. */
-.bb__blank p {
-  margin: 0 0 var(--space-6);
-  max-width: 42ch;
-  font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.65;
+/* The question, and room under it. It carried a paragraph explaining that the
+   policy is already running and falls through to the default — true, and an
+   answer to a question nobody has yet, standing between the one they do have
+   and its two answers. The chain says the same thing with its locked last card
+   the moment there is a chain. */
+.bb__empty h2 {
+  margin: 0 0 var(--space-8);
+  font-size: var(--fs-2xl); font-weight: var(--fw-semibold); letter-spacing: -0.015em;
+  color: var(--text-primary); text-align: center;
 }
-.bb__blank p strong { font-weight: var(--fw-semibold); color: var(--text-secondary); }
 
 /* --- The two ways in ---------------------------------------------------------
 
    Equal width, equal weight, no primary. Which one is right depends entirely on
    whether anything in the catalogue fits what you are protecting, and that is
    not something the board knows — so neither card wears the brand fill, and the
-   choice is made on the words rather than on which button looks louder.
+   choice is made on the words and the pictures rather than on which button
+   looks louder.
 
-   `1fr 1fr` rather than `auto`: the two descriptions are different lengths, and
-   a chooser whose halves are different widths reads as one recommendation and
-   one afterthought. */
-.bb__starts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); width: 100%; }
+   `1fr 1fr` rather than `auto`: the two captions are different lengths, and a
+   chooser whose halves are different widths reads as one recommendation and one
+   afterthought. */
+.bb__starts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); width: 100%; }
 .bb__start2 {
   display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
-  padding: var(--space-7) var(--space-6) var(--space-7);
+  padding: var(--space-8) var(--space-7);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
   background: var(--surface-raised);
   box-shadow: var(--el-low);
@@ -316,30 +328,73 @@
   transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard),
     transform var(--dur-fast) var(--ease-standard);
 }
-.bb__start2:hover { border-color: var(--brand); box-shadow: var(--el-mid); transform: translateY(-1px); }
+.bb__start2:hover { border-color: var(--border-strong); box-shadow: var(--el-mid); transform: translateY(-2px); }
 .bb__start2:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--focus-ring); }
 .bb__start2 strong { font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* One line each, and short enough to stay one at every width the two cards are
+   drawn at. Both captions ran to two lines under a 30ch cap, which put four
+   lines of grey under two pictures and made the pair read as documentation
+   rather than as a choice. */
 .bb__start2 > span:last-child {
-  max-width: 30ch;
   font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55;
-}
-/* A round mark rather than a rounded square, and tinted rather than grey.
-
-   The squares on this surface are all cards and controls; a circle is the one
-   shape here that is plainly not either, which is what an illustration wants to
-   be. The brand tint is the only colour in the block, so it is where the eye
-   lands first and the words are where it lands second. */
-.bb__start2__mark {
-  display: grid; place-items: center;
-  width: 46px; height: 46px; border-radius: 50%;
-  margin-bottom: var(--space-3);
-  background: var(--brand-subtle-bg); color: var(--brand-active);
+  white-space: nowrap;
 }
 
-/* One column when the region cannot hold two 300px cards side by side. */
+/* --- The illustrations, and their hover ---------------------------------------
+
+   See BoardEmpty.tsx for what they draw and why. Here is only how they move:
+   the deck fans open, and the page rules itself. Declared as states rather than
+   as keyframes wherever that is possible, so leaving reverses everything for
+   free.
+
+   `transform-box: fill-box` on every animated group, because an SVG element's
+   default transform origin is the VIEWBOX origin, not its own box — without it
+   a five-degree rotation swings the card across the picture instead of turning
+   it where it sits. */
+.bb__start2__art {
+  width: 172px; height: 116px;
+  margin-bottom: var(--space-5);
+  overflow: visible;
+}
+.bb__art__card,
+.bb__art__page,
+.bb__art__todo {
+  transform-box: fill-box;
+  transition: transform 0.34s var(--ease-standard), opacity 0.34s var(--ease-standard);
+  transition-delay: calc(var(--i, 0) * 55ms);
+}
+/* The deck, fanned from the bottom edge so it opens like a hand of cards rather
+   than sliding apart. `--i` is the card's depth; 0 is the face, which stays
+   put and lets the two behind it come out. */
+.bb__art__card { transform-origin: 50% 100%; }
+.bb__start2:hover .bb__art__card { transform: rotate(calc(var(--i) * -5deg)) translateY(calc(var(--i) * -3px)); }
+
+/* The page rules itself: the two lines not yet written fade up in order, and
+   the dashes start marching round the sheet. */
+.bb__art__todo { opacity: 0; transform: translateY(3px); }
+.bb__start2:hover .bb__art__todo { opacity: 1; transform: none; }
+.bb__art__ants { transition: stroke 0.34s var(--ease-standard); }
+.bb__start2:hover .bb__art__ants {
+  stroke: var(--border-strong);
+  animation: bb-art-ants 1.6s linear infinite;
+}
+@keyframes bb-art-ants {
+  to { stroke-dashoffset: -18; }
+}
+
+/* One column when the region cannot hold two cards side by side. */
 @media (max-width: 820px) {
-  .bb__blank { width: 380px; }
   .bb__starts { grid-template-columns: minmax(0, 1fr); }
+  .bb__empty { padding: var(--space-7) var(--space-5); }
+}
+/* Everything above stops, and the deck rests fanned OPEN rather than shut — so
+   the difference between the two pictures is still drawn, it just does not
+   move. */
+@media (prefers-reduced-motion: reduce) {
+  .bb__art__card, .bb__art__page, .bb__art__todo, .bb__art__ants { transition: none; }
+  .bb__start2:hover .bb__art__ants { animation: none; }
+  .bb__art__card { transform: rotate(calc(var(--i) * -5deg)) translateY(calc(var(--i) * -3px)); }
+  .bb__art__todo { opacity: 1; transform: none; }
 }
 
 .bb__chain { display: flex; flex-direction: column; align-items: stretch; width: var(--bb-card); }

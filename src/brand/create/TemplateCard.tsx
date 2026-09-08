@@ -14,7 +14,6 @@ import {
 import { Button, DecisionChip, Modal } from '../kit'
 import { conditionType, type AccessDecision, type Scenario } from '../data'
 import { leaves } from '../predicate'
-import { useBrand } from '../store'
 
 /* -----------------------------------------------------------------------------
    The template card, shared by the create gallery and the Templates library.
@@ -155,19 +154,23 @@ export function TemplateCard({
   onPreview: () => void
   useLabel?: string
 }) {
-  const art = useBrand().features.templateHero
   const shown = m.rules.slice(0, shownCount(m.rules.length))
   const rest = m.rules.length - shown.length
   const post = posture(m.rules)
 
   return (
-    <article className={`bgcard ${art ? '' : 'is-flat'}`}>
+    <article className="bgcard">
       {/* The illustration is the live preview: the template's rules drawn as
           the builder would order them, plus the control that expands them.
-          Withheld in lite, where a template is chosen from its name and its
-          description — which is v0's "Start from a scenario". The badge is
-          metadata rather than illustration, so it survives on its own. */}
-      {art && (
+
+          It used to be withheld in the lite edition, on the reasoning that a
+          template chosen from its name and its description is v0's behaviour.
+          That gate is gone, and it was the wrong kind of gap: the thumbnail is
+          a DRAWING of the template's own rules — the same fact the card states
+          in words, in the shape the builder will draw it — not a capability
+          anybody is paying for. All it withheld was the ability to see what you
+          were choosing, and it took the preview dialog with it, because the
+          only control that opens the preview lives inside this block. */}
       <div className="bgcard__canvas">
         <button
           type="button"
@@ -228,7 +231,6 @@ export function TemplateCard({
           <span className="bgcard__rtext">strictest outcome is {POSTURE_WORD[post]}</span>
         </p>
       </div>
-      )}
 
       <div className="bgcard__body">
         {/* Signals first, then the labels, then the words — Apollo's order, and

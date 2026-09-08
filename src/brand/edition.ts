@@ -34,8 +34,6 @@ export interface Features {
   coverage: boolean
   /** Policies list: the Exposure column and its sort. */
   exposure: boolean
-  /** Create: the animated template preview beside the scenario list. */
-  templateHero: boolean
   /** Create and builder: the five-question guided build. */
   guidedSetup: boolean
   /** Builder: the graded thirteen-attempt deck. */
@@ -57,7 +55,6 @@ export interface Features {
 const FULL: Features = {
   coverage: true,
   exposure: true,
-  templateHero: true,
   guidedSetup: true,
   gauntlet: true,
   checkStep: true,
@@ -74,7 +71,6 @@ const FULL: Features = {
 const LITE: Features = {
   coverage: false,
   exposure: false,
-  templateHero: false,
   guidedSetup: false,
   gauntlet: false,
   checkStep: false,
@@ -176,15 +172,6 @@ export const GAPS: Gap[] = [
     cost: 'The builder assumes you already know that a policy is an ordered list, that conditions compose, and that the first match wins. A first-time administrator knows none of the three.',
     covered: 'Five questions write the rules, in order, and grade them — so the first policy teaches the model instead of requiring it.',
     weight: 'medium',
-  },
-  {
-    id: 'templateHero',
-    surface: 'Create',
-    title: 'Template preview',
-    question: 'What will this template actually do?',
-    cost: 'A template is chosen from its name and a one-line description, and the rules it carries are only visible after it has been applied.',
-    covered: 'The preview draws the rules the template will create, in evaluation order, before it is chosen.',
-    weight: 'low',
   },
   {
     id: 'commands',

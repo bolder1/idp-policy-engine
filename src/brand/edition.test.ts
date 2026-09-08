@@ -2,7 +2,6 @@
 import { describe, expect, it } from 'vitest'
 
 import policiesSrc from './screens/Policies.tsx?raw'
-import sheetSrc from './create/TemplateSheet.tsx?raw'
 import mainSrc from './screens/PolicyBuilderMain.tsx?raw'
 import { GAPS, featuresOf, gapsFor, type Features } from './edition'
 
@@ -36,7 +35,6 @@ describe('the two editions', () => {
         'guidedSetup',
         'publish',
         'reviewStep',
-        'templateHero',
       ].sort(),
     )
   })
@@ -50,11 +48,13 @@ describe('the two editions', () => {
     // feature, and a render test only proves the paths it happens to walk.
     expect(policiesSrc).toContain('store.features.coverage')
     expect(policiesSrc).toContain('store.features.exposure')
-    /* Both gates moved with the surfaces that hold them. The template
-       catalogue is a sheet the board opens, not a create screen; the guided
-       build is offered from the naming form, which the policy list now owns.
-       Same two flags, asserted where they are actually read. */
-    expect(sheetSrc).toContain('store.features.templateHero')
+    /* The guided build is offered from the naming form, which the policy list
+       now owns — so the flag is asserted where it is actually read.
+
+       `templateHero` was asserted here too and has gone with the flag: the
+       template card's rule-stack face is a drawing of the template's own rules,
+       not a capability, and gating it only meant lite could not see what it was
+       choosing. */
     expect(policiesSrc).toContain('store.features.guidedSetup')
     for (const flag of ['gauntlet', 'blastRadius', 'commands', 'guidedSetup', 'publish']) {
       for (const [shell, src] of SHELLS) {

@@ -8,6 +8,7 @@ import { TemplateSheet } from '../../create/TemplateSheet'
 import { ReviewDialog } from '../builder-dialogs'
 import { CommandBar, type Cmd } from '../command-bar'
 import { BoardBar, BoardBarActions } from './BoardBar'
+import { BoardEmpty } from './BoardEmpty'
 import { BoardSheet } from './BoardSheet'
 import { diagnose, shadowedBy } from '../diagnostics'
 import { runGauntlet } from '../gauntlet'
@@ -618,6 +619,15 @@ export function BoardBuilder({
       className={`bb ${panelShown ? '' : 'is-insp-closed'} ${gripping ? 'is-gripping' : ''}`}
       style={{ '--bb-insp': `${inspW}px` } as React.CSSProperties}
     >
+      {/* The canvas comes into existence when there is something on it.
+
+          A policy with no rules used to draw the chooser INSIDE the pan-and-zoom
+          world, which meant the first thing anybody met could be panned off
+          screen. `BoardEmpty` is an ordinary screen; `Board` is the canvas; and
+          the board only ever mounts one of them. */}
+      {draft.rules.length === 0 ? (
+        <BoardEmpty onUseTemplate={() => setPicking(true)} onScratch={() => insert(blankRule(), 0)} />
+      ) : (
       <Board
         policy={draft}
         selection={selection}
@@ -629,7 +639,6 @@ export function BoardBuilder({
         expandedOf={expandedOf}
         onToggleExpand={toggleExpand}
         onInsert={(at) => insert(blankRule(), at)}
-        onUseTemplate={() => setPicking(true)}
         onMove={move}
         onToggle={(i, on) => patchRule(i, { enabled: on })}
         onDuplicate={duplicate}
@@ -695,6 +704,7 @@ export function BoardBuilder({
           </div>
         }
       />
+      )}
 
 
       {panelShown && (

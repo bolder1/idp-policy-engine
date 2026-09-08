@@ -621,21 +621,36 @@ html[data-theme='dark'] .bguided__sheen {
 
    Dressed as a shelf on purpose. This is the one surface in the product where
    you choose between other people's work rather than edit your own, and a mark,
-   a centred search and a count on every shelf are how a catalogue says so. The
-   wash is neutral rather than brand: brand here means "press this to publish",
-   and a storefront is not an instruction. */
+   a centred search and a count on every shelf are how a catalogue says so.
+
+   Warmth, and only warmth. The band was flat neutral on the reasoning that
+   brand here means "press this to publish" and a storefront is not an
+   instruction — right about the argument, wrong about the room: a grey band
+   over a grey rail over a grid of grey cards is a shop with the lights off. So
+   two soft blooms of the brand's palest tint sit behind the mark, one wide and
+   centred, one small and off to the left, both faded out well before they reach
+   anything you have to read. Nothing in here is brand COLOURED; the air is.
+
+   Order matters — the first background layer is the topmost — so the blooms are
+   listed before the neutral wash they sit on. */
 .bmarket__hero {
   flex: none;
   display: flex; flex-direction: column; align-items: center; text-align: center;
   padding: 36px 24px 28px;
-  background: linear-gradient(180deg, var(--surface-inset), var(--surface-page));
+  background:
+    radial-gradient(52% 88% at 50% -6%, var(--brand-subtle-bg) 0%, transparent 68%),
+    radial-gradient(26% 62% at 22% 8%, var(--brand-subtle-bg) 0%, transparent 72%),
+    linear-gradient(180deg, var(--surface-inset), var(--surface-page));
   border-bottom: 1px solid var(--border-subtle);
 }
+/* The mark takes the tint too. It is the one object standing in the warm part
+   of the band, and leaving it cold made the bloom read as a printing fault
+   rather than as a decision. */
 .bmarket__mark {
   flex: none; width: 40px; height: 40px; border-radius: 12px;
   display: grid; place-items: center; margin-bottom: 14px;
-  background: var(--surface-raised); color: var(--text-secondary);
-  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised); color: var(--brand-active);
+  border: 1px solid var(--brand-subtle-border);
   box-shadow: var(--el-low);
 }
 .bmarket__hero h2 {

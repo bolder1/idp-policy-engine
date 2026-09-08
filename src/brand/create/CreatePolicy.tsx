@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Suspense, forwardRef, lazy, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowRight, Plus, Store, Upload, X } from 'lucide-react'
+import { ArrowRight, Plus, Store, X } from 'lucide-react'
 
 import { Button } from '../kit'
 import { EVERYONE, blankPolicy, conditionType, scenarios, type Audience, type Policy, type Scenario } from '../data'
@@ -65,12 +65,13 @@ export function CreatePolicy() {
   const [guidedApp, setGuidedApp] = useState<string | null>(null)
   const templatesRef = useRef<HTMLDivElement>(null)
 
-  /* Honours prefers-reduced-motion: the destination is the point, the travel
-     is not, so a user who has asked for less motion is simply put there. */
-  const jumpToTemplates = () => {
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    templatesRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
-  }
+  /* `jumpToTemplates` went with the banner that called it — a link reading "Or
+     start from a template ↓" that scrolled to the section directly below it.
+     `templatesRef` stays: `Gallery` takes it, and a named handle on the page's
+     main section is worth keeping whether or not anything scrolls to it today.
+
+     (It honoured prefers-reduced-motion, jumping rather than gliding. If a
+     jump link ever comes back, that is the behaviour to bring back with it.) */
 
   function choose(s: Scenario | null) {
     setPicked(s)
@@ -106,46 +107,30 @@ export function CreatePolicy() {
           <span>New policy</span>
         </nav>
 
+        {/* The one way to start that is not a template, beside the title.
+
+            A banner stood between this header and the gallery: a second heading
+            ("Every policy starts one of four ways"), a sentence, three controls
+            and a decorative dotted panel with Deny / MFA / Allow chips in it. It
+            was answering a real question — where DO I start — and it answered by
+            putting a title above a title and a link pointing at the section
+            immediately beneath it.
+
+            The gallery is the page. Templates are what most people take, they
+            are already on screen, and the only thing the banner had that the
+            gallery does not is the blank start — so that is what stays, in the
+            place a page's primary action goes.
+
+            "Import from file" went with it. It raised a toast describing a
+            format and did nothing else; a control that only explains itself is
+            a promise, and the header is the wrong place to keep one. */}
         <div className="bcp__headrow">
           <h1>New policy</h1>
+          <Button variant="brand" onClick={() => choose(null)}>
+            <Plus size={15} strokeWidth={2.2} aria-hidden /> Start from scratch
+          </Button>
         </div>
       </header>
-
-      {/* The three ways to start, gathered into one banner instead of scattered
-          between a header action trail, a card in the grid and a promo tile.
-          The fourth way — a template — is a whole section of its own below, so
-          the banner points at it rather than trying to contain it.
-
-          Guided setup is deliberately not here. It belongs on step 2's bar,
-          beside Create policy — see the note there. */}
-      <section className="bhero">
-        <div className="bhero__body">
-          <h2>Every policy starts one of four ways</h2>
-          <p>
-            Build it yourself, copy one you already run, or bring one in from a file. Nothing goes
-            live until you switch it on.
-          </p>
-          <div className="bhero__acts">
-            <Button variant="brand" onClick={() => choose(null)}>
-              <Plus size={15} strokeWidth={2.2} aria-hidden /> Start from scratch
-            </Button>
-            <Button onClick={() => store.showToast('Bulk import accepts CSV or JSON, up to 10,000 entries')}>
-              <Upload size={14} strokeWidth={1.9} aria-hidden /> Import from file
-            </Button>
-            <button type="button" className="bhero__jump" onClick={jumpToTemplates}>
-              Or start from a template <ArrowDown size={14} strokeWidth={2} aria-hidden />
-            </button>
-          </div>
-        </div>
-        {/* Decorative only — the same dotted canvas the rule thumbnails use,
-            so the banner belongs to this product rather than to a marketing
-            page. aria-hidden because it says nothing the copy does not. */}
-        <div className="bhero__art" aria-hidden>
-          <span className="bhero__chip is-1">Deny</span>
-          <span className="bhero__chip is-2">MFA</span>
-          <span className="bhero__chip is-3">Allow</span>
-        </div>
-      </section>
 
       <Gallery ref={templatesRef} onChoose={choose} onOpenMarket={() => setMarket(true)} />
 

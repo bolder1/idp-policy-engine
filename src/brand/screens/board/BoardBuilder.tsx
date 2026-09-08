@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Check, Copy, Keyboard, ListChecks, ListOrdered, Maximize2, Minimize2, PanelRightClose, PanelRightOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Activity, Check, Copy, Keyboard, ListChecks, ListOrdered, PanelRightClose, PanelRightOpen, PanelTopClose, PanelTopOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
 import { Button, Modal } from '../../kit'
 import { fallbackRule, reidRule, blankRule, type Policy, type Rule } from '../../data'
@@ -585,7 +585,18 @@ export function BoardBuilder({
                 title={focus ? 'Show the header' : 'Focus mode — hide the header'}
                 onClick={onToggleFocus}
               >
-                {focus ? <Minimize2 size={14} strokeWidth={2} /> : <Maximize2 size={14} strokeWidth={2} />}
+                {/* The panel glyphs, not the maximise pair.
+
+                    `Maximize2` was the first choice and it collided: "Fit the
+                    chain in view" sits four buttons along in the SAME toolbar
+                    wearing the identical arrows, so one strip offered two
+                    different things under one mark.
+
+                    `PanelTop` says what actually happens — a panel along the top
+                    edge closes — and it rhymes with the `PanelRight` pair the
+                    inspector toggle already uses on this board. Two panels, one
+                    idiom, and the arrow says which edge. */}
+                {focus ? <PanelTopOpen size={14} strokeWidth={2} /> : <PanelTopClose size={14} strokeWidth={2} />}
               </button>
             )}
             <button type="button" className="bb__act" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo(hist)} onClick={() => setHist(undo)}>

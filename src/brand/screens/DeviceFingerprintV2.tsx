@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   BadgeCheck,
   Brush,
-  Activity,
   Check,
   CircuitBoard,
   Copy,
@@ -15,7 +14,6 @@ import {
   Cpu,
   Eye,
   Fingerprint,
-  Wifi,
   Globe,
   Hash,
   IdCard,
@@ -405,49 +403,17 @@ const ATTR_ICON: Record<string, typeof Cpu> = {
    still worth being able to jump around in. The profile page has none — it
    holds at most fourteen rows and usually fewer. */
 
-/* --- The picker ----------------------------------------------------------------
-   Thirty-eight checkboxes, filtered rather than filed. */
-const CAT_META: Record<string, { tint: string; icon: typeof Cpu }> = {
-  Hardware: { tint: 'slate', icon: Cpu },
-  /* 'lime', not 'teal'. The tints resolve to the kit's feedback ramps and there
-     is no teal one — the class said teal while the colour came out green,
-     which is the kind of quiet disagreement that gets read as a bug in the
-     ramp rather than in the name. */
-  Browser: { tint: 'lime', icon: Globe },
-  Security: { tint: 'indigo', icon: ShieldCheck },
-  Network: { tint: 'blue', icon: Wifi },
-  Behaviour: { tint: 'amber', icon: Activity },
-}
+/* `CAT_META` and `metaOf` stood here — a tint and an icon per category, for
+   the rail that filed thirty-eight attributes into five columns of one.
 
-const metaOf = (id: string) => CAT_META[id] ?? { tint: 'slate', icon: Cpu }
+   The rail is a dropdown now and the list is flat, so there is no per-category
+   surface left to tint: a `<option>` cannot carry a colour that means anything,
+   and a flat list tinted five ways is a list wearing its filing scheme as
+   decoration. The tints themselves live on in `--cat-*` for the one thing that
+   still uses them — a selected row takes its category's colour rather than the
+   brand, so a search returning hits from four families reads as four families.
 
-/* --- The catalogue, as the step that picks from it -----------------------------
-
-   ONE component where there were two, and it is also where the values are now
-   set rather than only the rows chosen.
-
-   `AttrPicker` (five rows, flat) and `RiskAttrPicker` (thirty-eight, railed)
-   were separate because the two catalogues are genuinely different sizes, and
-   that argument still holds — five things do not need a filing scheme and
-   thirty-eight do. What did not hold is everything else being duplicated with
-   it: two search boxes, two select-alls, two counts, two definitions of what a
-   row looks like, drifting. The rail is now a branch inside one component
-   instead of the reason for a second one.
-
-   Two things are new, and both come from the same requirement — that the wizard
-   leave you with a FINISHED profile rather than a scoped one:
-
-   · A ticked row opens its settings underneath itself. That is why the row is a
-     `<div>` with a `<button>` inside it rather than a `<button>`: a `<select>`
-     cannot be nested inside a button, so `.bfp2__opt` could never have grown a
-     control and stayed what it was. It is deleted rather than extended.
-   · Attributes an agent would be needed for are not rendered as greyed rows.
-     They were, over thirty-eight, on the argument that "why is TPM ID not in
-     the list" is a support ticket — which was right when the reach lived on
-     another screen and the refusal was unactionable from here. It is actionable
-     now: the reach was answered one step ago. So the blocked ones collapse to
-     one line per category that NAMES three of them and offers the way back.
-   -------------------------------------------------------------------------- */
+*/
 
 function AttrStep({
   mode,
@@ -473,21 +439,29 @@ function AttrStep({
   onBack?: () => void
 }) {
   const [q, setQ] = useState('')
-  const [cat, setCat] = useState<AttrCategory>(CATEGORIES[0].id)
+  /* '' is every category, and it is the default. The rail this replaces made
+     you pick one before you could see anything, which is a filing scheme
+     presented as a prerequisite. */
+  const [cat, setCat] = useState<AttrCategory | ''>('')
 
   const offered = offeredAttributes(mode, reach)
   const blocked = blockedAttributes(mode, reach)
+  const locked = offered.filter((a) => a.always)
+
   /* Counted against what is OFFERED, never against the whole catalogue. "6 of
      38 selected" on an agentless profile names a denominator eighteen of whose
      rows are not on the screen and cannot be reached from it. */
   const chosen = picked.filter((id) => offered.some((a) => a.id === id))
 
   const needle = q.trim().toLowerCase()
-  const hits = (a: Attribute) =>
-    !needle ||
-    a.name.toLowerCase().includes(needle) ||
-    a.purpose.toLowerCase().includes(needle) ||
-    (a.category ?? '').toLowerCase().includes(needle)
+  const shown = offered.filter(
+    (a) =>
+      (!cat || a.category === cat) &&
+      (!needle ||
+        a.name.toLowerCase().includes(needle) ||
+        a.purpose.toLowerCase().includes(needle) ||
+        (a.category ?? '').toLowerCase().includes(needle)),
+  )
 
   const toggle = (id: string) =>
     setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id])
@@ -497,7 +471,7 @@ function AttrStep({
       key={a.id}
       attr={a}
       mode={mode}
-      on={picked.includes(a.id)}
+      on={a.always || picked.includes(a.id)}
       config={config}
       weights={weights}
       onToggle={() => toggle(a.id)}
@@ -506,23 +480,36 @@ function AttrStep({
     />
   )
 
-  /* --- The small catalogue: no rail, no search, no counting -----------------
+  /* --- The small catalogue: no bar at all -----------------------------------
 
      Five rows, all of them on screen, every one of them a condition somebody is
      about to state. A search box over five rows is a control that can only ever
-     hide four of them. */
+     hide four of them, and a category filter over a list with no categories is
+     a control with one option. */
   if (!asksReach(mode) && offered.length <= 8) {
     return <div className="bfp2__pickrows">{offered.map(row)}</div>
   }
 
-  const groups = CATEGORIES.map((c) => ({
-    cat: c,
-    rows: offered.filter((a) => a.category === c.id && hits(a)),
-    blocked: blocked.filter((a) => a.category === c.id),
-  })).filter((g) => (needle ? g.rows.length > 0 : g.cat.id === cat))
+  const free = shown.filter((a) => !a.always)
+  const lockedShown = shown.filter((a) => a.always)
+  const blockedShown = cat ? blocked.filter((a) => a.category === cat) : blocked
 
   return (
     <div className="bfp2__pick">
+      {/* --- The bar ---------------------------------------------------------
+
+          The category rail is a dropdown here, and the list below is all of
+          them by default.
+
+          The rail was five buttons down the left, and it showed ONE category at
+          a time: a filing scheme you had to operate before the catalogue would
+          show you anything, spending 196px of a panel's width to hide 80% of
+          its contents. It answered "have I done Hardware yet" with a count per
+          row, which is real — and the count now sits in the dropdown's own
+          options, where it costs no width at all.
+
+          The list is the thing. The filter is a control on the bar beside the
+          search, which is where every list in this console puts one. */}
       <div className="bfp2__pickbar">
         <label className="bfp2__search">
           <Search size={14} strokeWidth={1.9} aria-hidden />
@@ -534,136 +521,129 @@ function AttrStep({
             onChange={(e) => setQ(e.target.value)}
           />
         </label>
+
+        <select
+          className="bfp2__select bfp2__catfilter"
+          aria-label="Filter by category"
+          value={cat}
+          onChange={(e) => setCat(e.target.value as AttrCategory | '')}
+        >
+          <option value="">All categories</option>
+          {CATEGORIES.map((c) => {
+            const all = offered.filter((a) => a.category === c.id)
+            /* A category an agentless profile cannot reach at all is offered
+               and says so, rather than being dropped from the list — "why is
+               Security missing" is the support ticket that hiding it writes. */
+            return (
+              <option key={c.id} value={c.id} disabled={all.length === 0}>
+                {c.label} · {all.filter((a) => a.always || picked.includes(a.id)).length}/{all.length}
+                {all.length === 0 ? ' · needs an agent' : ''}
+              </option>
+            )
+          })}
+        </select>
+
         <span className={`bfp2__pickcount ${chosen.length ? 'is-on' : ''}`}>
           {chosen.length} of {offered.length} selected
         </span>
-        {/* No select-all here. Each category header carries its own, acting on
-            what that category is showing — two select-alls on one pane, one
-            scoped to the group and one to everything visible, is a pair nobody
-            can tell apart at a glance. */}
-        {chosen.length > 0 && (
-          <button type="button" className="bfp2__clear" onClick={() => setPicked([])}>
-            Clear all
+        {/* Clears what can be cleared. The always-on four are not "selected" in
+            a sense anybody can undo, so a Clear that silently left four ticked
+            rows behind would read as a broken control rather than a correct
+            one — the label says which. */}
+        {chosen.length > locked.length && (
+          <button
+            type="button"
+            className="bfp2__clear"
+            onClick={() => setPicked(picked.filter((id) => locked.some((a) => a.id === id)))}
+          >
+            Clear the rest
           </button>
         )}
       </div>
 
-      <div className="bfp2__pickbody">
-        <nav className="bfp2__rail" aria-label="Attribute categories">
-          {CATEGORIES.map((c) => {
-            const all = offered.filter((a) => a.category === c.id)
-            const on = all.filter((a) => picked.includes(a.id)).length
-            const locked = all.length === 0
-            const dim = needle ? !all.some(hits) : false
-            const here = !needle && cat === c.id
-            const { tint, icon: Icon } = metaOf(c.id)
-            return (
-              <button
-                key={c.id}
-                type="button"
-                aria-current={here || undefined}
-                title={c.blurb}
-                className={`bfp2__railitem is-${tint} ${here ? 'is-on' : ''} ${dim ? 'is-dim' : ''} ${locked ? 'is-locked' : ''}`}
-                onClick={() => {
-                  setQ('')
-                  setCat(c.id)
-                }}
-              >
-                <span className="bfp2__railico" aria-hidden>
-                  {locked ? <Lock size={13} strokeWidth={2} /> : <Icon size={13} strokeWidth={1.9} />}
-                </span>
-                <span className="bfp2__raillabel">{c.label}</span>
-                {/* Progress, never hit count — so it means the same thing with
-                    a search running as without one. A category an agentless
-                    profile cannot reach at all reads 0/0 rather than 0/4, which
-                    is the honest denominator. */}
-                <span className={`bfp2__railcount ${on > 0 ? 'is-on' : ''}`}>
-                  {on}/{all.length}
-                </span>
-              </button>
-            )
-          })}
-        </nav>
+      <div className="bfp2__pane">
+        {shown.length === 0 ? (
+          <p className="bfp2__none">Nothing matches that.</p>
+        ) : (
+          <>
+            {/* --- Always collected, at the top --------------------------------
 
-        <div className="bfp2__pane">
-          {groups.length === 0 ? (
-            <p className="bfp2__none">Nothing matches that.</p>
-          ) : (
-            groups.map((g) => (
-              <section key={g.cat.id} className={`bfp2__pang is-${metaOf(g.cat.id).tint}`}>
+                Pinned rather than left in category order, because they are the
+                one part of this list nobody is choosing — a locked row sitting
+                between two you can tick reads as one you have failed to
+                untick. Grouped, labelled, and above the line, they read as what
+                they are: the floor this profile is built on.
+
+                They still carry their settings. What a profile decides about
+                these is not WHETHER they are collected but how much each one
+                counts, and that is the more interesting half. */}
+            {lockedShown.length > 0 && (
+              <section className="bfp2__pang">
                 <header className="bfp2__panghead">
-                  {(() => {
-                    const Ico = metaOf(g.cat.id).icon
-                    return <Ico size={13} strokeWidth={2} aria-hidden />
-                  })()}
-                  <h4>{g.cat.label}</h4>
-                  <span>
-                    {g.rows.filter((a) => picked.includes(a.id)).length}/{g.rows.length}
-                  </span>
-                  {/* Acts on what is VISIBLE, so with a search running it takes
-                      the matches rather than the whole category behind them. */}
-                  <button
-                    type="button"
-                    className="bfp2__selectall"
-                    onClick={() => {
-                      const ids = g.rows.map((a) => a.id)
-                      const full = ids.every((id) => picked.includes(id))
-                      setPicked(
-                        full
-                          ? picked.filter((x) => !ids.includes(x))
-                          : [...new Set([...picked, ...ids])],
-                      )
-                    }}
-                  >
-                    {g.rows.every((a) => picked.includes(a.id)) ? 'Clear these' : 'Select all'}
-                  </button>
-                </header>
-                {g.rows.length === 0 ? (
-                  <EmptyState
-                    compact
-                    icon={Lock}
-                    title="Nothing here without an agent"
-                    blurb={`${g.cat.label} is read by software on the machine. ${g.blocked
-                      .slice(0, 3)
-                      .map((a) => a.name)
-                      .join(', ')} all need one.`}
-                    action={
-                      onBack && (
-                        <Button variant="secondary" size="sm" onClick={onBack}>
-                          Change what it reads
-                        </Button>
-                      )
-                    }
+                  <Lock size={12} strokeWidth={2} aria-hidden />
+                  <h4>Always collected</h4>
+                  <span>{lockedShown.length}</span>
+                  <TipDot
+                    label="Always collected"
+                    text="These arrive with every request before any profile is consulted, so they cannot be switched off. What this profile decides is how much each one counts."
                   />
-                ) : (
-                  <div className="bfp2__pickrows">{g.rows.map(row)}</div>
-                )}
-
-                {/* Named, not counted. "4 more need an agent" is a number you
-                    cannot act on; the names are what tell you whether the ones
-                    you are missing are ones you wanted. */}
-                {g.rows.length > 0 && g.blocked.length > 0 && (
-                  <p className="bfp2__locked">
-                    <Lock size={12} strokeWidth={2} aria-hidden />
-                    <span>
-                      {g.blocked.length} more need an agent —{' '}
-                      {g.blocked
-                        .slice(0, 3)
-                        .map((a) => a.name)
-                        .join(', ')}
-                      {g.blocked.length > 3 && ` and ${g.blocked.length - 3} others`}.
-                    </span>
-                    {onBack && (
-                      <button type="button" className="bfp2__clear" onClick={onBack}>
-                        Change what it reads
-                      </button>
-                    )}
-                  </p>
-                )}
+                </header>
+                <div className="bfp2__pickrows">{lockedShown.map(row)}</div>
               </section>
-            ))
-          )}
-        </div>
+            )}
+
+            {free.length > 0 && (
+              <section className="bfp2__pang">
+                {lockedShown.length > 0 && (
+                  <header className="bfp2__panghead">
+                    <h4>{cat ? CATEGORIES.find((c) => c.id === cat)?.label : 'Everything else'}</h4>
+                    <span>
+                      {free.filter((a) => picked.includes(a.id)).length}/{free.length}
+                    </span>
+                    <button
+                      type="button"
+                      className="bfp2__selectall"
+                      onClick={() => {
+                        const ids = free.map((a) => a.id)
+                        const full = ids.every((id) => picked.includes(id))
+                        setPicked(
+                          full
+                            ? picked.filter((x) => !ids.includes(x))
+                            : [...new Set([...picked, ...ids])],
+                        )
+                      }}
+                    >
+                      {free.every((a) => picked.includes(a.id)) ? 'Clear these' : 'Select all'}
+                    </button>
+                  </header>
+                )}
+                <div className="bfp2__pickrows">{free.map(row)}</div>
+              </section>
+            )}
+          </>
+        )}
+
+        {/* Named, not counted. "12 more need an agent" is a number you cannot
+            act on; the names are what tell you whether the ones you are missing
+            are ones you wanted. */}
+        {blockedShown.length > 0 && (
+          <p className="bfp2__locked">
+            <Lock size={12} strokeWidth={2} aria-hidden />
+            <span>
+              {blockedShown.length} more need an agent —{' '}
+              {blockedShown
+                .slice(0, 3)
+                .map((a) => a.name)
+                .join(', ')}
+              {blockedShown.length > 3 && ` and ${blockedShown.length - 3} others`}.
+            </span>
+            {onBack && (
+              <button type="button" className="bfp2__clear" onClick={onBack}>
+                Change what it reads
+              </button>
+            )}
+          </p>
+        )}
       </div>
     </div>
   )
@@ -700,9 +680,23 @@ function AttrPickRow({
   onValue: (id: string, v: AttrConfigValue) => void
   onWeight: (id: string, w: number) => void
 }) {
+  /* An always-collected row is ticked and cannot be untucked, so the toggle is
+     a disabled button rather than a live one with a handler that refuses.
+
+     `disabled` and not `aria-disabled`: there is nothing to announce and
+     nothing to explain on press. The row still opens its settings — those are
+     the part a profile decides — so the control that is dead is exactly the
+     one with no decision behind it. */
+  const fixed = Boolean(attr.always)
   return (
-    <div className={`bfp2__pickrow ${on ? 'is-on' : ''}`}>
-      <button type="button" className="bfp2__picktoggle" aria-pressed={on} onClick={onToggle}>
+    <div className={`bfp2__pickrow ${on ? 'is-on' : ''} ${fixed ? 'is-fixed' : ''}`}>
+      <button
+        type="button"
+        className="bfp2__picktoggle"
+        aria-pressed={on}
+        disabled={fixed}
+        onClick={onToggle}
+      >
         <span className="bfp2__picktick" aria-hidden>
           <Check size={11} strokeWidth={3.2} />
         </span>
@@ -720,6 +714,11 @@ function AttrPickRow({
         <span className="bfp2__pickmain">
           <span className="bfp2__pickname">
             {attr.name}
+            {/* Says why the tick will not move, on the row where it will not
+                move. The section heading above says it once for the group; a
+                row read on its own — after a search, say, where the grouping is
+                gone — still has to answer it. */}
+            {fixed && <i className="bfp2__fixedtag">Always on</i>}
             {/* Marked here rather than only on the inner page. Whether a signal
                 is collected at all is part of deciding to include it, and
                 learning it afterwards is learning it too late. */}

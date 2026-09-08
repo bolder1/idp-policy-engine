@@ -10,9 +10,11 @@ import {
   REACHES,
   TIER_WEIGHT,
   VERSION_OPS,
+  alwaysOn,
   asksReach,
   attrOf,
   attributesFor,
+  withAlwaysOn,
   blockedAttributes,
   countLabel,
   describeProfile,
@@ -423,5 +425,49 @@ describe('what the page says about a profile', () => {
      match" ever after. One list, and this is the tripwire. */
   it('labels a kind the same way wherever it is named', () => {
     for (const m of MODES) expect(modeLabel({ mode: m.id as ProfileMode })).toBe(m.label)
+  })
+})
+
+
+/* -----------------------------------------------------------------------------
+   The signals a profile cannot switch off.
+   -------------------------------------------------------------------------- */
+
+describe('always-on attributes', () => {
+  /* Only the device kind has any. An OS-and-version profile is a set of
+     conditions somebody states outright, and a condition nobody wrote is not a
+     stricter rule — it is a rule that does not say what it does. */
+  it('belong to the device kind only', () => {
+    expect(alwaysOn('os')).toEqual([])
+    expect(alwaysOn('device').length).toBeGreaterThan(0)
+  })
+
+  /* They are what the REQUEST carries, so an agentless profile must be able to
+     collect every one of them. An unswitchable attribute that needs an agent
+     would be a profile nobody can make work and nobody can fix. */
+  it('never need an agent, or they could not be unswitchable', () => {
+    const needy = alwaysOn('device').filter((a) => a.needsAgent)
+    expect(needy.map((a) => a.id)).toEqual([])
+    const offered = offeredAttributes('device', 'agentless')
+    for (const a of alwaysOn('device')) expect(offered).toContain(a)
+  })
+
+  /* The picker ticks these whether or not they are stored, so a seed that omits
+     one reads on screen as enabled and in the model as not — and `scoreOf`
+     believes the model. */
+  it('are enabled on every profile of their kind', () => {
+    for (const p of seedProfiles) {
+      const missing = alwaysOn(p.mode)
+        .map((a) => a.id)
+        .filter((id) => !p.enabled.includes(id))
+      expect(`${p.id}: ${missing.join(',')}`).toBe(`${p.id}: `)
+    }
+  })
+
+  it('lead the list, and are never duplicated into it', () => {
+    const next = withAlwaysOn('device', ['mac', 'browser'])
+    expect(next.slice(0, alwaysOn('device').length)).toEqual(alwaysOn('device').map((a) => a.id))
+    expect(new Set(next).size).toBe(next.length)
+    expect(next).toContain('mac')
   })
 })

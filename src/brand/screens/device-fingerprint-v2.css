@@ -171,9 +171,30 @@
    fixed height was right for thirty-eight, where the list always overflowed;
    with fourteen it reserved a scroller for a list that fits and left a band of
    empty sunken panel under the last row. */
+/* One list, and a dropdown to narrow it.
+
+   This was a two-column body: a 196px rail of five categories on the left and a
+   pane on the right showing ONE of them. That is a filing scheme operated as a
+   prerequisite — a third of the panel's width spent to hide four fifths of its
+   contents, and a first impression of "choose a category" when the question is
+   "choose some attributes".
+
+   The counts the rail carried were real and they survive, in the dropdown's own
+   options, where they cost no width at all. */
+/* No height cap, because it is no longer inside anything that supplies one.
+
+   `max-height: min(56vh, 480px)` was written for a centred modal, where the
+   dialog sizes to its content and a list has to stop itself before it grows
+   past the viewport. In a slide-over the panel is already full height and its
+   body is already the scroller, so a second scroller inside it made a 480px
+   window onto the list with 200px of empty panel underneath — and two nested
+   scrollbars a centimetre apart, only one of which moves what you are looking
+   at.
+
+   One scroller: the drawer's. The list is as long as the list. */
 .bfp2__pick {
   display: flex; flex-direction: column; gap: 10px;
-  max-height: min(56vh, 480px); min-height: 0;
+  min-height: 0;
 }
 
 /* --- The picker's search row ----------------------------------------------------
@@ -488,8 +509,7 @@
 
 /* An attribute this reach cannot collect. Shown and refused rather than hidden:
    "why is TPM ID missing" is a support ticket, and a greyed row is the answer. */
-.bfp2__opt.is-blocked { opacity: 0.4; cursor: not-allowed; }
-.bfp2__opt.is-blocked:hover { border-color: var(--border-subtle); background: var(--surface-raised); }
+
 
 .bfp2__roster { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
 .bfp2__roster strong { font-size: var(--fs-sm); color: var(--text-primary); }
@@ -586,109 +606,32 @@
    flat checkboxes is a list you scroll rather than read. The match picker keeps
    the plain grid above — five items need no filing.
 
-   Lifted from `ba0e53d^` rather than rewritten, so the category tints, the
-   counts and the agentless dimming are the ones already reasoned about. Where a
-   selector is shared with the match picker (`.bfp2__opt` and friends) this
-   restates it identically rather than forking it.
-   ========================================================================== */
+   The rail that filed them into five columns has since become a dropdown on the
+   bar, and the tints it carried went with it — see below. What is left of this
+   region is the bar, the scroller and the group headings. */
 
-.bfp2__pickbody {
-  flex: 1; min-height: 0;
-  display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 12px;
-}
+/* The five category tints have gone with the rail that used them.
 
-/* --- The rail ---------------------------------------------------------------------
-   Five categories is a short enough list to show whole, so it is navigation
-   rather than an accordion: what is in the pane never moves, and the count
-   beside each label answers "have I done Hardware yet" without opening it.
+   One `--cat-*` block per family, read by the rail icon, the group heading and
+   a selected row — so a search returning hits from four categories read as four
+   categories. That argument needed a list GROUPED by category to be true of,
+   and the list is flat now: its two groups are "always collected" and
+   everything else, which are not families and must not be coloured as though
+   they were.
 
-   One line each. The category's sentence went to the tip — five of them stacked
-   here was more reading than the five labels needed, and the icon does the
-   identifying faster than the sentence did. */
-.bfp2__rail {
-  min-height: 0; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 2px;
-  padding: 6px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-}
-/* --- The five category tints ---------------------------------------------------
-   One declaration per family, published as variables, so every consumer of a
-   category's colour reads the same four values: the rail icon, the group
-   heading, the spine on a section, a selected row, its tick box and its icon.
-   They each used to restate five selectors of their own, which is how the
-   colour came to be missing in all of them at once — the selectors survived a
-   change that emptied their values, and five near-identical blocks all
-   resolving to brand orange does not look like a mistake until you count them.
-   A sixth category is one line here now.
+   Colouring each row by its own family instead was the alternative, and it is
+   worse than the brand it would replace: twenty selected rows in five hues is a
+   list wearing its filing scheme as decoration, on a screen that has already
+   had one colour pass for exactly that reason. A selected row takes the brand,
+   the same as every other "chosen" state on this surface.
 
-   The families are the kit's feedback ramps, picked for hue distance rather
-   than for meaning: five is exactly the count at which two neighbouring hues
-   stop being tellable apart, which is the failure this had before. None of
-   them is the positive or negative ramp — Behaviour is not a warning, Security
-   is not a pass, and a family must never read as a verdict on the attributes
-   filed under it. */
-.bfp2__pang.is-slate, .bfp2__railitem.is-slate {
-  --cat-bg: var(--fb-neutral-bg); --cat-border: var(--fb-neutral-border);
-  --cat-fg: var(--fb-neutral-fg); --cat-dot: var(--fb-neutral-dot);
-}
-.bfp2__pang.is-lime, .bfp2__railitem.is-lime {
-  --cat-bg: var(--fb-lime-bg); --cat-border: var(--fb-lime-border);
-  --cat-fg: var(--fb-lime-fg); --cat-dot: var(--fb-lime-dot);
-}
-.bfp2__pang.is-indigo, .bfp2__railitem.is-indigo {
-  --cat-bg: var(--fb-accent-bg); --cat-border: var(--fb-accent-border);
-  --cat-fg: var(--fb-accent-fg); --cat-dot: var(--fb-accent-dot);
-}
-.bfp2__pang.is-blue, .bfp2__railitem.is-blue {
-  --cat-bg: var(--fb-info-bg); --cat-border: var(--fb-info-border);
-  --cat-fg: var(--fb-info-fg); --cat-dot: var(--fb-info-dot);
-}
-.bfp2__pang.is-amber, .bfp2__railitem.is-amber {
-  --cat-bg: var(--fb-notice-bg); --cat-border: var(--fb-notice-border);
-  --cat-fg: var(--fb-notice-fg); --cat-dot: var(--fb-notice-dot);
-}
+*/
 
-.bfp2__railitem {
-  display: flex; align-items: center; gap: 9px;
-  padding: 8px 9px; border-radius: var(--radius-sm);
-  background: none; cursor: pointer; text-align: left;
-  transition: background var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard);
-}
-.bfp2__railitem:hover { background: var(--surface-inset); }
-.bfp2__railitem.is-on { background: var(--surface-raised); box-shadow: inset 0 0 0 1px var(--border-default); }
-.bfp2__railitem:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
-/* A category the running search cannot reach. Dimmed rather than hidden, so the
-   rail does not change length while you type. */
-.bfp2__railitem.is-dim { opacity: 0.4; }
-
-/* The icon carries the tint. It is the one mark on the row, so it is doing the
-   work the spine and the sentence used to share — and it says the tint even
-   when the row is not the selected one, which is the point: the rail is where
-   the five colours are learned. */
-.bfp2__railico {
-  flex: none; display: grid; place-items: center;
-  color: var(--cat-fg, var(--text-muted));
-}
-
-.bfp2__railitem > strong {
-  flex: 1; min-width: 0;
-  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
-.bfp2__railcount {
-  flex: none;
-  padding: 1px 7px; border-radius: var(--radius-sm);
-  background: var(--surface-inset);
-  font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums;
-}
-.bfp2__railcount.is-on { background: var(--brand-subtle-bg); color: var(--brand-active); font-weight: var(--fw-medium); }
-
-/* --- The pane ---------------------------------------------------------------------
-   One group while browsing, every group with a hit while searching. */
+/* The whole body, where it used to be the right half of a grid beside the
+   rail. */
+/* The whole body, and it does not scroll on its own — see `.bfp2__pick`. */
 .bfp2__pane {
-  min-height: 0; overflow-y: auto;
+  min-height: 0;
   padding: 0 12px 12px;
   background: var(--surface-sunken);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
@@ -706,12 +649,17 @@
   margin-bottom: 8px;
 }
 .bfp2__panghead > svg { flex: none; }
+/* No category tint on the heading any more: there are two groups now — the
+   always-collected floor and everything else — and neither is a family. The
+   `--cat-*` tints still colour a SELECTED ROW, which is where they do work: a
+   search returning hits from four families reads as four families. */
 .bfp2__panghead h4 {
   margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
   letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--cat-fg, var(--text-secondary));
+  color: var(--text-secondary);
 }
-.bfp2__panghead > svg { color: var(--cat-fg, var(--text-muted)); }
+.bfp2__panghead > svg { color: var(--text-muted); }
+.bfp2__panghead > .bx-tip { margin-left: -4px; }
 /* The heading and its icon take the category tint together — the same mark the
    rail uses, so a search showing four groups reads as four families. */
 .bfp2__panghead > span {
@@ -824,8 +772,8 @@
    categories reads as four categories rather than one long orange smear. The
    five-row catalogue has no categories and falls back to the brand. */
 .bfp2__pickrow.is-on {
-  border-color: var(--cat-border, var(--brand));
-  background: var(--cat-bg, var(--brand-subtle-bg));
+  border-color: var(--brand);
+  background: var(--brand-subtle-bg);
 }
 
 .bfp2__picktoggle {
@@ -850,8 +798,8 @@
   color: transparent;
 }
 .bfp2__pickrow.is-on .bfp2__picktick {
-  border-color: var(--cat-fg, var(--brand-active));
-  background: var(--cat-fg, var(--brand-active));
+  border-color: var(--brand-active);
+  background: var(--brand-active);
   /* The raised surface rather than white: a white tick fails contrast against
      the lighter half of the category ramp in one of the two themes. */
   color: var(--surface-raised);
@@ -921,7 +869,7 @@
 /* A category an agentless profile cannot reach at all. Dimmed rather than
    hidden: it still says the family exists, and its count reads 0/0, which is
    the honest denominator. */
-.bfp2__railitem.is-locked { opacity: 0.5; }
+
 
 /* --- Rules that were emitted and styled nowhere ---------------------------------
 
@@ -929,7 +877,16 @@
    declaration behind it. The search bar in particular was a visible defect: its
    three children stacked vertically because the flex that was meant to lay them
    out lived on the other picker's class. */
-.bfp2__pickbar { flex: none; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* Sticky, because the list under it is now as long as the catalogue and the
+   count, the filter and the search are what you use to get back to a manageable
+   one. It sticks to the drawer body's own scroll, which is the only scroll
+   there is. */
+.bfp2__pickbar {
+  position: sticky; top: 0; z-index: 2;
+  flex: none; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding-bottom: 10px; margin-bottom: -10px;
+  background: var(--surface-raised);
+}
 /* The search field itself, which lost its own declaration when the flat
    picker's filter bar was deleted around it. It had been nested there, so the
    `flex: 1` below was styling a box with no layout of its own — the magnifier
@@ -957,7 +914,7 @@
 .bfp2__clear:hover { text-decoration: underline; }
 .bfp2__clear:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-xs); }
 .bfp2__attico { flex: none; display: grid; place-items: center; width: 20px; color: var(--text-tertiary); }
-.bfp2__raillabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
 
 /* =============================================================================
    THE INNER PAGE
@@ -1228,3 +1185,34 @@ button.bfp2__factval:focus-visible {
    by a rule — a rule would make it look like another fact with the label
    missing. */
 .bfp2__factact { padding: var(--space-4) 0 var(--space-2); }
+
+/* --- The category filter, and the rows that cannot be turned off ----------------- */
+
+/* The rail, as one control on the bar. `width: auto` because the kit gives a
+   bare select `width: 100%` at zero specificity, which in a flex bar means it
+   takes everything the search box does not. */
+.bfp2__catfilter { flex: none; width: auto; max-width: 220px; }
+
+/* Ticked, and not by you.
+
+   The row is not dimmed — it is not disabled information, it is information
+   that happens to be settled, and half of it (how much it counts) is still
+   yours. Only the tick reads as fixed: filled like any selected row, but with
+   the cursor and the hover of something that does not move. */
+.bfp2__pickrow.is-fixed .bfp2__picktoggle { cursor: default; }
+.bfp2__pickrow.is-fixed .bfp2__picktick {
+  border-color: var(--border-strong);
+  background: var(--border-strong);
+  color: var(--surface-raised);
+}
+.bfp2__pickrow.is-fixed.is-on { border-color: var(--border-default); background: var(--surface-sunken); }
+
+/* Says why, on the row, in the two words it takes. The group heading says it
+   once for the group; after a search there is no group. */
+.bfp2__fixedtag {
+  flex: none; font-style: normal;
+  padding: 1px 6px; border-radius: var(--radius-pill);
+  background: var(--surface-inset); color: var(--text-tertiary);
+  font-size: 10px; font-weight: var(--fw-medium);
+  letter-spacing: 0.02em; white-space: nowrap;
+}

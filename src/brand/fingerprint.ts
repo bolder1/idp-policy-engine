@@ -134,6 +134,21 @@ export interface Attribute {
      names one is not misconfigured, it is inert: the value never arrives, so it
      never mismatches, and the profile is quietly weaker than it reads. */
   needsAgent?: true
+  /* Collected on every request whether or not a profile asks for it, so a
+     profile cannot turn it off.
+
+     Not a recommendation and not a default — a default is something you can
+     change. These four are what the request itself carries: a form factor, an
+     operating system, a browser and an address. They arrive before any profile
+     is consulted, they cost nothing to read, and a device fingerprint that
+     ignores them is not a weaker fingerprint, it is one throwing away the only
+     signals it is guaranteed to have.
+
+     What a profile still decides about them is how much each one COUNTS. That
+     is the whole of the difference between "always collected" and "always
+     mattering", and it is why these rows are ticked-and-locked rather than
+     hidden: an admin has to be able to see what is being weighed. */
+  always?: true
   /** Absent when the attribute has nothing to tune. */
   config?: AttrConfig
 }
@@ -306,6 +321,7 @@ export const DEVICE_ATTRIBUTES: Attribute[] = [
     id: 'device-type', category: 'Hardware', name: 'Device type',
     purpose: 'Desktop, laptop, mobile or tablet. Different form factors carry different risk.',
     priority: 'Low', weight: 5, phase: 1,
+    always: true,
   },
   {
     id: 'manufacturer', category: 'Hardware', name: 'Manufacturer and model',
@@ -321,6 +337,7 @@ export const DEVICE_ATTRIBUTES: Attribute[] = [
     id: 'os', category: 'Hardware', name: 'Operating system and version',
     purpose: 'An unpatched OS is a reason to ask for more, independent of whether the device is known.',
     priority: 'High', weight: 20, phase: 1,
+    always: true,
     config: { kind: 'choice', label: 'Match on', value: 'Major version', options: ['Exact build', 'Major version', 'Name only'] },
   },
   {
@@ -384,6 +401,7 @@ export const DEVICE_ATTRIBUTES: Attribute[] = [
     id: 'browser', category: 'Browser', name: 'Browser and version',
     purpose: 'Changes on every browser update, so it is noisy unless matched loosely.',
     priority: 'Medium', weight: 10, phase: 1,
+    always: true,
     config: { kind: 'choice', label: 'Match on', value: 'Family only', options: ['Exact version', 'Major version', 'Family only'] },
   },
   {
@@ -441,6 +459,7 @@ export const DEVICE_ATTRIBUTES: Attribute[] = [
     id: 'ip', category: 'Network', name: 'IP address',
     purpose: 'Public and private. Changes constantly on mobile networks.',
     priority: 'Medium', weight: 10, phase: 1,
+    always: true,
     config: { kind: 'choice', label: 'Match on', value: 'Subnet', options: ['Exact address', 'Subnet', 'Country only'] },
   },
   {
@@ -680,6 +699,20 @@ export const offeredAttributes = (mode: ProfileMode, reach: ProfileReach | null)
 
 export const blockedAttributes = (mode: ProfileMode, reach: ProfileReach | null): Attribute[] =>
   CATALOGUE[mode].filter((a) => a.needsAgent && reach !== 'agent')
+
+/* The signals a profile of this kind cannot switch off.
+
+   Only the device kind has any. An OS-and-version profile is a set of
+   conditions somebody states outright — there is no baseline to it, and a
+   profile that required something nobody asked for would be a rule with a
+   clause the author never wrote. */
+export const alwaysOn = (mode: ProfileMode): Attribute[] => CATALOGUE[mode].filter((a) => a.always)
+
+/** `enabled`, with the unswitchable ones present whether they were listed or not. */
+export const withAlwaysOn = (mode: ProfileMode, enabled: string[]): string[] => {
+  const base = alwaysOn(mode).map((a) => a.id)
+  return [...base, ...enabled.filter((id) => !base.includes(id))]
+}
 
 /** Whether this kind of profile is ever asked the agent question. */
 export const asksReach = (mode: ProfileMode) => blockedAttributes(mode, 'agentless').length > 0
@@ -1004,7 +1037,10 @@ export const seedProfiles: FingerprintProfile[] = [
        an agent-based profile that recognises specific machines is a device
        profile. `rosterNeedsMac` now names that state wherever it occurs. */
     mode: 'device',
-    enabled: ['mac', 'machine-sid', 'device-type'],
+    /* The four always-collected signals lead, because they are what every
+       device profile starts from — the roster's MAC and the machine SID are
+       what this one adds. */
+    enabled: ['device-type', 'os', 'browser', 'ip', 'mac', 'machine-sid'],
     config: {},
     weights: {},
     reach: 'agent',
@@ -1021,14 +1057,14 @@ export const seedProfiles: FingerprintProfile[] = [
     /* The store held no agentless device profile, so the answer that gates half
        the catalogue was never demonstrated by anything an admin could open — and
        neither was a device row carrying both a weight and a precision setting.
-       This is that profile: six signals a browser gives up for free, four of them
-       tuned.
+       This is that profile: the four every request carries, plus four more a
+       browser gives up for free — and four of the eight tuned.
 
        `restrictionSet: false` on purpose. The enrolment empty state is a real
        state of the product and this is the only way to reach it without creating
        something. */
     mode: 'device',
-    enabled: ['browser', 'ip', 'geo', 'canvas', 'locale', 'vpn'],
+    enabled: ['device-type', 'os', 'browser', 'ip', 'geo', 'canvas', 'locale', 'vpn'],
     config: {
       browser: 'Family only',
       ip: 'Subnet',

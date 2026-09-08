@@ -57,6 +57,14 @@ export interface CardModel {
   /** Condition groups the rules read — "Device", "Network", … */
   signals: string[]
   badge?: string
+  /* Which shelf the template sits on — "Device-based", "Compliance".
+
+     A plain `string`, deliberately, not `Scenario['category']`: the Templates
+     library builds this same model from `Template`, whose category union has a
+     fifth member (`'Uncategorized'`), and typing it narrowly here breaks that
+     caller at compile time for no gain. The hue map falls back to neutral for
+     anything it does not recognise. */
+  category?: string
   meta: string
   /** A dated, attributable review — deliberately not a rating. */
   reviewed?: { by: string; on: string }
@@ -120,6 +128,37 @@ const SIGNAL_TONE: Record<string, string> = {
   Everyone: 'neutral',
 }
 
+/* Category to hue, and the reasoning is about what each hue ALREADY means here.
+
+   Green, amber and red are reserved product-wide for Allow, MFA and Deny —
+   stated at the top of this file and enforced by `DecisionChip` — which leaves
+   exactly four non-decision families for exactly four categories. Two of the
+   four assign themselves:
+
+   · Device-based -> accent. `Device` is already accent in the board's
+     `GROUP_TONE` and in `SIGNAL_TONE` below, and every Device-based template
+     carries the `Device` tag. The pill and the signal chip say one word in one
+     colour.
+   · Compliance -> magenta, which is Identity. All three Compliance templates
+     are about WHO — contractors, regulated data, lifecycle.
+
+   The other two are the cheap moves. Risk-based takes info (blue) because
+   tokens.css argues for blue in exactly these terms where it defines the
+   priority ramp: it is the one hue in the palette with no valence, so it reads
+   as magnitude, which is what risk is. Quick Protection takes lime, which is
+   green-adjacent and reads "start here" — 62 degrees off Allow's green, and a
+   curation shelf has no condition group of its own to contradict.
+
+   Anything unrecognised — the library's `'Uncategorized'` — falls to neutral
+   rather than picking a hue at random. */
+const CAT_KEY: Record<string, string> = {
+  'Quick Protection': 'quick',
+  'Device-based': 'device',
+  'Risk-based': 'risk',
+  Compliance: 'compliance',
+}
+export const catKey = (c: string) => CAT_KEY[c] ?? 'neutral'
+
 function SignalRow({ signals }: { signals: string[] }) {
   return (
     <span className="bgcard__signals">
@@ -172,6 +211,21 @@ export function TemplateCard({
           were choosing, and it took the preview dialog with it, because the
           only control that opens the preview lives inside this block. */}
       <div className="bgcard__canvas">
+        {/* The shelf this template is on, in the shelf's own colour.
+
+            Top-left of the thumbnail, mirroring the preview control top-right —
+            the canvas already reserves 32px there, and its comment has called
+            that "room for the badge" since before there was anything to put in
+            it.
+
+            NOT in `.bgcard__tags` with the other metadata: that row and
+            `.bgcard__signals` are both `display: none` on request, because
+            eight chips above a card's name made it lead with its taxonomy. One
+            chip, on the picture rather than over the name, is the version of
+            that idea somebody actually asked for. */}
+        {m.category && (
+          <span className={`bgcard__cat is-${catKey(m.category)}`}>{m.category}</span>
+        )}
         <button
           type="button"
           className="bgcard__peek"
@@ -416,6 +470,7 @@ export function scenarioCard(s: Scenario): CardModel {
     name: s.name,
     description: s.description,
     badge: s.badge,
+    category: s.category,
     // A template with no conditions applies to everyone, which is worth saying.
     signals: signals.length > 0 ? signals : ['Everyone'],
     // On the tenant's own templates the useful fact is who wrote it and when;

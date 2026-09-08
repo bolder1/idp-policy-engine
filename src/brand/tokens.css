@@ -228,6 +228,13 @@
   --dur-fast: 120ms;
   --dur-normal: 200ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  /* A slower, symmetric curve for one thing only: the template picker's header
+     restaining itself when the category filter changes. `--ease-standard` is
+     tuned for controls — it leaves fast and arrives sharply, which is right for
+     a button and wrong for a 400px band of colour changing hue, where the same
+     curve reads as a flicker. This is Fluent 2's `curveEasyEase`, and it is
+     paired with a 360ms duration; see the note on `.bmarket__hero`. */
+  --ease-tone: cubic-bezier(0.33, 0, 0.67, 1);
 }
 
 :root {

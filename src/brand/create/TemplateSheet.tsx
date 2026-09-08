@@ -3,8 +3,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search, Store, X } from 'lucide-react'
 
 import { Button } from '../kit'
+import { Picker } from '../picker'
 import { scenarios, type Scenario } from '../data'
-import { TemplateCard, TemplatePreview, scenarioCard } from './TemplateCard'
+import { TemplateCard, TemplatePreview, catKey, scenarioCard } from './TemplateCard'
 
 /* -----------------------------------------------------------------------------
    The template picker.
@@ -13,51 +14,48 @@ import { TemplateCard, TemplatePreview, scenarioCard } from './TemplateCard'
    met a gallery, chose a template, and only then were asked what the policy
    was called. That put the catalogue before the decision it decorates — most
    people know what they are protecting before they know which ready-made set
-   of rules to start from, and the ones who do not were being asked to browse
-   twelve strangers' policies while holding an empty form in their head.
+   of rules to start from. The order is reversed now: the form comes first and
+   lands you in the builder, and the catalogue is offered from the empty board,
+   where taking a template is an edit to a real policy that undo can put back.
 
-   So the order is reversed. The form comes first and lands you in the builder;
-   the catalogue is here, offered from the empty board, where "how would you
-   like to start?" is a question you are actually in a position to answer — and
-   where the answer applies to a policy that already exists, so it is an edit
-   you can undo rather than a fork in a wizard.
+   TWO AXES, TWO CONTROLS. The rail used to carry six entries — All, Yours, and
+   the four content categories — which is one control doing two unrelated jobs:
+   who wrote it, and what it is for. Picked apart, the shelf is a two-way choice
+   that belongs in the rail, and the category is a filter that belongs above the
+   grid it filters. So: two entries down the side, one dropdown over one flat
+   list.
 
-   A sheet rather than a dialog: this is a catalogue you browse, and a 560px box
-   would put three cards on screen. It carries BOTH lists now — the tenant's own
-   templates and Xecurify's — because the gallery page that used to hold the
-   first one is gone, and a picker that can only offer somebody else's templates
-   is not a picker.
+   Note the consequence, because it is real and it is not a bug: both templates
+   this tenant wrote are Compliance ones, so filtering the Xecurify shelf to
+   Compliance shows one of the three the catalogue holds. The dropdown counts
+   are drawn from the shelf you are ON for that reason — advertising three and
+   delivering one is worse than saying one — and the empty state points at the
+   other shelf when that is where the rest are.
    -------------------------------------------------------------------------- */
 
 const MINE = scenarios.filter((s) => !s.provided)
 const PROVIDED = scenarios.filter((s) => s.provided)
 
-/* "All" and "Yours" are about WHERE a template came from; the other four are
-   about what it is for. One rail either way — they filter the same grid, and
-   splitting them into two controls would make the tenant's two templates a mode
-   rather than a shelf. */
-const CATEGORIES = ['All', 'Yours', 'Quick Protection', 'Device-based', 'Risk-based', 'Compliance'] as const
-type Category = (typeof CATEGORIES)[number]
+/** Who wrote it. The rail's whole job. */
+type Shelf = 'mine' | 'xecurify'
 
-const LABEL: Record<Category, string> = {
-  All: 'All templates',
-  Yours: 'Your templates',
-  'Quick Protection': 'Quick Protection',
-  'Device-based': 'Device-based',
-  'Risk-based': 'Risk-based',
-  Compliance: 'Compliance',
-}
-
-function inCategory(s: Scenario, c: Category) {
-  if (c === 'All') return true
-  if (c === 'Yours') return !s.provided
-  return s.category === c
-}
+/** What it is for. The dropdown's whole job. */
+const CATS = ['Quick Protection', 'Device-based', 'Risk-based', 'Compliance'] as const
+type Cat = (typeof CATS)[number]
 
 function hit(s: Scenario, q: string) {
   if (!q) return true
   const t = q.toLowerCase()
   return s.name.toLowerCase().includes(t) || s.description.toLowerCase().includes(t)
+}
+
+/* Which state the header band paints. One word, because the band takes exactly
+   one `data-tone` and the CSS holds one rule per value. The tenant's shelf is
+   `mine` whatever the filter says — its two templates do not need a taxonomy
+   between them. */
+function toneOf(shelf: Shelf, cat: Cat | 'All') {
+  if (shelf === 'mine') return 'mine'
+  return cat === 'All' ? 'all' : catKey(cat)
 }
 
 export function TemplateSheet({
@@ -70,16 +68,44 @@ export function TemplateSheet({
   /** Hands back the chosen template. What is done with its rules is the host's. */
   onChoose: (s: Scenario) => void
 }) {
-  const [cat, setCat] = useState<Category>('All')
+  const [shelf, setShelf] = useState<Shelf>('xecurify')
+  const [cat, setCat] = useState<Cat | 'All'>('All')
   const [q, setQ] = useState('')
   const [preview, setPreview] = useState<Scenario | null>(null)
 
-  const list = useMemo(() => scenarios.filter((s) => inCategory(s, cat) && hit(s, q)), [cat, q])
-  /* Yours first, then whatever the shelf holds. Two templates somebody on this
-     team wrote outrank twelve nobody here has met, and under "All" they would
-     otherwise sit wherever `scenarios` happens to list them. */
-  const mine = list.filter((s) => !s.provided)
-  const theirs = list.filter((s) => s.provided)
+  /* One flat list, filtered by three independent things. The old derivation
+     split the result into `mine` and `theirs` and drew two headed sections; the
+     shelf is a choice now, so there is one section and it needs no heading. */
+  const shelved = shelf === 'mine' ? MINE : PROVIDED
+  const list = useMemo(
+    () => shelved.filter((s) => (cat === 'All' || s.category === cat) && hit(s, q)),
+    [shelved, cat, q],
+  )
+
+  /* Counts from the shelf you are on, never from all fourteen. Compliance holds
+     three templates and exactly one of them is Xecurify's. */
+  const counts = useMemo(() => {
+    const n: Record<string, number> = { All: shelved.length }
+    for (const c of CATS) n[c] = shelved.filter((s) => s.category === c).length
+    return n
+  }, [shelved])
+
+  /** How many of this category are sitting on the OTHER shelf. */
+  const elsewhere = cat === 'All' ? 0 : (shelf === 'mine' ? PROVIDED : MINE).filter((s) => s.category === cat).length
+
+  /* The band blooms once as the sheet springs in rather than arriving already
+     coloured. `@property` transitions do not fire on first computed style, so
+     the tone is withheld for one frame and the initial grey is what it
+     transitions FROM. */
+  const [tone, setTone] = useState<string | null>(null)
+  useEffect(() => {
+    if (!open) {
+      setTone(null)
+      return
+    }
+    const id = requestAnimationFrame(() => setTone(toneOf(shelf, cat)))
+    return () => cancelAnimationFrame(id)
+  }, [open, shelf, cat])
 
   useEffect(() => {
     if (!open) return
@@ -100,10 +126,19 @@ export function TemplateSheet({
      search typed on one visit would still be filtering the grid on the next. */
   useEffect(() => {
     if (!open) return
+    setShelf('xecurify')
     setCat('All')
     setQ('')
     setPreview(null)
   }, [open])
+
+  /* Changing shelf clears the filter. A category chosen on one shelf means
+     something different on the other — and with two templates on the tenant's,
+     any filter at all is a way to see none of them. */
+  const pickShelf = (next: Shelf) => {
+    setShelf(next)
+    setCat('All')
+  }
 
   function take(s: Scenario) {
     setPreview(null)
@@ -149,7 +184,7 @@ export function TemplateSheet({
                 looking a place to stand. Centred, on the page grey, with the
                 search at the width a template name actually needs — and
                 nothing else in it. */}
-            <header className="bmarket__hero">
+            <header className="bmarket__hero" data-tone={tone ?? undefined}>
               {/* A storefront, briefly. This is a shelf of things somebody else
                   wrote — the one surface in the product where you are choosing
                   between other people's work rather than editing your own — and
@@ -179,73 +214,96 @@ export function TemplateSheet({
             </header>
 
             <div className="bmarket__work">
-              {/* The rail is back, and this time it is a CARD rather than a
-                  column.
-
-                  It was a full-height 236px column and became a chip row
-                  because at 750px tall it was six rows and six hundred pixels
-                  of nothing. The emptiness was the column, not the rail: sized
-                  to its own contents and stuck to the top of the scroll, six
-                  categories are a compact index that stays put while the grid
-                  moves past it — which is the thing a chip row cannot do and
-                  the reason every catalogue of any size grows one. */}
+              {/* Two entries. Who wrote it, and nothing else — the four content
+                  categories that used to share this rail are a dropdown over
+                  the grid now, because "written by my team" and "about devices"
+                  are not alternatives and a list that mixes them makes you pick
+                  one to lose the other. */}
               <aside className="bmarket__rail">
-                <p className="bmarket__railhead">Categories</p>
-                <div className="bmarket__cats" role="tablist" aria-label="Template categories">
-                  {CATEGORIES.map((c) => (
-                    <button
-                      key={c}
-                      role="tab"
-                      aria-selected={cat === c}
-                      className={`bmarket__cat ${cat === c ? 'is-on' : ''}`}
-                      onClick={() => setCat(c)}
-                    >
-                      <span>{LABEL[c]}</span>
-                      <em>{scenarios.filter((x) => inCategory(x, c)).length}</em>
-                    </button>
-                  ))}
+                <p className="bmarket__railhead">Templates</p>
+                <div className="bmarket__cats" role="tablist" aria-label="Whose templates">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={shelf === 'mine'}
+                    className={`bmarket__cat ${shelf === 'mine' ? 'is-on' : ''}`}
+                    onClick={() => pickShelf('mine')}
+                  >
+                    <span>Your templates</span>
+                    <em>{MINE.length}</em>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={shelf === 'xecurify'}
+                    className={`bmarket__cat ${shelf === 'xecurify' ? 'is-on' : ''}`}
+                    onClick={() => pickShelf('xecurify')}
+                  >
+                    <span>Xecurify templates</span>
+                    <em>{PROVIDED.length}</em>
+                  </button>
                 </div>
               </aside>
 
               <div className="bmarket__body">
-                {mine.length > 0 && (
-                  <>
-                    <h3 className="bgal__section">
-                      Your templates <em>{mine.length}</em>
-                      <span>Built by your team</span>
-                    </h3>
-                    <div className="bgal__grid">
-                      {mine.map((s) => (
-                        <Card key={s.id} s={s} onUse={() => take(s)} onPreview={() => setPreview(s)} />
-                      ))}
-                    </div>
-                  </>
-                )}
+                <div className="bmarket__shelf">
+                  <h3 className="bgal__section">
+                    {shelf === 'mine' ? 'Your templates' : 'Xecurify templates'} <em>{list.length}</em>
+                    <span>{shelf === 'mine' ? 'Built by your team' : 'by miniOrange'}</span>
+                  </h3>
 
-                {theirs.length > 0 && (
-                  <>
-                    <h3 className="bgal__section">
-                      Xecurify templates <em>{theirs.length}</em>
-                      <span>by miniOrange</span>
-                    </h3>
-                    <div className="bgal__grid">
-                      {theirs.map((s) => (
-                        <Card key={s.id} s={s} onUse={() => take(s)} onPreview={() => setPreview(s)} />
-                      ))}
-                    </div>
-                  </>
+                  {/* The filter, over the thing it filters, and only where it
+                      has work to do: two tenant templates do not need a
+                      taxonomy between them. Counts come from THIS shelf. */}
+                  {shelf === 'xecurify' && (
+                    <Picker
+                      label="Filter by category"
+                      value={cat}
+                      size="md"
+                      summary={cat === 'All' ? `All categories · ${counts.All}` : `${cat} · ${counts[cat]}`}
+                      options={[
+                        { value: 'All', label: 'All categories', meta: `${counts.All} templates` },
+                        ...CATS.map((c) => ({
+                          value: c,
+                          label: c,
+                          meta: counts[c] === 1 ? '1 template' : `${counts[c]} templates`,
+                        })),
+                      ]}
+                      onChange={(v) => setCat(v as Cat | 'All')}
+                    />
+                  )}
+                </div>
+
+                <div className="bgal__grid">
+                  {list.map((s) => (
+                    <Card key={s.id} s={s} onUse={() => take(s)} onPreview={() => setPreview(s)} />
+                  ))}
+                </div>
+
+                {/* Where the rest of them are. Both templates this tenant wrote
+                    are Compliance ones, so filtering Xecurify to Compliance
+                    shows one of three — and the two that are missing are one
+                    click away rather than gone. */}
+                {elsewhere > 0 && (
+                  <p className="bmarket__elsewhere">
+                    {elsewhere} more {cat} template{elsewhere === 1 ? ' is' : 's are'}{' '}
+                    {shelf === 'mine' ? "in Xecurify's" : "your team's"}.{' '}
+                    <button type="button" onClick={() => { pickShelf(shelf === 'mine' ? 'xecurify' : 'mine') }}>
+                      {shelf === 'mine' ? 'Show Xecurify templates' : 'Show your templates'}
+                    </button>
+                  </p>
                 )}
 
                 {list.length === 0 && (
                   <div className="bgal__none">
-                    <p>Nothing here matches “{q}”.</p>
+                    <p>{q ? `Nothing here matches “${q}”.` : 'Nothing on this shelf yet.'}</p>
                     <Button
                       onClick={() => {
                         setQ('')
                         setCat('All')
                       }}
                     >
-                      Clear search
+                      Clear filters
                     </Button>
                   </div>
                 )}

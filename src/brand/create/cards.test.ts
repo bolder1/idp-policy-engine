@@ -116,6 +116,31 @@ describe('ownership segregation', () => {
     expect(mine.length + provided.length).toBe(scenarios.length)
   })
 
+  /* The picker's dropdown is built from a hard-coded list of four categories and
+     counts them against the shelf you are on. Two ways that goes wrong silently:
+     a scenario carrying a fifth category simply never appears under any filter,
+     and a category with nothing provided offers an option that resolves to an
+     empty grid.
+
+     The second one is nearly true already and deliberately allowed: Compliance
+     holds exactly one provided template because both of the tenant's own are
+     Compliance. That is what the "N more are your team's" line under the grid
+     exists to say, so the floor here is one, not two — but it is a floor, and if
+     it ever reaches zero the dropdown is offering a dead end. */
+  const CATS = ['Quick Protection', 'Device-based', 'Risk-based', 'Compliance'] as const
+
+  it('never carries a category the picker cannot offer', () => {
+    for (const s of scenarios) {
+      expect(CATS as readonly string[], `${s.id}`).toContain(s.category)
+    }
+  })
+
+  it('has at least one provided template under every category the dropdown lists', () => {
+    for (const c of CATS) {
+      expect(provided.filter((s) => s.category === c).length, `provided in ${c}`).toBeGreaterThan(0)
+    }
+  })
+
   it("the tenant's own templates say who wrote them and when", () => {
     // Their card meta reads `author · when`, so a missing one renders
     // "undefined · undefined" rather than failing.

@@ -608,49 +608,122 @@ html[data-theme='dark'] .bguided__sheen {
    loses its brand tint with the move, because a storefront badge is not an
    action. */
 
-/* --- The storefront band ------------------------------------------------------
+/* --- The storefront band, and the four fields of light -------------------------
 
    A dedicated space at the top for the question and the one control that
-   answers it fastest, and nothing else in it.
-
-   The heading, the provenance line and the close shared a 24px header row with
-   the filters crammed underneath, so the catalogue began sixty pixels from the
-   top of the sheet and the search was a 220px box at the end of a filter strip.
+   answers it fastest, and nothing else in it. The heading, the provenance line
+   and the close used to share a 24px header row with the filters crammed
+   underneath, so the catalogue began sixty pixels from the top of the sheet.
    Somebody opening this is looking for one of fourteen things: give the looking
    somewhere to stand.
 
-   Dressed as a shelf on purpose. This is the one surface in the product where
-   you choose between other people's work rather than edit your own, and a mark,
-   a centred search and a count on every shelf are how a catalogue says so.
+   THE COLOUR IS A READOUT, NOT A MOOD. Every serious template gallery — Vercel,
+   ClickUp's Template Center, Fibery, Semrush's App Center — ships an unstained
+   white or grey header; the ones that stain are consumer creative tools. So the
+   band is allowed exactly one job: to say which shelf and which category you
+   are looking at, in the same four hues the cards' own pills use. Four fields
+   of light along the top edge, one per category, geometry constant across every
+   state. "All" is a horizon of four; choosing one collapses it to four values
+   of that hue; the tenant's shelf collapses it to slate.
 
-   Warmth, and only warmth. The band was flat neutral on the reasoning that
-   brand here means "press this to publish" and a storefront is not an
-   instruction — right about the argument, wrong about the room: a grey band
-   over a grey rail over a grid of grey cards is a shop with the lights off. So
-   two soft blooms of the brand's palest tint sit behind the mark, one wide and
-   centred, one small and off to the left, both faded out well before they reach
-   anything you have to read. Nothing in here is brand COLOURED; the air is.
+   The ceiling, so the next person knows where it is: stops are the hue mixed no
+   more than 30% into the page surface; colour occupies the top ~40% of the band
+   and 0% of the card grid; four hues, never five; 360ms, never past 400.
 
-   Order matters — the first background layer is the topmost — so the blooms are
-   listed before the neutral wash they sit on. */
+   HOW IT MOVES. `background-image` cannot be transitioned between two
+   gradients — writing `transition: background` here looks right in the diff and
+   hard-cuts in the browser. The four stops are `@property`-registered `<color>`
+   custom properties instead, so the browser interpolates them in oklab and one
+   `data-tone` attribute swaps the whole band. Registered properties feeding a
+   gradient repaint per frame rather than compositing, which is nothing for one
+   360ms run per click and is the second reason this never loops.
+
+   Where `@property` is missing the states still render exactly right; they just
+   snap. */
+@property --tone-a { syntax: '<color>'; inherits: false; initial-value: #eef1f4; }
+@property --tone-b { syntax: '<color>'; inherits: false; initial-value: #eef1f4; }
+@property --tone-c { syntax: '<color>'; inherits: false; initial-value: #eef1f4; }
+@property --tone-d { syntax: '<color>'; inherits: false; initial-value: #eef1f4; }
+
 .bmarket__hero {
   flex: none;
+  position: relative;
+  isolation: isolate;
   display: flex; flex-direction: column; align-items: center; text-align: center;
   padding: 36px 24px 28px;
+  /* The FIRST layer is the topmost, and the scrim is first because it is
+     load-bearing: it pins everything below 62% of the band to the untinted page
+     surface, which is what lets the fields run at 30% up top while the lede,
+     the search and the note keep byte-identical contrast in all six states. */
   background:
-    radial-gradient(52% 88% at 50% -6%, var(--brand-subtle-bg) 0%, transparent 68%),
-    radial-gradient(26% 62% at 22% 8%, var(--brand-subtle-bg) 0%, transparent 72%),
-    linear-gradient(180deg, var(--surface-inset), var(--surface-page));
+    linear-gradient(180deg, transparent 0%, transparent 24%, var(--surface-page) 62%),
+    radial-gradient(46% 66% at 11% -10%, var(--tone-a) 0%, transparent 72%),
+    radial-gradient(46% 66% at 37% -14%, var(--tone-b) 0%, transparent 72%),
+    radial-gradient(46% 66% at 63% -14%, var(--tone-c) 0%, transparent 72%),
+    radial-gradient(46% 66% at 89% -10%, var(--tone-d) 0%, transparent 72%),
+    var(--surface-page);
   border-bottom: 1px solid var(--border-subtle);
+  /* 40ms of stagger across the four, so the horizon restains left to right
+     rather than all at once. Past about 60ms the last field visibly lags and it
+     reads as broken rather than as choreographed. */
+  transition:
+    --tone-a 360ms var(--ease-tone),
+    --tone-b 360ms var(--ease-tone) 40ms,
+    --tone-c 360ms var(--ease-tone) 80ms,
+    --tone-d 360ms var(--ease-tone) 120ms;
 }
-/* The mark takes the tint too. It is the one object standing in the warm part
-   of the band, and leaving it cold made the bloom read as a printing fault
-   rather than as a decision. */
+
+/* The six states. `color-mix` against the page surface rather than literal
+   hexes, so one declaration carries both themes: the `-dot` hues are defined in
+   light and dark, `--surface-page` inverts, and the mix follows. Depths run
+   20 / 30 / 24 / 14% so even a single-hue horizon has some fall to it. */
+.bmarket__hero[data-tone='mine'] {
+  --tone-a: color-mix(in oklab, var(--fb-neutral-dot) 20%, var(--surface-page));
+  --tone-b: color-mix(in oklab, var(--fb-neutral-dot) 30%, var(--surface-page));
+  --tone-c: color-mix(in oklab, var(--fb-neutral-dot) 24%, var(--surface-page));
+  --tone-d: color-mix(in oklab, var(--fb-neutral-dot) 14%, var(--surface-page));
+}
+/* All four categories at once, in rail order — the one state where the band is
+   literally a picture of the thing it is filtering. */
+.bmarket__hero[data-tone='all'] {
+  --tone-a: color-mix(in oklab, var(--fb-lime-dot) 24%, var(--surface-page));
+  --tone-b: color-mix(in oklab, var(--fb-accent-dot) 26%, var(--surface-page));
+  --tone-c: color-mix(in oklab, var(--fb-info-dot) 24%, var(--surface-page));
+  --tone-d: color-mix(in oklab, var(--fb-magenta-dot) 22%, var(--surface-page));
+}
+.bmarket__hero[data-tone='quick'] {
+  --tone-a: color-mix(in oklab, var(--fb-lime-dot) 20%, var(--surface-page));
+  --tone-b: color-mix(in oklab, var(--fb-lime-dot) 30%, var(--surface-page));
+  --tone-c: color-mix(in oklab, var(--fb-lime-dot) 24%, var(--surface-page));
+  --tone-d: color-mix(in oklab, var(--fb-lime-dot) 14%, var(--surface-page));
+}
+.bmarket__hero[data-tone='device'] {
+  --tone-a: color-mix(in oklab, var(--fb-accent-dot) 20%, var(--surface-page));
+  --tone-b: color-mix(in oklab, var(--fb-accent-dot) 30%, var(--surface-page));
+  --tone-c: color-mix(in oklab, var(--fb-accent-dot) 24%, var(--surface-page));
+  --tone-d: color-mix(in oklab, var(--fb-accent-dot) 14%, var(--surface-page));
+}
+.bmarket__hero[data-tone='risk'] {
+  --tone-a: color-mix(in oklab, var(--fb-info-dot) 20%, var(--surface-page));
+  --tone-b: color-mix(in oklab, var(--fb-info-dot) 30%, var(--surface-page));
+  --tone-c: color-mix(in oklab, var(--fb-info-dot) 24%, var(--surface-page));
+  --tone-d: color-mix(in oklab, var(--fb-info-dot) 14%, var(--surface-page));
+}
+.bmarket__hero[data-tone='compliance'] {
+  --tone-a: color-mix(in oklab, var(--fb-magenta-dot) 20%, var(--surface-page));
+  --tone-b: color-mix(in oklab, var(--fb-magenta-dot) 30%, var(--surface-page));
+  --tone-c: color-mix(in oklab, var(--fb-magenta-dot) 24%, var(--surface-page));
+  --tone-d: color-mix(in oklab, var(--fb-magenta-dot) 14%, var(--surface-page));
+}
+
+/* The mark is neutral again. It was brand-tinted to keep an earlier pair of
+   brand blooms from reading as a printing fault; the band carries four hues of
+   its own now, and an orange badge sitting in front of them is a fifth. */
 .bmarket__mark {
   flex: none; width: 40px; height: 40px; border-radius: 12px;
   display: grid; place-items: center; margin-bottom: 14px;
-  background: var(--surface-raised); color: var(--brand-active);
-  border: 1px solid var(--brand-subtle-border);
+  background: var(--surface-raised); color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
   box-shadow: var(--el-low);
 }
 .bmarket__hero h2 {
@@ -676,12 +749,18 @@ html[data-theme='dark'] .bguided__sheen {
   font: inherit; font-size: var(--fs-base);
   box-shadow: var(--el-low);
 }
-.bmarket .bmarket__search::placeholder { color: var(--text-muted); }
+.bmarket .bmarket__search::placeholder { color: var(--text-tertiary); }
 .bmarket .bmarket__search:focus-visible {
   outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg);
 }
-/* The consequence, quiet and last. It is the one thing a shelf cannot show. */
-.bmarket__note { margin-top: 14px; max-width: 62ch; font-size: var(--fs-sm); color: var(--text-muted); }
+/* The consequence, quiet and last. It is the one thing a shelf cannot show.
+
+   `--text-tertiary`, not `--text-muted`: muted is #93a2b0, which is 2.31:1 on
+   the page surface and fails AA — a live failure on this line before any of the
+   colour work, and the search placeholder shared it. Tertiary clears 4.5 on
+   both themes and on every one of the six band states, because the scrim pins
+   this y-position to the untinted surface. */
+.bmarket__note { margin-top: 14px; max-width: 62ch; font-size: var(--fs-sm); color: var(--text-tertiary); }
 
 /* The close, over the band rather than in a row of its own. */
 .bmarket__x {
@@ -742,6 +821,35 @@ html[data-theme='dark'] .bguided__sheen {
 
 .bmarket__body { grid-column: 2; min-width: 0; }
 .bmarket__body .bgal__section:first-of-type { margin-top: 0; }
+
+/* The shelf's name and the filter over it, on one line. The heading keeps the
+   count so the dropdown does not have to be opened to know how many are under
+   it, and the filter sits at the end of the row it acts on rather than in a
+   toolbar of its own. */
+.bmarket__shelf {
+  display: flex; align-items: center; gap: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+.bmarket__shelf .bgal__section { margin: 0; flex: 1; min-width: 0; }
+
+/* Where the rest of a category is. Both templates this tenant wrote are
+   Compliance ones, so the Xecurify shelf filtered to Compliance shows one of
+   three — this is the line that says where the other two went. */
+.bmarket__elsewhere {
+  margin-top: var(--space-6);
+  font-size: var(--fs-sm); color: var(--text-tertiary);
+}
+.bmarket__elsewhere > button {
+  font: inherit; color: var(--text-link); background: none; border: 0; padding: 0; cursor: pointer;
+}
+.bmarket__elsewhere > button:hover { text-decoration: underline; }
+
+/* The band arrives at its colour instead of travelling to it. The four
+   `@property` stops are what animates, so pinning them is one declaration —
+   every state still paints exactly right, it just snaps. */
+@media (prefers-reduced-motion: reduce) {
+  .bmarket__hero { transition: none; }
+}
 
 @media (max-width: 720px) {
   .bmarket { padding: 0; }
@@ -911,6 +1019,33 @@ html[data-theme='dark'] .bguided__sheen {
    — `min-height: 224px`, sized for the 212px thumbnail — is still live above
    and is correct again now that every card has one. */
 
+
+/* --- The category pill --------------------------------------------------------
+
+   Top-left of the thumbnail, mirroring the preview control top-right — the
+   canvas already reserves 32px there, and its own comment has called that "room
+   for the badge" since before there was anything to put in it.
+
+   The four hues are the four the picker's header uses, and the reasoning for
+   which is which lives with the map in TemplateCard.tsx. What matters here is
+   what is NOT available: green, amber and red are reserved product-wide for
+   Allow, MFA and Deny, which is stated twice in this file and enforced by
+   `DecisionChip`. Four categories, four non-decision families, and no fifth. */
+.bgcard__cat {
+  position: absolute; top: 9px; left: 9px; z-index: 3;
+  max-width: calc(100% - 52px);
+  padding: 3px 9px; border-radius: var(--radius-pill);
+  font-size: 10px; font-weight: var(--fw-medium); letter-spacing: 0.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border: 1px solid transparent;
+}
+.bgcard__cat.is-quick { background: var(--fb-lime-bg); color: var(--fb-lime-fg); border-color: var(--fb-lime-border); }
+.bgcard__cat.is-device { background: var(--fb-accent-bg); color: var(--fb-accent-fg); border-color: var(--fb-accent-border); }
+.bgcard__cat.is-risk { background: var(--fb-info-bg); color: var(--fb-info-fg); border-color: var(--fb-info-border); }
+.bgcard__cat.is-compliance { background: var(--fb-magenta-bg); color: var(--fb-magenta-fg); border-color: var(--fb-magenta-border); }
+/* The library's `Uncategorized`, and anything a future category forgets to
+   map. Grey rather than a hue picked at random. */
+.bgcard__cat.is-neutral { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); border-color: var(--fb-neutral-border); }
 
 /* --- Signals, tags, and the pinned footer -------------------------------------
    Apollo's card grammar: a row of round glyphs for what the thing contains, a

@@ -798,28 +798,6 @@
   letter-spacing: 0.01em;
 }
 
-/* What the answer to the collector question is actually worth, as a number that
-   moves when you press a card.
-
-   The card says what agent-based costs and the hint above says what the
-   question decides; neither says how much difference it makes. That is the one
-   thing the old restriction panel could never show — the reach was chosen on
-   the same surface as everything else, so there was no next step to describe. */
-.bfp2__reachstat {
-  display: flex; align-items: baseline; gap: 10px;
-  margin: 14px 0 0; padding: 10px 12px;
-  border-radius: var(--radius-md); background: var(--surface-inset);
-  font-size: var(--fs-sm); color: var(--text-secondary);
-}
-.bfp2__reachstat strong {
-  font-size: var(--fs-base); font-weight: var(--fw-semibold);
-  color: var(--text-primary); font-variant-numeric: tabular-nums;
-}
-.bfp2__reachstat em {
-  font-style: normal; margin-left: auto;
-  font-size: var(--fs-xs); color: var(--fb-notice-fg);
-}
-
 /* --- A catalogue row -----------------------------------------------------------
 
    Single column, and a `<div>` rather than the `<button>` it replaces.

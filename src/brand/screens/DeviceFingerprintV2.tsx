@@ -1162,22 +1162,15 @@ function CreateDrawer({
                 })}
               </fieldset>
 
-              {/* The size of the difference, as a number that moves when you
-                  click. The card says what agent-based costs and the hint says
-                  what the question decides; this says what the answer is worth
-                  — which is the one thing the old panel could never show,
-                  because it was chosen on the same surface as everything else
-                  and had no next step to describe. */}
-              {reach && (
-                <p className="bfp2__reachstat">
-                  <strong>{offered.length}</strong> of {attributesFor(mode).length} attributes
-                  available
-                  {blockedAttributes(mode, reach).length > 0 && (
-                    <em>{blockedAttributes(mode, reach).length} need an agent</em>
-                  )}
-                </p>
-              )}
-
+              {/* A count of what the answer above makes available stood here —
+                  "20 of 38 attributes available · 18 need an agent". It was
+                  written to give the collector question a consequence you could
+                  see move, which it did, and it turned out to be the third
+                  thing on this step saying the same thing: the card says what
+                  agent-based costs, the panel below says what it requires of
+                  everybody, and the next step names the attributes that are
+                  missing and offers the way back to change it. A number is the
+                  least useful of the four. */}
               {reach === 'agent' && <AgentPrereq />}
           </section>
 

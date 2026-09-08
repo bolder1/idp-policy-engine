@@ -366,8 +366,12 @@
      width and the title gets the rest. The fold stays on the leading edge: it
      moved there because the right-hand cluster stranded it mid-head, and it
      reads better beside the index either way. */
-  display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-4);
-  padding: var(--space-4) var(--space-5) var(--space-3) var(--space-4);
+  display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: var(--space-4);
+  /* The right padding is the small one now. The fourth column held the on/off
+     switch and is gone with it — on/off is an action, and it lives in the
+     hover strip with duplicate and delete. Nothing sits on the right edge of
+     this row any more, so nothing needs clearance from it. */
+  padding: var(--space-4) var(--space-4) var(--space-3) var(--space-4);
 }
 .bb__cardhead > .bb__idx + .bb__fold__btn { margin-left: calc(var(--space-4) * -1 + var(--space-2)); }
 .bb__idx {
@@ -936,14 +940,24 @@
 @media (max-width: 1000px) { .bb__focus { grid-template-columns: minmax(0, 1fr); } }
 .bb__insp .bx-tabs { padding: 0 var(--space-4); border-bottom: 1px solid var(--border-subtle); }
 .bb__insphead {
-  /* Top-aligned, not centred. The name block grew a description underneath it,
-     so centring floated the index badge and the on/off switch down beside the
-     description — labelling and toggling the wrong line. */
-  display: flex; align-items: flex-start; gap: var(--space-3);
+  /* Centred, and the note that used to argue the opposite is why this drifted.
+
+     It was `flex-start`, because the name block once carried a description
+     underneath the title — centring would have floated the index badge and the
+     on/off switch down beside the description, labelling and toggling the wrong
+     line. That description is gone; `.bb__inspname` holds the title input and
+     nothing else.
+
+     What was left was three things of three heights hanging off a common top
+     edge: a 26px badge nudged down 3px by hand, a 36px input, and an 18px
+     switch sitting level with the input's border rather than its text. The
+     nudge is the tell — a hand-tuned offset against one specific control's
+     height is a centring that has been done by eye. */
+  display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border-subtle);
 }
-.bb__insphead .bb__idx { width: 26px; height: 26px; margin-top: 3px; font-size: var(--fs-xs); cursor: default; }
+.bb__insphead .bb__idx { width: 26px; height: 26px; font-size: var(--fs-xs); cursor: default; }
 .bb__insphead .bb__idx:hover { transform: none; }
 .bb__insphead h2 { margin: 0; min-width: 0; flex: 1; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bb__insphead p { margin: 0; font-size: var(--fs-xs); color: var(--text-muted); }
@@ -2083,7 +2097,9 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 /* One line for the note, full screen. It grows if there is something in it and
    takes no room when there is not — where the panel's two-row box is a
    paragraph of empty space across a screen's width. */
-.bb__insphead.is-focus { align-items: center; }
+/* `.bb__insphead.is-focus { align-items: center }` stood here to undo the
+   top-alignment for the room view. The bar centres everywhere now, so the
+   override has nothing left to correct. */
 .bb__insphead.is-focus .bb__input--desc { min-height: 30px; resize: vertical; }
 @media (max-width: 1000px) { .bb__rule.is-focus .bb__rulebody { grid-template-columns: minmax(0, 1fr); } }
 
@@ -2850,3 +2866,20 @@ button.bb__idx::after {
   padding: 3px 0;
 }
 .bb__ifjoin::after { content: ''; flex: 1; height: 1px; background: var(--if-line); }
+
+
+/* --- On/off, in the hover strip --------------------------------------------
+
+   A switch used to sit at the right of every card head, on at rest — so a chain
+   of nine rules carried nine green switches all saying the same thing, in the
+   widest position on the card, for a setting most rules never change. The card
+   already says "Off" beside the name when a rule is off, which is the only time
+   the fact is worth reading.
+
+   Off is the state worth marking, so it is the state that takes a colour: on
+   is a plain glyph like its neighbours, off is the negative tone the card
+   itself wears. The reverse — green for on — is what put nine of them on the
+   canvas. */
+.bb__acts .bb__act.is-off { color: var(--fb-negative-fg); }
+.bb__acts .bb__act.is-off:hover { background: var(--fb-negative-bg); }
+.bb__acts .bb__float__sep { height: 14px; margin: 0 1px; }

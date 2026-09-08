@@ -1,8 +1,7 @@
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { motion } from 'motion/react'
-import { ArrowDown, ArrowRight, ArrowUp, ChevronsDownUp, ChevronsUpDown, Copy, GripVertical, Home, Lock, Split, Trash2, Users } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, ChevronsDownUp, ChevronsUpDown, Copy, GripVertical, Home, Lock, Power, PowerOff, Split, Trash2, Users } from 'lucide-react'
 
-import { Toggle } from '../../kit'
 import { restConditions, whoEditable, whoIds } from '../../audience-ops'
 import { AvatarStack } from './Avatar'
 import { type Rule } from '../../data'
@@ -28,8 +27,8 @@ import { IfBlock, IfChip } from './IfBlock'
    catches this before that one. Reading the order should not mean scrolling
    past everything you are not asking about.
 
-   So the body folds. Collapsed, the card keeps its number, its name, its state
-   and its switch, and trades the brackets for one line saying how many
+   So the body folds. Collapsed, the card keeps its number, its name and its
+   state, and trades the brackets for one line saying how many
    conditions there are and what they decide — enough to keep the chain
    readable as a chain. Expanded, it is the card it always was.
 
@@ -335,6 +334,29 @@ export function RuleCard({
 
         <div className="bb__cardmeta" onClick={(e) => e.stopPropagation()}>
           <span className="bb__acts">
+            {/* On/off, with the other things you do TO a rule.
+
+                It was a switch pinned to the right of every card head, on at
+                rest — so a chain of nine rules carried nine green switches, all
+                saying the same thing, in the widest position on the card. The
+                state was never the switch's to tell: the label beside the name
+                already reads "Off" when a rule is off, which is the only time
+                the fact is worth reading.
+
+                Here it is what it always was: an action, beside duplicate and
+                delete, arriving when you reach for the card. */}
+            <button
+              type="button"
+              className={`bb__act ${rule.enabled ? '' : 'is-off'}`}
+              role="switch"
+              aria-checked={rule.enabled}
+              aria-label={`Rule ${index + 1} is ${rule.enabled ? 'on' : 'off'}`}
+              title={rule.enabled ? 'Switch this rule off' : 'Switch this rule on'}
+              onClick={() => onToggle(!rule.enabled)}
+            >
+              {rule.enabled ? <Power size={13} strokeWidth={2} /> : <PowerOff size={13} strokeWidth={2} />}
+            </button>
+            <span className="bb__float__sep" />
             <button type="button" className="bb__act" aria-label="Move up" disabled={!canUp} onClick={() => onMove(-1)}>
               <ArrowUp size={13} strokeWidth={2} />
             </button>
@@ -348,7 +370,6 @@ export function RuleCard({
               <Trash2 size={13} strokeWidth={2} />
             </button>
           </span>
-          <Toggle checked={rule.enabled} onChange={onToggle} label={`Rule ${index + 1} is ${rule.enabled ? 'on' : 'off'}`} size="sm" />
         </div>
       </div>
 

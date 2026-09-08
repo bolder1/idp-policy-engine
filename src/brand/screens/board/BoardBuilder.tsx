@@ -568,48 +568,15 @@ export function BoardBuilder({
         onDuplicate={duplicate}
         onDelete={remove}
         onHover={setHover}
-      >
-        {/* The chain-wide fold, bottom-left.
+        /* Everything that changes the VIEW, into the one centre toolbar `Board`
+           draws. Zoom is already in there because zoom state lives in `Board`;
+           these three used to sit in three separate corners.
 
-            Its own corner rather than a fifth item beside undo/redo: it does
-            not change the policy, it changes how much of the policy is on
-            screen — the same family as the zoom controls opposite it, and the
-            slot the stylesheet has always had for a left-hand pair.
-
-            A radiogroup, not a toggle button. There are two named states and
-            both are worth naming: "Outline" is a claim about what you get, and
-            a single button reading "Outline" cannot say whether that is what
-            you are in or what you would switch to. */}
-        <div className="bb__float bb__float--bl bb__density" role="radiogroup" aria-label="How much of each rule to show">
-          {(['outline', 'detailed'] as const).map((d) => (
-            <button
-              key={d}
-              type="button"
-              role="radio"
-              aria-checked={density === d}
-              tabIndex={density === d ? 0 : -1}
-              className={density === d ? 'is-on' : ''}
-              title={d === 'outline' ? 'Names and outcomes only' : 'Every condition, on every card'}
-              onClick={() => setChainDensity(d)}
-              onKeyDown={(e) => {
-                if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
-                e.preventDefault()
-                setChainDensity(d === 'outline' ? 'detailed' : 'outline')
-              }}
-            >
-              {d === 'outline' ? 'Outline' : 'Detailed'}
-            </button>
-          ))}
-        </div>
-
-        <div className="bb__float bb__float--tl" role="toolbar" aria-label="History and view">
-          {/* The one control here that is not history, and it belongs in this
-              cluster because the cluster is already named for both. Pressed, the
-              policy bar slides off the top and the canvas stops leaving room for
-              it — so the board is the whole region rather than the region minus
-              a header. */}
-          {onToggleFocus && (
-            <>
+           Order is the order you reach for them: get the chrome out of the way,
+           step back through what you did, then how much of each rule. */
+        tools={
+          <>
+            {onToggleFocus && (
               <button
                 type="button"
                 className="bb__act"
@@ -620,17 +587,42 @@ export function BoardBuilder({
               >
                 {focus ? <Minimize2 size={14} strokeWidth={2} /> : <Maximize2 size={14} strokeWidth={2} />}
               </button>
-              <span className="bb__float__sep" />
-            </>
-          )}
-          <button type="button" className="bb__act" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo(hist)} onClick={() => setHist(undo)}>
-            <Undo2 size={14} strokeWidth={2} />
-          </button>
-          <button type="button" className="bb__act" aria-label="Redo" title="Redo (⇧⌘Z)" disabled={!canRedo(hist)} onClick={() => setHist(redo)}>
-            <Redo2 size={14} strokeWidth={2} />
-          </button>
-        </div>
-
+            )}
+            <button type="button" className="bb__act" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo(hist)} onClick={() => setHist(undo)}>
+              <Undo2 size={14} strokeWidth={2} />
+            </button>
+            <button type="button" className="bb__act" aria-label="Redo" title="Redo (⇧⌘Z)" disabled={!canRedo(hist)} onClick={() => setHist(redo)}>
+              <Redo2 size={14} strokeWidth={2} />
+            </button>
+            <span className="bb__float__sep" />
+            {/* A radiogroup, not a toggle button. There are two named states and
+                both are worth naming: "Outline" is a claim about what you get,
+                and a single button reading "Outline" cannot say whether that is
+                what you are in or what you would switch to. */}
+            <span className="bb__density" role="radiogroup" aria-label="How much of each rule to show">
+              {(['outline', 'detailed'] as const).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  role="radio"
+                  aria-checked={density === d}
+                  tabIndex={density === d ? 0 : -1}
+                  className={density === d ? 'is-on' : ''}
+                  title={d === 'outline' ? 'Names and outcomes only' : 'Every condition, on every card'}
+                  onClick={() => setChainDensity(d)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+                    e.preventDefault()
+                    setChainDensity(d === 'outline' ? 'detailed' : 'outline')
+                  }}
+                >
+                  {d === 'outline' ? 'Outline' : 'Detailed'}
+                </button>
+              ))}
+            </span>
+          </>
+        }
+      >
         <div className="bb__float bb__float--tr" role="toolbar" aria-label="Publishing">
           {/* The pips are back, with the sheet that gives them somewhere to
               open — and with what made them worth having in the first place:

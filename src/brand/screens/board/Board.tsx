@@ -43,6 +43,7 @@ export function Board({
   expandedOf,
   onToggleExpand,
   children,
+  tools,
 }: {
   policy: Policy
   selection: Selection
@@ -73,8 +74,12 @@ export function Board({
      BUTTON never does: it fits what is actually on screen, which is the right
      answer for a deliberate press. */
   reserveOnOpen: number
-  /** Floating chrome the host wants over the stage — pips, the save bar. */
+  /** Floating chrome the host places itself — the publishing cluster. */
   children?: ReactNode
+  /* View controls the host contributes to the centre toolbar, which this
+     component owns because the zoom half of it lives here. They arrive before
+     the zoom controls and a separator is drawn between the two. */
+  tools?: ReactNode
 }) {
   const stage = useRef<HTMLDivElement | null>(null)
   const world = useRef<HTMLDivElement | null>(null)
@@ -464,11 +469,33 @@ export function Board({
 
       {children}
 
-      <div className="bb__float bb__float--br" role="group" aria-label="Zoom">
+      {/* One bar, bottom centre, for everything that changes the VIEW.
+
+          It was four pills in four corners: history top-left, publishing
+          top-right, density bottom-left, zoom bottom-right. Four objects to
+          learn the position of, three of which did the same kind of thing —
+          none of them changes the policy, they all change what you can see of
+          it — and a canvas with a control in every corner has no quiet edge
+          left to put a rule near.
+
+          Gathered here, in the order you reach for them: get out of the way
+          (focus), take a step back (undo/redo), how much of each rule (density),
+          how much of the chain (zoom), and the panel. Separators group them;
+          they are one toolbar because they answer one question.
+
+          Publishing stays top-right and is the exception that proves it: Check,
+          What changes, Discard and Review & publish act on the POLICY. Mixing
+          "undo" and "publish" into one strip is how somebody reaches for the
+          first and finds the second.
+
+          `tools` rather than more `children`, because the two slots land in two
+          different places and a single list could not say which was which. */}
+      <div className="bb__float bb__float--bc" role="toolbar" aria-label="View">
+        {tools}
+        {tools && <span className="bb__float__sep" />}
         <button type="button" className="bb__act" aria-label="Fit the chain in view" title="Fit" onClick={fit}>
           <Maximize2 size={14} strokeWidth={2} />
         </button>
-        <span className="bb__float__sep" />
         <button type="button" className="bb__act" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.15)}>
           <Minus size={14} strokeWidth={2} />
         </button>

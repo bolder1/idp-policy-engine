@@ -762,18 +762,17 @@
    step if the bar's height ever changes — see policy-bar.css. */
 .bb { --bb-top: 0px; }
 .bb.is-bared { --bb-top: var(--bpbar-h, 76px); }
-.bb__float--tl { left: var(--space-5); top: calc(var(--space-5) + var(--bb-top)); }
+/* `--tl`, `--bl` and `--br` are gone: history, density and zoom are one
+   toolbar at the bottom centre now. `--tr` is the only corner left, and it
+   holds the only cluster that is not about the view. */
 .bb__float--tr { right: var(--space-5); top: calc(var(--space-5) + var(--bb-top)); }
-.bb__float--br { right: var(--space-5); bottom: var(--space-5); }
-/* The two right-hand toolbars step aside for the panel.
+/* The publishing cluster steps aside for the panel.
 
-   The panel floats over the stage, so without this it covers Review & publish
-   and the zoom controls — the two things somebody reaches for most and the two
-   that must never be behind the thing they are editing. Transitioned on the
-   same curve as the panel, so opening it moves them together rather than
-   snapping them out of the way. */
+   The panel floats over the stage, so without this it covers Review & publish —
+   the thing somebody reaches for most, and the one that must never be behind
+   the thing they are editing. Transitioned on the same curve as the panel, so
+   opening it moves them together rather than snapping out of the way. */
 .bb:not(.is-gripping) .bb__float--tr,
-.bb:not(.is-gripping) .bb__float--br,
 /* The sheet moves with the panel too, and never did.
 
    It offsets by --bb-insp exactly as the toolbars do, but without their
@@ -787,12 +786,31 @@
    across. The class is on only while a drag is live, so the drag is exact and
    the open/close is smooth. */
 .bb:not(.is-gripping) .bb__sheet { transition: right 0.24s var(--ease-standard); }
-.bb:not(.is-insp-closed) .bb__float--tr,
-.bb:not(.is-insp-closed) .bb__float--br { right: calc(var(--bb-insp) + var(--space-6)); }
-.bb__float--bl { left: var(--space-5); bottom: var(--space-5); }
-/* The chain-wide fold. A segmented pair, sized like the other float controls
-   so the two bottom corners read as one family. */
-.bb__density { padding: 3px; gap: 2px; }
+.bb:not(.is-insp-closed) .bb__float--tr { right: calc(var(--bb-insp) + var(--space-6)); }
+
+/* --- The one view toolbar, bottom centre -----------------------------------
+
+   Four pills in four corners became one. History was top-left, publishing
+   top-right, density bottom-left, zoom bottom-right — four positions to learn,
+   three of which did the same KIND of thing (none of them changes the policy;
+   they all change what you can see of it), and a canvas with a control in every
+   corner has no quiet edge left to put a rule near.
+
+   Centred on the stage's own width. `left: 50%` alone would centre it under the
+   inspector when the panel is open, so the centre shifts by half the panel —
+   which keeps it centred on the part of the canvas you can actually see. The
+   transition matches the panel's, so the two move together rather than the bar
+   arriving after. */
+.bb__float--bc {
+  left: 50%; bottom: var(--space-5);
+  transform: translateX(-50%);
+}
+.bb:not(.is-insp-closed) .bb__float--bc { left: calc(50% - var(--bb-insp) / 2); }
+.bb:not(.is-gripping) .bb__float--bc { transition: left 0.24s var(--ease-standard); }
+
+/* The chain-wide fold, now a segment inside the bar rather than a pill of its
+   own — so it keeps its own padding and loses the pill's. */
+.bb__density { display: inline-flex; align-items: center; gap: 2px; }
 .bb__density > button {
   height: 26px; padding: 0 var(--space-3);
   border: none; border-radius: var(--radius-md);
@@ -2161,36 +2179,17 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 }
 .bb__chain:has(.bb__card.is-selected) .bb__card:not(.is-selected):hover { opacity: 1; }
 
-/* --- The zoom control, collapsed to its own readout -------------------------
+/* --- The zoom readout ------------------------------------------------------
 
-   It was a 147px bar carrying four controls, parked over the canvas at all
-   times for a setting most people never touch. At rest it is now just the
-   number — which is the one part that is worth reading without asking for it,
-   because it tells you why the cards are the size they are — and Fit, minus
-   and plus arrive on hover or on focus.
+   The zoom bar used to collapse to just its number at rest and expand Fit,
+   minus and plus on hover — worth it when it was a 147px pill parked in a
+   corner of its own for a setting most people never touch.
 
-   Focus counts as well as hover, so tabbing to Fit opens the bar and lands on
-   a control that is actually on screen. */
-.bb__float--br { gap: 0; }
-.bb__float--br > .bb__act,
-.bb__float--br > .bb__float__sep {
-  max-width: 0; opacity: 0; margin: 0;
-  overflow: hidden; pointer-events: none;
-  transition:
-    max-width 0.18s var(--ease-standard),
-    opacity 0.12s var(--ease-standard),
-    margin 0.18s var(--ease-standard);
-}
-.bb__float--br:hover, .bb__float--br:focus-within { gap: var(--space-2); }
-.bb__float--br:hover > .bb__act,
-.bb__float--br:focus-within > .bb__act { max-width: 24px; opacity: 1; pointer-events: auto; }
-.bb__float--br:hover > .bb__float__sep,
-.bb__float--br:focus-within > .bb__float__sep { max-width: 1px; opacity: 1; margin: 0 2px; }
-
-/* The number is the hover target, so it keeps a hand and a hint of a control
-   under it rather than reading as a label somebody forgot to remove. */
-.bb__zoom { cursor: default; border-radius: var(--radius-sm); padding: 2px 4px; transition: background-color 0.14s var(--ease-standard); }
-.bb__float--br:hover .bb__zoom { background: var(--surface-sunken); }
+   It is four items inside a shared toolbar now, and the same trick would make
+   that toolbar change width under the pointer — a centred bar that resizes as
+   you approach it moves the controls either side of the zoom away from where
+   you were aiming. One object, one width. */
+.bb__zoom { cursor: default; border-radius: var(--radius-sm); padding: 2px 4px; }
 
 @media (prefers-reduced-motion: reduce) {
   .bb__card.is-selected { transform: none; }

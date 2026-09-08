@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Braces, ChevronDown, Plus, Split, Ungroup, X } from 'lucide-react'
 
 import { cardJoin, cardLetter, ckey, drawsAsBracket, duplicatedAcrossCards, outerJoin } from '../../predicate'
@@ -11,6 +11,7 @@ import {
   type Rule,
   type ZoneScope,
 } from '../../data'
+import { MenuButton } from '../../kit'
 import * as ops from '../../when-ops'
 import { isWho, whoEditable } from '../../audience-ops'
 import { useBrand, useNameLookup } from '../../store'
@@ -248,25 +249,14 @@ export function WhenEditor({
              gap with a rail running down the rest — the same drawing the run
              inside a group gets, one level in. */
           <div className="bb__ifbracket" role="group" aria-label={`All of this rule's conditions, joined by ${outer.toUpperCase()}`}>
-            {members.map((m, i) =>
-              m.kind === 'cond' ? (
+            {members.map((m, i) => (
+              <Fragment key={m.key}>
+                {/* The bracket's operator, in every gap between its members.
+                    One control with several handles — see `JoinRow`. */}
+                {i > 0 && <JoinRow join={outer} scope="rule" onFlip={flipOuter} />}
+                {m.kind === 'cond' ? (
                 <ConditionRow
-                  key={m.key}
                   c={m.c}
-                  join={outer}
-                  /* ONE joiner for the bracket, drawn at the first gap, with a
-                     rail down the rest.
-
-                     The bracket holds a single operator — pressing it changes
-                     how every member joins — but drawing a pill in every gap
-                     presented one setting as four controls, and nothing said
-                     they moved together until you pressed one and watched the
-                     others change. */
-                  showJoin={i === 1}
-                  railed={i > 1}
-                  /* `if` opens the sentence once, on the very first member. */
-                  lead={i === 0}
-                  scope="rule"
                   fresh={fresh === m.c.id}
                   /* `duplicatedAcrossCards` returns ckeys, not ids. Asking it
                      about `c.id` compared two string spaces that never meet, so
@@ -282,7 +272,6 @@ export function WhenEditor({
                      materialised at its default lights the save bar on a rule
                      that means exactly what it did. */
                   onScope={(s) => write(ops.setScope(rule.when, m.c.id, s))}
-                  onFlipJoin={flipOuter}
                   onRemove={() => removeCondition(m.c.id)}
                   /* Gated on the same predicate the writer uses. The two used to
                      disagree — the button was drawn on every row while the
@@ -292,14 +281,8 @@ export function WhenEditor({
                 />
               ) : (
                 <GroupMember
-                  key={m.key}
                   k={m.card}
                   letter={cardLetter(m.index)}
-                  outer={outer}
-                  showJoin={i === 1}
-                  railed={i > 1}
-                  lead={i === 0}
-                  onFlipOuter={flipOuter}
                   rows={shownIn(m.card)}
                   fresh={fresh}
                   dupes={dupes}
@@ -318,8 +301,9 @@ export function WhenEditor({
                   setScope={(id, s) => write(ops.setScope(rule.when, id, s))}
                   splitOut={splitOut}
                 />
-              ),
-            )}
+              )}
+              </Fragment>
+            ))}
 
             {/* The bracket's own foot, INSIDE the frame.
 
@@ -336,15 +320,25 @@ export function WhenEditor({
                 <ConditionList label="Add a condition" onPick={add} onCancel={() => setAdding(null)} />
               </div>
             ) : (
+              /* One control, two things it can add.
+
+                 Two buttons side by side gave equal billing to the thing people
+                 do constantly and the thing they do rarely, and spent a whole
+                 row on it in a 400px panel. A group is a variation on adding a
+                 condition — it is still "put something here" — so it belongs
+                 behind the same affordance rather than beside it. */
               <div className="bb__iffoot">
-                <button type="button" className="bb__ifadd" onClick={openCatalogue('loose')}>
-                  <Plus size={12} strokeWidth={2.4} aria-hidden />
-                  Add condition
-                </button>
-                <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
-                  <Braces size={12} strokeWidth={2.2} aria-hidden />
-                  Add group
-                </button>
+                <MenuButton
+                  label="Add"
+                  icon={Plus}
+                  size="sm"
+                  align="start"
+                  items={[
+                    { id: 'cond', label: 'Add condition', icon: Plus, hint: 'One more thing that has to hold' },
+                    { id: 'group', label: 'Add condition group', icon: Braces, hint: 'A bracket with its own AND or OR inside it' },
+                  ]}
+                  onSelect={(id) => (id === 'group' ? addGroup() : openCatalogue('loose')())}
+                />
               </div>
             )}
           </div>
@@ -368,11 +362,6 @@ export function WhenEditor({
 function GroupMember({
   k,
   letter,
-  outer,
-  showJoin,
-  railed,
-  lead,
-  onFlipOuter,
   rows,
   fresh,
   dupes,
@@ -393,11 +382,6 @@ function GroupMember({
 }: {
   k: ConditionCard
   letter: string
-  outer: Joiner
-  showJoin: boolean
-  railed: boolean
-  lead: boolean
-  onFlipOuter: () => void
   rows: Condition[]
   fresh: string | null
   dupes: string[]
@@ -421,9 +405,6 @@ function GroupMember({
   const name = k.label?.trim() || `Group ${letter}`
 
   return (
-    <div className="bb__ifmember">
-      <JoinCell join={outer} show={showJoin} railed={railed} lead={lead} scope="rule" onFlip={onFlipOuter} />
-
       <div
         className="bb__ifgroup"
         role="group"
@@ -443,16 +424,14 @@ function GroupMember({
         </div>
 
         {rows.map((c, j) => (
+          <Fragment key={c.id}>
+            {/* The group's OWN operator, in the group's own gaps. It is the one
+                place a second operator exists on this pane, and drawing it the
+                same way as the outer one — same chip, same gap — is what says
+                they are the same kind of decision at two depths. */}
+            {j > 0 && <JoinRow join={join} scope="group" onFlip={onFlipJoin} />}
           <ConditionRow
-            key={c.id}
             c={c}
-            join={join}
-            showJoin={j === 1}
-            railed={j > 1}
-            /* Never. `if` opens the rule, and the rule opened above this
-               frame — a second one here reads as a second rule starting. */
-            lead={false}
-            scope="group"
             fresh={fresh === c.id}
             dupe={dupes.includes(ckey(c))}
             store={store}
@@ -460,10 +439,10 @@ function GroupMember({
             onChange={(nextC) => patchCondition(c.id, nextC)}
             onRetype={(typeId) => retype(c.id, typeId)}
             onScope={(s) => setScope(c.id, s)}
-            onFlipJoin={onFlipJoin}
             onRemove={() => removeCondition(c.id)}
             onSplit={k.conditions.length > 1 ? () => splitOut(c.id) : undefined}
           />
+          </Fragment>
         ))}
 
         {/* A group with nothing in it says so, rather than rendering as an
@@ -525,7 +504,6 @@ function GroupMember({
           </span>
         </div>
       </div>
-    </div>
   )
 }
 
@@ -540,46 +518,49 @@ function GroupMember({
    they started drifting apart in copy, size and colour, which is precisely what
    made a group look like a different kind of thing from the conditions beside
    it. */
-function JoinCell({
+/* The operator, on its own line in the gap it governs.
+
+   It was a left COLUMN: a pill in the first gap, a rail down the rest, and the
+   conditions indented past it. That column cost 34px of a 400px panel on every
+   row so that one of them could hold a chip, and it read as a margin rather
+   than as part of the sentence.
+
+   Between the rows now, left-aligned, in the gap — which is where the word
+   actually belongs when the conditions above and below it are full-width
+   blocks.
+
+   IN EVERY GAP, and that is a reversal worth stating. The old drawing put it in
+   the first gap only, on the argument that a bracket holds ONE operator and a
+   pill in every gap "presented one setting as four controls that happened to
+   agree". The argument was right about four INDEPENDENT controls. These are one
+   control with several handles: pressing any of them flips all of them
+   together, the label says so before you press, and the alternative — a word in
+   the first gap and nothing in the rest — leaves a four-condition rule with
+   three gaps that do not say how the rows either side of them join. */
+function JoinRow({
   join,
-  show,
-  railed,
-  lead,
   scope,
   onFlip,
 }: {
   join: Joiner
-  show: boolean
-  railed: boolean
-  lead: boolean
   /** What the operator governs, which is the only thing the two levels say differently. */
   scope: 'rule' | 'group'
   onFlip: () => void
 }) {
   const where = scope === 'group' ? 'in this group' : 'in this rule'
   return (
-    <span className={`bb__cond__join ${railed ? 'is-railed' : ''}`}>
-      {show && (
-        <button
-          type="button"
-          className={`bb__joinsel is-${join}`}
-          /* Says what it governs, not just what it is. One press changes every
-             condition at this level, and a control that announces itself as
-             "and" gives no hint of that. */
-          aria-label={`${join === 'and' ? `Every condition ${where} must match` : `Any one condition ${where} is enough`}. Switch to ${join === 'and' ? 'OR' : 'AND'} for all of them.`}
-          title={`Everything ${where} is joined by ${join.toUpperCase()}. Click for ${join === 'and' ? 'OR' : 'AND'}.`}
-          onClick={onFlip}
-        >
-          {join}
-          <ChevronDown size={12} strokeWidth={2.2} aria-hidden />
-        </button>
-      )}
-      {lead && (
-        <span className="bb__cond__first" aria-hidden>
-          if
-        </span>
-      )}
-    </span>
+    <div className="bb__joinrow">
+      <button
+        type="button"
+        className={`bb__joinsel is-${join}`}
+        aria-label={`${join === 'and' ? `Every condition ${where} must match` : `Any one condition ${where} is enough`}. Switch to ${join === 'and' ? 'OR' : 'AND'} for all of them.`}
+        title={`Everything ${where} is joined by ${join.toUpperCase()}. Click for ${join === 'and' ? 'OR' : 'AND'}.`}
+        onClick={onFlip}
+      >
+        {join}
+        <ChevronDown size={12} strokeWidth={2.2} aria-hidden />
+      </button>
+    </div>
   )
 }
 
@@ -620,11 +601,6 @@ function JoinCell({
    press, and the operator and the values live in the panel under it. */
 function ConditionRow({
   c,
-  join,
-  showJoin,
-  railed,
-  lead,
-  scope,
   fresh,
   dupe,
   store,
@@ -632,20 +608,10 @@ function ConditionRow({
   onChange,
   onRetype,
   onScope,
-  onFlipJoin,
   onRemove,
   onSplit,
 }: {
   c: Condition
-  join: Joiner
-  /** The first gap in the run, and the only place the joiner is drawn. */
-  showJoin: boolean
-  /** A later row in the same run: a rail, tying it to the joiner above. */
-  railed: boolean
-  /** The very first row of the whole block, which opens with `if`. */
-  lead: boolean
-  /** Which bracket's operator this row's joiner cell governs. */
-  scope: 'rule' | 'group'
   fresh: boolean
   dupe: boolean
   store: ReturnType<typeof useBrand>
@@ -654,7 +620,6 @@ function ConditionRow({
   onRetype: (typeId: string) => void
   /** Zone conditions only — the one writer for `scope` runs through here. */
   onScope: (s: 'both' | ZoneScope) => void
-  onFlipJoin: () => void
   onRemove: () => void
   /** Absent when the row is the only condition in its run — nothing to split. */
   onSplit?: () => void
@@ -686,10 +651,9 @@ function ConditionRow({
 
   return (
     <div className={`bb__cond ${fresh ? 'is-new' : ''}`}>
-      <JoinCell join={join} show={showJoin} railed={railed} lead={lead} scope={scope} onFlip={onFlipJoin} />
-
       <span className="bb__cond__body">
         <ConditionPopover
+          stacked
           c={c}
           summary={summary}
           options={options}

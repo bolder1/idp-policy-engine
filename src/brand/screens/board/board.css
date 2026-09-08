@@ -1677,44 +1677,27 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   position: relative;
   display: grid;
   gap: var(--space-1);
-  /* 12px each side, which is the bracket mark plus a hair. The pane is
-     draggable down to 320 and every pixel here comes off the values, so the
-     notation gets exactly the room it needs to be read as notation. */
-  padding: var(--space-4) var(--space-5) var(--space-4) var(--space-5);
+  padding: 0;
 }
-/* Both halves, `[` and `]`, because half a bracket is a margin rule.
+/* The `[ ]` marks are gone, and so is the joiner column they were sized for.
 
-   Drawn at 0.45 opacity on one side first, which is where this started, and it
-   read as a hairline somebody had forgotten to remove — the eye needs the
-   RETURN at the top and bottom to see a bracket at all, and it needs the
-   closing one to see what is inside it. Two marks, full strength, and the
-   notation says itself. */
-.bb__ifbracket::before,
-.bb__ifbracket::after {
-  content: '';
-  position: absolute; top: 0; bottom: 0; width: 7px;
-  border: 2px solid var(--bb-ring);
-  pointer-events: none;
-}
-.bb__ifbracket::before { left: 0; border-right: 0; border-radius: 7px 0 0 7px; }
-.bb__ifbracket::after { right: 0; border-left: 0; border-radius: 0 7px 7px 0; }
+   They were notation: two 7px brackets down the sides saying "everything here
+   is one expression", which is true and which cost 24px of a 400px panel plus
+   the 54px gutter the operators sat in. Seventy-eight pixels of margin so that
+   the values could be told they belonged together.
 
-/* A group takes ONE slot in the outer joiner column, however much is inside it
-   — which is the whole claim the layout is making, so it is made in the grid
-   rather than in a comment: same two columns as a condition row, same 54px
-   gutter, so the operator governing it lands in exactly the column the
-   operators governing its siblings land in. */
-.bb__ifmember {
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  align-items: stretch;
-  gap: var(--space-2);
-  padding: var(--space-1) 0;
-}
-/* Top-aligned, not centred. A group is tall; centring put its operator halfway
-   down a frame, level with nothing, while every other operator on the pane sits
-   on the line of the thing it introduces. The rail carries on down from it. */
-.bb__ifmember > .bb__cond__join { align-items: flex-start; padding-top: 11px; }
+   They do not need telling any more. A condition is a boxed block now and the
+   operator sits in the gap between two blocks, so the shape of the list says
+   what the brackets were saying — these are members, that word joins them —
+   using the space rather than framing it. The frames that remain are the ones
+   that carry a SECOND operator: a group, which is a real container with a real
+   name, and is told apart by being a container rather than by having a heavier
+   pair of the same marks. */
+
+/* `.bb__ifmember` was the two-column wrapper that put a group in the same
+   54px joiner gutter as a condition. There is no gutter — the operator is a row
+   between two members now — so a member is just the next block in the column
+   and needs no wrapper at all. */
 
 /* Told apart by material and by name, NOT by a second pair of bracket marks.
 
@@ -2256,17 +2239,7 @@ button.bb__idx::after {
    across a 400px panel is four crushed controls; one pill and a panel is the
    same information at any width, so the container query that used to fold the
    row into two lines is gone with it. */
-.bb__cond {
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) auto;
-  align-items: center; gap: var(--space-3);
-  /* Taller. A condition is the unit of this pane and it was reading at the
-     density of a table row — 3px of padding around a 32px control, four of them
-     stacked, with the operator that governs them all the same height as the
-     values it joins. The row is the thing being edited; it gets the space. */
-  padding: var(--space-2) 0;
-  min-height: 44px;
-}
+.bb__cond { display: block; min-width: 0; }
 .bb__cond.is-new { animation: bb-in 0.28s ease-out; }
 /* Silenced here rather than in the reduced-motion block further up the file: a
    media query carries no specificity of its own, both selectors are (0,2,0),
@@ -2276,27 +2249,27 @@ button.bb__idx::after {
   .bb__cond.is-new { animation: none; }
 }
 
-/* The joiner column, and the rail that says one operator governs the run.
+/* The gap between two members, and the word that fills it.
 
-   The pill is drawn once, at the first gap. Every row below it in the same run
-   gets a hairline in this column instead — so the four conditions read as four
-   things held together by the one operator above them, which is exactly what
-   the model says: a run has a single joiner and flipping it flips all of them.
-   Drawn as a pill per gap, the same fact looked like four independent selects
-   that happened to agree. */
-.bb__cond__join { position: relative; display: flex; align-items: center; justify-content: flex-end; }
-.bb__cond__join.is-railed::before {
-  content: '';
-  position: absolute; right: 14px; top: -4px; bottom: -4px;
-  width: 1px; background: var(--border-default);
+   Left-aligned and inset, so a column of blocks reads as a list with a word
+   between each pair rather than as blocks with a centred label floating over
+   the seam. The hairline runs from the chip to the right edge: it is what
+   carries the eye across a 400px gap and says the thing below is joined to the
+   thing above, not starting again.
+
+   Its height is deliberate and small. The blocks either side are 3 rows tall;
+   a gap that matched them would break the list into paragraphs. */
+.bb__joinrow {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 5px 0 5px 10px;
 }
-/* `if` on the very first row, in the quiet weight a keyword gets — it is the
-   sentence starting, not a control. */
-.bb__cond__first { font-size: var(--fs-xs); color: var(--text-muted); font-weight: var(--fw-medium); }
+.bb__joinrow::after {
+  content: '';
+  flex: 1; height: 1px; background: var(--border-subtle);
+}
 
 /* The joiner, drawn as the select it behaves like: press it and the level
-   flips. The pill does not move when it does, which is the whole reason the
-   joiner sits in the row rather than floating in the gap between two. */
+   flips. */
 .bb__joinsel {
   display: inline-flex; align-items: center; gap: 1px;
   height: 30px; padding: 0 5px 0 9px;
@@ -2311,9 +2284,15 @@ button.bb__idx::after {
 .bb__joinsel svg { opacity: 0.6; }
 .bb__joinsel:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
-.bb__cond__body { min-width: 0; display: flex; align-items: center; gap: 6px; }
-.bb__cond__body .cp__pill { flex: 1; min-width: 0; }
-.bb__cond__acts { display: flex; align-items: center; gap: 2px; opacity: 0; }
+.bb__cond__body { min-width: 0; display: block; position: relative; }
+/* The row's own actions — "move into a group of its own" — over the block's
+   top-right corner, level with the delete inside it, revealed on hover the way
+   they always were. Absolute, because the block is a form now and a trailing
+   column beside it would take width off every field in it. */
+.bb__cond__acts {
+  position: absolute; top: 6px; right: 40px;
+  display: flex; align-items: center; gap: 2px; opacity: 0;
+}
 .bb__cond:hover .bb__cond__acts, .bb__cond:focus-within .bb__cond__acts { opacity: 1; }
 .bb__ifact.is-danger:hover { color: var(--fb-negative-fg); }
 

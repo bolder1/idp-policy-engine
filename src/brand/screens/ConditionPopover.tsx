@@ -12,6 +12,7 @@ import {
   MapPin,
   Network,
   Search,
+  Trash2,
   UserRound,
   Users,
   X,
@@ -155,6 +156,7 @@ export function ConditionPopover({
   footer,
   onFooter,
   autoOpen,
+  stacked,
   hideAttribute,
 }: {
   c: Condition
@@ -176,6 +178,23 @@ export function ConditionPopover({
   onFooter?: () => void
   /** A row that was just added: start it at the first UNANSWERED decision. */
   autoOpen?: boolean
+  /* One condition as three stacked full-width rows rather than one pill.
+
+     The pill is right where there is room for a sentence: `Device profile ·
+     matches · Corporate managed` reads left to right and takes one line. The
+     inspector is 400px, and at that width three segments share the space by
+     truncating the one that carries the answer — a zone condition naming two
+     zones came out as `Office Netw…`, which is the part you were reading.
+
+     Stacked, every control gets the full width and none of them truncate. It
+     costs three lines per condition instead of one, and that is the trade: the
+     panel scrolls, and nothing in it is unreadable. The trail builder is wide
+     and keeps the pill.
+
+     One component either way. The menus, the value sources, the summary and
+     every keyboard path are shared — what differs is how the three triggers are
+     arranged, which is the only thing that should differ. */
+  stacked?: boolean
   /* Drop the attribute segment.
 
      For the WHO step, where the attribute IS the step: that row is about
@@ -211,53 +230,152 @@ export function ConditionPopover({
 
   const close = useCallback(() => setOpen(null), [])
 
-  return (
-    <>
-      <span className="cp__pill">
-        {!hideAttribute && (
-          <Seg
+  const valueLabel = `Change what ${t.label} is compared against. Currently ${
+    unset ? 'nothing chosen' : names.length > 1 ? `${names[0]} and ${names.length - 1} more` : names[0] || summary
+  }.`
+
+  /* Which half of a zone, when it is narrower than the zone as written. Absent
+     for "both", because that is what the zone means already. */
+  const scopeTag = c.scope ? <i className="cp__scopetag">{c.scope === 'ip' ? 'network' : 'map'}</i> : null
+
+  /* A window and a threshold are TYPED, not chosen from a list, and stacked
+     there is room to type them where they belong. The pill has to send them to
+     a popover — three segments on one line cannot hold two time inputs — so
+     this is the one behaviour the two arrangements do differently, and it is
+     the arrangement with room doing less work rather than more. */
+  const typedValue =
+    t.valueKind === 'time' ? (
+      <div className="cp__inline">
+        <input
+          type="time"
+          className="cp__fldinput"
+          aria-label={`${t.label} from`}
+          value={c.values[0] ?? '09:00'}
+          onChange={(e) => onValues([e.target.value, c.values[1] ?? '17:00'])}
+        />
+        <span className="cp__to">to</span>
+        <input
+          type="time"
+          className="cp__fldinput"
+          aria-label={`${t.label} to`}
+          value={c.values[1] ?? '17:00'}
+          onChange={(e) => onValues([c.values[0] ?? '09:00', e.target.value])}
+        />
+      </div>
+    ) : t.valueKind === 'range' ? (
+      <div className="cp__inline">
+        <input
+          type="number"
+          className="cp__fldinput is-num"
+          aria-label={t.label}
+          placeholder="0"
+          value={values[0] ?? ''}
+          onChange={(e) => onValues([e.target.value])}
+        />
+        <span className="cp__unit">score</span>
+      </div>
+    ) : null
+
+  const triggers = stacked ? (
+    /* Three rows, top to bottom, in the order they depend on each other:
+       what is checked, how it is compared, what it is compared against. */
+    <div className={`cp__stack ${unset ? 'is-unset' : ''}`}>
+      <div className="cp__stackhead">
+        {!hideAttribute ? (
+          <Field
             ref={whatRef}
             kind="what"
+            icon={groupIcon(t.group)}
             open={open === 'what'}
             label={`Change what is checked. Currently ${t.label}.`}
             onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
           >
             {t.label}
-          </Seg>
+          </Field>
+        ) : (
+          /* The Who pane owns the attribute, so the row opens on its operator
+             and the head is just the label and the way out. */
+          <span className="cp__stacklabel">
+            <GroupIcon icon={groupIcon(t.group)} />
+            {t.label}
+          </span>
         )}
+        <button type="button" className="cp__del" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
+          <Trash2 size={14} strokeWidth={1.9} />
+        </button>
+      </div>
 
-        <Seg
-          ref={opRef}
-          kind="op"
-          open={open === 'op'}
-          label={`Change how ${t.label} is compared. Currently ${c.operator}.`}
-          onOpen={() => setOpen((o) => (o === 'op' ? null : 'op'))}
-        >
-          {c.operator}
-        </Seg>
+      <Field
+        ref={opRef}
+        kind="op"
+        open={open === 'op'}
+        label={`Change how ${t.label} is compared. Currently ${c.operator}.`}
+        onOpen={() => setOpen((o) => (o === 'op' ? null : 'op'))}
+      >
+        {c.operator}
+      </Field>
 
-        <Seg
+      {typedValue ?? (
+        <Field
           ref={valRef}
           kind="val"
           open={open === 'val'}
           unset={unset}
-          label={`Change what ${t.label} is compared against. Currently ${
-            unset ? 'nothing chosen' : names.length > 1 ? `${names[0]} and ${names.length - 1} more` : names[0] || summary
-          }.`}
+          label={valueLabel}
           onOpen={() => setOpen((o) => (o === 'val' ? null : 'val'))}
         >
           {summary}
-          {/* Which half of a zone, when it is narrower than the zone as written.
-              Absent for "both", because that is what the zone means already. */}
-          {c.scope && <i className="cp__scopetag">{c.scope === 'ip' ? 'network' : 'map'}</i>}
+          {scopeTag}
+        </Field>
+      )}
+    </div>
+  ) : (
+    <span className="cp__pill">
+      {!hideAttribute && (
+        <Seg
+          ref={whatRef}
+          kind="what"
+          open={open === 'what'}
+          label={`Change what is checked. Currently ${t.label}.`}
+          onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
+        >
+          {t.label}
         </Seg>
+      )}
 
-        <button type="button" className="cp__pill__x" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
-          <X size={12} strokeWidth={2.4} />
-        </button>
-      </span>
+      <Seg
+        ref={opRef}
+        kind="op"
+        open={open === 'op'}
+        label={`Change how ${t.label} is compared. Currently ${c.operator}.`}
+        onOpen={() => setOpen((o) => (o === 'op' ? null : 'op'))}
+      >
+        {c.operator}
+      </Seg>
 
-      {open && (
+      <Seg
+        ref={valRef}
+        kind="val"
+        open={open === 'val'}
+        unset={unset}
+        label={valueLabel}
+        onOpen={() => setOpen((o) => (o === 'val' ? null : 'val'))}
+      >
+        {summary}
+        {scopeTag}
+      </Seg>
+
+      <button type="button" className="cp__pill__x" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
+        <X size={12} strokeWidth={2.4} />
+      </button>
+    </span>
+  )
+
+  return (
+    <>
+      {triggers}
+
+      {open && !(stacked && open === 'val' && typedValue) && (
         <Pop
           anchor={anchorFor[open]}
           onClose={() => {
@@ -548,6 +666,53 @@ function SearchField({ value, onChange, label }: { value: string; onChange: (v: 
         aria-label={label}
       />
     </div>
+  )
+}
+
+/* One full-width trigger: a mark, a value, a chevron.
+
+   It looks like a select and is not one — the menu behind it is `Pop`, the same
+   portalled, flip-and-clamp panel the pill opens, because the choices are
+   multi-select lists with search and a footer that navigates. What is borrowed
+   from a select is the SHAPE, which is what makes a column of three of them
+   read as one form rather than three chips that happen to be stacked. */
+function GroupIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return <Icon size={14} strokeWidth={1.9} className="cp__fldicon" aria-hidden />
+}
+
+function Field({
+  ref,
+  kind,
+  icon,
+  open,
+  unset,
+  label,
+  onOpen,
+  children,
+}: {
+  ref: RefObject<HTMLButtonElement | null>
+  kind: Part
+  icon?: LucideIcon
+  open: boolean
+  unset?: boolean
+  label: string
+  onOpen: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      className={`cp__fld is-${kind} ${open ? 'is-open' : ''} ${unset ? 'is-unset' : ''}`}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-label={label}
+      onClick={onOpen}
+    >
+      {icon && <GroupIcon icon={icon} />}
+      <span className="cp__fldtext">{children}</span>
+      <ChevronDown size={13} strokeWidth={2} aria-hidden />
+    </button>
   )
 }
 

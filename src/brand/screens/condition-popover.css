@@ -365,3 +365,86 @@
    `.cp__catrow.is-soon`, different list. */
 .cp__opt.is-soon { cursor: default; opacity: 0.55; }
 .cp__opt.is-soon:hover { background: none; }
+
+/* --- One condition, stacked ------------------------------------------------------
+
+   The pill above is for a surface with room for a sentence. This is for the
+   400px inspector, where three segments on one line means the third one — the
+   one carrying the answer — is the one that truncates.
+
+   A column of full-width fields instead. Every control gets the whole width, a
+   two-zone value reads in full, and the three read top to bottom in the order
+   they depend on each other. Boxed and padded so the three belong to each
+   other: without the box, a column of fields in a panel that also holds a
+   joiner chip and a group frame has no edge saying where one condition stops. */
+.cp__stack {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+.cp__stack.is-unset { border-color: var(--fb-negative-border); border-style: dashed; }
+
+/* The attribute and the way out of it. The delete sits with the attribute
+   rather than with the value, because what it deletes is the whole condition
+   and the attribute is the only row that names the whole condition. */
+.cp__stackhead { display: flex; align-items: center; gap: 6px; }
+.cp__stackhead > .cp__fld { flex: 1; min-width: 0; }
+.cp__stacklabel {
+  flex: 1; min-width: 0;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
+}
+.cp__del {
+  display: grid; place-items: center; width: 28px; height: 28px; flex: none;
+  border: 0; border-radius: var(--radius-sm); background: none;
+  color: var(--text-tertiary); cursor: pointer;
+}
+.cp__del:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.cp__del:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+
+.cp__fld {
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; min-width: 0; min-height: 32px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-base, var(--surface-raised));
+  font: inherit; font-size: var(--fs-sm); color: var(--text-primary);
+  text-align: left; cursor: pointer;
+}
+.cp__fld:hover { border-color: var(--border-strong); }
+.cp__fld.is-open { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.cp__fld:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--focus-ring); }
+.cp__fld > svg:last-child { flex: none; margin-left: auto; opacity: 0.45; }
+.cp__fldicon { flex: none; opacity: 0.55; }
+/* The one line that must never be cut: it holds the answer. It ellipsizes only
+   when a value genuinely exceeds the full panel width, which two library names
+   do not. */
+.cp__fldtext {
+  flex: 1; min-width: 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* What is checked is the row you read first, so it is the row that is set in
+   the page's own weight. The operator is grammar between two nouns. */
+.cp__fld.is-what .cp__fldtext { font-weight: var(--fw-medium); }
+.cp__fld.is-op { color: var(--text-secondary); background: var(--surface-sunken); }
+.cp__fld.is-val .cp__fldtext { font-weight: var(--fw-medium); color: var(--brand); }
+.cp__fld.is-val.is-unset { border-color: var(--fb-negative-border); border-style: dashed; }
+.cp__fld.is-val.is-unset .cp__fldtext { color: var(--fb-negative-fg); font-style: italic; font-weight: var(--fw-regular); }
+
+/* A typed value — a window, a threshold — in the row where a chosen one would
+   have been. */
+.cp__inline { display: flex; align-items: center; gap: var(--space-2); }
+.cp__fldinput {
+  min-width: 0; min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-base, var(--surface-raised));
+  font: inherit; font-size: var(--fs-sm); color: var(--text-primary);
+}
+.cp__fldinput[type='time'] { flex: 1; }
+.cp__fldinput.is-num { width: 92px; text-align: right; font-variant-numeric: tabular-nums; }
+.cp__fldinput:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--focus-ring); }
+.cp__unit { font-size: var(--fs-xs); color: var(--text-tertiary); }

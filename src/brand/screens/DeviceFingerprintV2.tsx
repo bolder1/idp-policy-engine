@@ -1181,12 +1181,23 @@ function CreateDrawer({
               {reach === 'agent' && <AgentPrereq />}
           </section>
 
-          {/* Below the collector, because it depends on it. Dimmed until the
-              question above is answered rather than hidden — a section that
-              appears out of nowhere on a press is a step that grew, and this
-              one is on the page from the start so the shape of the form is
-              honest before you touch it. */}
-          <section className={`bfp2__wizsection ${reach === null ? 'is-waiting' : ''}`}>
+          {/* Below the collector, and only once it is answered.
+
+              It was on the page from the start, dimmed, with a line saying what
+              it was waiting for — on the argument that a section appearing out
+              of nowhere on a press reads as a step that grew, and that the
+              shape of a form should be honest before you touch it. The argument
+              is sound about a form you can fill in any order and wrong about
+              this one: nothing here can be answered until the question above is,
+              because the collector decides whether a roster exists as an option
+              at all. So the placeholder was a heading and a sentence telling you
+              to do the thing you were already looking at, occupying the space
+              its own controls will take.
+
+              What keeps it honest is the step ladder, which says there is one
+              step and not two. */}
+          {reach !== null && (
+          <section className="bfp2__wizsection">
             <h4>
               How devices enrol
               <TipDot
@@ -1194,26 +1205,21 @@ function CreateDrawer({
                 text="The attributes decide whether a machine is the SAME one. These decide whether it is allowed to become a known one at all."
               />
             </h4>
-            {/* The one line here that is NOT an explanation: it is the whole
-                content of the section in this state, so it stays on the page. */}
-            {reach === null ? (
-              <p className="bfp2__stephint">Choose what the collector can read first — it decides whether a roster is possible.</p>
-            ) : (
-              <EnrolmentFields
-                mode={mode}
-                reach={reach}
-                registration={registration}
-                autoRegister={autoRegister}
-                maxDevices={maxDevices}
-                roster={null}
-                onChange={(p) => {
-                  if (p.registration !== undefined) setRegistration(p.registration)
-                  if (p.autoRegister !== undefined) setAutoRegister(p.autoRegister)
-                  if (p.maxDevices !== undefined) setMaxDevices(p.maxDevices)
-                }}
-              />
-            )}
+            <EnrolmentFields
+              mode={mode}
+              reach={reach}
+              registration={registration}
+              autoRegister={autoRegister}
+              maxDevices={maxDevices}
+              roster={null}
+              onChange={(p) => {
+                if (p.registration !== undefined) setRegistration(p.registration)
+                if (p.autoRegister !== undefined) setAutoRegister(p.autoRegister)
+                if (p.maxDevices !== undefined) setMaxDevices(p.maxDevices)
+              }}
+            />
           </section>
+          )}
         </div>
       )}
 
@@ -1999,26 +2005,39 @@ function EnrolmentFields({
                 : 'A roster is not available here: it is matched on MAC address, and MAC is one of the attributes only an agent can read.')
           }
         >
-          <select
-            className="bfp2__select"
-            aria-label="How a device gets registered"
-            value={registration}
-            onChange={(e) => {
-              const next = e.target.value as Registration
-              /* The console's own branch: a roster REPLACES the allowance
-                 rather than sitting beside it. */
-              onChange({
-                registration: next,
-                maxDevices: next === 'pre-approved' ? null : (maxDevices ?? DEFAULT_MAX_DEVICES),
-              })
-            }}
-          >
-            {(Object.keys(REGISTRATION_LABEL) as Registration[]).map((r) => (
-              <option key={r} value={r} disabled={r === 'pre-approved' && !rosterPossible}>
-                {REGISTRATION_LABEL[r]}
-              </option>
-            ))}
-          </select>
+          {/* A dropdown only where there is something to drop down to.
+
+              Both options were always rendered and the unavailable one was
+              `disabled`, which is a control with one usable entry — a decision
+              presented as a choice, with the reason it is not one hidden on the
+              tip. Where a roster is impossible there is exactly one way a device
+              can be registered, so the row states it. The tip still explains
+              why, because "this cannot be changed" is a fact somebody will want
+              a reason for. */}
+          {rosterPossible ? (
+            <select
+              className="bfp2__select"
+              aria-label="How a device gets registered"
+              value={registration}
+              onChange={(e) => {
+                const next = e.target.value as Registration
+                /* The console's own branch: a roster REPLACES the allowance
+                   rather than sitting beside it. */
+                onChange({
+                  registration: next,
+                  maxDevices: next === 'pre-approved' ? null : (maxDevices ?? DEFAULT_MAX_DEVICES),
+                })
+              }}
+            >
+              {(Object.keys(REGISTRATION_LABEL) as Registration[]).map((r) => (
+                <option key={r} value={r}>
+                  {REGISTRATION_LABEL[r]}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="bfp2__setvalue">{REGISTRATION_LABEL[registration]}</span>
+          )}
         </FormRow>
 
         <FormRow

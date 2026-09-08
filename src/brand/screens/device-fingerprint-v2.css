@@ -112,17 +112,35 @@
    modal's own background, so a raised "selected" card is invisible. */
 .bfp2__mode-card.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
 .bfp2__mode-card:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+/* No tile behind the icon, in either state — and that is what fixes the
+   alignment rather than a nudge.
+
+   It was a 30px rounded square filled with `--surface-inset`, and the SELECTED
+   card removed the fill. So the two cards in a pair never matched: one had a
+   grey chip with a glyph centred in it, the other had a bare glyph floating in
+   a 30px box, and the glyph's optical position moved between them even though
+   nothing about it had. Two things were being asked to say "chosen" — the
+   card's own border and tint, which already say it, and the disappearance of a
+   container — and the second one only registered as the icon jumping.
+
+   So the box goes, both states, and the icon is an icon: 18px, on the first
+   line of the title beside it, grey at rest and brand when the card is chosen.
+   One thing changes on selection and it is the colour. */
 .bfp2__mode-ico {
-  flex: none; display: grid; place-items: center; width: 30px; height: 30px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-inset); color: var(--text-secondary);
+  flex: none; display: grid; place-items: center;
+  width: 18px; height: 18px;
+  /* The card is `align-items: flex-start`, so the icon sits on the title's line
+     rather than in the middle of a three-line card. `--fs-md` at 1.4 makes an
+     18px line box, which is the icon's own box — so this is a single pixel of
+     optical correction, not a layout. */
+  margin-top: 1px;
+  color: var(--text-tertiary);
 }
 /* No type colour on these either. Two icons in two hues, on a card that already
    spells out its own name in bold above a sentence explaining it, is colour
-   spent on a distinction the words have already made — and it is the same
-   colour the chip uses elsewhere, so it reads as a state rather than a kind.
-   Grey at rest, brand for the one that is chosen. */
-.bfp2__mode-card.is-on .bfp2__mode-ico { background: transparent; color: var(--brand-active); }
+   spent on a distinction the words have already made. Grey at rest, brand for
+   the one that is chosen. */
+.bfp2__mode-card.is-on .bfp2__mode-ico { color: var(--brand-active); }
 .bfp2__mode-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .bfp2__mode-body strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bfp2__mode-body em { font-style: normal; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.45; }
@@ -303,7 +321,6 @@
   margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold);
   letter-spacing: 0; text-transform: none; color: var(--text-primary);
 }
-.bfp2__restform .bfp2__stephint { margin: 0; }
 /* `.bfp2__modes--stack` stood here — the drawer opting out of the side-by-side
    columns. Stacking is the base now, so the modifier had nothing left to say. */
 
@@ -492,12 +509,17 @@
    built for the create wizard, which really does have two or three. What it
    does NOT keep is the brand tint on the current step — see there. */
 
-/* One line per step saying what this question decides — the thing a flat panel
-   cannot tell you, because on a flat panel every question is asked at once. */
-.bfp2__stephint {
-  margin: 0 0 14px; max-width: 62ch;
-  font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.55;
-}
+/* `.bfp2__stephint` has gone with the last paragraph that used it.
+
+   Every step's explanation is on its heading now, as the `TipDot` the rest of
+   this screen uses, and the one remaining prose line — a placeholder under a
+   section whose question had not been answered yet — went when that section
+   stopped rendering until it had something to ask. */
+
+/* A form row's answer where there is nothing to choose. The same weight as the
+   value inside a control, without the box: a border drawn around one immovable
+   string is a control refusing to be used. */
+.bfp2__setvalue { font-size: var(--fs-md); color: var(--text-primary); }
 
 /* The answers as a sentence on the page, now that the controls live behind the
    button. Reads as a statement, not as a row of disabled fields. */
@@ -1056,11 +1078,9 @@
   font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
 }
 .bfp2__restform h4 { display: flex; align-items: center; gap: 6px; }
-.bfp2__wizsection > .bfp2__stephint { margin: 0; }
-/* Waiting on the answer above it. Dimmed rather than hidden, and not disabled —
-   there is nothing in it to disable yet, only a line saying what it is waiting
-   for. */
-.bfp2__wizsection.is-waiting > h4 { color: var(--text-tertiary); }
+/* `.is-waiting` stood here — the dimmed state for a section whose question
+   above it was unanswered. The section is not rendered at all until then, so
+   there is nothing left to dim. */
 
 /* --- A destructive change, held ---------------------------------------------------
 

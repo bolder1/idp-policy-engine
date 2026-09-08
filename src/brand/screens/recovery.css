@@ -143,14 +143,15 @@
 
 .bv5__radio-ico {
   flex: none; display: grid; place-items: center;
-  width: 32px; height: 32px; border-radius: var(--radius-md);
-  background: var(--surface-inset); border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
+  width: 18px; height: 18px;
+  color: var(--text-tertiary);
 }
-/* On the selected card the tile stops being a chip and becomes an outline, so
-   the card's own tint runs through it. Naming a surface token here instead —
-   any surface token — puts a fixed colour on top of a tinted card, and in dark
-   `--surface-raised` is the exact colour of an *unselected* card, which reads
-   as a hole punched in the selected one. Transparent has no theme to get
-   wrong. */
-.bv5__radio.is-on .bv5__radio-ico { background: transparent; border-color: var(--brand-subtle-border); color: var(--brand-active); }
+/* The tile went from these the same day it went from the device profile's mode
+   cards, and for the same reason: it was a filled chip at rest and an outline
+   when selected, so the glyph's optical position moved between two cards that
+   are meant to be identical apart from which one is chosen. The card's border
+   and tint already say "chosen"; the icon only has to be legible.
+
+   These cards are `align-items: center` rather than flex-start, so unlike the
+   device profile's there is no optical correction to make. */
+.bv5__radio.is-on .bv5__radio-ico { color: var(--brand-active); }

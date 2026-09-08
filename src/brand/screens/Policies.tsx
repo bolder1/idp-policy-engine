@@ -1,16 +1,21 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useMemo, useState } from 'react'
+import { Suspense, lazy, useMemo, useState } from 'react'
 import { BookmarkPlus, Copy, Pencil, Trash2, Waypoints } from 'lucide-react'
 
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
 import { AppLogo } from '../logos/AppLogo'
 import { Badge, Button, InfoDot, StatusPill } from '../kit'
-import { enforces, type Policy, type PolicyType } from '../data'
+import { blankPolicy, enforces, type Policy, type PolicyType } from '../data'
+import { NewPolicyDialog } from '../create/NewPolicyDialog'
 import { useBrand } from '../store'
 import { NoResults } from '../empty'
 import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
+
+/* Mounted only while it is open — the list is the landing screen and does not
+   need the interview's questions, composer and figures in its chunk. */
+const Interview = lazy(() => import('../create/Interview').then((m) => ({ default: m.Interview })))
 
 /* -----------------------------------------------------------------------------
    Policies — the list.
@@ -83,6 +88,24 @@ export function Policies() {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'modified', dir: 1 })
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  /* Creating a policy is a form, and the form opens here.
+
+     It was a whole SCREEN: `New policy` navigated to a gallery of templates,
+     you chose one, and only then were you asked the two questions that
+     actually make a policy — what it is called and what it protects. That put
+     the catalogue in front of the decision. Somebody who already knows they
+     are writing a rule for Workday had to browse twelve strangers' policies
+     before they could say so, and somebody who wanted a template was choosing
+     one for a policy that did not exist yet.
+
+     So the button opens the form, the form lands you in the builder, and the
+     catalogue is offered from the empty board — where "how would you like to
+     start?" is a question you are in a position to answer, and where taking a
+     template is an edit to a real policy that undo can put back. */
+  const [naming, setNaming] = useState(false)
+  const [interview, setInterview] = useState(false)
+  /** The application the form had already collected, carried into the guided build. */
+  const [guidedApp, setGuidedApp] = useState<string | null>(null)
 
   /* Keyed on the three collections it reads, not on the store object.
 
@@ -233,14 +256,54 @@ export function Policies() {
                 action that duplicates a nav item spends the page's most
                 valuable position on a shortcut to somewhere you can already
                 see. */}
-            <Button variant="brand" onClick={() => store.go({ name: 'create' })}>
+            <Button variant="brand" onClick={() => setNaming(true)}>
               New policy
             </Button>
           </>
         }
       />
 
-      {store.features.coverage && view === 'coverage' && <Coverage />}
+      {store.features.coverage && view === 'coverage' && <Coverage onNew={() => setNaming(true)} />}
+
+      {/* Two questions, then the builder.
+
+          `NewPolicyDialog` hands back a finished, rules-empty policy and does
+          not navigate — the Applications screen calls it the same way and
+          deliberately stays put. What happens next is the caller's, and from
+          here the errand was "I want to write a policy", so it ends in the one
+          place that can. */}
+      <NewPolicyDialog
+        open={naming}
+        onClose={() => setNaming(false)}
+        onCreate={(policy) => {
+          store.addPolicy(policy)
+          store.showToast(`${policy.name} created`)
+          store.go({ name: 'board', policyId: policy.id })
+        }}
+        onGuided={store.features.guidedSetup ? (id) => { setGuidedApp(id); setNaming(false); setInterview(true) } : undefined}
+      />
+
+      <AnimatePresence>
+        {interview && store.features.guidedSetup && (
+          <Suspense fallback={null}>
+            <Interview
+              open={interview}
+              onClose={() => setInterview(false)}
+              onCreate={(rules, builtName, audience) => {
+                /* The application the form had already collected. Without it
+                   the guided path silently produced a policy protecting nothing
+                   — the one field the form marks required with a red asterisk. */
+                const policy = blankPolicy(builtName, guidedApp ?? undefined)
+                policy.rules = rules
+                policy.audience = audience
+                store.addPolicy(policy)
+                store.showToast(`${policy.name} created with ${rules.length} rule${rules.length === 1 ? '' : 's'}`)
+                store.go({ name: 'board', policyId: policy.id })
+              }}
+            />
+          </Suspense>
+        )}
+      </AnimatePresence>
 
       {(view === 'list' || !store.features.coverage) && (
         <>

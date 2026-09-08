@@ -939,6 +939,40 @@ export function reach(a: Audience, allGroups: Group[], allUsers: User[]): number
   return fromGroups + named
 }
 
+/* The audience as a bar says it: one phrase for the selection, one number for
+   its size, and the two facts that decide how it is drawn.
+
+   Extracted because two bars now print it — the trail's tall `PolicyBar` and
+   the board's slim `BoardBar` — and the four derivations are exactly the kind
+   of thing that drifts when it is copied: whether "Everyone" suppresses the
+   count, whether three named people should read "3 people · 3 people", and
+   what counts as an audience that governs nobody at all. */
+export interface AudienceSummary {
+  /** "Everyone", or "2 groups · 1 person". Empty when nobody is selected. */
+  label: string
+  /** People reached, for the muted half. */
+  total: number
+  /* Suppressed when the selection is only named individuals: "3 people · 3
+     people" is a number restating itself. */
+  showTotal: boolean
+  /** Nothing selected — the rules cannot run. */
+  nobody: boolean
+}
+
+export function audienceSummary(a: Audience, allGroups: Group[], allUsers: User[]): AudienceSummary {
+  const { everyone, groupIds, userIds } = a
+  const parts = [
+    groupIds.length > 0 && `${groupIds.length} group${groupIds.length === 1 ? '' : 's'}`,
+    userIds.length > 0 && `${userIds.length} ${userIds.length === 1 ? 'person' : 'people'}`,
+  ].filter(Boolean) as string[]
+  return {
+    label: everyone ? 'Everyone' : parts.join(' · '),
+    total: reach(a, allGroups, allUsers),
+    showTotal: everyone || groupIds.length > 0,
+    nobody: !everyone && groupIds.length === 0 && userIds.length === 0,
+  }
+}
+
 export const zones: Zone[] = [
   /* No shipped defaults.
 

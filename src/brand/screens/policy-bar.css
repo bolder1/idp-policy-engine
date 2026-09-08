@@ -22,40 +22,19 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
-/* --- Floating, for the canvas ---------------------------------------------
+/* The floating variant has gone with the board that asked for it.
 
-   The trail is a scrolling column, so a bar above it costs one band of a page
-   that scrolls anyway. The board is a canvas, and a canvas has no natural
-   height — every pixel the chrome takes is a rule you cannot see without
-   panning. Out of the column and over the work, so the region below is the
-   whole region.
+   `.bpbar.is-float` lifted this strip out of the column and laid it over the
+   canvas at 76px, `.bpbar.is-away` slid it off the top for focus mode, and
+   `--bpbar-h` was declared for board.css to read back. All three are deleted:
+   the board has a 48px row of its own, and the trail — the only caller left —
+   is a scrolling column, where a bar above the work costs one band of a page
+   that scrolls anyway.
 
-   `--bpbar-h` is the strip it covers, and the board reads it back to step its
-   corner toolbars down past the bar. Declared here because this is the element
-   that knows how tall it is, and it is the one number the two files share. */
-.bpbar.is-float {
-  --bpbar-h: 76px;
-  position: absolute;
-  inset: 0 0 auto 0;
-  z-index: 6;
-  transition: transform 0.24s var(--ease-standard), opacity 0.18s var(--ease-standard);
-}
-
-/* Focus mode: off the top, and nothing left behind.
-
-   `translateY(-101%)` rather than `display: none`, so it animates out and back,
-   and `visibility: hidden` at the end of it so nothing in there is tabbable
-   while it is gone — a bar you cannot see but can still tab into is worse than
-   one that is simply absent. `aria-hidden` is set on the element too; see
-   `policy-bar.tsx`. */
-.bpbar.is-away {
-  transform: translateY(-101%);
-  opacity: 0;
-  visibility: hidden;
-}
-@media (prefers-reduced-motion: reduce) {
-  .bpbar.is-float { transition: none; }
-}
+   The reduced-motion block that suppressed the float's transition went too, as
+   a WHOLE block. An `@media` left with an empty body is invisible in
+   development and fails `npm run build` under lightningcss; shell.css records
+   this repo having been bitten by exactly that once already. */
 
 .bpbar__id { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
 .bpbar__back {
@@ -199,18 +178,9 @@
   grid-column: 2; grid-row: 1 / span 2;
   display: flex; align-items: center; gap: var(--space-3);
 }
-.bpbar__view {
-  display: inline-flex; padding: 2px; border-radius: var(--radius-md);
-  background: var(--surface-inset, #eef1f4);
-}
-.bpbar__view > button {
-  height: 26px; padding: 0 10px; border: none; border-radius: 4px; background: none;
-  font-family: inherit; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary); cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
-}
-.bpbar__view > button:hover { color: var(--text-primary); }
-.bpbar__view > button.is-on { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
-.bpbar__view > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+/* `.bpbar__view` — the Board / Trail segmented switch — stood here. The switch
+   itself was commented out of the markup long before this; the styles are gone
+   now too. Restoring it means writing both again, which is the honest cost. */
 
 .bpbar__edit {
   display: inline-flex; align-items: center; gap: var(--space-2);

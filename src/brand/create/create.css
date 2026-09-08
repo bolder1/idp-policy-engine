@@ -1,5 +1,19 @@
 /* ---------------------------------------------------------------------------
-   Create a policy — gallery, then name and app.
+   Creating a policy, and the templates it can start from.
+
+   This was one screen's stylesheet: a gallery page, a hero banner, a category
+   tab strip and a name-and-app step laid out beneath them. The gallery page is
+   gone — the naming form opens in place from the policy list, and the
+   catalogue is a sheet the board raises from its empty state — so what is left
+   here is the three things that outlived it: the template card and its
+   preview, the marketplace sheet those cards sit in, and the field styling the
+   naming form shares with Policy details.
+
+   `.bcp*`, `.bname2*`, `.bbar*` and `.bempty` are NOT create-page classes any
+   more, whatever their names suggest: PolicyDetails.tsx imports this file and
+   wears them, and `.bempty` restyles every empty state in the console. None of
+   them can be deleted as gallery cleanup.
+
    Console-native: white page, #f8f9fa tiles, 6px radii, orange primary.
    --------------------------------------------------------------------------- */
 
@@ -9,114 +23,7 @@
 .bcp__crumb button { color: var(--text-tertiary); }
 .bcp__crumb button:hover { color: var(--text-primary); text-decoration: underline; }
 .bcp__headrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
-.bcp__step { font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--brand-active); margin-bottom: 5px; }
 .bcp__headrow h1 { font-size: 20px; font-weight: 700; }
-.bcp__sub { margin-top: 6px; font-size: var(--fs-md); color: var(--text-secondary); max-width: 76ch; line-height: 1.55; }
-.bcp__headacts { display: flex; gap: 8px; flex: none; }
-
-/* --- Start banner -----------------------------------------------------------
-   The ways to begin used to be spread across three places: two buttons in the
-   page's action trail, a blank card inside the template grid, and a promo tile
-   for the marketplace. Three locations for one decision. They are one banner
-   now, and the fourth route — a template — is a section of its own below, so
-   the banner links down to it instead of pretending to contain it.
-
-   Guided setup is deliberately NOT here. It is the route you take once you have
-   decided to write a policy yourself and met the form, so it sits on that
-   form's action bar beside Create policy — offered at the moment the work
-   actually starts rather than as a fifth thing to choose between. */
-.bhero {
-  position: relative;
-  display: flex; align-items: center; gap: 24px;
-  margin-bottom: 28px;
-  padding: 26px 28px;
-  overflow: hidden;
-  border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  /* The dotted canvas the rule thumbnails use, warmed by the brand tint. It
-     reads as this product rather than as a marketing header. */
-  background:
-    radial-gradient(circle at 1px 1px, var(--card-dot) 1px, transparent 0) 0 0 / 12px 12px,
-    linear-gradient(105deg, var(--brand-subtle-bg) 0%, var(--surface-sunken) 58%, var(--surface-sunken) 100%);
-}
-.bhero__body { flex: 1; min-width: 0; }
-.bhero h2 {
-  font-size: var(--fs-2xl); font-weight: var(--fw-semibold);
-  letter-spacing: -0.015em; color: var(--text-primary);
-}
-.bhero p {
-  margin-top: 6px; max-width: 58ch;
-  font-size: var(--fs-base); color: var(--text-secondary); line-height: 1.55;
-}
-.bhero__acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
-.bhero__acts .bx-btn { display: inline-flex; align-items: center; gap: 7px; }
-/* A link, not a third button — it moves you down the page rather than starting
-   anything, and giving it a button's weight would misreport what it does. */
-.bhero__jump {
-  display: inline-flex; align-items: center; gap: 6px;
-  margin-left: 4px;
-  font-size: var(--fs-md); color: var(--text-link);
-}
-.bhero__jump:hover { text-decoration: underline; }
-
-/* Three chips on a spine — the same drawing as a rule stack, at a glance. */
-.bhero__art {
-  position: relative; flex: none;
-  width: 188px; height: 116px;
-  display: none;
-}
-@media (min-width: 900px) { .bhero__art { display: block; } }
-.bhero__art::before {
-  content: ''; position: absolute;
-  left: 14px; top: 12px; bottom: 12px;
-  width: 1px; background: var(--border-default);
-}
-.bhero__chip {
-  position: absolute; left: 0;
-  display: inline-flex; align-items: center;
-  height: 26px; padding: 0 11px 0 30px;
-  border-radius: 8px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  box-shadow: 0 1px 2px rgba(33, 37, 41, 0.05);
-  font-size: var(--fs-xs); font-weight: var(--fw-medium);
-}
-.bhero__chip::before {
-  content: ''; position: absolute; left: 9px;
-  width: 11px; height: 11px; border-radius: 3px;
-}
-.bhero__chip.is-1 { top: 6px; width: 132px; color: var(--fb-negative-fg); }
-.bhero__chip.is-1::before { background: var(--fb-negative-dot); }
-.bhero__chip.is-2 { top: 45px; width: 152px; color: var(--fb-notice-fg); }
-.bhero__chip.is-2::before { background: var(--fb-notice-dot); }
-.bhero__chip.is-3 { top: 84px; width: 116px; color: var(--fb-positive-fg); }
-.bhero__chip.is-3::before { background: var(--fb-positive-dot); }
-
-@media (max-width: 720px) {
-  .bhero { padding: 20px; }
-  .bhero__acts .bx-btn { flex: 1; justify-content: center; }
-}
-
-/* --- Gallery --------------------------------------------------------------- */
-
-.bgal__bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
-.bgal__bar .bgal__section { margin: 0; flex: 1; }
-.bcp__count {
-  font-style: normal; margin-left: 7px; padding: 0 6px;
-  border-radius: var(--radius-pill); background: var(--surface-inset);
-  font-size: var(--fs-xs); font-weight: 500; color: var(--text-tertiary);
-}
-.bgal__tabs { display: inline-flex; gap: 2px; padding: 3px; background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
-.bgal__tab { position: relative; padding: 7px 13px; border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--text-secondary); }
-.bgal__tab span { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; }
-.bgal__tab em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
-.bgal__tab.is-on { color: var(--text-primary); font-weight: 500; }
-.bgal__tabbg { position: absolute; inset: 0; background: var(--surface-raised); border-radius: var(--radius-sm); box-shadow: var(--el-low); }
-.bgal__search { width: 240px; margin-left: auto; }
-/* In the templates bar the search no longer claims the whole gap — the gallery
-   button sits after it, and both stay right-aligned as a pair. */
-.bgal__bar .bgal__search { flex: none; }
-.bgal__bar > .bx-btn { flex: none; }
 
 /* Spacing is asymmetric on purpose: a heading needs more air above it when it
    follows a block of cards than when it follows the toolbar, or the group it
@@ -297,14 +204,6 @@
 }
 .bgcard__mrow--rest .bgcard__mname { color: var(--text-secondary); }
 
-.bgcard__mrow--ghost {
-  background: transparent;
-  border-style: dashed;
-  box-shadow: none;
-}
-.bgcard__mrow--ghost .bgcard__mname { color: var(--text-tertiary); font-weight: var(--fw-regular); }
-.bgcard__mrow--ghost .bgcard__mn { color: var(--text-tertiary); }
-
 /* Fixed height and pinned to the canvas floor. Idle it states the posture;
    pointing at a row swaps in that rule's condition. Nothing reflows either
    way, which is what lets the strip carry real text. */
@@ -330,18 +229,6 @@
   min-width: 0;
   color: var(--text-secondary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
-.bgcard__badge {
-  position: absolute; top: 10px; left: 10px; z-index: 3;
-  max-width: calc(100% - 56px);
-  padding: 2px 9px; border-radius: var(--radius-pill); white-space: nowrap;
-  /* Violet, not brand orange. "Recommended" is a label, not an action, and in
-     brand orange it competed with the primary button on the same screen. */
-  background: var(--fb-accent-bg); color: var(--fb-accent-fg);
-  border: 1px solid var(--fb-accent-border);
-  font-size: var(--fs-xs); font-weight: 500;
-  overflow: hidden; text-overflow: ellipsis;
 }
 
 .bgcard__peek {
@@ -575,47 +462,6 @@
   line-height: 1.45;
 }
 
-/* What the template is about to give you. Only rendered when there is a
-   template — from scratch this was a box apologising for its own emptiness. */
-.bnp__prev {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-  overflow: hidden;
-}
-.bnp__prevhead {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-raised);
-  font-size: var(--fs-sm); color: var(--text-tertiary);
-}
-.bnp__prevhead strong { font-weight: var(--fw-medium); color: var(--text-secondary); }
-.bnp__off {
-  flex: none;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--fb-neutral-bg);
-  border: 1px solid var(--fb-neutral-border);
-  color: var(--fb-neutral-fg);
-  font-size: var(--fs-xs); font-weight: var(--fw-medium); white-space: nowrap;
-}
-/* Capped and scrolling, so a nine-rule template cannot push the two fields the
-   dialog exists for off the top of an 88vh panel. */
-.bnp__rules {
-  list-style: none; margin: 0; padding: 10px 12px;
-  display: flex; flex-direction: column; gap: 6px;
-  max-height: 208px; overflow-y: auto;
-}
-.bnp__rules li {
-  display: flex; align-items: center; gap: 9px;
-  padding: 9px 11px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-}
-.bnp__rules--default { border-style: dashed !important; background: transparent !important; }
-
 /* --- Bottom bar ------------------------------------------------------------ */
 
 .bbar {
@@ -717,13 +563,6 @@ html[data-theme='dark'] .bguided__sheen {
 @media (max-width: 720px) {
   .bcp { padding-bottom: 92px; }
   .bcp__headrow { flex-direction: column; gap: 14px; }
-  .bcp__headacts { width: 100%; }
-  .bcp__headacts .bx-btn { flex: 1; }
-
-  .bgal__bar { gap: 10px; }
-  .bgal__tabs { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
-  .bgal__tab { white-space: nowrap; }
-  .bgal__search { width: 100%; margin-left: 0; }
   .bgal__grid { grid-template-columns: minmax(0, 1fr); }
 
 
@@ -826,33 +665,6 @@ html[data-theme='dark'] .bguided__sheen {
 .bmarket__intro p { margin-top: 6px; max-width: 62ch; font-size: var(--fs-base); color: var(--text-secondary); line-height: 1.5; }
 .bmarket__body .bgal__section:first-of-type { margin-top: 0; }
 
-/* --- The entry point in the grid ------------------------------------------- */
-
-.bmarket__promo {
-  display: flex; flex-direction: column; align-items: flex-start;
-  height: 284px; padding: 22px 20px;
-  border: 1px dashed var(--border-default);
-  border-radius: 20px;
-  background: var(--surface-sunken);
-  text-align: left;
-  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
-}
-.bmarket__promo:hover { border-color: var(--brand); background: var(--brand-subtle-bg); }
-.bmarket__promoicon {
-  width: 46px; height: 46px; border-radius: 13px; margin-bottom: 16px;
-  display: grid; place-items: center;
-  background: var(--surface-raised); color: var(--brand-active);
-  border: 1px solid var(--border-subtle);
-}
-.bmarket__promo strong { font-size: var(--fs-lg); font-weight: 600; }
-.bmarket__promosub {
-  margin-top: 6px; font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.5;
-}
-.bmarket__promocta {
-  display: inline-flex; align-items: center; gap: 6px; margin-top: auto;
-  font-size: var(--fs-sm); font-weight: 500; color: var(--brand-active);
-}
-
 @media (max-width: 720px) {
   .bmarket__sheet { height: 100%; border-radius: 0; }
   .bmarket__head, .bmarket__body { padding-left: 16px; padding-right: 16px; }
@@ -894,8 +706,6 @@ html[data-theme='dark'] .bguided__sheen {
 }
 .bcp--fit .bcp__head { margin-bottom: 16px; }
 .bcp--fit > div:has(.bname2) { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-
-.bcp__stepcrumb { color: var(--brand-active); font-weight: 500; }
 
 /* The form, wherever it is asked.
 
@@ -1022,12 +832,16 @@ html[data-theme='dark'] .bguided__sheen {
    absolutely positioned against. With the canvas gone it needs a place in the
    flow rather than a corner to hang in, and the card needs its own top padding
    back — the canvas was providing it. */
-.bgcard.is-flat { padding-top: var(--space-5); }
-.bgcard__badge.is-flat {
-  position: static; display: inline-block; align-self: flex-start;
-  margin: 0 var(--space-5) var(--space-4);
-  max-width: calc(100% - var(--space-6) * 2);
-}
+/* And the floor goes with it.
+
+   `min-height: 224px` is a floor sized for a card CARRYING the 212px
+   thumbnail, so that a one-rule template and a five-rule one line up. Without
+   the thumbnail there is nothing to line up and the floor is simply 90px of
+   nothing: measured, a flat card came out 284px tall around 63px of text, and
+   `.bgcard__body { flex: 1 }` put the whole surplus in one gap between the
+   description and the footer. The grid row is `1fr`, so the cards in a row
+   still finish level with each other — that was never the floor's doing. */
+.bgcard.is-flat { padding-top: var(--space-5); min-height: 0; }
 
 
 /* --- Signals, tags, and the pinned footer -------------------------------------

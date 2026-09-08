@@ -31,7 +31,6 @@ const RiskSignals = lazy(() => import('./screens/RiskSignals').then((m) => ({ de
 const Hooks = lazy(() => import('./screens/Hooks').then((m) => ({ default: m.Hooks })))
 const ZonesPage = lazy(() => import('./screens/ZonesPage').then((m) => ({ default: m.ZonesPage })))
 const AuthMethodsPage = lazy(() => import('./screens/AuthMethodsPage').then((m) => ({ default: m.AuthMethodsPage })))
-const CreatePolicy = lazy(() => import('./create/CreatePolicy').then((m) => ({ default: m.CreatePolicy })))
 const BuilderPage = lazy(() => import('./screens/BuilderPage').then((m) => ({ default: m.BuilderPage })))
 const BoardPage = lazy(() => import('./screens/board/BoardPage').then((m) => ({ default: m.BoardPage })))
 const PolicyDetails = lazy(() => import('./screens/PolicyDetails').then((m) => ({ default: m.PolicyDetails })))
@@ -45,7 +44,6 @@ const warm = () => {
   void import('./screens/Hooks')
   void import('./screens/ZonesPage')
   void import('./screens/AuthMethodsPage')
-  void import('./create/CreatePolicy')
   void import('./screens/BuilderPage')
   void import('./screens/board/BoardPage')
   void import('./screens/Applications')
@@ -95,8 +93,6 @@ function Screen() {
       return <Hooks />
     case 'methods':
       return <AuthMethodsPage />
-    case 'create':
-      return <CreatePolicy />
   }
 }
 

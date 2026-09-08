@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Check, Copy, Keyboard, ListChecks, ListOrdered, PanelRightClose, PanelRightOpen, PanelTopClose, PanelTopOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Check, Copy, Keyboard, ListOrdered, PanelRightClose, PanelRightOpen, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
 import { Button, Modal } from '../../kit'
-import { fallbackRule, reidRule, blankRule, type Policy, type Rule } from '../../data'
+import { fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
 import { useBrand, useNameLookup } from '../../store'
+import { TemplateSheet } from '../../create/TemplateSheet'
 import { ReviewDialog } from '../builder-dialogs'
 import { CommandBar, type Cmd } from '../command-bar'
+import { BoardBar, BoardBarActions } from './BoardBar'
 import { BoardSheet } from './BoardSheet'
 import { diagnose, shadowedBy } from '../diagnostics'
 import { runGauntlet } from '../gauntlet'
@@ -56,15 +58,9 @@ const NO_OVERRIDES: Record<string, never> = {}
 export function BoardBuilder({
   policyId,
   openSheet,
-  focus,
-  onToggleFocus,
 }: {
   policyId: string
   openSheet?: Tab
-  /* Focus mode: the policy bar is away and the canvas has the whole region.
-     Owned by `BoardPage`, because it governs the bar as well as this. */
-  focus?: boolean
-  onToggleFocus?: () => void
 }) {
   const store = useBrand()
   const { registerLeaveGuard } = store
@@ -92,6 +88,14 @@ export function BoardBuilder({
      so it opens with the first paint and closing it does not fight a prop that
      is still set: after that the sheet is yours. */
   const [sheet, setSheet] = useState<Tab | null>(openSheet ?? null)
+  /* The template catalogue, offered from the empty board.
+
+     It used to be a page you met BEFORE the policy existed — you browsed
+     templates, chose one, and only then were asked what the policy was called.
+     Here the policy is already real, so taking a template is an ordinary edit:
+     it goes through `commitDraft` like every other one, undo puts it back, and
+     nothing is saved until you publish. */
+  const [picking, setPicking] = useState(false)
   const [inspOpen, setInspOpen] = useState(true)
   /* The inspector's width, dragged rather than fixed.
 
@@ -112,8 +116,8 @@ export function BoardBuilder({
      The old 400 was chosen when a condition was a run of chips that wrapped
      anyway, so no width had ever been right. Below the breakpoint the row folds
      to two deliberate lines instead of crushing — that is what the named grid
-     areas at the foot of board.css are for. The grip still moves it 320 to 720,
-     and focus mode is the way to the whole screen. */
+     areas at the foot of board.css are for. The grip moves it 320 to 720, and
+     closing the panel gives the canvas the whole region. */
   const [inspW, setInspW] = useState(560)
   /* How much of itself every card shows, and the per-card exceptions.
 
@@ -455,10 +459,15 @@ export function BoardBuilder({
     if (s.kind !== 'none') setInspOpen(true)
   }
   /* The panel is on screen only when it has something to say AND has not been
-     collapsed. Everything that has to step aside for it — the two floating
-     toolbars, the sheet, Fit — keys off `is-insp-closed`, so the two ways of
-     not being there resolve to one class and the layout cannot tell them
-     apart. It should not have to: both mean the stage has the width back. */
+     collapsed. One class for both, because the layout must not be able to tell
+     them apart: either way the stage has the width back.
+
+     What reads the class has shrunk to one thing — `.bb`'s own
+     `grid-template-columns`. It used to be four: two floating toolbars and the
+     sheet each subtracting the panel's width by hand, and Fit measuring it out
+     of the DOM. The panel is a track now, so collapsing the track is the whole
+     of the adjustment and everything drawn inside the stage follows for
+     free. */
   const panelShown = hasSubject && inspOpen
   const boardCommands: Cmd[] = [
     { id: 'add', label: 'Add a rule', icon: Plus },
@@ -512,6 +521,30 @@ export function BoardBuilder({
   }
   const duplicate = (i: number) => insert(reidRule({ ...draft.rules[i], name: `${draft.rules[i].name} (copy)` }), i + 1)
 
+  /* A template, applied to a policy that already exists.
+
+     One `commitDraft`, which is the whole point of routing it through here:
+     the rules land on the undo stack, `dirty` notices, and Review & publish
+     wakes up. `setHist(historyOf(next))` would look identical on screen and be
+     un-undoable — that call belongs to publish and discard, and undo is the
+     only thing standing between a mis-clicked template and lost work.
+
+     Rules ONLY. A `Scenario` also declares an audience, and writing it into the
+     draft would commit an edit that can never be saved: `dirty` compares rules
+     and the fallback, so the publish button would stay disabled over a policy
+     whose audience had silently changed. Who a policy governs is a standing
+     fact, edited where the other standing facts are.
+
+     The panel lands on rule 1 rather than on nothing, the same courtesy
+     `insert` does — five rules arriving with an empty inspector beside them
+     reads as a screen that has not finished loading. */
+  const applyTemplate = (t: Scenario) => {
+    const built = t.rules.map((r) => r.build())
+    commitDraft({ ...draft, rules: built })
+    if (built[0]) select(ruleAt(built[0].id))
+    store.showToast(`${t.name} applied — ${built.length} rule${built.length === 1 ? '' : 's'}, not saved yet`)
+  }
+
   const publish = () => {
     /* Publishing is what ends a draft.
 
@@ -543,12 +576,32 @@ export function BoardBuilder({
   }
 
   return (
+    <>
+      {/* The policy, above the work.
+
+          A sibling of `.bb` rather than a child, so the shell's flex column
+          places it and the board below it takes what is left. The verbs in it
+          act on the DRAFT, which is why this component renders the bar rather
+          than the page above it. */}
+      <BoardBar
+        policy={draft}
+        actions={
+          <BoardBarActions
+            test={test}
+            movement={movement}
+            sheet={sheet}
+            dirty={dirty}
+            blockers={blockers}
+            onSheet={setSheet}
+            onDiscard={discard}
+            onReview={() => setReview(true)}
+          />
+        }
+      />
+
     <div
       ref={shell}
-      /* `is-bared` says the policy bar is floating above this region, so the
-         corner toolbars step down past it. Focus mode drops the class and the
-         canvas reclaims the strip — which is the whole point of it. */
-      className={`bb ${panelShown ? '' : 'is-insp-closed'} ${gripping ? 'is-gripping' : ''} ${focus ? '' : 'is-bared'}`}
+      className={`bb ${panelShown ? '' : 'is-insp-closed'} ${gripping ? 'is-gripping' : ''}`}
       style={{ '--bb-insp': `${inspW}px` } as React.CSSProperties}
     >
       <Board
@@ -559,10 +612,10 @@ export function BoardBuilder({
         trace={trace}
         resolve={resolve}
         onSelect={select}
-        reserveOnOpen={inspW + 24}
         expandedOf={expandedOf}
         onToggleExpand={toggleExpand}
         onInsert={(at) => insert(blankRule(), at)}
+        onUseTemplate={() => setPicking(true)}
         onMove={move}
         onToggle={(i, on) => patchRule(i, { enabled: on })}
         onDuplicate={duplicate}
@@ -576,28 +629,32 @@ export function BoardBuilder({
            step back through what you did, then how much of each rule. */
         tools={
           <>
-            {onToggleFocus && (
-              <button
-                type="button"
-                className="bb__act"
-                aria-label={focus ? 'Show the policy header' : 'Hide the policy header'}
-                aria-pressed={focus}
-                title={focus ? 'Show the header' : 'Focus mode — hide the header'}
-                onClick={onToggleFocus}
-              >
-                {/* The panel glyphs, not the maximise pair.
+            {/* Show or hide the config panel.
 
-                    `Maximize2` was the first choice and it collided: "Fit the
-                    chain in view" sits four buttons along in the SAME toolbar
-                    wearing the identical arrows, so one strip offered two
-                    different things under one mark.
+                It was in the top-right publishing cluster, beside Discard and
+                Review & publish — a control that changes what you can SEE,
+                filed with the two that change what is SAVED. It is a view
+                control, so it lives with the view controls; and it is the only
+                way back once the panel is closed, which is a poor thing to
+                leave to a keyboard shortcut.
 
-                    `PanelTop` says what actually happens — a panel along the top
-                    edge closes — and it rhymes with the `PanelRight` pair the
-                    inspector toggle already uses on this board. Two panels, one
-                    idiom, and the arrow says which edge. */}
-                {focus ? <PanelTopOpen size={14} strokeWidth={2} /> : <PanelTopClose size={14} strokeWidth={2} />}
-              </button>
+                Absent, not disabled, when nothing is selected: there is no
+                panel to show or hide until a card is chosen, and a greyed-out
+                button in a toolbar invites somebody to work out why. */}
+            {hasSubject && (
+              <>
+                <button
+                  type="button"
+                  className="bb__act"
+                  aria-label={inspOpen ? 'Hide the panel' : 'Show the panel'}
+                  aria-pressed={inspOpen}
+                  title={inspOpen ? 'Hide the panel (⌘\)' : 'Show the panel (⌘\)'}
+                  onClick={() => setInspOpen((v) => !v)}
+                >
+                  {inspOpen ? <PanelRightClose size={14} strokeWidth={2} /> : <PanelRightOpen size={14} strokeWidth={2} />}
+                </button>
+                <span className="bb__float__sep" />
+              </>
             )}
             <button type="button" className="bb__act" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo(hist)} onClick={() => setHist(undo)}>
               <Undo2 size={14} strokeWidth={2} />
@@ -642,67 +699,8 @@ export function BoardBuilder({
               ))}
           </div>
         }
-      >
-        <div className="bb__float bb__float--tr" role="toolbar" aria-label="Publishing">
-          {/* The pips are back, with the sheet that gives them somewhere to
-              open — and with what made them worth having in the first place:
-              each carries its own answer, so the toolbar reports the state of
-              the policy without being opened. A pip that only opens a panel is
-              a menu item; a pip reading "F · 5 through" is a finding. */}
-          {features.gauntlet && (
-            <button type="button" className={`bb__pip ${sheet === 'check' ? 'is-on' : ''}`} title={test ? test.gradeReason : 'No rules are switched on, so there is nothing to grade'} onClick={() => setSheet('check')}>
-              <ListChecks size={13} strokeWidth={2} aria-hidden />
-              Check
-              {test ? (
-                <>
-                  <span className={`bb__grade is-${test.grade}`}>{test.grade}</span>
-                  {test.breaches > 0 && <span className="bb__n">{test.breaches} through</span>}
-                </>
-              ) : (
-                <span className="bb__n">—</span>
-              )}
-            </button>
-          )}
-          {features.blastRadius && (
-            <button
-              type="button"
-              className={`bb__pip ${sheet === 'impact' ? 'is-on' : ''} ${movement && movement.looser > 0 ? 'is-looser' : ''}`}
-              title={movement ? `${movement.stricter} stricter · ${movement.looser} looser, of 1,440 modelled situations` : 'Nothing unsaved to compare'}
-              onClick={() => setSheet('impact')}
-            >
-              <Activity size={13} strokeWidth={2} aria-hidden />
-              What changes
-              <span className="bb__n">{movement ? movement.changed.toLocaleString() : '—'}</span>
-            </button>
-          )}
-          <span className="bb__float__sep" />
-          {dirty && (
-            <Button variant="ghost" size="sm" onClick={discard}>
-              Discard
-            </Button>
-          )}
-          {/* The same two labels the trail uses, chosen the same way. Lite has
-              no publish gate, so the button says what it actually does there
-              rather than promising a review step that does not exist. */}
-          <Button variant="brand" size="sm" disabled={!dirty} title={blockers > 0 ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first` : undefined} onClick={() => setReview(true)}>
-            {features.publish ? 'Review & publish' : 'Review & Save'}
-          </Button>
-          {/* Absent, not disabled, when nothing is selected.
+      />
 
-              There is no panel to show or hide until a card is chosen, and a
-              greyed-out button in a toolbar invites somebody to work out why —
-              the same argument the pinned default makes for leaving its own
-              controls off the card rather than dimming them. */}
-          {hasSubject && (
-            <>
-              <span className="bb__float__sep" />
-              <button type="button" className="bb__act" aria-label={inspOpen ? 'Hide the inspector' : 'Show the inspector'} aria-pressed={inspOpen} onClick={() => setInspOpen((v) => !v)}>
-                {inspOpen ? <PanelRightClose size={14} strokeWidth={2} /> : <PanelRightOpen size={14} strokeWidth={2} />}
-              </button>
-            </>
-          )}
-        </div>
-      </Board>
 
       {panelShown && (
         <div
@@ -733,8 +731,9 @@ export function BoardBuilder({
           Not hidden with CSS — unmounted. The panel holds the editors for one
           rule, and an editor for a rule nobody is looking at is a form that
           keeps its own state about something that may since have been deleted.
-          Unmounting also means `fitTo` finds no `.bb__insp` to measure, so the
-          stage takes the full width back without anybody telling it to. */}
+          Unmounting also collapses its grid track — an explicitly-sized track
+          outlives the item in it, which is why `.bb.is-insp-closed` rewrites
+          the template rather than trusting the empty column to disappear. */}
       {panelShown && (
         <Inspector
           draft={draft}
@@ -818,6 +817,15 @@ export function BoardBuilder({
         }}
       />
 
+      {/* The catalogue, raised from the empty board.
+
+          Mounted here rather than inside `Board` because it writes to the
+          draft, and `commitDraft` is the one door. It carries `role="dialog"`
+          of its own, which the key handler above reads — without it, browsing
+          templates would leave Del, ⌘D and the arrow keys live on the rule
+          underneath. */}
+      <TemplateSheet open={picking} onClose={() => setPicking(false)} onChoose={applyTemplate} />
+
       <ReviewDialog open={review} policy={draft} onClose={() => setReview(false)} onConfirm={publish} />
 
       {/* Named, and it says what leaving costs.
@@ -849,5 +857,6 @@ export function BoardBuilder({
         </p>
       </Modal>
     </div>
+    </>
   )
 }

@@ -1,10 +1,11 @@
 /* -----------------------------------------------------------------------------
    The board — builder v2.
 
-   Three regions: a stage the chain sits on, the chain itself, and an inspector
-   beside it. Everything here is prefixed `bb-` and nothing reaches into the
-   trail's stylesheet; the two builders share the kit and the tokens and
-   nothing else.
+   Three regions, and they are regions now rather than a stack of overlays: a
+   flat top row that says which policy this is, a stage the chain sits on, and
+   the config panel beside it. Everything here is prefixed `bb-` and nothing
+   reaches into the trail's stylesheet; the two builders share the kit and the
+   tokens and nothing else.
    -------------------------------------------------------------------------- */
 
 /* 560 so a condition row is ONE row out of the box. The container query below
@@ -29,12 +30,34 @@
 
   flex: 1 1 auto;
   min-height: 0;
-  display: block;
+  /* Two tracks: the canvas, and the config panel beside it.
+
+     It was `display: block` with the stage absolutely positioned at `inset: 0`
+     and the panel floating on top — which gave the canvas the whole box and
+     made every other piece of chrome subtract the panel's width by hand. Five
+     separate rules did that arithmetic, in two different containing blocks, and
+     nothing on screen had an edge of its own.
+
+     A grid does the subtracting once. The stage is the first track, the panel
+     is the second, and neither has to know about the other.
+
+     `min()` rather than the bare token: `--bb-insp` is written INLINE on this
+     element by the grip drag, so a media query lowering it for narrow screens
+     could never win. Clamping the track against the region's own width does the
+     same job from inside the declaration, at every width, with no breakpoint. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) min(var(--bb-insp), 46%);
+  grid-template-rows: minmax(0, 1fr);
   background: var(--surface-raised);
+  /* Still the containing block for the grip and the sheet, which lie across the
+     seam between the two tracks rather than inside either of them. */
   position: relative;
 }
-/* The stage takes the whole box; the panel floats over it — see `.bb__stage`
-   below, which is where its position is set. */
+/* An explicitly-sized track outlives the item in it. The inspector is
+   UNMOUNTED when it closes — deliberately; see the note in BoardBuilder — so
+   without this, closing the panel would leave 560px of empty gutter where it
+   had been. */
+.bb.is-insp-closed { grid-template-columns: minmax(0, 1fr); }
 
 :root[data-theme='dark'] .bb,
 :root:not([data-theme='light']) .bb {
@@ -50,26 +73,152 @@
   :root:not([data-theme='dark']) .bb { --bb-dot: #d3dae1; --bb-stage: #f6f7f9; --bb-ring: #334155; }
 }
 
+/* --- The top row ------------------------------------------------------------
+
+   `bbtop`, not `bbar`, and the name matters: `.bbar` is already taken. It is
+   the sticky footer action bar in create.css, worn by Policy details and
+   Authentication methods, and both stylesheets are global — a board header
+   sharing the name would have inherited `position: sticky; bottom: 0` and lent
+   its own 48px height and bottom border to two unrelated screens. Caught by
+   navigating from the board to Policy details and finding a `.bbar` still on
+   the page after the board had unmounted.
+
+   48px, flat, in the flow. The policy's own strip used to float over the canvas
+   at 76px with a mode that hid it; see BoardBar.tsx for why that stopped.
+
+   It is a sibling of `.bb`, not a child of it, and that is deliberate: five
+   things inside `.bb` are positioned against `.bb`, so making the bar a child
+   would mean either re-parenting all five or giving every one of them a 48px
+   offset to carry. The shell's main region is already a flex column, so a
+   `flex: none` row above a `flex: 1 1 auto` board is the whole arrangement —
+   the same one the trail builder has always used for its own header.
+
+   `box-sizing: border-box` so the bottom rule lives INSIDE the 48 rather than
+   making it 49. */
+.bbtop {
+  flex: none;
+  box-sizing: border-box;
+  height: 48px;
+  display: flex; align-items: center; gap: var(--space-5);
+  padding: 0 var(--space-6);
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.bbtop__crumbs { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.bbtop__back {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px;
+  margin-left: calc(var(--space-4) * -1);
+  border: none; background: none; border-radius: var(--radius-sm);
+  color: var(--text-tertiary); cursor: pointer;
+}
+.bbtop__back:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bbtop__sl { flex: none; color: var(--border-strong); }
+
+/* A crumb is a fact, not a heading. 13px, secondary, and only the policy's own
+   name is allowed to shrink — a truncated application name is a policy pointed
+   at something you cannot read. */
+.bbtop__crumb {
+  flex: none;
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  padding: 0; border: 0; background: none;
+  font-family: inherit; font-size: var(--fs-md); color: var(--text-secondary);
+  white-space: nowrap;
+}
+.bbtop__crumb:not(.is-static):hover { color: var(--text-primary); text-decoration: underline; }
+.bbtop__crumb.is-static { cursor: default; }
+/* A policy naming no application is a set of rules no sign-in can ever reach.
+   It keeps the red and it never truncates. */
+.bbtop__crumb.is-warn { color: var(--fb-negative-fg); }
+
+/* The current crumb, and the way into what the policy IS.
+
+   A chip rather than a bare heading: it is the one crumb you can act on, and a
+   pencil that appears on hover would be a control nobody finds. `min-width: 0`
+   with the ellipsis on the inner `b`, so a long policy name gives way before
+   anything else in the row does. */
+.bbtop__name {
+  min-width: 0; display: inline-flex; align-items: center; gap: var(--space-3);
+  height: 26px; padding: 0 var(--space-3);
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  background: none; font-family: inherit; cursor: pointer;
+  color: var(--text-tertiary);
+  transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bbtop__name > b {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bbtop__name:hover { background: var(--surface-sunken); border-color: var(--border-subtle); color: var(--text-secondary); }
+.bbtop__name:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* Who it governs. A glyph carries the word for a sighted reader; the Peek
+   button's own label carries it for everyone else. */
+.bbtop__gov {
+  flex: none;
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  padding-left: var(--space-5);
+  border-left: 1px solid var(--border-subtle);
+  font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap;
+}
+.bbtop__gov > svg { color: var(--text-tertiary); }
+.bbtop__gov em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bbtop__gov.is-warn { color: var(--fb-negative-fg); }
+.bbtop__gov.is-warn > svg { color: var(--fb-negative-fg); }
+.bbtop__peek {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  padding: 0; border: 0; background: none;
+  font: inherit; color: inherit; cursor: default;
+  text-decoration: underline dotted var(--border-strong);
+  text-underline-offset: 4px;
+}
+.bbtop__peek:hover,
+.bbtop__peek.is-open { text-decoration-color: var(--brand); }
+.bbtop__peek:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-xs); }
+
+/* The verbs, hard right. `margin-left: auto` rather than a spacer element, so
+   the row collapses correctly when the crumbs are long. */
+.bbtop__acts { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); flex: none; }
+.bbtop__sep { width: 1px; height: 20px; background: var(--border-subtle); }
+/* No pill around the readings. They sat inside `.bb__float` — a bordered,
+   shadowed capsule — because they were floating over a canvas and needed an
+   edge of their own. The bar is that edge now, and a bordered box inside a
+   bordered bar is the same "box inside a box" the old strip's facts were
+   pulled out of. */
+.bbtop .bb__pip { height: var(--ctl-height-sm); }
+
+/* Under 1000 the readings go and the verbs stay. A grade and a change count are
+   reference; Discard and Review are the two things you came to the top of the
+   screen for, and they are also the two that cannot move anywhere else. */
+@media (max-width: 1000px) {
+  .bbtop { gap: var(--space-4); padding: 0 var(--space-5); }
+  .bbtop .bb__pip, .bbtop__sep { display: none; }
+}
+/* Below 800 the audience goes too — its list is one click away in Edit
+   details, and the crumb trail is what tells you where you are. */
+@media (max-width: 800px) {
+  .bbtop__gov { display: none; }
+}
+
 /* --- The stage ------------------------------------------------------------- */
 
 .bb__stage {
-  /* Absolute and full-bleed, because the panel no longer takes a column out of
-     the grid — it floats on top. The stage is the whole region again. */
-  position: absolute; inset: 0;
-  /* …except for the strip the policy bar is standing on, and only while it is.
+  /* `relative`, and it has to be exactly that.
 
-     The bar floats over this region, so without this the chain's first node —
-     "A sign-in arrives", the thing that says where the order starts — laid out
-     underneath it and could only be reached by panning. Insetting the stage
-     rather than padding the world, because the world is transform-scaled: 76px
-     of padding there is 51px at 67% zoom, which clears a 76px bar at exactly
-     one zoom level.
+     The stage is the grid's first track, so it needs no insets — but three
+     things inside it are positioned against it: `.bb__world`, the view dock,
+     and the card's own action strip. Making it `static`, which is what a grid
+     item wants to be, would re-anchor all three to `.bb` and put them back over
+     the panel this change exists to separate them from.
 
-     Nothing is lost by it. The bar is opaque and covers this strip exactly, so
-     while it is shown the canvas looks as full-bleed as it did before — and in
-     focus mode `--bb-top` is 0 and the stage takes the strip back, which is the
-     whole point of the mode. */
-  top: var(--bb-top);
+     The 76px `top` inset that used to be here went with the floating policy
+     bar. The bar is a sibling of this element's parent now, in the shell's own
+     column, so the strip it stands on is not the stage's to give back. */
+  position: relative;
+  /* Load-bearing since the stage became a grid item, and inert before it: an
+     absolutely-positioned box at `inset: 0` has no automatic minimum size, but
+     a grid item does, and without these the world's content would push this
+     track wider than the track it was given. */
   min-width: 0; min-height: 0;
   /* `clip`, not `hidden`, and the difference is the whole bug.
 
@@ -118,32 +267,19 @@
    arrives and nothing happens to it". The one action available was a 12px `+`
    on a connector between two cards nobody put there.
 
-   Sized like a card rather than like a page, because it stands where a card
-   will stand: press the button and the chain replaces it in the same place. */
+   No box round it any more, and that is the change that made room for two
+   offers instead of one. It was a 460px dashed panel standing exactly where the
+   first card would stand — the right drawing for "press this and a card appears
+   here", and the wrong one for a question with two answers: two cards inside a
+   dashed card is three nested containers to say one thing.
+
+   So the block itself is bare, the cards inside it carry the edges, and the
+   width follows them. `.bb__blank` stays as the class name because Board.tsx
+   measures it to centre the view, and centring on the world instead put it
+   about 130px too high. */
 .bb__blank {
-  width: 460px;
+  width: 660px;
   display: flex; flex-direction: column; align-items: center; text-align: center;
-  padding: var(--space-9) var(--space-8) var(--space-8);
-  background: var(--surface-raised);
-  /* Dashed, still: it stands exactly where the first card will stand, and a
-     dashed edge is how every canvas says "something goes here". Solid would
-     make it look like a card somebody had already made. */
-  border: 1px dashed var(--border-default);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--el-low);
-}
-
-/* A round mark rather than a rounded square, and tinted rather than grey.
-
-   The squares on this surface are all cards and controls; a circle is the one
-   shape here that is plainly not either, which is what an illustration wants to
-   be. The brand tint is the only colour in the panel, so it is where the eye
-   lands first and the button is where it lands second. */
-.bb__blank__mark {
-  display: grid; place-items: center;
-  width: 46px; height: 46px; border-radius: 50%;
-  margin-bottom: var(--space-5);
-  background: var(--brand-subtle-bg); color: var(--brand-active);
 }
 .bb__blank h2 {
   margin: 0 0 var(--space-3);
@@ -157,6 +293,53 @@
   font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.65;
 }
 .bb__blank p strong { font-weight: var(--fw-semibold); color: var(--text-secondary); }
+
+/* --- The two ways in ---------------------------------------------------------
+
+   Equal width, equal weight, no primary. Which one is right depends entirely on
+   whether anything in the catalogue fits what you are protecting, and that is
+   not something the board knows — so neither card wears the brand fill, and the
+   choice is made on the words rather than on which button looks louder.
+
+   `1fr 1fr` rather than `auto`: the two descriptions are different lengths, and
+   a chooser whose halves are different widths reads as one recommendation and
+   one afterthought. */
+.bb__starts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); width: 100%; }
+.bb__start2 {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
+  padding: var(--space-7) var(--space-6) var(--space-7);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+  text-align: center; cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+.bb__start2:hover { border-color: var(--brand); box-shadow: var(--el-mid); transform: translateY(-1px); }
+.bb__start2:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__start2 strong { font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bb__start2 > span:last-child {
+  max-width: 30ch;
+  font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55;
+}
+/* A round mark rather than a rounded square, and tinted rather than grey.
+
+   The squares on this surface are all cards and controls; a circle is the one
+   shape here that is plainly not either, which is what an illustration wants to
+   be. The brand tint is the only colour in the block, so it is where the eye
+   lands first and the words are where it lands second. */
+.bb__start2__mark {
+  display: grid; place-items: center;
+  width: 46px; height: 46px; border-radius: 50%;
+  margin-bottom: var(--space-3);
+  background: var(--brand-subtle-bg); color: var(--brand-active);
+}
+
+/* One column when the region cannot hold two 300px cards side by side. */
+@media (max-width: 820px) {
+  .bb__blank { width: 380px; }
+  .bb__starts { grid-template-columns: minmax(0, 1fr); }
+}
 
 .bb__chain { display: flex; flex-direction: column; align-items: stretch; width: var(--bb-card); }
 
@@ -752,45 +935,21 @@
   border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
   background: var(--surface-raised); box-shadow: var(--el-mid);
 }
-/* The two top toolbars step DOWN past the policy bar, which floats over this
-   region rather than sitting above it.
+/* `--bb-top` stood here — a variable holding the height of a policy bar that
+   floated over this region, so the corner toolbars could step down past it.
+   Nothing floats over the region now: the bar is a flat row above it, in the
+   shell's own column, and the four corners hold one cluster between them.
 
-   `--bb-top` is 0 unless the bar is there. `is-bared` is set by `BoardBuilder`
-   from the same state that shows the bar, so the two cannot disagree about
-   whether the strip is occupied — and in focus mode the class goes, the offset
-   goes with it, and the toolbars rise into the space the bar has vacated.
-
-   The value is the bar's own `--bpbar-h`, read through a fallback rather than
-   inherited: the bar is a SIBLING of this element, not an ancestor, so its
-   custom property does not cascade here. The fallback is the number to keep in
-   step if the bar's height ever changes — see policy-bar.css. */
-.bb { --bb-top: 0px; }
-.bb.is-bared { --bb-top: var(--bpbar-h, 76px); }
-/* `--tl`, `--bl` and `--br` are gone: history, density and zoom are one
-   toolbar at the bottom centre now. `--tr` is the only corner left, and it
-   holds the only cluster that is not about the view. */
-.bb__float--tr { right: var(--space-5); top: calc(var(--space-5) + var(--bb-top)); }
-/* The publishing cluster steps aside for the panel.
-
-   The panel floats over the stage, so without this it covers Review & publish —
-   the thing somebody reaches for most, and the one that must never be behind
-   the thing they are editing. Transitioned on the same curve as the panel, so
-   opening it moves them together rather than snapping out of the way. */
-.bb:not(.is-gripping) .bb__float--tr,
-/* The sheet moves with the panel too, and never did.
-
-   It offsets by --bb-insp exactly as the toolbars do, but without their
-   transition — so once the panel became selection-only, clicking a finding in
-   Check mounted a 400px panel and the sheet it was drawn in jumped that much
-   narrower in one frame, under the cursor that had just clicked.
-
-   Guarded on `is-gripping` rather than declared outright, because --bb-insp is
-   written to the DOM on every frame of a grip drag: an unguarded transition
-   makes all three trail the panel edge by a quarter-second the whole way
-   across. The class is on only while a drag is live, so the drag is exact and
-   the open/close is smooth. */
-.bb:not(.is-gripping) .bb__sheet { transition: right 0.24s var(--ease-standard); }
-.bb:not(.is-insp-closed) .bb__float--tr { right: calc(var(--bb-insp) + var(--space-6)); }
+   `--tl`, `--bl` and `--br` went when history, density and zoom became one
+   toolbar at the bottom centre. `--tr` has gone with this change: Check, What
+   changes, Discard and Review & publish are in the top row, which is where a
+   verb that acts on the whole policy belongs — beside the policy's own name,
+   rather than hovering over the rules in a pill that had to sidestep the panel
+   every time it opened. */
+/* The sheet had a transition on `right`, because it was measured from the
+   region's edge and had to step aside for a panel that floated. It is drawn
+   inside the stage now, so its right edge is the canvas's right edge in both
+   panel states and there is nothing left to animate. */
 
 /* --- The view dock, bottom centre ------------------------------------------
 
@@ -805,10 +964,12 @@
    rather than one because a mode and a row of presses are different objects —
    see the note in Board.tsx.
 
-   Centred on the stage's VISIBLE width. `left: 50%` alone would centre the dock
-   under the inspector when the panel is open, so the centre shifts by half the
-   panel. The transition matches the panel's, so the two move together rather
-   than the dock arriving after. */
+   Centred on the stage, which is now the only thing it CAN be centred on: the
+   dock is drawn inside `.bb__stage`, and the stage is a grid track that already
+   excludes the panel. It used to carry `left: calc(50% - var(--bb-insp) / 2)`
+   and a transition to animate it, because the stage was full-bleed and half a
+   panel had to be subtracted by hand. Both are gone — subtracting it again on
+   top of a narrowed track would put the dock half a panel left of centre. */
 .bb__dock {
   position: absolute; z-index: 3;
   left: 50%; bottom: var(--space-5);
@@ -824,9 +985,7 @@
 
    The dock does the positioning now; its children only have to be pills. */
 .bb__dock > .bb__float { position: static; }
-.bb:not(.is-insp-closed) .bb__dock { left: calc(50% - var(--bb-insp) / 2); }
 .bb__density { gap: 2px; }
-.bb:not(.is-gripping) .bb__dock { transition: left 0.24s var(--ease-standard); }
 .bb__density > button {
   /* 24px, not 26 — the same square as `.bb__act` next door, so the two pills
      are the same height. At 26 the density pill stood 2px taller than the
@@ -877,30 +1036,31 @@
 
 /* --- The inspector --------------------------------------------------------- */
 
-/* --- The panel, floating over the canvas --------------------------------------
+/* --- The panel, as a region of its own -----------------------------------------
 
-   It was the second column of a grid, so the stage was permanently 400px
-   narrower than the region it was drawn in — a canvas cropped by a panel that
-   is empty half the time. As a flyover the stage owns the whole box and the
-   panel sits on top of it, which is what every canvas tool with an inspector
-   does, and it is why closing the panel now gives the chain the space back
-   instead of merely revealing more white.
+   It has been both of the other two things this could be, and each was wrong in
+   its own way.
 
-   Fit knows about it: it measures the panel from the DOM at the moment it
-   runs and centres the chain in what is left, so "Fit" never files half the
-   diagram underneath. */
+   It started as the second column of a grid whose FIRST column was the whole
+   region: the stage sat permanently 400px narrower than the box it was drawn
+   in, even when nothing was selected and the panel was blank. So it became a
+   flyover — absolutely positioned, rounded, with a shadow, floating over a
+   full-bleed stage — and Fit grew a `reserve()` callback that measured it out
+   of the DOM so the chain would not be filed underneath it.
+
+   Both were the same mistake from opposite ends: one region pretending to be
+   two. The panel is a real track now and the stage is the other one, so nothing
+   measures anything — the canvas is exactly as wide as it looks, and when the
+   panel closes its track collapses and the canvas gets the space back for real
+   rather than by revealing more of something that was always there.
+
+   Flush, not floating: no radius, no shadow, no inset. One border down the left
+   edge, and a white panel against the canvas's grey. That seam is the whole
+   point — three regions that you can see are three regions. */
 .bb__insp {
-  position: absolute; z-index: 5;
-  /* Down past the floating policy bar, same as the corner toolbars. Without
-     this the panel's own header — the rule number, its name and the close —
-     sits under the bar, which is the one part of the panel you have to be able
-     to reach to get out of it. */
-  top: calc(var(--space-3) + var(--bb-top)); right: var(--space-3); bottom: var(--space-3);
-  width: var(--bb-insp);
   display: flex; flex-direction: column; min-height: 0; min-width: 0;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  border: 0; border-left: 1px solid var(--border-subtle); border-radius: 0;
   background: var(--surface-raised);
-  box-shadow: var(--el-high);
   overflow: hidden;
 }
 /* The slide-out has gone, and it is not coming back as an AnimatePresence.
@@ -1489,15 +1649,27 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__stage .bx-savebar { position: absolute; left: 50%; bottom: var(--space-5); transform: translateX(-50%); z-index: 4; }
 
 /* --- Narrow ----------------------------------------------------------------- */
-@media (max-width: 1100px) {
-  /* Under 1100 the stage cannot spare 480, so the panel takes 400 and the rows
-     fold — which is what the two-line layout at the foot of this file is for. */
-  .bb { --bb-insp: 400px; }
-}
+
+/* A `@media (max-width: 1100px) { .bb { --bb-insp: 400px } }` stood here and
+   had never once applied: `BoardBuilder` writes `--bb-insp` INLINE on `.bb`
+   from the grip's own state, and an inline custom property beats a stylesheet
+   at every width. The track clamps itself with `min(var(--bb-insp), 46%)`
+   instead — same intent, from inside the declaration, where the inline value
+   cannot outrank it. */
+
 @media (max-width: 900px) {
-  /* The panel already floats; on a narrow screen it floats across the
-     bottom instead of down the side. */
-  .bb__insp { position: absolute; inset: auto var(--space-2) var(--space-2); top: 46%; width: auto; }
+  /* Two tracks become two rows. Below 900 there is not enough width for a
+     canvas AND a panel side by side, so the panel takes the bottom half and
+     keeps the same seam — moved from its left edge to its top one, because
+     that is where the two regions now meet.
+
+     The template has to change with it. `display: none` or an unmounted item
+     does not collapse an explicitly-sized track, so `.is-insp-closed` gets a
+     one-row template of its own here exactly as it gets a one-column one
+     above. */
+  .bb { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 54%; }
+  .bb.is-insp-closed { grid-template-rows: minmax(0, 1fr); }
+  .bb__insp { border-left: 0; border-top: 1px solid var(--border-subtle); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2043,16 +2215,23 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 
 /* --- The divider you can drag ------------------------------------------------
 
-   4px of hit area sitting on the 1px border between the stage and the
-   inspector, widened on hover so it can be grabbed without aiming. It is a
+   6px of hit area sitting on the 1px seam between the stage and the panel,
+   filled with the brand on hover so it can be grabbed without aiming. It is a
    `separator` with a value, so the arrow keys move it and a screen reader can
    say where it is — a divider that only answers to a drag is one a keyboard
-   user cannot move at all. */
+   user cannot move at all.
+
+   Full height, and against the seam rather than against a floating panel's
+   rounded edge: the two regions meet along the whole of it now, so a grip that
+   stopped 12px short at each end would be a handle with two dead spots on the
+   line it is meant to move. `right` reads the same clamp the track does, or the
+   handle and the edge it drags disagree the moment the region is narrow enough
+   for the clamp to bite. */
 .bb__grip {
   position: absolute;
-  top: var(--space-5); bottom: var(--space-5);
-  right: calc(var(--bb-insp) + var(--space-3) - 3px);
-  width: 6px; border-radius: var(--radius-full); z-index: 6;
+  top: 0; bottom: 0;
+  right: calc(min(var(--bb-insp), 46%) - 3px);
+  width: 6px; z-index: 6;
   cursor: col-resize; touch-action: none;
   background: none;
   transition: background var(--dur-fast) var(--ease-standard);
@@ -2363,14 +2542,17 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 
 /* --- The sheet: whole-policy questions, over the board ----------------------
 
-   Docked to the bottom of the stage and stopping short of the inspector, so
-   the panel keeps showing whichever rule is selected while you read a finding
-   that names it. Half the stage's height: enough for the situation field and
-   the round list, not so much that the chain it is talking about disappears. */
+   Docked to the bottom of the stage, and stopping at its edge — which stops
+   short of the panel for free now that the panel is a track rather than a
+   flyover. It used to subtract `--bb-insp` by hand and animate the change; both
+   went with the flyover. The panel keeps showing whichever rule is selected
+   while you read a finding that names it. Half the stage's height: enough for
+   the situation field and the round list, not so much that the chain it is
+   talking about disappears. */
 .bb__sheet {
   position: absolute; z-index: 6;
   left: var(--space-3); bottom: var(--space-3);
-  right: calc(var(--bb-insp) + var(--space-3) * 2);
+  right: var(--space-3);
   height: min(58%, 520px);
   display: flex; flex-direction: column; min-height: 0;
   border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
@@ -2378,8 +2560,6 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   box-shadow: var(--el-high);
   overflow: hidden;
 }
-/* With the panel hidden the sheet takes the width it left behind. */
-.bb.is-insp-closed .bb__sheet { right: var(--space-3); }
 .bb__sheet:focus-visible { outline: none; box-shadow: var(--el-high), inset 0 0 0 2px var(--focus-ring); }
 
 .bb__sheethead {
@@ -2470,27 +2650,20 @@ button.bb__idx::after {
   }
 }
 
-/* --- Narrow screens: the toolbar wraps, and the sheet gets the bottom -------
+/* --- Narrow screens: the sheet gets the bottom -------------------------------
 
-   Two collisions that only appear once the Check and What-changes pips are
-   back in the top-right group, and once the sheet has somewhere to open. */
+   Below 900 the panel takes the bottom row (see the template switch further
+   up), and the sheet wants the same band — they were stacked on it, with the
+   sheet simply drawn over a panel that was still focusable underneath. Only one
+   of them can have it, and while you are reading a whole-policy answer it is
+   the sheet.
 
-/* The toolbar is a row of readings, not a fixed-width bar. Given less room
-   than it wants it wrapped off the left edge of the stage and took the first
-   pip with it — "Check F 5 through" clipped to "eck F 5 through". It wraps
-   downward now and stays inside the stage it floats over. */
-.bb__float--tr {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  max-width: calc(100% - var(--space-5) * 2);
-}
+   The TRACK has to go with the item. Hiding the panel and leaving its row
+   standing would give the sheet a canvas 54% shorter than the region it is
+   drawn in, for no reason anybody could see. */
 
 @media (max-width: 900px) {
-  /* Below 900 the panel already floats across the bottom, and so does the
-     sheet — they were stacked on the same band, with the sheet simply drawn
-     over a panel that was still focusable underneath it. Only one of them can
-     have the bottom, and while you are reading a whole-policy answer it is the
-     sheet. The panel comes back the moment the sheet closes. */
+  .bb:has(.bb__sheet) { grid-template-rows: minmax(0, 1fr); }
   .bb:has(.bb__sheet) .bb__insp { display: none; }
   .bb__sheet { top: var(--space-3); height: auto; }
 }

@@ -1,8 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
-import { Maximize2, Minus, Plus, Split } from 'lucide-react'
+import { LayoutTemplate, Maximize2, Minus, PencilRuler, Plus } from 'lucide-react'
 
-import { Button } from '../../kit'
 import { fallbackRule, type Policy } from '../../data'
 import { useCanvasView } from '../canvas-view'
 import type { Diagnostic } from '../diagnostics'
@@ -39,10 +38,9 @@ export function Board({
   onDuplicate,
   onDelete,
   onHover,
-  reserveOnOpen,
   expandedOf,
   onToggleExpand,
-  children,
+  onUseTemplate,
   tools,
   aside,
 }: {
@@ -63,20 +61,16 @@ export function Board({
   /** Whether this rule's body is unfolded. Held by the host so it survives reorder. */
   expandedOf: (ruleId: string) => boolean
   onToggleExpand: (ruleId: string) => void
-  /* Width to hold back on the OPENING Fit, for a panel that is not there yet.
+  /* Opens the template catalogue. Only the empty board offers it, and the host
+     mounts the sheet — applying a template is a write to the draft, and the
+     draft has one door.
 
-     The board opens with nothing selected, so there is no panel at first paint
-     and a measured Fit centres the chain across the whole stage. The first
-     thing anybody does is click a card — which mounts 400px of panel over the
-     right-hand end of the chain that was just centred without it, and leaves it
-     there until somebody finds the Fit button. Every board, every policy.
-
-     So the opening Fit reserves the width the panel is about to take. The Fit
-     BUTTON never does: it fits what is actually on screen, which is the right
-     answer for a deliberate press. */
-  reserveOnOpen: number
-  /** Floating chrome the host places itself — the publishing cluster. */
-  children?: ReactNode
+     `reserveOnOpen` stood here: a width to hold back on the opening Fit, for a
+     panel that floated over the stage and would otherwise cover the right-hand
+     end of a chain that had just been centred without it. The panel is a column
+     now, so the stage's own width already excludes it and there is nothing to
+     reserve. */
+  onUseTemplate?: () => void
   /* View controls the host contributes INSIDE the centre toolbar, which this
      component owns because the zoom half of it lives here. They arrive before
      the zoom controls and a separator is drawn between the two. */
@@ -98,12 +92,16 @@ export function Board({
      each is the way it is went with the code; what stays here is the part that
      is about a CHAIN rather than about a canvas.
 
-     Three of those: the world is measured by `offsetWidth` because the chain is
+     Two of those: the world is measured by `offsetWidth` because the chain is
      ordinary flow layout and a bounding rect would return the width at the
-     current zoom; the panel is measured from the DOM at the moment Fit runs,
-     because a prop would re-render every card on each frame of a grip drag;
-     and the fit is width-only, because a chain of eight rules fitted to the
-     height of a laptop screen is eight unreadable cards. */
+     current zoom; and the fit is width-only, because a chain of eight rules
+     fitted to the height of a laptop screen is eight unreadable cards.
+
+     A third has gone. Fit used to measure `.bb__insp` out of the DOM and take
+     its width off the stage before centring, because the panel floated on top
+     of a full-bleed stage. The panel is a grid track beside the stage now, so
+     `clientWidth` already excludes it — reserving it a second time would file
+     the chain half a panel to the left. */
   const {
     viewRef,
     zoomLabel,
@@ -116,12 +114,6 @@ export function Board({
     onPointerUp,
   } = useCanvasView(stage, world, {
     bounds: () => ({ w: world.current?.offsetWidth ?? 0, h: world.current?.offsetHeight ?? 0 }),
-    reserve: () => {
-      const s = stage.current
-      const panel = s?.parentElement?.querySelector('.bb__insp') as HTMLElement | null
-      const open = panel && !s?.parentElement?.classList.contains('is-insp-closed')
-      return { right: open ? panel!.offsetWidth + 24 : 0, bottom: 0 }
-    },
     axis: 'width',
     /* Only the stage and the world's own padding pan. A card, a button, an
        input — anything interactive — keeps the gesture for itself. */
@@ -130,7 +122,6 @@ export function Board({
     zMin: ZMIN,
     zMax: ZMAX,
     cssPrefix: 'bb',
-    reserveOnOpen,
   })
 
   /* --- Reorder by dragging the index ------------------------------------------ */
@@ -242,6 +233,56 @@ export function Board({
     })
     return () => cancelAnimationFrame(id)
   }, [empty, glide, stage, world])
+
+  /* …and out of it, which the placement above cannot do.
+
+     The chooser is placed at a fixed 0.9 on a 660px block. Answer it with "use
+     a template" and five rules arrive in a 560px chain several times its
+     height, at a zoom chosen for something else — so the board's first sight of
+     its own rules would be a view framed for the question rather than the
+     answer. Fit, animated, so the change reads as the chain arriving rather
+     than as the canvas jumping.
+
+     Guarded on the TRANSITION, not on `empty`: refitting whenever the policy is
+     non-empty would fight every pan and zoom somebody makes afterwards. */
+  /* The flag is cleared by the FIT, not by the effect that schedules it.
+
+     Clearing it on entry looks equivalent and is not: StrictMode mounts every
+     effect twice in development — run, clean up, run again — so the second run
+     would find the flag already down and schedule nothing. Written this way the
+     cleanup cancels the frames and the remount schedules them afresh, which is
+     what a cleanup is supposed to mean. */
+  const wasEmpty = useRef(empty)
+  useEffect(() => {
+    if (empty) {
+      wasEmpty.current = true
+      return
+    }
+    if (!wasEmpty.current) return
+    /* Two frames, and the second one is not padding.
+
+       Answering the chooser does two things at once: the rules arrive, and —
+       because applying a template selects rule 1 — the config panel mounts,
+       which narrows the stage. The browser runs animation-frame callbacks
+       BEFORE it broadcasts resize observations, so a fit scheduled on the first
+       frame starts a glide that the stage's own resize compensation then
+       cancels a moment later, leaving the view at the zoom the chooser was
+       placed at. Measured: 90%, on a chain that wanted 100.
+
+       On the second frame the panel is mounted, the compensation has run, and
+       `fitTo` measures the width the chain is actually being fitted into. */
+    let inner = 0
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => {
+        wasEmpty.current = false
+        fit()
+      })
+    })
+    return () => {
+      cancelAnimationFrame(outer)
+      cancelAnimationFrame(inner)
+    }
+  }, [empty, fit])
   /* What the empty policy actually does today, named rather than described.
      `terminal` is resolved below for the card; this reads the same rule, so the
      sentence and the card cannot disagree about the outcome. */
@@ -337,15 +378,13 @@ export function Board({
               there, and the default's own card is the piece most likely to be
               mistaken for the rule you are supposed to edit.
 
-              So the empty policy says what it does today and offers the one
-              move worth making. The chain comes back the moment there is a rule
-              to draw, which is the same view, arrived at rather than sat in. */}
+              So the empty policy says what it does today and offers the two
+              moves worth making. The chain comes back the moment there is a
+              rule to draw, which is the same view, arrived at rather than sat
+              in. */}
           {policy.rules.length === 0 ? (
             <div className="bb__blank">
-              <span className="bb__blank__mark" aria-hidden>
-                <Split size={20} strokeWidth={1.8} />
-              </span>
-              <h2>No rules yet</h2>
+              <h2>How would you like to start?</h2>
               {/* The consequence, not a definition. Somebody looking at an
                   empty policy needs to know it is not inert — it is already
                   deciding sign-ins, with the default, and that is the thing a
@@ -359,10 +398,40 @@ export function Board({
                 This policy is already running. Until you add a rule, every sign-in falls straight through to the
                 default — <strong>{fallbackName}</strong>.
               </p>
-              <Button variant="brand" onClick={() => onInsert(0)}>
-                <Plus size={15} strokeWidth={2.2} aria-hidden />
-                Add your first rule
-              </Button>
+
+              {/* Two ways in, side by side, sized the same.
+
+                  This used to be one brand button reading "Add your first
+                  rule", and the other way in — a catalogue of ready-made
+                  policies — was a PAGE you passed through before the policy
+                  existed. That is the wrong order: you were choosing a template
+                  for something unnamed, and once you were here the catalogue
+                  was gone for good.
+
+                  So both offers stand at the moment the question is actually
+                  asked, and neither is dressed as the primary: a template is
+                  the faster road and scratch is the honest one, and which is
+                  right depends entirely on whether anything in the catalogue
+                  fits. Taking a template writes its rules into THIS policy, so
+                  it is an edit like any other and ⌘Z puts it back. */}
+              <div className="bb__starts">
+                {onUseTemplate && (
+                  <button type="button" className="bb__start2" onClick={onUseTemplate}>
+                    <span className="bb__start2__mark" aria-hidden>
+                      <LayoutTemplate size={20} strokeWidth={1.7} />
+                    </span>
+                    <strong>Use a template</strong>
+                    <span>Ready-made rules for the situations most tenants protect first</span>
+                  </button>
+                )}
+                <button type="button" className="bb__start2" onClick={() => onInsert(0)}>
+                  <span className="bb__start2__mark" aria-hidden>
+                    <PencilRuler size={20} strokeWidth={1.7} />
+                  </span>
+                  <strong>Start from scratch</strong>
+                  <span>Write the first rule yourself — who it covers, and what happens</span>
+                </button>
+              </div>
             </div>
           ) : (
           <div className="bb__chain">
@@ -471,8 +540,6 @@ export function Board({
         </LayoutGroup>
       </div>
 
-      {children}
-
       {/* One dock, bottom centre, for everything that changes the VIEW.
 
           It was four pills in four corners: history top-left, publishing
@@ -491,10 +558,13 @@ export function Board({
           inside a strip of icon buttons reads as two buttons that happen to
           have words; given its own container it reads as the choice it is.
 
-          Publishing stays top-right and is the exception that proves the
-          gathering: Check, What changes, Discard and Review & publish act on the
-          POLICY. Mixing "undo" and "publish" into one strip is how somebody
-          reaches for the first and finds the second.
+          Publishing is the exception that proves the gathering, and it has
+          left the canvas entirely: Check, What changes, Discard and Review &
+          publish act on the POLICY, so they are in the top row beside the
+          policy's own name. Mixing "undo" and "publish" into one strip is how
+          somebody reaches for the first and finds the second — and a `children`
+          slot on this component, which is what put them over the stage, is gone
+          with them.
 
           Two slots because there are two pills — a single list could not say
           which control belonged in which. */}

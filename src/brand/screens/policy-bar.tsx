@@ -1,7 +1,7 @@
 import { AppWindow, ArrowLeft, Pencil, Users } from 'lucide-react'
 
 import { StatusPill } from '../kit'
-import { initials, reach, type Policy } from '../data'
+import { audienceSummary, initials, type Policy } from '../data'
 import { AppLogo } from '../logos/AppLogo'
 import { useBrand } from '../store'
 import { Peek } from './peek'
@@ -29,36 +29,33 @@ import './policy-bar.css'
    every time somebody adds a group.
    -------------------------------------------------------------------------- */
 
-export function PolicyBar({ policy, floating, away }: { policy: Policy; floating?: boolean; away?: boolean }) {
+export function PolicyBar({ policy }: { policy: Policy }) {
   const store = useBrand()
 
   const { everyone, groupIds, userIds } = policy.audience
-  const nobody = !everyone && groupIds.length === 0 && userIds.length === 0
-  const total = reach(policy.audience, store.groups, store.users)
-
   /* One phrase for the selection, one number for its size. Two groups and a
      named person is "2 groups · 1 person", and how many people that actually
      reaches is the muted half — the count is context for the selection, not the
-     other way round. */
-  const parts = [
-    groupIds.length > 0 && `${groupIds.length} group${groupIds.length === 1 ? '' : 's'}`,
-    userIds.length > 0 && `${userIds.length} ${userIds.length === 1 ? 'person' : 'people'}`,
-  ].filter(Boolean) as string[]
-  const audienceLabel = everyone ? 'Everyone' : parts.join(' · ')
-  /* Suppressed when the selection is only named individuals: "3 people · 3
-     people" is a number restating itself. */
-  const showTotal = everyone || groupIds.length > 0
+     other way round.
+
+     Derived in `data.ts` rather than here, because the board's own bar prints
+     the same four facts and the rules for them are exactly the kind of thing
+     that drifts when it is copied. */
+  const { label: audienceLabel, total, showTotal, nobody } = audienceSummary(policy.audience, store.groups, store.users)
 
   /* The system policy is the one that has no application and covers all of
      them — every other policy protects exactly one. */
   const app = policy.appId ? store.appById(policy.appId) : null
 
   return (
-    /* `floating` lifts the bar out of the column and over the canvas below it;
-       `away` slides it off the top. Two props rather than one because they are
-       two facts: the trail wants neither, the board wants the first always and
-       the second only in focus mode. */
-    <header className={`bpbar ${floating ? 'is-float' : ''} ${away ? 'is-away' : ''}`} aria-hidden={away || undefined}>
+    /* The trail's header, and only the trail's.
+
+       It carried `floating` and `away` for the board, which lifted it out of
+       the column, laid it over the canvas and slid it off the top in focus
+       mode. The board has its own 48px row now — see `board/BoardBar.tsx` for
+       why a shared component could not become one — so this is a plain strip
+       above a scrolling column again, which is all it ever was here. */
+    <header className="bpbar">
       <div className="bpbar__id">
         {/* With the heading, not in a toolbar of its own. The builder's top bar
             is about the rules; leaving `back` there meant a bar that existed
@@ -182,11 +179,13 @@ export function PolicyBar({ policy, floating, away }: { policy: Policy; floating
             here, apps behind a dialog, audience in a drawer — was three places
             to remember for one idea: what this policy IS, as opposed to what
             its rules do. */}
-        {/* Carries the builder you are in, so Back returns you to it. */}
+        {/* The trail is the only builder that renders this bar now, so the
+            ternary that asked which one you were in has gone with the caller
+            it was asking about. */}
         <button
           type="button"
           className="bpbar__edit"
-          onClick={() => store.go({ name: 'policy-details', policyId: policy.id, from: store.screen.name === 'board' ? 'board' : 'builder' })}
+          onClick={() => store.go({ name: 'policy-details', policyId: policy.id, from: 'builder' })}
         >
           <Pencil size={12} strokeWidth={2} aria-hidden />
           Edit details

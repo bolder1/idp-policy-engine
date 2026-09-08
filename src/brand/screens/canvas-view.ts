@@ -54,14 +54,13 @@ export interface CanvasViewOpts {
      flow layout — a bounding rect would return the width AT the current zoom
      and Fit would converge on whatever it already was. */
   bounds: () => { w: number; h: number }
-  /* What the host's own floating panels take out of the stage.
-
-     The board reaches for `.bb__insp` — the only place its canvas code looked
-     outside its own subtree — so an unmodified lift would have carried board
-     class names into every reuse. It comes in as a callback instead, evaluated
-     at the moment Fit runs, which is also what keeps it correct during a
-     drag of the panel's edge. */
-  reserve?: () => { right: number; bottom: number }
+  /* `reserve` stood here: a callback returning what the host's own FLOATING
+     panels took out of the stage, so Fit could centre the world in what was
+     left. Its one caller was the board, whose inspector floated over a
+     full-bleed stage; the inspector is a column beside the stage now, so
+     `clientWidth` already excludes it and reserving it again would be a
+     double-count. `reserveOnOpen`, which did the same job for a panel that had
+     not mounted yet, went with it. */
   /* A chain fits its WIDTH and is panned down: fitted to the height of a
      laptop screen, eight rules are eight unreadable cards. A graph is short and
      wide and wants both axes. */
@@ -76,8 +75,6 @@ export interface CanvasViewOpts {
      was already shipping `--bb-x/y/z` in its stylesheet, so this is how it
      keeps them rather than renaming a working background. */
   cssPrefix?: string
-  /** Width to hold back on the opening Fit, for a panel not yet on screen. */
-  reserveOnOpen?: number
   /** Padding kept around the world when fitting. */
   pad?: number
 }
@@ -87,7 +84,7 @@ export function useCanvasView(
   world: RefObject<HTMLDivElement | null>,
   opts: CanvasViewOpts,
 ) {
-  const { axis = 'width', zMin = 0.5, zMax = 1.4, cssPrefix = 'cv', reserveOnOpen = 0, pad = 40 } = opts
+  const { axis = 'width', zMin = 0.5, zMax = 1.4, cssPrefix = 'cv', pad = 40 } = opts
 
   /* Everything the frame loop reads goes through a ref.
 
@@ -173,20 +170,13 @@ export function useCanvasView(
 
   /* --- Fit ----------------------------------------------------------------- */
   const fitTo = useCallback(
-    (ms: number, openingReserve = 0) => {
+    (ms: number) => {
       const s = stage.current
       if (!s) return
       const { w: ww, h: wh } = o.current.bounds()
       if (!ww) return
-      const held = o.current.reserve?.() ?? { right: 0, bottom: 0 }
-      /* `openingReserve` is the panel that is not there YET.
-
-         Measuring is right for the Fit button — it fits what is on screen. It
-         is wrong once, on mount, when the host opens with its panel closed and
-         the first click puts one over what was just centred without it. */
-      const right = held.right || openingReserve
-      const sw = s.clientWidth - right
-      const sh = s.clientHeight - held.bottom
+      const sw = s.clientWidth
+      const sh = s.clientHeight
       const p = o.current.pad ?? pad
       const byW = (sw - p) / ww
       const z = Math.min(
@@ -215,12 +205,45 @@ export function useCanvasView(
   useLayoutEffect(() => {
     // Once, on mount, and instantly — an opening animation on the first paint
     // is a canvas that arrives late rather than one that arrives.
-    const id = requestAnimationFrame(() => fitTo(0, reserveOnOpen))
+    const id = requestAnimationFrame(() => fitTo(0))
     return () => cancelAnimationFrame(id)
-    // Mount only. `reserveOnOpen` is a panel width the host can change, but
-    // this effect is the opening frame and must not re-run for that.
+    // Mount only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /* --- When the stage itself changes size -------------------------------------
+
+     Half the delta, on both axes, straight into the pan.
+
+     The view is stored in stage-local coordinates, so a stage that narrows from
+     the right leaves the world exactly where it was — and what you were looking
+     at slides towards the edge and off it. That never happened while the stage
+     was `inset: 0` over a panel that floated; it happens on every panel open,
+     every close and every frame of a grip drag now that the panel is a track
+     beside it.
+
+     Re-FITTING would be the wrong answer: opening a panel is not a request to
+     re-zoom, and a canvas that reframes itself when you click a card is a canvas
+     you cannot hold your place in. Keeping the visible centre fixed is what
+     every tool with a collapsible inspector does, and it is one subtraction.
+
+     Written through `apply` rather than `glide` — this must land in the same
+     frame as the resize, or the world visibly lags the edge being dragged. */
+  const size = useRef<{ w: number; h: number } | null>(null)
+  useLayoutEffect(() => {
+    const s = stage.current
+    if (!s || typeof ResizeObserver === 'undefined') return
+    size.current = { w: s.clientWidth, h: s.clientHeight }
+    const ro = new ResizeObserver(() => {
+      const prev = size.current
+      const now = { w: s.clientWidth, h: s.clientHeight }
+      size.current = now
+      if (!prev || (prev.w === now.w && prev.h === now.h)) return
+      apply((v) => ({ ...v, x: v.x + (now.w - prev.w) / 2, y: v.y + (now.h - prev.h) / 2 }))
+    })
+    ro.observe(s)
+    return () => ro.disconnect()
+  }, [apply, stage])
 
   /* --- Keeping focus inside the stage ---------------------------------------
 

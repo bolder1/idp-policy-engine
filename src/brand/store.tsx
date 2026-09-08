@@ -80,7 +80,10 @@ export type BrandScreen =
   | { name: 'risk-signals' }
   | { name: 'hooks' }
   | { name: 'methods' }
-  | { name: 'create' }
+  /* `create` has gone. Creating a policy was a screen — a gallery of templates
+     that asked for the policy's name only after you had chosen one — and it is
+     a form opened in place from the list now, so there is nothing to route to.
+     The templates it carried are offered from the empty board instead. */
   /* The admin's application catalogue — the console's Apps page.
 
      NOT `apps`. That name is taken directly below by the end-user launcher,

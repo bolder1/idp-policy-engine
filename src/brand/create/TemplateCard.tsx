@@ -12,7 +12,8 @@ import {
 } from 'lucide-react'
 
 import { Button, DecisionChip, Modal } from '../kit'
-import type { AccessDecision } from '../data'
+import { conditionType, type AccessDecision, type Scenario } from '../data'
+import { leaves } from '../predicate'
 import { useBrand } from '../store'
 
 /* -----------------------------------------------------------------------------
@@ -373,4 +374,55 @@ export function TemplatePreview({
       )}
     </Modal>
   )
+}
+
+/* --- A scenario, in the shape this card renders --------------------------------
+
+   It lived in CreatePolicy.tsx, which was a `lazy()` route. Anything importing
+   it dragged the create page's whole chunk — the gallery, the marketplace sheet
+   and a `lazy(() => import('./Interview'))` reference — into the importing
+   bundle. It belongs beside `CardModel`, which is its return type and lives
+   here, so the picker can have it without the page.
+   -------------------------------------------------------------------------- */
+
+/** Condition groups, said the way an admin would say them. */
+const SIGNAL_OF: Record<string, string> = {
+  Network: 'Network',
+  Location: 'Location',
+  Time: 'Time',
+  Device: 'Device',
+  User: 'Identity',
+  Group: 'Identity',
+  'Custom attributes': 'Attributes',
+  Webhooks: 'External',
+}
+
+export function scenarioCard(s: Scenario): CardModel {
+  const built = s.rules.map((r) => r.build())
+
+  const signals: string[] = []
+  for (const r of built)
+    for (const c of leaves(r.when)) {
+      const label = SIGNAL_OF[conditionType(c.typeId).group] ?? 'Other'
+      if (!signals.includes(label)) signals.push(label)
+    }
+
+  const reach = built.reduce((n, r) => Math.max(n, r.matchEstimate), 0)
+
+  return {
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    badge: s.badge,
+    // A template with no conditions applies to everyone, which is worth saying.
+    signals: signals.length > 0 ? signals : ['Everyone'],
+    // On the tenant's own templates the useful fact is who wrote it and when;
+    // on Xecurify's it is how many people the thing would reach.
+    reviewed: s.reviewed,
+    /* "~340 people" not "340 people". matchEstimate is seed data that never
+       recomputes, and the builder's impact panel already labels the same figure
+       an estimate — the card was the one place stating it as a bare fact. */
+    meta: s.provided ? `~${reach.toLocaleString()} people` : `${s.author} · ${s.when}`,
+    rules: s.rules.map((r, i) => ({ ...r, reach: built[i].matchEstimate })),
+  }
 }

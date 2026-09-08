@@ -90,7 +90,15 @@ function cellLabel(c: Cell) {
   return c.rules > 1 ? `${word} · ${c.rules}` : word
 }
 
-export function Coverage() {
+export function Coverage({ onNew }: {
+  /* Opening the naming form is the LIST's job, not this grid's.
+
+     An uncovered cell used to navigate to a create SCREEN, which no longer
+     exists — the form opens in place now, and the state that opens it lives on
+     the screen that renders both this and the button. Passed down rather than
+     duplicated here, so there is one form and one place it is opened from. */
+  onNew: () => void
+}) {
   const store = useBrand()
   const [flipped, setFlipped] = useState(false)
   const [hover, setHover] = useState<{ a: number; g: number } | null>(null)
@@ -122,7 +130,7 @@ export function Coverage() {
 
   function open(cell: Cell | null) {
     if (cell) store.go({ name: 'board', policyId: cell.policy.id })
-    else store.go({ name: 'create' })
+    else onNew()
   }
 
   return (

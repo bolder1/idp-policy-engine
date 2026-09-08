@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Wand2 } from 'lucide-react'
 
-import { Button, DecisionChip, Modal } from '../kit'
-import { blankPolicy, type Policy, type Scenario } from '../data'
+import { Button, Modal } from '../kit'
+import { blankPolicy, type Policy } from '../data'
 import { ApplicationField, ApplicationFixed } from '../screens/scope-fields'
 
 /* -----------------------------------------------------------------------------
@@ -34,7 +34,6 @@ export function NewPolicyDialog({
   onCreate,
   seedName = '',
   fixedAppId,
-  picked = null,
   onGuided,
 }: {
   open: boolean
@@ -44,7 +43,6 @@ export function NewPolicyDialog({
   seedName?: string
   /** The application, stated rather than asked. See `ApplicationFixed`. */
   fixedAppId?: string
-  picked?: Scenario | null
   /* Absent in lite, and absent from an application row: the guided build is
      withheld there, and a button that opens nothing is worse than no button. */
   onGuided?: (appId: string | null) => void
@@ -88,8 +86,7 @@ export function NewPolicyDialog({
       open={open}
       onClose={onClose}
       title="Name your policy"
-      /* Wider only when there is a second thing to read. */
-      width={picked ? 620 : 520}
+      width={520}
       footer={
         <>
           {/* Only when it explains a control you cannot press.
@@ -205,45 +202,11 @@ export function NewPolicyDialog({
           {fixedAppId ? <ApplicationFixed appId={fixedAppId} /> : <ApplicationField appId={appId} onChange={setAppId} />}
         </div>
 
-        {/* What the template is about to give you, when there is a template.
-
-            It renders only when there is something to read: from scratch its
-            whole content was a box saying "No rules yet, you will add them in
-            the builder", and a panel apologising for its own emptiness was
-            taking half the page from the form that needed it. */}
-        {picked && (
-          <section className="bnp__prev">
-            <header className="bnp__prevhead">
-              <span>
-                From <strong>{picked.name}</strong> · {picked.rules.length} rule
-                {picked.rules.length === 1 ? '' : 's'}
-              </span>
-              <span className="bnp__off">Created off</span>
-            </header>
-            <ol className="bnp__rules">
-              {picked.rules.map((r, i) => (
-                <li key={r.name}>
-                  <span className="bprev__n">{i + 1}</span>
-                  <span className="bprev__body">
-                    <strong>{r.name}</strong>
-                    <span>IF {r.ifText}</span>
-                  </span>
-                  <DecisionChip decision={r.decision} size="sm" />
-                </li>
-              ))}
-              <li className="bnp__rules--default">
-                <span className="bprev__n" aria-hidden>
-                  ⌄
-                </span>
-                <span className="bprev__body">
-                  <strong>Everyone else</strong>
-                  <span>Nothing above matched</span>
-                </span>
-                <DecisionChip decision="1fa" size="sm" />
-              </li>
-            </ol>
-          </section>
-        )}
+        {/* The template preview that stood here has gone with the step that
+            fed it. A template is not chosen before the policy exists any more —
+            it is offered from the empty board, applied to a policy that is
+            already there, and undone with ⌘Z if it was the wrong one. There is
+            nothing for this form to preview. */}
       </div>
     </Modal>
   )

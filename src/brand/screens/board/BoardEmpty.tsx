@@ -80,16 +80,18 @@ export function BoardEmpty({ onUseTemplate, onScratch }: { onUseTemplate?: () =>
    off.
    -------------------------------------------------------------------------- */
 
-/* A card in the deck, and the page. One shape, so the two illustrations are
-   plainly the same object in two situations. */
-function ArtCard({ dashed }: { dashed?: boolean }) {
+/* A card in the deck, and the card being written. One shape, so the two
+   illustrations are plainly the same object in two situations.
+
+   It took a `dashed` variant, for a scratch card drawn as an unmade page with
+   marching ants round it. That card is a REAL rule with a cursor in it now — it
+   is the thing you are about to make, not a placeholder for it — so there is
+   one card again. */
+function ArtCard() {
   return (
     <rect
-      className={dashed ? 'bb__art__ants' : undefined}
       x="0.5" y="0.5" width="83" height="57" rx="6"
-      fill="var(--surface-raised)"
-      stroke={dashed ? 'var(--border-default)' : 'var(--border-subtle)'}
-      strokeDasharray={dashed ? '5 4' : undefined}
+      fill="var(--surface-raised)" stroke="var(--border-subtle)"
     />
   )
 }
@@ -149,24 +151,44 @@ function TemplateArt() {
 
 function ScratchArt() {
   return (
-    <svg className="bb__start2__art" viewBox="0 0 148 100" role="img" aria-label="An empty policy, waiting for its first rule">
-      <defs>
-        {/* The canvas's own dot grid, at the size it would be inside a card
-            this small. The page is blank, not featureless. */}
-        <pattern id="bb-art-dots" width="8" height="8" patternUnits="userSpaceOnUse">
-          <circle cx="1" cy="1" r="0.9" fill="var(--border-strong)" opacity="0.28" />
-        </pattern>
-      </defs>
+    <svg className="bb__start2__art" viewBox="0 0 148 100" role="img" aria-label="An empty rule, waiting to be written">
       <g transform="translate(32 20)">
         <g className="bb__art__page">
-          <ArtCard dashed />
-          <rect x="6" y="6" width="72" height="46" rx="3" fill="url(#bb-art-dots)" />
-          {/* One line written, two still to come — they draw themselves in when
-              you point at the card. */}
-          <ArtLine i={0} w={48} lead />
+          <ArtCard />
+
+          {/* A caret on an empty line, and that is the whole idea.
+
+              This card was a dashed page with the canvas's dot grid printed
+              inside it and one line already on it — near enough to the deck
+              beside it that at 84x58 the pair read as two grey smudges, and it
+              claimed a rule was already written, which is the one thing scratch
+              means you do not have.
+
+              A cursor says the opposite, and nothing else in the pair has one.
+              At rest: an empty rule with the caret at its start. On hover the
+              line writes itself out left to right, the caret rides along to the
+              end of it, and a second line surfaces underneath — you are the one
+              writing these. */}
+          <g className="bb__art__ink">
+            <rect
+              className="bb__art__line is-lead"
+              x="12" y="18" width="44" height="5" rx="2.5"
+              fill="var(--border-strong)" opacity="0.45"
+            />
+          </g>
+          <rect
+            className="bb__art__caret"
+            x="12" y="15" width="2" height="11" rx="1"
+            fill="var(--border-strong)" opacity="0.55"
+          />
+
           <g className="bb__art__todo">
-            <ArtLine i={1} w={36} />
-            <ArtLine i={2} w={42} />
+            <rect
+              className="bb__art__line"
+              style={{ '--i': 1 } as CSSProperties}
+              x="12" y="32" width="34" height="5" rx="2.5"
+              fill="var(--border-strong)" opacity="0.28"
+            />
           </g>
         </g>
       </g>

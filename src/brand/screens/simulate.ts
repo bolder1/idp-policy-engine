@@ -26,6 +26,25 @@ export interface SimUser {
   role: string
 }
 
+/* What `user-attr` reads, keyed by the names the catalogue offers.
+
+   A fixed table, and the module header already says why that is the honest
+   shape here: the map from a context option to a condition value is a table,
+   not the engine. What is real is the order of evaluation and the decision.
+
+   Only the keys a `SimUser` can actually answer. `designation`, `team`, `age`
+   and `years_of_experience` are offered by the catalogue and are NOT here —
+   a directory holds them and this fixture does not, so a rule naming one comes
+   back undecided rather than passing on a value nobody supplied. That is the
+   same rule `unknown` follows everywhere else in this evaluator. */
+export const userAttr = (u: SimUser, key: string): string | null => {
+  if (key === 'email') return u.email
+  if (key === 'username') return u.email.split('@')[0]
+  if (key === 'department') return u.groupName
+  if (key === 'employment_type') return u.userType
+  return null
+}
+
 export const SIM_USERS: SimUser[] = [
   { id: 'priya', name: 'Priya Sharma', email: 'priya@mo.com', groupId: 'finance', groupName: 'Finance', userType: 'Employee', role: 'Member' },
   { id: 'arun', name: 'Arun Patel', email: 'arun@mo.com', groupId: 'engineering', groupName: 'Engineering', userType: 'Employee', role: 'Member' },
@@ -166,6 +185,29 @@ export interface SimEnv {
 
 export type CondState = 'pass' | 'fail' | 'unknown'
 
+/* Where the tenant's clock sits, and how far every offerable zone is from UTC.
+
+   Minutes, not hours, because two of these are not whole hours — and a table
+   that could not express Asia/Kolkata would be a table that quietly rounded a
+   fixture's own timezone away.
+
+   STANDARD time only. There is no date in a `SimContext`, so there is nothing
+   to decide DST against; a rehearsal in July against Europe/Berlin is an hour
+   out, and that is a stated limit rather than a bug to hunt. */
+const TZ_OFFSET: Record<string, number> = {
+  'Asia/Kolkata': 330,
+  'Europe/Berlin': 60,
+  'Europe/London': 0,
+  'America/New_York': -300,
+  'America/Los_Angeles': -480,
+  'Asia/Tokyo': 540,
+  'Asia/Singapore': 480,
+  'Australia/Sydney': 600,
+}
+
+/** The zone an unqualified window is read in. The fixtures are an Indian tenant. */
+export const TENANT_TZ = 'Asia/Kolkata'
+
 export const clock = (mins: number) =>
   `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
 
@@ -305,12 +347,79 @@ export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: 
     case 'user':
       return decide(vals.includes(ctx.user.id), `this sign-in is ${ctx.user.name}`)
 
+    /* An attribute the directory holds, by name.
+
+       Two ways to be undecided and they are different: no key means the author
+       has not finished the condition, and a key this fixture cannot answer
+       means the SIMULATION does not have the value. Both are `unknown` — which
+       is never a pass — and the sentences say which, because "no attribute
+       chosen" is a thing to go and fix and "the sim does not model team" is
+       not. */
+    case 'user-attr': {
+      if (!c.key) return unknown('the condition does not say which attribute')
+      const got = userAttr(ctx.user, c.key)
+      if (got === null) return unknown(`this simulation does not carry “${c.key}”`)
+      const hit =
+        c.operator === 'contains'
+          ? vals.some((v) => got.toLowerCase().includes(v.toLowerCase()))
+          : c.operator === 'above' || c.operator === 'below'
+            ? (() => {
+                const a = Number(got)
+                const b = Number(vals[0])
+                if (!Number.isFinite(a) || !Number.isFinite(b)) return false
+                return c.operator === 'above' ? a > b : a < b
+              })()
+            : vals.some((v) => v.toLowerCase() === got.toLowerCase())
+      /* `above` and `below` carry the comparison, so the generic negation flip
+         must not also apply to them. */
+      if (c.operator === 'above' || c.operator === 'below')
+        return { state: hit ? 'pass' : 'fail', detail: `${c.key} is ${got}` }
+      return decide(hit, `${c.key} is ${got}`)
+    }
+
+    /* A key this product has never heard of, by definition. Nothing in a
+       fixture can answer it, and saying so is the whole value of the case —
+       without it the row falls to `default` and reports "this simulation does
+       not model custom attribute", which sounds like a gap in the simulator
+       rather than a fact about where the value lives. */
+    case 'custom-attr':
+      return unknown(
+        c.key
+          ? `“${c.key}” comes from your directory, which this simulation does not call`
+          : 'the condition does not say which attribute',
+      )
+
+    /* The endpoint is not called, and the rule that consults one cannot be
+       rehearsed without calling it.
+
+       `unknown`, deliberately, and it is the correct answer rather than a
+       missing feature: a hook's verdict depends on a live service, so any value
+       this simulator invented would be a rehearsal of a decision the product
+       never made. The hook's FAILURE MODE is the part that can be reasoned
+       about statically, and `diagnostics` already does — PE130 to PE133. */
+    case 'webhook':
+      return unknown('an external hook is not called during a rehearsal')
+
     case 'time': {
       const from = toMinutes(vals[0] ?? '00:00')
       const to = toMinutes(vals[1] ?? '23:59')
+      /* The clock the window is read against, shifted into the zone it names.
+
+         `ctx.nowMinutes` is one number — the hour the rehearsal is set to — and
+         it has no zone of its own, so the honest reading is "this is the
+         tenant's local time". A condition that names Europe/Berlin is asking
+         about a different clock, and `TZ_OFFSET` is the fixed table that says
+         how far apart the two are. Fixed, because the module header says the
+         map from a context option to a value is a table rather than the engine:
+         no DST, no date, and both of those would matter in a real evaluator.
+
+         Absent `tz` shifts by nothing, which is exactly what every window meant
+         before the field existed. */
+      const shift = c.tz ? (TZ_OFFSET[c.tz] ?? 0) - (TZ_OFFSET[TENANT_TZ] ?? 0) : 0
+      const local = ((ctx.nowMinutes + shift) % 1440 + 1440) % 1440
       // A window that wraps midnight is an OR, not an AND.
-      const inside = from <= to ? ctx.nowMinutes >= from && ctx.nowMinutes <= to : ctx.nowMinutes >= from || ctx.nowMinutes <= to
-      return decide(inside, `it is ${clock(ctx.nowMinutes)} right now`)
+      const inside = from <= to ? local >= from && local <= to : local >= from || local <= to
+      return decide(inside, c.tz ? `it is ${clock(local)} in ${c.tz}` : `it is ${clock(ctx.nowMinutes)} right now`)
     }
 
     default:

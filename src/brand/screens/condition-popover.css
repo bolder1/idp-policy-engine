@@ -452,3 +452,27 @@
 .cp__fldinput.is-num { width: 92px; text-align: right; font-variant-numeric: tabular-nums; }
 .cp__fldinput:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--focus-ring); }
 .cp__unit { font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* A native select, dressed as one of the fields above it.
+
+   Used for the two settings whose options are a closed list nobody searches —
+   which attribute a condition is about, and which timezone a window is read in.
+   `Pop` would be the wrong tool: it exists to carry search, multi-select and a
+   footer that navigates, and none of those apply to eight timezones. */
+.cp__fldsel {
+  width: 100%; min-width: 0; min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--surface-base, var(--surface-raised));
+  font: inherit; font-size: var(--fs-sm); color: var(--text-primary);
+  cursor: pointer;
+}
+.cp__fldsel:hover { border-color: var(--border-strong); }
+.cp__fldsel:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--focus-ring); }
+/* The tenant default, and an attribute nobody has named yet, read as absences
+   rather than as values. */
+.cp__fldsel:has(option[value='']:checked) { color: var(--text-tertiary); }
+
+/* A typed value fills the row, the way a chosen one does. */
+.cp__fldinput.is-text { width: 100%; }
+.cp__fldinput::placeholder { color: var(--text-muted); }

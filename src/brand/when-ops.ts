@@ -110,12 +110,15 @@ export function patchCondition(w: Predicate, conditionId: string, next: Partial<
 export function retypeCondition(w: Predicate, conditionId: string, typeId: string, firstOperator: string): Predicate {
   /* Not `patchCondition`, and the difference is a field it cannot express.
 
-     `scope` belongs to a zone condition and to nothing else, and it is written
-     as absent-when-default. A patch merges, so retyping a scoped zone into a
-     Country left `scope: 'ip'` sitting on a condition whose type has no halves
-     — invisible on screen, carried into `ckey`, and therefore able to split two
-     identical Country conditions into two different rules for the linter. The
-     rebuild drops every field the new type does not own. */
+     Three fields belong to one type each and are written as absent-when-default:
+     `scope` to a zone, `key` to the two attribute conditions, `tz` to a window.
+     A patch merges, so retyping a scoped zone into something else left
+     `scope: 'ip'` sitting on a condition whose type has no halves — invisible
+     on screen, carried into `ckey`, and therefore able to split two identical
+     conditions into two different rules for the linter.
+
+     The rebuild names only what every condition has, so a field the new type
+     does not own cannot survive by being forgotten here. */
   return mapConditions(w, (c) => (c.id === conditionId ? { id: c.id, typeId, operator: firstOperator, values: [] } : c))
 }
 
@@ -134,6 +137,40 @@ export function setScope(w: Predicate, conditionId: string, scope: ZoneScope | '
     const next = { ...c }
     if (scope === 'both') delete next.scope
     else next.scope = scope
+    return next
+  })
+}
+
+/* Which attribute an attribute-condition is about. `''` REMOVES the field.
+
+   Delete-at-default, like `setScope` above and for the same reason: every dirty
+   check in this app is a `JSON.stringify` comparison, so a key set back to
+   nothing has to leave no trace or the save bar stays lit on a rule that means
+   exactly what it did. An unset key is also a first-class diagnosable state —
+   "User attribute is FTE" without saying WHICH attribute is a condition the
+   linter should be able to report. */
+export function setKey(w: Predicate, conditionId: string, key: string): Predicate {
+  return mapConditions(w, (c) => {
+    if (c.id !== conditionId) return c
+    const next = { ...c }
+    const k = key.trim()
+    if (!k) delete next.key
+    else next.key = k
+    return next
+  })
+}
+
+/* The timezone a window is read in. `''` is the tenant's own, and REMOVES it.
+
+   Absent means "whatever the tenant is set to", which is what every rule meant
+   before this field existed — so a seeded window keeps its exact meaning and
+   nothing written against the old shape has to change. */
+export function setTz(w: Predicate, conditionId: string, tz: string): Predicate {
+  return mapConditions(w, (c) => {
+    if (c.id !== conditionId) return c
+    const next = { ...c }
+    if (!tz) delete next.tz
+    else next.tz = tz
     return next
   })
 }

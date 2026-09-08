@@ -272,6 +272,8 @@ export function WhenEditor({
                      materialised at its default lights the save bar on a rule
                      that means exactly what it did. */
                   onScope={(s) => write(ops.setScope(rule.when, m.c.id, s))}
+                  onKey={(k) => write(ops.setKey(rule.when, m.c.id, k))}
+                  onTz={(tz) => write(ops.setTz(rule.when, m.c.id, tz))}
                   onRemove={() => removeCondition(m.c.id)}
                   /* Gated on the same predicate the writer uses. The two used to
                      disagree — the button was drawn on every row while the
@@ -299,6 +301,8 @@ export function WhenEditor({
                   removeCondition={removeCondition}
                   retype={(id, typeId) => write(ops.retypeCondition(rule.when, id, typeId, conditionType(typeId).operators[0]))}
                   setScope={(id, s) => write(ops.setScope(rule.when, id, s))}
+                  setKey={(id, k) => write(ops.setKey(rule.when, id, k))}
+                  setTz={(id, tz) => write(ops.setTz(rule.when, id, tz))}
                   splitOut={splitOut}
                 />
               )}
@@ -381,6 +385,8 @@ function GroupMember({
   removeCondition,
   retype,
   setScope,
+  setKey,
+  setTz,
   splitOut,
 }: {
   k: ConditionCard
@@ -402,6 +408,8 @@ function GroupMember({
   removeCondition: (id: string) => void
   retype: (id: string, typeId: string) => void
   setScope: (id: string, s: 'both' | ZoneScope) => void
+  setKey: (id: string, k: string) => void
+  setTz: (id: string, tz: string) => void
   splitOut: (id: string) => void
 }) {
   const join = cardJoin(k)
@@ -442,6 +450,8 @@ function GroupMember({
             onChange={(nextC) => patchCondition(c.id, nextC)}
             onRetype={(typeId) => retype(c.id, typeId)}
             onScope={(s) => setScope(c.id, s)}
+            onKey={(k) => setKey(c.id, k)}
+            onTz={(tz) => setTz(c.id, tz)}
             onRemove={() => removeCondition(c.id)}
             onSplit={k.conditions.length > 1 ? () => splitOut(c.id) : undefined}
           />
@@ -613,6 +623,8 @@ function ConditionRow({
   onChange,
   onRetype,
   onScope,
+  onKey,
+  onTz,
   onRemove,
   onSplit,
 }: {
@@ -625,6 +637,10 @@ function ConditionRow({
   onRetype: (typeId: string) => void
   /** Zone conditions only — the one writer for `scope` runs through here. */
   onScope: (s: 'both' | ZoneScope) => void
+  /** Attribute conditions only: which attribute. */
+  onKey: (k: string) => void
+  /** Time conditions only: which timezone the window is read in. */
+  onTz: (tz: string) => void
   onRemove: () => void
   /** Absent when the row is the only condition in its run — nothing to split. */
   onSplit?: () => void
@@ -670,6 +686,8 @@ function ConditionRow({
           onOperator={(operator) => onChange({ ...c, operator })}
           onValues={(v) => onChange({ ...c, values: v })}
           onScope={onScope}
+          onKey={onKey}
+          onTz={onTz}
           onRemove={onRemove}
           footer={footer}
           onFooter={onFooter}

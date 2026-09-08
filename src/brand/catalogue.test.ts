@@ -14,6 +14,7 @@ import {
 } from './data'
 import { WHO_TYPES } from './audience-ops'
 import { seedProfiles } from './fingerprint'
+import { seedHooks } from './hooks'
 import { leaves } from './predicate'
 import { DECK } from './screens/gauntlet'
 
@@ -75,19 +76,29 @@ function everyCondition(): { where: string; c: Condition }[] {
 
 describe('the condition catalogue', () => {
   it('offers exactly the attributes the When panel is meant to offer', () => {
+    /* The order is the list's order, asserted rather than sorted: it groups the
+       three library references first, then the clock, then the attributes, then
+       risk — and that reading order is a decision somebody made, so a reorder
+       should have to be made deliberately here too. */
     expect(WHEN_CONDITIONS.map((c) => c.id)).toEqual([
       'zone',
+      'fingerprint',
+      'webhook',
       'time',
       'day',
-      'fingerprint',
+      'user-attr',
+      'custom-attr',
       'device-risk',
       'ml-risk',
     ])
     expect(WHEN_CONDITIONS.filter(isOfferable).map((c) => c.id)).toEqual([
       'zone',
+      'fingerprint',
+      'webhook',
       'time',
       'day',
-      'fingerprint',
+      'user-attr',
+      'custom-attr',
       'device-risk',
     ])
   })
@@ -161,12 +172,17 @@ describe('the seeded estate', () => {
      one of these in the seed before this check existed (`in zone ['japan']`
      against a zone that had never been written), and it had been there long
      enough to acquire a comment. */
-  it('names only zones and device profiles that exist', () => {
+  it('names only library objects that exist', () => {
     const dangling = everyCondition()
       .flatMap(({ where, c }) => {
         const kind = conditionType(c.typeId).valueKind
-        if (kind !== 'zone' && kind !== 'fingerprint') return []
-        const library = kind === 'zone' ? zones.map((z) => z.id) : seedProfiles.map((p) => p.id)
+        if (kind !== 'zone' && kind !== 'fingerprint' && kind !== 'hook') return []
+        const library =
+          kind === 'zone'
+            ? zones.map((z) => z.id)
+            : kind === 'fingerprint'
+              ? seedProfiles.map((p) => p.id)
+              : seedHooks.map((h) => h.id)
         return c.values.filter((v) => !library.includes(v)).map((v) => `${where}: ${kind} “${v}”`)
       })
     expect(dangling).toEqual([])

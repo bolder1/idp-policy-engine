@@ -2653,3 +2653,16 @@ button.bb__idx::after {
 }
 .bb__ifchip.is-val { color: var(--brand); }
 .bb__ifchip.is-val.is-unset { color: var(--fb-negative-fg); }
+
+/* The rule's operator between two members, on the card.
+
+   Left-aligned at the members' own edge, with a hairline carrying it across —
+   the same drawing the editor's `.bb__joinrow` makes, so a rule joined by AND
+   looks the same whether you are reading it or writing it. It was the first
+   keyword inside the second group's box, which is where a group's OWN operator
+   lives, so the two levels were drawn in one place. */
+.bb__ifjoin {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 3px 0;
+}
+.bb__ifjoin::after { content: ''; flex: 1; height: 1px; background: var(--if-line); }

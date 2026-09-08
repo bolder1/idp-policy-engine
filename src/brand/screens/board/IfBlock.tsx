@@ -7,7 +7,7 @@ import { conditionType, type Condition, type Rule } from '../../data'
 import { cardJoin, cardLetter, topJoin } from '../../predicate'
 import type { NameLookup } from '../predicate-prose'
 import { DECISION_NAME, TONE, journeyOf } from './model'
-import { GROUP_TONE, groupIcon } from './tones'
+import { GROUP_TONE, conditionIcon } from './tones'
 
 /* -----------------------------------------------------------------------------
    The rule, as a conditional.
@@ -105,7 +105,7 @@ function valueChips(c: Condition, resolve: NameLookup): { text: string; unset: b
 /** One condition, read-only: [attribute] operator [value]… */
 export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup }) {
   const t = conditionType(c.typeId)
-  const Ico = groupIcon(t.group)
+  const Ico = conditionIcon(t.id, t.group)
   const tone = GROUP_TONE[t.group] ?? 'neutral'
   return (
     <>
@@ -302,16 +302,35 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
              is worse than a card that shows less. */
           const join = cardJoin(k)
           return (
-          /* A frame means a group somebody MADE, and this drew one round every
-             card unconditionally — so a rule whose conditions were simply typed
-             one after another came back wearing a bracket its author had not
-             asked for. The editor has told these two states apart since groups
-             became a thing; the card went on showing them the same, which meant
-             the canvas and the panel described the same rule differently.
+          <Fragment key={k.id}>
+            {/* The RULE's operator, between the members it joins — outside the
+                group, because it is not the group's.
 
-             `grouped` is the field that says which is which, and it is exactly
-             what it is for. */
-          <div key={k.id} className={k.grouped ? 'bb__ifgroup' : 'bb__ifplain'}>
+                It was drawn as the first keyword INSIDE the group's box, which
+                put the word that says how this bracket joins the one above it
+                in the one place that reads as part of this bracket. On a rule
+                with two groups the card said `(AND … OR …)` where the AND
+                belonged to neither.
+
+                Its own row, at the group's left edge, in the gap — which is
+                where the editor puts it too, so the two surfaces draw one
+                operator in one place. */}
+            {i > 0 && (
+              <div className="bb__ifrow bb__ifjoin">
+                <IfKw tone={top}>{top}</IfKw>
+              </div>
+            )}
+            {/* A frame means a group somebody MADE, and this drew one round
+                every card unconditionally — so a rule whose conditions were
+                simply typed one after another came back wearing a bracket its
+                author had not asked for. The editor has told these two states
+                apart since groups became a thing; the card went on showing them
+                the same, which meant the canvas and the panel described the
+                same rule differently.
+
+                `grouped` is the field that says which is which, and it is
+                exactly what it is for. */}
+            <div className={k.grouped ? 'bb__ifgroup' : 'bb__ifplain'}>
             {/* The group's name, on the card, in words.
 
                 It was a `title` attribute — invisible, unreachable by keyboard,
@@ -337,14 +356,17 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
                  readable at a glance, which is the whole job of the card. */
               <div key={c.id} className="bb__ifrow is-cond">
                 {j === 0 ? (
-                  <>
-                    {i === 0 && (
+                  /* `if` opens the sentence once, on the very first row of the
+                     whole block. A member after the first is introduced by the
+                     operator row above it, not by a keyword of its own. */
+                  i === 0 && (
+                    <>
                       <span className="bb__ifbranch" aria-hidden>
                         <Split size={12} strokeWidth={2} />
                       </span>
-                    )}
-                    <IfKw tone={i === 0 ? undefined : top}>{i === 0 ? 'if' : top}</IfKw>
-                  </>
+                      <IfKw>if</IfKw>
+                    </>
+                  )
                 ) : (
                   <IfKw tone={join}>{join}</IfKw>
                 )}
@@ -352,6 +374,7 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
               </div>
             ))}
           </div>
+          </Fragment>
           )
         })
       )}

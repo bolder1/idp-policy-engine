@@ -98,9 +98,13 @@ export interface ConditionType {
   group: string
   hint: string
   operators: string[]
-  /** Where the value comes from: a library object, a fixed list, or a clock. */
-  valueKind: 'zone' | 'fingerprint' | 'group' | 'user' | 'list' | 'range' | 'time'
+  /** Where the value comes from: a library object, a fixed list, a clock, typed. */
+  valueKind: 'zone' | 'fingerprint' | 'hook' | 'group' | 'user' | 'list' | 'range' | 'time' | 'text'
   options?: string[]
+  /* The attribute names this condition offers, when its subject is a field
+     rather than the type itself. `user-attr` has a list; `custom-attr` has
+     none and takes what is typed. */
+  keys?: readonly string[]
   /* In the catalogue, and NOT in the When list.
 
      `group` and `user` are the WHO step's vocabulary. `audience-ops.ts` is a
@@ -127,7 +131,7 @@ export interface ConditionType {
 
 /* The components that remain, and the four that do not.
 
-   This catalogue was twenty-four attributes in nine components. It is six rows
+   This catalogue was twenty-four attributes in nine components. It is nine rows
    in four, and the cut is not a simplification — it is a rule about where a
    value is allowed to live.
 
@@ -154,12 +158,51 @@ export interface ConditionType {
    count that is true.
 
    Gone for a different reason, and worth naming separately: `user-type`,
-   `user-role`, `auth-state`, `trust-age`, `user-attr`, `group-attr` and
-   `webhook` are not consolidated anywhere. They are simply not offered. The
-   hooks library still exists and the Hooks screen still runs — but no rule can
-   reference a hook now, so it is a library nothing reads. That is a real
-   regression and it is deliberate, not an oversight. */
-export const CONDITION_GROUPS = ['Network', 'Time', 'Device', 'Risk', 'Group', 'User'] as const
+   `user-role`, `auth-state` and `trust-age` are not consolidated anywhere and
+   are simply not offered. Each was a fixed vocabulary this product does not
+   own — a four-value role enum that no tenant can extend, an auth-state list
+   nothing outside the simulator produces — and what replaces them is
+   `custom-attr`, which asks the directory rather than guessing at its schema.
+
+   `group-attr` goes for the same reason and a sharper one: a group's custom
+   attributes were a second attribute system reachable from one condition, with
+   no screen anywhere that defines one. */
+export const CONDITION_GROUPS = ['Library', 'Time', 'Attributes', 'Risk', 'Group', 'User'] as const
+
+/* The timezones a window can be read in.
+
+   A short list, not the full IANA set. Every one of these is a zone a seeded
+   policy actually names, and a 400-row picker for a setting most rules leave
+   at the tenant default would be the largest control on the pane. Widen it
+   from what a fixture needs, never from the tz database. */
+export const TIMEZONES = [
+  'Asia/Kolkata',
+  'Europe/Berlin',
+  'Europe/London',
+  'America/New_York',
+  'America/Los_Angeles',
+  'Asia/Tokyo',
+  'Asia/Singapore',
+  'Australia/Sydney',
+] as const
+
+/* The directory fields a rule can ask about by name.
+
+   These are the ones the sheet enumerates — email, username, designation, age,
+   years of experience, team — plus the two the seeded scenarios reach for. They
+   are a LIST because they exist on every user whether or not a tenant has
+   configured anything; a key nobody has defined belongs in `custom-attr`, which
+   takes a typed name. */
+export const USER_ATTR_KEYS = [
+  'email',
+  'username',
+  'designation',
+  'department',
+  'team',
+  'age',
+  'years_of_experience',
+  'employment_type',
+] as const
 
 export const CONDITION_CATALOGUE: ConditionType[] = [
   /* The only way to say anything about where a request came from.
@@ -170,16 +213,7 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      by country" are the same attribute asked two ways, rather than an IP
      condition and a Country condition that can contradict each other. See
      `ZoneScope`. */
-  { id: 'zone', label: 'Network zone', group: 'Network', hint: 'Match a zone from your Zones library — addresses, ASNs and places, named once', operators: ['in zone', 'not in zone'], valueKind: 'zone' },
-
-  { id: 'time', label: 'Time of day', group: 'Time', hint: 'A window in the tenant’s timezone', operators: ['between', 'not between'], valueKind: 'time' },
-  /* Separate from the window, because they answer different questions and get
-     asked separately: "office hours" is a time, "not at the weekend" is a day,
-     and a rule usually wants one or the other rather than a single control that
-     means both. The parameter sheet lists them as two rows for the same
-     reason. */
-  { id: 'day', label: 'Day of week', group: 'Time', hint: 'Match particular days', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
-
+  { id: 'zone', label: 'Network zone', group: 'Library', hint: 'Match a zone from your Zones library — addresses, ASNs and places, named once', operators: ['in zone', 'not in zone'], valueKind: 'zone' },
   /* The only way to say anything about the device.
 
      "Matches", not "recognised by", and the word had to change with the scope.
@@ -189,8 +223,46 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      conditions no longer exist on their own. So the question is whether the
      device matches the profile as written, which is wider than recognition and
      is what the word now says. */
-  { id: 'fingerprint', label: 'Device profile', group: 'Device', hint: 'Match a profile from your Device profiles library — OS, browser, MDM and posture, configured once', operators: ['matches', 'does not match'], valueKind: 'fingerprint' },
+  { id: 'fingerprint', label: 'Device profile', group: 'Library', hint: 'Match a profile from your Device profiles library — OS, browser, MDM and posture, configured once', operators: ['matches', 'does not match'], valueKind: 'fingerprint' },
+  /* Third of the three library references, and the reason the Hooks screen is
+     wired to anything at all.
 
+     It was cut and is back. The argument for cutting it was that nothing else
+     in the shrunken catalogue could reach a hook, so the library read as
+     configuration nothing consults — which was true, and the answer is the
+     condition rather than the deletion. Same shape as the two above it: the
+     rule names an object from a library and the endpoint, the timeout and the
+     failure mode live there, so rotating a URL is one edit rather than an audit
+     of every policy in the tenant.
+
+     `single` in `valueSource`, and that is deliberate: `diagnostics` reads
+     `values[0]` to check the endpoint still exists, and a rule consulting two
+     services would have to say what happens when they disagree. */
+  { id: 'webhook', label: 'External hook', group: 'Library', hint: 'Ask an endpoint from your Hooks library, and use its answer', operators: ['returns true', 'returns false'], valueKind: 'hook' },
+  { id: 'time', label: 'Time of day', group: 'Time', hint: 'A window, read in a timezone you name', operators: ['between', 'not between'], valueKind: 'time' },
+  /* Separate from the window, because they answer different questions and get
+     asked separately: "office hours" is a time, "not at the weekend" is a day,
+     and a rule usually wants one or the other rather than a single control that
+     means both. The parameter sheet lists them as two rows for the same
+     reason. */
+  { id: 'day', label: 'Day of week', group: 'Time', hint: 'Match particular days', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
+  /* --- The two attribute conditions, and why there are two -------------------
+
+     The sheet lists both: "Custom user attributes", with the comparison types
+     it supports (equality, greater or less than, contains, date range,
+     boolean), and "Custom Attributes", whose note enumerates the user fields —
+     email, username, designation, age, years of experience, team.
+
+     So they are split by whether the tenant had to define the attribute.
+     `user-attr` offers the fields every directory has, as a list, and cannot
+     be misspelled. `custom-attr` takes a name the tenant invented, typed, with
+     the same operators — because a list cannot contain a key this product has
+     never heard of.
+
+     Both carry `key`, which is the field this model did not have and the reason
+     the seeded scenarios were writing `employment_type=FTE` into the VALUE. */
+  { id: 'user-attr', label: 'User attribute', group: 'Attributes', hint: 'A field the directory holds on every user', operators: ['is', 'is not', 'contains', 'above', 'below'], valueKind: 'text', keys: [...USER_ATTR_KEYS] },
+  { id: 'custom-attr', label: 'Custom attribute', group: 'Attributes', hint: 'An attribute your tenant defines, by name', operators: ['is', 'is not', 'contains', 'above', 'below'], valueKind: 'text' },
   /* One risk attribute, and it is the one this console actually computes.
 
      The id is historical and the label is not: `device-risk` is the score the
@@ -206,7 +278,6 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      real it is a flag flip, not a re-implementation — and a coming-soon row
      that would return "undecided" the day it shipped is worse than no row. */
   { id: 'ml-risk', label: 'ML risk score', group: 'Risk', hint: 'An AI-derived verdict across every signal. Not available yet.', operators: ['is', 'is not'], valueKind: 'list', options: ['Low', 'Medium', 'High'], soon: true },
-
   /* The two the Who step is a view over. See `who` above. */
   { id: 'group', label: 'Group Membership', group: 'Group', hint: "Match by the user's group", operators: ['in', 'not in'], valueKind: 'group', who: true },
   { id: 'user', label: 'Specific people', group: 'User', hint: 'Match named individuals from the directory', operators: ['is', 'is not'], valueKind: 'user', who: true },
@@ -291,6 +362,26 @@ export interface Condition {
      storing the answer on the zone would make one rule's narrowing silently
      rewrite the other's. */
   scope?: ZoneScope
+  /* WHICH attribute this condition is about.
+
+     `user-attr` and `custom-attr` are the only conditions whose subject is not
+     fixed by the type: "User attribute is X" is not a question until you say
+     which attribute. The seed used to smuggle the name into the value as
+     `employment_type=FTE`, which is a convention no reader parses and no
+     validator checks — the gap register calls it out as 22-G1.
+
+     Absent, not empty, when unset, so a condition nobody has finished is
+     `values: []` and `key: undefined` rather than a pair of empty strings that
+     a dirty check reads as an edit. */
+  key?: string
+  /* The zone the WINDOW is read in. `time` only; absent = the tenant's own.
+
+     The parameter sheet says "Time (including timezone)" and every seeded
+     business-hours rule carries a comment saying the timezone was dropped —
+     nine of them, because `time` was documented as "a window in the tenant's
+     timezone", one setting for the whole tenant. A global operations policy
+     with an India rule, a Germany rule and a US rule cannot mean one zone. */
+  tz?: string
 }
 
 /* An AND-set, and the unit of grouping.
@@ -1169,13 +1260,32 @@ const nextCardId = () => `k${(cardSeq += 1)}`
    That is deliberate: it turns every authored call site into an arity error
    rather than a silent no-op, which is the only reliable way to find seventy of
    them. */
-export function cond(typeId: string, operator: string, values: string[] = [], scope?: ZoneScope): Condition {
-  /* Spread-if-set rather than `scope` unconditionally. `{ scope: undefined }`
+export function cond(
+  typeId: string,
+  operator: string,
+  values: string[] = [],
+  scope?: ZoneScope,
+  /* The two fields that belong to one type each: which attribute a
+     `user-attr`/`custom-attr` is about, and which zone a `time` window is read
+     in. A fifth positional argument would have been unreadable at the call
+     site — `cond('time','between',['09:00','19:00'], undefined, 'Asia/Kolkata')`
+     — so they arrive named. */
+  extra?: { key?: string; tz?: string },
+): Condition {
+  /* Spread-if-set rather than the fields unconditionally. `{ scope: undefined }`
      and `{}` are the same object to every reader and two different strings to
      `JSON.stringify`, which is what the whole estate's dirty checking compares
      — so an authored `cond(...)` with no scope has to be byte-identical to one
-     written before this parameter existed. */
-  return { id: nextCondId(), typeId, operator, values, ...(scope ? { scope } : null) }
+     written before this parameter existed. Same for the two below. */
+  return {
+    id: nextCondId(),
+    typeId,
+    operator,
+    values,
+    ...(scope ? { scope } : null),
+    ...(extra?.key ? { key: extra.key } : null),
+    ...(extra?.tz ? { tz: extra.tz } : null),
+  }
 }
 
 /** One alternative. Throws on empty, because an empty card matches everything. */
@@ -2121,13 +2231,11 @@ export const policies: Policy[] = [
                    There is no >=. `above ['79']` is an OFF-BY-ONE HACK that is
                    wrong for any non-integer score. */
                 cond('device-risk', 'above', ['79']),
-                /* Two more red flags stood here and are GONE, not migrated:
-                   `webhook returns true hk-hr-suspended` (an HR suspension) and
-                   a posture check. Neither has a condition any more, so this
-                   group is down to two legs — the sanctioned-country zone and
-                   the risk threshold — and a suspended privileged user is no
-                   longer stopped by it. That is a security-relevant loss and it
-                   is recorded rather than smoothed over. */
+                /* The HR suspension is back with the `webhook` condition. The
+                   posture check is not: no attribute in either catalogue
+                   carries "jailbroken", and the row that used to stand in for
+                   it — `posture fails OS up to date` — did not detect one. */
+                cond('webhook', 'returns true', ['hk-hr-suspended']),
               ),
               join: 'or',
               grouped: true,
@@ -2237,11 +2345,25 @@ export const policies: Policy[] = [
     modifiedBy: 'Jaspreet T.',
     audience: audienceOf(['contractors']),
     rules: [
+      /* Restored with the `webhook` condition. This rule and the two legs
+         below it were deleted when the condition was cut — a DENY whose only
+         test is a hook becomes a deny-everything the moment the test is
+         removed, so deleting it was the only safe move at the time. The test
+         exists again, so the rule does. */
+      rule({
+        name: 'Contract expired',
+        // Doc: webhook(`hr-system`).contract_status = `expired`. The comparison
+        // lives in the hook's `responsePath`, not here — the engine can only ask
+        // "returns true".
+        when: when(card(cond('webhook', 'returns false', ['hk-hr-contract']))),
+        decision: 'deny',
+        matchEstimate: 18,
+      }),
       rule({
         name: 'Active, office',
         when: when(
           card(
-            // The contract-status hook leg is gone with the webhook condition.
+            cond('webhook', 'returns true', ['hk-hr-contract']),
             cond('zone', 'in zone', ['office-cidr'], 'ip'),
           ),
         ),
@@ -2408,9 +2530,11 @@ export const policies: Policy[] = [
                same conjunction the two conditions expressed. */
             cond('zone', 'in zone', ['in-office']),
             cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
-            // The doc pins this to Asia/Kolkata. `time` has no timezone field —
-            // it evaluates in one implicit tenant-wide zone.
-            cond('time', 'between', ['09:00', '19:00']),
+            /* The zone the window is read in, which this rule could not say
+               until `Condition.tz` existed — three regional rules in one policy
+               cannot all mean one implicit tenant-wide clock, which is what the
+               note that used to sit here was recording. */
+            cond('time', 'between', ['09:00', '19:00'], undefined, { tz: 'Asia/Kolkata' }),
           ),
         ),
         decision: '2fa',
@@ -2427,8 +2551,7 @@ export const policies: Policy[] = [
                same conjunction the two conditions expressed. */
             cond('zone', 'in zone', ['de-office']),
             cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
-            // Europe/Berlin in the doc. Same implicit zone as the rule above.
-            cond('time', 'between', ['08:00', '18:00']),
+            cond('time', 'between', ['08:00', '18:00'], undefined, { tz: 'Europe/Berlin' }),
           ),
         ),
         decision: '2fa',
@@ -2445,8 +2568,7 @@ export const policies: Policy[] = [
                same conjunction the two conditions expressed. */
             cond('zone', 'in zone', ['us-office']),
             cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
-            // America/New_York in the doc.
-            cond('time', 'between', ['08:00', '18:00']),
+            cond('time', 'between', ['08:00', '18:00'], undefined, { tz: 'America/New_York' }),
           ),
         ),
         decision: '2fa',
@@ -2493,7 +2615,9 @@ export const policies: Policy[] = [
         name: 'Migrated and compliant',
         when: when(
           card(
-            // Webhook and posture legs dropped — neither has a condition now.
+            cond('webhook', 'returns true', ['hk-hr-contract']),
+            // The posture leg stays dropped: no attribute in either catalogue
+            // carries disk encryption. Only the webhook came back.
             cond('fingerprint', 'matches', ['fp-managed']),
             cond('zone', 'in zone', ['ma-countries'], 'location'),
           ),

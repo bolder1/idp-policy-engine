@@ -15,6 +15,7 @@ import {
   Trash2,
   UserRound,
   Users,
+  Webhook,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -33,10 +34,11 @@ const operatorIcon = (o: string): LucideIcon =>
 
 import { EmptyState } from '../empty'
 import { modeLabel } from '../fingerprint'
-import { groupIcon } from './board/tones'
+import { conditionIcon } from './board/tones'
 import type { BrandStore } from '../store'
 import type { NameLookup } from './predicate-prose'
 import {
+  TIMEZONES,
   ZONE_SCOPE_LABEL,
   WHEN_CONDITIONS,
   conditionType,
@@ -152,6 +154,8 @@ export function ConditionPopover({
   onOperator,
   onValues,
   onScope,
+  onKey,
+  onTz,
   onRemove,
   footer,
   onFooter,
@@ -173,6 +177,10 @@ export function ConditionPopover({
   onOperator: (op: string) => void
   onValues: (v: string[]) => void
   onScope: (s: 'both' | ZoneScope) => void
+  /** Which attribute — `user-attr` and `custom-attr` only. */
+  onKey: (k: string) => void
+  /** Which timezone the window is read in — `time` only. `''` is the tenant's. */
+  onTz: (tz: string) => void
   onRemove: () => void
   footer?: string
   onFooter?: () => void
@@ -274,7 +282,65 @@ export function ConditionPopover({
         />
         <span className="cp__unit">score</span>
       </div>
+    ) : t.valueKind === 'text' ? (
+      <input
+        className="cp__fldinput is-text"
+        aria-label={`What ${c.key || t.label} is compared against`}
+        placeholder="Value…"
+        value={values[0] ?? ''}
+        onChange={(e) => onValues([e.target.value])}
+      />
     ) : null
+
+  /* The subject, when the type does not fix it.
+
+     "User attribute is FTE" is not a question until it says WHICH attribute, so
+     the row goes ABOVE the operator — it is the other half of the noun, not a
+     setting on the comparison. A known field is a list and cannot be
+     misspelled; a tenant's own is typed, because a list cannot hold a key this
+     product has never heard of. */
+  const keyRow =
+    t.valueKind !== 'text' ? null : t.keys?.length ? (
+      <select
+        className="cp__fldsel"
+        aria-label="Which attribute"
+        value={c.key ?? ''}
+        onChange={(e) => onKey(e.target.value)}
+      >
+        <option value="">Choose an attribute…</option>
+        {t.keys.map((k) => (
+          <option key={k} value={k}>
+            {k}
+          </option>
+        ))}
+      </select>
+    ) : (
+      <input
+        className="cp__fldinput is-text"
+        aria-label="Which attribute"
+        placeholder="Attribute name…"
+        value={c.key ?? ''}
+        onChange={(e) => onKey(e.target.value)}
+      />
+    )
+
+  /* The zone the window is read in, under the window.
+
+     Below rather than above, because it narrows an answer already given: the
+     hours are the decision and the timezone is what they are measured against.
+     "Tenant timezone" is the empty value and the default, which is what every
+     window meant before this control existed. */
+  const tzRow =
+    t.valueKind !== 'time' ? null : (
+      <select className="cp__fldsel" aria-label="Timezone" value={c.tz ?? ''} onChange={(e) => onTz(e.target.value)}>
+        <option value="">Tenant timezone</option>
+        {TIMEZONES.map((z) => (
+          <option key={z} value={z}>
+            {z}
+          </option>
+        ))}
+      </select>
+    )
 
   const triggers = stacked ? (
     /* Three rows, top to bottom, in the order they depend on each other:
@@ -285,7 +351,7 @@ export function ConditionPopover({
           <Field
             ref={whatRef}
             kind="what"
-            icon={groupIcon(t.group)}
+            icon={conditionIcon(t.id, t.group)}
             open={open === 'what'}
             label={`Change what is checked. Currently ${t.label}.`}
             onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
@@ -296,7 +362,7 @@ export function ConditionPopover({
           /* The Who pane owns the attribute, so the row opens on its operator
              and the head is just the label and the way out. */
           <span className="cp__stacklabel">
-            <GroupIcon icon={groupIcon(t.group)} />
+            <GroupIcon icon={conditionIcon(t.id, t.group)} />
             {t.label}
           </span>
         )}
@@ -304,6 +370,8 @@ export function ConditionPopover({
           <Trash2 size={14} strokeWidth={1.9} />
         </button>
       </div>
+
+      {keyRow}
 
       <Field
         ref={opRef}
@@ -328,6 +396,7 @@ export function ConditionPopover({
           {scopeTag}
         </Field>
       )}
+      {tzRow}
     </div>
   ) : (
     <span className="cp__pill">
@@ -407,12 +476,15 @@ export function ConditionPopover({
                    draw. Four rows do not need finding, but the mark is what
                    tells you at a glance that two of them are about the same
                    thing. */
+                /* No `meta`. It carried the component name — "Time" under
+                   "Time of day", "Attributes" under "User attribute" — which is
+                   a second line restating the first word of the row above it.
+                   Nine rows, nine echoes. The mark already groups them. */
                 .map((x) => ({
                   value: x.id,
                   label: x.label,
-                  meta: x.group,
                   note: x.soon ? 'Coming soon' : undefined,
-                  icon: groupIcon(x.group),
+                  icon: conditionIcon(x.id, x.group),
                   disabled: x.soon,
                 }))}
               picked={[c.typeId]}
@@ -855,7 +927,8 @@ function ValueBody({
      already exists and already navigates — it just never rendered in the one
      case where it is the only useful control on the panel. */
   if (options.length === 0) {
-    const lib = t.valueKind === 'zone' ? 'zone' : t.valueKind === 'fingerprint' ? 'device profile' : null
+      const lib =
+      t.valueKind === 'zone' ? 'zone' : t.valueKind === 'fingerprint' ? 'device profile' : t.valueKind === 'hook' ? 'hook' : null
     return (
       <div className="cp__body">
         <EmptyState
@@ -978,7 +1051,7 @@ export function valueSource(
      zones cannot write a network rule at all, so "Manage zones →" is not a
      convenience link here, it is the route out of a dead end. `EMPTY` below is
      what the list says when it has nothing to offer. */
-  if (t.valueKind === 'zone' || t.valueKind === 'fingerprint') {
+  if (t.valueKind === 'zone' || t.valueKind === 'fingerprint' || t.valueKind === 'hook') {
     const kind = t.valueKind
     const options: ValueOption[] =
       kind === 'zone'
@@ -989,12 +1062,24 @@ export function valueSource(
             note: z.usedIn ? `Used by ${z.usedIn} rule${z.usedIn === 1 ? '' : 's'}` : undefined,
             icon: Globe,
           }))
-        : store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p), icon: Fingerprint }))
+        : kind === 'fingerprint'
+          ? store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p), icon: Fingerprint }))
+          : /* Sync hooks only. An attribute-sync hook writes values onto the
+               user out of band; it has no answer to give a rule that is waiting
+               on it, and offering one here would be offering a condition that
+               can never resolve. */
+            store.hooks
+              .filter((h) => h.mode === 'sync')
+              .map((h) => ({ value: h.id, label: h.name, meta: `Answers within ${h.timeoutMs}ms`, icon: Webhook }))
     return {
       options,
       names: values.map((id) => resolve(kind, id) ?? `deleted · ${id}`),
-      footer: kind === 'zone' ? 'Manage zones' : 'Manage device profiles',
-      onFooter: () => store.go({ name: kind === 'zone' ? 'zones' : 'fingerprint' } as never),
+      /* A hook holds one. `diagnostics` reads `values[0]` to check the endpoint
+         still exists, and a rule consulting two services would have to say what
+         happens when they disagree. */
+      single: kind === 'hook',
+      footer: kind === 'zone' ? 'Manage zones' : kind === 'fingerprint' ? 'Manage device profiles' : 'Manage hooks',
+      onFooter: () => store.go({ name: kind === 'zone' ? 'zones' : kind === 'fingerprint' ? 'fingerprint' : 'hooks' } as never),
     }
   }
 
@@ -1068,7 +1153,7 @@ export function ConditionList({
       </p>
 
       {WHEN_CONDITIONS.map((t) => {
-        const Ico = groupIcon(t.group)
+        const Ico = conditionIcon(t.id, t.group)
         return (
           <button
             key={t.id}

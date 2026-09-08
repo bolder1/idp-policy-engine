@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { CONDITION_CATALOGUE, EVERYONE, blankRule, card, cond, groups, policies, when, type Policy, type Rule } from './data'
+import { EVERYONE, blankRule, card, cond, groups, policies, when, type Policy, type Rule } from './data'
 import { SLOW_TIMEOUT_MS, canSaveHook, describeHook, seedHooks, validateHook, type Hook } from './hooks'
 import { leaves } from './predicate'
 import { diagnose } from './screens/diagnostics'
@@ -142,42 +142,45 @@ describe('a rule gated on a hook', () => {
   })
 })
 
-/* --- What used to be here, and why it is not ---------------------------------
+/* These two were deleted and are back, which is worth a note because the
+   deletion was correct at the time.
 
-   Two tests stood here. One asserted the seeded estate contains at least one
-   hook-gated rule; the other asserted that the seeded pairing actually trips
-   the fail-open-on-deny warning — both on the argument that a capability which
-   ships unexercised is a capability nobody ever sees fire.
+   `webhook` was cut from the condition catalogue, so no rule could name a hook,
+   and no seed could be written that would satisfy either of them. They were
+   replaced by their own inverse — "cannot gate a rule on a hook" — rather than
+   weakened to `toHaveLength(0)`, which would have turned two tests that said
+   "this works" into two that say "nothing happens".
 
-   The argument still holds. What changed is that the capability does not ship:
-   `webhook` is gone from the condition catalogue, so no rule in this product
-   can name a hook, and no seed can be written that would satisfy either test.
-   Weakening them to `toHaveLength(0)` would have turned two tests that said
-   "this works" into two that say "nothing happens", which is the same as
-   deleting them but harder to notice.
-
-   So they are replaced by the fact that replaced them. The four `hook*`
-   diagnostics above still have their tests — they run against hand-built rules,
-   they are correct, and they are what a `webhook` condition would need on the
-   day one is reintroduced. They are simply unreachable from the seed now, and
-   that is the thing worth pinning. */
+   The condition is back and so is the capability, so the original pair returns
+   unchanged. The inverse pair goes: it now asserts something false. */
 describe('the seeded catalogue', () => {
-  it('cannot gate a rule on a hook, because no condition can name one', () => {
+  /* A capability that ships unexercised is a capability nobody in the demo ever
+     sees fire. The seeded estate has to contain at least one hook-gated rule,
+     and the hook it names has to exist. */
+  it('contains a rule that actually calls a hook', () => {
+    /* `leaves` rather than a card walk: a hook named inside any alternative is
+       a hook this rule can call, so the question "does the id resolve" is asked
+       of every condition in the predicate, whichever card holds it. */
     const gated = policies.flatMap((p) =>
-      p.rules.filter((r) => leaves(r.when).some((c) => c.typeId === 'webhook')),
+      p.rules
+        .filter((r) => leaves(r.when).some((c) => c.typeId === 'webhook'))
+        .map((r) => ({ p, r })),
     )
-    expect(gated).toEqual([])
-    expect(CONDITION_CATALOGUE.some((c) => c.id === 'webhook')).toBe(false)
+    expect(gated.length).toBeGreaterThan(0)
+
+    for (const { r } of gated) {
+      for (const c of leaves(r.when).filter((x) => x.typeId === 'webhook')) {
+        expect(seedHooks.some((h) => h.id === c.values[0]), `${r.name} names ${c.values[0]}`).toBe(true)
+      }
+    }
   })
 
-  /* The library outlives the condition. The Hooks screen still runs and hooks
-     are still validated and still linted for a missing `onFailure` — they are
-     just objects no rule can reference. That is a real regression and this is
-     the test that says so out loud rather than letting the silence read as an
-     oversight. */
-  it('still ships hooks, which nothing can now consult', () => {
-    expect(seedHooks.length).toBeGreaterThan(0)
+  /* And the seeded pairing has to actually trip a check. A warning that only
+     ever fires against a hand-built test fixture is a warning nobody in the
+     room ever sees, which makes it indistinguishable from one that does not
+     work. */
+  it('trips the fail-open-on-deny check somewhere in the seeded estate', () => {
     const found = policies.flatMap((p) => diagnose(p, groups, seedHooks))
-    expect(found.filter((d) => d.id.startsWith('hook'))).toEqual([])
+    expect(found.some((d) => d.id.startsWith('hookopen'))).toBe(true)
   })
 })

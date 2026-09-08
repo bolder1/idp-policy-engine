@@ -754,13 +754,18 @@ function ConditionRow({
              merges — so retyping a scoped zone into a Country left the field
              behind, invisible on screen and still reaching `ckey`. */
           const next = conditionType(typeId)
-          onPatch({ typeId, operator: next.operators[0], values: [], scope: undefined })
+          onPatch({ typeId, operator: next.operators[0], values: [], scope: undefined, key: undefined, tz: undefined })
         }}
         onOperator={(operator) => onPatch({ operator })}
         onValues={(values) => onPatch({ values })}
         /* `undefined` for both, never the stored word — absent is the default
            and every dirty check here is a `JSON.stringify` comparison. */
         onScope={(sc) => onPatch({ scope: sc === 'both' ? undefined : sc })}
+        /* `undefined`, not `''`. Every dirty check here is a `JSON.stringify`,
+           so clearing a field has to remove it — an empty string left behind is
+           an edit the save bar reports and the rule does not have. */
+        onKey={(k) => onPatch({ key: k.trim() || undefined })}
+        onTz={(tz) => onPatch({ tz: tz || undefined })}
         onRemove={onRemove}
         footer={footer}
         onFooter={onFooter}

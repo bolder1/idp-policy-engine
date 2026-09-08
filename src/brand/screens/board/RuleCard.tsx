@@ -212,7 +212,14 @@ export function RuleCard({
     >
       <div className="bb__cardhead">
         {/* The index is the grip. It is the one thing on the card that says
-            "this is a position", so it is the thing you drag to change it. */}
+            "this is a position", so it is the thing you drag to change it.
+
+            The two are drawn in two places. The number stays in the head, where
+            it is the rule's position and is worth reading at rest; the grip
+            appears OUTSIDE the card's left edge on hover, where a handle
+            belongs and where it is not covering the thing it moves. They are
+            one button, so there is one drag handler, one accessible name and
+            one keyboard target — the arrow keys still reorder from either. */}
         <button
           type="button"
           className="bb__idx"
@@ -239,8 +246,10 @@ export function RuleCard({
             }
           }}
         >
-          <span>{index + 1}</span>
-          <GripVertical size={14} strokeWidth={2} aria-hidden />
+          <span className="bb__idx__n">{index + 1}</span>
+          <span className="bb__idx__grip" aria-hidden>
+            <GripVertical size={14} strokeWidth={2} />
+          </span>
         </button>
 
         {/* The fold, at the LEADING edge, beside the index.

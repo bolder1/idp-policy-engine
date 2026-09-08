@@ -239,8 +239,14 @@ describe('the seeded catalogue', () => {
      the deck, the evaluator or the seed that quietly makes A unreachable is a
      change worth failing a build over. */
   it('contains a policy that actually survives the deck', () => {
-    const zt = policies.find((p) => p.id === 'zero-trust')
-    expect(zt, 'the Zero-Trust Baseline seed').toBeDefined()
+    /* `s5-devops` — the use-case document's Scenario 5, Policy B. It replaces
+       the invented Zero-Trust Baseline seed and it is a better exemplar than
+       that was: it is the strictest thing the document writes anywhere, and it
+       is strict for a stated reason rather than to pass this test. Office IP
+       AND registered device AND MDM managed, then password plus a push. Nothing
+       in the deck gets past it. */
+    const zt = policies.find((p) => p.id === 's5-devops')
+    expect(zt, 'the Scenario 5 DevOps policy').toBeDefined()
 
     const r = runGauntlet(zt!, rawEnv)
     const missed = r.rounds.filter((x) => x.outcome !== 'held').map((x) => `${x.challenge.id}: wanted ${x.want}, got ${x.decision}`)
@@ -249,7 +255,7 @@ describe('the seeded catalogue', () => {
   })
 
   it('keeps that policy clean under the linter too', () => {
-    const zt = policies.find((p) => p.id === 'zero-trust')!
+    const zt = policies.find((p) => p.id === 's5-devops')!
     expect(diagnose(zt, groups).filter((d) => d.severity === 'error')).toEqual([])
   })
 

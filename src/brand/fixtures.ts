@@ -162,11 +162,17 @@ export function policiesAt(depth: Depth): Policy[] {
 
   if (depth === 'small') {
     /* Three policies, and specifically the three a Delegator ends up with:
-       one broad MFA baseline, one for the segment they worry about, and one
-       they started and never finished. The last is not padding — an unfinished
-       policy is the single most common thing in a small tenant, and the config
-       -issue marker exists for it. */
-    const keep = ['finance-high', 'default-workforce', 'partner-portal']
+       one broad MFA baseline (the country allowlist every tenant writes first),
+       one for the segment they worry about (Payroll), and one they started and
+       never finished — S5's application baseline, which is a Default Rule and
+       no rules at all. The last is not padding: an unfinished policy is the
+       single most common thing in a small tenant, and the config-issue marker
+       exists for it.
+
+       These three are named from the use-case document's own scenarios rather
+       than invented, so a Delegator's tenant is a subset of the estate the rest
+       of the console is reasoned about with. */
+    const keep = ['uc3-country-allowlist', 's9-finance', 's5-baseline']
     return [
       ...system,
       ...seedPolicies

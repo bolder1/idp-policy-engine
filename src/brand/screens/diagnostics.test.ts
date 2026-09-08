@@ -13,7 +13,6 @@ import {
   type Policy,
   type Rule,
 } from '../data'
-import { sig } from '../predicate'
 import { diagnose, impactOf, outcomeSplit, shadowedBy } from './diagnostics'
 
 /* -----------------------------------------------------------------------------
@@ -292,49 +291,23 @@ describe('quiet on healthy policies', () => {
     }
   })
 
-  it('reads the Finance seed as two alternatives — the left-fold reading of the old joiners', () => {
-    /* Was "catches the one genuine flaw in the seed: Finance mixes AND with OR".
-       That check is deleted, because the ambiguity it warned about is now
-       expressible: "Off-network finance access" was
-       `zone AND time OR device-type` with no precedence defined, and it
-       migrated to the reading the old evaluator actually had — a left fold,
-       `(zone AND time) OR (device-type)`, two cards. The test that reported the
-       warning now pins the migration instead. */
-    const finance = policies.find((p) => p.id === 'finance-high')!
-    const r = finance.rules.find((x) => x.name === 'Off-network finance access')!
+  /* A test pinning the migration of one seeded rule stood here.
 
-    const leftFold = when(
-      card(
-        cond('group', 'in', ['finance']),
-        cond('zone', 'not in zone', ['office']),
-        cond('time', 'between', ['09:00', '17:00']),
-      ),
-      card(cond('group', 'in', ['finance']), cond('device-type', 'is', ['Mobile', 'Tablet'])),
-    )
-    // The other reading, had AND been given the tighter binding: zone would
-    // have survived into both alternatives. A different rule, catching
-    // different sign-ins.
-    const precedence = when(
-      card(
-        cond('group', 'in', ['finance']),
-        cond('zone', 'not in zone', ['office']),
-        cond('time', 'between', ['09:00', '17:00']),
-      ),
-      card(
-        cond('group', 'in', ['finance']),
-        cond('zone', 'not in zone', ['office']),
-        cond('device-type', 'is', ['Mobile', 'Tablet']),
-      ),
-    )
+     "Off-network finance access" was `zone AND time OR device-type` with no
+     precedence defined, and it migrated to the reading the old evaluator
+     actually had — a left fold, `(zone AND time) OR (device-type)`. This test
+     pinned that shape so the migration could not silently un-migrate.
 
-    expect(r.when.cards).toHaveLength(2)
-    expect(sig(r.when)).toBe(sig(leftFold))
-    expect(sig(r.when)).not.toBe(sig(precedence))
+     The seed is gone. The ten invented policies were replaced by the
+     twenty-eight from `ruleset-usecase-scenarios.md`, and nothing in that
+     document has an ambiguous joiner to migrate — the document states its OR
+     forms explicitly (multi-value IN, ANY-OF groups, rule splitting) and this
+     estate encodes them that way from the start.
 
-    // And nothing is reported about it any more — grouping is the answer, not
-    // the symptom.
-    expect(diagnose(finance, groups).filter((d) => d.severity === 'warning')).toEqual([])
-  })
+     The PROPERTY the test guarded is not lost: that a multi-card predicate
+     reads as an OR of AND-runs is `predicatePasses` in `predicate.ts`, pinned
+     directly by `when-ops.test.ts`, which does not depend on a fixture
+     surviving. */
 })
 
 describe('impact', () => {

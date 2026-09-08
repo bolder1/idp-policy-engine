@@ -206,4 +206,56 @@ export const seedHooks: Hook[] = [
     onFailure: 'fail-open',
     maxAgeHours: 36,
   },
+
+
+  /* A hook for HR status. NOTE THE DISTORTION: the engine can only ask a hook
+     "returns true" / "returns false" — there is no field/value comparison — so
+     the test `hr.status = 'suspended'` has to be MOVED INTO THE HOOK, whose
+     responsePath must point at a boolean that is true when the user is suspended.
+     The rule can no longer state what it is testing for. Append to `seedHooks`. */
+  /* Scenario 11's HR system, and the reason it is fail-OPEN.
+
+     The document gives this provider a contract: "timeout 3s, cache TTL =
+     session. First login of day pays the latency; rest cached." And it says
+     the scenario reaches fail-closed *through rule structure* — rules 2 and 3
+     both require a positive `contract_status = active`, so a null answer fails
+     every rule and lands on the Default Rule's DENY — "complementing provider
+     fail-mode" rather than depending on it.
+
+     So this is a fail-open provider on a policy whose first rule is a DENY, and
+     the linter's `hookopen` warning fires on exactly that pairing. That is not
+     a fixture bug to be tuned away: it is the document's own S20 break-point #1
+     — "webhook down → the red-flag check silently loses one signal" — sitting
+     in the estate where somebody can see the warning and judge it. A warning
+     that only ever fires against a hand-built test fixture is one nobody in the
+     room ever sees. */
+  {
+    id: 'hk-hr-contract',
+    name: 'HR contract status',
+    description:
+      'Asks the HR system whether this person’s contract is still active. Returns false when it has ended.',
+    mode: 'sync',
+    url: 'https://hrms.example.com/api/v1/contract-active',
+    method: 'POST',
+    authHeader: 'Authorization',
+    timeoutMs: 3000,
+    responsePath: 'active',
+    onFailure: 'fail-open',
+  },
+  {
+    id: 'hk-hr-suspended',
+    name: 'HR suspension check',
+    description:
+      'Returns true when HR reports the account suspended. The comparison lives here, not in the rule, because a rule can only ask a hook for a boolean.',
+    mode: 'sync',
+    url: 'https://hrms.example.com/api/v1/suspended',
+    method: 'POST',
+    authHeader: 'Authorization',
+    timeoutMs: 400,
+    responsePath: 'suspended',
+    /* fail-closed, because for PAM a silent loss of the suspension signal is the
+       scenario's own named break-point. The engine gets this right — `onFailure`
+       is a required field with no default (hooks.ts). */
+    onFailure: 'fail-closed',
+  },
 ]

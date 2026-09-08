@@ -61,21 +61,25 @@ const SYSTEM = policies.find((p) => p.isSystem)!
 
 describe('policiesForApp', () => {
   it('returns every match in store order, not the first', () => {
-    // Three policies really do name Workday at this depth. The relation is
-    // one-app-to-many-policies and a screen that showed only the first would
-    // be hiding two rules that decide sign-ins.
-    const on = policiesForApp('workday', policiesAt('large'))
-    expect(on.length).toBe(3)
-    expect(on.map((p) => p.id)).toEqual(['finance-high', 'syn-0-finance-high', 'syn-8-finance-high'])
+    /* Four policies really do name Google Workspace, and they are the
+       document's Scenario 5: one per group — Admin, DevOps, End-Users — plus
+       the application's own baseline. The relation is one-app-to-many-policies
+       and a screen that showed only the first would be hiding three sets of
+       rules that decide sign-ins. */
+    const on = policiesForApp('google-workspace', policiesAt('medium'))
+    expect(on.length).toBe(4)
+    expect(on.map((p) => p.id)).toEqual(['s5-admin', 's5-devops', 's5-endusers', 's5-baseline'])
   })
 
   it('returns an array, never undefined, for an app nothing names', () => {
-    expect(policiesForApp('aws', policiesAt('medium'))).toEqual([])
+    expect(policiesForApp('zoom', policiesAt('medium'))).toEqual([])
     expect(policiesForApp('servicenow', policiesAt('medium'))).toEqual([])
   })
 
   it('never returns an unattached policy', () => {
-    expect(policiesForApp('workday', policiesAt('medium')).every((p) => p.appId === 'workday')).toBe(true)
+    expect(
+      policiesForApp('google-workspace', policiesAt('medium')).every((p) => p.appId === 'google-workspace'),
+    ).toBe(true)
   })
 
   it('never returns the system policy, though it covers every app', () => {
@@ -94,7 +98,7 @@ describe('protectionOf', () => {
   })
 
   it('reports an unprotected app as own-empty with the fallback still there', () => {
-    const got = protectionOf('aws', policiesAt('medium'))
+    const got = protectionOf('zoom', policiesAt('medium'))
     expect(got.own).toEqual([])
     expect(got.decides).toEqual([])
     expect(got.fallback?.id).toBe('global-default')
@@ -214,21 +218,25 @@ describe('attachableTo', () => {
   })
 
   it('excludes policies already on this app and includes ones on another', () => {
-    const got = attachableTo('workday', policiesAt('medium')).map((p) => p.id)
-    expect(got).not.toContain('finance-high')
-    expect(got).toContain('zero-trust')
+    const got = attachableTo('google-workspace', policiesAt('medium')).map((p) => p.id)
+    expect(got).not.toContain('s5-admin')
+    expect(got).toContain('uc3-country-allowlist')
   })
 
   it('sorts the unattached above the ones that would have to be moved', () => {
-    const got = attachableTo('workday', policiesAt('medium'))
+    const got = attachableTo('google-workspace', policiesAt('medium'))
     const firstMove = got.findIndex((p) => p.appId !== undefined)
     const lastFresh = got.map((p) => p.appId === undefined).lastIndexOf(true)
     expect(lastFresh).toBeLessThan(firstMove)
   })
 
   it('offers the unattached policy to an app nothing protects', () => {
-    const got = attachableTo('aws', policiesAt('medium')).map((p) => p.id)
-    expect(got).toContain('account-recovery')
+    const got = attachableTo('zoom', policiesAt('medium')).map((p) => p.id)
+    /* The break-glass policy is the estate's only unattached one now — the
+       document asks it to cover every application and the model has no such
+       policy, so it sits with no app at all. That is what makes it the thing
+       an app with nothing on it is offered first. */
+    expect(got).toContain('break-glass')
     expect(got).not.toContain('global-default')
   })
 })
@@ -308,12 +316,22 @@ describe('detachFrom', () => {
 
 describe('summarise', () => {
   it('says an app nothing names is not protected', () => {
-    const s = summarise('aws', policiesAt('medium'))
+    const s = summarise('zoom', policiesAt('medium'))
     expect(s).toMatchObject({ own: 0, decides: 0, label: 'Not protected', tag: null, tone: 'off' })
   })
 
+  /* On a local fixture, not the estate.
+
+     It read the seeds for an app with exactly one inactive policy on it, and
+     the estate this console is reasoned about with no longer has one: every
+     policy in the use-case document is written to be in force, and the single
+     exception is in monitor rather than off. Rather than switch a scenario to
+     `inactive` so a unit test can find it — inventing configuration to satisfy
+     an assertion — this states the same property about a policy it makes
+     itself. The estate-coupled assertions above are the ones that have to read
+     the real seeds; this one never did. */
   it('marks one attached-but-inactive policy off rather than protected', () => {
-    const s = summarise('zoom', policiesAt('medium'))
+    const s = summarise('workday', [policy({ appId: 'workday', status: 'inactive' })])
     expect(s.own).toBe(1)
     expect(s.decides).toBe(0)
     expect(s.tag).toBe('Off')
@@ -341,9 +359,11 @@ describe('summarise', () => {
   })
 
   it('counts a monitor policy as attached but not deciding', () => {
-    // eng-vpn watches GitHub and refuses nothing. A cell reading "1 policy"
-    // with no qualification would overstate the tenant's cover.
-    const s = summarise('github', policiesAt('medium'))
+    /* The M&A onboarding policy watches Document Management and refuses
+       nothing — it is the document's Scenario 15, deliberately in monitor while
+       an acquired company's devices migrate. A cell reading "1 policy" with no
+       qualification would overstate the tenant's cover. */
+    const s = summarise('dms', policiesAt('medium'))
     expect(s.own).toBe(1)
     expect(s.decides).toBe(0)
     expect(s.tone).toBe('off')

@@ -556,6 +556,41 @@ export const apps: App[] = [
   { id: 'zoom', name: 'Zoom', protocol: 'SAML', glyph: '▣', tint: '#2d8cff', type: 'Desktop', lastUpdated: 'Jul 03, 2026, 10:44:12' },
   { id: 'box', name: 'Box', protocol: 'OIDC', glyph: '▢', tint: '#0061d5', type: 'Desktop', lastUpdated: 'Apr 26, 2026, 15:29:06' },
   { id: 'servicenow', name: 'ServiceNow', protocol: 'SAML', glyph: '◉', tint: '#62d84e', type: 'SAML/WS-FED', lastUpdated: 'Sep 01, 2026, 07:33:41' },
+
+  /* --- The applications the use-case document names --------------------------
+
+     `ruleset-usecase-scenarios.md` describes twenty-three policies against
+     twenty-one applications, and ten of them were the whole app list. Seeding
+     the scenarios against the nearest existing app was the alternative and it
+     is worse than it sounds: half of them have no near neighbour — there is no
+     wiki, no CRM, no ERP, no vault, no PAM gateway — so "Trading Platform"
+     would have been written against Salesforce and the policy's name would
+     have stopped describing the thing it protects. A scenario whose app is a
+     stand-in cannot be read as the scenario.
+
+     Fabricated exactly as the ten above are: the FORMAT of `lastUpdated` is the
+     live console's, the values are not, and nothing may sort on a parse of it.
+     Protocol and type follow the class of product — an internal portal behind
+     the IdP is SAML, a modern SaaS console is OIDC, a desktop client is
+     Desktop. Tints are the vendors' own where a vendor exists and a neutral
+     slate where the app is a generic internal one, because a made-up brand
+     colour on a made-up product is detail pretending to be data. */
+  { id: 'hr-portal', name: 'Internal HR Portal', protocol: 'SAML', glyph: '▤', tint: '#4b6bfb', type: 'SAML/WS-FED', lastUpdated: 'Aug 19, 2026, 10:22:13' },
+  { id: 'finance-dashboard', name: 'Finance Dashboard', protocol: 'SAML', glyph: '▦', tint: '#0f9d7a', type: 'SAML/WS-FED', lastUpdated: 'Aug 27, 2026, 08:41:55' },
+  { id: 'google-workspace', name: 'Google Workspace', protocol: 'SAML', glyph: '◍', tint: '#4285f4', type: 'SAML/WS-FED', lastUpdated: 'Aug 25, 2026, 12:09:38' },
+  { id: 'corporate-email', name: 'Corporate Email', protocol: 'SAML', glyph: '✉', tint: '#d93025', type: 'SAML/WS-FED', lastUpdated: 'Aug 29, 2026, 15:52:07' },
+  { id: 'vpn-portal', name: 'VPN Portal', protocol: 'SAML', glyph: '⛨', tint: '#5b6470', type: 'SAML/WS-FED', lastUpdated: 'Aug 11, 2026, 07:14:46' },
+  { id: 'admin-console', name: 'Admin Console', protocol: 'OIDC', glyph: '⚙', tint: '#8a5cf6', type: 'OAuth/OpenID', lastUpdated: 'Sep 02, 2026, 09:30:11' },
+  { id: 'payroll', name: 'Payroll System', protocol: 'SAML', glyph: '₹', tint: '#c2410c', type: 'SAML/WS-FED', lastUpdated: 'Aug 06, 2026, 16:47:29' },
+  { id: 'wiki', name: 'Internal Wiki', protocol: 'OIDC', glyph: '▨', tint: '#0891b2', type: 'OAuth/OpenID', lastUpdated: 'Jul 22, 2026, 11:35:02' },
+  { id: 'crm', name: 'Customer Database', protocol: 'OIDC', glyph: '◫', tint: '#0369a1', type: 'OAuth/OpenID', lastUpdated: 'Aug 18, 2026, 14:03:50' },
+  { id: 'trading', name: 'Trading Platform', protocol: 'SAML', glyph: '◭', tint: '#15803d', type: 'SAML/WS-FED', lastUpdated: 'Sep 03, 2026, 06:58:24' },
+  { id: 'erp', name: 'ERP System', protocol: 'SAML', glyph: '▩', tint: '#7c3aed', type: 'SAML/WS-FED', lastUpdated: 'Aug 15, 2026, 13:26:40' },
+  { id: 'dms', name: 'Document Management', protocol: 'OIDC', glyph: '▧', tint: '#b45309', type: 'OAuth/OpenID', lastUpdated: 'Aug 31, 2026, 17:12:33' },
+  { id: 'pam', name: 'Privileged Access Gateway', protocol: 'SAML', glyph: '⛭', tint: '#b91c1c', type: 'SAML/WS-FED', lastUpdated: 'Sep 04, 2026, 08:05:19' },
+  { id: 'monitoring', name: 'Production Monitoring', protocol: 'OIDC', glyph: '◠', tint: '#ea580c', type: 'OAuth/OpenID', lastUpdated: 'Aug 23, 2026, 20:44:57' },
+  { id: 'knowledge-base', name: 'Internal Knowledge Base', protocol: 'OIDC', glyph: '▥', tint: '#0d9488', type: 'OAuth/OpenID', lastUpdated: 'Jul 30, 2026, 09:19:15' },
+  { id: 'vault', name: 'Legal Document Vault', protocol: 'SAML', glyph: '⛁', tint: '#334155', type: 'SAML/WS-FED', lastUpdated: 'Sep 05, 2026, 11:41:08' },
 ]
 
 /* The synthetic `all` row is gone.
@@ -570,6 +605,54 @@ export const groups: Group[] = [
   { id: 'executives', name: 'Executives', memberCount: 12 },
   { id: 'contractors', name: 'Contractors', memberCount: 154 },
   { id: 'it-admins', name: 'IT Admins', memberCount: 9 },
+
+  /* --- The groups the use-case document targets ------------------------------
+
+     Five groups could not carry twenty-three scenarios: the document assigns
+     policies to Employees, Accounts, DevOps, Support, Traders and a dozen more,
+     and mapping each onto the nearest of the five would have made most of them
+     the same policy written six times. `Notice-Period` is not `Contractors`.
+
+     Counts are stated rather than derived and they add up deliberately:
+     `employees` is the broad population at 1,180 of the tenant's 1,240, and the
+     departmental groups are subsets of it rather than a partition — a person is
+     in Employees AND Engineering, which is the shape the document's own
+     multi-group collision finding (#1) depends on being possible. */
+  { id: 'employees', name: 'Employees', memberCount: 1180 },
+  { id: 'accounts', name: 'Accounts', memberCount: 34 },
+  { id: 'admin', name: 'Admin', memberCount: 6 },
+  { id: 'devops', name: 'DevOps', memberCount: 28 },
+  { id: 'end-users', name: 'End-Users', memberCount: 1042 },
+  { id: 'support', name: 'Support', memberCount: 72 },
+  { id: 'traders', name: 'Traders', memberCount: 41 },
+  { id: 'global-ops', name: 'Global-Operations', memberCount: 217 },
+  { id: 'legal', name: 'Legal-Department', memberCount: 19 },
+  { id: 'privileged', name: 'Privileged-Users', memberCount: 14 },
+
+  /* Temporary by design, and the document says so: notice-period and travel
+     memberships must be removed by the provisioning system on a date (finding
+     #9), and a break-glass group holds two accounts on purpose so that one dead
+     war-room terminal does not lock the tenant out (S16). Small counts here are
+     the fixture agreeing with that, not a shortage of invention. */
+  { id: 'acquired', name: 'Acquired-Co-Employees', memberCount: 128 },
+  { id: 'notice-period', name: 'Notice-Period', memberCount: 3 },
+  { id: 'japan-travel', name: 'Japan-Travel', memberCount: 1 },
+  { id: 'break-glass', name: 'Break-Glass Accounts', memberCount: 2 },
+
+  /* --- Two groups that are never a target ------------------------------------
+
+     `On-Call` and `Matter-Acme-Litigation` exist to be read by a `group`
+     CONDITION inside a rule, which is the distinction the document draws in
+     finding #15: a fast-rotating operational group belongs in a condition,
+     because targeting it would mean re-assigning a policy on every rotation,
+     and a matter group belongs in a condition because membership of it is what
+     the rule is asking about rather than which rule applies.
+
+     Nothing in this fixture marks them as condition-only. That is the gap, not
+     an omission: the model has no way to say "this group is not an assignment
+     target", so the audience picker will offer both. */
+  { id: 'on-call', name: 'On-Call', memberCount: 4 },
+  { id: 'matter-acme', name: 'Matter-Acme-Litigation', memberCount: 7 },
 ]
 
 /** Everyone the tenant claims, for the audience readout. */
@@ -620,6 +703,97 @@ export const users: User[] = [
   { id: 'u-it-3', name: 'Yusuf Demir', email: 'yusuf.d@mo.com', groupId: 'it-admins', userType: 'Employee', role: 'Admin' },
   { id: 'u-it-4', name: 'Bethany Cole', email: 'bethany.c@mo.com', groupId: 'it-admins', userType: 'Employee', role: 'Auditor' },
   { id: 'u-it-5', name: 'Omar Haddadi', email: 'omar.h@mo.com', groupId: 'it-admins', userType: 'Employee', role: 'Member' },
+
+  /* --- The four people the use-case document names ---------------------------
+
+     Every other person here is invented to fill a group. These four are named
+     in the scenarios themselves and each is named because a rule singles them
+     out: the CFO who may sign in from anywhere with two factors (S9), the
+     break-glass account that exists for the day the MFA provider is down (S16),
+     the developer serving a notice period (S17), and the VP travelling to Japan
+     (S18).
+
+     Their addresses are the document's own — `@acme.com`, not this fixture's
+     `@mo.com` — deliberately. The scenarios write `Primary email =
+     'cfo@acme.com'` as a literal, and a rule whose stated value matches nobody
+     in the directory is a rule that reads as configured and fires never. If the
+     tenant's domain changes, both have to change together, which is exactly the
+     fragility the document's finding #13 is about. */
+  /* --- Members for the groups the scenarios target ---------------------------
+
+     Fifteen groups arrived with the use-case document and thirteen of them had
+     nobody in them, which is worse than it sounds: `reach()` counts directory
+     rows, the audience picker prints that count, and the simulator picks a
+     person to test against. A policy assigned to `devops` with an empty
+     `devops` was a policy that read as configured and could be tested against
+     nobody — the same failure mode as a condition that never evaluates, one
+     level up.
+
+     Two or three each, not the `memberCount` on the group. That number is the
+     tenant's claim and this list is a sample of it — the file already says so
+     above, and `unlistedUsers` is what the pickers print. Matching 1,180 rows
+     for Employees would make the fixture look like data.
+
+     `groupId` is singular, so each person is in exactly one group. That is the
+     model's limit and it is a real one: Scenario 21's whole point is an
+     engineer who is ALSO on the on-call rotation, and Scenario 23 needs a
+     lawyer who is also assigned to a matter. Neither is expressible, so the
+     `on-call` and `matter-acme` rows below hold people who are ONLY that —
+     which is not what either scenario describes. See the gap register, G8. */
+  { id: 'u-emp-1', name: 'Sanjay Bhatt', email: 'sanjay.b@mo.com', groupId: 'employees', userType: 'Employee', role: 'Member' },
+  { id: 'u-emp-2', name: 'Hannah Lowe', email: 'hannah.l@mo.com', groupId: 'employees', userType: 'Employee', role: 'Member' },
+  { id: 'u-emp-3', name: 'Ifeoma Nwosu', email: 'ifeoma.n@mo.com', groupId: 'employees', userType: 'Employee', role: 'Member' },
+
+  { id: 'u-acc-1', name: 'Deepa Nair', email: 'deepa.n@mo.com', groupId: 'accounts', userType: 'Employee', role: 'Member' },
+  { id: 'u-acc-2', name: 'Marco Bianchi', email: 'marco.b@mo.com', groupId: 'accounts', userType: 'Employee', role: 'Auditor' },
+
+  { id: 'u-adm-1', name: 'Karan Malhotra', email: 'karan.m@mo.com', groupId: 'admin', userType: 'Employee', role: 'Admin' },
+  { id: 'u-adm-2', name: 'Sofia Almeida', email: 'sofia.a@mo.com', groupId: 'admin', userType: 'Employee', role: 'Admin' },
+
+  { id: 'u-dev-1', name: 'Arjun Pillai', email: 'arjun.p@mo.com', groupId: 'devops', userType: 'Employee', role: 'Admin' },
+  { id: 'u-dev-2', name: 'Nadia Haddad', email: 'nadia.h@mo.com', groupId: 'devops', userType: 'Employee', role: 'Member' },
+  { id: 'u-dev-3', name: 'Tom Whelan', email: 'tom.w@mo.com', groupId: 'devops', userType: 'Employee', role: 'Member' },
+
+  { id: 'u-eu-1', name: 'Ritika Joshi', email: 'ritika.j@mo.com', groupId: 'end-users', userType: 'Employee', role: 'Member' },
+  { id: 'u-eu-2', name: 'Daniel Osei', email: 'daniel.o@mo.com', groupId: 'end-users', userType: 'Employee', role: 'Member' },
+
+  { id: 'u-sup-1', name: 'Farhan Qureshi', email: 'farhan.q@mo.com', groupId: 'support', userType: 'Employee', role: 'Member' },
+  { id: 'u-sup-2', name: 'Grace Okafor', email: 'grace.o@mo.com', groupId: 'support', userType: 'Employee', role: 'Member' },
+
+  { id: 'u-trd-1', name: 'Vikram Shetty', email: 'vikram.s@mo.com', groupId: 'traders', userType: 'Employee', role: 'Member' },
+  { id: 'u-trd-2', name: 'Elena Petrova', email: 'elena.p@mo.com', groupId: 'traders', userType: 'Employee', role: 'Member' },
+
+  { id: 'u-glo-1', name: 'Lars Andersen', email: 'lars.a@mo.com', groupId: 'global-ops', userType: 'Employee', role: 'Manager' },
+  { id: 'u-glo-2', name: 'Sneha Rao', email: 'sneha.r@mo.com', groupId: 'global-ops', userType: 'Employee', role: 'Member' },
+  { id: 'u-glo-3', name: 'Miguel Santos', email: 'miguel.s@mo.com', groupId: 'global-ops', userType: 'Employee', role: 'Member' },
+
+  { id: 'u-leg-1', name: 'Anjali Verma', email: 'anjali.v@mo.com', groupId: 'legal', userType: 'Employee', role: 'Manager' },
+  { id: 'u-leg-2', name: 'Peter Halloran', email: 'peter.h@mo.com', groupId: 'legal', userType: 'Employee', role: 'Member' },
+
+  { id: 'u-prv-1', name: 'Rajesh Kannan', email: 'rajesh.k@mo.com', groupId: 'privileged', userType: 'Employee', role: 'Admin' },
+  { id: 'u-prv-2', name: 'Ingrid Volkov', email: 'ingrid.v@mo.com', groupId: 'privileged', userType: 'Employee', role: 'Admin' },
+
+  /* Contractors of the acquired company, which is why they are `Contractor`
+     during the integration window rather than `Employee` — Scenario 15 gates
+     them on a legacy HR system precisely because our own directory does not
+     vouch for them yet. */
+  { id: 'u-acq-1', name: 'Bilal Rehman', email: 'bilal.r@acquired.example', groupId: 'acquired', userType: 'Contractor', role: 'Member' },
+  { id: 'u-acq-2', name: 'Julia Kowalski', email: 'julia.k@acquired.example', groupId: 'acquired', userType: 'Contractor', role: 'Member' },
+
+  { id: 'u-bg-2', name: 'Break-glass Secondary', email: 'breakglass2@acme.com', groupId: 'break-glass', userType: 'Employee', role: 'Admin' },
+
+  /* Only-on-call and only-on-the-matter, which neither scenario means. See the
+     note above. */
+  { id: 'u-oncall-1', name: 'Nikhil Rane', email: 'nikhil.r@mo.com', groupId: 'on-call', userType: 'Employee', role: 'Member' },
+  { id: 'u-oncall-2', name: 'Aoife Byrne', email: 'aoife.b@mo.com', groupId: 'on-call', userType: 'Employee', role: 'Member' },
+
+  { id: 'u-matter-1', name: 'Rohit Sethi', email: 'rohit.s@mo.com', groupId: 'matter-acme', userType: 'Employee', role: 'Member' },
+  { id: 'u-matter-2', name: 'Claire Dubois', email: 'claire.d@mo.com', groupId: 'matter-acme', userType: 'Employee', role: 'Member' },
+
+  { id: 'u-cfo', name: 'Meera Raghavan', email: 'cfo@acme.com', groupId: 'finance', userType: 'Employee', role: 'Manager' },
+  { id: 'u-breakglass', name: 'Break-glass Operator', email: 'breakglass@acme.com', groupId: 'break-glass', userType: 'Employee', role: 'Admin' },
+  { id: 'u-notice', name: 'Dev Singh', email: 'dev.singh@acme.com', groupId: 'notice-period', userType: 'Employee', role: 'Member' },
+  { id: 'u-vpsales', name: 'Aditi Rao', email: 'aditi.rao@acme.com', groupId: 'japan-travel', userType: 'Employee', role: 'Manager' },
 ]
 
 /** Two letters for an avatar. "Priya Sharma" → PS, "Devon" → DE. */
@@ -719,6 +893,58 @@ export const zones: Zone[] = [
     asn: ['AS9009', 'AS16276'],
     location: emptyLocation(),
     usedIn: 4,
+  },
+
+  /* --- The named lists the use-case document needs ---------------------------
+
+     A zone is this engine's only named-list primitive, and the document's
+     finding #12 is exactly about that: inline value lists — office CIDRs,
+     sanctioned countries — copied into every rule that needs them go stale
+     independently. These three are the lists the twenty-three scenarios name,
+     referenced rather than retyped.
+
+     `sanctioned` is a location list where the other two are address lists, which
+     is the same object doing two different jobs. That is the engine's shape, not
+     a choice made here. */
+  // --- appended to `zones` in data.ts ---
+  {
+    id: 'office-cidr',
+    kind: 'allowed',
+    name: 'Office egress · 203.0.113.0/24',
+    ip: ['203.0.113.0/24'],
+    asn: [],
+    location: emptyLocation(),
+    usedIn: 4,
+  },
+
+
+  {
+    id: 'corp-network',
+    kind: 'allowed',
+    name: 'Corp network — HQ range + branch block',
+    // classifyIp() in zone-validation.ts accepts 'a.b.c.d-e.f.g.h' as 'ipv4-range'.
+    ip: ['198.51.100.1-198.51.100.254', '203.0.113.0/26'],
+    asn: [],
+    location: emptyLocation(),
+    usedIn: 1,
+  },
+
+  /* Named list object for the sanctioned countries — Finding #12. Zone is the
+     engine's only named-list primitive and its location half is a country list.
+     Append to `zones`. Values are free string[], unconstrained by the `country`
+     condition's five-item option list. */
+  {
+    id: 'sanctioned',
+    kind: 'blocked',
+    name: 'Sanctioned countries',
+    ip: [],
+    asn: [],
+    location: {
+      countries: ['Iran', 'North Korea', 'Syria', 'Cuba'],
+      states: [],
+      cities: [],
+    },
+    usedIn: 1,
   },
 ]
 
@@ -869,6 +1095,32 @@ export function reidRule(r: Rule): Rule {
 }
 
 export const policies: Policy[] = [
+
+  /* --- The policies, from the use-case document ------------------------------
+
+     Twenty-eight policies covering the twenty-three scenarios in
+     `ruleset-usecase-scenarios.md`. They replace ten invented ones.
+
+     The invented ten were written to exercise the builder — a finance policy, a
+     zero-trust baseline, a contractor limit — and they did that. What they could
+     not do is answer the question this pass is about: can the engine express what
+     the product has actually promised? A fixture you wrote to fit the model
+     always fits the model. These were written from a document the model has never
+     seen, and where one of them cannot be expressed the comment above it says so
+     rather than the policy quietly becoming a different policy.
+
+     Twenty-eight rather than twenty-three because four scenarios need more than
+     one policy each: S5 assigns three group policies plus the application's own
+     baseline, S9 pairs the Finance policy with a baseline, and S17 covers two
+     applications. That is the document's own shape — a policy is reusable and an
+     assignment binds it — and it is the first thing this engine cannot model:
+     there is no assignment table, so a policy carries one `audience` and one
+     `appId`, and "the same policy on two apps" becomes two policies.
+
+     Every one of these keeps its Default Rule as `fallback`, which the model
+     already had right: the last row of a policy is a rule, so it can DENY with a
+     reason or ALLOW with a chain. The document's finding #3 asks for exactly
+     that. */
   {
     id: 'global-default',
     name: 'Global Default Policy',
@@ -888,230 +1140,1503 @@ export const policies: Policy[] = [
       }),
     ],
   },
+
+  /* Appended to `policies` in data.ts. `rule` is module-private, so this cannot
+     live anywhere else without exporting it first.
+
+     APP: the scenario says "Production Monitoring (Grafana/PagerDuty)". Neither
+     exists in `apps`. Closest is `aws` (AWS Console) — the only production-
+     operations surface in the fixture. `servicenow` is the runner-up (ITSM, not
+     monitoring). Nothing in the catalogue is actually a monitoring product. */
   {
-    id: 'finance-high',
-    name: 'Finance Team – High Security',
+    id: 's21-oncall',
+    name: 'Production Monitoring — On-Call Override',
     type: 'App Access',
-    appId: 'workday',
+    appId: 'monitoring',
     status: 'active',
-    lastModified: '2 hours ago',
-    modifiedBy: 'Mehak Garg',
-    audience: EVERYONE,
+    lastModified: '6 hours ago',
+    modifiedBy: 'Ravi Menon',
+    audience: audienceOf(['engineering']),
     rules: [
       rule({
-        name: 'Block compromised devices',
-        when: when(card(cond('fingerprint', 'not recognised by', ['fp-corp']))),
-        decision: 'deny',
-        matchEstimate: 108,
-      }),
-      rule({
-        name: 'Off-network finance access',
+        name: 'Office hours, anyone in Engineering',
         when: when(
-          card(cond('group', 'in', ['finance']), cond('zone', 'not in zone', ['office']), cond('time', 'between', ['09:00', '17:00'])),
-          card(cond('group', 'in', ['finance']), cond('device-type', 'is', ['Mobile', 'Tablet'])),
+          namedCard(
+            'Weekday working window',
+            cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
+            cond('time', 'between', ['09:00', '19:00']),
+            // `Asia/Kolkata` HAS NO HOME. See gap 21-G3.
+          ),
         ),
         decision: '2fa',
-        matchEstimate: 85,
-      }),
-      rule({
-        name: 'Executive step-up',
-        when: when(card(cond('group', 'in', ['executives']), cond('ml-risk', 'is', ['High']), cond('zone', 'not in zone', ['office']))),
-        decision: '2fa',
+        firstFactor: 'Password',
         secondFactor: 'specific',
-        /* "Specific" with nothing named is a rule that cannot be satisfied —
-           the diagnostics checker found this gap in the seed.
-
-           These are matched against the live catalogue BY NAME (see
-           `rulesUsing` in AuthMethods.tsx), so they have to be names that
-           actually exist in methods.ts. They were 'WebAuthn / FIDO2 + Passkeys'
-           and 'miniOrange Authenticator' — spellings from the older catalogue
-           in this file, which nothing reads any more. Neither resolved, so the
-           join found nothing and "Used in N policy rules" rendered on none of
-           the twenty-one method cards. */
-        secondFactorMethods: ['FIDO2 / Passkey', 'miniOrange Push'],
-        matchEstimate: 12,
+        secondFactorMethods: ['Google Authenticator'],
+        rememberMfa: false,
+        allowDisable2fa: false,
+        matchEstimate: 268,
       }),
       rule({
-        name: 'Contractor baseline',
-        when: when(card(cond('group', 'in', ['contractors']), cond('user-type', 'is', ['Contractor']))),
-        decision: '1fa',
-        matchEstimate: 154,
+        /* "After-hours" is nowhere in this predicate. It is carried entirely by
+           rule ordering — rule 1 ate the office-hours window. The engine's
+           first-match-wins (`simulate.ts:421`) preserves that faithfully, so this
+           one thing survives the mapping intact. */
+        name: 'After hours, on-call rotation only',
+        when: when(
+          namedCard(
+            'On the rotation, on a managed device',
+            cond('group', 'in', ['on-call']),
+            cond('mdm', 'is', ['Enrolled']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['miniOrange Push'],
+        // SetReAuthFrequency(8h) HAS NO HOME. See gap 21-G5.
+        rememberMfa: false,
+        allowDisable2fa: false,
+        matchEstimate: 8,
       }),
     ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      // DENY("After-hours access is for the on-call rotation") — reason lost. 21-G6.
+      matchEstimate: 34,
+    }),
   },
-  /* The one seeded policy built to survive the gauntlet.
 
-     Every other policy here is realistic, which is to say it has holes — and a
-     product where the best available score is F teaches its user that the score
-     only ever says "bad", at which point they stop reading it. This one exists
-     so the top of the ladder is visible in the product and not just in the
-     grading function.
+  /* Appended to `policies` in data.ts.
 
-     It is also the shape the checks argue for, in order: refuse what cannot be
-     legitimate, refuse what cannot complete a challenge, then step up on risk,
-     on unmanaged hardware, and on the two moments an account is most
-     impersonated. Everything left is a managed device on a known network, which
-     is the only case that earns a single factor. */
+     content store. Neither is a knowledge base as such.
+
+     TARGET: "Default Group | DEFAULT" is the one target in these three scenarios
+     that maps exactly — `EVERYONE`. */
   {
-    id: 'zero-trust',
-    name: 'Zero-Trust Baseline',
+    id: 's22-employment',
+    name: 'Knowledge Base — Employment Type Matrix',
     type: 'App Access',
-    appId: 'salesforce',
+    appId: 'knowledge-base',
     status: 'active',
-    lastModified: '4 hours ago',
-    modifiedBy: 'Mehak Garg',
+    lastModified: 'Yesterday',
+    modifiedBy: 'Clara Boucher',
     audience: EVERYONE,
     rules: [
       rule({
-        name: 'Block anonymised sources',
-        when: when(card(cond('zone', 'in zone', ['anon']))),
-        decision: 'deny',
-        matchEstimate: 31,
+        name: 'Confirmed FTE, probation cleared',
+        when: when(
+          namedCard(
+            'FTE past probation',
+            /* THE ATTRIBUTE NAME IS NOT A FIELD. `Condition` is
+               { id, typeId, operator, values, scope? } — there is nowhere to say
+               WHICH custom attribute. The `key=value` string below is a
+               convention I am inventing in this document; the engine defines
+               nothing of the kind and no reader parses it. See 22-G1. */
+            cond('user-attr', 'is', ['employment_type=FTE']),
+            /* UNREPRESENTABLE. `user-attr` operators are ['is','is not','contains'].
+               There is no `<`, no date type, and no `today`. The string below is a
+               placeholder that compiles and means nothing. See 22-G2, 22-G3. */
+            cond('user-attr', 'is', ['probation_until<today']),
+          ),
+        ),
+        decision: '1fa',
+        firstFactor: 'Password',
+        secondFactor: 'any',
+        // SetRememberMfaTimeout(30d) on a chain with NO second factor. See 22-G6.
+        rememberMfa: true,
+        rememberDays: 30,
+        allowDisable2fa: false,
+        matchEstimate: 780,
       }),
       rule({
-        name: 'Block accounts with no second factor',
-        when: when(card(cond('auth-state', 'is', ['No MFA configured']))),
-        decision: 'deny',
+        name: 'Probationary FTE',
+        when: when(
+          namedCard('FTE, probation not yet cleared',
+            cond('user-attr', 'is', ['employment_type=FTE']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        rememberMfa: true,
+        rememberDays: 7,
+        allowDisable2fa: false,
+        matchEstimate: 190,
+      }),
+      rule({
+        name: 'Intern, office hours only',
+        when: when(
+          namedCard(
+            'Intern on the office network in working hours',
+            cond('user-attr', 'is', ['employment_type=INTERN']),
+            cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
+            cond('time', 'between', ['09:00', '18:00']),   // no `Asia/Kolkata`
+            /* The literal CIDR, because NO SEEDED ZONE CONTAINS IT. The `office`
+               zone (data.ts:659) holds the single address `203.0.113.5`, not the
+               /24. Using `cond('zone','in zone',['office'])` would silently widen
+               this to 10.0.0.0/8 + 192.168.1.0/24 + 198.51.100.0/24 + 172.16/12
+               + 2001:db8::/32. See 22-G8. */
+            cond('ip', 'is', ['203.0.113.0/24']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        // SetRememberMfaTimeout(0) — the ONE settings node that maps. See 22-G6.
+        rememberMfa: false,
+        forceMfaEachLogin: true,
+        allowDisable2fa: false,
+        matchEstimate: 45,
+      }),
+    ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      // DENY("Access not provisioned for your employment type") — reason lost.
+      matchEstimate: 225,
+    }),
+  },
+
+  /* Appended to `policies` in data.ts.
+
+     worse fits. */
+  {
+    id: 's23-vault',
+    name: 'Legal Document Vault — Clearance Ladder',
+    type: 'App Access',
+    appId: 'vault',
+    status: 'active',
+    lastModified: '3 days ago',
+    modifiedBy: 'Mehak Garg',
+    audience: audienceOf(['legal']),
+    rules: [
+      rule({
+        name: 'Senior counsel, cleared, on matter',
+        when: when(
+          namedCard(
+            'Role, matter and clearance all agree',
+            /* `user-role` is a CLOSED enum: ['Admin','Manager','Member','Auditor']
+               (data.ts:211). LEGAL_COUNSEL and GENERAL_COUNSEL are not in it and
+               cannot be added per-tenant. The two values below are a substitution,
+               not a translation. See 23-G3. */
+            cond('user-role', 'is', ['Admin', 'Manager']),
+            cond('group', 'in', ['matter-acme']),
+            /* UNREPRESENTABLE twice over: no attribute key, and no `>=`.
+               See 23-G4. */
+            cond('user-attr', 'is', ['clearance_level>=3']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['miniOrange Push'],
+        // SetReAuthFrequency(4h) HAS NO HOME. See 23-G5.
+        rememberMfa: false,
+        allowDisable2fa: false,
         matchEstimate: 6,
       }),
       rule({
-        name: 'Verify elevated risk',
-        when: when(card(cond('ml-risk', 'is', ['High']))),
-        decision: '2fa',
-        matchEstimate: 64,
-      }),
-      rule({
-        name: 'Verify unmanaged devices',
-        when: when(card(cond('mdm', 'is', ['Not enrolled']))),
-        decision: '2fa',
-        matchEstimate: 410,
-      }),
-      /* Redundant against the rule above for anyone on unmanaged hardware, and
-         deliberately kept: a first login from a *managed* device is still the
-         one moment an account is worth binding to a person. */
-      rule({
-        name: 'Verify first login and resets',
+        name: 'Paralegal, cleared, on matter, from the office',
         when: when(
-          card(cond('auth-state', 'is', ['First time login'])),
-          card(cond('auth-state', 'is', ['MFA recently reset'])),
+          namedCard(
+            'Paralegal on the matter, on the office network',
+            cond('user-role', 'is', ['Member']),      // PARALEGAL is not an option
+            cond('group', 'in', ['matter-acme']),
+            cond('user-attr', 'is', ['clearance_level>=2']),   // UNREPRESENTABLE
+            cond('ip', 'is', ['203.0.113.0/24']),              // inlined again, 22-G8
+          ),
         ),
         decision: '2fa',
-        matchEstimate: 60,
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        // SetReAuthFrequency(2h) HAS NO HOME.
+        rememberMfa: false,
+        allowDisable2fa: false,
+        matchEstimate: 9,
       }),
     ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      // DENY("Vault access requires matter assignment and clearance") — lost.
+      matchEstimate: 9,
+    }),
   },
+
+  // --- Scenario 5, appended to `policies` in data.ts ---
+
+  /* Policy A — Admin */
   {
-    id: 'contractor-session',
-    name: 'Contractor Session Limits',
-    type: 'Session',
-    appId: 'slack',
+    id: 's5-admin',
+    name: 'Workspace — Admin, office only',
+    type: 'App Access',
+    appId: 'google-workspace',
+    audience: audienceOf(['admin']),
+    status: 'active',
+    lastModified: '3 hours ago',
+    modifiedBy: 'Mehak Garg',
+    rules: [
+      rule({
+        name: 'Office only',
+        when: when(card(cond('zone', 'in zone', ['office-cidr'], 'ip'))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator', 'miniOrange OTP'],
+        matchEstimate: 9,
+      }),
+    ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 0,
+    }),
+  },
+
+
+  /* Policy B — DevOps */
+  {
+    id: 's5-devops',
+    name: 'Workspace — DevOps, office network and office device',
+    type: 'App Access',
+    appId: 'google-workspace',
+    audience: audienceOf(['devops']),
+    status: 'active',
+    lastModified: '3 hours ago',
+    modifiedBy: 'Mehak Garg',
+    rules: [
+      rule({
+        name: 'Office IP and office device',
+        when: when(
+          card(
+            cond('zone', 'in zone', ['office-cidr'], 'ip'),
+            cond('device-reg', 'is', ['Registered']),
+            cond('mdm', 'is', ['Enrolled']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['miniOrange Push'],
+        matchEstimate: 268,
+      }),
+    ],
+    fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 0 }),
+  },
+
+
+  /* Policy C — End-Users */
+  {
+    id: 's5-endusers',
+    name: 'Workspace — End users, office network',
+    type: 'App Access',
+    appId: 'google-workspace',
+    /* 'End-Users' has no group. EVERYONE is the only available expression and it
+       is WIDER than the scenario: it also covers it-admins and engineering. */
+    audience: audienceOf(['end-users']),
+    status: 'active',
+    lastModified: '3 hours ago',
+    modifiedBy: 'Mehak Garg',
+    rules: [
+      rule({
+        name: 'Office IP',
+        when: when(card(cond('zone', 'in zone', ['office-cidr'], 'ip'))),
+        decision: '1fa',
+        firstFactor: 'Password',
+        secondFactor: 'any',
+        matchEstimate: 921,
+      }),
+    ],
+    fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 0 }),
+  },
+
+
+  /* Application Baseline Policy */
+  {
+    id: 's5-baseline',
+    name: 'Workspace — Application baseline',
+    type: 'App Access',
+    appId: 'google-workspace',
+    audience: EVERYONE,
+    status: 'active',
+    lastModified: '3 hours ago',
+    modifiedBy: 'Mehak Garg',
+    configIssue: 'No rules configured — every sign-in falls straight through to the default rule.',
+    rules: [],
+    fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 0 }),
+  },
+
+  // --- Scenario 6, appended to `policies` in data.ts ---
+  {
+    id: 's6-mdm-os',
+    name: 'Corporate Email — MDM OS matrix',
+    type: 'App Access',
+    appId: 'corporate-email',
+    audience: EVERYONE,            // Default Group → everyone
+    status: 'active',
+    lastModified: 'Yesterday',
+    modifiedBy: 'Mehak Garg',
+    rules: [
+      rule({
+        name: 'Managed Apple',
+        when: when(card(
+          cond('mdm', 'is', ['Enrolled']),
+          cond('os', 'is', ['iOS', 'macOS']),   // multi-value list == IN
+        )),
+        decision: '1fa',
+        firstFactor: 'Specific',
+        firstFactorMethod: 'FIDO2 / Passkey',   // AUTH_METHODS name; builder cannot produce it
+        secondFactor: 'any',                    // required field, meaningless at 1fa
+        matchEstimate: 214,
+      }),
+      rule({
+        name: 'Managed Android and Windows',
+        when: when(card(
+          cond('mdm', 'is', ['Enrolled']),
+          cond('os', 'is', ['Android', 'Windows']),
+        )),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        matchEstimate: 596,
+      }),
+    ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',            // "Unmanaged device" — reason is lost
+      matchEstimate: 430,
+    }),
+  },
+
+  // --- Scenario 7, appended to `policies` in data.ts ---
+  {
+    id: 's7-network-factor',
+    name: 'VPN Portal — factor by network',
+    type: 'App Access',
+    /* There is no VPN portal in `apps`. `aws` is the closest infrastructure
+       gateway; the fit is poor and the fixture says so. */
+    appId: 'vpn-portal',
+    /* `employees` is the document's own target and excludes contractors, which
+      EVERYONE would not. */
+    audience: audienceOf(['employees']),
+    status: 'active',
+    lastModified: '6 hours ago',
+    modifiedBy: 'Jaspreet T.',
+    rules: [
+      rule({
+        name: 'Corp network',
+        when: when(card(cond('zone', 'in zone', ['corp-network'], 'ip'))),
+        decision: '1fa',
+        firstFactor: 'Specific',
+        firstFactorMethod: 'miniOrange Push',
+        secondFactor: 'any',
+        matchEstimate: 640,
+      }),
+      rule({
+        name: 'Known mobile',
+        when: when(card(
+          cond('device-type', 'is', ['Mobile']),
+          cond('device-reg', 'is', ['Registered']),
+        )),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        matchEstimate: 190,
+      }),
+    ],
+    /* The Default Rule ALLOWS here, and the engine reads only the token '2fa'
+       from it — the chain below is stored and never evaluated. */
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: '2fa',
+      firstFactor: 'Password',
+      secondFactor: 'specific',
+      secondFactorMethods: ['Google Authenticator'],
+      matchEstimate: 410,
+    }),
+  },
+
+  // --- Scenario 8, appended to `policies` in data.ts ---
+  {
+    id: 's8-role-escalation',
+    name: 'Admin Console — role escalation',
+    type: 'App Access',
+    appId: 'admin-console',
+    audience: audienceOf(['it-admins']), // 'IT' → it-admins
+    status: 'active',
+    lastModified: '2 days ago',
+    modifiedBy: 'Ravi Menon',
+    rules: [
+      rule({
+        name: 'Super admin',
+        // SUPER_ADMIN does not exist in the user-role enum. 'Admin' is the nearest.
+        when: when(card(cond('user-role', 'is', ['Admin']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['miniOrange Push'],
+        matchEstimate: 3,
+      }),
+      rule({
+        name: 'Helpdesk admin',
+        /* HELPDESK has NO counterpart in ['Admin','Manager','Member','Auditor'].
+           'Member' is written here and it is a rename, not a mapping: it catches
+           every ordinary member of it-admins. */
+        when: when(card(cond('user-role', 'is', ['Member']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        matchEstimate: 1,
+      }),
+    ],
+    /* ALLOW → CHAIN [1F: Password, 2F: ALLOW_ANY (2-factor type)]
+                + SetReAuthFrequency(12h)
+       Only the token '2fa' is read. `secondFactor: 'any'` is the closest thing to
+       ALLOW_ANY and carries no factor-type constraint. SetReAuthFrequency(12h)
+       has no field and is DROPPED ENTIRELY. */
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: '2fa',
+      firstFactor: 'Password',
+      secondFactor: 'any',
+      matchEstimate: 5,
+    }),
+  },
+
+  // --- Scenario 9, appended to `policies` in data.ts ---
+
+  /* Finance Policy */
+  {
+    id: 's9-finance',
+    name: 'Payroll — Finance',
+    type: 'App Access',
+    appId: 'payroll',
+    /* The scenario's claim is "no separate user-to-Policy assignment is required".
+       But `inAudience` (simulate.ts:384) short-circuits ABOVE the rules, so a
+       rule naming someone outside the audience never runs. Mehak Garg is in
+       `executives`, so she must be added to the audience by name — which IS a
+       user-to-policy assignment, the exact thing the scenario says it avoids. */
+    audience: audienceOf(['finance']),
+    status: 'active',
+    lastModified: '4 days ago',
+    modifiedBy: 'Mehak Garg',
+    rules: [
+      rule({
+        name: 'CFO anywhere, hardened',
+        /* `user-attr is cfo@acme.com` would be the literal reading, but user-attr
+           has no evaluator case and would never match. `user` is modelled. */
+        when: when(card(cond('user', 'is', ['mehak']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['miniOrange Push'],
+        /* SetRememberMfaTimeout(1h): `rememberDays` is DAYS and the editor floors
+           it at 1. One hour cannot be written. `forceMfaEachLogin` (timeout 0) is
+           the nearest and is STRICTER than asked. */
+        rememberMfa: false,
+        forceMfaEachLogin: true,
+        matchEstimate: 1,
+      }),
+      rule({
+        name: 'Finance office access',
+        when: when(card(cond('zone', 'in zone', ['office-cidr'], 'ip'))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        matchEstimate: 74,
+      }),
+    ],
+    fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 12 }),
+  },
+
+
+  /* Application Baseline Policy */
+  {
+    id: 's9-baseline',
+    name: 'Payroll — Application baseline',
+    type: 'App Access',
+    appId: 'payroll',
+    audience: EVERYONE,
+    status: 'active',
+    lastModified: '4 days ago',
+    modifiedBy: 'Mehak Garg',
+    configIssue: 'No rules configured — every sign-in falls straight through to the default rule.',
+    rules: [],
+    fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 1154 }),
+  },
+
+  /* Scenario 16 — Break-Glass Admin Account.
+     Append inside the `policies` array in data.ts; `rule` is module-private. */
+  {
+    id: 'break-glass',
+    name: 'Break-Glass Emergency Access',
+    type: 'App Access',
+    /* The document says "All Apps using the emergency Policy". Not
+       expressible: `appId` is one application, and the only every-app policy is
+       the `isSystem` singleton. Left unset, which the console reads as a
+       configuration fault rather than as breadth — the honest encoding, and the
+       gap register's G2. */
+    appId: undefined,
+    configIssue:
+      'No application assigned — this policy cannot take effect until one is attached. The scenario asks for every application; the model has no such policy.',
+    status: 'active',
+    lastModified: '6 weeks ago',
+    modifiedBy: 'Ravi Menon',
+    /* The doc's shape is a dedicated `Break-Glass Accounts` group. It does not
+       exist. Two closest encodings, both shown; the second is what the engine
+       actually makes easy and the doc's Tier-4 preamble forbids. */
+    audience: audienceOf(['break-glass']),
+    rules: [
+      rule({
+        name: 'War-room terminal only',
+        when: when(
+          card(
+            cond('ip', 'is', ['203.0.113.10']),
+            cond('device-reg', 'is', ['Registered']),
+          ),
+        ),
+        decision: '1fa',
+        firstFactor: 'Password',
+        /* SetRememberMfaTimeout(0) — the closest the model has. `rememberMfa:false`
+           is "never remember"; `forceMfaEachLogin` is set for the same intent even
+           though a 1fa rule has no MFA to force. */
+        rememberMfa: false,
+        forceMfaEachLogin: true,
+        /* SetReAuthFrequency(15min) HAS NO FIELD. Silently dropped. */
+        allowDisable2fa: false,
+        matchEstimate: 2,
+      }),
+    ],
+    fallback: rule({
+      /* DENY("Break-glass usable only from war-room terminal") — the reason
+         string has nowhere to live, so it is smuggled into the name, which is
+         the only text any surface prints. */
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 0,
+    }),
+  },
+
+  /* Scenario 17 — Departing Employee. TWO POLICIES, because the scenario names
+     two applications and `Policy.appId` is one app. The rules are byte-identical;
+     the duplication is the gap, not a modelling choice. */
+  {
+    id: 'notice-period-github',
+    name: 'Notice Period — Code Repository',
+    type: 'App Access',
+    /* Scenario says GitLab. No such app. Closest real id: `github`. */
+    appId: 'github',
+    status: 'active',
+    lastModified: '3 days ago',
+    modifiedBy: 'Clara Boucher',
+    audience: audienceOf(['notice-period']),
+    rules: [
+      rule({
+        name: 'Office, business hours only',
+        when: when(
+          card(
+            cond('ip', 'is', ['203.0.113.0/24']),
+            cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
+            /* Time 09:00–18:00 Asia/Kolkata. The TIMEZONE IS DROPPED — `time` is
+               documented as "A window in the tenant's timezone", one tenant-wide
+               setting, not a per-rule IANA zone. */
+            cond('time', 'between', ['09:00', '18:00']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        /* SetRememberMfaTimeout(0) */
+        rememberMfa: false,
+        forceMfaEachLogin: true,
+        /* SetReAuthFrequency(2h) — NO FIELD. Dropped. */
+        allowDisable2fa: false,
+        matchEstimate: 1,
+      }),
+    ],
+    fallback: rule({
+      name: 'Default rule',   // DENY("Access restricted during notice period")
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 0,
+    }),
+  },
+
+
+  {
+    /* The identical policy again, because the second application needs its own.
+       Two rows in the list, two things to edit, two things to forget to revoke. */
+    id: 'notice-period-aws',
+    name: 'Notice Period — Production Cloud Console',
+    type: 'App Access',
+    appId: 'aws',
+    status: 'active',
+    lastModified: '3 days ago',
+    modifiedBy: 'Clara Boucher',
+    audience: audienceOf(['notice-period']),
+    rules: [
+      rule({
+        name: 'Office, business hours only',
+        when: when(
+          card(
+            cond('ip', 'is', ['203.0.113.0/24']),
+            cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
+            cond('time', 'between', ['09:00', '18:00']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        rememberMfa: false,
+        forceMfaEachLogin: true,
+        allowDisable2fa: false,
+        matchEstimate: 1,
+      }),
+    ],
+    fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 0 }),
+  },
+
+
+  /* Scenario 18 — Traveling Executive. */
+  {
+    id: 'japan-travel',
+    name: 'Japan Travel Exception',
+    type: 'App Access',
+    appId: 'salesforce',
+    status: 'active',
+    lastModified: 'Yesterday',
+    modifiedBy: 'Mehak Garg',
+    /* Scenario targets a temporary `Japan-Travel` group. Does not exist.
+       Closest real group is `executives`; the VP Sales is not separable from the
+       other eleven, so this grants the Japan exception to all of them. The named
+       -user form (`audienceOf([], ['u-exec-4'])`) is narrower and is what the
+       engine actually makes easy. */
+    audience: audienceOf(['japan-travel']),
+    rules: [
+      rule({
+        name: 'Japan trip window',
+        when: when(
+          card(
+            /* Country = JP. `cond('country','is',['Japan'])` TYPES but 'Japan' is
+               not in the catalogue's `options`, so the picker cannot produce it
+               and any option-driven renderer shows an unknown value. Zone form
+               used instead — the only loadable encoding. */
+            cond('zone', 'in zone', ['japan'], 'location'),
+            cond('device-reg', 'is', ['Registered']),
+            /* Risk score < 60. `device-risk` is the numeric one; `ml-risk` is the
+               AI one and is a 3-value enum with no numbers in it. The parameter
+               sheet has ONE attribute ("Risk score (Device Score / Device Trust)
+               (AI included)"); the engine has two, and the scenario's number only
+               fits the non-AI one. */
+            cond('device-risk', 'below', ['60']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        /* SetRememberMfaTimeout(0) */
+        rememberMfa: false,
+        forceMfaEachLogin: true,
+        allowDisable2fa: false,
+        matchEstimate: 1,
+      }),
+      rule({
+        name: 'Home countries normal',
+        /* Country in [IN, US] — implicit multi-value IN on the `is` operator.
+           Both values ARE in the option list, so this one is loadable literally. */
+        when: when(card(cond('country', 'is', ['India', 'United States']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        allowDisable2fa: false,
+        matchEstimate: 11,
+      }),
+    ],
+    fallback: rule({
+      name: 'Default rule',   // DENY("Location not permitted")
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 0,
+    }),
+  },
+
+  /* Scenario 19 — Hybrid Work Access. The canonical (A OR B) AND (C OR D).
+
+     THE SHAPE IS EXPRESSIBLE, contrary to the "two-level DNF" framing: `Predicate
+     .join` and `ConditionCard.join` (data.ts:278-308) let the trunk be AND while
+     each card is OR, and `predicatePasses` reads exactly that. What is missing is
+     HELPER support — `when()` and `card()` never set `join` — so the joins are
+     spread on by hand. `drawsAsBracket` then returns true for both cards (their
+     join disagrees with `outerJoin`), so the UI renders it as two brackets. */
+  {
+    id: 'hybrid-work',
+    name: 'Hybrid Work Access',
+    type: 'App Access',
+    appId: 'jira',
+    status: 'active',
+    lastModified: '2 days ago',
+    modifiedBy: 'Jaspreet T.',
+    /* Scenario targets `Employees`. No such group. Union of the four
+       non-contractor groups — 417 people — rather than EVERYONE, which would
+       quietly hand this to 154 contractors. */
+    audience: audienceOf(['employees']),
+    rules: [
+      {
+        ...rule({
+          name: 'Trusted network + trusted device',
+          /* CHAIN [1F: ALLOW_SPECIFIC [FIDO2 (Passkey / Biometric), Password]] —
+             A TWO-METHOD 1F SET. `firstFactor` is 'Password' | 'Any' | 'Specific'
+             and `firstFactorMethod` is ONE optional string. The pair cannot be
+             written. 'Any' chosen as the least-wrong: it admits the intended two
+             and ALSO admits 'Magic link', the third primary-class method. */
+          decision: '1fa',
+          firstFactor: 'Any',
+          /* SetRememberMfaTimeout(30d) */
+          rememberMfa: true,
+          rememberDays: 30,
+          allowDisable2fa: false,
+          matchEstimate: 300,
+        }),
+        when: {
+          join: 'and',
+          cards: [
+            {
+              ...card(
+                cond('ip', 'is', ['203.0.113.0/24']),
+                cond('ip', 'is', ['198.51.100.0/24']),
+              ),
+              join: 'or',
+              grouped: true,
+              label: 'Trusted network',
+            },
+            {
+              ...card(
+                cond('device-reg', 'is', ['Registered']),
+                cond('mdm', 'is', ['Enrolled']),
+              ),
+              join: 'or',
+              grouped: true,
+              label: 'Trusted device',
+            },
+          ],
+        },
+      },
+      {
+        ...rule({
+          name: 'One trust pair missing',
+          decision: '2fa',
+          firstFactor: 'Password',
+          /* 2F: ALLOW_ANY (2-factor type) — maps exactly. */
+          secondFactor: 'any',
+          /* SetRememberMfaTimeout(1d) */
+          rememberMfa: true,
+          rememberDays: 1,
+          allowDisable2fa: false,
+          matchEstimate: 90,
+        }),
+        /* ANY OF ( IP in office/VPN CIDRs , MDM managed = true ) — one card, join
+           'or'. With a single card, `outerJoin` reads the card's own join, so the
+           whole rule renders as one OR bracket. Correct. */
+        when: {
+          cards: [
+            {
+              ...card(
+                cond('ip', 'is', ['203.0.113.0/24', '198.51.100.0/24']),
+                cond('mdm', 'is', ['Enrolled']),
+              ),
+              join: 'or',
+              grouped: true,
+              label: 'Any trust signal',
+            },
+          ],
+        },
+      },
+    ],
+    /* The Default Rule as ALLOW-with-heavy-chain, not DENY. This is the one thing
+       the engine models RIGHT and better than a bare decision would: `fallback` is
+       a full Rule, so it carries a factor plan and a remember window. */
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: '2fa',
+      firstFactor: 'Password',
+      secondFactor: 'specific',
+      secondFactorMethods: ['Google Authenticator'],
+      rememberMfa: false,
+      forceMfaEachLogin: true,
+      matchEstimate: 27,
+    }),
+  },
+
+
+  /* Scenario 20 — Red-Flag Deny Guard. */
+  {
+    id: 'privileged-gateway',
+    name: 'Privileged Access — Red-Flag Guard',
+    type: 'App Access',
+    appId: 'pam',
+    status: 'active',
+    lastModified: '4 hours ago',
+    modifiedBy: 'Ravi Menon',
+    /* Scenario targets `Privileged-Users`. Does not exist. Closest: `it-admins`. */
+    audience: audienceOf(['privileged']),
+    rules: [
+      {
+        ...rule({
+          name: 'Any red flag',
+          decision: 'deny',   // DENY("Access blocked — security policy") — reason dropped
+          matchEstimate: 1,
+        }),
+        /* OR of four bad signals: ONE card, join 'or'. With a single card,
+           `outerJoin` reads the card's own join, so the rule renders as one OR
+           bracket. The SHAPE is right. Three of the four CONDITIONS are not. */
+        when: {
+          cards: [
+            {
+              ...card(
+                /* Country in [sanctioned list] — via the named zone, because the
+                   `country` condition's option list holds five friendly countries
+                   and not one sanctioned one. */
+                cond('zone', 'in zone', ['sanctioned'], 'location'),
+                /* Risk score >= 80. `device-risk` has ONLY 'above'/'below'.
+                   There is no >=. `above ['79']` is an OFF-BY-ONE HACK that is
+                   wrong for any non-integer score. */
+                cond('device-risk', 'above', ['79']),
+                /* webhook(hr-system).status = 'suspended'. The engine can only ask
+                   "returns true". The comparison has moved into the hook above and
+                   the rule no longer says what it tests. */
+                cond('webhook', 'returns true', ['hk-hr-suspended']),
+                /* Posture: jailbroken = true. THE OPTION DOES NOT EXIST — posture
+                   offers [Disk encryption, Screen lock, OS up to date, Antivirus
+                   running, Firewall on]. THIS IS NOT THE SCENARIO'S CONDITION; it
+                   is the nearest row in the list, and it does not detect a
+                   jailbreak. The red flag is LOST. */
+                cond('posture', 'fails', ['OS up to date']),
+              ),
+              join: 'or',
+              grouped: true,
+              label: 'Any red flag',
+            },
+          ],
+        },
+      },
+      rule({
+        name: 'Clean request',
+        when: when(
+          card(
+            cond('mdm', 'is', ['Enrolled']),
+            cond('device-reg', 'is', ['Registered']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['miniOrange Push'],
+        /* SetReAuthFrequency(4h) — NO FIELD. Dropped. */
+        rememberMfa: false,
+        allowDisable2fa: false,
+        matchEstimate: 8,
+      }),
+    ],
+    /* POLICY-WIDE METHOD CONSTRAINT — DISALLOW [OTP over SMS, SMS Link, OTP over
+       SMS and Email, OTP over Phone Call, Security Questions] — HAS NO HOME.
+       `Policy` has no method field. `MethodSet` is a library object that NO Rule
+       field references (grep: nothing outside its own test reads it). The nearest
+       approximation is naming the permitted method on each rule individually,
+       which is what `secondFactorMethods: ['miniOrange Push']` above does — an
+       allow-of-one standing in for a deny-of-five, enforced per rule rather than
+       per policy, and silently absent from any rule that forgets it. */
+    fallback: rule({
+      name: 'Default rule',   // DENY("Privileged access requires managed, registered device")
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 0,
+    }),
+  },
+
+
+  {
+    id: 's10-aws-posture',
+    name: 'Production Cloud Console — Device Posture',
+    type: 'App Access',
+    appId: 'aws',
+    status: 'active',
+    lastModified: '6 hours ago',
+    modifiedBy: 'Ravi Menon',
+    // Doc target is `DevOps`. No such group in the fixtures — `engineering` is the
+    // closest and is strictly broader (310 people, not a DevOps subset).
+    audience: audienceOf(['devops']),
+    rules: [
+      rule({
+        name: 'Full posture',
+        when: when(
+          card(
+            cond('mdm', 'is', ['Enrolled']),
+            cond('posture', 'passes', ['Disk encryption']),
+            cond('posture', 'passes', ['Screen lock']),
+            // Stands in for `os_patch_age_days < 30`. The catalogue has a boolean
+            // 'OS up to date' and no numeric patch age.
+            cond('posture', 'passes', ['OS up to date']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['miniOrange Push'],
+        matchEstimate: 214,
+      }),
+      rule({
+        name: 'Posture degraded',
+        when: when(card(cond('mdm', 'is', ['Enrolled']), cond('posture', 'passes', ['Disk encryption']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['miniOrange Push'],
+        // The doc says + SetReAuthFrequency(4h). Nothing on Rule holds it.
+        rememberMfa: false,
+        matchEstimate: 71,
+      }),
+    ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      // "Device posture insufficient — contact IT" has nowhere to go.
+      matchEstimate: 25,
+    }),
+  },
+
+
+  {
+    id: 's11-wiki-contractor',
+    name: 'Internal Wiki — Contractor Control',
+    type: 'App Access',
+    // Doc app is "Internal Wiki". No such app; `jira` is the nearest
+    // collaboration surface in the fixtures.
+    appId: 'wiki',
     status: 'active',
     lastModified: 'Yesterday',
     modifiedBy: 'Jaspreet T.',
     audience: audienceOf(['contractors']),
     rules: [
-      rule({ name: 'Cap session length',when: when(card(cond('user-type', 'is', ['Contractor']))), decision: '1fa', matchEstimate: 154 }),
-      rule({ name: 'Re-auth after idle',when: when(card(cond('trust-age', 'over', ['30']))), decision: '2fa', matchEstimate: 96 }),
+      rule({
+        name: 'Contract expired',
+        // Doc: webhook(`hr-system`).contract_status = `expired`.
+        // No `hr-system` hook; `hk-entitlement` is the closest sync boolean hook.
+        // The field comparison lives in the hook's responsePath, not here.
+        when: when(card(cond('webhook', 'returns false', ['hk-hr-contract']))),
+        decision: 'deny',
+        matchEstimate: 18,
+      }),
+      rule({
+        name: 'Active, office',
+        when: when(
+          card(
+            cond('webhook', 'returns true', ['hk-hr-contract']),
+            cond('ip', 'is', ['203.0.113.0/24']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        matchEstimate: 96,
+      }),
+      rule({
+        name: 'Active, remote',
+        when: when(card(cond('webhook', 'returns true', ['hk-hr-contract']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        matchEstimate: 40,
+      }),
     ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 12,
+    }),
   },
+
+
   {
-    id: 'account-recovery',
-    name: 'Account Recovery Verification',
-    type: 'Account Management',
+    id: 's12-crm-risk',
+    name: 'Customer Database — Risk Tiers',
+    type: 'App Access',
+    appId: 'crm',
+    status: 'active',
+    lastModified: '2 days ago',
+    modifiedBy: 'Clara Boucher',
+    // Doc target is `Support`. No such group; `it-admins` is the nearest by
+    // function and far smaller than a real support organisation.
+    audience: audienceOf(['support']),
+    rules: [
+      rule({
+        name: 'Low risk, trusted device',
+        // (risk < 30) AND (registered OR mdm-managed) — DNF requires the risk
+        // leaf to be duplicated into both cards.
+        when: when(
+          namedCard('Registered device',
+            cond('device-risk', 'below', ['30']),
+            cond('device-reg', 'is', ['Registered']),
+          ),
+          namedCard('MDM-managed device',
+            cond('device-risk', 'below', ['30']),
+            cond('mdm', 'is', ['Enrolled']),
+          ),
+        ),
+        // Doc: CHAIN [1F: Password, StepUpIfRiskAbove(70) -> 2F: miniOrange Push].
+        // No conditional second factor exists. '1fa' drops the step-up entirely.
+        decision: '1fa',
+        firstFactor: 'Password',
+        matchEstimate: 6,
+      }),
+      rule({
+        name: 'Medium risk',
+        when: when(card(cond('device-risk', 'below', ['70']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        matchEstimate: 2,
+      }),
+      rule({
+        name: 'High risk',
+        // Doc says `>= 70`. Only `above` / `below` exist, so this is `above 69`.
+        when: when(card(cond('device-risk', 'above', ['69']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['miniOrange Push'],
+        // SetRememberMfaTimeout(0), as closely as the model allows.
+        rememberMfa: false,
+        forceMfaEachLogin: true,
+        matchEstimate: 1,
+      }),
+    ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 0,
+    }),
+  },
+
+
+  {
+    id: 's13-trading-compliance',
+    name: 'Trading Platform — Compliance Gate',
+    type: 'App Access',
+    // Doc app is "Trading Platform". Nothing in the fixtures is in that class;
+    // `workday` is the nearest regulated financial system of record.
+    appId: 'trading',
     status: 'active',
     lastModified: '3 days ago',
     modifiedBy: 'Mehak Garg',
-    configIssue: 'No application assigned — this policy cannot take effect until one is attached.',
-    audience: EVERYONE,
+    // Doc target is `Traders`. No such group; `finance` is the nearest.
+    audience: audienceOf(['traders']),
     rules: [
-      rule({ name: 'First login enforcement',when: when(card(cond('auth-state', 'is', ['First time login']))), decision: '2fa', matchEstimate: 42 }),
-      rule({ name: 'After MFA reset',when: when(card(cond('auth-state', 'is', ['MFA recently reset']))), decision: '2fa', matchEstimate: 18 }),
-      rule({ name: 'No MFA configured',when: when(card(cond('auth-state', 'is', ['No MFA configured']))), decision: 'deny', matchEstimate: 6 }),
-    ],
-  },
-  {
-    id: 'exec-stepup',
-    name: 'Executive Step-up Authentication',
-    type: 'App Access',
-    appId: 'm365',
-    status: 'active',
-    lastModified: '5 days ago',
-    modifiedBy: 'Mehak Garg',
-    audience: audienceOf(['executives']),
-    rules: [
-      rule({ name: 'Deny anonymized traffic',when: when(card(cond('zone', 'in zone', ['anon']))), decision: 'deny', matchEstimate: 12 }),
-      /* The Lenskart/Oberoi shape, seeded so the capability is exercised rather
-         than merely available: a condition this engine cannot evaluate, asked
-         of a system that can. Paired with a fail-open hook on a deny rule
-         deliberately — the linter reports it, and a warning nobody can trigger
-         is a warning nobody trusts. */
       rule({
-        name: 'External risk verdict',
-        when: when(card(cond('webhook', 'returns true', ['hk-fraud']))),
+        name: 'Training lapsed',
+        // Doc: custom_attr(`compliance_training_expiry`) < today.
+        // `user-attr` has no attribute-name field, no `<`, no date type and no
+        // `today`. The attribute name is smuggled into the value string; the
+        // date comparison is pre-computed outside the engine and reduced to a
+        // string equality. This is a convention, not a feature.
+        when: when(card(cond('user-attr', 'is', ['compliance_training_expiry:lapsed']))),
         decision: 'deny',
-        matchEstimate: 3,
+        matchEstimate: 4,
       }),
-      rule({ name: 'New country',when: when(card(cond('country', 'is not', ['India']))), decision: '2fa', matchEstimate: 9 }),
-      rule({ name: 'Unmanaged device',when: when(card(cond('mdm', 'is', ['Not enrolled']))), decision: '2fa', matchEstimate: 7 }),
-      rule({ name: 'High ML risk',when: when(card(cond('ml-risk', 'is', ['High']))), decision: '2fa', matchEstimate: 4 }),
-      rule({ name: 'Trusted office access',when: when(card(cond('zone', 'in zone', ['office']))), decision: '1fa', matchEstimate: 12 }),
+      rule({
+        name: 'Floor terminal',
+        when: when(
+          card(
+            // Doc: MacAddress in allowlist [floor-terminals] — a named list
+            // object. Inlined, because no such object exists.
+            cond('mac', 'is', ['00:1B:44:11:3A:B7', '00:1B:44:11:3A:B8', '00:1B:44:11:3A:B9']),
+            cond('browser', 'is', ['Chrome', 'Edge']),
+          ),
+        ),
+        decision: '1fa',
+        firstFactor: 'Password',
+        // Doc: + SetReAuthFrequency(24h). Nothing on Rule holds it, and
+        // rememberDays is an MFA-remember window, meaningless on a 1fa rule.
+        matchEstimate: 22,
+      }),
+      rule({
+        name: 'Office, approved browser',
+        when: when(
+          card(
+            cond('ip', 'is', ['203.0.113.0/24']),
+            cond('browser', 'is', ['Chrome', 'Edge']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        // Catalogue spelling is 'RSA MFA (SecurID)', not the doc's
+        // 'RSA Authenticator (SecurID)'. 'Display Token' matches exactly.
+        secondFactorMethods: ['RSA MFA (SecurID)', 'Display Token'],
+        matchEstimate: 48,
+      }),
     ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 12,
+    }),
   },
+
+
   {
-    id: 'default-workforce',
-    name: 'Default Workforce Access',
+    id: 's14-erp-regional',
+    name: 'ERP — Regional Office Hours',
     type: 'App Access',
-    appId: 'zoom',
-    status: 'inactive',
+    // Doc app is "ERP System". No ERP in the fixtures; `servicenow` is the
+    // nearest enterprise system-of-record (`workday` is the other candidate and
+    // is already standing in for S13's Trading Platform).
+    appId: 'erp',
+    status: 'active',
     lastModified: '1 week ago',
-    modifiedBy: 'System',
-    audience: EVERYONE,
-    rules: [rule({ name: 'Everyone', decision: '1fa', matchEstimate: 1240 })],
+    modifiedBy: 'Mehak Garg',
+    // Doc target is `Global-Operations`. No such group and no near-miss.
+    // EVERYONE is strictly broader than the doc intends.
+    audience: audienceOf(['global-ops']),
+    rules: [
+      rule({
+        name: 'India office hours',
+        when: when(
+          card(
+            cond('country', 'is', ['India']),
+            cond('ip', 'is', ['203.0.113.0/24']),
+            cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
+            // The doc pins this to Asia/Kolkata. `time` has no timezone field —
+            // it evaluates in one implicit tenant-wide zone.
+            cond('time', 'between', ['09:00', '19:00']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        matchEstimate: 640,
+      }),
+      rule({
+        name: 'Germany office hours',
+        when: when(
+          card(
+            cond('country', 'is', ['Germany']),
+            cond('ip', 'is', ['198.51.100.0/24']),
+            cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
+            // Europe/Berlin in the doc. Same implicit zone as the rule above.
+            cond('time', 'between', ['08:00', '18:00']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        matchEstimate: 210,
+      }),
+      rule({
+        name: 'US office hours',
+        when: when(
+          card(
+            cond('country', 'is', ['United States']),
+            cond('ip', 'is', ['192.0.2.0/24']),
+            cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
+            // America/New_York in the doc.
+            cond('time', 'between', ['08:00', '18:00']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        matchEstimate: 180,
+      }),
+      rule({
+        name: 'After-hours, managed device',
+        when: when(card(cond('mdm', 'is', ['Enrolled']), cond('device-reg', 'is', ['Registered']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        // SetRememberMfaTimeout(0)
+        rememberMfa: false,
+        forceMfaEachLogin: true,
+        matchEstimate: 150,
+      }),
+    ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 60,
+    }),
   },
+
+
   {
-    id: 'partner-portal',
-    name: 'Partner Portal Access',
+    id: 's15-ma-onboarding',
+    name: 'M&A Integration — Document Management',
     type: 'App Access',
-    appId: 'box',
-    status: 'inactive',
-    lastModified: '2 weeks ago',
-    modifiedBy: 'Jaspreet T.',
-    configIssue: 'No rules configured — every sign-in falls straight through to the default rule.',
-    audience: audienceOf(['contractors']),
-    rules: [],
+    appId: 'dms',
+    status: 'monitor',
+    lastModified: '4 days ago',
+    modifiedBy: 'Ravi Menon',
+    // Doc target is `Acquired-Co-Employees`. No such group; `contractors` is the
+    // nearest population (external people temporarily on the estate).
+    audience: audienceOf(['acquired']),
+    rules: [
+      rule({
+        name: 'Not yet in HR sync',
+        // Doc: webhook(`legacy-hr`).employee_status != `active`.
+        // No `legacy-hr` hook. `hk-hrms` is the right system but is
+        // mode:'attribute-sync' with an empty responsePath, so it cannot answer a
+        // rule condition. `hk-entitlement` is the closest usable sync boolean.
+        when: when(card(cond('webhook', 'returns false', ['hk-hr-contract']))),
+        decision: 'deny',
+        matchEstimate: 31,
+      }),
+      rule({
+        name: 'Migrated and compliant',
+        when: when(
+          card(
+            cond('webhook', 'returns true', ['hk-hr-contract']),
+            cond('mdm', 'is', ['Enrolled']),
+            cond('posture', 'passes', ['Disk encryption']),
+            cond('country', 'is', ['India', 'Germany']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        // Doc: + SetReAuthFrequency(8h). No field.
+        matchEstimate: 62,
+      }),
+      rule({
+        name: 'Migrated device, posture pending',
+        when: when(
+          card(
+            cond('webhook', 'returns true', ['hk-hr-contract']),
+            cond('mdm', 'is', ['Enrolled']),
+            cond('country', 'is', ['India', 'Germany']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['Google Authenticator'],
+        // Doc: + SetReAuthFrequency(4h) + SetRememberMfaTimeout(0).
+        // Only the second half is expressible.
+        rememberMfa: false,
+        forceMfaEachLogin: true,
+        matchEstimate: 28,
+      }),
+      rule({
+        name: 'Unmigrated device, office only',
+        when: when(
+          card(
+            cond('webhook', 'returns true', ['hk-hr-contract']),
+            cond('ip', 'is', ['203.0.113.0/24']),
+            cond('device-risk', 'below', ['50']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['miniOrange Push'],
+        rememberMfa: false,
+        forceMfaEachLogin: true,
+        matchEstimate: 19,
+      }),
+    ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 14,
+    }),
   },
+
+  /* Scenario 1 — Office-Only Access (IP gate).
+   */
   {
-    id: 'eng-vpn',
-    name: 'Engineering VPN Policy',
+    id: 'uc1-office-only',
+    name: 'HR Portal — Office or VPN only',
+    type: 'App Access',
+    appId: 'hr-portal',
+    status: 'active',
+    lastModified: '2 hours ago',
+    modifiedBy: 'Mehak Garg',
+    audience: audienceOf(['employees']),
+    rules: [
+      rule({
+        name: 'Office or VPN',
+        /* Multi-value on one attribute = the doc's OR form 1. `values` is ORed:
+           predicate-prose.ts:64 — "A condition holds when ANY of its values
+           match — the evaluator is `vals.some(...)`". But the OPERATOR is `is`,
+           not `in`, so this reads "IP address is A or B". */
+        when: when(card(cond('ip', 'is', ['203.0.113.0/24', '198.51.100.0/24']))),
+        decision: '1fa',
+        firstFactor: 'Password',
+        matchEstimate: 291,
+      }),
+    ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 126,
+    }),
+  },
+
+  /* Scenario 2 — Business Hours Only (Time gate).
+     (the only finance-function app in the catalogue). This puts a THIRD policy on
+     'workday' alongside the seeded `finance-high` and the Scenario 1 fixture; see
+     gap 2.9 — precedence between them is store array order and nothing else.
+   */
+  {
+    id: 'uc2-business-hours',
+    name: 'Finance Dashboard — working hours only',
+    type: 'App Access',
+    appId: 'finance-dashboard',
+    status: 'active',
+    lastModified: 'Yesterday',
+    modifiedBy: 'Jaspreet T.',
+    audience: audienceOf(['accounts']),
+    rules: [
+      rule({
+        name: 'Working hours',
+        /* Two of the scenario's three conditions. `Timezone = Asia/Kolkata` has
+           NO condition in the catalogue and is dropped — see gap 2.2. */
+        when: when(
+          card(
+            cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
+            cond('time', 'between', ['09:00', '19:00']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        /* Catalogue-true (`AUTH_METHODS`), editor-invisible (`rule-form.METHODS`).
+           See gap 2.4. */
+        secondFactorMethods: ['Google Authenticator'],
+        matchEstimate: 71,
+      }),
+    ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 15,
+    }),
+  },
+
+  /* Scenario 3 — Country Allowlist (Location gate).
+     Doc app: Salesforce — 'salesforce' EXISTS. It is already claimed by the
+     seeded `zero-trust` policy (status 'active'); see gap 3.2.
+     Doc target: `Default Group` (includes everyone) → the `EVERYONE` flag. */
+  {
+    id: 'uc3-country-allowlist',
+    name: 'Salesforce — India and US only',
+    type: 'App Access',
+    appId: 'salesforce',
+    status: 'active',
+    lastModified: '3 days ago',
+    modifiedBy: 'Mehak Garg',
+    audience: EVERYONE,
+    rules: [
+      rule({
+        name: 'Allowed countries',
+        /* Multi-value = OR. Both values exist in the hardcoded five-item option
+           list; a sixth country could not be named at all. See gap 3.3. */
+        when: when(card(cond('country', 'is', ['India', 'United States']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        /* The one clean mapping in all four scenarios:
+           `2F: ALLOW_ANY (2-factor type)` → secondFactor: 'any'. */
+        secondFactor: 'any',
+        matchEstimate: 1183,
+      }),
+    ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 57,
+    }),
+  },
+
+  /* Scenario 4 — Registered Devices Only (Device gate).
+     Doc app: "Code Repository (GitLab)" — GitLab does NOT exist in `apps`.
+     Nearest real id: 'github' (GitHub Enterprise). Already claimed by the seeded
+     `eng-vpn` policy, but at status 'monitor', which does not decide sign-ins
+     (`app-policies.decidesFor` requires `enforces`), so there is no live
+     precedence collision — only an indistinguishable pair of "assignments".
+     Doc target: Group `Engineering` → 'engineering' EXISTS (310). */
+  {
+    id: 'uc4-registered-devices',
+    name: 'Code repository — trusted device required',
     type: 'App Access',
     appId: 'github',
-    /* Seeded in monitor rather than inactive, so the state exists in the demo
-       estate and not only in the type. Its first rule denies everything off the
-       corporate ASN, which is precisely the kind of rule nobody should switch
-       on without watching it for a week first. */
-    status: 'monitor',
-    lastModified: '2 weeks ago',
+    status: 'active',
+    lastModified: '4 days ago',
     modifiedBy: 'Mehak Garg',
     audience: audienceOf(['engineering']),
     rules: [
-      rule({ name: 'Require corporate ASN', when: when(card(cond('zone', 'not in zone', ['asn']))), decision: 'deny', matchEstimate: 310 }),
-      rule({ name: 'Known device',when: when(card(cond('device-reg', 'is', ['Registered']))), decision: '1fa', matchEstimate: 280 }),
-      rule({ name: 'Everything else',decision: '2fa', matchEstimate: 30 }),
+      rule({
+        name: 'Trusted device (either root)',
+        /* The doc's OR form 2 — cross-attribute ANY OF. Two cards ARE the
+           disjunction: `Predicate.join` defaults to 'or' and each card's own
+           join defaults to 'and', so this is exactly
+           (device-reg = Registered) OR (mdm = Enrolled).
+           This is the ONE predicate-shape requirement in S1–S4 and the model
+           carries it natively. */
+        when: when(
+          namedCard('Registered with IAM', cond('device-reg', 'is', ['Registered'])),
+          namedCard('Enrolled in MDM', cond('mdm', 'is', ['Enrolled'])),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        /* The ONLY method name in all four scenarios present in BOTH
+           `AUTH_METHODS` and the editor's `rule-form.METHODS`. */
+        secondFactorMethods: ['miniOrange Push'],
+        matchEstimate: 268,
+      }),
     ],
-  },
-  {
-    id: 'idle-session',
-    name: 'Idle Session Timeout',
-    type: 'Session',
-    appId: 'jira',
-    status: 'active',
-    lastModified: '3 weeks ago',
-    modifiedBy: 'System',
-    audience: EVERYONE,
-    rules: [
-      rule({ name: 'Standard idle window',when: when(card(cond('trust-age', 'over', ['15']))), decision: '1fa', matchEstimate: 1240 }),
-      rule({ name: 'Shorter for contractors',when: when(card(cond('group', 'in', ['contractors']), cond('user-type', 'is', ['Contractor']))), decision: '2fa', matchEstimate: 154 }),
-    ],
+    fallback: rule({
+      name: 'Default rule',
+      when: anySignIn(),
+      decision: 'deny',
+      matchEstimate: 42,
+    }),
   },
 ]
 

@@ -307,11 +307,14 @@
 .bb__reach.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-dot: var(--fb-positive-dot, #128f43); }
 
 .bb__cardhead {
-  /* Four columns now: the index, the fold, the title, and the right-hand
-     cluster. The fold moved to the leading edge because on the right it was
-     stranded mid-head by the hover actions, which reserve their width at zero
-     opacity — see RuleCard. A tighter gap after the index, because those two
-     are one group. */
+  /* Four columns: the index, the fold, the title, and the toggle.
+
+     The fourth used to hold the hover actions as well, reserving their width at
+     zero opacity so the head would not reflow when they appeared. They are
+     outside the card now — see `.bb__acts` — so the column is the toggle's own
+     width and the title gets the rest. The fold stays on the leading edge: it
+     moved there because the right-hand cluster stranded it mid-head, and it
+     reads better beside the index either way. */
   display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-4);
   padding: var(--space-4) var(--space-5) var(--space-3) var(--space-4);
 }
@@ -369,8 +372,44 @@ button.bb__idx svg { display: none; }
 .bb__state.is-off::before { background: var(--border-strong); }
 
 /* Card actions: shown on hover or selection, never a hidden menu. */
-.bb__acts { display: inline-flex; gap: 2px; opacity: 0; transition: opacity 0.15s ease; }
-.bb__card:hover .bb__acts, .bb__card.is-selected .bb__acts, .bb__card:focus-within .bb__acts { opacity: 1; }
+/* Outside the card, on its right edge, only while it is the card in hand.
+
+   It was a row of four buttons inside the head, sharing the line with the
+   title, the state and the toggle — and reserving its width at zero opacity so
+   the layout would not jump when it appeared. That reservation is the cost: a
+   quarter of the head permanently held for controls that are not there, on
+   every card in the chain, so a rule with a long name truncated to make room
+   for nothing.
+
+   Floated out, the head is the title and the toggle and nothing else, the
+   reservation disappears, and the controls arrive where they cannot cover the
+   name they act on.
+
+   ABOVE the card, not beside it. Beside was the first placement and the board
+   settles it: a card near the right edge of the canvas sits under the
+   inspector, so the strip opened half-hidden behind a panel — a control that is
+   sometimes there is worse than one that is always in the way. There is always
+   room above, because the chain puts a gap between every pair of cards.
+
+   `pointer-events: none` at rest matters more than it looks: an invisible strip
+   sitting over the canvas by every card would otherwise swallow clicks meant
+   for the board, and drags meant for the card behind it. */
+.bb__acts {
+  position: absolute;
+  right: var(--space-4); bottom: 100%;
+  margin-bottom: 5px;
+  z-index: 2;
+  display: inline-flex; gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+.bb__card:hover .bb__acts, .bb__card.is-selected .bb__acts, .bb__card:focus-within .bb__acts {
+  opacity: 1; pointer-events: auto;
+}
 .bb__act {
   display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-sm);
   border: none; background: none; color: var(--text-muted); cursor: pointer;
@@ -2089,7 +2128,20 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 
    `text-align: left` because the empty state centres its text and the list is
    not text. */
-.bb__ifblank__pick { width: 100%; margin-top: var(--space-2); text-align: left; }
+/* Out past the empty state's own padding, so "full width" means the pane's
+   width rather than what is left of it.
+
+   `.bb__ifblank` pads itself generously — it is a centred column of a mark, a
+   heading and a sentence, and that air is most of what makes it read as an
+   empty state rather than as a broken one. The list is not part of that column.
+   Negative margins on exactly the horizontal padding, so the two can disagree
+   without either being wrong. */
+.bb__ifblank__pick {
+  width: auto;
+  align-self: stretch;
+  margin: var(--space-2) calc(var(--space-6) * -1) 0;
+  text-align: left;
+}
 /* Inside the state the adders are the point, so they lose the `align-self` the
    footer version carries. */
 .bb__ifblank__acts .bb__ifaddgroup { margin-top: 0; }

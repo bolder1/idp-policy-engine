@@ -104,6 +104,73 @@ describe('the stylesheets', () => {
     expect(swallowed).toEqual([])
   })
 
+  /* A stylesheet still has the rules its screen is built out of.
+
+     The two checks above are about a sheet that has been CORRUPTED. This one is
+     about a sheet that has been silently EMPTIED, which is a different failure
+     and the one that actually happened: an edit script sliced from one marker to
+     another, the second marker resolved two thousand lines further down the file
+     than intended, and `board.css` went from 3,146 rules to 823 in one commit.
+
+     Nothing caught it. Braces stayed balanced, because a truncation removes
+     matched pairs. No rule was swallowed by a comment. `tsc` does not read CSS.
+     `npm run build` succeeded. The tests passed. The board rendered as unstyled
+     text for five commits, and the only reason it was noticed at all is that
+     somebody looked at it.
+
+     So: the load-bearing selector of each region the board draws, asserted to
+     exist. Not every class — a list that tracks every rule would be rewritten
+     with every change and would teach people to update it without reading it.
+     One anchor per region is enough, because the failure this guards against
+     removes regions wholesale.
+
+     `bb__idx__n` and `bb__ifpick` are deliberately absent from this list: both
+     are rendered by the board and neither has ever had a rule, which is a real
+     if minor oversight and not the thing being tested here. */
+  const ANCHORS: [string, string[]][] = [
+    [
+      './screens/board/board.css',
+      [
+        '.bb ', // the region itself
+        '.bbtop', // the flat top row
+        '.bb__stage',
+        '.bb__world',
+        '.bb__empty', // the chooser, when there are no rules
+        '.bb__chain', // the chain, when there are
+        '.bb__start',
+        '.bb__link',
+        '.bb__card',
+        '.bb__idx',
+        '.bb__dock',
+        '.bb__float',
+        '.bb__insp',
+        '.bb__insphead',
+        '.bb__sheet',
+        '.bb__grip',
+        '.bb__if', // a condition row
+        '.bb__rule',
+      ],
+    ],
+    [
+      './create/create.css',
+      ['.bmarket', '.bmarket__hero', '.bmarket__rail', '.bmarket__body', '.bgcard', '.bgcard__cat'],
+    ],
+  ]
+
+  it('keeps a rule for every region its screen draws', () => {
+    for (const [path, anchors] of ANCHORS) {
+      const css = SHEETS[path]
+      expect(`${path} found`, `${path} is not in the glob`).toBe(css ? `${path} found` : `${path} MISSING`)
+      /* Comments are stripped first. This file is heavily commented and several
+         of these selectors are discussed in prose — a check that counted a
+         mention as a rule would pass on a file that had been emptied and
+         annotated, which is very nearly what happened. */
+      const rules = css.replace(/\/\*[\s\S]*?\*\//g, '')
+      const missing = anchors.filter((a) => !rules.includes(a))
+      expect(missing, `${path} has no rule for`).toEqual([])
+    }
+  })
+
   it('never leaves an at-rule with a wholly empty body', () => {
     /* The other half of the same delete. An `@media` whose rules have all been
        removed is dead weight, and the edit that empties it is one keystroke

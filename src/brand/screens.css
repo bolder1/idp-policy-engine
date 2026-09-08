@@ -83,8 +83,25 @@
 .btable tbody tr:last-child td { border-bottom: none; }
 .btable tbody tr { transition: background var(--dur-fast) var(--ease-standard); }
 .btable tbody tr:hover { background: var(--surface-sunken); }
-.btable tbody tr.is-system { background: var(--brand-subtle-bg); }
-.btable tbody tr.is-system:hover { background: var(--brand-subtle-bg); }
+/* The system policy is the FLOOR under the list, not a highlight in it.
+
+   It was washed in `--brand-subtle-bg` — the only warm thing in a table of
+   neutrals, which made the one row nobody can edit the loudest, in the colour
+   this console otherwise reserves for the button that publishes. The row also
+   held that fill on hover, so it was the one row in the table that did not
+   answer the pointer: permanently lit, and inert.
+
+   Nothing is added back. Three things already say what it is, and none of them
+   is a colour: the badge reads "System", the row is PINNED to the top whatever
+   the sort is doing (see `rows` in Policies.tsx), and its cells carry a heavier
+   rule underneath than the hairline between the tenant's own policies. That
+   last one is the whole drawing — the same separation a totals row gets, which
+   is the right idiom: it is not one of the ten below it, it is what is left
+   when none of them matches.
+
+   The hover comes back with the fill going, so the row behaves like every other
+   row in a table where it is just as clickable. */
+.btable tbody tr.is-system td { border-bottom: var(--bw-thin) solid var(--border-strong); }
 
 .btable__primary { display: flex; align-items: center; gap: var(--space-4); min-width: 230px; }
 .btable__link {

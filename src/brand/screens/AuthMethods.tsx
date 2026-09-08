@@ -506,13 +506,11 @@ function SetupModal({
       width={640}
       footer={
         <>
-          <span className="bm8__setupnote">
-            {missing.length === 0
-              ? 'Everything required is filled in.'
-              : `${missing.length} required field${missing.length === 1 ? '' : 's'} left: ${missing
-                  .map((f) => f.label)
-                  .join(', ')}`}
-          </span>
+          {/* Named its missing fields, which is the most defensible version
+              of this line anywhere in the console — and still redundant. Every
+              required field carries its own marker, and each collapsed group
+              header carries its own "N required", so a closed section still
+              says whether anything in it is outstanding. */}
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>

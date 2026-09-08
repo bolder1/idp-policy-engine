@@ -17,23 +17,20 @@
 
 .bdlg { display: flex; flex-direction: column; }
 
-/* Sits in the modal footer, left of the buttons, and carries the count or the
-   reason the primary action is disabled. Disabled-with-no-reason is the failure
-   this exists to prevent. */
-.bdlg-foot__note {
-  margin-right: auto;
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-4);
-  font-size: var(--fs-sm);
-  color: var(--text-secondary);
-}
-.bdlg-foot__note em {
-  font-style: normal;
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-}
-.bdlg-foot__note.is-blocked { color: var(--fb-negative-fg); font-weight: var(--fw-medium); }
+/* The footer note has gone from every form in the console, and this is the
+   argument it took with it: "Disabled-with-no-reason is the failure this exists
+   to prevent."
+
+   That failure is real and the answer was in the wrong place. A reason parked
+   beside the button is a reason nobody reads — the eye is on the control, not
+   on the sentence to its left — and it is always a SECOND telling of something
+   the form is already showing: the empty required field, the list of errors in
+   the body, the marker on the row. Each of those is at the thing it is about,
+   which is where a reason has to be to do any work.
+
+   What the line reliably added was a second reading order in the footer: a
+   paragraph and two buttons on one row, where the buttons are the only reason
+   anybody is looking at that row. */
 
 .bdlg-empty {
   margin: 0;

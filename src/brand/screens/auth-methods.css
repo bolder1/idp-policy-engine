@@ -444,13 +444,6 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
   font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary);
 }
 
-/* Names what is still missing rather than only disabling Save. A greyed button
-   with no reason beside it is a dead end you have to hunt for. */
-.bm8__setupnote {
-  flex: 1; min-width: 0;
-  font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.45;
-}
-
 /* --- Prerequisites, and the grouped form -------------------------------------------
    RSA is twenty-six fields with two required. Ungrouped it is one scroll where
    the two that matter are indistinguishable from the twenty-four that ship with

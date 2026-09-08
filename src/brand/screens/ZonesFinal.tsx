@@ -896,7 +896,6 @@ function DuplicateZoneModal({
       width={460}
       footer={
         <>
-          <span className="bz7__foot">{clean ? '' : 'Name the copy to continue.'}</span>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
@@ -983,7 +982,6 @@ function NameOnlyModal({
       width={460}
       footer={
         <>
-          <span className="bz7__footnote">You choose what it matches on next.</span>
           <Button variant="ghost" onClick={close}>
             Cancel
           </Button>

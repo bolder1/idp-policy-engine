@@ -434,7 +434,7 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 .bz7__hitnote.is-warn { color: var(--fb-notice-fg); }
 .bz7__nohit { padding: 14px; text-align: center; font-size: var(--fs-sm); color: var(--text-muted); }
 
-.bz7__footnote { flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
 
 @media (max-width: 860px) {
   /* Declared once. There were two of these, the first dead — and the columns
@@ -671,7 +671,7 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg);
 }
 /* Says WHY the primary is disabled, at the moment it is. */
-.bz7__foot { flex: 1; font-size: var(--fs-sm); color: var(--text-muted); }
+
 
 /* --- Duplicating a zone -----------------------------------------------------
    "Duplicate" is the one row action whose scope a reader cannot get from the

@@ -910,28 +910,6 @@ function CreateModal({
     )
   }
 
-  const footnote = () => {
-    if (at === 0) {
-      if (!named) return 'Name the profile to continue.'
-      return steps.length === 3
-        ? 'Next: what the collector can read.'
-        : 'Next: what a device must be running.'
-    }
-    if (at === 1 && steps.length === 3) {
-      if (reach === null) return 'Choose what the collector can read.'
-      const blocked = blockedAttributes(mode, reach)
-      return reach === 'agent'
-        ? `All ${attributesFor(mode).length} attributes are available. The agent is Windows only.`
-        : `${blocked.length} of ${attributesFor(mode).length} attributes need an agent and will not be offered.`
-    }
-    if (offeredPicked.length === 0) {
-      return mode === 'os'
-        ? 'Pick at least one. A profile that requires nothing lets every device through.'
-        : 'Pick at least one. A profile that watches nothing cannot tell one device from another.'
-    }
-    return `${countLabel(mode, offeredPicked.length)}. Everything set here is live the moment it is created.`
-  }
-
   const title =
     at === 0
       ? 'Create a device profile'
@@ -953,8 +931,12 @@ function CreateModal({
       title={title}
       width={width}
       footer={
+        /* No footnote. It said "Name the profile to continue", then "Next: what
+           the collector can read", then a count — three sentences narrating a
+           form that is on the screen above them. The name field is empty and
+           focused, which is what says the name is missing; the step ladder at
+           the top of the body says where Next goes. */
         <>
-          <span className="bfp2__footnote">{footnote()}</span>
           <Button variant="ghost" onClick={at === 0 ? onClose : () => setAt(at - 1)}>
             {at === 0 ? 'Cancel' : 'Back'}
           </Button>
@@ -2103,11 +2085,6 @@ function AddModal({
       width={profile.mode === 'os' ? 760 : 1000}
       footer={
         <>
-          <span className="bfp2__footnote">
-            {picked.length === 0
-              ? `Pick at least one. A profile with no ${noun.many} decides nothing.`
-              : countLabel(profile.mode, picked.length)}
-          </span>
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
@@ -2187,13 +2164,6 @@ function ReachDialog({
       width={560}
       footer={
         <>
-          <span className="bfp2__footnote">
-            {!changed
-              ? 'Nothing changes.'
-              : dropped.length > 0
-                ? `${countLabel(profile.mode, dropped.length)} and their settings will be removed.`
-                : `All ${attributesFor(profile.mode).length} attributes become available.`}
-          </span>
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>

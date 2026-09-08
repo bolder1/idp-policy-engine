@@ -271,7 +271,9 @@ function HookForm({
 
   const set = (p: Partial<Hook>) => setDraft((d) => ({ ...d, ...p }))
   const issues = validateHook(draft)
-  const errors = issues.filter((i) => i.level === 'error')
+  /* `errors` — the count that stood beside the Save button — has gone with it.
+     `canSaveHook` is what gates the button and always was; the list of issues
+     in the form body is what says why. */
 
   return (
     <Modal
@@ -281,9 +283,8 @@ function HookForm({
       width={640}
       footer={
         <>
-          <span className="bdlg-foot__note">
-            {errors.length > 0 ? `${errors.length} thing${errors.length === 1 ? '' : 's'} to fix first` : 'Referenced by name from any rule.'}
-          </span>
+          {/* The form already lists every issue in `.bhk__formissues`, so
+              this was a count of a list two centimetres above it. */}
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>

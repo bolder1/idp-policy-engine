@@ -352,7 +352,7 @@
 .bnew__opt:hover { border-color: var(--brand); }
 .bnew__opt strong { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
 .bnew__opt span { display: block; margin-top: 2px; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.45; }
-.bnew__foothint { margin-right: auto; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
 
 .bname { display: flex; flex-direction: column; gap: var(--space-7); }
 .bname__from {

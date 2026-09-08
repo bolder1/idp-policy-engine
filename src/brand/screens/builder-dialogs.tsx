@@ -90,11 +90,9 @@ export function ReviewDialog({
       width={680}
       footer={
         <>
-          {errors.length > 0 && (
-            <span className="bdlg-foot__note is-blocked">
-              {errors.length} error{errors.length === 1 ? '' : 's'} to fix before this can be saved
-            </span>
-          )}
+          {/* The count went from here. Every one of those errors is printed
+              in full against its own rule in the list above — a number beside
+              the button was the same fact, worse, and second. */}
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
@@ -436,9 +434,6 @@ export function CopyRuleDialog({
       width={620}
       footer={
         <>
-          <span className="bdlg-foot__note">
-            An independent copy. Later edits to either one do not reach the other.
-          </span>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>

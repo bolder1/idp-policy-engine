@@ -735,7 +735,7 @@
 .bfp2__selectall:hover { text-decoration: underline; }
 .bfp2__selectall:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
 
-.bfp2__footnote { flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
 .bfp2__none { padding: 22px; text-align: center; font-size: var(--fs-md); color: var(--text-tertiary); }
 
 

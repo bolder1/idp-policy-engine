@@ -42,7 +42,7 @@ import {
   UserRound,
 } from 'lucide-react'
 
-import { Button, Drawer, MenuButton, Modal, NumberStepper, TipDot, Toggle } from '../kit'
+import { Button, Drawer, MenuButton, NumberStepper, TipDot, Toggle } from '../kit'
 import { TierPick } from '../tier-pick'
 import {
   CATEGORIES,
@@ -81,6 +81,7 @@ import {
   type ProfileMode,
   type ProfileReach,
   type Registration,
+  type Roster,
 } from '../fingerprint'
 import { useBrand } from '../store'
 import { EmptyState } from '../empty'
@@ -175,7 +176,7 @@ export function DeviceFingerprintV2() {
         />
       )}
 
-      <CreateModal open={creating} onClose={() => setCreating(false)} onCreate={create} />
+      <CreateDrawer open={creating} onClose={() => setCreating(false)} onCreate={create} />
     </div>
   )
 }
@@ -802,29 +803,36 @@ function WizSteps({ steps, at }: { steps: string[]; at: number }) {
 
 /* --- Create ------------------------------------------------------------------
 
-   Two steps, or three, and which one you get is a property of the KIND rather
-   than a step somebody skips.
+   A slide-over, not a centred dialog, and three steps for both kinds.
 
-   · **OS and version** — name it, then say what a device must be running. Two.
-     Everything this kind reads arrives with the request, so there is no
-     collection question to ask: `asksReach('os')` is false because nothing in
-     that catalogue carries `needsAgent`, and a question whose two answers lead
-     to the same list is not a question.
-   · **Device attributes** — name it, say what the collector can read, then pick
-     and tune. Three, and the middle one is load-bearing: it decides which
-     attributes EXIST at the step after it.
+   It was a modal, and it outgrew one. A modal is right for a question — name
+   this, confirm that — and this is a form: a name, a choice of kind, a
+   collector, four enrolment rows, and a catalogue of up to thirty-eight
+   attributes each of which opens its own settings. At 620px that was a column
+   of controls in a box floating over a page it had nothing to do with; at
+   1000px it was a box with almost no page left around it, which is a modal
+   pretending to be a screen. A panel that slides in from the edge is the shape
+   this already was — it keeps the list it came from visible beside it, it can
+   be dragged wider for the step that needs it, and it does not have to choose
+   a width that suits both a text field and a five-category picker.
 
-   That middle step used to be the first row of a panel on the detail page,
-   which put it AFTER the attributes it governs. You chose eighteen signals and
-   discovered, on a different surface, that half of them never arrive — and the
-   picker had no way to say so, because the answer had not been given yet.
+   THE STEPS
 
-   The last step now sets values as well as choosing rows, which is the other
-   half of the same idea: a wizard should hand back a finished profile. It used
-   to hand back a scoped one — ticked attributes, every value at its default,
-   and a detail page you had to visit to make it mean anything.
+     1  Profile       what it is called, and which of the two kinds it is
+     2  Devices       what the collector can read (the kind that is asked), and
+                      how machines enrol — order matters, a roster needs MAC and
+                      MAC needs an agent
+     3  Requirements  the catalogue, and every ticked row's own settings
+        / Attributes
+
+   The middle step is new for the OS kind, which had two. That is not the
+   collector question arriving there — `asksReach('os')` is still false and the
+   cards still do not render — it is the enrolment question, which both kinds
+   have to answer and which neither was asked. It used to be a panel of defaults
+   on the detail page that every new profile arrived holding without anybody
+   having said so, which is exactly what `restrictionSet` exists to admit.
    -------------------------------------------------------------------------- */
-function CreateModal({
+function CreateDrawer({
   open,
   onClose,
   onCreate,
@@ -837,22 +845,23 @@ function CreateModal({
   const [name, setName] = useState('')
   const [mode, setMode] = useState<ProfileMode>('os')
   /* Null, not `'agentless'`. A default here would let the question be skipped,
-     and the whole reason it moved to a step of its own is that it is an answer
-     somebody gives rather than a setting that happens to have a value. */
+     and the whole reason it is a step is that it is an answer somebody gives
+     rather than a setting that happens to have a value. */
   const [reach, setReach] = useState<ProfileReach | null>(null)
   const [picked, setPicked] = useState<string[]>([])
   const [config, setConfig] = useState<Record<string, AttrConfigValue>>({})
   const [weights, setWeights] = useState<Record<string, number>>({})
+  const [registration, setRegistration] = useState<Registration>('self')
+  const [autoRegister, setAutoRegister] = useState(false)
+  const [maxDevices, setMaxDevices] = useState<number | null>(DEFAULT_MAX_DEVICES)
 
   /* Cleared on the way IN, not on the way out.
 
-     The dialog never unmounts, so something has to blank it between uses. Doing
-     it on close means either a visible snap back to step one while the dialog
-     is still animating away, or a timer to outlast the animation — and a timer
-     races the user: close on the last step, re-open inside the delay, and the
-     pending reset fires under an open dialog. Clearing on open has neither
-     problem. The copy on its way out keeps showing what you left, which is what
-     it should show. */
+     The panel never unmounts, so something has to blank it between uses. Doing
+     it on close means either a visible snap back to step one while it is still
+     animating away, or a timer to outlast the animation — and a timer races the
+     user: close on the last step, re-open inside the delay, and the pending
+     reset fires under an open panel. Clearing on open has neither problem. */
   useEffect(() => {
     if (!open) return
     setAt(0)
@@ -862,6 +871,9 @@ function CreateModal({
     setPicked([])
     setConfig({})
     setWeights({})
+    setRegistration('self')
+    setAutoRegister(false)
+    setMaxDevices(DEFAULT_MAX_DEVICES)
   }, [open])
 
   const steps = stepsFor(mode)
@@ -869,9 +881,9 @@ function CreateModal({
 
   /* A permissive draft and a strict write.
 
-     `picked` is never filtered as you move between steps, so going back from
-     the attributes to the collector, flipping to agentless and returning HIDES
-     the agent-only rows and flipping back RESTORES them — which is what a Back
+     `picked` is never filtered as you move between steps, so going back from the
+     catalogue to the collector, flipping to agentless and returning HIDES the
+     agent-only rows and flipping back RESTORES them — which is what a Back
      button is for. What gets written is `offeredPicked`, so no incoherent
      profile can be created even transiently, and nothing is silently deleted
      from under you on the way past. */
@@ -879,7 +891,7 @@ function CreateModal({
   const offeredPicked = picked.filter((id) => offered.some((a) => a.id === id))
 
   const named = name.trim().length > 0
-  const canAdvance = at === 0 ? named : at === 1 && steps.length === 3 ? reach !== null : true
+  const canAdvance = at === 0 ? named : at === 1 ? !asksReach(mode) || reach !== null : true
   const canSave = named && offeredPicked.length > 0
 
   const save = () => {
@@ -897,45 +909,49 @@ function CreateModal({
         /* Agentless on an OS profile is not a default nobody chose: it is what
            those five attributes actually need. They arrive with the request. */
         reach: reach ?? 'agentless',
-        registration: 'self',
-        maxDevices: DEFAULT_MAX_DEVICES,
+        registration,
+        maxDevices,
         roster: null,
-        autoRegister: false,
-        /* Enrolment is still unanswered — three questions this dialog does not
-           ask, and until somebody does the panel shows an empty state rather
-           than presenting "self-service, three devices" as a decision. */
-        restrictionSet: false,
+        autoRegister,
+        /* True, and it is the point of the Devices step. This used to ship
+           false on every new profile — "self-service, three devices" presented
+           as a configuration nobody had chosen — because nothing asked. */
+        restrictionSet: true,
         usedIn: 0,
       }),
     )
   }
 
-  const title =
+  /* The step's own question, as the panel's caption. The title stays put: a
+     panel that renames itself on every press is one you have to re-read to know
+     you are still in the same place. */
+  const caption =
     at === 0
-      ? 'Create a device profile'
-      : at === 1 && steps.length === 3
-        ? `What ${name.trim()} can read`
+      ? 'What it is called, and how it decides.'
+      : at === 1
+        ? asksReach(mode)
+          ? 'What the collector can read, and how machines enrol.'
+          : 'How machines enrol, and how many each person may keep.'
         : mode === 'os'
-          ? `What a device must be running — ${name.trim()}`
-          : `What identifies a device — ${name.trim()}`
-
-  /* 620 for the two questions, wider for the catalogue — and 760 rather than
-     900 for the five. A row is a name, a sentence and a control now; at 900 the
-     control ends up a third of a screen from the name it belongs to. */
-  const width = at === 0 || (at === 1 && steps.length === 3) ? 620 : mode === 'os' ? 760 : 1000
+          ? 'Everything a device has to satisfy.'
+          : 'Every signal it watches, and what each one counts for.'
 
   return (
-    <Modal
+    <Drawer
       open={open}
       onClose={onClose}
-      title={title}
-      width={width}
-      footer={
-        /* No footnote. It said "Name the profile to continue", then "Next: what
-           the collector can read", then a count — three sentences narrating a
-           form that is on the screen above them. The name field is empty and
-           focused, which is what says the name is missing; the step ladder at
-           the top of the body says where Next goes. */
+      title="New device profile"
+      caption={caption}
+      /* Wide enough for the catalogue step, draggable for the one time in ten
+         somebody wants the whole of Hardware on screen at once. The first two
+         steps do not need 760 and are not hurt by it — the fields inside them
+         have their own widths, so the extra space is margin rather than
+         stretched controls. */
+      width={760}
+      resizable
+      minWidth={560}
+      maxWidth={1120}
+      actions={
         <>
           <Button variant="ghost" onClick={at === 0 ? onClose : () => setAt(at - 1)}>
             {at === 0 ? 'Cancel' : 'Back'}
@@ -986,12 +1002,17 @@ function CreateModal({
                     /* The two do not share a catalogue, so a ticked row cannot
                        survive the switch — and neither can a value set against
                        it. Clearing here rather than filtering at the end means
-                       the count in the footer is never briefly a lie. */
+                       no count in this panel is ever briefly a lie. */
                     setMode(m.id)
                     setPicked([])
                     setConfig({})
                     setWeights({})
                     setReach(null)
+                    /* A roster needs an agent, and an OS profile has none. */
+                    if (m.id === 'os') {
+                      setRegistration('self')
+                      setMaxDevices((n) => n ?? DEFAULT_MAX_DEVICES)
+                    }
                   }}
                 >
                   <span className="bfp2__mode-ico" aria-hidden>
@@ -1001,7 +1022,7 @@ function CreateModal({
                     <strong>{m.label}</strong>
                     <em>{m.blurb}</em>
                     <i className="bfp2__mode-steps">
-                      {stepsFor(m.id).length} steps · {attributesFor(m.id).length} attributes
+                      {attributesFor(m.id).length} attributes to choose from
                     </i>
                   </span>
                   {mode === m.id && (
@@ -1014,61 +1035,105 @@ function CreateModal({
         </div>
       )}
 
-      {at === 1 && steps.length === 3 && (
+      {at === 1 && (
         <div className="bfp2__form">
-          <p className="bfp2__stephint">
-            This decides which attributes exist at the next step. Hardware identifiers — the TPM,
-            the motherboard, the disk — need software running on the machine. Everything else
-            arrives with the request.
-          </p>
+          {asksReach(mode) && (
+            <section className="bfp2__wizsection">
+              <h4>What the collector can read</h4>
+              <p className="bfp2__stephint">
+                This decides which attributes exist at the next step. Hardware identifiers — the
+                TPM, the motherboard, the disk — need software running on the machine. Everything
+                else arrives with the request.
+              </p>
 
-          <fieldset className="bfp2__modes" aria-label="What the collector can read">
-            {REACHES.map((r) => {
-              const Ico = REACH_ICON[r.id]
-              return (
-                <button
-                  key={r.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={reach === r.id}
-                  className={`bfp2__mode-card ${reach === r.id ? 'is-on' : ''}`}
-                  onClick={() => setReach(r.id)}
-                >
-                  <span className="bfp2__mode-ico" aria-hidden>
-                    <Ico size={17} strokeWidth={1.8} />
-                  </span>
-                  <span className="bfp2__mode-body">
-                    <strong>{r.label}</strong>
-                    <em>{r.blurb}</em>
-                    {r.note && (
-                      <i className="bfp2__mode-note">
-                        <AlertTriangle size={11} strokeWidth={2.2} aria-hidden />
-                        {r.note}
-                      </i>
-                    )}
-                  </span>
-                  {reach === r.id && (
-                    <Check size={15} strokeWidth={2.6} className="bfp2__mode-tick" aria-hidden />
+              <fieldset className="bfp2__modes" aria-label="What the collector can read">
+                {REACHES.map((r) => {
+                  const Ico = REACH_ICON[r.id]
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={reach === r.id}
+                      className={`bfp2__mode-card ${reach === r.id ? 'is-on' : ''}`}
+                      onClick={() => {
+                        setReach(r.id)
+                        /* A roster is matched on MAC, so going agentless takes
+                           the option away — and the answer already given with
+                           it, rather than leaving a selected value the next
+                           dropdown will not offer. */
+                        if (r.id === 'agentless') {
+                          setRegistration('self')
+                          setMaxDevices((n) => n ?? DEFAULT_MAX_DEVICES)
+                        }
+                      }}
+                    >
+                      <span className="bfp2__mode-ico" aria-hidden>
+                        <Ico size={17} strokeWidth={1.8} />
+                      </span>
+                      <span className="bfp2__mode-body">
+                        <strong>{r.label}</strong>
+                        <em>{r.blurb}</em>
+                        {r.note && (
+                          <i className="bfp2__mode-note">
+                            <AlertTriangle size={11} strokeWidth={2.2} aria-hidden />
+                            {r.note}
+                          </i>
+                        )}
+                      </span>
+                      {reach === r.id && (
+                        <Check size={15} strokeWidth={2.6} className="bfp2__mode-tick" aria-hidden />
+                      )}
+                    </button>
+                  )
+                })}
+              </fieldset>
+
+              {/* The size of the difference, as a number that moves when you
+                  click. The card says what agent-based costs and the hint says
+                  what the question decides; this says what the answer is worth
+                  — which is the one thing the old panel could never show,
+                  because it was chosen on the same surface as everything else
+                  and had no next step to describe. */}
+              {reach && (
+                <p className="bfp2__reachstat">
+                  <strong>{offered.length}</strong> of {attributesFor(mode).length} attributes
+                  available
+                  {blockedAttributes(mode, reach).length > 0 && (
+                    <em>{blockedAttributes(mode, reach).length} need an agent</em>
                   )}
-                </button>
-              )
-            })}
-          </fieldset>
-
-          {/* The size of the difference, as a number that moves when you click.
-              The card says what agent-based costs and the hint says what the
-              question decides; this says what the answer is worth — which is the
-              one thing the old panel could never show, because it was chosen on
-              the same surface as everything else and had no next step to
-              describe. */}
-          {reach && (
-            <p className="bfp2__reachstat">
-              <strong>{offered.length}</strong> of {attributesFor(mode).length} attributes available
-              {blockedAttributes(mode, reach).length > 0 && (
-                <em>{blockedAttributes(mode, reach).length} need an agent</em>
+                </p>
               )}
-            </p>
+            </section>
           )}
+
+          {/* Below the collector, because it depends on it. Dimmed until the
+              question above is answered rather than hidden — a section that
+              appears out of nowhere on a press is a step that grew, and this
+              one is on the page from the start so the shape of the form is
+              honest before you touch it. */}
+          <section
+            className={`bfp2__wizsection ${asksReach(mode) && reach === null ? 'is-waiting' : ''}`}
+          >
+            <h4>How devices enrol</h4>
+            {asksReach(mode) && reach === null ? (
+              <p className="bfp2__stephint">Choose what the collector can read first — it decides whether a roster is possible.</p>
+            ) : (
+              <EnrolmentFields
+                mode={mode}
+                reach={reach}
+                registration={registration}
+                autoRegister={autoRegister}
+                maxDevices={maxDevices}
+                roster={null}
+                onChange={(p) => {
+                  if (p.registration !== undefined) setRegistration(p.registration)
+                  if (p.autoRegister !== undefined) setAutoRegister(p.autoRegister)
+                  if (p.maxDevices !== undefined) setMaxDevices(p.maxDevices)
+                }}
+              />
+            )}
+          </section>
         </div>
       )}
 
@@ -1088,11 +1153,11 @@ function CreateModal({
             weights={weights}
             onValue={(id, v) => setConfig((c) => ({ ...c, [id]: v }))}
             onWeight={(id, w) => setWeights((c) => ({ ...c, [id]: w }))}
-            onBack={steps.length === 3 ? () => setAt(1) : undefined}
+            onBack={asksReach(mode) ? () => setAt(1) : undefined}
           />
         </>
       )}
-    </Modal>
+    </Drawer>
   )
 }
 
@@ -1124,8 +1189,9 @@ function ProfilePage({
   onChange: (p: FingerprintProfile) => void
 }) {
   const [adding, setAdding] = useState(false)
-  const [restricting, setRestricting] = useState(false)
-  const [reaching, setReaching] = useState(false)
+  /* One editor, one flag. It was three — `restricting`, `reaching`, and no way
+     to rename at all — which is three doors into one room. */
+  const [editing, setEditing] = useState(false)
   const [summarising, setSummarising] = useState(false)
   const [showUses, setShowUses] = useState(false)
   /* `attrOf(profile.mode, …)`, not a merged lookup. `device-type` is in both
@@ -1190,6 +1256,14 @@ function ProfilePage({
             a thing anybody navigates to, and the two counts disagreeing on the
             same object is worse than either being wrong. */}
         <div className="bfp2__headacts">
+          {/* THE edit. Everything about this profile that is not an attribute
+              is behind it — the name, what it can read, how devices enrol —
+              and every panel below states rather than asks. A page you can read
+              without first working out which parts of it are live. */}
+          <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+            <Sliders size={14} strokeWidth={2} aria-hidden />
+            Edit
+          </Button>
           {/* The whole profile, stated. Everything below this header is an
               editor — the panels answer "what would I change" — and there is no
               surface that answers "what does this thing DO", which is the
@@ -1243,12 +1317,11 @@ function ProfilePage({
               icon={REACH_ICON[profile.reach]}
               label="What it can read"
               tip={`${REACH_META[profile.reach].blurb}${REACH_META[profile.reach].note ? ` ${REACH_META[profile.reach].note}` : ''}`}
+              /* Stated, not changed. It had its own Change button, which made
+                 this the one row on a panel of facts that was also a control —
+                 and the second of three edit affordances on a page that now has
+                 one. */
               value={reachLabel(profile.reach)}
-              action={
-                <Button variant="secondary" size="sm" onClick={() => setReaching(true)}>
-                  Change
-                </Button>
-              }
             />
           )}
 
@@ -1299,14 +1372,12 @@ function ProfilePage({
           one deliberately set to those defaults — and printing "Agentless ·
           self-service · 3 per person" as a configuration is a claim the screen
           cannot support until somebody has actually said so. */}
+      {/* No Edit here. The panel states what was decided; the one Edit in the
+          header is where it is decided — and a new profile arrives with these
+          answered, because the create form asks them on the step where the
+          collector is chosen. */}
       <div className="bfp2__panelhead bfp2__panelhead--page">
         <h3>Device restriction</h3>
-        {profile.restrictionSet && (
-          <Button variant="secondary" size="sm" onClick={() => setRestricting(true)}>
-            <Sliders size={14} strokeWidth={2} aria-hidden />
-            Edit
-          </Button>
-        )}
       </div>
 
       {profile.restrictionSet ? (
@@ -1388,8 +1459,12 @@ function ProfilePage({
             icon={ShieldOff}
             title="Nothing decided yet"
             blurb="How a device gets registered, whether the first sign-in enrols it silently, and how many each person may keep."
+            /* Still an action, and it is the same one the header carries — an
+               empty state whose whole job is to say "nobody has answered this"
+               needs a way to answer it, and pointing somewhere else on the page
+               would make it a sign rather than a door. */
             action={
-              <Button variant="secondary" size="sm" onClick={() => setRestricting(true)}>
+              <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
                 <Sliders size={14} strokeWidth={2} aria-hidden />
                 Configure
               </Button>
@@ -1398,11 +1473,11 @@ function ProfilePage({
         </section>
       )}
 
-      <RestrictionDrawer
-        open={restricting}
+      <EditProfileDrawer
+        open={editing}
         profile={profile}
         onChange={onChange}
-        onClose={() => setRestricting(false)}
+        onClose={() => setEditing(false)}
       />
 
       <div className="bfp2__panelhead bfp2__panelhead--page">
@@ -1491,13 +1566,6 @@ function ProfilePage({
         </section>
       )}
 
-      <ReachDialog
-        open={reaching}
-        profile={profile}
-        onChange={onChange}
-        onClose={() => setReaching(false)}
-      />
-
       <SummaryDrawer
         open={summarising}
         profile={profile}
@@ -1530,7 +1598,7 @@ function ProfilePage({
         )}
       </Drawer>
 
-      <AddModal
+      <AttributesDrawer
         open={adding}
         profile={profile}
         onClose={() => setAdding(false)}
@@ -1826,35 +1894,171 @@ function FormRow({
    and `TIER_WEIGHT` on the way out — which is where a storage format belongs,
    not inside a control shared with a screen that stores tiers directly. */
 
-/* --- Device restriction, in a slide-over ----------------------------------------
+/* --- Enrolment: one definition, two places -------------------------------------
 
-   It was a three-step dialog, and the steps were not arbitrary — they were the
-   dependency order, asked so that each question only appeared while it was
-   still open:
+   How a device gets onto a person's list, and how many they may keep. The
+   attributes decide whether a machine is the SAME one; these decide whether it
+   is allowed to become a known one at all.
 
-     1  what it can READ      agentless or agent, which decides whether a roster
-                              is even possible, since a roster matches on MAC
-                              and MAC is agent-only
-     2  how devices REGISTER  self-service or a roster
-     3  the LIMIT             whichever of those the last answer left
+   It is asked in the create form now, on the step where the collector is
+   chosen, and it is edited from one place afterwards. It used to be editable
+   only — a panel of defaults on the detail page that a new profile arrived
+   holding without anybody having answered them, which is what `restrictionSet`
+   exists to admit. A question worth asking is worth asking while the thing is
+   being made.
 
-   The dependency is real and it stays. What went is the paging. Three steps buy
-   their sequencing at the price of never showing you the shape of the thing:
-   six settings, one screen apart from each other, with a Next between you and
-   the answer you came to change. That is a good trade for a first run and a bad
-   one every time after, and this panel is opened to EDIT far more often than to
-   fill in.
+   One component because the two surfaces must not drift: the same rows, the
+   same dependency order, the same refusals. That order is real and it is why a
+   roster question can disappear rather than grey out — a roster is matched on
+   MAC address, MAC is one of the eighteen things only an agent can read, and it
+   is in the device catalogue only. So an OS-and-version profile cannot use one
+   at any reach, and an agentless device profile cannot either. */
+function EnrolmentFields({
+  mode,
+  reach,
+  registration,
+  autoRegister,
+  maxDevices,
+  roster,
+  onChange,
+}: {
+  mode: ProfileMode
+  /** Null while the collector question is still unanswered on the step above. */
+  reach: ProfileReach | null
+  registration: Registration
+  autoRegister: boolean
+  maxDevices: number | null
+  roster: Roster | null
+  onChange: (p: {
+    registration?: Registration
+    autoRegister?: boolean
+    maxDevices?: number | null
+  }) => void
+}) {
+  const rosterPossible = mode === 'device' && reach === 'agent'
 
-   So: one surface, in dependency order down the page, and a question that no
-   longer applies is not disabled or greyed — it is not rendered. That is what
-   the steps were protecting, and a section that disappears when a roster
-   replaces it says the same thing a skipped step did, without the paging.
+  return (
+    <>
+      {/* Only where it explains something the screen cannot: why the roster
+          option is not offered. The other branch said "either people enrol their
+          own machines, or you supply the list", which is the two options in the
+          dropdown directly below it, read aloud. */}
+      {!rosterPossible && (
+        <p className="bfp2__stephint">
+          {mode === 'os'
+            ? 'An OS and version profile cannot use a roster: a roster is matched on MAC address, which is not one of the things it reads.'
+            : 'An agentless profile cannot use a roster: a roster is matched on MAC address, and MAC is one of the attributes only an agent can read.'}
+        </p>
+      )}
 
-   A slide-over rather than a dialog because it sits beside the profile it
-   edits. A centred modal covers the page, so "what does this profile watch"
-   and "what may it read" cannot be read together, and they are two halves of
-   one question. */
-function RestrictionDrawer({
+      <div className="bfp2__rows bfp2__rows--form">
+        <FormRow
+          icon={UserRound}
+          label="How a device gets registered"
+          tip={
+            registration === 'self'
+              ? 'People enrol their own machines, up to a limit.'
+              : 'Only devices on the uploaded roster may sign in.'
+          }
+        >
+          <select
+            className="bfp2__select"
+            aria-label="How a device gets registered"
+            value={registration}
+            onChange={(e) => {
+              const next = e.target.value as Registration
+              /* The console's own branch: a roster REPLACES the allowance
+                 rather than sitting beside it. */
+              onChange({
+                registration: next,
+                maxDevices: next === 'pre-approved' ? null : (maxDevices ?? DEFAULT_MAX_DEVICES),
+              })
+            }}
+          >
+            {(Object.keys(REGISTRATION_LABEL) as Registration[]).map((r) => (
+              <option key={r} value={r} disabled={r === 'pre-approved' && !rosterPossible}>
+                {REGISTRATION_LABEL[r]}
+              </option>
+            ))}
+          </select>
+        </FormRow>
+
+        <FormRow
+          icon={Repeat}
+          label="Register silently on first sign-in"
+          /* Worth stating rather than leaving to be discovered: the convenience
+             and the hole it opens are the same sentence. */
+          help="Convenient, and it means an attacker's machine registers itself."
+        >
+          <Toggle
+            checked={autoRegister}
+            onChange={(next) => onChange({ autoRegister: next })}
+            label="Register silently on first sign-in"
+            size="sm"
+          />
+        </FormRow>
+
+        {/* One or the other, never both. A question that no longer applies is
+            not disabled or greyed — it is not rendered. */}
+        {registration === 'self' ? (
+          <FormRow
+            icon={Smartphone}
+            label="Devices per person"
+            tip="How many they may register before the next one is refused."
+          >
+            <NumberStepper
+              label="Devices per person"
+              value={maxDevices ?? DEFAULT_MAX_DEVICES}
+              min={1}
+              max={20}
+              onChange={(next) => onChange({ maxDevices: next })}
+            />
+          </FormRow>
+        ) : (
+          <FormRow
+            icon={Server}
+            label="Approved device roster"
+            help="A CSV of device name, user email and MAC address."
+          >
+            {roster ? (
+              <span className="bfp2__roster">
+                <strong>{roster.fileName}</strong>
+                <em>
+                  {roster.rows} devices · {roster.uploadedAt}
+                </em>
+              </span>
+            ) : (
+              <Button variant="secondary" size="sm">
+                Upload CSV
+              </Button>
+            )}
+          </FormRow>
+        )}
+      </div>
+    </>
+  )
+}
+
+/* --- The one editor for a profile's details -------------------------------------
+
+   One Edit, and everything about the profile that is not an attribute is behind
+   it: its name, what it can read, and how devices enrol.
+
+   There were three before — an Edit on the restriction panel, a Change on the
+   overview's reach row, and no way at all to rename — which is three doors into
+   one room, each showing a different corner of it. The panels state; this
+   changes. That split is the whole point: a page you can read without deciding
+   whether you are about to alter it.
+
+   Every control writes through as it is touched, the same as the rest of this
+   page, so the action says Done rather than Save. What Done commits is that
+   somebody answered — the restriction panel stops showing its empty state from
+   here.
+
+   The one exception is the reach, which is the only destructive edit in the
+   room: switching to agentless deletes attributes and their settings. It is
+   held behind a second press that names them. */
+function EditProfileDrawer({
   open,
   profile,
   onChange,
@@ -1865,185 +2069,170 @@ function RestrictionDrawer({
   onChange: (p: FingerprintProfile) => void
   onClose: () => void
 }) {
-  /* A roster is matched on MAC address, and MAC is one of the eighteen things
-     only an agent can read — and it is in the device catalogue only. So an
-     OS-and-version profile cannot use a roster either, for the same reason and
-     one step earlier: it has no MAC to match on at any reach.
+  /* The reach a press is proposing, or null when none is. Not a copy of the
+     current value — this is "somebody has asked for a change and not yet
+     confirmed it", which is a different thing and reads as one. */
+  const [pendingReach, setPendingReach] = useState<ProfileReach | null>(null)
+  useEffect(() => {
+    if (open) setPendingReach(null)
+  }, [open])
 
-     `setReach` and `wouldDrop` have gone with the section above. The writer is
-     `withReach` in the model now, called from `ReachDialog` — and it does the
-     half this copy missed, which was pruning the VALUES of the attributes it
-     dropped. Switching to agentless removed MAC from `enabled` and left its
-     weight behind, so switching back restored a tier nobody re-approved. */
-  const rosterPossible = profile.mode === 'device' && profile.reach === 'agent'
+  const dropped =
+    pendingReach === null
+      ? []
+      : profile.enabled
+          .map((id) => attrOf(profile.mode, id))
+          .filter((a): a is Attribute => Boolean(a?.needsAgent && pendingReach !== 'agent'))
+
+  const commitReach = (reach: ProfileReach) => {
+    onChange(withReach(profile, reach))
+    setPendingReach(null)
+  }
+
+  const pressReach = (reach: ProfileReach) => {
+    if (reach === profile.reach) return setPendingReach(null)
+    /* Only the destructive direction waits. Turning an agent ON adds nothing
+       and removes nothing — it makes rows available — so a confirmation there
+       would be a dialog about a change with no cost. */
+    const loses = profile.enabled.some((id) => attrOf(profile.mode, id)?.needsAgent)
+    if (reach === 'agentless' && loses) setPendingReach(reach)
+    else commitReach(reach)
+  }
 
   return (
     <Drawer
       open={open}
       onClose={onClose}
-      title="Device restriction"
+      title="Edit profile"
       caption={profile.name}
       /* 600, not 520. The widest row here is a label and a select reading
          "Users register their own devices", and at 520 the label wrapped to two
          lines and pushed its own tip onto a third — a three-line row for one
-         dropdown. The extra 80px is what it takes for every label to sit on one
-         line, which is the only reason it is not the default 460. */
+         dropdown. */
       width={600}
       actions={
-        /* Done, not Save. Every control here writes through as it is touched,
-           the same as the rest of this page, so there is nothing held back to
-           commit and a Save button would imply there was. What it does commit
-           is the fact that somebody answered: the section stops showing its
-           empty state from here. */
-        <Button variant="brand" onClick={() => {
-          onChange({ ...profile, restrictionSet: true })
-          onClose()
-        }}>
+        <Button
+          variant="brand"
+          onClick={() => {
+            onChange({ ...profile, restrictionSet: true })
+            onClose()
+          }}
+        >
           Done
         </Button>
       }
     >
       <div className="bfp2__restform">
-        {/* The reach section stood here.
-
-            It is asked at CREATION now, and changed from the Overview panel's
-            own control — which is the whole point of moving it. It was the
-            first question on this panel because it decides what the others can
-            be, and being first on a panel is not the same as being first: the
-            attributes were already chosen by the time anybody opened this.
-
-            It also could not state its own cost here. Flipping to agentless
-            deleted attributes the moment you clicked the card, and the warning
-            beside it described the OTHER direction. `ReachDialog` holds the
-            change until it has said what it will take. */}
         <section>
-          <h4>How devices register</h4>
-          {/* Only where it explains something the screen cannot: why the roster
-              option is greyed out. The other branch said "either people enrol
-              their own machines, or you supply the list", which is the two
-              options in the dropdown directly below it, read aloud. */}
-          {!rosterPossible && (
-            <p className="bfp2__stephint">
-              {profile.mode === 'os'
-                ? 'An OS and version profile cannot use a roster: a roster is matched on MAC address, which is not one of the things it reads.'
-                : 'An agentless profile cannot use a roster: a roster is matched on MAC address, and MAC is one of the attributes only an agent can read.'}
-            </p>
-          )}
-          <div className="bfp2__rows bfp2__rows--form">
-            <FormRow
-              icon={UserRound}
-              label="How a device gets registered"
-              /* The select beside it already reads "Users register their own
-                 devices". This was that sentence again in the third person. */
-              tip={
-                profile.registration === 'self'
-                  ? 'People enrol their own machines, up to a limit.'
-                  : 'Only devices on the uploaded roster may sign in.'
-              }
-            >
-              <select
-                className="bfp2__select"
-                aria-label="How a device gets registered"
-                value={profile.registration}
-                onChange={(e) => {
-                  const registration = e.target.value as Registration
-                  onChange({
-                    ...profile,
-                    registration,
-                    /* The console's own branch: a roster REPLACES the allowance
-                       rather than sitting beside it. */
-                    maxDevices:
-                      registration === 'pre-approved'
-                        ? null
-                        : (profile.maxDevices ?? DEFAULT_MAX_DEVICES),
-                  })
-                }}
-              >
-                {(Object.keys(REGISTRATION_LABEL) as Registration[]).map((r) => (
-                  <option key={r} value={r} disabled={r === 'pre-approved' && !rosterPossible}>
-                    {REGISTRATION_LABEL[r]}
-                  </option>
-                ))}
-              </select>
-            </FormRow>
-
-            <FormRow
-              icon={Repeat}
-              label="Register silently on first sign-in"
-              /* Worth stating rather than leaving to be discovered: the
-                 convenience and the hole it opens are the same sentence. */
-              help="Convenient, and it means an attacker's machine registers itself."
-            >
-              <Toggle
-                checked={profile.autoRegister}
-                onChange={(autoRegister) => onChange({ ...profile, autoRegister })}
-                label="Register silently on first sign-in"
-                size="sm"
-              />
-            </FormRow>
-          </div>
+          <h4>Name</h4>
+          <label className="bfp2__field">
+            <span className="u-sr-only">Profile name</span>
+            <input
+              type="text"
+              value={profile.name}
+              placeholder="Corporate laptops"
+              aria-label="Profile name"
+              onChange={(e) => onChange({ ...profile, name: e.target.value })}
+            />
+          </label>
         </section>
 
-        <section>
-          <h4>
-            {profile.registration === 'self' ? 'How many' : 'Which ones'}
-            {/* The self branch's hint — "the allowance, and whether phones count
-                against it" — described a mobile row that no longer exists, and
-                the half that was still true restated the heading. The roster
-                branch says something real, so it keeps it on a tip. */}
-            {profile.registration !== 'self' && (
+        {asksReach(profile.mode) && (
+          <section>
+            <h4 id="bfp2-reach">
+              What it can read
               <TipDot
-                label="Which ones"
-                text="The roster replaces the per-person allowance rather than sitting beside it."
+                label="What it can read"
+                text="Hardware identifiers need something installed on the machine. This decides which attributes can arrive at all."
               />
-            )}
-          </h4>
-          <div className="bfp2__rows bfp2__rows--form">
-            {/* One or the other. This is the branch the third step used to
-                carry, and it is still a branch — just not a page. */}
-            {profile.registration === 'self' ? (
-              <FormRow
-                icon={Smartphone}
-                label="Devices per person"
-                /* The name, restated, beside a stepper showing the number. */
-                tip="How many they may register before the next one is refused."
-              >
-                <NumberStepper
-                  label="Devices per person"
-                  value={profile.maxDevices ?? DEFAULT_MAX_DEVICES}
-                  min={1}
-                  max={20}
-                  onChange={(maxDevices) => onChange({ ...profile, maxDevices })}
-                />
-              </FormRow>
-            ) : (
-              <FormRow
-                icon={Server}
-                label="Approved device roster"
-                help="A CSV of device name, user email and MAC address."
-              >
-                {profile.roster ? (
-                  <span className="bfp2__roster">
-                    <strong>{profile.roster.fileName}</strong>
-                    <em>
-                      {profile.roster.rows} devices · {profile.roster.uploadedAt}
-                    </em>
+            </h4>
+            {/* The section's own <h4> is the visible heading, so a legend would
+                print it twice. `aria-labelledby` points at the heading that is
+                already there — one label in the accessibility tree instead of
+                two saying the same words. */}
+            <fieldset className="bfp2__modes" aria-labelledby="bfp2-reach">
+              {REACHES.map((r) => {
+                const Ico = REACH_ICON[r.id]
+                const on = profile.reach === r.id
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    className={`bfp2__mode-card ${on ? 'is-on' : ''} ${pendingReach === r.id ? 'is-pending' : ''}`}
+                    onClick={() => pressReach(r.id)}
+                  >
+                    <span className="bfp2__mode-ico" aria-hidden>
+                      <Ico size={17} strokeWidth={1.8} />
+                    </span>
+                    <span className="bfp2__mode-body">
+                      <strong>{r.label}</strong>
+                      <em>{r.blurb}</em>
+                      {r.note && (
+                        <i className="bfp2__mode-note">
+                          <AlertTriangle size={11} strokeWidth={2.2} aria-hidden />
+                          {r.note}
+                        </i>
+                      )}
+                    </span>
+                    {on && <Check size={15} strokeWidth={2.6} className="bfp2__mode-tick" aria-hidden />}
+                  </button>
+                )
+              })}
+            </fieldset>
+
+            {/* Named, not counted, and before it happens rather than after.
+                "4 attributes" is a number nobody can act on; the names are what
+                say whether the ones going are ones you wanted. */}
+            {pendingReach && (
+              <div className="bfp2__confirm">
+                <p className="bfp2__prereq">
+                  <AlertTriangle size={13} strokeWidth={2} aria-hidden />
+                  <span>
+                    Removes {dropped.map((a) => a.name).join(', ')} and everything they are set to.
+                    {profile.registration === 'pre-approved' &&
+                      ' The approved roster is matched on MAC address, so it will stop matching anything.'}
                   </span>
-                ) : (
-                  <Button variant="secondary" size="sm">
-                    Upload CSV
+                </p>
+                <div className="bfp2__confirmacts">
+                  <Button variant="ghost" size="sm" onClick={() => setPendingReach(null)}>
+                    Keep {reachLabel(profile.reach).toLowerCase()}
                   </Button>
-                )}
-              </FormRow>
+                  <Button variant="danger" size="sm" onClick={() => commitReach(pendingReach)}>
+                    Switch and remove {dropped.length}
+                  </Button>
+                </div>
+              </div>
             )}
-          </div>
+          </section>
+        )}
+
+        <section>
+          <h4>How devices enrol</h4>
+          <EnrolmentFields
+            mode={profile.mode}
+            reach={profile.reach}
+            registration={profile.registration}
+            autoRegister={profile.autoRegister}
+            maxDevices={profile.maxDevices}
+            roster={profile.roster}
+            onChange={(p) => onChange({ ...profile, ...p })}
+          />
         </section>
       </div>
     </Drawer>
   )
 }
 
-function AddModal({
+/* The same catalogue, the same shape.
+
+   It renders `AttrStep`, which is the create panel's last step — so it is the
+   same surface at the same width in the same place on the screen, opened from
+   a different button. As a centred 1000px modal beside a 760px slide-over it
+   was two different treatments of one thing, and the only difference between
+   them is whether the profile exists yet. */
+function AttributesDrawer({
   open,
   profile,
   onClose,
@@ -2056,18 +2245,18 @@ function AddModal({
 }) {
   /* A draft of the three fields the picker writes, not of the profile.
 
-     It held only `enabled`, which is why re-opening this dialog and saving used
-     to drop nothing and change nothing else — the values were somewhere the
-     dialog could not see. Now that a row carries its settings, the dialog has
-     to carry them too, or ticking an attribute here and setting it here would
-     write one and discard the other. */
+     It held only `enabled`, which is why re-opening this used to drop nothing
+     and change nothing else — the values were somewhere the dialog could not
+     see. Now that a row carries its settings, the draft has to carry them too,
+     or ticking an attribute here and setting it here would write one and
+     discard the other. */
   const [picked, setPicked] = useState<string[]>(profile.enabled)
   const [config, setConfig] = useState(profile.config)
   const [weights, setWeights] = useState(profile.weights)
 
-  /* On `open` alone, deliberately — the same argument as `CreateModal`'s reset.
-     A draft that re-synced while the dialog was open would throw away what you
-     had just ticked every time the page behind it re-rendered. */
+  /* On `open` alone, deliberately — the same argument as the create panel's
+     reset. A draft that re-synced while the panel was open would throw away
+     what you had just ticked every time the page behind it re-rendered. */
   useEffect(() => {
     if (!open) return
     setPicked(profile.enabled)
@@ -2078,12 +2267,16 @@ function AddModal({
   const noun = ITEM_NOUN[profile.mode]
 
   return (
-    <Modal
+    <Drawer
       open={open}
       onClose={onClose}
-      title={`What ${profile.name} ${noun.verb}`}
-      width={profile.mode === 'os' ? 760 : 1000}
-      footer={
+      title={`What it ${noun.verb}`}
+      caption={profile.name}
+      width={760}
+      resizable
+      minWidth={560}
+      maxWidth={1120}
+      actions={
         <>
           <Button variant="ghost" onClick={onClose}>
             Cancel
@@ -2113,124 +2306,18 @@ function AddModal({
         onValue={(id, v) => setConfig((c) => ({ ...c, [id]: v }))}
         onWeight={(id, w) => setWeights((c) => ({ ...c, [id]: w }))}
       />
-    </Modal>
+    </Drawer>
   )
 }
 
-/* --- Changing the reach afterwards ---------------------------------------------
+/* `ReachDialog` stood here — a dialog of its own for the one destructive edit.
 
-   The one destructive edit on this page, and the only one held behind a
-   confirmation.
-
-   Not un-editable: an admin who rolls the agent out to their fleet has to be
-   able to upgrade a profile, and refusing that means "duplicate it, re-pick
-   twenty attributes, re-tune eight, and re-point every policy rule".
-
-   Not inline either, which is what the restriction panel did — two radio cards
-   that deleted attributes on click, with a warning underneath describing the
-   direction you had not chosen. A control that destroys has to say what it will
-   take BEFORE it takes it, and it has to name the casualties rather than count
-   them: "4 attributes" is a number you cannot act on; the names are what tell
-   you whether the ones going are ones you wanted. */
-function ReachDialog({
-  open,
-  profile,
-  onChange,
-  onClose,
-}: {
-  open: boolean
-  profile: FingerprintProfile
-  onChange: (p: FingerprintProfile) => void
-  onClose: () => void
-}) {
-  /* Held, not written. The whole point of this dialog is that the change does
-     not happen until it has said what it will take — so `pending` is local, and
-     it syncs from the profile on open only. */
-  const [pending, setPending] = useState<ProfileReach>(profile.reach)
-  useEffect(() => {
-    if (open) setPending(profile.reach)
-  }, [open])
-
-  const dropped = profile.enabled
-    .map((id) => attrOf(profile.mode, id))
-    .filter((a): a is Attribute => Boolean(a?.needsAgent && pending !== 'agent'))
-  const changed = pending !== profile.reach
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={`What ${profile.name} can read`}
-      width={560}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant={dropped.length > 0 ? 'danger' : 'brand'}
-            disabled={!changed}
-            onClick={() => {
-              onChange(withReach(profile, pending))
-              onClose()
-            }}
-          >
-            {pending === 'agentless' ? 'Switch to agentless' : 'Switch to agent-based'}
-          </Button>
-        </>
-      }
-    >
-      <p className="bfp2__stephint">
-        This decides which attributes can arrive at all. Hardware identifiers — the TPM, the
-        motherboard, the disk — need software running on the machine.
-      </p>
-
-      <fieldset className="bfp2__modes" aria-label="What it can read">
-        {REACHES.map((r) => {
-          const Ico = REACH_ICON[r.id]
-          return (
-            <button
-              key={r.id}
-              type="button"
-              role="radio"
-              aria-checked={pending === r.id}
-              className={`bfp2__mode-card ${pending === r.id ? 'is-on' : ''}`}
-              onClick={() => setPending(r.id)}
-            >
-              <span className="bfp2__mode-ico" aria-hidden>
-                <Ico size={17} strokeWidth={1.8} />
-              </span>
-              <span className="bfp2__mode-body">
-                <strong>{r.label}</strong>
-                <em>{r.blurb}</em>
-                {r.note && (
-                  <i className="bfp2__mode-note">
-                    <AlertTriangle size={11} strokeWidth={2.2} aria-hidden />
-                    {r.note}
-                  </i>
-                )}
-              </span>
-              {pending === r.id && (
-                <Check size={15} strokeWidth={2.6} className="bfp2__mode-tick" aria-hidden />
-              )}
-            </button>
-          )
-        })}
-      </fieldset>
-
-      {dropped.length > 0 && (
-        <p className="bfp2__prereq">
-          <AlertTriangle size={13} strokeWidth={2} aria-hidden />
-          <span>
-            Removes {dropped.map((a) => a.name).join(', ')} and everything they are set to.
-            {profile.registration === 'pre-approved' &&
-              ' The approved roster is matched on MAC address, so it will stop matching anything.'}
-          </span>
-        </p>
-      )}
-    </Modal>
-  )
-}
+   It has folded into `EditProfileDrawer`, which is now the single door into
+   everything about a profile that is not an attribute. Its argument survives
+   intact and is applied there: the change waits for a second press, and that
+   press NAMES what it will take rather than counting it. What has gone is a
+   dialog you reached through a button on a panel that also had an Edit, beside
+   a page that had no way to rename anything. */
 
 /* --- The whole profile, stated ------------------------------------------------
 

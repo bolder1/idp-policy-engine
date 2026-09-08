@@ -4,6 +4,7 @@ import {
   ALL_ATTRIBUTES,
   CATALOGUE,
   DEVICE_ATTRIBUTES,
+  ITEM_NOUN,
   MODES,
   OS_ATTRIBUTES,
   REACHES,
@@ -297,8 +298,23 @@ describe('what a kind can collect', () => {
     expect(offeredAttributes('os', null)).toEqual(OS_ATTRIBUTES)
     expect(asksReach('os')).toBe(false)
     expect(asksReach('device')).toBe(true)
-    expect(stepsFor('os')).toHaveLength(2)
-    expect(stepsFor('device')).toHaveLength(3)
+  })
+
+  /* Both kinds take three steps, and the middle one is why this is a separate
+     assertion from `asksReach`.
+
+     It was `stepsFor('os')).toHaveLength(2)`, which tied the step count to the
+     collector question — so "this kind is not asked about agents" and "this
+     kind has fewer steps" were one fact. They are not: the middle step is the
+     DEVICES step, and how a machine enrols is a question both kinds have to
+     answer. What still depends on `asksReach` is whether the collector cards
+     render inside it. */
+  it('takes three steps either way, and names the last after what it holds', () => {
+    expect(stepsFor('os')).toEqual(['Profile', 'Devices', 'Requirements'])
+    expect(stepsFor('device')).toEqual(['Profile', 'Devices', 'Attributes'])
+    for (const m of MODES) {
+      expect(stepsFor(m.id).at(-1)?.toLowerCase()).toBe(ITEM_NOUN[m.id].many)
+    }
   })
 
   it('partitions the device catalogue at every reach', () => {

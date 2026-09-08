@@ -1048,3 +1048,44 @@
   font-size: var(--fs-sm); color: var(--fb-notice-fg); line-height: 1.5;
 }
 .bfp2__sumwarn svg { flex: none; margin-top: 2px; }
+
+/* --- The create panel's sections ------------------------------------------------
+
+   The Devices step asks two questions with a dependency between them — what the
+   collector can read, and how machines enrol — so they are two headed sections
+   rather than one run of controls. Which is also what lets the second one be
+   present-but-waiting: it is on the page from the moment the step opens, so the
+   shape of the form is honest before you touch anything, and a section that
+   appeared out of nowhere on a press would read as a step that grew. */
+.bfp2__wizsection { display: flex; flex-direction: column; gap: var(--space-4); }
+.bfp2__wizsection > h4 {
+  margin: 0;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bfp2__wizsection > .bfp2__stephint { margin: 0; }
+/* Waiting on the answer above it. Dimmed rather than hidden, and not disabled —
+   there is nothing in it to disable yet, only a line saying what it is waiting
+   for. */
+.bfp2__wizsection.is-waiting > h4 { color: var(--text-tertiary); }
+
+/* --- A destructive change, held ---------------------------------------------------
+
+   The one edit on this screen that deletes something. It waits for a second
+   press, and the press NAMES what it will take — the panel it replaces deleted
+   attributes the moment a card was clicked, and showed a warning describing the
+   direction you had not chosen. */
+.bfp2__confirm {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--fb-notice-border); border-radius: var(--radius-md);
+  background: var(--fb-notice-bg);
+}
+.bfp2__confirm .bfp2__prereq { margin: 0; padding: 0; border: 0; background: none; }
+.bfp2__confirmacts { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); }
+/* The card the confirmation is about, marked while it waits — without it the
+   panel says "removes MAC address" with nothing on screen pointing at which
+   press caused it. */
+.bfp2__mode-card.is-pending {
+  border-color: var(--fb-notice-border);
+  background: var(--fb-notice-bg);
+}

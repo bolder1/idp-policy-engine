@@ -848,17 +848,28 @@ export function describeProfile(p: FingerprintProfile): string {
   return parts.join(' · ')
 }
 
-/* How many steps this kind of profile takes to create, and what each is called.
+/* The steps a profile takes to create, and what each is called.
 
-   Words, not numerals. Two or three is few enough to name every step rather
-   than count them, which is the difference between a progress bar and a table
-   of contents — and the difference is the whole reason the OS kind is shorter:
-   it is not "the same wizard with one step skipped", it is a shorter question.
+   Words, not numerals. Three is few enough to name every step rather than count
+   them, which is the difference between a progress bar and a table of contents
+   — and the last one is named after what that kind actually holds, so the
+   ladder says "Requirements" on one and "Attributes" on the other.
 
-   Derived from `asksReach` rather than written out, so a catalogue that gains
-   an agent-only attribute gains the step that governs it. */
-export const stepsFor = (mode: ProfileMode): string[] =>
-  asksReach(mode) ? ['Profile', 'Collector', 'Attributes'] : ['Profile', 'Requirements']
+   Both kinds take three now, and the middle one is why. It was the collector
+   question, which only the device kind is asked, so the OS kind had two. It is
+   the DEVICES step: how a machine gets onto a person's list, and how many they
+   may keep — questions both kinds have to answer. The collector cards sit
+   inside it for the kind that is asked them, above the enrolment rows they
+   constrain, because a roster needs MAC and MAC needs an agent.
+
+   `asksReach` still decides whether the cards render. What has gone is the idea
+   that "this kind is not asked about agents" and "this kind has fewer steps"
+   are the same fact. */
+export const stepsFor = (mode: ProfileMode): string[] => [
+  'Profile',
+  'Devices',
+  ITEM_NOUN[mode].many.replace(/^./, (c) => c.toUpperCase()),
+]
 
 /* --- The three weights a risk profile can give an attribute ---------------------
    The master carries four (5, 10, 20, 30) because the sheet does. A profile

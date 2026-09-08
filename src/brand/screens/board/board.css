@@ -792,31 +792,46 @@
 .bb:not(.is-gripping) .bb__sheet { transition: right 0.24s var(--ease-standard); }
 .bb:not(.is-insp-closed) .bb__float--tr { right: calc(var(--bb-insp) + var(--space-6)); }
 
-/* --- The one view toolbar, bottom centre -----------------------------------
+/* --- The view dock, bottom centre ------------------------------------------
 
-   Four pills in four corners became one. History was top-left, publishing
-   top-right, density bottom-left, zoom bottom-right — four positions to learn,
-   three of which did the same KIND of thing (none of them changes the policy;
-   they all change what you can see of it), and a canvas with a control in every
-   corner has no quiet edge left to put a rule near.
+   Four pills in four corners became two side by side. History was top-left,
+   publishing top-right, density bottom-left, zoom bottom-right — four positions
+   to learn, three of which did the same KIND of thing (none of them changes the
+   policy; they all change what you can see of it), and a canvas with a control
+   in every corner has no quiet edge left to put a rule near.
 
-   Centred on the stage's own width. `left: 50%` alone would centre it under the
-   inspector when the panel is open, so the centre shifts by half the panel —
-   which keeps it centred on the part of the canvas you can actually see. The
-   transition matches the panel's, so the two move together rather than the bar
-   arriving after. */
-.bb__float--bc {
+   The dock is the positioned element and carries no chrome of its own; the
+   pills inside it are `.bb__float` like every other floating cluster. Two
+   rather than one because a mode and a row of presses are different objects —
+   see the note in Board.tsx.
+
+   Centred on the stage's VISIBLE width. `left: 50%` alone would centre the dock
+   under the inspector when the panel is open, so the centre shifts by half the
+   panel. The transition matches the panel's, so the two move together rather
+   than the dock arriving after. */
+.bb__dock {
+  position: absolute; z-index: 3;
   left: 50%; bottom: var(--space-5);
   transform: translateX(-50%);
+  display: flex; align-items: center; gap: var(--space-3);
 }
-.bb:not(.is-insp-closed) .bb__float--bc { left: calc(50% - var(--bb-insp) / 2); }
-.bb:not(.is-gripping) .bb__float--bc { transition: left 0.24s var(--ease-standard); }
+/* The pills inside the dock are NOT absolutely positioned, and they inherit
+   that from `.bb__float` — which is `position: absolute` because every other
+   floating cluster on this stage positions itself against the stage. Inside a
+   flex row that is exactly wrong: two absolute children with no offsets both
+   sit at their static position and the row cannot lay them out. Measured, the
+   density pill came back 98px above the toolbar it is meant to sit beside.
 
-/* The chain-wide fold, now a segment inside the bar rather than a pill of its
-   own — so it keeps its own padding and loses the pill's. */
-.bb__density { display: inline-flex; align-items: center; gap: 2px; }
+   The dock does the positioning now; its children only have to be pills. */
+.bb__dock > .bb__float { position: static; }
+.bb:not(.is-insp-closed) .bb__dock { left: calc(50% - var(--bb-insp) / 2); }
+.bb__density { gap: 2px; }
+.bb:not(.is-gripping) .bb__dock { transition: left 0.24s var(--ease-standard); }
 .bb__density > button {
-  height: 26px; padding: 0 var(--space-3);
+  /* 24px, not 26 — the same square as `.bb__act` next door, so the two pills
+     are the same height. At 26 the density pill stood 2px taller than the
+     toolbar and the pair read as two unrelated objects rather than one dock. */
+  height: 24px; padding: 0 var(--space-3);
   border: none; border-radius: var(--radius-md);
   background: transparent; color: var(--text-secondary);
   font-size: var(--fs-xs); font-weight: var(--fw-medium);
@@ -824,7 +839,15 @@
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 .bb__density > button:hover { color: var(--text-primary); background: var(--surface-sunken); }
-.bb__density > button.is-on { background: var(--brand); color: #fff; }
+/* A tint and the brand in the text, not a solid fill.
+
+   Solid brand is what this console's PRIMARY button wears — the one that
+   publishes. A segment saying "you are looking at outlines" is not an action
+   and does not need the action colour; at full strength it also made the
+   density pair the loudest object on a canvas whose whole job is showing rules.
+   The tint says "this one" without claiming to be a button you should press. */
+.bb__density > button.is-on { background: var(--brand-subtle-bg); color: var(--brand); }
+.bb__density > button.is-on:hover { background: var(--brand-subtle-bg); color: var(--brand); }
 .bb__density > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 .bb__float__sep { width: 1px; height: 18px; background: var(--border-subtle); margin: 0 2px; }
 .bb__zoom { min-width: 44px; text-align: center; font-size: var(--fs-xs); color: var(--text-secondary); font-variant-numeric: tabular-nums; }

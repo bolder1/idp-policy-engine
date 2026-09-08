@@ -44,6 +44,7 @@ export function Board({
   onToggleExpand,
   children,
   tools,
+  aside,
 }: {
   policy: Policy
   selection: Selection
@@ -76,10 +77,13 @@ export function Board({
   reserveOnOpen: number
   /** Floating chrome the host places itself — the publishing cluster. */
   children?: ReactNode
-  /* View controls the host contributes to the centre toolbar, which this
+  /* View controls the host contributes INSIDE the centre toolbar, which this
      component owns because the zoom half of it lives here. They arrive before
      the zoom controls and a separator is drawn between the two. */
   tools?: ReactNode
+  /* A pill of the host's own, docked to the left of that toolbar — for a
+     control that is a MODE rather than a press. See the note at the dock. */
+  aside?: ReactNode
 }) {
   const stage = useRef<HTMLDivElement | null>(null)
   const world = useRef<HTMLDivElement | null>(null)
@@ -469,7 +473,7 @@ export function Board({
 
       {children}
 
-      {/* One bar, bottom centre, for everything that changes the VIEW.
+      {/* One dock, bottom centre, for everything that changes the VIEW.
 
           It was four pills in four corners: history top-left, publishing
           top-right, density bottom-left, zoom bottom-right. Four objects to
@@ -478,36 +482,43 @@ export function Board({
           it — and a canvas with a control in every corner has no quiet edge
           left to put a rule near.
 
-          Gathered here, in the order you reach for them: get out of the way
-          (focus), take a step back (undo/redo), how much of each rule (density),
-          how much of the chain (zoom), and the panel. Separators group them;
-          they are one toolbar because they answer one question.
+          Two pills, not one, and the split is a real distinction rather than a
+          decoration. Everything in the right-hand pill is a MOMENTARY press —
+          undo it, fit it, zoom it, hide the header — and the pill is a row of
+          bare glyphs because that is what a row of verbs looks like. The
+          left-hand pill is a MODE: two named states, one of them on, and it
+          stays on until you say otherwise. A segmented control that lives
+          inside a strip of icon buttons reads as two buttons that happen to
+          have words; given its own container it reads as the choice it is.
 
-          Publishing stays top-right and is the exception that proves it: Check,
-          What changes, Discard and Review & publish act on the POLICY. Mixing
-          "undo" and "publish" into one strip is how somebody reaches for the
-          first and finds the second.
+          Publishing stays top-right and is the exception that proves the
+          gathering: Check, What changes, Discard and Review & publish act on the
+          POLICY. Mixing "undo" and "publish" into one strip is how somebody
+          reaches for the first and finds the second.
 
-          `tools` rather than more `children`, because the two slots land in two
-          different places and a single list could not say which was which. */}
-      <div className="bb__float bb__float--bc" role="toolbar" aria-label="View">
-        {tools}
-        {tools && <span className="bb__float__sep" />}
-        <button type="button" className="bb__act" aria-label="Fit the chain in view" title="Fit" onClick={fit}>
-          <Maximize2 size={14} strokeWidth={2} />
-        </button>
-        <button type="button" className="bb__act" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.15)}>
-          <Minus size={14} strokeWidth={2} />
-        </button>
-        {/* Written by `paint`, not by a render. `aria-live` is deliberately
-            absent: the value changes on every frame of a zoom, and a live
-            region that announces sixty times a second announces nothing. */}
-        <span className="bb__zoom" ref={zoomLabel}>
-          {Math.round(viewRef.current.z * 100)}%
-        </span>
-        <button type="button" className="bb__act" aria-label="Zoom in" onClick={() => zoomBy(1.15)}>
-          <Plus size={14} strokeWidth={2} />
-        </button>
+          Two slots because there are two pills — a single list could not say
+          which control belonged in which. */}
+      <div className="bb__dock">
+        {aside}
+        <div className="bb__float" role="toolbar" aria-label="View">
+          {tools}
+          {tools && <span className="bb__float__sep" />}
+          <button type="button" className="bb__act" aria-label="Fit the chain in view" title="Fit" onClick={fit}>
+            <Maximize2 size={14} strokeWidth={2} />
+          </button>
+          <button type="button" className="bb__act" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.15)}>
+            <Minus size={14} strokeWidth={2} />
+          </button>
+          {/* Written by `paint`, not by a render. `aria-live` is deliberately
+              absent: the value changes on every frame of a zoom, and a live
+              region that announces sixty times a second announces nothing. */}
+          <span className="bb__zoom" ref={zoomLabel}>
+            {Math.round(viewRef.current.z * 100)}%
+          </span>
+          <button type="button" className="bb__act" aria-label="Zoom in" onClick={() => zoomBy(1.15)}>
+            <Plus size={14} strokeWidth={2} />
+          </button>
+        </div>
       </div>
     </div>
   )

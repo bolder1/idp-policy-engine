@@ -605,12 +605,22 @@ export function BoardBuilder({
             <button type="button" className="bb__act" aria-label="Redo" title="Redo (⇧⌘Z)" disabled={!canRedo(hist)} onClick={() => setHist(redo)}>
               <Redo2 size={14} strokeWidth={2} />
             </button>
-            <span className="bb__float__sep" />
-            {/* A radiogroup, not a toggle button. There are two named states and
-                both are worth naming: "Outline" is a claim about what you get,
-                and a single button reading "Outline" cannot say whether that is
-                what you are in or what you would switch to. */}
-            <span className="bb__density" role="radiogroup" aria-label="How much of each rule to show">
+          </>
+        }
+        /* Density gets a pill of its own, docked to the left of the toolbar.
+
+           It is the one control down there that is a MODE — two named states,
+           one of them on, and it stays on until you say otherwise — where
+           everything beside it is a momentary press. Sitting inside that strip
+           it read as two buttons that happen to have words instead of glyphs;
+           in its own container it reads as the choice it is.
+
+           A radiogroup, not a toggle button. Both states are worth naming:
+           "Outline" is a claim about what you get, and a single button reading
+           "Outline" cannot say whether that is what you are in or what you
+           would switch to. */
+        aside={
+          <div className="bb__float bb__density" role="radiogroup" aria-label="How much of each rule to show">
               {(['outline', 'detailed'] as const).map((d) => (
                 <button
                   key={d}
@@ -630,8 +640,7 @@ export function BoardBuilder({
                   {d === 'outline' ? 'Outline' : 'Detailed'}
                 </button>
               ))}
-            </span>
-          </>
+          </div>
         }
       >
         <div className="bb__float bb__float--tr" role="toolbar" aria-label="Publishing">

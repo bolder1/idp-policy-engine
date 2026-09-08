@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
-import { Store, X } from 'lucide-react'
+import { Search, Store, X } from 'lucide-react'
 
-import { Button, Chip } from '../kit'
+import { Button } from '../kit'
 import { scenarios, type Scenario } from '../data'
 import { TemplateCard, TemplatePreview, scenarioCard } from './TemplateCard'
 
@@ -135,65 +135,79 @@ export function TemplateSheet({
             exit={{ y: 16, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 380, damping: 34 }}
           >
-            <header className="bmarket__head">
-              <div className="bmarket__brand">
-                <span className="bmarket__mark" aria-hidden>
-                  <Store size={20} strokeWidth={1.7} />
-                </span>
-                <div>
-                  <h2>Start from a template</h2>
-                  <p>
-                    {MINE.length} of your own · {PROVIDED.length} from miniOrange, free with your licence
-                  </p>
-                </div>
+            <button type="button" className="bmarket__x" onClick={onClose} aria-label="Close the gallery">
+              <X size={18} strokeWidth={1.9} />
+            </button>
+
+            {/* A band of its own for the question and the one control that
+                answers it fastest.
+
+                The heading, the provenance line and the close used to share a
+                24px header row with the filters crammed under them, and the
+                catalogue started 60px from the top of the sheet. Somebody
+                opening this is looking for one of fourteen things; give the
+                looking a place to stand. Centred, on the page grey, with the
+                search at the width a template name actually needs — and
+                nothing else in it. */}
+            <header className="bmarket__hero">
+              {/* A storefront, briefly. This is a shelf of things somebody else
+                  wrote — the one surface in the product where you are choosing
+                  between other people's work rather than editing your own — and
+                  a mark, a big centred search and counts on every shelf are how
+                  a catalogue says so. */}
+              <span className="bmarket__mark" aria-hidden>
+                <Store size={20} strokeWidth={1.7} />
+              </span>
+              <h2>Start from a template</h2>
+              <p className="bmarket__lede">
+                {MINE.length} written by your team, {PROVIDED.length} from miniOrange — free with your licence
+              </p>
+              <div className="bmarket__searchbox">
+                <Search size={16} strokeWidth={2} aria-hidden />
+                <input
+                  type="search"
+                  className="bmarket__search"
+                  placeholder="Search templates"
+                  aria-label="Search the gallery"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
               </div>
-              <button type="button" className="bmarket__x" onClick={onClose} aria-label="Close the gallery">
-                <X size={18} strokeWidth={1.9} />
-              </button>
-            </header>
-
-            {/* The filters are a row, and they are the SAME row the Templates
-                page uses — `Chip`, active state, count and all.
-
-                They were a 236px left rail, which is the shape a gallery of any
-                size ends up with and is the wrong one here twice over. Six
-                categories do not need a fixed index: at 236px wide and 750px
-                tall the rail was six rows and six hundred pixels of nothing,
-                and it took a fifth of the sheet from the grid it was filtering.
-                And the console already filters this exact catalogue with a chip
-                row on the Templates page — two shapes for one control is how
-                the two drift.
-
-                Search sits at the end of the same row, because it filters the
-                same thing. */}
-            <div className="bmarket__filters">
-              <div className="bmarket__cats" role="tablist" aria-label="Template categories">
-                {CATEGORIES.map((c) => (
-                  <Chip
-                    key={c}
-                    active={cat === c}
-                    count={scenarios.filter((x) => inCategory(x, c)).length}
-                    onClick={() => setCat(c)}
-                  >
-                    {LABEL[c]}
-                  </Chip>
-                ))}
-              </div>
-              <input
-                type="search"
-                className="bmarket__search"
-                placeholder="Search templates"
-                aria-label="Search the gallery"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-              />
-            </div>
-
-            <div className="bmarket__body">
-              <p className="bmarket__intro">
+              <p className="bmarket__note">
                 Taking one writes its rules into this policy. Nothing is saved until you publish, and undo puts it back.
               </p>
+            </header>
 
+            <div className="bmarket__work">
+              {/* The rail is back, and this time it is a CARD rather than a
+                  column.
+
+                  It was a full-height 236px column and became a chip row
+                  because at 750px tall it was six rows and six hundred pixels
+                  of nothing. The emptiness was the column, not the rail: sized
+                  to its own contents and stuck to the top of the scroll, six
+                  categories are a compact index that stays put while the grid
+                  moves past it — which is the thing a chip row cannot do and
+                  the reason every catalogue of any size grows one. */}
+              <aside className="bmarket__rail">
+                <p className="bmarket__railhead">Categories</p>
+                <div className="bmarket__cats" role="tablist" aria-label="Template categories">
+                  {CATEGORIES.map((c) => (
+                    <button
+                      key={c}
+                      role="tab"
+                      aria-selected={cat === c}
+                      className={`bmarket__cat ${cat === c ? 'is-on' : ''}`}
+                      onClick={() => setCat(c)}
+                    >
+                      <span>{LABEL[c]}</span>
+                      <em>{scenarios.filter((x) => inCategory(x, c)).length}</em>
+                    </button>
+                  ))}
+                </div>
+              </aside>
+
+              <div className="bmarket__body">
                 {mine.length > 0 && (
                   <>
                     <h3 className="bgal__section">
@@ -235,6 +249,7 @@ export function TemplateSheet({
                     </Button>
                   </div>
                 )}
+              </div>
             </div>
           </motion.div>
 

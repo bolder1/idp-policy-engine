@@ -755,13 +755,12 @@ function AssignAppsDialog({
         {/* Only once the list is long enough to need it. Twenty-six rows is
             past that; a tenant with six would spend a control on nothing. */}
         {store.apps.length > 8 && (
-          <input
-            type="search"
-            className="bassign__search"
+          <SearchBox
+            block
             placeholder="Search applications…"
-            aria-label="Search applications"
+            label="Search applications"
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={setQ}
           />
         )}
 

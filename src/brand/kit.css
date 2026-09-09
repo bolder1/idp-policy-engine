@@ -305,6 +305,7 @@ html[data-theme='dark'] {
   border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   color: var(--text-muted);
 }
+.bx-search.is-block { width: 100%; }
 .bx-search:hover { border-color: var(--ctl-border-hover); }
 .bx-search:focus-within { border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
 .bx-search svg { flex: none; }

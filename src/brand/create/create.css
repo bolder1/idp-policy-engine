@@ -669,27 +669,10 @@ html[data-theme='dark'] .bguided__sheen {
 }
 .bmarket__lede { margin-top: 5px; font-size: var(--fs-md); color: var(--text-tertiary); }
 
-/* The search, at the width a template name actually needs. */
-.bmarket__searchbox {
-  position: relative;
-  width: min(440px, 100%);
-  margin-top: 12px;
-}
-.bmarket__searchbox > svg {
-  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
-  color: var(--text-muted); pointer-events: none;
-}
-.bmarket .bmarket__search {
-  width: 100%; height: 42px; padding: 0 14px 0 38px;
-  border: 1px solid var(--border-default); border-radius: var(--radius-pill);
-  background: var(--surface-raised); color: var(--text-primary);
-  font: inherit; font-size: var(--fs-base);
-  box-shadow: var(--el-low);
-}
-.bmarket .bmarket__search::placeholder { color: var(--text-tertiary); }
-.bmarket .bmarket__search:focus-visible {
-  outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo);
-}
+/* The search, at the width a template name actually needs. The pill-shaped
+   42px field this used to draw is gone — a fifth shape for the same object —
+   and the wrapper now only says how wide the box is on this page. */
+.bmarket__searchbox { width: min(440px, 100%); margin-top: 12px; }
 /* The consequence, quiet and last. It is the one thing a shelf cannot show.
 
    `--text-tertiary`, not `--text-muted`: muted is #93a2b0, which is 2.31:1 on

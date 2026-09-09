@@ -30,7 +30,6 @@ import {
   Plus,
   RadioTower,
   Repeat,
-  Search,
   Server,
   ShieldCheck,
   ShieldOff,
@@ -591,16 +590,12 @@ function AttrStep({
           The list is the thing. The filter is a control on the bar beside the
           search, which is where every list in this console puts one. */}
       <div className="bfp2__pickbar">
-        <label className="bfp2__search">
-          <Search size={14} strokeWidth={1.9} aria-hidden />
-          <input
-            type="search"
-            value={q}
-            placeholder={`Search all ${offered.length} attributes…`}
-            aria-label="Search attributes"
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </label>
+        <SearchBox
+          value={q}
+          onChange={setQ}
+          placeholder={`Search all ${offered.length} attributes…`}
+          label="Search attributes"
+        />
 
         {/* `Picker`, like every filter in the console. The counts and the
             "needs an agent" note ride on each option's `meta` line, where a

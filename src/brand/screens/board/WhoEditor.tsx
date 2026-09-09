@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, Pencil, Plus, UserRound, Users } from 'lucide-react'
 
-import { Button, Modal } from '../../kit'
+import { Button, Modal, SearchBox } from '../../kit'
 import { useBrand, useNameLookup } from '../../store'
 import type { Audience, Predicate, Rule } from '../../data'
 import { cardLetter } from '../../predicate'
@@ -382,15 +382,13 @@ function WhoPicker({
         {/* Both lists get a search now that both are long enough to want one:
             the dialog shows every group rather than the handful the panel had
             room for. */}
-        <div className="bb__whosearch">
-          <input
-            type="search"
-            value={q}
-            placeholder={tab === 'group' ? 'Search groups' : `Search the ${store.users.length} people listed`}
-            aria-label={tab === 'group' ? 'Search groups' : 'Search people'}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
+        <SearchBox
+          block
+          value={q}
+          onChange={setQ}
+          placeholder={tab === 'group' ? 'Search groups' : `Search the ${store.users.length} people listed`}
+          label={tab === 'group' ? 'Search groups' : 'Search people'}
+        />
 
         {/* Select-all, over the list rather than in it.
 

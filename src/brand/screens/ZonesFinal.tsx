@@ -1445,16 +1445,13 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
           something in. Eight is about where a column stops being scannable. */}
       {all.length > 8 && (
         <div className="bz7__listbar">
-          <label className="bz7__filter">
-            <Search size={13} strokeWidth={1.9} aria-hidden />
-            <input
-              type="search"
-              value={filter}
-              placeholder={`Filter ${all.length} entries…`}
-              aria-label="Filter entries"
-              onChange={(e) => setFilter(e.target.value)}
-            />
-          </label>
+          <SearchBox
+            block
+            value={filter}
+            onChange={setFilter}
+            placeholder={`Filter ${all.length} entries…`}
+            label="Filter entries"
+          />
           <button
             type="button"
             className="bz7__clear"

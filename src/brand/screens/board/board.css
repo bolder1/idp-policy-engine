@@ -3253,16 +3253,8 @@ button.bb__idx::after {
    mismatch with the policy, and dashed is how this pane draws "not settled". */
 .bb__whotag.is-warn { border-style: dashed; border-color: var(--border-strong); color: var(--text-secondary); }
 
-.bb__whosearch input {
-  width: 100%; height: var(--ctl-height-sm); padding: 0 var(--space-3);
-  background: var(--surface-inset); border: 1px solid transparent; border-radius: var(--radius-sm);
-  font-family: inherit; font-size: var(--fs-md); color: var(--text-primary);
-}
-/* The one focusable thing in this pane that was ringed in brand rather than in
-   `--focus-ring`, and it had no box-shadow either — so draining the orange
-   without this would have left the search field with no visible focus at all.
-   It takes the same ink ring as every other control in the panel. */
-.bb__whosearch input:focus-visible { outline: none; border-color: var(--border-strong); box-shadow: 0 0 0 4px var(--focus-halo); }
+/* `.bb__whosearch` stood here — this surface's own magnifier-and-field. Every search in
+   the console is `SearchBox` from the kit now; see the note on `.bx-search`. */
 
 .bb__whohint { margin: 0; padding: var(--space-4); font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
 .bb__who > .bb__whohint { padding: 0; }

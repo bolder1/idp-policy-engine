@@ -505,20 +505,9 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 .bz7__note button:hover { opacity: 1; }
 
 .bz7__listbar { display: flex; align-items: center; gap: 10px; }
-.bz7__filter {
-  flex: 1; min-width: 0;
-  display: flex; align-items: center; gap: 7px;
-  height: var(--ctl-height-sm); padding: 0 10px;
-  background: var(--ctl-bg);
-  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
-  color: var(--text-muted);
-}
-.bz7__filter:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
-.bz7 .bz7__filter input {
-  flex: 1; min-width: 0; height: auto; padding: 0;
-  background: none; border: 0; font-size: var(--fs-sm); color: var(--text-primary);
-}
-.bz7__filter input:focus-visible { outline: none; }
+/* `.bz7__filter` stood here — this surface's own magnifier-and-field. Every search in
+   the console is `SearchBox` from the kit now; see the note on `.bx-search`. */
+.bz7__listbar > .bx-search { flex: 1; min-width: 0; width: auto; }
 
 .bz7__clear {
   flex: none; background: none; cursor: pointer;

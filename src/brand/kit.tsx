@@ -1127,15 +1127,21 @@ export function SearchBox({
   onChange,
   placeholder,
   label,
+  block,
 }: {
   value: string
   onChange: (next: string) => void
   placeholder: string
   /** The accessible name — "Search zones", not "Search". */
   label: string
+  /* Full width of whatever holds it. A toolbar gives the box a fixed width so
+     the row does not reflow as the page does; a dialog or a drawer has already
+     decided how wide the column is, and a 300px box inside a 520px panel is a
+     box that looks like it failed to load. */
+  block?: boolean
 }) {
   return (
-    <label className="bx-search">
+    <label className={`bx-search ${block ? 'is-block' : ''}`}>
       <Search size={14} strokeWidth={2} aria-hidden />
       <input
         type="search"

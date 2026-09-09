@@ -955,24 +955,11 @@
   padding-bottom: 10px; margin-bottom: -10px;
   background: var(--surface-raised);
 }
-/* The search field itself, which lost its own declaration when the flat
-   picker's filter bar was deleted around it. It had been nested there, so the
-   `flex: 1` below was styling a box with no layout of its own — the magnifier
-   sat on a line above the input. */
-.bfp2__search {
-  flex: 1; min-width: 16ch;
-  display: flex; align-items: center; gap: 8px;
-  height: var(--ctl-height-sm); padding: 0 10px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  color: var(--text-muted);
-}
-.bfp2__search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
-.bfp2__search input {
-  flex: 1; min-width: 0; height: auto; padding: 0;
-  background: none; border: 0; font-size: var(--fs-md); color: var(--text-primary);
-}
-.bfp2__search input:focus-visible { outline: none; }
+/* `.bfp2__search` stood here — this drawer's own magnifier-and-field. It is
+   `SearchBox` from the kit now, like every other search in the console; what
+   remains is the one thing that genuinely belongs to THIS row, which is that
+   the box stretches and the filter beside it does not. */
+.bfp2__pickbar > .bx-search { flex: 1; min-width: 16ch; width: auto; }
 .bfp2__pickcount { font-size: var(--fs-sm); color: var(--text-tertiary); margin-left: auto; }
 .bfp2__pickcount.is-on { color: var(--text-secondary); font-weight: var(--fw-medium); }
 .bfp2__clear {

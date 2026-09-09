@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Store, X } from 'lucide-react'
+import { Store, X } from 'lucide-react'
 
-import { Button } from '../kit'
+import { Button, SearchBox } from '../kit'
 import { Picker } from '../picker'
 import { scenarios, type Scenario } from '../data'
 import { TemplateCard, TemplatePreview, scenarioCard } from './TemplateCard'
@@ -183,14 +183,12 @@ export function TemplateSheet({
               </span>
               <h2>Start from a template</h2>
               <div className="bmarket__searchbox">
-                <Search size={16} strokeWidth={2} aria-hidden />
-                <input
-                  type="search"
-                  className="bmarket__search"
+                <SearchBox
+                  block
                   placeholder="Search templates"
-                  aria-label="Search the gallery"
+                  label="Search the gallery"
                   value={q}
-                  onChange={(e) => setQ(e.target.value)}
+                  onChange={setQ}
                 />
               </div>
             </header>

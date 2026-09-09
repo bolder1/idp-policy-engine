@@ -256,13 +256,8 @@ button.btable__app--edit:focus-visible { outline: none; box-shadow: 0 0 0 2px va
    every application is visible without opening a second layer inside it. */
 .bassign { display: flex; flex-direction: column; gap: var(--space-4); }
 .bassign__lede { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55; }
-.bassign__search {
-  height: var(--ctl-height-md); padding: 0 11px;
-  background: var(--surface-raised);
-  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md);
-  font-size: var(--fs-md); color: var(--text-primary);
-}
-.bassign__search:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+/* `.bassign__search` stood here — this surface's own magnifier-and-field. Every search in
+   the console is `SearchBox` from the kit now; see the note on `.bx-search`. */
 /* Capped and scrolled, so a tenant with sixty applications gets a dialog the
    same height as a tenant with six. */
 .bassign__list {

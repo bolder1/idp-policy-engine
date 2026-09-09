@@ -9,7 +9,7 @@ import type { NameLookup } from '../predicate-prose'
 import type { StepKind } from '../simulate'
 import type { RuleState } from '../rule-form'
 import { DECISION_NAME, TONE, type Part } from './model'
-import { IfBlock, IfChip } from './IfBlock'
+import { IfBlock, IfChip, IfKw } from './IfBlock'
 
 /* -----------------------------------------------------------------------------
    A card on the chain — one rule, read whole, or read short.
@@ -47,10 +47,44 @@ const STATE_LABEL: Record<RuleState, string> = { ready: 'Ready', setup: 'Needs s
    — and "3 conditions" is still enough to tell a broad rule from a narrow one
    while you are scanning for order.
 
-   "any sign-in" rather than "0 conditions" for the empty case: a rule with no
-   conditions does not test less, it tests nothing, and it catches everything
-   that reaches it. That is the fact worth putting on a folded card. */
-function CardSummary({ rule, resolve }: { rule: Rule; resolve?: NameLookup }) {
+   Two kinds of card fold, and only one of them can be empty by accident. An
+   ordinary rule with no who and no conditions is a rule nobody has finished
+   writing, and the line says so. The default's predicate is empty because the
+   default's test was never written in a predicate at all — so the same silence
+   means the opposite thing there, and the two are told apart before anything
+   is counted. */
+function CardSummary({ rule, resolve, terminal }: { rule: Rule; resolve?: NameLookup; terminal?: boolean }) {
+  /* The default, which has no conditions and never will.
+
+     `fallbackRule` builds it on the always-true predicate and the builder never
+     offers to edit it — "everything above missed" is a position in the list,
+     not something anybody could write in a condition card. So the reading
+     below found no who and no conditions, concluded the rule was unconfigured,
+     and printed "Nothing set yet" on the one row whose outcome is always set.
+     Folded, the default read "Nothing else matched / Nothing set yet" under a
+     head saying "Always on" and "Locked", and over a body saying "always". One
+     card, three parts, one of them denying the other two.
+
+     What it says now is what the body says, in the shape every folded card
+     uses: the branch mark, what is tested, an arrow, what is decided. `always`
+     takes the count's place because that IS the test here, and the decision
+     chip is the one of the three facts the head has not already given you.
+
+     `terminal` rather than a check for "no conditions", and it is the same prop
+     `IfBlock` takes for the same reason: this is not a rule that happens to be
+     empty, it is the rule whose condition is where it sits. */
+  if (terminal)
+    return (
+      <div className="bb__cardsum">
+        <span className="bb__ifbranch" aria-hidden>
+          <Split size={11} strokeWidth={2} />
+        </span>
+        <IfKw>always</IfKw>
+        <ArrowRight size={11} strokeWidth={2} aria-hidden />
+        <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>
+      </div>
+    )
+
   /* `restConditions`, not every leaf. The who is reported separately at the
      head of this line now, and counting a group twice inflates the number the
      line exists to give. */
@@ -533,7 +567,7 @@ export function TerminalCard({
       </div>
       <div className="bb__fold bb__fold--sum" aria-hidden={expanded} inert={expanded}>
         <div>
-          <CardSummary rule={rule} />
+          <CardSummary terminal rule={rule} />
         </div>
       </div>
       <div className="bb__fold bb__fold--body" id="bb-terminal-body" inert={!expanded}>

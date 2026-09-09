@@ -73,7 +73,11 @@
   width: 36px; height: 36px; border-radius: var(--radius-md);
   background: var(--surface-inset); color: var(--text-tertiary);
 }
-.bfp2__tile--lg { width: 48px; height: 48px; border-radius: var(--radius-lg); }
+/* `.bfp2__tile--lg` stood here — the 48px tile before the profile name on the
+   inner page. The mode is already stated in words on that page and the heading
+   is the thing you go there to read, so the tile was decoration in the one
+   position that costs the most. The list keeps `--sm`, where a glyph does the
+   work of telling one row from another. */
 /* --- The two modes, in two colours -----------------------------------------
    Colour is back on the mode, and the reason it went away is the reason it is
    allowed back in this form.

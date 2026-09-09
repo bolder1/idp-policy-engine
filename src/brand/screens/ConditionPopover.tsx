@@ -34,7 +34,7 @@ const operatorIcon = (o: string): LucideIcon =>
 
 import { EmptyState } from '../empty'
 import { modeLabel } from '../fingerprint'
-import { conditionIcon } from './board/tones'
+import { conditionIcon, conditionTone } from './board/tones'
 import type { BrandStore } from '../store'
 import type { NameLookup } from './predicate-prose'
 import {
@@ -489,6 +489,7 @@ export function ConditionPopover({
             ref={whatRef}
             kind="what"
             icon={conditionIcon(t.id, t.group)}
+            tone={conditionTone(t.id, t.group)}
             open={open === 'what'}
             label={`Change what is checked. Currently ${t.label}.`}
             onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
@@ -644,11 +645,15 @@ export function ConditionPopover({
                   label: x.label,
                   note: x.soon ? 'Coming soon' : undefined,
                   icon: conditionIcon(x.id, x.group),
-                  /* The family, for the tint. Nine rows across five families
-                     were nine identical grey marks — so the glyph told them
-                     apart and nothing said which two were about the same kind
-                     of thing. The colour groups them without a heading. */
-                  tone: x.group,
+                  /* The tint, from `tones.ts`, keyed by attribute rather than
+                     by group.
+
+                     It was `x.group`, which paints `Network zone`, `Device
+                     profile` and `External hook` one blue — they are all
+                     `Library`, and they are the three most different things in
+                     the catalogue. A tint whose job is to say "these two are
+                     the same kind of thing" must not say it about those. */
+                  tone: conditionTone(x.id, x.group),
                   disabled: x.soon,
                 }))}
               picked={[c.typeId]}
@@ -951,6 +956,7 @@ function Field({
   ref,
   kind,
   icon,
+  tone,
   open,
   unset,
   label,
@@ -960,6 +966,16 @@ function Field({
   ref: RefObject<HTMLButtonElement | null>
   kind: Part
   icon?: LucideIcon
+  /* The condition's family colour, for the MARK only.
+
+     The tone class sets `--cond-bg` as well as `--cond-fg`, and nothing here
+     reads the background on purpose: the card is a readout and wears the pill,
+     this is a control and stays a control. Three tinted boxes in a row would
+     fight the chevron that says they open. But the glyph is the same glyph the
+     card draws, so it takes the same colour — otherwise one condition is violet
+     on the canvas and grey in the panel beside it, which is the disagreement
+     `tones.ts` exists to prevent. */
+  tone?: string
   open: boolean
   unset?: boolean
   label: string
@@ -970,7 +986,7 @@ function Field({
     <button
       ref={ref}
       type="button"
-      className={`cp__fld is-${kind} ${open ? 'is-open' : ''} ${unset ? 'is-unset' : ''}`}
+      className={`cp__fld is-${kind} ${tone ? `is-tone-${tone}` : ''} ${open ? 'is-open' : ''} ${unset ? 'is-unset' : ''}`}
       aria-haspopup="dialog"
       aria-expanded={open}
       aria-label={label}
@@ -1042,7 +1058,7 @@ function List({
                 </span>
               )}
               {Ico && (
-                <i className={`cp__icon ${o.tone ? `is-${o.tone.toLowerCase()}` : ''}`} aria-hidden>
+                <i className={`cp__icon ${o.tone ? `is-tone-${o.tone}` : ''}`} aria-hidden>
                   <Ico size={13} strokeWidth={2} />
                 </i>
               )}
@@ -1377,7 +1393,14 @@ export function ConditionList({
             disabled={t.soon}
             onClick={() => onPick(t.id)}
           >
-            <Ico size={15} strokeWidth={1.9} aria-hidden />
+            {/* The mark on its tinted tile, the same one the attribute menu
+                draws and the same tone the card carries — `tones.ts` is the one
+                source for both. It was a bare grey glyph here, so the list that
+                INTRODUCES the eleven conditions was the only one of the three
+                surfaces showing them uncoloured. */}
+            <i className={`cp__icon is-tone-${conditionTone(t.id, t.group)}`} aria-hidden>
+              <Ico size={13} strokeWidth={2} />
+            </i>
             <span className="cp__catname">
               {t.label}
               {/* The one placeholder, and it says which. `WhatEditor` deleted a

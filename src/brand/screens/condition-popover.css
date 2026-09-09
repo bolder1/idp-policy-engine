@@ -260,11 +260,22 @@
   background: var(--surface-inset);
   color: var(--text-tertiary);
 }
-.cp__icon.is-library { background: var(--fb-info-bg); color: var(--fb-info-fg); }
-.cp__icon.is-time { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
-.cp__icon.is-attributes { background: var(--accent-subtle-bg, var(--surface-inset)); color: var(--accent); }
-.cp__icon.is-risk { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
-.cp__icon.is-group, .cp__icon.is-user { background: var(--surface-inset); color: var(--text-secondary); }
+/* Keyed by the tone, not by the group name.
+
+   These were `.is-library`, `.is-time`, `.is-attributes`, `.is-risk`,
+   `.is-group` and `.is-user` — the catalogue's group names, lowercased at the
+   call site. One blue covered `Network zone`, `Device profile` and `External
+   hook`, because all three are `Library`: the three rows the list opens with
+   and the three most different things in it.
+
+   The tone comes from `tones.ts` now, per attribute, so this file no longer
+   needs to know what a group is called — and the card, this menu and the
+   catalogue below all read the same map. `--cond-*` is set by the `.is-tone-*`
+   block in board.css, which is loaded on every screen that draws a condition. */
+.cp__icon[class*='is-tone-'] {
+  background: var(--cond-bg, var(--surface-inset));
+  color: var(--cond-fg, var(--text-tertiary));
+}
 
 /* Chosen, said on the mark rather than in a gutter beside it. The row keeps its
    tint and gains the ring, so the answer is legible without a column that is
@@ -371,7 +382,8 @@
   font: inherit; cursor: pointer;
 }
 .cp__catrow:first-of-type { border-top: 0; }
-.cp__catrow > svg { flex: none; color: var(--text-tertiary); }
+/* The mark is a tinted tile now, not a bare glyph — see `.cp__icon`. */
+.cp__catrow > .cp__icon { flex: none; }
 .cp__catrow:hover { background: var(--surface-sunken); }
 .cp__catrow:focus-visible { outline: none; background: var(--surface-sunken); box-shadow: inset 0 0 0 2px var(--focus-ring); }
 .cp__catname {
@@ -389,7 +401,7 @@
 .cp__catrow.is-soon { cursor: default; }
 .cp__catrow.is-soon:hover { background: none; }
 .cp__catrow.is-soon .cp__catname { color: var(--text-tertiary); }
-.cp__catrow.is-soon > svg { opacity: 0.5; }
+.cp__catrow.is-soon > .cp__icon { opacity: 0.5; }
 
 /* Listed and not choosable, in the pill's own attribute menu — same meaning as
    `.cp__catrow.is-soon`, different list. */
@@ -496,7 +508,11 @@
 .cp__fld.is-open { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
 .cp__fld:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
 .cp__fld > svg:last-child { flex: none; margin-left: auto; opacity: 0.45; }
-.cp__fldicon { flex: none; opacity: 0.55; }
+/* The family colour, at full strength — a tinted glyph at 55% is a muddy glyph.
+   `--cond-fg` comes from the tone class on the field; the fallbacks leave every
+   other `Field` exactly as it was. */
+.cp__fldicon { flex: none; color: var(--cond-fg, currentcolor); opacity: var(--cp-fldicon-fade, 0.55); }
+.cp__fld[class*='is-tone-'] .cp__fldicon { --cp-fldicon-fade: 1; }
 /* The one line that must never be cut: it holds the answer. It ellipsizes only
    when a value genuinely exceeds the full panel width, which two library names
    do not. */

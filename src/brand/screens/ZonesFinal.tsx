@@ -224,14 +224,21 @@ export function ZonesFinal() {
             <ZonesEmpty onCreate={() => setNaming(true)} />
           ) : (
             <>
-              <div className="bz7__toolbar">
-                <SearchBox
-                  value={q}
-                  onChange={setQ}
-                  placeholder="Search zones, networks or places…"
-                  label="Search zones"
-                />
-                <span className="bz7__count">
+              {/* `.btoolbar`, the same element policies, applications and device
+                  profiles use — this page had its own `.bz7__toolbar` with its
+                  own gap and no margin, which is half of why the space between
+                  the search row and the table was different here than there. */}
+              <div className="btoolbar">
+                <div className="btoolbar__left">
+                  <SearchBox
+                    value={q}
+                    onChange={setQ}
+                    placeholder="Search zones, networks or places…"
+                    label="Search zones"
+                  />
+                </div>
+                <div className="btoolbar__right">
+                <span className="btoolbar__count">
                   {shown.length} of {store.zones.length}
                 </span>
                 <div className="bviewswitch bz7__viewswitch" role="tablist" aria-label="View">
@@ -253,6 +260,7 @@ export function ZonesFinal() {
                   >
                     <List size={15} strokeWidth={1.9} aria-hidden />
                   </button>
+                </div>
                 </div>
               </div>
 

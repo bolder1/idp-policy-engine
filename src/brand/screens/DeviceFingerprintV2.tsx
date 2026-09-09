@@ -1461,10 +1461,16 @@ function ProfilePage({
         {/* `draft.name`, not `profile.name`. The heading IS the name field
             now, so it has to show what you have typed rather than what was last
             saved — the bar at the bottom is what says the two differ. */}
+        {/* A 48px tile carrying the mode glyph stood before the name.
+
+            It was decoration on the one page where the mode is already stated
+            twice — `Decides by` says it in words under `Fixed and derived`, and
+            the tabs differ by it. A glyph earns its place in a LIST, where it
+            tells one row from another at a glance; on a page about a single
+            profile there is nothing to tell it apart from, so it was 48px of
+            ground between the back link and the heading somebody came here to
+            read and rename. The list keeps its `.bfp2__tile--sm`. */}
         <div className="bfp2__pagehead">
-          <span className="bfp2__tile bfp2__tile--lg" aria-hidden>
-            {renderModeIcon(draft.mode, 18)}
-          </span>
           <EditableName value={draft.name} onChange={(name) => setDraft((d) => ({ ...d, name }))} />
         </div>
 

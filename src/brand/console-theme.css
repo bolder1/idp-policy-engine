@@ -529,7 +529,20 @@
   color: var(--text-secondary);
   line-height: 1.55;
 }
+/* The toolbar's own margin, and why it is zero on the library pages.
+
+   `.bz7`, `.bfp2` and `.bm8` are flex COLUMNS, and a flex child's margin adds
+   to the column's gap instead of replacing it. So this 12px was landing on top
+   of each page's gap — and each page had picked its own gap, 16px on zones and
+   18px on the other two. Between the search row and the table that came out as
+   16px on zones and 30px on device profiles: two pages one nav click apart,
+   drawing the same two objects at nearly twice the distance.
+
+   One gap for the three, and the toolbar contributes nothing on top of it. The
+   margin stays for the pages that are still block-flow. */
 .btoolbar { margin-bottom: var(--space-5); }
+.bpage.bz7, .bpage.bfp2, .bpage.bm8 { gap: var(--space-6); }
+.bz7 > .btoolbar, .bfp2 > .btoolbar, .bm8 > .btoolbar { margin-bottom: 0; }
 /* Top, not centre. The caption makes the left column two lines tall on the
    longer ones, and an action centred against that sits below the title it
    belongs to. */

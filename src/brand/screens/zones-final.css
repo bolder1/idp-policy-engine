@@ -27,7 +27,9 @@
 
 /* --- Toolbar --------------------------------------------------------------------- */
 
-.bz7__toolbar { display: flex; align-items: center; gap: 10px; }
+/* `.bz7__toolbar` stood here. The page uses `.btoolbar` now, with the rest of
+   the console — see the note on `.btoolbar` in console-theme.css for the gap
+   this page's private copy was quietly disagreeing about. */
 /* `.bz7__search` stood here. It was the box this page grew for itself: a
    magnifier inside a 380px field, stretching to fill the toolbar, while the
    other three list screens ran a bare 260px input with no glyph. It was the
@@ -36,7 +38,8 @@
    The `.bz7 .bz7__search input` double-class that fought the kit's input base
    went with it: `.bx-search input` clears the same rules at one class, because
    the base is written at zero specificity for exactly that. */
-.bz7__count { margin-left: auto; font-size: var(--fs-sm); color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* `.bz7__count` stood here — a private copy of `.btoolbar__count`, down to the
+   tabular figures. The shared one is in screens.css and this page reads it. */
 
 /* .bviewswitch is padded 5px 13px for text labels. These are icons. */
 .bz7__viewswitch button { display: grid; place-items: center; width: 30px; height: 26px; padding: 0; }

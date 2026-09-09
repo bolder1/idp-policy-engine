@@ -216,7 +216,29 @@ button.btable__app--edit {
   font: inherit; color: inherit; text-align: left;
   border-radius: var(--radius-xs);
 }
-button.btable__app--edit:hover { text-decoration: underline; text-underline-offset: 2px; }
+/* A pencil on row hover, not an underline on cell hover.
+
+   The underline said "link", and this is not one — it does not navigate, it
+   opens the dialog that changes which applications the policy covers. It also
+   only appeared once the pointer was on the four words themselves, so the fact
+   that the cell does anything at all was discoverable exactly where nobody
+   looks for it.
+
+   The mark answers both: it says EDIT rather than "go", and it appears while
+   the pointer is anywhere on the row, which is where reading happens. It holds
+   its space when hidden so nothing shifts under the pointer.
+
+   `:focus-within` keeps it for the keyboard, where there is no hover at all. */
+.btable__appedit {
+  flex: none; margin-left: var(--space-1);
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.btable tbody tr:hover .btable__appedit,
+button.btable__app--edit:focus-visible .btable__appedit { opacity: 1; }
+button.btable__app--edit:hover { color: var(--accent-strong); }
+button.btable__app--edit:hover .btable__appedit { color: var(--accent-strong); }
 button.btable__app--edit:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
 /* Not a Button. A brand or neutral button in every unassigned row would make

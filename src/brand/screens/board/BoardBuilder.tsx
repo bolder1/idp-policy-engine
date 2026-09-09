@@ -648,6 +648,9 @@ export function BoardBuilder({
               ? 'any application'
               : null
         }
+        /* The first application's id, for its logo in the start pill. The label
+           beside it already says how many more there are. */
+        destinationAppId={draft.appIds.length > 0 ? (appsOf(draft, store.apps)[0]?.id ?? null) : null}
         selection={selection}
         diagnostics={diagnostics}
         shadowed={shadowed}

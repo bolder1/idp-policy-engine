@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
-import { Maximize2, Minus, Plus } from 'lucide-react'
+import { AppWindow, Maximize2, Minus, Plus } from 'lucide-react'
 
 import { fallbackRule, type Policy } from '../../data'
+import { AppLogo } from '../../logos/AppLogo'
 import { useCanvasView } from '../canvas-view'
 import type { Diagnostic } from '../diagnostics'
 import type { NameLookup } from '../predicate-prose'
@@ -27,6 +28,7 @@ const STEP = 220 // ms between rule lights in a rehearsal
 export function Board({
   policy,
   destination,
+  destinationAppId,
   selection,
   diagnostics,
   shadowed,
@@ -59,6 +61,8 @@ export function Board({
      rules no sign-in can ever reach, and the pill says so rather than opening
      the chain with an arrival that never happens. */
   destination: string | null
+  /** The first application's id, when there is one, for its mark in the pill. */
+  destinationAppId?: string | null
   selection: Selection
   diagnostics: Diagnostic[]
   /** Rules dimmed because the hovered rule puts them out of reach. */
@@ -352,14 +356,30 @@ export function Board({
                 crumb; this says it pointing at the chain the sentence is about,
                 which is the half the bar cannot reach. */}
             <div className="bb__start">
-              {destination === null ? (
-                <span className="bb__pulse is-dead" aria-hidden />
-              ) : landedOn === null && trace && inAudience ? (
+              {/* The application's own mark, where a pulsing orange dot used to
+                  be.
+
+                  The dot was the arrival — brand-coloured, ringing twice a
+                  second, on the argument that a sign-in reaching this chain is
+                  the event the canvas is about. It was the only orange on the
+                  board at rest, it moved forever, and it said nothing you could
+                  not read in the sentence beside it. The logo is in the same
+                  slot and answers a question the sentence only names: WHICH
+                  application, recognisable before the words are.
+
+                  The travelling token is untouched. That one is orange because
+                  it is a single moving thing during a rehearsal, which is
+                  exactly what the accent is for. */}
+              {landedOn === null && trace && inAudience ? (
                 <motion.span layoutId="bb-token" className="bb__token" aria-hidden transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
                   ●
                 </motion.span>
+              ) : destinationAppId ? (
+                <AppLogo appId={destinationAppId} size={18} />
               ) : (
-                <span className="bb__pulse" aria-hidden />
+                <span className="bb__startmark" aria-hidden>
+                  <AppWindow size={13} strokeWidth={1.8} />
+                </span>
               )}
               {destination === null ? (
                 <span>

@@ -446,16 +446,28 @@
   box-shadow: var(--el-low);
   font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary);
 }
-.bb__start .bb__pulse {
-  position: relative; width: 10px; height: 10px; border-radius: 50%;
-  background: var(--accent);
+/* `.bb__pulse` and its `bb-pulse` keyframes stood here — a 10px brand dot with
+   a ring expanding out of it, forever.
+
+   It was the only orange on a resting board and the only thing moving on one,
+   and what it communicated was "a sign-in arrives", which is the first four
+   words of the sentence printed beside it. An animation that restates the text
+   next to it is an animation with nothing to say, and this one never stopped
+   saying it. The slot now holds the application's own logo, which answers the
+   question the sentence only names.
+
+   The travelling token kept its accent and its motion: that one marks a single
+   thing moving through the chain during a rehearsal, which is what both the
+   colour and the movement are for. */
+.bb__start > .applogo { flex: none; }
+/* The stand-in when there is no application to draw — a generic app mark rather
+   than a hole, because the pill still has a left slot. Muted, not dead: the
+   sentence beside it already says nothing arrives here. */
+.bb__startmark {
+  flex: none; display: grid; place-items: center;
+  width: 18px; height: 18px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); color: var(--text-tertiary);
 }
-.bb__start .bb__pulse::after {
-  content: ''; position: absolute; inset: -4px; border-radius: 50%;
-  border: 2px solid var(--accent); opacity: 0;
-  animation: bb-pulse 2.4s ease-out infinite;
-}
-@keyframes bb-pulse { 0% { transform: scale(0.6); opacity: 0.7; } 70% { transform: scale(1.25); opacity: 0; } 100% { opacity: 0; } }
 .bb__start em { font-style: normal; color: var(--text-muted); font-weight: var(--fw-regular); }
 /* The application is the only noun in the pill, so it is the only thing in it
    set at the page's own weight and colour. The words either side of it are
@@ -463,17 +475,6 @@
    the dash is a caption. Three weights in one line, and the eye lands on the
    one word that differs between two policies. */
 .bb__start__at { font-weight: var(--fw-semibold); color: var(--text-primary); }
-/* A pulse that does not pulse, for the policy nothing arrives at.
-
-   The dot is the arrival: it is brand-coloured and it rings, twice a second,
-   because a sign-in reaching this chain is the event the whole canvas is about.
-   On a policy naming no application that event never happens, so the ring is
-   switched off and the dot goes the colour of the border beside it — the mark
-   stays, because the pill still has a left slot and a hole in it reads as a
-   bug, but it stops advertising something that cannot occur. */
-.bb__start .bb__pulse.is-dead { background: var(--border-strong); }
-.bb__start .bb__pulse.is-dead::after { display: none; }
-
 /* The token: the sign-in itself, travelling. Rendered in the start node until
    the rehearsal lands it on a card. */
 .bb__token {
@@ -918,26 +919,35 @@
    colour and wants no box at all. The dead half goes; the grid row keeps the
    name. */
 
-/* One tone for every condition family, and the family is carried by the ICON.
+/* One tone per condition, carried by the pill on the card, the tile in the
+   catalogue and the tile in the attribute menu.
 
-   There were seven — info, lime, accent, notice, magenta, positive, neutral —
-   one per catalogue group, so a rule with five conditions was five different
-   colours in a row and a chain of nine rules was a paint chart. None of it was
-   a signal: knowing that Network is blue and Location is green tells you
-   nothing you cannot read from the word "Network", and it spent the whole
-   palette on a distinction nobody acts on.
+   These seven were collapsed to a single grey for a while, on the argument that
+   a five-condition rule became five colours in a row and a nine-rule chain a
+   paint chart. That argument was made against a per-GROUP tint, and it was
+   right about that one: `Library` holds a zone, a device profile and an
+   external hook, so grouping by family painted the three most different things
+   in the catalogue the same and told you nothing.
 
-   The glyphs stay and still differ per family, which is the part that helps at
-   a glance. The classes stay too rather than being deleted from three call
-   sites, so the distinction can be brought back by editing seven lines here if
-   it ever earns its place. */
-.is-tone-info,
-.is-tone-lime,
-.is-tone-accent,
-.is-tone-notice,
-.is-tone-magenta,
-.is-tone-positive,
-.is-tone-neutral { --cond-bg: var(--fb-neutral-bg); --cond-fg: var(--text-secondary); }
+   Keyed per attribute it says something you act on. Two Time rows share amber
+   and are told apart by a clock against a calendar; two Attributes rows share
+   lime; the three Library rows differ, because they are different. The tint is
+   how you find the network condition in a rule you did not write without
+   reading all five.
+
+   The block was left in place with a note saying the distinction could be
+   brought back by editing seven lines. This is that edit.
+
+   `--cond-bg` is the pill, `--cond-fg` its text and glyph, `--cond-border` its
+   edge. Never `negative`: red means danger here, and a network condition is not
+   a danger. */
+.is-tone-info { --cond-bg: var(--fb-info-bg); --cond-fg: var(--fb-info-fg); --cond-border: var(--fb-info-border); }
+.is-tone-lime { --cond-bg: var(--fb-lime-bg); --cond-fg: var(--fb-lime-fg); --cond-border: var(--fb-lime-border); }
+.is-tone-accent { --cond-bg: var(--fb-accent-bg); --cond-fg: var(--fb-accent-fg); --cond-border: var(--fb-accent-border); }
+.is-tone-notice { --cond-bg: var(--fb-notice-bg); --cond-fg: var(--fb-notice-fg); --cond-border: var(--fb-notice-border); }
+.is-tone-magenta { --cond-bg: var(--fb-magenta-bg); --cond-fg: var(--fb-magenta-fg); --cond-border: var(--fb-magenta-border); }
+.is-tone-positive { --cond-bg: var(--fb-positive-bg); --cond-fg: var(--fb-positive-fg); --cond-border: var(--fb-positive-border); }
+.is-tone-neutral { --cond-bg: var(--fb-neutral-bg); --cond-fg: var(--text-secondary); --cond-border: var(--border-subtle); }
 
 /* THEN, as the journey. */
 .bb__then { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
@@ -1758,7 +1768,8 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bb__start .bb__pulse::after { animation: none; }
+  /* The start pill's forever-ripple was switched off here. It is a static
+     application logo now, so there is nothing left in that slot to still. */
   .bb__card, .bb__link::before, .bb__dot, .bb__decide > button { transition: none; }
   /* The ripple is the one thing on this surface that repeats, which makes it
      the one somebody who asked for no motion would notice most. The colour
@@ -3216,11 +3227,34 @@ button.bb__idx::after {
    identically — which is how this was — a row of three chips said which was
    which only by reading order, and the one you would go and change looked
    exactly like the one you would not. */
+/* The attribute is a PILL, and the family colour is on the MARK alone.
+
+   It was transparent, borderless and flush left — quiet on purpose, so the
+   value beside it could carry the brand. What that produced on a five-condition
+   card was five lines of running grey text with one coloured word each, and no
+   edge anywhere to say where a condition's subject ended and its operator
+   began. The name is the thing you scan a card for; it was the least visible
+   part of it. So it takes the pill.
+
+   The tint went on the whole pill first and that was too much: a card with four
+   conditions became four filled colour blocks, each one louder than the value
+   it introduces, and the eye had nowhere quiet to land. The glyph carries the
+   family instead — one small mark per row, which is enough to find the network
+   condition in a rule you did not write, and the pill itself stays the neutral
+   chip everything else on the card wears.
+
+   So: a neutral pill with a coloured mark, a bare operator between, and the
+   value in the brand accent. Three kinds of thing, three treatments, one colour
+   each at most. */
 .bb__ifchip.is-attr {
-  background: transparent; border-color: transparent;
-  color: var(--text-secondary); font-weight: var(--fw-regular);
-  padding-left: 0;
+  background: var(--if-chip);
+  border-color: var(--if-chip-border);
+  color: var(--text-secondary);
+  font-weight: var(--fw-medium);
+  padding-left: var(--space-2);
 }
+/* No `color: inherit` on the mark — the base `.bb__ifchip > i` rule already
+   paints it `--cond-fg`, and that is now the only place the family shows. */
 .bb__ifchip.is-val { color: var(--accent); }
 .bb__ifchip.is-val.is-unset { color: var(--fb-negative-fg); }
 

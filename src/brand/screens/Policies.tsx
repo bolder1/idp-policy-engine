@@ -501,11 +501,24 @@ function PolicyRow({
           <button
             type="button"
             className="btable__app btable__app--edit"
-            title={named.map((a) => a.name).join(', ')}
+            title={`Change the applications this policy covers — currently ${named.map((a) => a.name).join(', ')}`}
             onClick={() => setAssigning(true)}
           >
             <AppLogo appId={named[0].id} size={20} />
             {appsLabel(named)}
+            {/* The affordance, as a mark rather than as an underline.
+
+                The cell used to underline itself on hover, which says "link" —
+                and this is not a link, it does not go anywhere. It opens the
+                dialog that CHANGES which applications the policy covers, so the
+                mark that says so is a pencil, and it appears when the pointer
+                is anywhere on the ROW rather than only on the four words
+                themselves: you notice a row is editable while reading the row,
+                not after finding the exact glyph to point at.
+
+                `aria-hidden`, because the button's accessible name already says
+                what pressing it does. */}
+            <Pencil className="btable__appedit" size={12} strokeWidth={2} aria-hidden />
           </button>
         ) : (
           <button type="button" className="btable__assign" onClick={() => setAssigning(true)}>

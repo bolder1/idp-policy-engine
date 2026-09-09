@@ -36,6 +36,7 @@ import {
   type Rule,
 } from '../data'
 import { ConditionList, ConditionPopover, condSummary, valueSource } from './ConditionPopover'
+import { conditionTone } from './board/tones'
 import { useBrand, useNameLookup } from '../store'
 import { ruleSentence } from './builder-dialogs'
 import { impactOf, type Diagnostic } from './diagnostics'
@@ -71,20 +72,16 @@ const GROUP_ICON: Record<string, LucideIcon> = {
    because a rail heading reading "Device" wanted to say "Device profiles". The
    rail is gone with the dialog, and the four attributes name themselves now:
    the row IS "Device profile". */
-/* One feedback triad per condition category. Eight groups, seven distinct tones
-   and neutral for the rest — and never `negative`, because red means danger in
-   this kit and a network condition is not a danger. */
-const GROUP_TONE: Record<string, string> = {
-  Network: 'info',
-  Location: 'lime',
-  Device: 'accent',
-  Risk: 'notice',
-  User: 'magenta',
-  Group: 'positive',
-  Time: 'notice',
-  'Custom attributes': 'neutral',
-  Webhooks: 'neutral',
-}
+/* `GROUP_TONE` stood here — a private copy of the board's map, keyed by
+   `Network`, `Location`, `Device`, `Custom attributes` and `Webhooks`.
+
+   The catalogue has not had those groups for some time; it has `Library`,
+   `Time`, `Attributes`, `Risk`, `Group` and `User`. So every lookup returned
+   `undefined` and every condition in this builder fell to neutral — the same
+   silent failure the board's copy had, which is what having two copies buys
+   you. The trail reads from `tones.ts` now, with the board, so a Network zone
+   is one colour on both builders or on neither.
+   */
 
 /* `METHOD_GROUPS` was here, filtering three groups out of the condition pool.
    It had already stopped doing anything — no catalogue entry has carried those
@@ -720,7 +717,7 @@ function ConditionRow({
   ]
 
   return (
-    <li className={`bf__cond ${unset ? 'is-unset' : ''} is-${GROUP_TONE[t.group] ?? 'neutral'}`}>
+    <li className={`bf__cond ${unset ? 'is-unset' : ''} is-${conditionTone(t.id, t.group)}`}>
       <span className="bf__condicon" aria-hidden>
         <Ico size={13} strokeWidth={1.9} />
       </span>

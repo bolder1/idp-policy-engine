@@ -7,7 +7,7 @@ import { conditionType, type Condition, type Rule } from '../../data'
 import { cardJoin, cardLetter, topJoin } from '../../predicate'
 import type { NameLookup } from '../predicate-prose'
 import { DECISION_NAME, TONE, journeyOf } from './model'
-import { GROUP_TONE, conditionIcon } from './tones'
+import { conditionIcon, conditionTone } from './tones'
 
 /* -----------------------------------------------------------------------------
    The rule, as a conditional.
@@ -116,10 +116,10 @@ function valueChips(c: Condition, resolve: NameLookup): { text: string; unset: b
 export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup }) {
   const t = conditionType(c.typeId)
   const Ico = conditionIcon(t.id, t.group)
-  const tone = GROUP_TONE[t.group] ?? 'neutral'
+  const tone = conditionTone(t.id, t.group)
   return (
     <>
-      <IfChip tone={tone} variant="attr" icon={<Ico size={9} strokeWidth={2.2} />} title={t.group}>
+      <IfChip tone={tone} variant="attr" icon={<Ico size={11} strokeWidth={2.2} />} title={t.group}>
         {t.label}
       </IfChip>
       <IfKw tone="op">{c.operator}</IfKw>

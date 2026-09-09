@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { LayoutGroup, motion, useReducedMotion } from 'motion/react'
-import { Flag, GripVertical, Home, KeyRound, PanelLeftClose, Plus, ShieldAlert, UserCheck } from 'lucide-react'
+import { GripVertical, Home, KeyRound, PanelLeftClose, Plus, ShieldAlert, UserCheck } from 'lucide-react'
 
 import type { AccessDecision, Policy } from '../data'
 import { ruleState } from './rule-form'
@@ -31,14 +31,13 @@ import { predicateSummary } from './predicate-prose'
    is spent on that everywhere else — on a rail of tiles it would read as a rule
    with a problem rather than a rule that raises one. A flag is the mark you
    plant on something to come back to, which is what this outcome does. */
-const TILE = { deny: ShieldAlert, '2fa': KeyRound, warn: Flag, '1fa': UserCheck } as const
-const TONE = { deny: 'deny', '2fa': 'mfa', warn: 'flag', '1fa': 'allow' } as const
+const TILE = { deny: ShieldAlert, '2fa': KeyRound, '1fa': UserCheck } as const
+const TONE = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' } as const
 
 /** Said as a consequence, not as a setting — this row is read far more than set. */
 export const FALLBACK_SUB: Record<AccessDecision, string> = {
   '1fa': 'signs in on one factor',
   '2fa': 'is asked for a second factor',
-  warn: 'signs in on one factor, and the attempt is raised',
   deny: 'is refused',
 }
 

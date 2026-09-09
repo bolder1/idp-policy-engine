@@ -123,41 +123,23 @@ export interface Trace {
 export const DECISION_NAME: Record<AccessDecision, string> = {
   '1fa': 'Let in',
   '2fa': 'Let in, then verify',
-  /* "and flag it", not "and warn them". The person signing in may well see a
-     notice, but that is the client's business; what the RULE does is raise the
-     event, and an administrator choosing this outcome is choosing to be told.
-     Naming it after the notice would make the audit trail sound optional. */
-  warn: 'Let in, and flag it',
   deny: 'Deny',
 }
 
 export const DECISION_SHORT: Record<AccessDecision, string> = {
   '1fa': 'Let in',
   '2fa': 'Verify',
-  warn: 'Flag',
   deny: 'Deny',
 }
 
 /* Tone class suffix for a decision — shared with the flow rail's colours.
 
-   Two things about the fourth one, and neither is arbitrary.
-
-   It is called `flag`, not `warn`, even though the decision it draws is
-   `warn`. `is-warn` is already a class in this console and it means something
-   else everywhere it appears — a breadcrumb with a problem, a readiness row
-   that failed, a coverage stat worth looking at. `Coverage.tsx` alone would
-   have carried both senses, one on `.bcov__stat` and one on
-   `.bcov__statvalue`. A tone that shares a name with the console's word for
-   "something is wrong here" would be read as exactly that, on a card whose
-   whole point is that nothing is wrong — the sign-in went through.
-
-   And it takes the INFO ramp rather than notice. Notice is amber, amber reads
-   as caution, and caution is arguably what this outcome is — but amber is
-   already spent on `2fa`, and two outcomes in one colour on a board whose job
-   is showing which sign-in falls where is worse than a colour one step off the
-   feeling. Blue is what the kit already uses for "recorded, look at it later",
-   which is the literal content of this decision. */
-export const TONE: Record<AccessDecision, 'allow' | 'mfa' | 'flag' | 'deny'> = { '1fa': 'allow', '2fa': 'mfa', warn: 'flag', deny: 'deny' }
+   There was a fourth, `flag`, carrying a long note about why it was not called
+   `warn` (that word means "something is wrong here" everywhere else in this
+   console) and why it took the info ramp rather than notice (amber was already
+   spent on `2fa`). Both arguments were right and both are moot: the outcome is
+   gone, so its tone is too. */
+export const TONE: Record<AccessDecision, 'allow' | 'mfa' | 'deny'> = { '1fa': 'allow', '2fa': 'mfa', deny: 'deny' }
 
 /* The journey a rule produces, as steps a person walks.
 
@@ -187,18 +169,6 @@ export function journeyOf(rule: Rule): JourneyStep[] {
     kind: 'first',
   }
   const out: JourneyStep[] = [first]
-
-  /* The flag is a step, not a footnote.
-
-     It could have been a `sub` on "Signed in" — the person does get signed in,
-     and nothing else about their journey changes. But the journey on the card
-     is read to answer "what does this rule DO", and the whole of what this rule
-     does that `1fa` does not is this. A qualification hung off the last step
-     would put the entire difference between two outcomes in the smallest type
-     on the card. */
-  if (rule.decision === 'warn') {
-    out.push({ id: 'flag', label: 'Raised for review', sub: 'signed in, and recorded', kind: 'flag' })
-  }
 
   if (rule.decision === '2fa') {
     const methods = rule.secondFactorMethods ?? []

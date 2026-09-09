@@ -129,12 +129,25 @@ export function WhoEditor({
            rule has. Saying "no one selected" would report that legitimate
            default as a gap, and the button beside it is the same offer either
            way. */
+        /* ONE LINE: the state, and the way out of it.
+
+           It was a mark, a bold line, a grey line explaining what the control
+           was for, and a button under all three — four rows for a section whose
+           whole content is "nobody in particular". The explanation is the thing
+           that went: "Narrow it to particular groups or people, or leave it as
+           it is" is the button re-typed as prose, and it was printed on every
+           visit forever to be read once.
+
+           The row now reads as the sentence it is: everyone, unless you choose.
+           `Choose people` rather than `Add people`, because nothing is being
+           added to a set — it is being narrowed from everyone to some. */
         <div className="bb__whonone">
           <Users size={15} strokeWidth={1.8} aria-hidden />
-          <span>
-            <b>Everyone this policy governs</b>
-            <em>Narrow it to particular groups or people, or leave it as it is.</em>
-          </span>
+          <b>Everyone this policy governs</b>
+          <button type="button" className="bb__wholink" onClick={() => setPicking(true)}>
+            <Plus size={12} strokeWidth={2.4} aria-hidden />
+            Choose people
+          </button>
         </div>
       ) : (
         /* A CAP, a count, and the way in — on one line.
@@ -194,14 +207,10 @@ export function WhoEditor({
         </p>
       )}
 
-      {/* Only while there is nobody. Once there is, the summary above IS the
-          button — a second one beside it would be two ways into one dialog. */}
-      {chosen.length === 0 && (
-        <Button size="sm" variant="secondary" onClick={() => setPicking(true)}>
-          <Plus size={13} strokeWidth={2.4} aria-hidden />
-          Add people
-        </Button>
-      )}
+      {/* The standalone `Add people` button stood here, under the empty state.
+          It is on the empty state's own line now — one row instead of two — and
+          once somebody is chosen the summary above IS the button, which it
+          always was. */}
 
       <WhoPicker
         open={picking}
@@ -466,3 +475,4 @@ function WhoStandDown({ rule, onOpenPart }: { rule: Rule; onOpenPart: (part: Par
     </div>
   )
 }
+

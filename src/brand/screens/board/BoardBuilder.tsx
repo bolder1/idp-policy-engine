@@ -484,6 +484,30 @@ export function BoardBuilder({
      of the adjustment and everything drawn inside the stage follows for
      free. */
   const panelShown = hasSubject && inspOpen
+
+  /* The panel outlives its own close by one animation.
+
+     It is UNMOUNTED when it closes, on purpose — an editor for a rule nobody
+     is looking at is a form holding state about something that may since have
+     been deleted. That is still true, and this does not change it: the panel is
+     kept alive for the length of the slide and then dropped.
+
+     Deliberately NOT an `AnimatePresence`. board.css records what happened last
+     time: an exit interrupted by a fast click on a second card could strand the
+     old panel at 2% opacity and never mount the next one, and that click is the
+     common gesture. A timer has no such state — re-opening clears it and
+     removes the class, and the worst an interruption can do is cancel a
+     240ms animation. */
+  const [panelAlive, setPanelAlive] = useState(panelShown)
+  useEffect(() => {
+    if (panelShown) {
+      setPanelAlive(true)
+      return
+    }
+    const t = setTimeout(() => setPanelAlive(false), 200)
+    return () => clearTimeout(t)
+  }, [panelShown])
+  const panelLeaving = panelAlive && !panelShown
   const boardCommands: Cmd[] = [
     { id: 'add', label: 'Add a rule', icon: Plus },
     ...(selAt >= 0
@@ -754,14 +778,16 @@ export function BoardBuilder({
 
       {/* Mounted only when it has a subject.
 
-          Not hidden with CSS — unmounted. The panel holds the editors for one
-          rule, and an editor for a rule nobody is looking at is a form that
-          keeps its own state about something that may since have been deleted.
-          Unmounting also collapses its grid track — an explicitly-sized track
-          outlives the item in it, which is why `.bb.is-insp-closed` rewrites
-          the template rather than trusting the empty column to disappear. */}
-      {panelShown && (
+          Not hidden with CSS — unmounted, one animation late. The panel holds
+          the editors for one rule, and an editor for a rule nobody is looking at
+          is a form that keeps its own state about something that may since have
+          been deleted; `panelAlive` delays the drop by the length of the slide
+          and nothing else. Closing also narrows its grid track, which
+          `.bb.is-insp-closed` does by rewriting the template — to zero rather
+          than to one column, so the width has something to animate between. */}
+      {panelAlive && (
         <Inspector
+          leaving={panelLeaving}
           draft={draft}
           selection={selection}
           onPatchRule={patchRule}

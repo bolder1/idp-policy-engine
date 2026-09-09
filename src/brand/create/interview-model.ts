@@ -265,8 +265,6 @@ export function narrate(rules: Rule[]): string[] {
         ? 'is refused'
         : r.decision === '1fa'
           ? 'signs in on one factor'
-          : r.decision === 'warn'
-            ? 'signs in on one factor, and the attempt is raised'
             : 'is asked for a second factor'
     const trigger = r.when.cards.length === 0 ? 'anyone still unmatched' : describe(r)
     return `${i + 1}. ${trigger} ${what}.`

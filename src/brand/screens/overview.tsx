@@ -109,7 +109,7 @@ export function PolicyOverview({
                   onBlur={() => setHover(null)}
                   onClick={() => onJump(i)}
                 >
-                  <span className={`bov__n is-${r.decision === 'deny' ? 'deny' : r.decision === '2fa' ? 'mfa' : r.decision === 'warn' ? 'flag' : 'allow'}`}>
+                  <span className={`bov__n is-${r.decision === 'deny' ? 'deny' : r.decision === '2fa' ? 'mfa' : 'allow'}`}>
                     {i + 1}
                   </span>
                   <div>

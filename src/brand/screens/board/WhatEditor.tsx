@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { AlertTriangle, Flag, Plus, ShieldAlert, Trash2, UserCheck, X, XCircle } from 'lucide-react'
+import { AlertTriangle, Plus, ShieldAlert, Trash2, UserCheck, X, XCircle } from 'lucide-react'
 
 import { Toggle } from '../../kit'
 import { Picker } from '../../picker'
@@ -52,7 +52,6 @@ import { Prop } from './Section'
    here" everywhere else in this console; see the note on `TONE` in model.ts. */
 const TILES: { id: AccessDecision; label: string; tone: string; icon: typeof UserCheck; hint: string }[] = [
   { id: '1fa', label: 'Allow', tone: 'allow', icon: UserCheck, hint: 'Sign-in proceeds through the factors below.' },
-  { id: 'warn', label: 'Flag', tone: 'flag', icon: Flag, hint: 'Sign-in proceeds on the first factor, and the attempt is raised for review.' },
   { id: 'deny', label: 'Deny', tone: 'deny', icon: ShieldAlert, hint: 'Sign-in refused. No fallback path.' },
 ]
 
@@ -91,7 +90,6 @@ export function WhatEditor({
      not. That is what decides whether the ladder is drawn. */
   const walksFactors = rule.decision !== 'deny'
   const twoStep = rule.decision === '2fa'
-  const flagged = rule.decision === 'warn'
 
   /* Which flavour of Allow to return to. Seeded from the rule so switching to
      Deny and back does not silently add or drop a second step; `'1fa'` only
@@ -127,7 +125,6 @@ export function WhatEditor({
        shows and nothing on the rule reads. The first factor is left alone —
        a flagged sign-in still walks it, and it is the one setting the ladder
        below still offers. */
-    if (id === 'warn') return onPatch({ decision: 'warn', ...noSecondStep })
     onPatch({ decision: lastAllow.current })
   }
 
@@ -136,7 +133,7 @@ export function WhatEditor({
   /* Which tile is lit. Both Allow flavours light the one tile — that is the
      point of the merge, and it is why this is not simply `rule.decision`.
      `warn` is not one of those flavours: it lights its own. */
-  const active: string = rule.decision === 'deny' ? 'deny' : flagged ? 'warn' : '1fa'
+  const active: string = rule.decision === 'deny' ? 'deny' : '1fa'
 
   /* A rule nobody has answered shows no tile lit.
 
@@ -335,22 +332,13 @@ export function WhatEditor({
                 <RememberBlock rule={rule} onPatch={onPatch} />
               </div>
             </div>
-          ) : flagged ? (
-            /* No adder under Flag, and a sentence rather than a disabled
-               button.
-
-               `warn` and `2fa` are two values of ONE field, so "flag and also
-               verify" is not a rule this model can hold. The button below is
-               `onPatch({ decision: '2fa' })` — on a flagged rule that does not
-               add a step, it silently converts the rule to Allow-plus-verify
-               and un-lights the Flag tile. This arm existed upstream, was lost
-               when this pane was restructured, and `walksFactors` is
-               `decision !== 'deny'` — so a flagged rule fell straight through to
-               the adder. */
-            <p className="bb__addnote">
-              One factor, then the attempt is raised. Choose <b>Allow</b> to add a second factor.
-            </p>
           ) : (
+            /* A third arm stood here, for the Flag outcome: no adder, and a
+               sentence saying to choose Allow first. `warn` and `2fa` were two
+               values of ONE field, so "flag and also verify" was not a rule the
+               model could hold, and the adder below would have silently
+               converted a flagged rule to Allow-plus-verify. The outcome is
+               gone, so both the trap and the guard against it are. */
             /* The offer, once, under the first factor rather than as a third
                rung inside the ladder. A ladder numbers the steps a person
                walks; an add button is not a step. */

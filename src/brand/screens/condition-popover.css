@@ -437,13 +437,32 @@
 
    Taller than any one of the old rows and shorter than all three, which is the
    trade: a condition is now one thing to scan past rather than three. */
+/* ONE BOX PER CONDITION, and the parts inside it have no boxes of their own.
+
+   It was a bordered frame holding three bordered dropdowns: four rectangles to
+   draw one sentence, and at 340px the three inner ones spent most of their
+   width on their own edges and padding. Nesting a control inside a control also
+   said the wrong thing — that the frame and the fields were different kinds of
+   object, when a condition IS its three parts and you change it by changing
+   one of them.
+
+   So the frame is the control. It carries the border, the hover and the focus
+   ring, and the parts inside are segments of it, told apart by a hairline
+   rather than by an edge each. That is the whole of the change: no pixel of
+   width goes to a border that is not the outside of the thing.
+   -------------------------------------------------------------------------- */
 .cp__stack {
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 7px 8px;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  background: var(--surface-raised);
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 0;
+  border: 1px solid var(--ctl-border); border-radius: var(--radius-md);
+  background: var(--ctl-bg);
+  overflow: hidden;
 }
-.cp__stack:hover { border-color: var(--border-default); }
+.cp__stack:hover { border-color: var(--ctl-border-hover); }
+/* The frame answers for the whole condition, so it takes the ring when any
+   segment inside it is open or focused. */
+.cp__stack:focus-within { border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
+.cp__stack:has(.cp__fld.is-open) { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
 /* The unset condition says so on its frame rather than only on the value
    inside it — at a glance down a list, the box is what you see. */
 .cp__stack.is-unset { border-color: var(--fb-negative-border); }
@@ -460,25 +479,49 @@
    half that holds a library name. `min-width: 0` on both is what lets them
    ellipsize instead of forcing the row wider than the panel. */
 .cp__stackrow {
-  display: flex; align-items: center; gap: 5px;
+  display: flex; align-items: stretch;
   min-width: 0;
 }
 .cp__stackrow > .cp__fld.is-what { flex: 1 1 34%; min-width: 0; }
 .cp__stackrow > .cp__fld.is-op { flex: 0 0 auto; width: auto; white-space: nowrap; }
 .cp__stackrow > .cp__fld.is-op .cp__fldtext { overflow: visible; }
 .cp__stackrow > .cp__fld.is-val { flex: 1 1 44%; min-width: 0; }
-.cp__stackrow > .cp__inline { flex: 1 1 44%; min-width: 0; }
-.cp__stackrow > .cp__stacklabel { flex: 1 1 34%; min-width: 0; }
+.cp__stackrow > .cp__inline { flex: 1 1 44%; min-width: 0; padding: 0 8px; }
+.cp__stackrow > .cp__stacklabel { flex: 1 1 34%; min-width: 0; padding: 0 10px; }
+
+/* A segment, not a field. No border, no radius, no ground of its own — the
+   frame supplies all three. The hairline between segments is the only mark
+   that separates them, and it is one pixel where four borders used to be. */
+.cp__stackrow > .cp__fld {
+  border: 0; border-radius: 0; background: none;
+  min-height: 36px;
+}
+.cp__stackrow > .cp__fld + .cp__fld,
+.cp__stackrow > .cp__fld + .cp__inline,
+.cp__stackrow > .cp__inline + .cp__fld { border-left: 1px solid var(--border-subtle); }
+/* Hover and open are said with the GROUND, since the edge is spoken for. */
+.cp__stackrow > .cp__fld:hover { background: var(--surface-sunken); }
+.cp__stackrow > .cp__fld.is-open { background: var(--surface-sunken); box-shadow: none; border-color: transparent; }
+/* The frame draws the ring for the whole condition, so a segment inside it
+   must not draw a second one round itself. */
+.cp__stackrow > .cp__fld:focus-visible { box-shadow: none; background: var(--surface-sunken); }
 
 /* The one row that is not part of the sentence: an attribute's key, a time
-   window's timezone. Full width under the row they qualify. */
+   window's timezone. Full width under the row they qualify, and separated from
+   it by the same hairline the segments use — it is a second line of the same
+   control, not a second control. */
 .cp__stack > .cp__fld,
 .cp__stack > .cp__inline { width: 100%; }
+.cp__stack > .cp__fld,
+.cp__stack > .cp__inline { border-top: 1px solid var(--border-subtle); }
+.cp__stack > .cp__fld { border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; background: none; min-height: 34px; }
+.cp__stack > .cp__fld:hover { background: var(--surface-sunken); }
+.cp__stack > .cp__inline { padding: 6px 8px; }
 
 /* The delete, at the end of the row rather than beside the attribute. It is a
    quiet icon until the condition is hovered, because a bin on every row of a
    list is a list that looks like it is mostly about deleting. */
-.cp__stackrow > .cp__del { flex: none; width: 26px; height: 26px; opacity: 0; }
+.cp__stackrow > .cp__del { flex: none; align-self: center; width: 26px; height: 26px; margin: 0 4px; opacity: 0; }
 .cp__stack:hover .cp__del,
 .cp__stack:focus-within .cp__del { opacity: 1; }
 .cp__del:focus-visible { opacity: 1; }

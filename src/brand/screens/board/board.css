@@ -92,11 +92,25 @@
 .bb__stage { grid-column: 1; grid-row: 1; }
 .bb__insp,
 .bb__grip { grid-column: 2; grid-row: 1; }
-/* An explicitly-sized track outlives the item in it. The inspector is
-   UNMOUNTED when it closes — deliberately; see the note in BoardBuilder — so
-   without this, closing the panel would leave 560px of empty gutter where it
-   had been. */
-.bb.is-insp-closed { grid-template-columns: minmax(0, 1fr); }
+/* An explicitly-sized track outlives the item in it, so closing the panel would
+   otherwise leave 560px of empty gutter where it had been.
+
+   To ZERO, not to one column. A template that drops a track cannot be
+   interpolated — the browser has nothing to animate between `1fr 560px` and
+   `1fr` — so the panel used to appear and vanish on a frame while the stage
+   jumped to fill the space. Two tracks either way, and the second one goes to
+   nothing, which is a width and therefore animatable. The gap goes with it, or
+   a closed panel leaves 8px of margin against the right edge that the open one
+   does not. */
+.bb.is-insp-closed { grid-template-columns: minmax(0, 1fr) 0px; column-gap: 0; }
+/* The one motion the whole region makes, and it covers three gestures with one
+   declaration: opening, closing, and the narrow/wide toggle — which was
+   instant, and reads as the panel being replaced rather than resized.
+
+   Not during a grip drag: the handle sets `--bb-insp` on every pointer move, so
+   easing each one would put the panel 220ms behind the cursor. */
+.bb { transition: grid-template-columns var(--dur-normal) var(--ease-standard), column-gap var(--dur-normal) var(--ease-standard); }
+.bb.is-gripping { transition: none; }
 
 :root[data-theme='dark'] .bb,
 :root:not([data-theme='light']) .bb {
@@ -628,7 +642,6 @@
 .bb__card.is-unreached { opacity: 0.45; }
 .bb__card.is-deny { --hit-border: var(--fb-negative-border); --hit-glow: rgba(165, 20, 43, 0.35); --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); --tone-dot: var(--fb-negative-dot, #d01243); }
 .bb__card.is-mfa { --hit-border: var(--fb-notice-border); --hit-glow: rgba(125, 88, 0, 0.35); --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); --tone-dot: var(--fb-notice-dot, #b07a00); }
-.bb__card.is-flag { --hit-border: var(--fb-info-border); --hit-glow: rgba(17, 137, 212, 0.35); --tone-bg: var(--fb-info-bg); --tone-fg: var(--fb-info-fg); --tone-border: var(--fb-info-border); --tone-dot: var(--fb-info-dot, #1189d4); }
 .bb__card.is-allow { --hit-border: var(--fb-positive-border); --hit-glow: rgba(20, 102, 58, 0.35); --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); --tone-dot: var(--fb-positive-dot, #128f43); }
 
 /* The same three tones, on the badge rather than on a card ancestor.
@@ -650,7 +663,6 @@
 .bb__idx { --tone-bg: var(--surface-sunken); --tone-fg: var(--text-secondary); }
 .bb__reach.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-dot: var(--fb-negative-dot, #d01243); }
 .bb__reach.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-dot: var(--fb-notice-dot, #b07a00); }
-.bb__reach.is-flag { --tone-bg: var(--fb-info-bg); --tone-fg: var(--fb-info-fg); --tone-dot: var(--fb-info-dot, #1189d4); }
 .bb__reach.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-dot: var(--fb-positive-dot, #128f43); }
 
 .bb__cardhead {
@@ -1169,8 +1181,38 @@
   border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
   background: var(--surface-raised);
   overflow: hidden;
+  animation: bb-insp-in var(--dur-normal) var(--ease-standard);
 }
-/* The slide-out has gone, and it is not coming back as an AnimatePresence.
+/* Frozen at the width it had, so it slides rather than being squeezed flat by
+   the track closing underneath it. `pointer-events: none` because a panel on
+   its way out must not take a click meant for the card behind it. */
+.bb__insp.is-leaving {
+  width: min(var(--bb-insp), 46vw);
+  pointer-events: none;
+  animation: bb-insp-out var(--dur-normal) var(--ease-standard) forwards;
+}
+/* The slide is back, and it is still not an AnimatePresence.
+
+   `.bb__insp` slides in on mount and out under `.is-leaving`, both as plain CSS
+   animations, with `BoardBuilder` holding the panel alive for the length of the
+   exit on a timer. The objection below was to the PRESENCE MACHINERY, not to
+   the motion, and a timer cannot strand anything: re-opening clears it and
+   drops the class.
+
+   `forwards` on the exit so the panel stays gone for the frames between the
+   animation ending and the unmount landing.
+*/
+@keyframes bb-insp-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes bb-insp-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateX(16px); }
+}
+
+/* The historical note this replaces — worth keeping, because the fix it warns
+   against is the one somebody will reach for again:
 
    It used to translate and fade under `.bb.is-insp-closed`. That class and the
    panel's mount are now driven by the same boolean, so the rule was never
@@ -1572,7 +1614,6 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__result.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); }
 .bb__result.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); }
-.bb__result.is-flag { --tone-bg: var(--fb-info-bg); --tone-fg: var(--fb-info-fg); --tone-border: var(--fb-info-border); }
 .bb__result.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); }
 .bb__result.is-out { --tone-bg: var(--surface-sunken); --tone-fg: var(--text-secondary); --tone-border: var(--border-subtle); }
 .bb__result strong { display: block; font-size: var(--fs-md); font-weight: var(--fw-semibold); }
@@ -1617,7 +1658,6 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__wantgot .bb__decision { height: 22px; font-size: 11px; }
 .bb__wantgot .bb__decision.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); }
 .bb__wantgot .bb__decision.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); }
-.bb__wantgot .bb__decision.is-flag { --tone-bg: var(--fb-info-bg); --tone-fg: var(--fb-info-fg); --tone-border: var(--fb-info-border); }
 .bb__wantgot .bb__decision.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); }
 .bb__roundacts { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
 
@@ -1666,7 +1706,6 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__lanebar.is-before > i { background: var(--border-strong); opacity: 0.55; }
 .bb__lane.is-allow .bb__lanebar.is-after > i { background: var(--fb-positive-dot, #128f43); }
 .bb__lane.is-mfa .bb__lanebar.is-after > i { background: var(--fb-notice-dot, #b07a00); }
-.bb__lane.is-flag .bb__lanebar.is-after > i { background: var(--fb-info-dot, #1189d4); }
 .bb__lane.is-deny .bb__lanebar.is-after > i { background: var(--fb-negative-dot, #d01243); }
 .bb__lanelegend { display: flex; gap: var(--space-4); font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
 .bb__lanelegend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; background: var(--border-strong); opacity: 0.55; margin-right: 4px; vertical-align: middle; }
@@ -1679,7 +1718,6 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__flow .bb__decision { height: 20px; font-size: 11px; padding: 0 8px 0 6px; }
 .bb__flow .bb__decision.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); }
 .bb__flow .bb__decision.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); }
-.bb__flow .bb__decision.is-flag { --tone-bg: var(--fb-info-bg); --tone-fg: var(--fb-info-fg); --tone-border: var(--fb-info-border); }
 .bb__flow .bb__decision.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); }
 
 /* The field: 1,440 situations, one dot each, in a fixed order. */
@@ -1696,7 +1734,6 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__dot.is-allow { --dot: var(--fb-positive-dot, #128f43); }
 .bb__dot.is-mfa { --dot: var(--fb-notice-dot, #b07a00); }
-.bb__dot.is-flag { --dot: var(--fb-info-dot, #1189d4); }
 .bb__dot.is-deny { --dot: var(--fb-negative-dot, #d01243); }
 .bb__dot.is-dim { opacity: 0.18; }
 .bb__dot.is-changed { box-shadow: inset 0 0 0 1.5px var(--surface-raised), 0 0 0 1px var(--text-primary); }
@@ -2099,7 +2136,6 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifdot { width: 8px; height: 8px; border-radius: 50%; }
 .bb__ifdot.is-deny { background: var(--fb-negative-dot); }
 .bb__ifdot.is-mfa { background: var(--fb-notice-dot); }
-.bb__ifdot.is-flag { background: var(--fb-info-dot); }
 .bb__ifdot.is-allow { background: var(--fb-positive-dot); }
 
 .bb__ifinput {
@@ -3354,28 +3390,28 @@ button.bb__idx::after {
 }
 .bb__insp .bb__sec:last-child { border-bottom: 0; }
 
-/* The heading is the smallest thing on the page and the loudest in the
-   hierarchy: uppercase, tracked, tertiary. It is a LABEL for the block below
-   it, not a title competing with the rule's name at the top of the panel. */
+/* A heading, at heading size.
+
+   It was 10px, tracked, uppercase and tertiary — the smallest type in the
+   panel — with a grey caption on the same line saying what the section was
+   for. `Who`, `If` and `Then` are the three parts of a rule and the only three
+   headings here; drawn that way they were quieter than every control beneath
+   them, and each was sharing its line with a sentence you read once and then
+   read past forever.
+
+   So: the panel's own reading size, semibold, primary. The hint went with the
+   size — what a section is for is said by its empty state, at the moment it is
+   useful. */
 .bb__insp .bb__sec__head {
-  display: flex; align-items: baseline; gap: var(--space-3);
+  display: flex; align-items: center; gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
 .bb__insp .bb__sec__head h3 {
-  margin: 0; flex: none;
-  font-size: 10px; font-weight: var(--fw-semibold);
-  letter-spacing: 0.09em; text-transform: uppercase;
-  color: var(--text-tertiary);
-}
-/* The hint sits on the heading's line rather than under it — one line of
-   chrome, not two — and truncates rather than wrapping the heading away from
-   its own block. */
-.bb__insp .bb__sec__head p {
   margin: 0; flex: 1; min-width: 0;
-  font-size: var(--fs-xs); color: var(--text-muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-base); font-weight: var(--fw-semibold);
+  letter-spacing: 0; text-transform: none;
+  color: var(--text-primary);
 }
-.bb__insp .bb__sec__head p:only-of-type { margin-right: auto; }
 .bb__insp .bb__sec__head .bb__secact { margin-left: auto; flex: none; }
 
 /* Which third of the rule you arrived at, said on the heading.
@@ -3392,14 +3428,31 @@ button.bb__idx::after {
    that pushed the conditions and the outcome below the fold. */
 .bb__who { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }
 
+/* One row: the mark, the state, and the way out of it.
+
+   It was a two-line stack with a button underneath — four rows to say "nobody
+   in particular", on the section that is answered by leaving it alone. The
+   second line explained what the button does, which the button says. */
 .bb__whonone {
-  display: flex; align-items: flex-start; gap: var(--space-3);
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%;
   color: var(--text-tertiary);
 }
-.bb__whonone > svg { flex: none; margin-top: 1px; }
-.bb__whonone span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.bb__whonone b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
-.bb__whonone em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.5; }
+.bb__whonone > svg { flex: none; }
+.bb__whonone b { flex: 1; min-width: 0; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+/* A link, not a Button. The row is a sentence and this is its last clause; a
+   filled or outlined control at the end of it would read as the section's
+   primary action, which is wrong — leaving this alone is the commonest answer
+   a rule gives. */
+.bb__wholink {
+  flex: none;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  color: var(--text-link);
+}
+.bb__wholink:hover { text-decoration: underline; text-underline-offset: 2px; }
+.bb__wholink:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 4px var(--focus-halo); }
 
 
 /* --- Who, in the dialog ------------------------------------------------------ */

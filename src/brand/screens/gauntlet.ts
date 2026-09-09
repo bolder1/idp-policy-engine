@@ -36,7 +36,6 @@ export type Expect = AccessDecision
 export const EXPECT_LABEL: Record<Expect, string> = {
   deny: 'Blocked',
   '2fa': 'Verified',
-  warn: 'Flagged',
   '1fa': 'Straight in',
 }
 
@@ -49,7 +48,7 @@ export const EXPECT_LABEL: Record<Expect, string> = {
    much a rule DOES about a sign-in, because that is what says whether a change
    loosened something — and a rule that stops recording has loosened, even
    though nobody's access widened. */
-const STRICTNESS: Record<AccessDecision, number> = { '1fa': 0, warn: 1, '2fa': 2, deny: 3 }
+const STRICTNESS: Record<AccessDecision, number> = { '1fa': 0, '2fa': 1, deny: 2 }
 
 /* One condition of a fix spec, in the same shape `cond()` takes.
 

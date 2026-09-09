@@ -355,10 +355,10 @@ function Axis({
 
 // --- Decision log ------------------------------------------------------------
 
-type LogDecision = 'Allow' | 'Deny' | 'Challenge' | 'Flagged'
+type LogDecision = 'Allow' | 'Deny' | 'Challenge'
 
-const DECISION_OF: Record<AccessDecision, LogDecision> = { deny: 'Deny', '2fa': 'Challenge', warn: 'Flagged', '1fa': 'Allow' }
-const DECISION_TONE: Record<LogDecision, string> = { Allow: 'allow', Deny: 'deny', Challenge: 'challenge', Flagged: 'flag' }
+const DECISION_OF: Record<AccessDecision, LogDecision> = { deny: 'Deny', '2fa': 'Challenge', '1fa': 'Allow' }
+const DECISION_TONE: Record<LogDecision, string> = { Allow: 'allow', Deny: 'deny', Challenge: 'challenge' }
 
 interface LogRow {
   id: string

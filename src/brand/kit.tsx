@@ -369,8 +369,8 @@ export function DecisionChip({
   decision: AccessDecision
   size?: 'sm' | 'md'
 }) {
-  const tone = decision === 'deny' ? 'negative' : decision === '2fa' ? 'notice' : decision === 'warn' ? 'info' : 'positive'
-  const label = decision === 'deny' ? 'Deny' : decision === '2fa' ? 'MFA' : decision === 'warn' ? 'Flag' : 'Allow'
+  const tone = decision === 'deny' ? 'negative' : decision === '2fa' ? 'notice' : 'positive'
+  const label = decision === 'deny' ? 'Deny' : decision === '2fa' ? 'MFA' : 'Allow'
   /* No dot. The chip is already tinted, bordered and named — see the note on
      `.bx-decision` in kit.css for why a fourth signal was removed rather than
      kept. */

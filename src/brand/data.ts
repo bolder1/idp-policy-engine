@@ -447,23 +447,35 @@ export interface Predicate {
    decision would have to read two fields to know what a rule does, and the
    thing an administrator picks would stop being one choice. One choice, and
    the combination is the cost. */
-export type AccessDecision = 'deny' | '1fa' | '2fa' | 'warn'
+/* Two answers and a count of steps, and `warn` is no longer one of them.
+
+   `'warn'` meant "let them in on one factor and raise the attempt for review".
+   It was argued from a real case — a client version floor is a rollout control,
+   and locking an on-call engineer out of the monitoring console at 3am because
+   their handset has not taken an app update is the wrong answer — but it was a
+   third peer on a question that only has two: whether somebody gets in.
+   Everything that made it different from a plain allow happens AFTER the
+   sign-in succeeds, which is reporting, not access control.
+
+   The console this prototype is modelled on decides allow or deny, and the six
+   seeded rules that flagged now allow. The two policies whose names promised
+   the third answer are renamed rather than left over-promising.
+
+   Removed from the type rather than deprecated, so the twelve `Record<
+   AccessDecision, …>` maps that had to carry a `warn` arm stop carrying one and
+   the compiler finds anything that still expects it. */
+export type AccessDecision = 'deny' | '1fa' | '2fa'
 
 export const DECISION_LABEL: Record<AccessDecision, string> = {
   deny: 'Deny',
   '1fa': '1 factor',
   '2fa': '2 factors',
-  /* Still one factor, which is what this label counts — the flag is what makes
-     it a different outcome and the label has to carry it, or two rules that
-     behave differently read identically in every list that prints this. */
-  warn: '1 factor, flagged',
 }
 
 export const DECISION_CAPTION: Record<AccessDecision, string> = {
   deny: 'Block access',
   '1fa': 'One step',
   '2fa': 'Two steps',
-  warn: 'One step, raised',
 }
 
 export interface Rule {
@@ -1536,7 +1548,7 @@ export const policies: Policy[] = [
 
   {
     id: 'sc1-os-compliance',
-    name: 'Device OS Compliance — allow, flag or deny',
+    name: 'Device OS Compliance — allow or deny',
     type: 'App Access',
     appIds: ['corporate-email'],
     status: 'active',
@@ -1559,9 +1571,9 @@ export const policies: Policy[] = [
         matchEstimate: 812,
       }),
       rule({
-        name: 'Behind, but still supported — let in and flag',
+        name: 'Behind, but still supported — let in',
         when: when(card(cond('fingerprint', 'matches', ['fp-os-floor']))),
-        decision: 'warn',
+        decision: '1fa',
         matchEstimate: 305,
       }),
     ],
@@ -1662,7 +1674,7 @@ export const policies: Policy[] = [
       rule({
         name: 'Client behind the floor',
         when: when(card(cond('fingerprint', 'does not match', ['fp-client-current']))),
-        decision: 'warn',
+        decision: '1fa',
         matchEstimate: 96,
       }),
     ],
@@ -1776,7 +1788,7 @@ export const policies: Policy[] = [
       rule({
         name: 'Untampered, but not fully compliant',
         when: when(card(cond('fingerprint', 'matches', ['fp-integrity']))),
-        decision: 'warn',
+        decision: '1fa',
         matchEstimate: 9,
       }),
     ],
@@ -1835,7 +1847,7 @@ export const policies: Policy[] = [
             cond('zone', 'in zone', ['office']),
           ),
         ),
-        decision: 'warn',
+        decision: '1fa',
         matchEstimate: 141,
       }),
     ],
@@ -1918,9 +1930,9 @@ export const policies: Policy[] = [
         matchEstimate: 8,
       }),
       rule({
-        name: 'Client behind the floor — let in and flag',
+        name: 'Client behind the floor — let in',
         when: when(card(cond('fingerprint', 'does not match', ['fp-client-current']))),
-        decision: 'warn',
+        decision: '1fa',
         matchEstimate: 4,
       }),
     ],
@@ -1999,9 +2011,9 @@ export const policies: Policy[] = [
         matchEstimate: 63,
       }),
       rule({
-        name: 'Outdated browser — recorded, not refused',
+        name: 'Outdated browser — let in',
         when: when(card(cond('fingerprint', 'does not match', ['fp-browser-current']))),
-        decision: 'warn',
+        decision: '1fa',
         matchEstimate: 22,
       }),
     ],

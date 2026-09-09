@@ -3,7 +3,6 @@ import { motion } from 'motion/react'
 import { ChevronsLeftRight, ChevronsRightLeft, Plus, X } from 'lucide-react'
 
 import { Toggle } from '../../kit'
-import { restConditions } from '../../audience-ops'
 import { fallbackRule, type Policy, type Rule } from '../../data'
 import { TONE, type Part, type Selection } from './model'
 import { WhatEditor } from './WhatEditor'
@@ -39,6 +38,7 @@ export function Inspector({
   onClose,
   wide,
   onToggleWidth,
+  leaving,
 }: {
   draft: Policy
   selection: Selection
@@ -53,6 +53,8 @@ export function Inspector({
   /** Whether the panel is at its full width, and the way to change that. */
   wide: boolean
   onToggleWidth: () => void
+  /** On its way out. The board keeps it mounted for the length of the slide. */
+  leaving?: boolean
 }) {
   /* Resolved once. `at` is -1 when the selected rule is gone — undone, deleted,
      discarded — but the board no longer mounts this component in that case, so
@@ -68,7 +70,7 @@ export function Inspector({
   const what = rule ? `Rule ${at + 1}` : 'The default'
 
   return (
-    <aside className="bb__insp" aria-label="Inspector">
+    <aside className={`bb__insp ${leaving ? 'is-leaving' : ''}`} aria-label="Inspector">
       <div className="bb__inspbar">
         <b>{what}</b>
         {/* Narrow, or full width. Nothing else.
@@ -152,13 +154,13 @@ export function Inspector({
                 move between them. What it no longer does is HIDE the other
                 two. */}
             <motion.div key={`pane:${rule.id}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
-              <Section id="who" title="Who" hint="Leave empty for everyone this policy governs" focused={part === 'who'}>
+              <Section id="who" title="Who" focused={part === 'who'}>
                 <WhoEditor rule={rule} audience={draft.audience} onPatch={patch} onOpenPart={onOpenPart} />
               </Section>
 
               <ConditionSection rule={rule} onPatch={patch} focused={part === 'when'} />
 
-              <Section id="then" title="Then" hint="What happens when the rule matches">
+              <Section id="then" title="Then">
                 <WhatEditor rule={rule} onPatch={patch} />
               </Section>
             </motion.div>
@@ -178,10 +180,21 @@ export function Inspector({
 
 /* --- A section of the panel --------------------------------------------------
 
-   A heading, an optional hint, an optional action, and a hairline under the
-   lot. No box: three bordered cards inside a bordered panel is four frames to
-   draw one form, and the boxes were most of why this panel read as a pile of
-   widgets rather than as a sentence.
+   A heading, an optional action, and a hairline under the lot. No box: three
+   bordered cards inside a bordered panel is four frames to draw one form, and
+   the boxes were most of why this panel read as a pile of widgets rather than
+   as a sentence.
+
+   THE HINT IS GONE, and so is the 10px tracked uppercase label it sat beside.
+
+   `Who`, `If` and `Then` are the three parts of a rule and the only three
+   headings in this panel, and they were drawn as the smallest type on it —
+   10px, tracked, tertiary — with a grey sentence on the same line explaining
+   what each section was for. So the word you navigate by was quieter than every
+   control under it, and it was competing on its own line with a caption you
+   read once. `Who` is now a heading at the panel's reading size, and what each
+   section is for is said by the section's own empty state, where it is read at
+   the moment it is useful rather than on every visit forever.
 
    `focused` carries the selection's part, and it does the one job the tabs did
    that was worth keeping — saying which third of the rule you arrived at. It
@@ -189,14 +202,12 @@ export function Inspector({
 function Section({
   id,
   title,
-  hint,
   action,
   focused,
   children,
 }: {
   id: string
   title: string
-  hint?: string
   action?: ReactNode
   focused?: boolean
   children: ReactNode
@@ -205,7 +216,6 @@ function Section({
     <section className={`bb__sec ${focused ? 'is-focused' : ''}`} aria-labelledby={`bb-sec-${id}`}>
       <div className="bb__sec__head">
         <h3 id={`bb-sec-${id}`}>{title}</h3>
-        {hint && <p>{hint}</p>}
         {action}
       </div>
       {children}
@@ -229,12 +239,10 @@ function ConditionSection({
      anything but null — so the effect in `WhenEditor` that opens the catalogue
      could never fire from here at all. */
   const [openAt, setOpenAt] = useState<{ nonce: number } | null>(null)
-  const n = restConditions(rule.when).length
   return (
     <Section
       id="if"
       title="If"
-      hint={n === 0 ? 'Every sign-in that reaches this rule matches' : undefined}
       focused={focused}
       action={
         <button

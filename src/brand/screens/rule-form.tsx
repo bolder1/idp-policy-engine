@@ -110,7 +110,7 @@ export const OUTCOMES: { id: AccessDecision; label: string; sub: string; icon: L
 
 /** Allow covers both allow-flavours; the second-factor switch chooses between them. */
 export const allows = (d: AccessDecision) => d !== 'deny'
-export const DEC_KEY: Record<AccessDecision, string> = { deny: 'deny', '2fa': 'mfa', warn: 'flag', '1fa': 'allow' }
+export const DEC_KEY: Record<AccessDecision, string> = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' }
 
 /** The console's first-factor catalogue, in its order. */
 export const METHODS = [

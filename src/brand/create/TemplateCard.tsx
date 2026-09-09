@@ -70,24 +70,21 @@ export interface CardModel {
 /* `monthOf` stood here — "2026-01" into "Jan 2026", for the review line in the
    card's footer. Both are gone; the seed data still carries the dates. */
 
-const DEC_WORD: Record<AccessDecision, string> = { deny: 'Deny', '2fa': 'MFA', warn: 'Flag', '1fa': 'Allow' }
-const DEC_KEY: Record<AccessDecision, string> = { deny: 'deny', '2fa': 'mfa', warn: 'flag', '1fa': 'allow' }
+const DEC_WORD: Record<AccessDecision, string> = { deny: 'Deny', '2fa': 'MFA', '1fa': 'Allow' }
+const DEC_KEY: Record<AccessDecision, string> = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' }
 
 /* Strictest outcome present — used by the readout and the preview dialog.
 
-   `warn` is checked after `2fa` and before the bare allow, which is where it
-   belongs on a ladder reading "what is the heaviest thing this template does".
-   A template whose only outcome is a flag is not an allow-only template, and
-   summarising it as one would let a compliance template read as doing nothing. */
-export function posture(rules: CardRule[]): 'deny' | 'mfa' | 'flag' | 'allow' | 'none' {
+   The `flag` rung between `2fa` and the bare allow is gone with the outcome it
+   summarised. */
+export function posture(rules: CardRule[]): 'deny' | 'mfa' | 'allow' | 'none' {
   if (rules.length === 0) return 'none'
   if (rules.some((r) => r.decision === 'deny')) return 'deny'
   if (rules.some((r) => r.decision === '2fa')) return 'mfa'
-  if (rules.some((r) => r.decision === 'warn')) return 'flag'
   return 'allow'
 }
 
-const POSTURE_WORD = { deny: 'Deny', mfa: 'MFA', flag: 'Flag', allow: 'Allow', none: '—' } as const
+const POSTURE_WORD = { deny: 'Deny', mfa: 'MFA', allow: 'Allow', none: '—' } as const
 
 /* --- The signal row ------------------------------------------------------------
    Apollo puts a row of small round glyphs at the top of every workflow card, one

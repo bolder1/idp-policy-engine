@@ -366,7 +366,12 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
               <div className="bb__ifgrouptag">
                 <Braces size={10} strokeWidth={2.2} aria-hidden />
                 <b>{k.label?.trim() || `Group ${cardLetter(i)}`}</b>
-                {k.conditions.length > 1 && <span>{join === 'and' ? 'all must match' : 'any one matches'}</span>}
+                {/* `· all must match` stood here and has gone with the change
+                    above it. Every gap inside this box now carries the operator
+                    on a line of its own, so the caption was the third telling of
+                    one fact — said once in the heading, then again in each of
+                    the group's internal joins. The heading names the group; the
+                    joins say how it holds together. */}
               </div>
             )}
             {k.conditions.map((c, j) => (
@@ -377,14 +382,40 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
                  the operator that starts each row is the only mark, and at
                  11px it is easy to lose. A rule per row makes the count
                  readable at a glance, which is the whole job of the card. */
-              <div key={c.id} className="bb__ifrow is-cond">
-                {/* `if` used to open this row when it was the first of the
-                    whole block. It has a line of its own above the body now, so
-                    the first condition starts with the condition — and a member
-                    after the first is still introduced by its operator. */}
-                {j > 0 && <IfKw tone={join}>{join}</IfKw>}
-                <CondReadout c={c} resolve={resolve} />
-              </div>
+              <Fragment key={c.id}>
+                {/* The operator between two conditions, on a line of its own.
+
+                    It used to be the first word of the SECOND one's row, which
+                    made `and` a property of the condition after it. It is not:
+                    `and` joins the two and belongs to neither, and this is the
+                    same misattribution that was fixed one level up when the
+                    rule's own operator was lifted out of the group box it was
+                    being drawn inside. Both levels are drawn the same way now,
+                    which is also how the editor beside this card draws them.
+
+                    Two things fall out of it. Every condition row now starts
+                    with its attribute glyph at the same x, so the guide line
+                    has one hard edge under it instead of one that jogged in on
+                    every row after the first. And an operator can no longer
+                    wrap: a five-chip condition that ran onto a second line used
+                    to leave the `and` stranded above a fragment of the
+                    condition it introduced.
+
+                    `is-run` is what keeps the two levels apart. The operator
+                    between MEMBERS carries a hairline out to the block's right
+                    edge, because a member boundary is the bigger break; the
+                    operator between conditions of one member is the bare pill.
+                    One mark per level, which is what the hairline in every gap
+                    was removed for. */}
+                {j > 0 && (
+                  <div className="bb__ifrow bb__ifjoin is-run">
+                    <IfKw tone={join}>{join}</IfKw>
+                  </div>
+                )}
+                <div className="bb__ifrow is-cond">
+                  <CondReadout c={c} resolve={resolve} />
+                </div>
+              </Fragment>
             ))}
           </div>
           </Fragment>

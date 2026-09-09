@@ -19,14 +19,23 @@
   --bb-dot: #d3dae1;
   --bb-stage: #f6f7f9;
   --bb-link: var(--border-default);
-  /* Selected is INK, not brand.
+  /* Selected is INK, not brand — and one shade of it, not a slab.
 
      The ring was `--brand`, so the one card you were working on wore the same
      colour as the publish button, the switches and every value in the panel.
-     Selection is not an action and does not need the action colour: a heavy
-     neutral ring against a white card on a grey canvas is unmistakable, and it
-     leaves brand meaning "press this". */
-  --bb-ring: #334155;
+     Selection is not an action and does not need the action colour, and that
+     part of the decision stands: brand goes on things you press.
+
+     What did not stand was the WEIGHT. #334155 measures 10.3:1 against a white
+     card — more contrast than the card's own body text — and it was drawn 3px
+     thick, so the one card you were reading was framed in a stroke darker and
+     heavier than anything printed inside it. The eye went to the edge instead
+     of to the rule.
+
+     Slate 500 is the same ink two steps lighter: 4.6:1 in light, 5.5:1 on the
+     dark card, still three times the hover border either side of it and quiet
+     enough to be a boundary rather than a frame. */
+  --bb-ring: #64748b;
 
   flex: 1 1 auto;
   min-height: 0;
@@ -82,11 +91,12 @@
   /* The selection ring inverts with the surface. A slate ring on a dark card
      is the card — the whole point of a neutral ring is that it contrasts, and
      a token defined only for light leaves the one state you need to see
-     invisible on the other. */
-  --bb-ring: #cbd5e1;
+     invisible on the other. Two steps down from #cbd5e1 for the same reason
+     the light value came down: an edge, not a frame. */
+  --bb-ring: #94a3b8;
 }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']) .bb { --bb-dot: #d3dae1; --bb-stage: #f6f7f9; --bb-ring: #334155; }
+  :root:not([data-theme='dark']) .bb { --bb-dot: #d3dae1; --bb-stage: #f6f7f9; --bb-ring: #64748b; }
 }
 
 /* --- The top row ------------------------------------------------------------
@@ -586,10 +596,11 @@
   cursor: pointer;
 }
 .bb__card:hover { border-color: var(--border-default); box-shadow: var(--el-mid); }
-.bb__card.is-selected {
-  border-color: var(--bb-ring);
-  box-shadow: 0 0 0 1px var(--bb-ring), var(--el-mid);
-}
+/* The selected card is drawn once, further down — see "The selected card".
+   A second `.bb__card.is-selected` stood here at the same specificity in the
+   same sheet, so source order decided it and this one lost every property it
+   declared. Two blocks, one of them silently dead, is how a change to the
+   selection ring comes to have no effect on screen. */
 .bb__card:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring), var(--el-mid); }
 .bb__card.is-off { opacity: 0.62; }
 .bb__card.is-off:hover { opacity: 0.85; }
@@ -998,7 +1009,17 @@
   border-left: 3px solid var(--tone-border, var(--border-default));
 }
 .bb__card.is-terminal:hover { border-color: var(--border-default); box-shadow: var(--el-mid); }
-.bb__card.is-terminal.is-selected { border-color: var(--bb-ring); }
+/* Three sides, not four. `border-color` is a longhand for all four edges, and
+   this selector outranks the `border-left: 3px solid var(--tone-border)` above
+   it — so selecting the default row repainted the one thing that card is
+   built around, the tone running down its edge, in selection slate. The rule
+   whose whole design idea is "the edge says what it decides" lost what it
+   decides the moment you clicked it. */
+.bb__card.is-terminal.is-selected {
+  border-top-color: var(--bb-ring);
+  border-right-color: var(--bb-ring);
+  border-bottom-color: var(--bb-ring);
+}
 
 /* The pill. Neutral, never negative — locked is a lifecycle state, not a
    warning, and this kit keeps those grey. */
@@ -1805,8 +1826,12 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   --if-chip-hover: var(--surface-inset);
   --if-line: var(--border-default);
 
-  display: grid; gap: 1px;
-  padding: 10px 12px;
+  /* `who`, `if` and `then` are three sections of one reading, and a 1px gap
+     between them put a keyword hard against the body of the section above it.
+     4px is the smallest step on the scale that reads as a break rather than as
+     a printing error. */
+  display: grid; gap: var(--space-2);
+  padding: var(--space-5);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: var(--if-bg);
@@ -1864,33 +1889,31 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
    group sits in its own tint, so a hairline in every gap was a third mark for
    a boundary already stated twice — and on a five-condition card it was four
    more lines than the card had anything to say with. */
-.bb__ifrow.is-cond { padding: 4px 0; }
-/* Inside a group the rows are already bracketed together, so the hairline is
-   doing less work and the frame's own padding gives them the air. */
-.bb__ifgroup > .bb__ifrow.is-cond { padding: 3px 0; }
+.bb__ifrow.is-cond { padding: var(--space-2) 0; }
+/* One condition-row metric at both depths. A row inside a group used to be 1px
+   tighter than a row outside one, which made the nesting a matter of vertical
+   rhythm as well as of tint — two signals for one fact, and the tighter one
+   fought the operator rows now sitting between them. The group's own padding is
+   what says "nested". */
+.bb__ifgroup > .bb__ifrow.is-cond { padding: var(--space-2) 0; }
 
-/* Two alternatives still have to read as two.
-
-   The frames used to do that job on the card, badly — they said "group" about
-   runs nobody had grouped. Removing them left nothing marking where a second
-   way in began, so the break between runs is drawn as a break: one accent rule.
-
-   It applies to BOTH renderers now, which it did not before. The editor used to
-   put a `.bb__ifjoin` divider between its runs, so this adjacency never
-   occurred there; the divider has gone, and this line is what has taken over
-   its one useful job — saying that an alternative starts here — without
-   spending a row on it or repeating a setting that has one value. */
-.bb__if > .bb__ifplain + .bb__ifplain,
-.bb__if > .bb__ifplain + .bb__ifgroup,
-.bb__if > .bb__ifgroup + .bb__ifplain,
-.bb__if > .bb__ifgroup + .bb__ifgroup {
-  margin-top: 7px;
-  padding-top: 7px;
-  border-top: 1px dashed var(--fb-accent-border);
-}
+/* A dashed accent rule between two alternatives stood here, and it never once
+   drew. `.bb__if > .bb__ifplain` requires the run to be a CHILD of the block:
+   on the card the runs are nested inside `.bb__ifbody`, and in the editor
+   inside `.bb__ifbracket`, so the combinator matched in neither renderer —
+   while its own comment claimed it applied to both. The seam between members is
+   the operator row, which is a mark that exists. */
 
 
-.bb__ifbranch { display: grid; color: var(--if-muted); margin-right: -2px; }
+/* 14px, and no negative margin.
+
+   The icon box was intrinsic width with `margin-right: -2px` pulling the
+   keyword back over it, which left `if` starting at 16px while everything
+   indented under it started at 20px — a 4px jog between a word and the things
+   that answer it, on every card. 14px is this block's own icon-box unit (the
+   chip's mark is the same), and 14 + 6 puts the keyword at the body's own
+   content edge. */
+.bb__ifbranch { display: grid; width: 14px; color: var(--if-muted); margin-right: 0; }
 .bb__ifkw { flex: none; font-weight: var(--fw-semibold); color: var(--text-primary); letter-spacing: 0.01em; min-width: 14px; }
 
 /* --- `and` and `or`, coloured ------------------------------------------------
@@ -1906,9 +1929,14 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
    coloured word among coloured chips is just another chip; a pill says
    "operator". Both carry their own foreground token, so contrast holds in
    either theme without a second rule. */
+/* `--radius-pill`, not `--radius-full`. The token file reserves `full` for
+   things whose roundness IS their geometry — avatars, dots, the switch — and
+   sends every label-bearing chip through `pill`. The editor's own joiner
+   already draws at 4px, so one operator had two shapes on two surfaces that are
+   on screen at the same time showing the same rule. */
 .bb__ifkw.is-and,
 .bb__ifkw.is-or {
-  height: 18px; padding: 0 7px; border-radius: var(--radius-full);
+  height: 18px; padding: 0 var(--space-3); border-radius: var(--radius-pill);
   display: inline-flex; align-items: center;
   font-size: 10px; font-weight: var(--fw-semibold);
   letter-spacing: 0.04em; text-transform: uppercase;
@@ -1942,10 +1970,17 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
    "one thing follows", which was true of the outcome and of nothing else; the
    guide reads as "all of this belongs to the word above", which is true of all
    three. */
+/* One vertical edge for the whole block, at x = 20px.
+
+   `margin-left` centres the 1px rule under the branch icon above it (6 → 7,
+   centre 6.5, against the 14px icon's centre at 7). `padding-left` is then
+   arithmetic, not a choice: 20 − 6 − 1. Twenty is the constraint — it is where
+   the keyword's text starts, so it is where everything answering the keyword
+   has to start. Do not round it to a token; it would move the edge. */
 .bb__ifbody {
   position: relative;
-  padding-left: 14px;
-  margin-left: 5px;
+  padding-left: 13px;
+  margin-left: var(--space-3);
 }
 /* Drawn as a border rather than a `::before`, so it takes the block's real
    height including any group frame inside it and cannot fall out of step with
@@ -1960,8 +1995,8 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__ifwho { display: flex; align-items: center; min-height: 26px; }
 
 .bb__ifchip {
-  display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
-  height: 22px; padding: 0 7px; border-radius: 5px;
+  display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%;
+  height: 22px; padding: 0 var(--space-3); border-radius: var(--radius-pill);
   background: var(--if-chip); border: 1px solid var(--if-chip-border);
   color: var(--text-primary); font-family: inherit; font-size: 11px; font-weight: var(--fw-medium); white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
@@ -2133,12 +2168,12 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifwho + .bb__ifplain,
 .bb__ifwho + .bb__ifgroup { margin-top: 2px; }
 
-.bb__ifplain { display: grid; gap: 1px; }
+.bb__ifplain { display: grid; gap: var(--space-1); }
 /* A tint, not a frame — the same material the editor's group wears, so the
    card and the panel are describing the same object. */
 .bb__ifgroup {
-  display: grid; gap: 1px;
-  padding: 6px 8px;
+  display: grid; gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
   background: var(--surface-inset, var(--surface-sunken));
   border: 0;
   border-radius: var(--radius-md);
@@ -2146,9 +2181,13 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 /* The name, and what its operator means, said in the group rather than hidden
    in a `title`. Small and quiet: it is a caption on a thing you are reading,
    not a control. */
+/* A caption on the same vertical module as the operator pill below it — 18px,
+   so a nested group's heading and the joins inside it sit on one grid. The 6px
+   below it is the air the conditions now need: they are 38px apart, and 3px
+   under a heading no longer reads as "these belong to me". */
 .bb__ifgrouptag {
-  display: flex; align-items: center; gap: 5px;
-  padding: 1px 0 3px;
+  display: flex; align-items: center; gap: var(--space-2); min-height: 18px;
+  padding: 0 0 var(--space-3);
   font-size: 10px; color: var(--text-tertiary);
 }
 .bb__ifgrouptag svg { flex: none; opacity: 0.7; }
@@ -2472,27 +2511,50 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__link.is-dead::before { background: var(--border-subtle); }
 .bb__link.is-dead .bb__link__add { color: var(--text-muted); }
 
-/* --- The selected card, lifted ---------------------------------------------
+/* --- The selected card ------------------------------------------------------
 
-   A 1px ring the same weight as the hover border was the only thing marking
-   the card the whole right-hand panel is editing. It now takes a 2px brand
-   ring, a brand-tinted shadow and a 1px lift, and everything else on the chain
-   steps back — the spotlight is the contrast between them, not the ring alone.
+   Four signals were doing one job. The card the panel is editing wore a 2px
+   ink ring on top of its own 1px border — 3px of near-black around a card whose
+   resting edge is a 1.2:1 hairline — plus a 24px orange bruise under it, plus a
+   1px jump upwards. Ink, weight, hue, elevation and position, all at once, to
+   say a thing the 560px panel that just opened beside it had already said.
+
+   Two of them go and two stay, and which is which follows from what each one
+   is for. The RING stays, because an edge is how every other selected thing in
+   this console is marked — one border step, the way the trail builder's open
+   rule takes one and the kit's chosen chip takes one. The DIM stays, because it
+   is what actually makes a selected card legible on a chain of nine: the
+   spotlight is the difference between the cards, not the brightness of one.
+
+   The GLOW goes. `rgba(235,84,36,0.45)` is the light-mode brand written out as
+   a literal, so it neither tracked the token nor inverted for the dark theme,
+   and it put the console's action colour on a card that is not an action —
+   which is the exact thing the ring was changed from brand to ink to avoid.
+
+   The LIFT goes. `transform` was never in this card's transition list, so it
+   snapped while the shadow eased; and the wrapper is already running a Motion
+   layout projection on the same element during a reorder, which is where a
+   second transform on the child has bitten before.
+
+   What is left is one 1px slate edge and a step back from everything else.
 
    `:not(.is-off):not(.is-shadowed)` because those two already carry a lower
    opacity that means something specific, and a blanket dim would raise them. */
 .bb__card.is-selected {
   border-color: var(--bb-ring);
-  box-shadow:
-    0 0 0 2px var(--bb-ring),
-    0 10px 24px -10px rgba(235, 84, 36, 0.45),
-    var(--el-mid);
-  transform: translateY(-1px);
+  box-shadow: var(--el-mid);
 }
 .bb__chain:has(.bb__card.is-selected) .bb__card:not(.is-selected):not(.is-off):not(.is-shadowed) {
   opacity: 0.72;
 }
 .bb__chain:has(.bb__card.is-selected) .bb__card:not(.is-selected):hover { opacity: 1; }
+/* A switched-off rule that is ALSO the one being edited.
+
+   `.is-off` is 0.62 and the dim above deliberately skips it, so selecting a
+   disabled rule made it the faintest card on a chain where every other card had
+   just been raised to 0.72 — the one you were editing, hardest to see. It reads
+   as off, and it reads as the one in hand. */
+.bb__card.is-off.is-selected { opacity: 0.85; }
 
 /* --- The zoom readout ------------------------------------------------------
 
@@ -2506,9 +2568,6 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    you were aiming. One object, one width. */
 .bb__zoom { cursor: default; border-radius: var(--radius-sm); padding: 2px 4px; }
 
-@media (prefers-reduced-motion: reduce) {
-  .bb__card.is-selected { transform: none; }
-}
 
 /* A group that holds nothing yet.
 
@@ -3156,18 +3215,38 @@ button.bb__idx::after {
 .bb__ifchip.is-val { color: var(--brand); }
 .bb__ifchip.is-val.is-unset { color: var(--fb-negative-fg); }
 
-/* The rule's operator between two members, on the card.
+/* An operator, on a line of its own, at both levels.
 
-   Left-aligned at the members' own edge, with a hairline carrying it across —
-   the same drawing the editor's `.bb__joinrow` makes, so a rule joined by AND
-   looks the same whether you are reading it or writing it. It was the first
-   keyword inside the second group's box, which is where a group's OWN operator
-   lives, so the two levels were drawn in one place. */
+   Left-aligned at the members' own edge — the same drawing the editor's
+   `.bb__joinrow` makes, so a rule joined by AND looks the same whether you are
+   reading it or writing it. That promise used to be kept for one of the two
+   operators a rule has and broken for the other: the operator between MEMBERS
+   had its own row, and the operator between the CONDITIONS of one member was
+   the first word of the next condition's row. Both have their own row now.
+
+   `min-height` is the override that makes it work. `.bb__ifjoin` is applied
+   alongside `.bb__ifrow`, whose 26px is the height of a row carrying chips —
+   so without this an operator row weighed exactly as much as a condition, and a
+   five-condition rule read as nine peers instead of five things with four small
+   joins between them. The row is the pill: 18px, its own height.
+
+   Symmetric padding, because the operator belongs to neither neighbour. The
+   whole point of lifting it out of the second condition's row was that `and`
+   joins two things and is a property of neither; padding weighted to one side
+   would say the same wrong thing vertically.
+
+   The hairline is what tells the two levels apart. Between members it runs out
+   to the block's right edge, because a member boundary is the bigger break;
+   between conditions of one member (`is-run`) it is the bare pill. One mark per
+   level — which is the whole reason a hairline in every gap was removed. */
 .bb__ifjoin {
   display: flex; align-items: center; gap: var(--space-3);
-  padding: 3px 0;
+  min-height: 18px;
+  padding: var(--space-3) 0;
 }
 .bb__ifjoin::after { content: ''; flex: 1; height: 1px; background: var(--if-line); }
+.bb__ifjoin.is-run { padding: var(--space-2) 0; }
+.bb__ifjoin.is-run::after { display: none; }
 
 
 /* --- On/off, in the hover strip --------------------------------------------

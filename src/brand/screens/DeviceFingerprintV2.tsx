@@ -43,7 +43,7 @@ import {
 import { Button, Drawer, MenuButton, NumberStepper, TipDot, Toggle } from '../kit'
 import { TierPick } from '../tier-pick'
 import {
-  CATEGORIES,
+  categoriesFor,
   DEFAULT_MAX_DEVICES,
   MODES,
   MODE_META,
@@ -543,7 +543,7 @@ function AttrStep({
           onChange={(e) => setCat(e.target.value as AttrCategory | '')}
         >
           <option value="">All categories</option>
-          {CATEGORIES.map((c) => {
+          {categoriesFor(mode).map((c) => {
             const all = offered.filter((a) => a.category === c.id)
             /* A category an agentless profile cannot reach at all is offered
                and says so, rather than being dropped from the list — "why is
@@ -610,7 +610,7 @@ function AttrStep({
               <section className="bfp2__pang">
                 {lockedShown.length > 0 && (
                   <header className="bfp2__panghead">
-                    <h4>{cat ? CATEGORIES.find((c) => c.id === cat)?.label : 'Everything else'}</h4>
+                    <h4>{cat ? categoriesFor(mode).find((c) => c.id === cat)?.label : 'Everything else'}</h4>
                     <span>
                       {free.filter((a) => picked.includes(a.id)).length}/{free.length}
                     </span>

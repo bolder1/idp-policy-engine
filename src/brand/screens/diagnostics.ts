@@ -33,6 +33,7 @@ const DECISION_WORD: Record<AccessDecision, string> = {
   deny: 'Deny',
   '1fa': '1 factor',
   '2fa': '2 factors',
+  warn: '1 factor, flagged',
 }
 
 export interface Diagnostic {

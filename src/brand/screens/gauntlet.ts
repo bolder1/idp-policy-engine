@@ -36,12 +36,20 @@ export type Expect = AccessDecision
 export const EXPECT_LABEL: Record<Expect, string> = {
   deny: 'Blocked',
   '2fa': 'Verified',
+  warn: 'Flagged',
   '1fa': 'Straight in',
 }
 
 /** How strict a treatment is. Used to say whether a result was weaker or
     heavier than the card asked for — the two failures are not the same kind. */
-const STRICTNESS: Record<AccessDecision, number> = { '1fa': 0, '2fa': 1, deny: 2 }
+/* Four steps, not three, and `warn` sits ABOVE a bare allow.
+
+   It grants exactly the same access, so on the axis of "who gets in" it is
+   `1fa`. That is not the axis this number measures. What it measures is how
+   much a rule DOES about a sign-in, because that is what says whether a change
+   loosened something — and a rule that stops recording has loosened, even
+   though nobody's access widened. */
+const STRICTNESS: Record<AccessDecision, number> = { '1fa': 0, warn: 1, '2fa': 2, deny: 3 }
 
 /* One condition of a fix spec, in the same shape `cond()` takes.
 

@@ -38,7 +38,14 @@ interface Cell {
   fallback: boolean
 }
 
-const STRICTNESS: Record<AccessDecision, number> = { '1fa': 0, '2fa': 1, deny: 2 }
+/* Four steps, not three, and `warn` sits ABOVE a bare allow.
+
+   It grants exactly the same access, so on the axis of "who gets in" it is
+   `1fa`. That is not the axis this number measures. What it measures is how
+   much a rule DOES about a sign-in, because that is what says whether a change
+   loosened something — and a rule that stops recording has loosened, even
+   though nobody's access widened. */
+const STRICTNESS: Record<AccessDecision, number> = { '1fa': 0, warn: 1, '2fa': 2, deny: 3 }
 
 function match(p: Policy, app: App, group: Group): Cell | null {
   /* `enforces`, not `!== 'inactive'`. A monitor policy evaluates and records
@@ -82,11 +89,13 @@ function resolve(policies: Policy[], app: App, group: Group): Cell | null {
   return null
 }
 
-const TONE: Record<AccessDecision, string> = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' }
+/* `flag`, not `warn` — `.bcov__stat.is-warn` in this same file already means
+   "this number is worth looking at". See the note on `TONE` in board/model. */
+const TONE: Record<AccessDecision, string> = { deny: 'deny', '2fa': 'mfa', warn: 'flag', '1fa': 'allow' }
 
 /** The strictest outcome this pair can get, and how many rules can produce it. */
 function cellLabel(c: Cell) {
-  const word = c.decision === 'deny' ? 'Deny' : c.decision === '2fa' ? 'MFA' : 'Allow'
+  const word = c.decision === 'deny' ? 'Deny' : c.decision === '2fa' ? 'MFA' : c.decision === 'warn' ? 'Flag' : 'Allow'
   return c.rules > 1 ? `${word} · ${c.rules}` : word
 }
 

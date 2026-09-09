@@ -363,6 +363,7 @@
 .bdl__chip.is-deny { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
 .bdl__chip.is-deny i { background: var(--fb-negative-dot); }
 .bdl__chip.is-challenge { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bdl__chip.is-flag { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
 .bdl__chip.is-challenge i { background: var(--fb-notice-dot); }
 
 .bdl__empty { padding: var(--space-8); text-align: center; font-size: var(--fs-sm); color: var(--text-muted); }

@@ -14,6 +14,7 @@ import {
   asksReach,
   attrOf,
   attributesFor,
+  categoriesFor,
   withAlwaysOn,
   blockedAttributes,
   countLabel,
@@ -57,24 +58,69 @@ const profile = (over: Partial<FingerprintProfile> = {}): FingerprintProfile => 
 })
 
 describe('the attribute master', () => {
-  /* The master is curated, not transcribed, and the number is the whole point:
-     one screen, no grouping, no filter. Let it drift past fifteen and the
-     screen needs a filing scheme again — which is the thing that was taken out.
-     This is the tripwire for that. */
-  it('keeps the match catalogue small enough not to need a filing scheme', () => {
-    /* The ceiling is what this test is for, and it now applies to ONE of the two
-       lists. Attribute match offers five — a form factor and a version per
-       platform — and the moment that list needs scrolling it needs grouping,
-       which is the thing the flat picker exists to avoid.
+  /* This asserted the requirements list stayed under ten, on the grounds that a
+     list which needs scrolling needs grouping — and grouping was the thing the
+     flat picker existed to avoid.
 
-       The risk catalogue is deliberately the opposite: thirty-eight weak signals
-       that only mean something summed, filed into five categories with a rail to
-       navigate them. Holding it to the same bound would be holding it to the
-       wrong screen's constraint. */
+     The list is thirteen and it is grouped. That is not the tripwire failing,
+     it is the premise changing: the catalogue grew a browser floor per family,
+     two posture checks and two client versions, and at that size the filing IS
+     the readable shape. What the test protects now is the property that made
+     the old bound worth having — that the list is never a heap. Under ten, flat
+     and unfiled; over it, filed, with every row in a category the picker
+     actually offers.
+
+     The ceiling stays, further out. Twenty is not a design claim, it is a
+     tripwire: past it somebody should be asked whether a fourteenth family of
+     requirement really belongs in one profile. */
+  it('keeps each catalogue in a shape its picker can draw', () => {
     expect(OS_ATTRIBUTES.length).toBeGreaterThanOrEqual(4)
-    expect(OS_ATTRIBUTES.length).toBeLessThanOrEqual(10)
+    expect(OS_ATTRIBUTES.length).toBeLessThanOrEqual(20)
     expect(DEVICE_ATTRIBUTES.length).toBeGreaterThan(20)
     expect(DEVICE_ATTRIBUTES.every((a: Attribute) => a.category)).toBe(true)
+    // Filed now, and the picker's category filter is the reason it has to be:
+    // an uncategorised row falls into "Everything else" and cannot be found.
+    expect(OS_ATTRIBUTES.every((a: Attribute) => a.category)).toBe(true)
+  })
+
+  /* The bug a single shared `CATEGORIES` list produced, asserted from both ends.
+
+     The picker counts a category's rows and labels an empty one "needs an
+     agent". That sentence is true of Security on an agentless risk profile and
+     nonsense for Behaviour on a requirements profile, which has no behaviour
+     rows and never will — so a category offered for a catalogue it does not
+     describe is not untidy, it is a false explanation in a dropdown.
+
+     Both directions matter. Every row files under a category its own catalogue
+     offers, and every category its catalogue offers has at least one row. */
+  it('gives each catalogue a filing scheme that fits it exactly', () => {
+    for (const mode of ['os', 'device'] as ProfileMode[]) {
+      const cats = categoriesFor(mode)
+      const ids = new Set(cats.map((c) => c.id))
+      const used = new Set(attributesFor(mode).map((a) => a.category))
+
+      for (const a of attributesFor(mode)) {
+        expect(ids.has(a.category!)).toBe(true)
+      }
+      for (const c of cats) {
+        expect(used.has(c.id)).toBe(true)
+      }
+      // Named once each, or the filter shows the same option twice.
+      expect(cats.length).toBe(ids.size)
+    }
+  })
+
+  /* `platformsNamed` says which operating systems a profile pins, and it used to
+     find them by asking which rows compared a version. Ten rows do that now —
+     four browsers and two miniOrange clients joined the four platforms — so the
+     old reading would have called Chrome and the authenticator app platforms. */
+  it('counts only operating systems as platforms', () => {
+    const named = platformsNamed({
+      ...({} as FingerprintProfile),
+      mode: 'os',
+      enabled: ['os-windows', 'browser-chrome', 'mo-authenticator'],
+    })
+    expect(named).toEqual(['Windows'])
   })
 
   it('offers each kind its own catalogue', () => {

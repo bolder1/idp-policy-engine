@@ -211,6 +211,7 @@
 }
 .bf__nodetile.is-allow { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
 .bf__nodetile.is-mfa { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bf__nodetile.is-flag { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
 .bf__nodetile.is-deny { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
 
 .bf__nodeselect {
@@ -327,6 +328,7 @@
 }
 .bf__ruleno.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
 .bf__ruleno.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bf__ruleno.is-flag { background: var(--fb-info-bg); color: var(--fb-info-fg); }
 .bf__ruleno.is-deny { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
 .bf .bf__ruleName {
   flex: 1; min-width: 0; height: 34px; padding: 0 var(--space-4);
@@ -865,6 +867,7 @@
 .bf__outrow.is-on { border-color: var(--out-dot); box-shadow: inset 3px 0 0 0 var(--out-dot); }
 .bf__outrow.is-allow { --out-dot: var(--fb-positive-dot); --out-bg: var(--fb-positive-bg); --out-fg: var(--fb-positive-fg); }
 .bf__outrow.is-mfa { --out-dot: var(--fb-notice-dot); --out-bg: var(--fb-notice-bg); --out-fg: var(--fb-notice-fg); }
+.bf__outrow.is-flag { --out-dot: var(--fb-info-dot); --out-bg: var(--fb-info-bg); --out-fg: var(--fb-info-fg); }
 .bf__outrow.is-deny { --out-dot: var(--fb-negative-dot); --out-bg: var(--fb-negative-bg); --out-fg: var(--fb-negative-fg); }
 
 .bf__outpick {
@@ -1175,6 +1178,7 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focu
 }
 .bov__n.is-allow { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
 .bov__n.is-mfa { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bov__n.is-flag { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
 .bov__n.is-deny { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
 .bov__n.is-trigger { background: var(--accent); border-color: var(--accent); color: #fff; }
 

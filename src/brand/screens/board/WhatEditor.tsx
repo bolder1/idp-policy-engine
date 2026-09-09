@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { AlertTriangle, Plus, ShieldAlert, Trash2, UserCheck, X, XCircle } from 'lucide-react'
+import { AlertTriangle, Flag, Plus, ShieldAlert, Trash2, UserCheck, X, XCircle } from 'lucide-react'
 
 import { Toggle } from '../../kit'
 import { Picker } from '../../picker'
@@ -32,20 +32,28 @@ import { Prop } from './Section'
    different things.
    -------------------------------------------------------------------------- */
 
-/* Two, and a third that says it is not here yet.
+/* Three, and the third is the one this pane once held a greyed placeholder
+   for.
 
-   The placeholder is disabled and labelled, rather than left out. An outcome
-   picker with two tiles reads as a finished binary; the same picker with a
-   greyed third says the shape is going to grow, which is true and is cheaper to
-   say now than to explain later when a row appears where nobody expected one. */
-const TILES: { id: AccessDecision | 'soon'; label: string; tone: string; icon: typeof UserCheck; hint: string }[] = [
+   The placeholder said "Coming soon · Not decided yet" and was deleted on the
+   grounds that a promise is not a control. It is a control now. `Flag` writes
+   `decision: 'warn'`: the person signs in on their first factor and the attempt
+   is raised, which is the only honest answer for a device that is out of
+   compliance without being dangerous — an estate one release behind its OS
+   floor is too far back to ignore and not far enough to lock somebody out of
+   their own inbox over. Without this tile the two answers available were both
+   wrong for that case.
+
+   It sits between Allow and Deny because that is where it sits on the ladder
+   of severity the row is read along, and because arrowing right should walk
+   from the mildest outcome to the hardest without doubling back.
+
+   The tone key is `flag`, not `warn`. `is-warn` means "something is wrong
+   here" everywhere else in this console; see the note on `TONE` in model.ts. */
+const TILES: { id: AccessDecision; label: string; tone: string; icon: typeof UserCheck; hint: string }[] = [
   { id: '1fa', label: 'Allow', tone: 'allow', icon: UserCheck, hint: 'Sign-in proceeds through the factors below.' },
+  { id: 'warn', label: 'Flag', tone: 'flag', icon: Flag, hint: 'Sign-in proceeds on the first factor, and the attempt is raised for review.' },
   { id: 'deny', label: 'Deny', tone: 'deny', icon: ShieldAlert, hint: 'Sign-in refused. No fallback path.' },
-  /* A third tile said "Coming soon · Not decided yet". It was a placeholder
-     for an outcome nobody has specified, taking a third of the width of the
-     one control on this pane that matters, permanently disabled — and now that
-     nothing is selected by default it sat beside two real choices looking like
-     the reason none of them was picked. A promise is not a control. */
 ]
 
 /* How the second factor is proved. Four modes, named the way an IdP names
@@ -76,14 +84,25 @@ export function WhatEditor({
   const chain = rule.methodChain ?? []
   const methods = rule.secondFactorMethods ?? []
 
-  const allowed = rule.decision !== 'deny'
+  /* Three states now, and `allowed` is doing a narrower job than its name
+     suggests, so it is renamed to the question it actually answers: does this
+     outcome walk the person through factors? Allow and Flag both do — the flag
+     is raised AFTER a successful sign-in, not instead of one — and Deny does
+     not. That is what decides whether the ladder is drawn. */
+  const walksFactors = rule.decision !== 'deny'
   const twoStep = rule.decision === '2fa'
+  const flagged = rule.decision === 'warn'
 
   /* Which flavour of Allow to return to. Seeded from the rule so switching to
      Deny and back does not silently add or drop a second step; `'1fa'` only
-     when the rule genuinely had none. */
-  const lastAllow = useRef<AccessDecision>(rule.decision === 'deny' ? '1fa' : rule.decision)
-  if (rule.decision !== 'deny') lastAllow.current = rule.decision
+     when the rule genuinely had none.
+
+     `warn` is excluded on purpose. It is its own tile, so returning to Allow
+     from Deny must never land on it — a rule that was flagging, was switched to
+     Deny, and is switched back should come back as an allow, and the tile that
+     lights should be the tile that was pressed. */
+  const lastAllow = useRef<AccessDecision>(rule.decision === '2fa' ? '2fa' : '1fa')
+  if (rule.decision === '1fa' || rule.decision === '2fa') lastAllow.current = rule.decision
 
   /* Deny normalises everything that belongs to Allow, and so does removing the
      second step. Without it a rule keeps a remembered-device window and a
@@ -100,17 +119,24 @@ export function WhatEditor({
     allowDisable2fa: false,
   }
 
-  const pick = (id: AccessDecision | 'soon') => {
-    if (id === 'soon') return
+  const pick = (id: AccessDecision) => {
     if (id === 'deny') return onPatch({ decision: 'deny', firstFactor: 'Password', firstFactorMethod: undefined, ...noSecondStep })
-    onPatch({ decision: lastAllow.current === 'deny' ? '1fa' : lastAllow.current })
+    /* Flag normalises the second step for the same reason Deny does: `warn` is
+       one factor by definition, so a rule that had a method list and a
+       remembered-device window would keep both as state nothing on screen
+       shows and nothing on the rule reads. The first factor is left alone —
+       a flagged sign-in still walks it, and it is the one setting the ladder
+       below still offers. */
+    if (id === 'warn') return onPatch({ decision: 'warn', ...noSecondStep })
+    onPatch({ decision: lastAllow.current })
   }
 
   const unsatisfiable = twoStep && rule.secondFactor === 'specific' && methods.length === 0
 
   /* Which tile is lit. Both Allow flavours light the one tile — that is the
-     point of the merge, and it is why this is not simply `rule.decision`. */
-  const active: string = allowed ? '1fa' : 'deny'
+     point of the merge, and it is why this is not simply `rule.decision`.
+     `warn` is not one of those flavours: it lights its own. */
+  const active: string = rule.decision === 'deny' ? 'deny' : flagged ? 'warn' : '1fa'
 
   /* A rule nobody has answered shows no tile lit.
 
@@ -145,15 +171,12 @@ export function WhatEditor({
         {TILES.map((t, i) => {
           const on = answered && t.id === active
           const Ico = t.icon
-          const soon = t.id === 'soon'
           return (
             <button
               key={t.id}
               type="button"
               role="radio"
               aria-checked={on}
-              aria-disabled={soon || undefined}
-              disabled={soon}
               /* With nothing lit the roving tabindex has no home, so the
                  first tile takes it — otherwise the whole group drops out of
                  the tab order exactly when it most needs to be reachable. */
@@ -168,22 +191,18 @@ export function WhatEditor({
                 const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
                 if (!d) return
                 e.preventDefault()
-                /* Skips the placeholder. An arrow key that parks focus on a
-                   disabled tile is an arrow key that appears to do nothing. */
-                const live = TILES.filter((x) => x.id !== 'soon')
-                const at = live.findIndex((x) => x.id === active)
-                pick(live[(at + d + live.length) % live.length].id)
+                const at = TILES.findIndex((x) => x.id === active)
+                pick(TILES[(at + d + TILES.length) % TILES.length].id)
               }}
             >
               <Ico size={16} strokeWidth={1.9} aria-hidden />
               <strong>{t.label}</strong>
-              {i === 2 && <em>Not decided yet</em>}
             </button>
           )
         })}
       </div>
 
-      {!allowed ? null : (
+      {!walksFactors ? null : (
         <>
           {unsatisfiable && (
             <p className="bb__diag is-error" role="alert">
@@ -255,6 +274,19 @@ export function WhatEditor({
                 >
                   <X size={13} strokeWidth={2.2} />
                 </button>
+              </li>
+            ) : flagged ? (
+              /* No adder under Flag, and a line saying why rather than a
+                 disabled button.
+
+                 `warn` and `2fa` are values of one field, so "flag AND verify"
+                 is not a rule this model can hold. A greyed adder would offer
+                 it and refuse it in the same control; a sentence says what the
+                 outcome is and leaves the tiles above as the way to change it. */
+              <li className="bb__rung is-note">
+                <span className="bb__rung__body">
+                  <em>One factor, then the attempt is raised. Choose Allow to add a second factor.</em>
+                </span>
               </li>
             ) : (
               <li className="bb__rung is-add">

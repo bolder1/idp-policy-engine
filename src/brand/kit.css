@@ -379,6 +379,7 @@ html[data-theme='dark'] {
 .bx-decision--positive { background: var(--fb-positive-bg); color: var(--fb-positive-fg); border-color: var(--fb-positive-border); }
 .bx-decision--negative { background: var(--fb-negative-bg); color: var(--fb-negative-fg); border-color: var(--fb-negative-border); }
 .bx-decision--notice { background: var(--fb-notice-bg); color: var(--fb-notice-fg); border-color: var(--fb-notice-border); }
+.bx-decision--info { background: var(--fb-info-bg); color: var(--fb-info-fg); border-color: var(--fb-info-border); }
 
 .bx-status--active { color: var(--text-body); }
 .bx-status--active i { background: var(--fb-positive-dot); }

@@ -627,6 +627,7 @@
 .bb__card.is-unreached { opacity: 0.45; }
 .bb__card.is-deny { --hit-border: var(--fb-negative-border); --hit-glow: rgba(165, 20, 43, 0.35); --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); --tone-dot: var(--fb-negative-dot, #d01243); }
 .bb__card.is-mfa { --hit-border: var(--fb-notice-border); --hit-glow: rgba(125, 88, 0, 0.35); --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); --tone-dot: var(--fb-notice-dot, #b07a00); }
+.bb__card.is-flag { --hit-border: var(--fb-info-border); --hit-glow: rgba(17, 137, 212, 0.35); --tone-bg: var(--fb-info-bg); --tone-fg: var(--fb-info-fg); --tone-border: var(--fb-info-border); --tone-dot: var(--fb-info-dot, #1189d4); }
 .bb__card.is-allow { --hit-border: var(--fb-positive-border); --hit-glow: rgba(20, 102, 58, 0.35); --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); --tone-dot: var(--fb-positive-dot, #128f43); }
 
 /* The same three tones, on the badge rather than on a card ancestor.
@@ -648,6 +649,7 @@
 .bb__idx { --tone-bg: var(--surface-sunken); --tone-fg: var(--text-secondary); }
 .bb__reach.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-dot: var(--fb-negative-dot, #d01243); }
 .bb__reach.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-dot: var(--fb-notice-dot, #b07a00); }
+.bb__reach.is-flag { --tone-bg: var(--fb-info-bg); --tone-fg: var(--fb-info-fg); --tone-dot: var(--fb-info-dot, #1189d4); }
 .bb__reach.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-dot: var(--fb-positive-dot, #128f43); }
 
 .bb__cardhead {
@@ -1439,6 +1441,17 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__rung.is-sub > * { grid-column: 2; }
 .bb__rung.is-add { grid-template-columns: 22px minmax(0, 1fr); }
 .bb__rung.is-add > * { grid-column: 2; justify-self: start; }
+/* The rung that is a sentence rather than a control — what stands where the
+   adder would, under Flag. Aligned to the adder's column so the ladder does not
+   jog sideways when the outcome changes, and quiet, because it is explaining an
+   absence rather than offering anything. */
+.bb__rung.is-note { grid-template-columns: 22px minmax(0, 1fr); }
+.bb__rung.is-note > * { grid-column: 2; }
+/* One column, not the label-and-control pair `.bb__rung__body` is. The note
+   is a sentence rather than a labelled setting, and inheriting the 88px label
+   track put it in a column four words wide. */
+.bb__rung.is-note .bb__rung__body { grid-template-columns: minmax(0, 1fr); }
+.bb__rung.is-note em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.45; }
 /* No dashed rectangle. Same reason as the condition pane's adders: a dotted box
    is the loudest thing on a pane whose problem was boxes, and "add one more of
    these" is a text button with a mark in front of it everywhere else here. */
@@ -1612,6 +1625,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__result.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); }
 .bb__result.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); }
+.bb__result.is-flag { --tone-bg: var(--fb-info-bg); --tone-fg: var(--fb-info-fg); --tone-border: var(--fb-info-border); }
 .bb__result.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); }
 .bb__result.is-out { --tone-bg: var(--surface-sunken); --tone-fg: var(--text-secondary); --tone-border: var(--border-subtle); }
 .bb__result strong { display: block; font-size: var(--fs-md); font-weight: var(--fw-semibold); }
@@ -1656,6 +1670,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__wantgot .bb__decision { height: 22px; font-size: 11px; }
 .bb__wantgot .bb__decision.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); }
 .bb__wantgot .bb__decision.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); }
+.bb__wantgot .bb__decision.is-flag { --tone-bg: var(--fb-info-bg); --tone-fg: var(--fb-info-fg); --tone-border: var(--fb-info-border); }
 .bb__wantgot .bb__decision.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); }
 .bb__roundacts { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
 
@@ -1704,6 +1719,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__lanebar.is-before > i { background: var(--border-strong); opacity: 0.55; }
 .bb__lane.is-allow .bb__lanebar.is-after > i { background: var(--fb-positive-dot, #128f43); }
 .bb__lane.is-mfa .bb__lanebar.is-after > i { background: var(--fb-notice-dot, #b07a00); }
+.bb__lane.is-flag .bb__lanebar.is-after > i { background: var(--fb-info-dot, #1189d4); }
 .bb__lane.is-deny .bb__lanebar.is-after > i { background: var(--fb-negative-dot, #d01243); }
 .bb__lanelegend { display: flex; gap: var(--space-4); font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
 .bb__lanelegend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; background: var(--border-strong); opacity: 0.55; margin-right: 4px; vertical-align: middle; }
@@ -1716,6 +1732,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__flow .bb__decision { height: 20px; font-size: 11px; padding: 0 8px 0 6px; }
 .bb__flow .bb__decision.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); }
 .bb__flow .bb__decision.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); }
+.bb__flow .bb__decision.is-flag { --tone-bg: var(--fb-info-bg); --tone-fg: var(--fb-info-fg); --tone-border: var(--fb-info-border); }
 .bb__flow .bb__decision.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); }
 
 /* The field: 1,440 situations, one dot each, in a fixed order. */
@@ -1732,6 +1749,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__dot.is-allow { --dot: var(--fb-positive-dot, #128f43); }
 .bb__dot.is-mfa { --dot: var(--fb-notice-dot, #b07a00); }
+.bb__dot.is-flag { --dot: var(--fb-info-dot, #1189d4); }
 .bb__dot.is-deny { --dot: var(--fb-negative-dot, #d01243); }
 .bb__dot.is-dim { opacity: 0.18; }
 .bb__dot.is-changed { box-shadow: inset 0 0 0 1.5px var(--surface-raised), 0 0 0 1px var(--text-primary); }
@@ -2059,6 +2077,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
    rather than three colours picked to sit on a navy slab. */
 .bb__ifchip.is-tone-deny { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
 .bb__ifchip.is-tone-mfa { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bb__ifchip.is-tone-flag { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
 .bb__ifchip.is-tone-allow { background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg); }
 
 /* The two adders, told apart by the word they insert.
@@ -2132,6 +2151,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifdot { width: 8px; height: 8px; border-radius: 50%; }
 .bb__ifdot.is-deny { background: var(--fb-negative-dot); }
 .bb__ifdot.is-mfa { background: var(--fb-notice-dot); }
+.bb__ifdot.is-flag { background: var(--fb-info-dot); }
 .bb__ifdot.is-allow { background: var(--fb-positive-dot); }
 
 .bb__ifinput {

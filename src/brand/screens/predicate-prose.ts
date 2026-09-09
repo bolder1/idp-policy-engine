@@ -175,6 +175,8 @@ export function audienceSentence(a: Audience, groups: Group[] = seedGroups, dire
 /** What the rule does when it matches, in one sentence. */
 export function decisionSentence(rule: Rule): string {
   if (rule.decision === 'deny') return 'Access is blocked. No alternative path.'
+  if (rule.decision === 'warn')
+    return 'The user signs in on the first factor, and the attempt is raised for review.'
 
   if (rule.decision === '2fa') {
     if (rule.secondFactor === 'specific') {

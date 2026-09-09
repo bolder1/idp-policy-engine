@@ -41,7 +41,7 @@ import type { SimEnv } from './simulate'
 
 type View = 'after' | 'before' | 'moved'
 
-const LANE_KEY: Record<Lane, string> = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' }
+const LANE_KEY: Record<Lane, string> = { deny: 'deny', '2fa': 'mfa', warn: 'flag', '1fa': 'allow' }
 
 export function ImpactArenaDialog({
   open,

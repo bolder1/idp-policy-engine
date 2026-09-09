@@ -32,13 +32,22 @@
    ground: a card is a name, an index and a state pill, and the longest rule
    name in the seeded estate ends around 340. The rest was gap.
 
-   440 is measured off the CONTENT rather than off a threshold that no longer
-   exists: the longest name plus the state pill, plus room for a condition row's
-   three parts without wrapping. Narrower cards also mean more of the chain is
-   on screen at once, which is what the canvas is for. */
+   520 is measured off the CONTENT rather than off a threshold that no longer
+   exists, and the content that decides it is a condition row: attribute,
+   operator, value, on ONE line. 440 was tried first and was too tight — the
+   widest real pairing in the estate, `Device profile does not match Phones and
+   tablets with a screen lock`, needs 425px, and the card spends 72 on padding
+   and the guide indent. A condition that wraps costs a whole extra line on the
+   card and breaks the reading in the middle of a sentence, which is worse than
+   the width it saves.
+
+   Measured, not guessed: the three longest pairings the seeded estate can
+   produce come out at 425, 421 and 412. 520 clears all three with headroom, and
+   the row below refuses to wrap in any case, so a longer name than anything
+   here ellipsizes rather than folding. */
 .bb {
   --bb-insp: 560px;
-  --bb-card: 440px;
+  --bb-card: 520px;
   --bb-dot: #d3dae1;
   --bb-stage: #f6f7f9;
   --bb-link: var(--border-default);
@@ -1009,8 +1018,12 @@
 .is-tone-positive { --cond-bg: var(--fb-positive-bg); --cond-fg: var(--fb-positive-fg); --cond-border: var(--fb-positive-border); }
 .is-tone-neutral { --cond-bg: var(--fb-neutral-bg); --cond-fg: var(--text-secondary); --cond-border: var(--border-subtle); }
 
-/* THEN, as the journey. */
-.bb__then { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+/* `.bb__then` stood here — the journey row, `display: flex; align-items:
+   center`. Nothing has emitted it since `IfBlock` took over drawing the
+   outcome, and leaving it cost exactly what this file's other tombstones warn
+   about: a new section class called `bb__then` was added 470 lines below, and
+   this rule's `align-items: center` silently centred every part of it inside a
+   534px panel. Third time in this sheet. Deleted, not commented. */
 .bb__decision {
   display: inline-flex; align-items: center; gap: 6px;
   height: 26px; padding: 0 10px 0 7px; border-radius: var(--radius-full);
@@ -1428,29 +1441,37 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__decide > button strong { font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bb__decide > button em { font-style: normal; font-size: 11px; color: var(--text-tertiary); line-height: 1.3; }
 .bb__decide > button svg { color: var(--text-tertiary); }
-/* Chosen, said without a hue.
+/* Colour on the MARK, always; the chosen state said without needing it.
 
-   The tiles filled green for Allow and red for Deny, and the fill WAS the
-   chosen state — `is-on` set nothing else. Draining the tone would have left a
-   chosen tile identical to an unchosen one, on a pane that deliberately lights
-   neither until you answer: "nothing chosen yet" is a real state here and has to
-   stay distinguishable from both answers.
+   These filled green for Allow and red for Deny, and the fill WAS the chosen
+   state — `is-on` set nothing else. That had to go: a chosen tile and an
+   unchosen one were told apart by hue alone, on a pane where "nothing chosen
+   yet" is a third real state. The fix drained the tone entirely, which fixed
+   the fault and took the outcome's colour with it — three grey tiles, and the
+   only difference between letting somebody in and refusing them was the word.
 
-   So the mark moves off colour entirely — a sunken ground, an ink edge doubled
-   by an inset hairline, and the label at the page's own weight. Three channels,
-   none of them hue, and it survives a greyscale screen. The words Allow and Deny
-   and their two glyphs were always doing the semantic work; the green and the
-   red were saying "chosen", which is a different question and one the tile can
-   answer for itself.
+   Both, then. The glyph carries the outcome's tone at rest, so the row reads
+   green-amber-red down the marks before any of it is read. The chosen state is
+   still said in three channels that are not hue — a sunken ground, an ink edge
+   doubled by an inset hairline, and the label at full weight — so it survives a
+   greyscale screen and does not depend on the tone it sits beside.
 
-   `box-shadow`, not `border-width`: thickening the border would shift the tile's
-   contents half a pixel on each side as it is chosen. */
+   `box-shadow`, not `border-width`: thickening the border would shift the
+   tile's contents half a pixel on each side as it is chosen. */
+.bb__decide > button.is-allow svg { color: var(--fb-positive-fg); }
+.bb__decide > button.is-mfa svg { color: var(--fb-notice-fg); }
+.bb__decide > button.is-deny svg { color: var(--fb-negative-fg); }
+/* And the chosen one takes its tone's ground, faintly, under the ink edge that
+   is doing the actual work. */
 .bb__decide > button.is-on {
   background: var(--surface-inset, var(--surface-sunken));
   border-color: var(--text-primary);
   box-shadow: inset 0 0 0 1px var(--text-primary);
 }
-.bb__decide > button.is-on strong, .bb__decide > button.is-on svg { color: var(--text-primary); }
+.bb__decide > button.is-allow.is-on { background: var(--fb-positive-bg); }
+.bb__decide > button.is-mfa.is-on { background: var(--fb-notice-bg); }
+.bb__decide > button.is-deny.is-on { background: var(--fb-negative-bg); }
+.bb__decide > button.is-on strong { color: var(--text-primary); }
 .bb__decide > button.is-on em { color: var(--text-secondary); }
 
 /* The placeholder. Dashed and quiet, and it does not lift on hover — a tile
@@ -1470,9 +1491,19 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
    second gated on a tile above them. They are the two things a person walks
    through in order, so they are drawn in order, numbered, with a rail down the
    side — and adding the second rung is what makes the rule two-factor. */
+/* The parts of THEN, with air between them.
+
+   The pane was a bare `<div>` and each part brought its own margin — or did
+   not: the ladder had a top margin, the tiles had none, and the second-factor
+   card had one of its own, so the first factor sat flush against the tiles
+   while the card below them stood off. A column with one gap replaces three
+   margins that had to agree with each other and did not. */
+.bb__thenparts { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-5); }
+.bb__thenparts > * { margin-top: 0; margin-bottom: 0; }
+
 .bb__ladder {
   list-style: none;
-  margin: var(--space-3) 0 0;
+  margin: 0;
   padding: 0;
   display: grid;
   gap: var(--space-2);
@@ -1964,6 +1995,22 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   gap: 4px 6px; min-height: 26px;
 }
 .bb__ifrow.is-new { animation: bb-in 0.28s ease-out; }
+/* A condition is ONE line, whatever it holds.
+
+   The row wrapped like every other `.bb__ifrow`, so a long profile name put the
+   value on a second line under its own operator — a sentence broken across two
+   lines inside a card whose whole job is to be read in one pass. The card is
+   wide enough for every pairing the estate can produce (see `--bb-card`), and
+   this is the guarantee for the one it cannot: the value elides instead.
+
+   The attribute and the operator never shrink — they are what the row is ABOUT,
+   and eliding "does not match" to "does not m…" would change what the rule
+   appears to say. Only the value gives way, and only past the point where the
+   card has already been sized for it. */
+.bb__ifrow.is-cond { flex-wrap: nowrap; }
+.bb__ifrow.is-cond > .bb__ifchip.is-attr,
+.bb__ifrow.is-cond > .bb__ifkw { flex: none; }
+.bb__ifrow.is-cond > .bb__ifchip.is-val { min-width: 0; }
 .bb__ifrow.is-quiet { min-height: 20px; }
 
 /* One condition, one section.
@@ -3538,7 +3585,6 @@ button.bb__idx::after {
    rows under a numbered ladder, so "Remember this device" read as a property of
    the rule rather than of the factor that gives it meaning. */
 .bb__second {
-  margin-top: var(--space-4);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
   background: var(--surface-raised);
   overflow: hidden;

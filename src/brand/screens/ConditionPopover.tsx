@@ -148,6 +148,20 @@ export function summarise(names: string[], placeholder: string): string {
   return `${names[0]} +${names.length - 1}`
 }
 
+/* The same summary, split so the COUNT survives truncation.
+
+   `summarise` returns one string, and one string ellipsizes as one string: a
+   field holding `Phones and tablets with a screen lock +2` in 190px came out as
+   `Phones and tablets wi…`, which loses the only part a reader cannot
+   reconstruct. A clipped name is still recognisably that name; a missing `+2`
+   is a rule that looks like it names one thing.
+
+   So the lead elides and the count does not — see `.cp__fldmore`. */
+export function summariseParts(names: string[], placeholder: string): { lead: string; more: number } {
+  if (names.length === 0) return { lead: placeholder, more: 0 }
+  return { lead: names[0], more: names.length - 1 }
+}
+
 /* Every value, spoken. `or`, because the evaluator is `vals.some(…)` — see the
    argument on `conditionSentence` in predicate-prose.ts, which this follows so
    the field and the prose read a condition the same way. */
@@ -364,6 +378,10 @@ export function ConditionPopover({
     unset && !names.length ? 'nothing chosen' : spoken(names.length ? names : values) || summary
   }.`
 
+  /* The same summary the pill prints, split so the count can outlive the
+     truncation — see `summariseParts`. */
+  const summaryParts = summariseParts(names.length ? names : values.filter(Boolean), summary)
+
   /* Which half of a zone, when it is narrower than the zone as written. Absent
      for "both", because that is what the zone means already. */
   const scopeTag = c.scope ? <i className="cp__scopetag">{c.scope === 'ip' ? 'network' : 'map'}</i> : null
@@ -524,7 +542,8 @@ export function ConditionPopover({
             label={valueLabel}
             onOpen={() => setOpen((o) => (o === 'val' ? null : 'val'))}
           >
-            {summary}
+            <span className="cp__fldlead">{summaryParts.lead}</span>
+            {summaryParts.more > 0 && <i className="cp__fldmore">+{summaryParts.more}</i>}
             {scopeTag}
           </Field>
         )}

@@ -412,12 +412,29 @@
 .cp__catrow.is-soon { cursor: default; }
 .cp__catrow.is-soon:hover { background: none; }
 .cp__catrow.is-soon .cp__catname { color: var(--text-tertiary); }
-.cp__catrow.is-soon > .cp__icon { opacity: 0.5; }
 
 /* Listed and not choosable, in the pill's own attribute menu — same meaning as
    `.cp__catrow.is-soon`, different list. */
 .cp__opt.is-soon { cursor: default; opacity: 0.55; }
 .cp__opt.is-soon:hover { background: none; }
+
+/* A row you cannot choose does not get a family colour.
+
+   `is-soon` was drawn by fading the row, so the mark came out as a washed-out
+   version of its tone — a pale green sparkle beside a full green one, which
+   reads as the same category rendered badly rather than as a row that is not
+   available. The tone is what says "this is a Risk attribute"; it is worth
+   nothing on the one row that cannot become a condition.
+
+   Overriding the two custom properties rather than the painted colours, so it
+   reaches the tile and the glyph together and stays correct if either rule
+   moves. */
+.cp__opt.is-soon,
+.cp__catrow.is-soon {
+  --cond-bg: var(--fb-neutral-bg);
+  --cond-fg: var(--text-tertiary);
+  --cond-border: var(--border-subtle);
+}
 
 /* --- One condition, stacked ------------------------------------------------------
 
@@ -561,7 +578,14 @@
 .cp__fld:hover { border-color: var(--border-strong); }
 .cp__fld.is-open { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
 .cp__fld:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
-.cp__fld > svg:last-child { flex: none; margin-left: auto; opacity: 0.45; }
+/* The caret sits BESIDE the value, not at the far edge of the segment.
+
+   `margin-left: auto` pushed it to the right of a segment sized by the row's
+   proportions, so a short answer like `Any phone or tablet` left forty pixels
+   of nothing between the word and its own chevron — the field read as two
+   controls with a gap in it. A fixed gap keeps them one object; the segment is
+   still the full click target either way. */
+.cp__fld > svg:last-child { flex: none; margin-left: var(--space-2); opacity: 0.45; }
 /* The family colour, at full strength — a tinted glyph at 55% is a muddy glyph.
    `--cond-fg` comes from the tone class on the field; the fallbacks leave every
    other `Field` exactly as it was. */
@@ -571,7 +595,9 @@
    when a value genuinely exceeds the full panel width, which two library names
    do not. */
 .cp__fldtext {
-  flex: 1; min-width: 0;
+  /* Shrinks to its content and no further than it has to — it was `flex: 1`,
+     which is what held the caret out at the edge. */
+  flex: 0 1 auto; min-width: 0;
   display: inline-flex; align-items: center; gap: 6px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -707,3 +733,16 @@
    exists when the condition is narrowed — its presence is the signal. */
 .bb__insp .cp__scopetag { background: var(--surface-inset, var(--surface-sunken)); color: var(--text-secondary); }
 
+
+/* The value's two halves: a name that may elide, and a count that may not.
+
+   A field holding `Phones and tablets with a screen lock +2` in 190px used to
+   come out as `Phones and tablets wi…` — the ellipsis ate the only part a
+   reader cannot reconstruct. A clipped name is still recognisably that name; a
+   missing `+2` is a rule that looks like it names one thing. */
+.cp__fldlead { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp__fldmore {
+  flex: none;
+  font-style: normal; font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  color: var(--text-tertiary); font-variant-numeric: tabular-nums;
+}

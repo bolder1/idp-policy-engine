@@ -1,5 +1,23 @@
-import { useRef, useState } from 'react'
-import { AlertTriangle, Plus, ShieldAlert, Trash2, UserCheck, X, XCircle } from 'lucide-react'
+import { useState } from 'react'
+import {
+  AlertTriangle,
+  BellRing,
+  Fingerprint,
+  HelpCircle,
+  KeyRound,
+  Layers,
+  ListChecks,
+  Lock,
+  Mail,
+  MessageSquare,
+  ShieldAlert,
+  Timer,
+  Usb,
+  UserCheck,
+  UserRound,
+  XCircle,
+  type LucideIcon,
+} from 'lucide-react'
 
 import { Toggle } from '../../kit'
 import { Picker } from '../../picker'
@@ -11,58 +29,88 @@ import { Prop } from './Section'
 /* -----------------------------------------------------------------------------
    THEN — what happens when the rule matches.
 
-   Two outcomes and a ladder of steps, which is a different shape from the three
-   tiles that stood here, and the reason is that one of the three was never an
-   outcome.
+   The first factor, then what happens, then the settings the answer needs.
 
-   "Let in", "Let in then verify" and "Deny" asked one question that is really
-   two. Whether somebody gets in is the decision; how many times they prove who
-   they are is a property of getting in. Presenting them as three peers meant
-   the second and third rows of this panel — first factor, second factor —
-   restated in settings what the tile above had already claimed, and the two
-   could disagree: a rule could say "Let in, then verify" while naming no second
-   factor at all, which is a rule nobody can satisfy. Twenty-nine of the
-   thirty-three two-factor rules in the seeded estate are in exactly that shape.
+   That is the order a rule is written and the order it is read: you decide what
+   a sign-in has to prove before you decide what to do when it does. The panel
+   had it the other way round for a long time, with the outcome first and the
+   factors as its detail — true of the MODEL, false of the writing.
 
-   So: Allow or Deny, and under Allow the steps a person walks, numbered. Adding
-   a second step is what makes a rule two-factor. `Rule.decision` still holds all
-   three values — nothing downstream changes, the linter and the simulator and
-   the cards all read it as they always did — but it is written by the ladder
-   rather than typed into it, so the tile and the settings can no longer say
-   different things.
+   Three outcomes, and they are the three values `AccessDecision` holds, one
+   tile each. An earlier shape had two tiles and added the second factor with a
+   dashed button underneath, which offered three choices while presenting two;
+   an earlier one still had a third tile, Flag, that was not an outcome at all —
+   see `AccessDecision` in data.ts for why that went.
+
+   The tiles map one-to-one onto the field they write, so the row and the
+   settings under it cannot disagree. They used to: a rule could say "Let in,
+   then verify" while naming no second factor, which is a rule nobody can
+   satisfy, and twenty-nine of the thirty-three two-factor rules in the seeded
+   estate were in exactly that shape.
    -------------------------------------------------------------------------- */
 
-/* Three, and the third is the one this pane once held a greyed placeholder
-   for.
+/* THREE outcomes, and they are exactly the three values `AccessDecision` holds.
 
-   The placeholder said "Coming soon · Not decided yet" and was deleted on the
-   grounds that a promise is not a control. It is a control now. `Flag` writes
-   `decision: 'warn'`: the person signs in on their first factor and the attempt
-   is raised, which is the only honest answer for a device that is out of
-   compliance without being dangerous — an estate one release behind its OS
-   floor is too far back to ignore and not far enough to lock somebody out of
-   their own inbox over. Without this tile the two answers available were both
-   wrong for that case.
+   The pane went through two shapes to get here. First: three peers where one of
+   them — Flag — was not an outcome at all, and the settings below could
+   contradict the tile above them. Then: two tiles, Allow and Deny, with a
+   second factor added by a dashed button underneath, on the reasoning that
+   whether somebody gets in is the decision and how many times they prove it is
+   a property of getting in.
 
-   It sits between Allow and Deny because that is where it sits on the ladder
-   of severity the row is read along, and because arrowing right should walk
-   from the mildest outcome to the hardest without doubling back.
+   That reasoning is sound and the drawing was still wrong. The button sat below
+   the tiles as a third thing you could press, so the panel offered three
+   choices while presenting two — and the one it hid was the commonest answer a
+   real policy gives. Three tiles say what the rule can do in one row, and the
+   row maps one-to-one onto the field it writes, so nothing here can disagree
+   with anything below it.
 
-   The tone key is `flag`, not `warn`. `is-warn` means "something is wrong
-   here" everywhere else in this console; see the note on `TONE` in model.ts. */
+   Allow, second factor, Deny: the ladder of severity, so arrowing right walks
+   from the mildest outcome to the hardest without doubling back. It also puts
+   the two that let somebody in next to each other, which is the distinction a
+   reader is actually making. */
 const TILES: { id: AccessDecision; label: string; tone: string; icon: typeof UserCheck; hint: string }[] = [
-  { id: '1fa', label: 'Allow', tone: 'allow', icon: UserCheck, hint: 'Sign-in proceeds through the factors below.' },
+  { id: '1fa', label: 'Allow', tone: 'allow', icon: UserCheck, hint: 'Signed in on the first factor alone.' },
+  { id: '2fa', label: 'Require a second factor', tone: 'mfa', icon: KeyRound, hint: 'Signed in only after proving a second time.' },
   { id: 'deny', label: 'Deny', tone: 'deny', icon: ShieldAlert, hint: 'Sign-in refused. No fallback path.' },
 ]
 
-/* How the second factor is proved. Four modes, named the way an IdP names
-   them — a sentence per option was a sentence read four times to choose one. */
-const SECOND: { value: Rule['secondFactor']; label: string }[] = [
-  { value: 'any', label: 'Any enrolled method' },
-  { value: 'specific', label: 'One of these' },
-  { value: 'chain', label: 'All of these, in order' },
-  { value: 'preferred', label: 'User preference' },
+/* How the second factor is proved — four modes, NAMED rather than described.
+
+   They were "One of these", "All of these, in order" and "User preference":
+   phrases that only mean anything once you know what "these" refers to, which
+   is a list that appears after you choose. Every other enterprise IdP names
+   these as things — a method, a chain, a preference — and so does the rest of
+   this console. A dropdown holds names; the sentence explaining one belongs on
+   the option, not in place of it. */
+const SECOND: { value: Rule['secondFactor']; label: string; meta: string; icon: LucideIcon }[] = [
+  { value: 'any', label: 'Any enrolled method', meta: 'Whatever they have set up', icon: Layers },
+  { value: 'specific', label: 'Specific methods', meta: 'Any one from a list you choose', icon: ListChecks },
+  /* `Method chain` — every method in a set order — stood here and is gone.
+
+     Nothing in the seeded estate used it, and it was the one mode that needed
+     an ordering control: the multi-select below says WHICH methods, and the
+     order you tick them is a weak answer to "in what order". The model keeps
+     the value (`Rule.secondFactor` still has it, and the trail builder still
+     offers it), so a rule that arrives holding it is not broken — this pane
+     simply does not mint new ones. */
+  { value: 'preferred', label: 'User preference', meta: 'Their default, with a fallback', icon: UserRound },
 ]
+
+/* A mark per method, so a list of seven is scanned rather than read. The
+   families are what the marks distinguish: something you are pushed, something
+   you read off a clock, something you plug in or touch, something that arrives
+   as a message. */
+const METHOD_ICON: Record<string, LucideIcon> = {
+  'miniOrange Push': BellRing,
+  'TOTP Authenticator': Timer,
+  'WebAuthn / FIDO2': Fingerprint,
+  'SMS / OTP': MessageSquare,
+  'Email OTP': Mail,
+  'Hardware Token': Usb,
+  'Security Questions': HelpCircle,
+}
+const methodOption = (m: string) => ({ value: m, label: m, icon: METHOD_ICON[m] ?? KeyRound })
 
 export function WhatEditor({
   rule,
@@ -80,27 +128,12 @@ export function WhatEditor({
      None was ever patched on, so the journey on the card beside this panel said
      "Empty chain" while the control here named a specific method: two readings
      of one rule, disagreeing on screen at the same time. */
-  const chain = rule.methodChain ?? []
   const methods = rule.secondFactorMethods ?? []
 
-  /* Three states now, and `allowed` is doing a narrower job than its name
-     suggests, so it is renamed to the question it actually answers: does this
-     outcome walk the person through factors? Allow and Flag both do — the flag
-     is raised AFTER a successful sign-in, not instead of one — and Deny does
-     not. That is what decides whether the ladder is drawn. */
+  /* Does this outcome walk the person through factors? Allow and the
+     second-factor tile do; Deny does not. */
   const walksFactors = rule.decision !== 'deny'
   const twoStep = rule.decision === '2fa'
-
-  /* Which flavour of Allow to return to. Seeded from the rule so switching to
-     Deny and back does not silently add or drop a second step; `'1fa'` only
-     when the rule genuinely had none.
-
-     `warn` is excluded on purpose. It is its own tile, so returning to Allow
-     from Deny must never land on it — a rule that was flagging, was switched to
-     Deny, and is switched back should come back as an allow, and the tile that
-     lights should be the tile that was pressed. */
-  const lastAllow = useRef<AccessDecision>(rule.decision === '2fa' ? '2fa' : '1fa')
-  if (rule.decision === '1fa' || rule.decision === '2fa') lastAllow.current = rule.decision
 
   /* Deny normalises everything that belongs to Allow, and so does removing the
      second step. Without it a rule keeps a remembered-device window and a
@@ -117,23 +150,25 @@ export function WhatEditor({
     allowDisable2fa: false,
   }
 
+  /* One tile, one value, and the tile IS the field.
+
+     `lastAllow` stood here — a ref remembering which flavour of Allow to return
+     to when Deny was pressed and unpressed, because the two-factor state had no
+     tile of its own and had to be inferred. It has one now, so there is nothing
+     left to remember: pressing a tile writes that decision.
+
+     The first factor is never reset. Deny used to blank it, which was invisible
+     while the row only rendered under Allow — it is above the tiles now, so
+     resetting it would clear a control the user is looking at, and switching
+     back from Deny would return a different rule than the one they left. */
   const pick = (id: AccessDecision) => {
-    if (id === 'deny') return onPatch({ decision: 'deny', firstFactor: 'Password', firstFactorMethod: undefined, ...noSecondStep })
-    /* Flag normalises the second step for the same reason Deny does: `warn` is
-       one factor by definition, so a rule that had a method list and a
-       remembered-device window would keep both as state nothing on screen
-       shows and nothing on the rule reads. The first factor is left alone —
-       a flagged sign-in still walks it, and it is the one setting the ladder
-       below still offers. */
-    onPatch({ decision: lastAllow.current })
+    if (id === '2fa') return onPatch({ decision: '2fa' })
+    onPatch({ decision: id, ...noSecondStep })
   }
 
   const unsatisfiable = twoStep && rule.secondFactor === 'specific' && methods.length === 0
 
-  /* Which tile is lit. Both Allow flavours light the one tile — that is the
-     point of the merge, and it is why this is not simply `rule.decision`.
-     `warn` is not one of those flavours: it lights its own. */
-  const active: string = rule.decision === 'deny' ? 'deny' : '1fa'
+  const active: string = rule.decision
 
   /* A rule nobody has answered shows no tile lit.
 
@@ -163,7 +198,67 @@ export function WhatEditor({
   )
 
   return (
-    <div>
+    <div className="bb__thenparts">
+        {/* The first factor is a plain row; the second is a CARD.
+
+            They were two rungs of one numbered ladder, which said they were
+            two of a kind. They are not. The first factor is always there and
+            has one setting — which method. The second is optional, and
+            choosing it opens four more decisions: the mode, the methods,
+            whether the device is remembered, whether a user may opt out.
+            Drawn as peers, the second rung's four followers hung off the
+            bottom of the ladder as loose rows with nothing saying they
+            belonged to it, and "Add second factor" sat between them as a
+            third rung — an action in a list of settings.
+
+            So: one row for the first factor, and a bordered card for the
+            second holding everything that is about the second. The card is
+            the one box this section draws, and it earns it by containing
+            something. */}
+        <ol className="bb__ladder">
+          <li className="bb__rung">
+            <span className="bb__rung__n" aria-hidden>
+              1
+            </span>
+            <span className="bb__rung__body">
+              <b>First factor</b>
+              <Picker
+                label="First step"
+                width="fill"
+                value={rule.firstFactor === 'Specific' ? (rule.firstFactorMethod ?? 'Specific') : rule.firstFactor}
+                /* One picker, not a segment plus a conditional picker beneath
+                   it. "Specific" was never an answer — it was a promise to
+                   answer, and the row it revealed asked the same question
+                   again one line down. The methods are in this list. */
+                options={[
+                  { value: 'Password', label: 'Password', icon: Lock },
+                  { value: 'Any', label: 'Any enrolled method', icon: Layers },
+                  ...METHODS.map((m) => ({ ...methodOption(m), group: 'Specific method' })),
+                ]}
+                onChange={(v) =>
+                  v === 'Password' || v === 'Any'
+                    ? onPatch({ firstFactor: v as Rule['firstFactor'], firstFactorMethod: undefined })
+                    : onPatch({ firstFactor: 'Specific', firstFactorMethod: v })
+                }
+              />
+            </span>
+          </li>
+
+        </ol>
+
+      {/* The decision comes AFTER the first factor.
+
+          It was first, on the reasoning that whether somebody gets in is the
+          bigger question and the steps are its detail. That is true of the
+          MODEL and false of the writing: you decide what a sign-in has to prove
+          before you decide what happens when it does, and a rule is read the
+          same way — one factor, then allowed or refused, then a second factor
+          if the first was not enough.
+
+          Which is also why the first factor is drawn under Deny, where it does
+          not run. It is the question that was already answered, not a setting
+          this outcome has; the line under the tiles says so rather than the
+          control vanishing and taking its value with it. */}
       <div className="bb__decide" role="radiogroup" aria-label="What happens when this rule matches">
         {TILES.map((t, i) => {
           const on = answered && t.id === active
@@ -199,7 +294,18 @@ export function WhatEditor({
         })}
       </div>
 
-      {!walksFactors ? null : (
+      {/* One line under the two simple answers; the settings under the third.
+
+          Allow and Deny are complete the moment they are pressed — the first
+          factor above is the whole of what Allow does, and Deny does nothing at
+          all. A sentence confirming that is the right amount of panel for
+          them. The second-factor tile is the only one with anything left to
+          decide, so it is the only one that opens. */}
+      {!walksFactors ? (
+        <p className="bb__addnote">Refused outright. The factor above is never asked for.</p>
+      ) : !twoStep ? (
+        <p className="bb__addnote">Signed in on the first factor above. Nothing more is asked.</p>
+      ) : (
         <>
           {unsatisfiable && (
             <p className="bb__diag is-error" role="alert">
@@ -210,69 +316,19 @@ export function WhatEditor({
             </p>
           )}
 
-          {/* The first factor is a plain row; the second is a CARD.
 
-              They were two rungs of one numbered ladder, which said they were
-              two of a kind. They are not. The first factor is always there and
-              has one setting — which method. The second is optional, and
-              choosing it opens four more decisions: the mode, the methods,
-              whether the device is remembered, whether a user may opt out.
-              Drawn as peers, the second rung's four followers hung off the
-              bottom of the ladder as loose rows with nothing saying they
-              belonged to it, and "Add second factor" sat between them as a
-              third rung — an action in a list of settings.
-
-              So: one row for the first factor, and a bordered card for the
-              second holding everything that is about the second. The card is
-              the one box this section draws, and it earns it by containing
-              something. */}
-          <ol className="bb__ladder">
-            <li className="bb__rung">
-              <span className="bb__rung__n" aria-hidden>
-                1
-              </span>
-              <span className="bb__rung__body">
-                <b>First factor</b>
-                <Picker
-                  label="First step"
-                  width="fill"
-                  value={rule.firstFactor === 'Specific' ? (rule.firstFactorMethod ?? 'Specific') : rule.firstFactor}
-                  /* One picker, not a segment plus a conditional picker beneath
-                     it. "Specific" was never an answer — it was a promise to
-                     answer, and the row it revealed asked the same question
-                     again one line down. The methods are in this list. */
-                  options={[
-                    { value: 'Password', label: 'Password' },
-                    { value: 'Any', label: 'Any enrolled method' },
-                    ...METHODS.map((m) => ({ value: m, label: m, group: 'Specific method' })),
-                  ]}
-                  onChange={(v) =>
-                    v === 'Password' || v === 'Any'
-                      ? onPatch({ firstFactor: v as Rule['firstFactor'], firstFactorMethod: undefined })
-                      : onPatch({ firstFactor: 'Specific', firstFactorMethod: v })
-                  }
-                />
-              </span>
-            </li>
-
-          </ol>
-
-          {twoStep ? (
-            <div className="bb__second">
+          <div className="bb__second">
               <div className="bb__second__head">
                 <span className="bb__second__n" aria-hidden>
                   2
                 </span>
                 <b>Second factor</b>
-                <button
-                  type="button"
-                  className="bb__second__drop"
-                  aria-label="Remove the second factor"
-                  title="Remove the second factor — this becomes single-factor"
-                  onClick={() => onPatch({ decision: '1fa', ...noSecondStep })}
-                >
-                  <X size={13} strokeWidth={2.2} />
-                </button>
+                {/* The card's own close stood here, undoing the choice back to
+                    a plain Allow. The tile above does that now — pressing
+                    `Allow` is how you drop the second factor — and a second
+                    control for it inside the thing it removes was the older
+                    shape, from when the second factor was added by a button
+                    rather than chosen. */}
               </div>
 
               <div className="bb__second__body">
@@ -282,32 +338,39 @@ export function WhatEditor({
                     label="Second step"
                     width="fill"
                     value={rule.secondFactor}
-                    options={SECOND.map((s) => ({ value: s.value, label: s.label }))}
+                    options={SECOND.map((x) => ({ value: x.value, label: x.label, meta: x.meta, icon: x.icon }))}
                     onChange={(v) => onPatch({ secondFactor: v as Rule['secondFactor'] })}
                   />
                 </span>
 
-                {/* One editor for both list modes: a row of dropdowns, and a way
-                    to add another.
+                {/* ONE multi-select, and it replaced three shapes.
 
-                    `specific` was a wall of twenty-one toggle chips — every
-                    method the catalogue holds, rendered whether or not anybody
-                    wanted it, in a 400px panel. It does not scale, and it did
-                    not match `chain`, which asks the same question (which
-                    methods, in what order) with a list that grows.
+                    A wall of twenty-one toggle chips — every method the
+                    catalogue holds, rendered whether or not anybody wanted it.
+                    Then a list of dropdowns with an `Add method` button, which
+                    scaled but asked you to add a row and then say what it was:
+                    two gestures per method, and a fresh row arrived holding a
+                    method nobody had picked.
 
-                    The two modes differ in what the list MEANS — any one of
-                    these versus all of these in order — and that difference is
-                    already said by the mode above. It has no business also being
-                    said by two different controls. */}
-                {(rule.secondFactor === 'specific' || rule.secondFactor === 'chain') && (
-                  <MethodList
-                    ordered={rule.secondFactor === 'chain'}
-                    values={rule.secondFactor === 'chain' ? chain : methods}
-                    onChange={(next) =>
-                      onPatch(rule.secondFactor === 'chain' ? { methodChain: next } : { secondFactorMethods: next })
-                    }
-                  />
+                    A multi-select asks once. The list is the catalogue, the
+                    ticks are the answer, and adding a fourth method is the same
+                    gesture as adding the first. */}
+                {rule.secondFactor === 'specific' && (
+                  <span className="bb__subrow">
+                    <b>Methods</b>
+                    <Picker
+                      label="Methods accepted"
+                      width="fill"
+                      multiple
+                      value={methods}
+                      options={METHODS.map(methodOption)}
+                      onChange={(v) =>
+                        onPatch({
+                          secondFactorMethods: methods.includes(v) ? methods.filter((x) => x !== v) : [...methods, v],
+                        })
+                      }
+                    />
+                  </span>
                 )}
 
                 {rule.secondFactor === 'preferred' && (
@@ -331,22 +394,7 @@ export function WhatEditor({
                     factor did, without ever having said why they were there. */}
                 <RememberBlock rule={rule} onPatch={onPatch} />
               </div>
-            </div>
-          ) : (
-            /* A third arm stood here, for the Flag outcome: no adder, and a
-               sentence saying to choose Allow first. `warn` and `2fa` were two
-               values of ONE field, so "flag and also verify" was not a rule the
-               model could hold, and the adder below would have silently
-               converted a flagged rule to Allow-plus-verify. The outcome is
-               gone, so both the trap and the guard against it are. */
-            /* The offer, once, under the first factor rather than as a third
-               rung inside the ladder. A ladder numbers the steps a person
-               walks; an add button is not a step. */
-            <button type="button" className="bb__addsecond" onClick={() => onPatch({ decision: '2fa' })}>
-              <Plus size={13} strokeWidth={2.4} aria-hidden />
-              Require a second factor
-            </button>
-          )}
+          </div>
         </>
       )}
 
@@ -363,71 +411,13 @@ export function WhatEditor({
   )
 }
 
-/* The methods a second factor accepts — one dropdown per method, and a way to
-   add another.
+/* `MethodList` stood here — one dropdown per chosen method, plus an `Add
+   method` button that appended a row holding whatever was still free.
 
-   It replaces two controls that asked one question two ways: a wall of
-   twenty-one toggle chips for "one of these", and a list of dropdowns for "all
-   of these, in order". The chips do not scale — every method in the catalogue
-   is rendered whether or not anybody wants it, and the twenty-second would have
-   made it worse — and having two shapes for one question meant switching mode
-   changed the CONTROL rather than the meaning.
-
-   `ordered` is the only difference the shapes have any business showing: a
-   chain is walked in sequence, so its rows are numbered. Which methods count is
-   the same question either way.
-
-   `nextFree` rather than a fixed default: pressing Add twice used to add the
-   same method twice, which for "one of these" is a row that means nothing. */
-function MethodList({
-  ordered,
-  values,
-  onChange,
-}: {
-  ordered: boolean
-  values: string[]
-  onChange: (next: string[]) => void
-}) {
-  /* Password is a first factor everywhere else in this pane, and a chain is the
-     one place it can legitimately appear as a later step. */
-  const pool = ordered ? ['Password', ...METHODS] : METHODS
-  const nextFree = pool.find((m) => !values.includes(m)) ?? pool[0]
-
-  return (
-    <div className="bb__methods">
-      {values.map((m, i) => (
-        <div className="bb__methodrow" key={i}>
-          {ordered && (
-            <b className="bb__methodn" aria-hidden>
-              {i + 1}
-            </b>
-          )}
-          <Picker
-            label={ordered ? `Step ${i + 1}` : `Method ${i + 1}`}
-            width="fill"
-            value={m}
-            options={pool.map((x) => ({ value: x, label: x }))}
-            onChange={(v) => onChange(values.map((old, n) => (n === i ? v : old)))}
-          />
-          <button
-            type="button"
-            className="bb__act is-danger"
-            aria-label={`Remove ${m}`}
-            title="Remove"
-            onClick={() => onChange(values.filter((_, n) => n !== i))}
-          >
-            <Trash2 size={13} strokeWidth={2} />
-          </button>
-        </div>
-      ))}
-
-      <button type="button" className="bb__addrow" onClick={() => onChange([...values, nextFree])}>
-        <Plus size={12} strokeWidth={2.4} aria-hidden />
-        Add method
-      </button>
-    </div>
-  )
-}
+   It replaced a wall of toggle chips and was better than them, but it still
+   asked for two gestures per method: add a row, then say what it is. The
+   control is a multi-select now, in the card above; see the note at the call
+   site for what the chain does about order. */
 
 /* Remembering a device, folded into one row that grows.
 
@@ -487,3 +477,4 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
     </div>
   )
 }
+

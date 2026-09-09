@@ -90,18 +90,18 @@ describe('partSummary', () => {
     const r = ruleWith(
       when(card(cond('group', 'in', ['finance']), cond('day', 'is', ['Monday']), cond('time', 'between', ['09:00', '17:00']))),
     )
-    expect(partSummary(r, 'when', resolve).text).toBe('2 conditions → Let in')
+    expect(partSummary(r, 'when', resolve).text).toBe('2 conditions → Allow')
   })
 
   it('says any sign-in when the only condition is a who', () => {
     // A rule that names a group and nothing else tests no circumstances at all.
     const r = ruleWith(when(card(cond('group', 'in', ['finance']))))
-    expect(partSummary(r, 'when', resolve)).toEqual({ text: 'Any sign-in → Let in', dim: true })
+    expect(partSummary(r, 'when', resolve)).toEqual({ text: 'Any sign-in → Allow', dim: true })
   })
 
   it('singularises one condition', () => {
     expect(partSummary(ruleWith(when(card(cond('day', 'is', ['Monday'])))), 'when', resolve).text).toBe(
-      '1 condition → Let in',
+      '1 condition → Allow',
     )
   })
 
@@ -132,6 +132,6 @@ describe('partSummary', () => {
 
   it('still counts the conditions of an OR-shaped rule across every alternative', () => {
     const r = ruleWith(when(card(cond('group', 'in', ['finance'])), card(cond('day', 'is', ['Monday']))))
-    expect(partSummary(r, 'when', resolve).text).toBe('1 condition → Let in')
+    expect(partSummary(r, 'when', resolve).text).toBe('1 condition → Allow')
   })
 })

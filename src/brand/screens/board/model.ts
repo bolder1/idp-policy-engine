@@ -115,19 +115,29 @@ export interface Trace {
   runId: number
 }
 
-/* How a decision is named on this surface.
+/* How a decision is named on this surface — and it is the SAME word the tile
+   that wrote it carries.
 
-   The model's labels count factors — "1 factor", "2 factors". These name what
-   the person signing in experiences, which is the thing an administrator is
-   actually choosing between. The MODEL keeps its three values untouched. */
+   The model's own labels count factors ("1 factor", "2 factors"), which is the
+   wrong altitude for a card. These used to be "Let in" and "Let in, then
+   verify" instead, on the argument that they name what the person signing in
+   experiences rather than what the field holds. That was right, and it was
+   still one field with two vocabularies: the panel offered `Allow`, `Deny` and
+   `Require a second factor` while the card six inches to its left reported the
+   same three as `Let in`, `Deny` and `Let in, then verify`, so a rule you had
+   just written came back described in words you had not chosen.
+
+   The tiles win, because they are where the answer is given. `DECISION_SHORT`
+   keeps a terser second factor for the places that have a column rather than a
+   line. */
 export const DECISION_NAME: Record<AccessDecision, string> = {
-  '1fa': 'Let in',
-  '2fa': 'Let in, then verify',
+  '1fa': 'Allow',
+  '2fa': 'Second factor',
   deny: 'Deny',
 }
 
 export const DECISION_SHORT: Record<AccessDecision, string> = {
-  '1fa': 'Let in',
+  '1fa': 'Allow',
   '2fa': 'Verify',
   deny: 'Deny',
 }

@@ -160,11 +160,9 @@ export function WhenEditor({
      that a bare card's conditions are members of the one bracket. Splitting a
      loose condition used to move it to the end of the list and change nothing
      else, so the button did visibly nothing. */
-  const splitOut = (conditionId: string) => {
-    const next = ops.splitOut(rule.when, conditionId)
-    if (next === rule.when) return
-    restructure(ops.setGrouped(next, next.cards[next.cards.length - 1].id, true))
-  }
+  /* `splitOut` — move one condition into a bracket of its own — stood here.
+     Its only trigger was a hover-revealed Split on each row, withdrawn until
+     there is a better home for the gesture; see the note in `ConditionRow`. */
   /* The inverse of "Add group", and it replaces "Merge up".
 
      "Merge up" folded a group into whatever card happened to precede it, which
@@ -302,7 +300,6 @@ export function WhenEditor({
                      disagree — the button was drawn on every row while the
                      writer bailed whenever the row was the only one — so the
                      first row of every group had a control that did nothing. */
-                  onSplit={m.card.conditions.length > 1 ? () => splitOut(m.c.id) : undefined}
                 />
               ) : (
                 <GroupMember
@@ -329,7 +326,6 @@ export function WhenEditor({
                   setScope={(id, s) => write(ops.setScope(rule.when, id, s))}
                   setKey={(id, k) => write(ops.setKey(rule.when, id, k))}
                   setTz={(id, tz) => write(ops.setTz(rule.when, id, tz))}
-                  splitOut={splitOut}
                 />
               )}
               </Fragment>
@@ -413,7 +409,6 @@ function GroupMember({
   setScope,
   setKey,
   setTz,
-  splitOut,
 }: {
   k: ConditionCard
   letter: string
@@ -436,7 +431,6 @@ function GroupMember({
   setScope: (id: string, s: 'both' | ZoneScope) => void
   setKey: (id: string, k: string) => void
   setTz: (id: string, tz: string) => void
-  splitOut: (id: string) => void
 }) {
   const join = cardJoin(k)
   const name = k.label?.trim() || `Group ${letter}`
@@ -479,7 +473,6 @@ function GroupMember({
             onKey={(k) => setKey(c.id, k)}
             onTz={(tz) => setTz(c.id, tz)}
             onRemove={() => removeCondition(c.id)}
-            onSplit={k.conditions.length > 1 ? () => splitOut(c.id) : undefined}
           />
           </Fragment>
         ))}
@@ -680,7 +673,6 @@ function ConditionRow({
   onKey,
   onTz,
   onRemove,
-  onSplit,
 }: {
   c: Condition
   fresh: boolean
@@ -697,7 +689,6 @@ function ConditionRow({
   onTz: (tz: string) => void
   onRemove: () => void
   /** Absent when the row is the only condition in its run — nothing to split. */
-  onSplit?: () => void
 }) {
   const t = conditionType(c.typeId)
   const values = c.values.filter(Boolean)
@@ -753,19 +744,13 @@ function ConditionRow({
         )}
       </span>
 
-      <span className="bb__cond__acts">
-        {onSplit && (
-          <button
-            type="button"
-            className="bb__ifact"
-            aria-label={`Move ${t.label} into a group of its own`}
-            title="Move into a group of its own"
-            onClick={onSplit}
-          >
-            <Split size={13} strokeWidth={2} />
-          </button>
-        )}
-      </span>
+      {/* `Move into a group of its own` stood here — a hover-revealed Split on
+          every condition row. Withdrawn for now: grouping is a shape the model
+          supports and the panel has no other way to reach, so a single icon on
+          a row was the whole of its discoverability, and pressing it produced a
+          bracket most people had not asked for. `splitOut` is still here and
+          still correct, so putting the gesture back is a question of where it
+          belongs rather than of rebuilding it — only the trigger is gone. */}
     </div>
   )
 }

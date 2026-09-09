@@ -252,7 +252,7 @@ export function ImpactTab({
 
           <div className="bb__fieldkey">
             <span>
-              <i style={{ '--dot': 'var(--fb-positive-dot, #128f43)' } as CSSProperties} /> Let in
+              <i style={{ '--dot': 'var(--fb-positive-dot, #128f43)' } as CSSProperties} /> Allow
             </span>
             <span>
               <i style={{ '--dot': 'var(--fb-notice-dot, #b07a00)' } as CSSProperties} /> Verify

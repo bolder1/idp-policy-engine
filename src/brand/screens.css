@@ -7,8 +7,18 @@
   flex-wrap: wrap;
   margin-bottom: var(--space-6);
 }
+/* One order, four screens: what you TYPE on the left, what NARROWS on the
+   right. Policies had search last in the filter group, Applications had it
+   first, device profiles had it on the right and zones had it on the left —
+   four pages one nav click apart, each asking you to find the search box
+   again. `__left` and `__right` are the whole rule; a page with only a search
+   still uses `__left`, so the box does not move when a filter is added. */
+.btoolbar__left { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
 .btoolbar__filters { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
 .btoolbar__right { margin-left: auto; display: flex; align-items: center; gap: var(--space-5); }
+/* For the pages whose right-hand group is the filters themselves, with no
+   count after them. */
+.btoolbar__filters--end { margin-left: auto; }
 /* How many rows survived the filters. Every list screen carries one, in the
    same place and the same voice — Zones had it, nothing else did, so the
    answer to "is this all of them?" depended on which page you were on. */
@@ -29,7 +39,8 @@
 }
 .btoolbar__clear { font-size: var(--fs-md); color: var(--text-link); }
 .btoolbar__clear:hover { text-decoration: underline; }
-.btoolbar__search { width: 260px; }
+/* `.btoolbar__search` stood here at 260px. The box is `SearchBox` in the kit
+   now, and it brings its own width — see the note on `.bx-search`. */
 
 .bsec { margin: var(--space-8) 0 var(--space-5); }
 
@@ -71,14 +82,14 @@
 /* The row menu stays reachable when the table does scroll. It is the only
    column whose position matters more than its context. */
 .btable thead th.btable__col-actions,
-.btable td.btable__right {
+.btable td.btable__actions {
   position: sticky;
   right: 0;
   background: inherit;
 }
 .btable thead th.btable__col-actions { background: var(--table-head-bg); }
-.btable tbody td.btable__right { background: var(--surface-raised); }
-.btable tbody tr:hover td.btable__right { background: var(--table-row-hover); }
+.btable tbody td.btable__actions { background: var(--surface-raised); }
+.btable tbody tr:hover td.btable__actions { background: var(--table-row-hover); }
 /* Every value from the table recipe in console-theme.css — see the block there
    for what each one is doing and why. */
 .btable thead th {
@@ -118,7 +129,7 @@
   text-transform: inherit;
   letter-spacing: inherit;
 }
-.btable__right .btable__sort { flex-direction: row-reverse; }
+.btable__actions .btable__sort { flex-direction: row-reverse; }
 /* The un-sorted glyph is a hint, not a state: it appears when the pointer or
    the keyboard reaches the column and is otherwise out of the way. A column of
    permanent ⇅ marks reads as four things needing attention. */
@@ -132,7 +143,20 @@
 .btable__sort:focus-visible span { opacity: 1; }
 .btable__sort.is-on { color: var(--text-primary); }
 .btable__sort.is-on span { opacity: 1; color: var(--accent); }
-.btable__right { text-align: right; }
+/* The actions column is CENTRED, on every table, and the class says what it
+   holds rather than where it points.
+
+   It was `.btable__right`, right-aligned, and it had drifted: the header word
+   sat hard against the scrollbar while the kebab underneath it sat a few pixels
+   further in, because the button has padding and the text does not. Five of the
+   five uses of `__right` were this one column, so the name was describing an
+   alignment nobody had chosen on purpose. Centred, header and control share an
+   axis, and the same rule is now true of the two grid tables below. */
+.btable th.btable__actions,
+.btable td.btable__actions { text-align: center; }
+/* The grid-row tables (device profiles, zones) are not <table>s — their cells
+   are grid children, so they need the same word in two places. */
+.btable__center { text-align: center; justify-self: center; }
 /* Counts and dates line up on the digit, not on the word. */
 .btable__num { text-align: right; font-variant-numeric: tabular-nums; }
 

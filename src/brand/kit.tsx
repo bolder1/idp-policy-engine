@@ -17,7 +17,9 @@ import {
   ChevronDown,
   Info,
   Minus,
+  MoreHorizontal,
   Plus,
+  Search,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -166,6 +168,14 @@ export function MenuButton({
      with the three icons beside it. */
   iconOnly?: boolean
 }) {
+  /* `iconOnly` without an `icon` used to render an EMPTY button — no glyph, no
+     label, no chevron — and the risk-profile table shipped one: three rows of
+     blank 28px boxes in the Actions column, clickable, opening a real menu that
+     nothing on screen suggested was there. `iconOnly` means the icon is the
+     whole control, so a missing one is a contradiction the component answers
+     rather than draws. The overflow glyph is the same one the three callers
+     that DO pass it chose. */
+  const Glyph = icon ?? (iconOnly ? MoreHorizontal : undefined)
   const [open, setOpen] = useState(false)
   const [cursor, setCursor] = useState(0)
   const wrap = useRef<HTMLSpanElement | null>(null)
@@ -222,7 +232,7 @@ export function MenuButton({
           }
         }}
       >
-        {icon && <MenuIcon icon={icon} size={size} />}
+        {Glyph && <MenuIcon icon={Glyph} size={size} />}
         {!iconOnly && label}
         {!iconOnly && <ChevronDown size={size === 'sm' ? 12 : 13} strokeWidth={2.2} aria-hidden />}
       </button>
@@ -1088,6 +1098,53 @@ export function TipMark({ text }: { text: ReactNode }) {
         ?
       </span>
     </Tip>
+  )
+}
+
+/* -----------------------------------------------------------------------------
+   The search box, once.
+
+   There were five of them. Zones wrapped a bare input in a label with a
+   magnifier and sized it 380px; policies, applications and device profiles used
+   a plain `<input type="search">` at 260px with no icon; risk signals had its
+   own copy of the zones markup under a `.brs__` name. So the one control an
+   administrator reaches for on every list screen changed its width, its glyph
+   and its affordance depending on which screen they were on — and the zones one
+   read as the odd one out because it was the only box on the console with
+   something inside it.
+
+   One component, one width, one glyph. The icon is decorative — `aria-label`
+   on the input carries the name, and a magnifier announced as "search" beside
+   a field announced as "Search zones" says it twice.
+
+   `type="search"` and not `text`: it brings the browser's own clear button,
+   which is the affordance that empties a filter without selecting the text
+   first. Zones was on `text` and had to offer a "Clear" link in the empty
+   state to make up for it.
+   -------------------------------------------------------------------------- */
+export function SearchBox({
+  value,
+  onChange,
+  placeholder,
+  label,
+}: {
+  value: string
+  onChange: (next: string) => void
+  placeholder: string
+  /** The accessible name — "Search zones", not "Search". */
+  label: string
+}) {
+  return (
+    <label className="bx-search">
+      <Search size={14} strokeWidth={2} aria-hidden />
+      <input
+        type="search"
+        value={value}
+        placeholder={placeholder}
+        aria-label={label}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
   )
 }
 

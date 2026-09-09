@@ -59,7 +59,10 @@ export function ApplicationField({ appIds, onChange }: { appIds: string[]; onCha
          is a set of rules no sign-in can ever reach. So the empty state is a
          placeholder again, and the footer will not let you past it. */
       placeholder="Choose applications"
-      invalid={appIds.length === 0}
+      /* Never invalid. Empty is a legitimate answer — a policy with no
+         application is a draft, which is a state this product carries on
+         purpose — so the red edge that used to sit here was reporting a fault
+         where there is a choice. The dialog says what blank means instead. */
       /* The real marks, back from the list this control replaced.
 
          `AppList` drew them, and answering the same question with a picker had

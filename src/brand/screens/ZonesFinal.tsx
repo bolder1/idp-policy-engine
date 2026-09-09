@@ -21,7 +21,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { Button, Drawer, Modal, SaveBar } from '../kit'
+import { Button, Drawer, Modal, SaveBar, SearchBox } from '../kit'
 import {
   ASN_DIRECTORY,
   emptyLocation,
@@ -225,16 +225,12 @@ export function ZonesFinal() {
           ) : (
             <>
               <div className="bz7__toolbar">
-                <label className="bz7__search">
-                  <Search size={15} strokeWidth={1.9} aria-hidden />
-                  <input
-                    type="text"
-                    value={q}
-                    placeholder="Search zones, networks or places…"
-                    aria-label="Search zones"
-                    onChange={(e) => setQ(e.target.value)}
-                  />
-                </label>
+                <SearchBox
+                  value={q}
+                  onChange={setQ}
+                  placeholder="Search zones, networks or places…"
+                  label="Search zones"
+                />
                 <span className="bz7__count">
                   {shown.length} of {store.zones.length}
                 </span>
@@ -461,10 +457,10 @@ function ZoneTable({
         <span role="columnheader">Locations</span>
         <span role="columnheader">Used by</span>
         {/* Named, the way the policies table names it — an unlabelled
-          columnheader over the only route to Duplicate and Delete. */}
-      <span role="columnheader" className="bz7__thactions">
-        Actions
-      </span>
+            columnheader over the only route to Duplicate and Delete. */}
+        <span role="columnheader" className="btable__center">
+          Actions
+        </span>
       </div>
       {zones.map((z) => {
         const meta = SHAPE[shapeOf(z)]

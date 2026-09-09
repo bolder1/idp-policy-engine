@@ -285,6 +285,40 @@ html[data-theme='dark'] {
 }
 .bx-tipdot:hover { border-color: var(--border-strong); color: var(--text-secondary); }
 
+/* --- Search --------------------------------------------------------------- */
+
+/* The box is the label; the input inside it is bare.
+
+   The border, ground and focus ring belong to the wrapper so that the glyph
+   sits INSIDE the field rather than beside it — an icon outside the box reads
+   as a button next to a text field, which is what a magnifier used to mean.
+   The input then has to give all of that up, or the page draws a second border
+   a few pixels inside the first.
+
+   `:focus-within` and not `:focus-visible`, because the element that takes
+   focus is not the element that draws the ring. */
+.bx-search {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  width: 300px; max-width: 100%;
+  height: var(--ctl-height-md); padding: 0 11px;
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
+  color: var(--text-muted);
+}
+.bx-search:hover { border-color: var(--ctl-border-hover); }
+.bx-search:focus-within { border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
+.bx-search svg { flex: none; }
+/* One class beats the `:where()` base in this file, which is zero-specificity
+   on purpose so that exactly this can happen. */
+.bx-search input {
+  flex: 1; min-width: 0; height: auto; padding: 0;
+  border: 0; background: none;
+  font: inherit; font-size: var(--fs-md); color: var(--text-primary);
+}
+.bx-search input:hover { background: none; }
+.bx-search input:focus-visible { outline: none; box-shadow: none; }
+.bx-search input::-webkit-search-cancel-button { cursor: pointer; }
+
 /* --- Badge ---------------------------------------------------------------- */
 
 /* One line, always, and a ceiling it cannot grow past.

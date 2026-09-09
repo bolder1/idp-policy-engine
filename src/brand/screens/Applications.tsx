@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { LayoutGrid, Pencil, Plus, Rows3, Table2, Trash2 } from 'lucide-react'
 
-import { Button } from '../kit'
+import { Button, SearchBox } from '../kit'
 import { NoResults } from '../empty'
 import { PageHead } from '../Shell'
 import { AppLogo } from '../logos/AppLogo'
@@ -168,17 +168,20 @@ export function Applications() {
           most had no fixed home. Fidelity to a single screen is worth less than
           the console agreeing with itself. */}
       <div className="btoolbar">
-        <div className="btoolbar__filters">
-          <input
-            type="search"
-            placeholder="Search applications…"
-            aria-label="Search applications"
+        {/* This page only ever had a search, and it was already on the left —
+            but it was wearing `btoolbar__filters`, the class the OTHER pages use
+            for their dropdowns. Same slot, opposite meaning. Renamed to the
+            group it actually is, so the four list screens now agree that
+            `__left` holds what you type and `__right` holds what narrows. */}
+        <div className="btoolbar__left">
+          <SearchBox
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value)
+            onChange={(next) => {
+              setQuery(next)
               setPage(0)
             }}
-            className="btoolbar__search bapl__search"
+            placeholder="Search applications…"
+            label="Search applications"
           />
         </div>
         <div className="btoolbar__right">
@@ -195,7 +198,7 @@ export function Applications() {
                 {head('type', 'App Type')}
                 {head('protection', 'Protection')}
                 {head('updated', 'Last Updated')}
-                <th scope="col" className="btable__right btable__col-actions">Actions</th>
+                <th scope="col" className="btable__actions btable__col-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -317,7 +320,7 @@ function AppRow({
       <td className="u-muted" title={app.lastUpdated}>
         {app.lastUpdated.replace(/:\d\d$/, '')}
       </td>
-      <td className="btable__right">
+      <td className="btable__actions">
         <div className="btable__menuwrap">
           <button
             type="button"

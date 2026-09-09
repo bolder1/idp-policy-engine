@@ -19,7 +19,9 @@
    which is the reverse of the policies table. Kept, because this page is being
    reproduced rather than redesigned — and the search is wider than the shared
    260px because "Search Application" is a longer prompt than "Search policies". */
-.bapl__search { width: 340px; max-width: 100%; }
+/* `.bapl__search` widened the toolbar's search box to 340px here and nowhere
+   else, which is a third width for the same control. Gone with the shared
+   `SearchBox`. */
 
 .bapl__viewswitch button:disabled {
   opacity: var(--disabled-opacity);

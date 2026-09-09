@@ -430,7 +430,10 @@
   display: grid;
   /* Same as the zones table beside it: the name is the row's identity, so it
      takes the slack rather than sharing it evenly with three fixed columns. */
-  grid-template-columns: minmax(190px, 1.7fr) 150px 100px 110px 32px;
+  /* Four columns, not five. `Attributes` was a bare count with no unit and
+     no threshold — six is not better than two — so its width went to the two
+     columns anybody reads. */
+  grid-template-columns: minmax(190px, 1.7fr) 170px 130px 64px;
   align-items: center; gap: 12px;
   padding: var(--space-4) var(--table-cell-x); min-height: var(--table-row-h);
   border-bottom: 1px solid var(--table-rule);
@@ -467,25 +470,36 @@
    untinted chip: no error, no failing test, a chip that quietly stops saying
    anything. The component emits `MODE_META[mode].tint` now, so a kind renamed
    in the model keeps its colour without this file being opened. */
-/* Both neutral.
+/* A hue per mode, on ramps that mean nothing else here.
 
-   They were info-blue and accent-violet, one hue per mode. Neither hue meant
-   what it says elsewhere in this console — blue is information, violet is
-   "New / Beta / Recommended" — so the column was borrowing two semantic tones
-   to separate two categories that are neither. Two short, unmistakable phrases
-   do that on their own: "OS and version" against "Device attributes".
+   Both chips were drained to neutral, on the argument that the column was
+   borrowing two semantic tones — blue means information, violet means
+   "New / Beta / Recommended" — to separate two categories that are neither.
+   That objection was about WHICH hues, not about whether a taxonomy may carry
+   one, and the console's own pill rule says colour stays per family "since a
+   pill's tint is what it means".
 
-   The colour goes back to the budget. A profile's MODE is not a status and
-   never needs finding from across the page; what an admin scans this table for
-   is the name and what uses it. */
-.bfp2__modechip.is-info,
-.bfp2__modechip.is-accent {
-  background: var(--fb-neutral-bg); border-color: var(--fb-neutral-border); color: var(--fb-neutral-fg);
+   So the tints come back on `--fb-lime-*` and `--fb-magenta-*`, the two ramps
+   the feedback scale carries for categorical rather than graded meaning.
+   Neither is spoken for by a status anywhere in the product, so nothing has to
+   be un-learned to read them. Blue and violet stay where they are.
+
+   Still not a status: a profile's mode is a fact about what it reads, so these
+   are pale fills that separate two kinds at a glance without competing with the
+   name beside them. */
+.bfp2__modechip.is-info {
+  background: var(--fb-lime-bg); border-color: var(--fb-lime-border); color: var(--fb-lime-fg);
 }
-.bfp2__tnum { font-size: var(--fs-md); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.bfp2__modechip.is-accent {
+  background: var(--fb-magenta-bg); border-color: var(--fb-magenta-border); color: var(--fb-magenta-fg);
+}
+/* `.bfp2__tnum` stood here, for the `Attributes` cell in the list table. The
+   column is gone — a raw count with no unit and no threshold — so the rule that
+   set its digits in tabular figures went with it. */
 
 /* Row actions, matching the zones table. */
-.bfp2__menuwrap { position: relative; display: flex; justify-content: flex-end; }
+/* Centred under a centred header — see `.btable__actions` in screens.css. */
+.bfp2__menuwrap { position: relative; display: flex; justify-content: center; }
 .bfp2__kebab {
   display: grid; place-items: center; width: 26px; height: 26px;
   border-radius: var(--radius-sm); background: none; cursor: pointer;
@@ -497,10 +511,10 @@
 @media (max-width: 860px) {
   /* The kebab keeps its column here — it is the only way to delete from the
      list, so it is the last thing that should be dropped for width. */
-  .bfp2__trow { grid-template-columns: minmax(0, 1fr) 70px 32px; }
-  /* Indexed off the template above: Decides-by and Attributes go, the name,
-     Used-by and the kebab stay. */
-  .bfp2__trow > :nth-child(2), .bfp2__trow > :nth-child(3) { display: none; }}
+  .bfp2__trow { grid-template-columns: minmax(0, 1fr) 100px 64px; }
+  /* Indexed off the template above. Only Decides-by goes now — Attributes is
+     no longer a column, so the old rule was hiding Used-by instead. */
+  .bfp2__trow > :nth-child(2) { display: none; }}
 
 /* --- Used by ---------------------------------------------------------------
 
@@ -562,9 +576,40 @@
    "why is TPM ID missing" is a support ticket, and a greyed row is the answer. */
 
 
-.bfp2__roster { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
-.bfp2__roster strong { font-size: var(--fs-sm); color: var(--text-primary); }
-.bfp2__roster em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
+/* The uploaded roster, as a file card.
+
+   `.bfp2__roster` stood here: a right-aligned two-line stack, `strong` over
+   `em`, which is the same typography every other value in this form uses. It
+   was the one row holding an ARTEFACT rather than a setting and it read as a
+   setting, so you had to parse the filename to notice a file was there at all.
+
+   Boxed, so it is an object; tiled green with a spreadsheet mark, because that
+   is what tabular data has looked like on every desktop since Lotus and it is
+   recognised before the words are read. `--fb-positive-*` supplies the green —
+   the same token trio the console uses for its positive feedback, so this does
+   not introduce a colour, and the orange budget is untouched. */
+.bfp2__file {
+  display: flex; align-items: center; gap: 10px;
+  max-width: 340px; min-width: 0;
+  padding: 7px 7px 7px 9px;
+  background: var(--surface-inset);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.bfp2__file-ico {
+  flex: none; display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: var(--radius-sm);
+  background: var(--fb-positive-bg);
+  border: var(--bw-thin) solid var(--fb-positive-border);
+  color: var(--fb-positive-fg);
+}
+/* The elastic part, and the only part allowed to truncate — a roster exported
+   from an MDM is called something like `approved-devices-2026-09-01.csv`. */
+.bfp2__file-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.bfp2__file-body strong {
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bfp2__file-body em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* The name cell, which now carries the icon too. */
 .bfp2__tname { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -812,11 +857,18 @@
    fighting for one glance. */
 .bfp2__pickrows { display: flex; flex-direction: column; gap: 6px; }
 
+/* A row is two controls side by side: the toggle, which takes the width, and
+   the mark carrying the purpose sentence, which sits at the end in a column of
+   its own. They used to be nested — see the note in the TSX. */
 .bfp2__pickrow {
+  display: flex; align-items: flex-start; gap: 2px;
+  padding-right: 8px;
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
   transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
 }
+/* Vertically on the name's line, not on the top of the box. */
+.bfp2__pickrow > .bx-tip { flex: none; margin-top: 11px; }
 .bfp2__pickrow:hover { border-color: var(--border-strong); }
 /* Selected takes the CATEGORY's colour where there is one — the same tint as
    the rail icon and the group heading, so a search showing hits from four
@@ -862,46 +914,20 @@
   display: flex; align-items: center; gap: 7px; min-width: 0;
   font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
 }
-/* On the row, not on a `title`. The tip was right over thirty-eight rows in two
-   columns, where the sentences were a wall of prose in front of a choice made
-   from the names — but a `title` is unreachable by keyboard, and with the rail
-   showing one category at a time there is room for the line that says what the
-   attribute IS. */
-.bfp2__pickpurpose {
-  font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5;
-}
+/* `.bfp2__pickpurpose`, `.bfp2__pickvals` and the five `.bfp2__pickcfg` rules
+   stood here — the purpose sentence under each attribute name, and the settings
+   that unfolded when a row was ticked.
 
-/* The settings, revealed by ticking.
+   Both are gone from the picker, for the same reason. The panel's one job is
+   choosing WHICH attributes a profile collects; how each one is then tuned
+   belongs to the row on the details page, where the attribute is in the list it
+   is actually part of. Editing in both places meant two surfaces could disagree
+   about the same value, and the purpose sentence is on a mark now, where it
+   costs nothing until it is wanted.
 
-   Indented to sit under the NAME rather than under the tick — the controls
-   belong to the attribute, and a column that starts at the checkbox reads as a
-   second list rather than as this row's own detail. */
-/* 26px was the tick plus the attribute mark; the mark has gone, so the indent
-   is the tick alone. The settings still line up under the NAME rather than
-   under the checkbox — a column starting at the box reads as a second list. */
-.bfp2__pickvals {
-  display: flex; flex-direction: column; gap: 10px;
-  margin: 0 12px; padding: 11px 0 12px 26px;
-  border-top: 1px solid var(--border-subtle);
-}
-.bfp2__pickcfg { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.bfp2__pickcfg > span {
-  flex: none; width: 140px;
-  font-size: var(--fs-sm); color: var(--text-secondary);
-}
-/* Every control on these rows is the same width, and none of them is elastic.
-
-   The kit gives a bare `<select>` `width: 100%` at zero specificity, which is
-   right for a form column and wrong here: as a flex child it took the whole
-   remaining row, so "Match on" was a 380px dropdown holding the word "Subnet"
-   sitting under a 130px one holding "Medium". Two settings on one attribute
-   have to read as a pair. */
-.bfp2__pickcfg > :not(span) { flex: none; width: 200px; }
-.bfp2__pickcfg .bfp2__select { width: 200px; }
-/* The two-part controls size to their own halves — an operator glyph and a
-   typed version are not a 200px box between them. */
-.bfp2__pickcfg > .bfp2__expr,
-.bfp2__pickcfg > .bfp2__rule { width: auto; }
+   Deleted rather than left commented: a dead rule with a plausible name is a
+   trap for whoever next needs that name — this file has already been bitten
+   twice, and `.brs__cat` in risk-signals.css records the third. */
 
 /* What an agentless profile cannot have, named rather than counted.
 
@@ -1158,10 +1184,21 @@
 .bfp2__cardcount i { font-style: normal; color: var(--fb-notice-fg); }
 .bfp2__card > .bfp2__rows { padding: 0 var(--space-6); }
 .bfp2__card > .bx-empty { padding: var(--space-7) var(--space-6); }
-.bfp2__cardbody { padding: var(--space-6); }
+/* A stack with a gap, not a plain block.
+
+   It was `padding` only, and every child in it carried `margin: 0` — the two
+   reach cards, the "install the agent first" panel and the switch confirmation
+   sat edge to edge, so a bordered notice appeared welded to the bottom of the
+   fieldset above it. The gap is the card's, not each child's: whichever
+   combination of the three is rendered, the spacing between them is the same
+   one, and nothing has to remember to bring its own margin. */
+.bfp2__cardbody {
+  display: flex; flex-direction: column; gap: var(--space-5);
+  padding: var(--space-6);
+}
 /* The facts keep their own rhythm — flush rows with rules between them — so the
    body loses its vertical padding and the first rule lands on the header. */
-.bfp2__cardbody--facts { padding: 0 var(--space-6); }
+.bfp2__cardbody--facts { display: block; padding: 0 var(--space-6); }
 
 /* Two across, now that there is width for two.
 

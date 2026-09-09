@@ -79,6 +79,8 @@ export function NewPolicyDialog({
     return () => cancelAnimationFrame(id)
   }, [open])
 
+  /* Still read, for the line under the field — an optional question is
+     allowed to say what leaving it blank will do. */
   const noApp = appIds.length === 0
 
   return (
@@ -100,11 +102,21 @@ export function NewPolicyDialog({
 
               Nothing when the form is ready. The button is enabled; that is
               the message. */}
-          {(!name.trim() || noApp) && (
-            <p className="bnp__note">
-              {!name.trim() ? 'Give the policy a name to continue.' : 'Choose the application this policy protects.'}
-            </p>
-          )}
+          {/* Only the name blocks now.
+
+              Choosing an application used to be the second gate: the field was
+              starred, the picker went red while empty, and Create stayed
+              disabled until something was ticked. It is optional, and the model
+              already had the state it produces — `blankPolicy` mints a DRAFT,
+              and a policy with no application is exactly what a draft is. The
+              form was refusing to create a shape the product carries on
+              purpose, which is how the break-glass fixture is stored.
+
+              The consequence is also already handled everywhere it lands: the
+              policies table offers "Assign apps" on an unassigned row, and the
+              board's readiness gate says the rules are saved but never
+              evaluated. Neither of those needed a required field to work. */}
+          {!name.trim() && <p className="bnp__note">Give the policy a name to continue.</p>}
 
           {/* Cancel, from both callers.
 
@@ -141,7 +153,7 @@ export function NewPolicyDialog({
           <Button
             variant="brand"
             onClick={() => onCreate(blankPolicy(name.trim() || 'Untitled policy', appIds))}
-            disabled={!name.trim() || noApp}
+            disabled={!name.trim()}
           >
             Create policy
           </Button>
@@ -201,11 +213,18 @@ export function NewPolicyDialog({
           {/* Plural, and it is not cosmetic: the field takes several now, and a
               label reading "Application" over a control that accepts four is the
               form telling you it wants one. */}
-          <span className="bname2__label">Applications {!fixedAppId && <i>*</i>}</span>
+          {/* No asterisk. It is optional, and a required marker on a field
+              that does not block is the form contradicting its own button. */}
+          <span className="bname2__label">Applications</span>
           {fixedAppId ? (
             <ApplicationFixed appId={fixedAppId} />
           ) : (
             <ApplicationField appIds={appIds} onChange={setAppIds} />
+          )}
+          {noApp && !fixedAppId && (
+            <span className="bnp__optional">
+              Optional. Left blank it is created as a draft, and you can assign applications later.
+            </span>
           )}
         </div>
 

@@ -141,15 +141,26 @@
   transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
 .bshell__subitem:hover { background: rgba(0, 0, 0, 0.22); }
-/* The active sub-item is drawn the way the active parent is — a darker ground
-   and a full-strength label — rather than in orange text. The rail had three
-   separate orange signals in one column (the parent's edge, the badge, this),
-   and the edge is the one the console actually ships. */
-.bshell__subitem.is-active {
-  color: var(--shell-text);
-  background: var(--shell-item-active);
-  font-weight: 500;
-}
+/* Orange text, and nothing else.
+
+   This shipped as a darker ground with a full-strength label, on the argument
+   that the rail carried three separate orange signals in one column — the
+   parent's edge, the "New" badge, and this — and that the edge is the one the
+   console actually ships. The argument is sound and the treatment is reverted
+   anyway, at Surajit's instruction: the rest of the product marks a chosen
+   thing in orange text, and one column disagreeing is worse than the column
+   being over its own budget.
+
+   He named the cost himself when he asked for it, so it is recorded rather than
+   argued: the state is now carried by COLOUR ALONE. There is no weight change
+   and no ground behind it, which is a WCAG 1.4.1 failure and leaves the current
+   page unmarked for anyone who cannot separate the orange from the grey around
+   it. `aria-current="page"` is on the button, so assistive tech is told; a
+   sighted reader with low colour discrimination is not.
+
+   The cheapest fix when it comes back: keep the orange and add the weight. That
+   is one declaration and it makes the state legible without a ground. */
+.bshell__subitem.is-active { color: var(--brand); }
 
 /* Not the badge. "New" is an invitation and is filled with the brand; this is a
    caveat, so it is outlined and grey — the difference has to be legible at a

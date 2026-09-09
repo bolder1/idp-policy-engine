@@ -5,7 +5,7 @@ import { BookmarkPlus, Copy, Pencil, Plus, Trash2, Waypoints } from 'lucide-reac
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
 import { AppLogo } from '../logos/AppLogo'
-import { Badge, Button, Modal, StatusPill } from '../kit'
+import { Badge, Button, Modal, SearchBox, StatusPill } from '../kit'
 import { appsLabel, appsOf, blankPolicy, enforces, type Policy, type PolicyType } from '../data'
 import { NewPolicyDialog } from '../create/NewPolicyDialog'
 import { useBrand } from '../store'
@@ -325,65 +325,61 @@ export function Policies() {
           was reporting a fault class invented by the prototype, and the red dot
           it told you to hover was the same invention on the row. */}
       <div className="btoolbar">
-        {/* Both filters are dropdowns, and they sit together.
-
-            Type used to be a row of four chips while status was already a
-            select, so two controls doing the same job looked like two different
-            kinds of thing — and the chip row grew a line every time a policy
-            type was added. A select costs one row at any number of types. */}
-        <div className="btoolbar__filters">
-          <select
-            aria-label="Filter by policy type"
-            value={type}
-            onChange={(e) => setType(e.target.value as PolicyType | 'All')}
-            className={`btoolbar__select ${type !== 'All' ? 'is-set' : ''}`}
-          >
-            {TYPE_FILTERS.map((t) => (
-              <option key={t} value={t}>
-                {t === 'All' ? 'All types' : t}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Filter by status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as typeof status)}
-            className={`btoolbar__select ${status !== 'all' ? 'is-set' : ''}`}
-          >
-            <option value="all">All statuses</option>
-            <option value="draft">Draft</option>
-            <option value="active">Active</option>
-            <option value="monitor">Monitor</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          {/* Only appears once something is filtered — a permanent Clear that
-              clears nothing is just another thing to read. */}
-          {(type !== 'All' || status !== 'all') && (
-            <button
-              type="button"
-              className="btoolbar__clear"
-              onClick={() => {
-                setType('All')
-                setStatus('all')
-              }}
-            >
-              Clear filters
-            </button>
-          )}
-          <input
-            type="search"
-            placeholder="Search policies…"
-            aria-label="Search policies"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="btoolbar__search"
-          />
+        {/* Search left, filters right — the order zones already used, and now
+            the order every list screen uses. You type a name far more often
+            than you narrow a kind, so the control reached first sits where
+            reading starts; the controls that narrow sit with the count of what
+            survived, which is the thing they change. */}
+        <div className="btoolbar__left">
+          <SearchBox value={query} onChange={setQuery} placeholder="Search policies…" label="Search policies" />
         </div>
-        {/* Everything that narrows the list is on the left; the count of what
-            survived is on the right. Search used to be the right-hand group on
-            this page and the left-hand one on Applications, which is two pages
-            disagreeing about where you type. */}
         <div className="btoolbar__right">
+          {/* Both filters are dropdowns, and they sit together.
+
+              Type used to be a row of four chips while status was already a
+              select, so two controls doing the same job looked like two different
+              kinds of thing — and the chip row grew a line every time a policy
+              type was added. A select costs one row at any number of types. */}
+          <div className="btoolbar__filters">
+            <select
+              aria-label="Filter by policy type"
+              value={type}
+              onChange={(e) => setType(e.target.value as PolicyType | 'All')}
+              className={`btoolbar__select ${type !== 'All' ? 'is-set' : ''}`}
+            >
+              {TYPE_FILTERS.map((t) => (
+                <option key={t} value={t}>
+                  {t === 'All' ? 'All types' : t}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Filter by status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as typeof status)}
+              className={`btoolbar__select ${status !== 'all' ? 'is-set' : ''}`}
+            >
+              <option value="all">All statuses</option>
+              <option value="draft">Draft</option>
+              <option value="active">Active</option>
+              <option value="monitor">Monitor</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            {/* Only appears once something is filtered — a permanent Clear that
+                clears nothing is just another thing to read. */}
+            {(type !== 'All' || status !== 'all') && (
+              <button
+                type="button"
+                className="btoolbar__clear"
+                onClick={() => {
+                  setType('All')
+                  setStatus('all')
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
           <span className="btoolbar__count">
             {rows.length === counts.total
               ? `${counts.total} policies`
@@ -404,7 +400,7 @@ export function Policies() {
               {store.features.exposure && head('exposure', 'Exposure')}
               <th scope="col" className="btable__col-status">Status</th>
 
-              <th scope="col" className="btable__right btable__col-actions">Actions</th>
+              <th scope="col" className="btable__actions btable__col-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -559,7 +555,7 @@ function PolicyRow({
       <td>
         <StatusPill status={policy.status} />
       </td>
-      <td className="btable__right">
+      <td className="btable__actions">
         <div className="btable__menuwrap">
           <button type="button" className="btable__kebab" onClick={onMenu} aria-label={`Actions for ${policy.name}`} aria-expanded={menuOpen}>
             ⋯

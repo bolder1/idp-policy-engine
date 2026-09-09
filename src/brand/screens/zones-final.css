@@ -28,20 +28,14 @@
 /* --- Toolbar --------------------------------------------------------------------- */
 
 .bz7__toolbar { display: flex; align-items: center; gap: 10px; }
-.bz7__search {
-  flex: 1; max-width: 380px;
-  display: flex; align-items: center; gap: 8px;
-  height: var(--ctl-height-md); padding: 0 11px;
-  background: var(--ctl-bg);
-  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
-  color: var(--text-muted);
-}
-.bz7 .bz7__search input {
-  flex: 1; min-width: 0; height: auto; padding: 0;
-  background: none; border: 0; font-size: var(--fs-md); color: var(--text-primary);
-}
-.bz7 .bz7__search input:focus-visible { outline: none; }
-.bz7__search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
+/* `.bz7__search` stood here. It was the box this page grew for itself: a
+   magnifier inside a 380px field, stretching to fill the toolbar, while the
+   other three list screens ran a bare 260px input with no glyph. It was the
+   right design and the wrong place for it — so it became `SearchBox` in the
+   kit, and the other three moved onto it rather than this one being cut down.
+   The `.bz7 .bz7__search input` double-class that fought the kit's input base
+   went with it: `.bx-search input` clears the same rules at one class, because
+   the base is written at zero specificity for exactly that. */
 .bz7__count { margin-left: auto; font-size: var(--fs-sm); color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* .bviewswitch is padded 5px 13px for text labels. These are icons. */
@@ -122,13 +116,27 @@
    networks", "Corporate (private range)", "Germany" - are the solid ones now,
    which is the right way round for a column somebody scans to find a
    constraint. */
+/* Tinted again, and the dashed edge stays.
+
+   This has been both things. It was a filled `--fb-info-*` band, on the reading
+   that an empty section means MATCH ANY and is therefore the loudest fact on
+   the card rather than the quietest — the file header above still says so. It
+   was then drained to a dashed grey outline, on the reading that "any" is an
+   OPEN boundary while the values beside it are the constraints somebody scans
+   for.
+
+   Both readings are right about different halves, so it keeps both: the info
+   tint says WHICH state this is — the same one the linter grades it as, so the
+   colour is the linter's verdict rather than a second opinion — and the dashed
+   edge says the boundary is open where "6 networks" is closed. A fill AND a
+   dash, not a fill or a dash. */
 .bz7__any {
   flex: none; align-self: center;
   display: inline-flex; align-items: center;
   padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
   line-height: var(--pill-line);
-  background: none; border: var(--bw-thin) dashed var(--border-default);
-  font-size: var(--pill-fs); font-weight: var(--fw-regular); color: var(--text-tertiary);
+  background: var(--fb-info-bg); border: var(--bw-thin) dashed var(--fb-info-border);
+  font-size: var(--pill-fs); font-weight: var(--fw-regular); color: var(--fb-info-fg);
   white-space: nowrap;
 }
 /* Sized to its own words everywhere, including the row.
@@ -612,7 +620,9 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 
    Worth having at all because these actions used to require opening the zone
    first: deleting one you just created by mistake was a two-page job. */
-.bz7__menuwrap { position: relative; display: flex; justify-content: flex-end; }
+/* Centred under a centred header — see `.btable__actions` in screens.css for
+   why every actions column on the console now shares that axis. */
+.bz7__menuwrap { position: relative; display: flex; justify-content: center; }
 
 .bz7__kebab {
   display: grid; place-items: center;
@@ -707,7 +717,6 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 .bz7__dupnote svg { flex: none; margin-top: 2px; }
 
 /* The named last column. */
-.bz7__thactions { justify-self: end; }
 
 /* --- Two columns: the work, and what only describes it ------------------------
 

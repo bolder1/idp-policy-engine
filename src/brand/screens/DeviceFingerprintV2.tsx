@@ -13,6 +13,7 @@ import {
   Pencil,
   Cpu,
   Eye,
+  FileSpreadsheet,
   Fingerprint,
   Globe,
   Hash,
@@ -37,10 +38,11 @@ import {
   Smartphone,
   Trash2,
   Unlink,
+  Upload,
   UserRound,
 } from 'lucide-react'
 
-import { Button, Drawer, MenuButton, Modal, NumberStepper, SaveBar, Tabs, TipDot, Toggle } from '../kit'
+import { Button, Drawer, MenuButton, Modal, NumberStepper, SaveBar, SearchBox, Tabs, TipDot, Toggle } from '../kit'
 import { TierPick } from '../tier-pick'
 import {
   categoriesFor,
@@ -173,7 +175,6 @@ export function DeviceFingerprintV2() {
             store.updateFingerprint(p)
             store.showToast(`${p.name} saved`)
           }}
-          onDuplicate={(p) => duplicate(p, true)}
           onDelete={(p) => {
             remove(p)
             setOpenId(null)
@@ -224,6 +225,19 @@ function ProfileList({
     run()
   }
 
+  const [q, setQ] = useState('')
+  const [mode, setMode] = useState<ProfileMode | 'all'>('all')
+
+  /* Name only. The other columns are a kind, a count and a count — none of them
+     is something anybody types to find a row, and a search that silently
+     matched a mode would make "device" return every device-attributes profile
+     whether or not one is called that. */
+  const shown = profiles.filter((p) => {
+    if (mode !== 'all' && p.mode !== mode) return false
+    const n = q.trim().toLowerCase()
+    return !n || p.name.toLowerCase().includes(n)
+  })
+
   return (
     <>
       <header className="bfp2__head">
@@ -241,6 +255,58 @@ function ProfileList({
           </Button>
         )}
       </header>
+
+      {/* Search and one filter, on the same row, and no more than that.
+
+          The filter is `Decides by` because it is the only column with a closed
+          set of values — two — and because it is the one that changes what a row
+          MEANS: an OS profile states requirements, a device profile scores
+          signals, and somebody working on one kind rarely wants the other in
+          the way. Used by is a count, and a count filters badly; Attributes was
+          a number and is now not a column at all.
+
+          Hidden with the table. A search box over an empty state is a control
+          for filtering nothing. */}
+      {profiles.length > 0 && (
+        <div className="btoolbar">
+          {/* Search LEFT, filter right, which is the order zones already used
+              and the order the eye wants: you type a name far more often than
+              you narrow a kind, so the thing reached first sits where reading
+              starts. The policies table is swapped to match. */}
+          <div className="btoolbar__left">
+            <SearchBox value={q} onChange={setQ} placeholder="Search profiles…" label="Search device profiles" />
+          </div>
+          <div className="btoolbar__filters btoolbar__filters--end">
+            <select
+              aria-label="Filter by what the profile decides by"
+              value={mode}
+              onChange={(e) => setMode(e.target.value as ProfileMode | 'all')}
+              className={`btoolbar__select ${mode !== 'all' ? 'is-set' : ''}`}
+            >
+              <option value="all">All kinds</option>
+              {MODES.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            {/* Only once something is filtered — a permanent Clear that clears
+                nothing is one more thing to read. */}
+            {(mode !== 'all' || q.trim() !== '') && (
+              <button
+                type="button"
+                className="btoolbar__clear"
+                onClick={() => {
+                  setMode('all')
+                  setQ('')
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {profiles.length === 0 ? (
         <EmptyState
@@ -263,11 +329,20 @@ function ProfileList({
             <div className="bfp2__trow bfp2__thead" role="row">
               <span role="columnheader">Profile</span>
               <span role="columnheader">Decides by</span>
-              <span role="columnheader">Attributes</span>
+              {/* `Attributes` stood here — the raw length of `enabled`.
+
+                  A number with no unit and no threshold: six is not better or
+                  worse than two, it does not say whether the profile is
+                  finished, and nothing on this page acts on it. What the column
+                  cost is the width it took from the two that are read — the
+                  name, and what depends on it. */}
               <span role="columnheader">Used by</span>
-              <span role="columnheader" />
+              {/* Named, like every other table here. It was a blank cell, which
+                  leaves a screen reader announcing "column five" and a sighted
+                  reader guessing what the dots do until they press one. */}
+              <span role="columnheader" className="btable__center">Actions</span>
             </div>
-            {profiles.map((p) => {
+            {shown.map((p) => {
               const users = policiesUsing('fingerprint', p.id, policies)
               return (
               <div className="bfp2__trow" role="row" key={p.id}>
@@ -293,7 +368,6 @@ function ProfileList({
                       test, a chip that quietly stops saying anything. */}
                   <i className={`bfp2__modechip is-${MODE_META[p.mode].tint}`}>{modeLabel(p)}</i>
                 </span>
-                <span role="cell" className="bfp2__tnum">{p.enabled.length}</span>
                 {/* The count, and what is behind it — the same peek the zones
                     table and the policies table use. */}
                 <span role="cell">
@@ -428,16 +502,22 @@ const ATTR_ICON: Record<string, typeof Cpu> = {
 
 */
 
+/* `config`, `weights`, `onValue`, `onWeight` and `settings` were threaded
+   through here to reach the settings block under each ticked row.
+
+   That block is gone from both callers, so the whole chain went with it.
+   `settings` was already a flag for "off while creating, on once the profile
+   exists" — the answer is now "off everywhere", which is the flag having become
+   a constant, and a constant is not a prop.
+
+   Nothing is lost by not asking: an untouched attribute keeps the weight and
+   the precision the catalogue gives it. This step says WHAT is watched; the
+   profile's own attributes list says what each one is set to. */
 function AttrStep({
   mode,
   reach,
   picked,
   setPicked,
-  config,
-  weights,
-  onValue,
-  onWeight,
-  settings,
   onBack,
 }: {
   mode: ProfileMode
@@ -445,24 +525,6 @@ function AttrStep({
   reach: ProfileReach | null
   picked: string[]
   setPicked: (ids: string[]) => void
-  config: Record<string, AttrConfigValue>
-  weights: Record<string, number>
-  onValue: (id: string, v: AttrConfigValue) => void
-  onWeight: (id: string, w: number) => void
-  /* Whether a ticked row opens its settings underneath it.
-
-     Off while the profile is being CREATED, on once it exists. Choosing what a
-     profile watches and tuning what each signal is worth are two jobs, and the
-     wizard step was doing both: every tick unfolded a weight dropdown and a
-     configuration control, so a person picking eight attributes answered
-     sixteen questions they had not asked for, in a list that grew under them
-     as they worked.
-
-     The defaults are not lost by hiding them — an untouched attribute keeps the
-     weight and the precision the catalogue gives it, which is the same value
-     the wizard would have written. So the wizard says WHAT is watched, and the
-     profile's own Attributes panel says how much each one counts. */
-  settings: boolean
   /* Absent on the detail page, where there is no step to go back to. */
   onBack?: () => void
 }) {
@@ -495,18 +557,7 @@ function AttrStep({
     setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id])
 
   const row = (a: Attribute) => (
-    <AttrPickRow
-      key={a.id}
-      attr={a}
-      mode={mode}
-      on={a.always || picked.includes(a.id)}
-      config={config}
-      weights={weights}
-      settings={settings}
-      onToggle={() => toggle(a.id)}
-      onValue={onValue}
-      onWeight={onWeight}
-    />
+    <AttrPickRow key={a.id} attr={a} on={a.always || picked.includes(a.id)} onToggle={() => toggle(a.id)} />
   )
 
   /* --- The small catalogue: no bar at all -----------------------------------
@@ -690,27 +741,17 @@ function AttrStep({
    indistinguishable from "somebody chose exactly the default" — which is the
    distinction `restrictionSet` exists for one panel further down. It matters
    here too: `pruneValues` can then tell a real setting from a ghost. */
+/* Six props went with the settings block: `mode`, `config`, `weights`,
+   `settings`, `onValue` and `onWeight`. A row chooses; it does not configure,
+   so it needs the attribute, whether it is on, and a way to say otherwise. */
 function AttrPickRow({
   attr,
-  mode,
   on,
-  config,
-  weights,
-  settings,
   onToggle,
-  onValue,
-  onWeight,
 }: {
   attr: Attribute
-  mode: ProfileMode
   on: boolean
-  config: Record<string, AttrConfigValue>
-  weights: Record<string, number>
-  /** See `AttrStep`: off while creating, on once the profile exists. */
-  settings: boolean
   onToggle: () => void
-  onValue: (id: string, v: AttrConfigValue) => void
-  onWeight: (id: string, w: number) => void
 }) {
   /* An always-collected row is ticked and cannot be untucked, so the toggle is
      a disabled button rather than a live one with a handler that refuses.
@@ -758,47 +799,58 @@ function AttrPickRow({
                 learning it afterwards is learning it too late. */}
             {attr.phase === 2 && <i className="bfp2__soon">Not collected yet</i>}
           </span>
-          {/* On the row, not on a `title` tip. The tip was right when the pane
-              held thirty-eight rows in two columns and the sentences were a
-              wall of prose in front of a choice made from the names — but a
-              `title` is unreachable by keyboard, and with the rail showing one
-              category at a time there is room for the line that says what the
-              attribute IS. */}
-          <span className="bfp2__pickpurpose">{attr.purpose}</span>
+          {/* On a mark, not under the name — and only where the sentence adds
+              something the name does not.
+
+              This was a full line of prose under every row. Thirteen rows each
+              carrying two lines meant the list was mostly sentences, and the
+              sentences are the part you read once: "Device type — desktop,
+              laptop, mobile or tablet" tells somebody who has read the name
+              almost nothing, so it doubled the height of the list to restate
+              it. Scanning thirteen names is the job here; understanding one is
+              the exception.
+
+              `TipDot` rather than a `title`, because the old objection to a tip
+              was that `title` is unreachable by keyboard. This one is a real
+              button — hover, focus and the accessible name all reach it — so
+              the sentence is still there for anybody who wants it, and gone for
+              everybody who does not.
+
+              On every row that has a purpose, which in both catalogues is all
+              of them — a rule that withheld the mark where the sentence merely
+              restates the name was drafted here and cut, because no row is
+              actually in that state: every purpose carries a risk framing the
+              name does not ("a laptop and a phone are not the same risk"). A
+              heuristic that never fires is a heuristic to maintain for nothing.
+              The "only where needed" is done by the tip being on demand rather
+              than on screen. */}
         </span>
       </button>
 
-      {on && settings && (
-        <div className="bfp2__pickvals">
-          {/* Both, on a device row, and they are not the same question.
+      {/* Outside the toggle, not inside it.
 
-              The page argued for years that showing a weight AND a
-              configuration meant one of them was inert, and that argument was
-              right about the OS catalogue's configs — "at least Windows 10" is
-              a CONDITION, and a score has no conditions. It is wrong about the
-              device catalogue's, which are all precision: "Match on: Family
-              only" decides whether a Chrome update counts as a change at all.
-              One says whether something changed, the other says what that
-              costs. The one genuine duplicate — `device-type`'s "Treat a change
-              as" — is deleted from the catalogue rather than hidden here. */}
-          {mode === 'device' && (
-            <div className="bfp2__pickcfg">
-              <span>How much it counts</span>
-              <TierPick
-                value={tierOf(weights[attr.id] ?? attr.weight)}
-                label={`${attr.name} weight`}
-                onChange={(t) => onWeight(attr.id, TIER_WEIGHT[t])}
-              />
-            </div>
-          )}
-          {attr.config && (
-            <div className="bfp2__pickcfg">
-              <span>{attr.config.label}</span>
-              <AttrControl attr={attr} values={config} onChange={onValue} />
-            </div>
-          )}
-        </div>
-      )}
+          `TipDot` renders a real button, and it was sitting in the middle of
+          the toggle button — a nested `<button>`, which is invalid HTML that
+          React reports as a hydration error, and which meant a press on the
+          mark ticked the attribute as well as opening the tip. The row is a
+          flex row now: the toggle takes the width, the mark sits at the end,
+          and the two controls are two controls. */}
+      <TipDot label={attr.name} text={attr.purpose} />
+
+      {/* The settings block stood here — a weight and a configuration under
+          every ticked row.
+
+          This picker CHOOSES; the page behind it configures. Two surfaces
+          editing one setting meant the same dropdown existed twice, and the
+          dialog copy had to be reconciled with the row copy every time either
+          moved. Ticking thirteen attributes with a dropdown unfolding under
+          each one also made the list grow as you used it, which is the opposite
+          of what a chooser should do — the thing you are scanning gets longer
+          the more of it you have answered.
+
+          So a row is a tick, a name and a mark. Everything a chosen attribute
+          is SET to is on the profile page, where the list is short because it
+          holds only what was chosen. */}
     </div>
   )
 }
@@ -1268,11 +1320,6 @@ function CreateDrawer({
             reach={reach}
             picked={picked}
             setPicked={setPicked}
-            config={config}
-            weights={weights}
-            onValue={(id, v) => setConfig((c) => ({ ...c, [id]: v }))}
-            onWeight={(id, w) => setWeights((c) => ({ ...c, [id]: w }))}
-            settings={false}
             onBack={asksReach(mode) ? () => setAt(1) : undefined}
           />
         </section>
@@ -1333,19 +1380,20 @@ const ENROLMENT_KEYS = ['registration', 'autoRegister', 'maxDevices', 'roster'] 
 const enrolmentAnswered = (before: FingerprintProfile, after: FingerprintProfile) =>
   ENROLMENT_KEYS.some((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]))
 
+/* `onDuplicate` went with the header button. Duplicating is a list gesture —
+   you do it while comparing, and possibly twice — so it lives in the row menu,
+   where doing it again is a click rather than a navigation. */
 function ProfilePage({
   profile,
   policies,
   onBack,
   onChange,
-  onDuplicate,
   onDelete,
 }: {
   profile: FingerprintProfile
   policies: Policy[]
   onBack: () => void
   onChange: (p: FingerprintProfile) => void
-  onDuplicate: (p: FingerprintProfile) => void
   onDelete: (p: FingerprintProfile) => void
 }) {
   const [tab, setTab] = useState<ProfileTab>('basic')
@@ -1420,19 +1468,34 @@ function ProfilePage({
           <EditableName value={draft.name} onChange={(name) => setDraft((d) => ({ ...d, name }))} />
         </div>
 
-        {/* The whole of C, R, U and D, in the order they are reached.
+        {/* The same two the zone page carries, in the same order and the same
+            treatment — which is the whole reason for this shape.
 
-            Update is the page itself now, so what is left up here is everything
-            that acts on the profile as a WHOLE — read it out, copy it, destroy
-            it. Duplicate and Delete were on the list only, which meant the one
-            screen showing you enough to decide whether a profile was worth
-            keeping was the one screen that could not act on the answer. */}
+            It briefly held Duplicate as well. Duplicating is a LIST gesture:
+            you do it while comparing profiles, and you may do it twice, so it
+            belongs in the row menu where it already lives and where doing it
+            again is one click rather than a navigation. Inside a profile the
+            two questions worth a header button are "what depends on this" and
+            "get rid of it".
+
+            Delete is `danger`, unlike everything else here. The kit reserves red
+            for the confirming control inside a destructive dialog, on the
+            grounds that a trigger only opens one — but this is the one action on
+            this header that destroys something policy rules may be pointing at,
+            and looking identical to Used by beside it is the wrong kind of
+            quiet. The zone page made the same call for the same reason. */}
         <div className="bfp2__headacts">
-          <Button variant="secondary" size="sm" onClick={() => onDuplicate(draft)}>
-            <Copy size={14} strokeWidth={1.9} aria-hidden />
-            Duplicate
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowUses(true)}
+            disabled={users.length === 0}
+          >
+            <Link2 size={14} strokeWidth={1.9} aria-hidden />
+            Used by
+            <i className="buse__count">{users.length}</i>
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => setDeleting(true)}>
+          <Button variant="danger" size="sm" onClick={() => setDeleting(true)}>
             <Trash2 size={14} strokeWidth={1.9} aria-hidden />
             Delete
           </Button>
@@ -1529,13 +1592,10 @@ function ProfilePage({
             </p>
           )}
 
-          <div className="bfp2__osuses">
-            <Button variant="secondary" size="sm" onClick={() => setShowUses(true)} disabled={users.length === 0}>
-              <Link2 size={14} strokeWidth={1.9} aria-hidden />
-              Used by
-              <i className="buse__count">{users.length}</i>
-            </Button>
-          </div>
+          {/* "Used by" stood here too, added when this surface was the only one
+              without it. The header carries it for BOTH shapes now, so a second
+              copy at the foot of one of them would be two doors into one
+              drawer. */}
         </div>
       )}
 
@@ -1930,7 +1990,7 @@ function AttributesTab({
             be the wrong promise. */}
         <Button variant="secondary" size="sm" onClick={onAdd}>
           <Pencil size={13} strokeWidth={2} aria-hidden />
-          Add or remove
+          Manage attributes
         </Button>
       </header>
 
@@ -1978,22 +2038,37 @@ function AttributesTab({
                   </span>
                 </div>
 
-                {/* Both controls on a device row, where there are two to show.
-                    One says whether something changed; the other says what that
-                    costs. */}
+                {/* ONE control per row, and which one depends on the kind of
+                    profile rather than on what the attribute happens to carry.
+
+                    A device row showed a weight AND a per-attribute config —
+                    "How much it counts: Medium" beside "Match on: Major
+                    version" — on the argument that they answer different
+                    questions: one says whether something changed, the other
+                    says what that costs. True, and it still put two dropdowns on
+                    every row of a sixteen-row list to express one decision
+                    anybody actually makes, which is how much a signal is worth.
+
+                    A risk profile is a weighting. That is the whole of what it
+                    is for, so a device row is its weight and nothing else. The
+                    match precision the config carried keeps its stored value and
+                    its default; what has gone is a control for it on this row.
+
+                    An OS row is the other way round: it has no weight — a
+                    requirement is not scored — so the config IS the row, and for
+                    the version attributes that config is the floor dropdown. */}
                 <div className="bfp2__attctl">
-                  {draft.mode === 'device' && (
+                  {draft.mode === 'device' ? (
                     <TierPick
                       value={tierOf(draft.weights[a.id] ?? a.weight)}
                       label={`${a.name} weight`}
                       onChange={(t) => onWeight(a.id, TIER_WEIGHT[t])}
                     />
-                  )}
-                  {a.config ? (
+                  ) : a.config ? (
                     <AttrControl attr={a} values={draft.config} onChange={onConfig} />
-                  ) : draft.mode === 'os' ? (
+                  ) : (
                     <span className="bfp2__nocfg">Nothing to tune</span>
-                  ) : null}
+                  )}
                 </div>
 
                 <button
@@ -2520,14 +2595,37 @@ function EnrolmentFields({
             help="A CSV of device name, user email and MAC address."
           >
             {roster ? (
-              <span className="bfp2__roster">
-                <strong>{roster.fileName}</strong>
-                <em>
-                  {roster.rows} devices · {roster.uploadedAt}
-                </em>
+              /* A file, drawn as a file.
+
+                 It was two lines of right-aligned text — a bolded name over a
+                 grey count — which is the same shape as every other value in
+                 this form. The one row on the page that is not a setting but a
+                 THING somebody uploaded looked like a setting, so the answer to
+                 "is the roster in?" was a sentence to read rather than an
+                 object to recognise. The tile is the recognisable part: a
+                 spreadsheet mark on the green sheet software has used for
+                 tabular data since Lotus, and the extension under the name for
+                 the case where the file is called `export`. */
+              <span className="bfp2__file">
+                <span className="bfp2__file-ico" aria-hidden>
+                  <FileSpreadsheet size={17} strokeWidth={1.8} />
+                </span>
+                <span className="bfp2__file-body">
+                  <strong title={roster.fileName}>{roster.fileName}</strong>
+                  <em>
+                    {roster.rows} devices · {roster.uploadedAt}
+                  </em>
+                </span>
+                {/* Replace, not Upload. The row already has a file, and a
+                    second `Upload CSV` beside one would not say which of the
+                    two survives. */}
+                <Button variant="ghost" size="sm">
+                  Replace
+                </Button>
               </span>
             ) : (
               <Button variant="secondary" size="sm">
+                <Upload size={14} strokeWidth={1.9} aria-hidden />
                 Upload CSV
               </Button>
             )}
@@ -2659,17 +2757,7 @@ function AttributesDrawer({
         </>
       }
     >
-      <AttrStep
-        mode={profile.mode}
-        reach={profile.reach}
-        picked={picked}
-        setPicked={setPicked}
-        config={config}
-        weights={weights}
-        onValue={(id, v) => setConfig((c) => ({ ...c, [id]: v }))}
-        onWeight={(id, w) => setWeights((c) => ({ ...c, [id]: w }))}
-        settings
-      />
+      <AttrStep mode={profile.mode} reach={profile.reach} picked={picked} setPicked={setPicked} />
     </Drawer>
   )
 }

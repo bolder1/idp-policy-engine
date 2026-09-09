@@ -15,7 +15,6 @@ import {
   Plus,
   Puzzle,
   Route,
-  Search,
   Server,
   ShieldOff,
   Smartphone,
@@ -27,7 +26,7 @@ import {
 } from 'lucide-react'
 
 import { PageHead } from '../Shell'
-import { Badge, Button, MenuButton, Modal, SaveBar, TipMark, Toggle } from '../kit'
+import { Badge, Button, MenuButton, Modal, SaveBar, SearchBox, TipMark, Toggle } from '../kit'
 import { Picker } from '../picker'
 import { TierPick } from '../tier-pick'
 import { PlatformMark } from '../logos/PlatformMark'
@@ -268,7 +267,7 @@ function RiskProfileList({
               <th>Profile</th>
               <th>Listening to</th>
               <th>Scores High at</th>
-              <th className="btable__right">Actions</th>
+              <th scope="col" className="btable__actions btable__col-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -297,7 +296,7 @@ function RiskProfileList({
                   {/* Tabular, because the whole point of the column is comparing
                       it down the table. */}
                   <td className="brs__listscore">{scale.High}</td>
-                  <td className="btable__right" onClick={(e) => e.stopPropagation()}>
+                  <td className="btable__actions" onClick={(e) => e.stopPropagation()}>
                     <MenuButton
                       iconOnly
                       size="sm"
@@ -545,28 +544,25 @@ function RiskProfileDetail({
       </div>
 
       <div className="btoolbar">
-        <label className="brs__search">
-          <Search size={14} strokeWidth={2} aria-hidden />
-          <input
-            type="search"
-            value={q}
-            placeholder="Search signals…"
-            aria-label="Search risk signals"
-            onChange={(e) => setQ(e.target.value)}
+        <SearchBox value={q} onChange={setQ} placeholder="Search signals…" label="Search risk signals" />
+        {/* Pushed to the right edge, with the filters on every other list
+            screen. It used to sit against the search box, which read as one
+            two-part control rather than a thing you type and a thing you
+            narrow. */}
+        <div className="btoolbar__right">
+          <Picker
+            label="Filter by category"
+            value={cat}
+            options={[
+              { value: ALL, label: 'All categories', meta: `${RISK_SIGNALS.length} signals` },
+              ...SIGNAL_CATEGORIES.map((c) => {
+                const n = RISK_SIGNALS.filter((s) => s.category === c).length
+                return { value: c, label: c, meta: `${n} signal${n === 1 ? '' : 's'}` }
+              }),
+            ]}
+            onChange={setCat}
           />
-        </label>
-        <Picker
-          label="Filter by category"
-          value={cat}
-          options={[
-            { value: ALL, label: 'All categories', meta: `${RISK_SIGNALS.length} signals` },
-            ...SIGNAL_CATEGORIES.map((c) => {
-              const n = RISK_SIGNALS.filter((s) => s.category === c).length
-              return { value: c, label: c, meta: `${n} signal${n === 1 ? '' : 's'}` }
-            }),
-          ]}
-          onChange={setCat}
-        />
+        </div>
       </div>
 
       {/* The caveat belongs HERE as well as on the list, and this is the half

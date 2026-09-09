@@ -22,7 +22,7 @@
 .bapl__search { width: 340px; max-width: 100%; }
 
 .bapl__viewswitch button:disabled {
-  opacity: 0.42;
+  opacity: var(--disabled-opacity)2;
   cursor: not-allowed;
 }
 
@@ -51,7 +51,7 @@
 /* Disabled at both ends rather than hidden. Ten applications fit on one page,
    so this is the resting state — and a pager that vanishes when it cannot page
    makes the footer jump the moment a search narrows the list. */
-.bapl__pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+.bapl__pager button:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
 
 /* The Protection cell. A dot, a count, and the shortfall when there is one —
    the dot carries whether anything is outstanding, because a cell that reads
@@ -60,7 +60,7 @@
 .bapl__prot {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4);
   padding: 2px 0;
   background: none;
   border: 0;
@@ -71,18 +71,38 @@
   text-align: left;
 }
 .bapl__prot:hover { color: var(--text-link); }
-.bapl__prot:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--brand-subtle-bg); border-radius: var(--radius-sm); }
-.bapl__prot i {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--fb-neutral-fg);
+.bapl__prot:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
+/* No dot in front of the count.
+
+   Ten rows of green circle saying "this one is fine" is ten marks spent on the
+   answer nobody scans a protection column for. What somebody scans for is the
+   row that ISN'T fine, and the dot gave that row exactly the same amount of
+   drawing as the nine above it.
+
+   So the ordinary case is a plain count — text, no mark, no colour — and only
+   the two states worth stopping on are drawn: an app with no policy on it at
+   all, and one whose policies do not all decide. Both take the pill family, so
+   they read as the same kind of object as every other tag in the console. */
+.bapl__prot.is-off span,
+.bapl__prot.is-part em {
+  padding: var(--pill-py) var(--pill-px);
+  border-radius: var(--pill-radius);
+  line-height: var(--pill-line);
+  font-size: var(--pill-fs);
+  font-weight: var(--pill-fw);
+  border: var(--bw-thin) solid transparent;
+  white-space: nowrap;
 }
-.bapl__prot.is-on i { background: var(--fb-positive-fg); }
-.bapl__prot.is-part i { background: var(--fb-notice-fg); }
-.bapl__prot.is-off i { background: var(--text-muted); }
-.bapl__prot.is-off span { color: var(--text-muted); }
+.bapl__prot.is-off span {
+  background: var(--fb-notice-bg);
+  border-color: var(--fb-notice-border);
+  color: var(--fb-notice-fg);
+}
+.bapl__prot.is-part em {
+  background: var(--fb-neutral-bg);
+  border-color: var(--fb-neutral-border);
+  color: var(--fb-neutral-fg);
+}
 .bapl__prot em {
   font-style: normal;
   font-size: var(--fs-xs);
@@ -185,7 +205,7 @@
    list rather than only in a toast that is already fading. */
 .bapr__row.is-new { animation: bapr-land 900ms var(--ease-standard); }
 @keyframes bapr-land {
-  from { background: var(--brand-subtle-bg); border-color: var(--brand); }
+  from { background: var(--accent-soft); border-color: var(--accent); }
   to { background: var(--surface-raised); border-color: var(--border-subtle); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -220,9 +240,9 @@
   cursor: pointer;
 }
 .bapr__choice:hover { border-color: var(--border-strong); }
-.bapr__choice.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
-.bapr__choice.is-disabled { opacity: 0.6; cursor: not-allowed; }
-.bapr__choice input { grid-row: 1 / span 2; accent-color: var(--brand); }
+.bapr__choice.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.bapr__choice.is-disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
+.bapr__choice input { grid-row: 1 / span 2; accent-color: var(--accent); }
 .bapr__choicename { font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-primary); }
 .bapr__choicehint { font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
 

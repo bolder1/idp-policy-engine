@@ -9,7 +9,16 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Minus, Plus, type LucideIcon } from 'lucide-react'
+import {
+  AlertOctagon,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  Info,
+  Minus,
+  Plus,
+  type LucideIcon,
+} from 'lucide-react'
 
 import type { AccessDecision, PolicyStatus } from './data'
 
@@ -350,12 +359,10 @@ export function DecisionChip({
 }) {
   const tone = decision === 'deny' ? 'negative' : decision === '2fa' ? 'notice' : 'positive'
   const label = decision === 'deny' ? 'Deny' : decision === '2fa' ? 'MFA' : 'Allow'
-  return (
-    <span className={`bx-decision bx-decision--${tone} bx-decision--${size}`}>
-      <i />
-      {label}
-    </span>
-  )
+  /* No dot. The chip is already tinted, bordered and named — see the note on
+     `.bx-decision` in kit.css for why a fourth signal was removed rather than
+     kept. */
+  return <span className={`bx-decision bx-decision--${tone} bx-decision--${size}`}>{label}</span>
 }
 
 export function StatusPill({ status }: { status: PolicyStatus }) {
@@ -377,7 +384,6 @@ export function StatusPill({ status }: { status: PolicyStatus }) {
   if (status === 'monitor')
     return (
       <span className="bx-status bx-status--monitor" title="Evaluates every sign-in and records what it would have done. Enforces nothing.">
-        <i />
         Monitor
       </span>
     )
@@ -586,6 +592,18 @@ export function Field({
   )
 }
 
+const CALLOUT_ICON = {
+  info: Info,
+  notice: AlertTriangle,
+  negative: AlertOctagon,
+  positive: CheckCircle2,
+} as const
+
+function CalloutIcon({ tone }: { tone: keyof typeof CALLOUT_ICON }) {
+  const Icon = CALLOUT_ICON[tone]
+  return <Icon className="bx-callout__mark" size={16} strokeWidth={2} aria-hidden />
+}
+
 export function Callout({
   tone = 'info',
   title,
@@ -597,7 +615,11 @@ export function Callout({
 }) {
   return (
     <div className={`bx-callout bx-callout--${tone}`}>
-      <span className="bx-callout__mark" aria-hidden />
+      {/* An icon, not a coloured dot. The dot repeated what the tint and the
+          border already said and carried nothing of its own; a mark that
+          differs per tone is the one part of a callout you can read before you
+          read the sentence. */}
+      <CalloutIcon tone={tone} />
       <div>
         {title && <strong>{title}</strong>}
         <div>{children}</div>
@@ -1067,9 +1089,17 @@ export function TipMark({ text }: { text: ReactNode }) {
   )
 }
 
-/** Small "why" affordance — the current prototype shows bare red dots. */
+/* The "something is wrong with this row" mark.
+
+   It was a 8px coloured circle and nothing else — a dot with no label, which is
+   the one thing COMPONENTS.md rules out, and the banner above the table had to
+   spend a sentence telling people to hover it. A shape carries the meaning
+   instead: the same triangle the notice callout uses, so a warning looks like a
+   warning wherever it appears, and an octagon where it is worse than that. The
+   sentence is on hover, on focus, and in the accessible name. */
 export function InfoDot({ text, tone = 'notice' }: { text: string; tone?: 'notice' | 'negative' }) {
   const [open, setOpen] = useState(false)
+  const Mark = tone === 'negative' ? AlertOctagon : AlertTriangle
   return (
     <span className="bx-infodot-wrap">
       <button
@@ -1080,7 +1110,9 @@ export function InfoDot({ text, tone = 'notice' }: { text: string; tone?: 'notic
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-      />
+      >
+        <Mark size={14} strokeWidth={2} aria-hidden />
+      </button>
       <AnimatePresence>
         {open && (
           <motion.span

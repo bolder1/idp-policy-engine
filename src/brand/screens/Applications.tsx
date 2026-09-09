@@ -90,7 +90,11 @@ export function Applications() {
   const head = (key: SortKey, label: string) => {
     const on = sort.key === key
     return (
-      <th className={on ? 'is-sorted' : ''}>
+      <th
+        className={on ? 'is-sorted' : ''}
+        scope="col"
+        aria-sort={on ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}
+      >
         <button
           type="button"
           className={`btable__sort ${on ? 'is-on' : ''}`}
@@ -113,8 +117,13 @@ export function Applications() {
     <div className="bpage bapl" onClick={() => setMenuFor(null)}>
       <PageHead
         title="Applications"
-        caption="Every application connected to this tenant, and what decides a sign-in to it."
+        caption="Every application connected to this tenant."
         actions={
+          <>
+          <Button variant="brand" onClick={() => store.showToast('Adding an application is outside this revamp')}>
+            <Plus size={15} strokeWidth={2.2} aria-hidden />
+            Add application
+          </Button>
           <div className="bviewswitch bapl__viewswitch" role="tablist" aria-label="Application view">
             <button role="tab" aria-selected className="is-on" aria-label="Table view">
               <Table2 size={15} strokeWidth={1.9} aria-hidden />
@@ -144,17 +153,25 @@ export function Applications() {
               <LayoutGrid size={15} strokeWidth={1.9} aria-hidden />
             </button>
           </div>
+          </>
         }
       />
 
-      {/* Search left, button right — the live page's arrangement, which is the
-          reverse of the policies table's. Kept as it is rather than normalised,
-          because this page is being reproduced rather than redesigned. */}
+      {/* One toolbar shape on every list screen: what narrows the list on the
+          left, what counts or reframes it on the right, and the primary action
+          in the page head with the title it belongs to.
+
+          This page had the primary button down here instead, on the argument
+          that the live console puts it there. It does — and the cost was that
+          "Add Application" and "New policy" sat at two different heights on two
+          pages one nav click apart, so the one control an admin reaches for
+          most had no fixed home. Fidelity to a single screen is worth less than
+          the console agreeing with itself. */}
       <div className="btoolbar">
         <div className="btoolbar__filters">
           <input
             type="search"
-            placeholder="Search Application"
+            placeholder="Search applications…"
             aria-label="Search applications"
             value={query}
             onChange={(e) => {
@@ -165,10 +182,7 @@ export function Applications() {
           />
         </div>
         <div className="btoolbar__right">
-          <Button variant="brand" onClick={() => store.showToast('Adding an application is outside this revamp')}>
-            <Plus size={15} strokeWidth={2.2} aria-hidden />
-            Add Application
-          </Button>
+          <span className="btoolbar__count">{total === 1 ? '1 application' : `${total} applications`}</span>
         </div>
       </div>
 
@@ -181,7 +195,7 @@ export function Applications() {
                 {head('type', 'App Type')}
                 {head('protection', 'Protection')}
                 {head('updated', 'Last Updated')}
-                <th className="btable__right">Actions</th>
+                <th scope="col" className="btable__right btable__col-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -297,7 +311,13 @@ function AppRow({
       <td>
         <ProtectionCell app={app} summary={summary} onOpen={onOpen} />
       </td>
-      <td className="u-muted">{app.lastUpdated}</td>
+      {/* Without the seconds. "Sep 02, 2026, 09:30:11" is eleven characters of
+          precision nobody reads on a list, and it made Last Updated the widest
+          column on the table — wide enough to push Actions off the edge at
+          1280px. The full stamp is on hover. */}
+      <td className="u-muted" title={app.lastUpdated}>
+        {app.lastUpdated.replace(/:\d\d$/, '')}
+      </td>
       <td className="btable__right">
         <div className="btable__menuwrap">
           <button
@@ -366,7 +386,6 @@ function ProtectionCell({ app, summary, onOpen }: { app: App; summary: AppSummar
       title={summary.title}
       aria-label={`${summary.label}${summary.tag ? `, ${summary.tag}` : ''} — open protection for ${app.name}`}
     >
-      <i aria-hidden />
       <span>{summary.label}</span>
       {summary.tag && <em>{summary.tag}</em>}
     </button>

@@ -10,6 +10,19 @@
 export interface LogoSource {
   /** Matches the app id used everywhere else in the app data. */
   id: string
+  /**
+   * Other ids in `data.ts` that mean the same product.
+   *
+   * The catalogue and this registry were written at different times and do not
+   * always agree on a name: the registry calls it `google`, the app list calls
+   * it `google-workspace`, and the consequence was silent — `AppLogo` found no
+   * entry, fell through to the monogram, and Google Workspace showed two grey
+   * letters on eleven rows while its logo sat unused in `public/logos`.
+   *
+   * An alias fixes it without renaming the fetched file or invalidating the
+   * generated manifest, both of which are keyed on `id`.
+   */
+  aliases?: string[]
   name: string
   /** Canonical domain. Logo providers key off this. */
   domain: string
@@ -30,7 +43,7 @@ export const LOGO_SOURCES: LogoSource[] = [
   { id: 'box', name: 'Box', domain: 'box.com', fallbackTint: '#0061d5', fallbackMonogram: 'BX' },
   { id: 'servicenow', name: 'ServiceNow', domain: 'servicenow.com', fallbackTint: '#62d84e', fallbackMonogram: 'SN' },
   { id: 'okta', name: 'Okta', domain: 'okta.com', fallbackTint: '#007dc1', fallbackMonogram: 'OK' },
-  { id: 'google', name: 'Google Workspace', domain: 'google.com', fallbackTint: '#4285f4', fallbackMonogram: 'GW' },
+  { id: 'google', name: 'Google Workspace', domain: 'google.com', fallbackTint: '#4285f4', fallbackMonogram: 'GW', aliases: ['google-workspace'] },
   { id: 'dropbox', name: 'Dropbox', domain: 'dropbox.com', fallbackTint: '#0061ff', fallbackMonogram: 'DB' },
   { id: 'zendesk', name: 'Zendesk', domain: 'zendesk.com', fallbackTint: '#03363d', fallbackMonogram: 'ZD' },
   { id: 'confluence', name: 'Confluence', domain: 'atlassian.com', fallbackTint: '#1868db', fallbackMonogram: 'CF' },

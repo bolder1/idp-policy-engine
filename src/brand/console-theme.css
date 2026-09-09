@@ -48,11 +48,31 @@
   --border-default: #d3dae1;
   --border-strong: #adb5bd;
 
+  /* --- The grey ramp, all of it readable --------------------------------------
+
+     Measured against WCAG 1.4.3, which asks 4.5:1 of any text a person is
+     expected to read:
+
+       secondary  #495057  8.18 on white   pass
+       tertiary   #6c757d  4.69 on white,  4.14 on the inset grey   FAILS there
+       muted      #868e96  3.32 on white,  2.93 on inset            FAILS both
+
+     Muted is not a rare token. It is on 223 declarations: placeholders, hints,
+     units, counts, the dash that stands for "no value", the caption under a
+     card title. None of that is decorative — every one of them is a word
+     somebody has to read to use the page, and at 3.3:1 they are the words that
+     disappear first on a laptop screen in an office.
+
+     Both are darkened until they clear 4.5:1 on all three light surfaces —
+     white, sunken and inset — since a token that is only legible on one of them
+     is a trap for whoever next puts a caption on a tile. The step between
+     tertiary and muted survives: muted is still visibly the lighter of the two,
+     which is all the hierarchy it was ever carrying. */
   --text-primary: #212529;
   --text-body: #212529;
   --text-secondary: #495057;
-  --text-tertiary: #6c757d;
-  --text-muted: #868e96;
+  --text-tertiary: #5a6570;
+  --text-muted: #646e79;
   --text-inverse: #ffffff;
   --text-link: #0f6ba4;
 
@@ -60,6 +80,15 @@
   --brand: #eb5424;
   --brand-hover: #d64c21;
   --brand-active: #a73c1a;
+  /* Brand orange with white type on it is 3.6:1 — under 4.5:1, so any LABEL set
+     in white on the brand fill fails. The primary button is exempt: it is a
+     button, and buttons are judged as UI components at 3:1. A "New" pill is
+     not, it is text.
+
+     This is the one shade of brand that carries white type at 5.1:1 while still
+     reading as the same orange from across a page. It is for filled brand
+     surfaces with words on them, and nothing else. */
+  --brand-on-fill: #c2431c;
   --brand-subtle-bg: #fdeee9;
   --brand-subtle-border: #f9cabb;
 
@@ -130,8 +159,111 @@
   --fb-magenta-fg: #8b1f81;
   --fb-magenta-dot: #b52aa8;
 
-  --focus-ring: #263746;
-  --focus-ring-danger: #dc3545;
+  /* --- 60 / 30 / 10 -------------------------------------------------------
+
+     Sixty is the white page and the white card. Thirty is the ink and the
+     greys — type, rules, the dark rail, every fill that is not a surface. Ten
+     is brand orange, and it is a budget rather than a palette entry: once it is
+     spent, the next thing that wants attention has to earn it some other way.
+
+     It was not being kept. Orange appeared 330 times across the stylesheets,
+     and almost none of those were the primary action: they were SELECTION —
+     the set filter, the chosen chip, the ticked option, the sorted column, the
+     open dropdown, the hovered matrix column, the current tour dot. Every one
+     of those is a state, and a state drawn in the same colour as the button
+     that publishes a policy makes both of them mean less. By the time a screen
+     has nine orange things on it, the tenth cannot be the important one.
+
+     So selection has its own ramp, and it is greyscale. Value, not hue: a
+     selected control is darker and firmer than an unselected one, which is
+     exactly as legible and does not spend the budget. Every `var(--brand*)`
+     outside this file, the token file and the rail was rewritten to
+     `var(--accent*)` in one sweep, so the whole selection language is set here.
+
+     What is still orange, and why each one earns it:
+       - the primary button, one per view (`--int-brand-bg`)
+       - the rail's active edge, which is the console's measured signature
+       - "New", in the rail and beside a method — rare, and the one label whose
+         entire job is to interrupt
+
+     That is four things in the product, not three hundred. */
+  --accent: #4a5560;
+  --accent-hover: #343a40;
+  --accent-strong: #212529;
+  --accent-soft: #eef1f4;
+  --accent-soft-border: #ccd3da;
+
+  /* --- The states, once -------------------------------------------------------
+
+     Every interactive thing in the console has the same five states, and until
+     now each component decided for itself what they looked like. Disabled was
+     the clearest case: eight different opacities across thirteen rules — 0.28,
+     0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.75 — so a stepper's disabled arrow was
+     nearly gone while a gauntlet counter's was barely dimmed, and neither
+     number was chosen against the other.
+
+     One value each, stated here:
+
+       hover      a step of fill, no movement
+       press      one step further, so a click is felt rather than inferred
+       selected   the --accent ramp above: grey fill, firm border, ink label
+       focus      the halo below, on every control without exception
+       disabled   this opacity, plus not-allowed
+
+     0.45 for disabled: enough that it reads as off at a glance, not so much
+     that the label stops being readable. A control you cannot use is still a
+     control somebody has to identify before they can work out why. */
+  --disabled-opacity: 0.45;
+  --state-hover-bg: var(--surface-sunken);
+  --state-press-bg: var(--surface-inset);
+
+  /* --- One control -----------------------------------------------------------
+
+     Every field in the console was a white box with a hairline all the way
+     round. That is the shape that reads as boxy: four hard edges of equal
+     weight, and nothing inside the box to say it is a place you can type. It is
+     also the shape that has the least to work with — a hairline light enough
+     not to shout is a hairline you cannot quite see, so the border ends up
+     doing two contradictory jobs at once.
+
+     A quiet fill does one of those jobs instead. At rest the field is a soft
+     grey shape on a white card, which is legible as a control from across the
+     page without a single strong line; the border is a hairline that defines
+     the edge and nothing more. On focus the fill drops to white — the field
+     lights UP as you enter it — and the halo appears.
+
+     Radius is one value. It was 6px on native inputs and 4px on the Picker
+     trigger, and those two sit next to each other in every filter bar and every
+     condition row: same height, same fill, different corners. */
+  --ctl-radius: var(--radius-md);
+  --ctl-bg: #fbfcfd;
+  --ctl-bg-hover: #f6f8fa;
+  --ctl-border: #dde3e9;
+  --ctl-border-hover: #c6cfd8;
+  --ctl-border-focus: #8d99a6;
+
+  /* Placeholder text was `--text-muted` at 3.3:1 on white, which is under the
+     4.5:1 that any string a person is expected to read has to clear. */
+  --text-placeholder: #646e79;
+
+  /* --- Focus, calm -----------------------------------------------------------
+
+     It was 2px of near-black at 2px offset: a hard rectangle that jumped off
+     every control it landed on, and on a keyboard pass through a form the page
+     flickered between states rather than showing you where you were.
+
+     A hairline plus a soft halo instead. The hairline is what makes it precise
+     — it traces the control — and the halo is what makes it findable from
+     across the screen without being a shout. It is the same slate as selection,
+     so focus and selection read as one language rather than two.
+
+     Still never suppressed, and never brand: a brand-coloured ring disappears
+     against a brand-coloured control, which is the one place focus matters
+     most. #4a5560 is 7.0:1 on white, well past the 3:1 that a focus indicator
+     owes anybody. */
+  --focus-ring: #4a5560;
+  --focus-halo: rgba(74, 85, 96, 0.18);
+  --focus-ring-danger: #a5142b;
 
   /* Shell — measured off the live sidebar ---------------------------------- */
   --shell-bg: #1e2c38;
@@ -207,7 +339,84 @@
   border-color: var(--border-subtle);
   box-shadow: none;
 }
-.btable thead th { background: var(--surface-sunken); }
+
+/* --- One pill ------------------------------------------------------------------
+
+   Twelve label-pill classes had grown across the screens. Counted before this
+   was written: six type sizes (9, 10, 12px and three by token), five paddings,
+   three radii and two letter cases. Nothing about that was a decision — each
+   one was reasonable where it was typed and none of them could see the others,
+   which is precisely what makes a screen feel assembled rather than designed.
+
+   Geometry is now one set of variables. COLOUR is not in here on purpose: a
+   pill's tint is what it MEANS, and meaning belongs beside the thing that has
+   it. Shape is what has to agree.
+
+   The floor is 12px. There were pills at 9 and 10, which is small enough that
+   the eye reads a shape and guesses the word — and every one of them was a
+   label somebody would need at some point: "Phishing-resistant", "Default",
+   "Assumed". A label too small to read is a label that is not there.
+
+   No uppercase either. It was on two of the twelve, and at 10px it costs more
+   in legibility than the structure it buys — the console does not use it
+   anywhere else. */
+:root {
+  --pill-fs: var(--fs-xs);
+  --pill-fw: var(--fw-medium);
+  --pill-py: 1px;
+  --pill-px: var(--space-4);
+  --pill-radius: var(--radius-sm);
+  --pill-line: 18px;
+  --pill-gap: var(--space-3);
+}
+
+/* --- One table, five implementations ------------------------------------------
+
+   The console draws tables five different ways: two real `<table>`s (policies,
+   applications, coverage) and three CSS grids that could not be tables because
+   their rows hold nested controls (zones, device profiles, risk signals). That
+   is a reasonable split — but each one had grown its own head, and the heads
+   had drifted: same intent, four paddings, three type sizes, two border
+   weights.
+
+   The recipe is a variable set rather than a shared selector, so every head
+   reads its values from one place while each sheet keeps its own rule. A
+   selector list here would win on source order and leave four sheets stating
+   something untrue about themselves.
+
+   What changed, and why:
+
+   HEAD FILL. It was `--surface-raised` — white, the same as the rows under it —
+   on the argument that the head belongs to the card. It does, but a head that
+   shares the row fill has to earn its separation from type alone, and it was
+   set at 14px/500 against 14px/400 body: one step of weight is not a boundary.
+   `--surface-inset` puts a calm grey band across the top, which is what a table
+   head is for, and it is the same grey the console uses for every other
+   recessed strip.
+
+   HEAD TYPE. Down to 13px and up to 600, in `--text-secondary`. Smaller AND
+   heavier than the data reads as a label rather than as the first row — the
+   opposite of the old 14px/500 primary, which read as a row that happened to be
+   bold. No uppercase: the console does not use it, and at 12px it costs more in
+   legibility than it returns in structure.
+
+   RULE UNDER IT. `--border-default`, a full weight, against the `--border-subtle`
+   hairline between rows — so the gap between the head and the data is visibly
+   larger than the gap between two rows. That is the hierarchy the whole thing
+   is for. */
+:root {
+  --table-head-bg: var(--surface-inset);
+  --table-head-fg: var(--text-secondary);
+  --table-head-fs: var(--fs-sm);
+  --table-head-fw: 600;
+  --table-head-rule: var(--border-default);
+  --table-rule: var(--border-subtle);
+  --table-row-hover: var(--surface-sunken);
+  /* The horizontal inset of a cell, head and body alike. One value, because a
+     head label that does not start on the same pixel as the data beneath it is
+     the single most visible way a table can look unfinished. */
+  --table-cell-x: var(--space-6);
+}
 
 /* --- Corrections after reading the live Adaptive Access Policies screen -----
    The navy buttons on the dashboard are the "Setup / Customize" tiles, which
@@ -225,7 +434,19 @@
   --int-setup-bg-hover: #1e2c38;
 }
 
-.bx-btn--brand { font-weight: 400; padding: 0 16px; }
+/* The primary button's fill is the deeper brand, not #EB5424.
+
+   #EB5424 is locked as THE brand colour and it still is — it is what the nav's
+   active edge is drawn in, and nothing sits on top of that. But white type on
+   it is 3.6:1, and a button's LABEL is text: 1.4.3 asks 4.5:1 of it, whatever
+   1.4.11 says about the button as a component. The single most important
+   control in the console was the one whose words were hardest to read.
+
+   #C2431C is the same orange half a step deeper — indistinguishable from the
+   locked value beside the nav edge at a glance, 5.11:1 under white. */
+.bx-btn--brand { background: var(--brand-on-fill); border-color: var(--brand-on-fill); font-weight: 400; padding: 0 16px; }
+.bx-btn--brand:not(:disabled):hover { background: var(--brand-active); border-color: var(--brand-active); }
+.bx-btn--brand:not(:disabled):active { background: #92330f; border-color: #92330f; }
 .bx-btn--setup { background: var(--int-setup-bg); color: #fff; border-color: var(--int-setup-bg); }
 .bx-btn--setup:not(:disabled):hover { background: var(--int-setup-bg-hover); border-color: var(--int-setup-bg-hover); }
 
@@ -246,10 +467,12 @@
 .bpage h3 { font-size: 14px; font-weight: 600; letter-spacing: 0; }
 .bpage__headrow p, .bwiz__title p { font-size: var(--fs-md); color: var(--text-secondary); }
 
-/* Table chrome to match: checkbox column, selection bar, rows-per-page footer. */
-.btable thead th { font-size: var(--fs-md); font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text-primary); background: var(--surface-raised); border-bottom: 1px solid var(--border-default); }
+/* The body cell keeps the console's reading size; the head is stated in
+   screens.css from the variables above. This rule used to restate the head too,
+   contradicting screens.css at equal weight and winning on source order — which
+   is why the head was white here and grey in the sheet that appeared to own it. */
 .btable tbody td { font-size: var(--fs-md); }
-.btable__foot { background: var(--surface-raised); color: var(--text-secondary); }
+.btable__foot { background: var(--surface-sunken); color: var(--text-secondary); }
 
 /* Page head, stacked ----------------------------------------------------------
    Title, then caption beneath it — which is how Zones, Device fingerprint and
@@ -269,7 +492,45 @@
    Every value below is the other headers' own — 4px under the title, --fs-md
    secondary, 1.55 leading, 68ch — so this is the same block rather than a near
    miss that reads as a third shape. */
-.bpage__head { margin-bottom: 16px; }
+/* --- The page rhythm ----------------------------------------------------------
+
+   Everything on a list screen used to sit 16px from everything else: the title
+   block, the banner, the toolbar and the table were four things at one
+   interval, so nothing on the page said which of them belonged together.
+
+   Three intervals now, ordered by relation rather than by convenience:
+
+     24px  after the title block — it names the page, and what follows is a
+           different level of the document.
+     16px  between page-level things that are merely adjacent, e.g. an
+           attention banner and the toolbar under it.
+     10px  between the toolbar and the table it filters — they are ONE object,
+           and a toolbar that floats equidistant between the title above it and
+           the data below it reads as belonging to neither.
+
+   The three bespoke page heads join the shared one here rather than each being
+   corrected in its own sheet: Zones, Device profiles and Authentication methods
+   build their own header element, and the reason they kept drifting is that
+   there was nowhere that said what a page head IS. */
+.bpage__head,
+.bz7__head,
+.bfp2__head,
+.bm8__head { margin-bottom: var(--space-8); }
+.bz7__head,
+.bfp2__head,
+.bm8__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-7); }
+.bpage__title p,
+.bz7__head p,
+.bfp2__head p,
+.bm8__head p {
+  margin: 4px 0 0;
+  max-width: 68ch;
+  font-size: var(--fs-md);
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+.btoolbar { margin-bottom: var(--space-5); }
+.bpolicies__banner { margin-bottom: var(--space-6); }
 /* Top, not centre. The caption makes the left column two lines tall on the
    longer ones, and an action centred against that sits below the title it
    belongs to. */
@@ -298,4 +559,40 @@
 .bpage.bfp2,
 .bpage.bm8 {
   padding-inline: clamp(20px, 9%, 148px);
+}
+
+/* --- The selection ramp in dark ------------------------------------------------
+
+   `:root[data-theme="dark"]` at (0,2,0), matching tokens.css so it can be heard
+   at all — a plain `:root` here is (0,1,0) and loses to the dark block whatever
+   the source order, which is why the light values would otherwise have carried
+   straight into dark and painted every selected control near-black on a
+   near-black page.
+
+   Inverted rather than translated: in dark the selected thing is LIGHTER than
+   its surroundings, because value is still the only channel doing the work and
+   the direction of "more" flips with the ground. */
+:root[data-theme='dark'] {
+  --accent: #93a0ae;
+  --accent-hover: #b6c0cb;
+  --accent-strong: #e8edf2;
+  --accent-soft: #232d39;
+  --accent-soft-border: #3a4756;
+
+  --focus-ring: #93a0ae;
+  --focus-halo: rgba(147, 160, 174, 0.22);
+  --focus-ring-danger: #fd4d4d;
+
+  --ctl-bg: #161d26;
+  --ctl-bg-hover: #1b232d;
+  --ctl-border: #2f3a46;
+  --ctl-border-hover: #45525f;
+  --ctl-border-focus: #7f8c9a;
+  --text-placeholder: #8a95a1;
+
+  --table-head-bg: var(--surface-sunken);
+  --table-head-fg: var(--text-secondary);
+  --table-head-rule: var(--border-default);
+  --table-rule: var(--border-subtle);
+  --table-row-hover: var(--surface-inset);
 }

@@ -77,8 +77,8 @@
    border. Hover-only selection means the answer to "what is selected" is
    wherever the pointer happens to be. */
 .bdlg-row.is-on {
-  background: var(--brand-subtle-bg);
-  border-color: var(--brand-subtle-border);
+  background: var(--accent-soft);
+  border-color: var(--accent-soft-border);
 }
 .bdlg-row.is-on .bdlg-row__text { color: var(--text-primary); font-weight: var(--fw-medium); }
 
@@ -92,7 +92,7 @@
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--brand);
+  accent-color: var(--accent);
   cursor: pointer;
 }
 
@@ -121,7 +121,7 @@
   background: var(--surface-sunken);
   border-color: var(--border-subtle);
 }
-.bdlg-row--all.is-on { background: var(--brand-subtle-bg); border-color: var(--brand-subtle-border); }
+.bdlg-row--all.is-on { background: var(--accent-soft); border-color: var(--accent-soft-border); }
 
 /* --- Review & Save ---------------------------------------------------------- */
 
@@ -307,16 +307,16 @@
 }
 .bdlg-radio:hover { background: var(--surface-sunken); }
 .bdlg-radio.is-on {
-  background: var(--brand-subtle-bg);
-  border-color: var(--brand-subtle-border);
-  color: var(--brand-active);
+  background: var(--accent-soft);
+  border-color: var(--accent-soft-border);
+  color: var(--accent-strong);
   font-weight: var(--fw-medium);
 }
 .bdlg-radio input {
   width: 14px;
   height: 14px;
   margin: 0;
-  accent-color: var(--brand);
+  accent-color: var(--accent);
   cursor: pointer;
 }
 
@@ -388,8 +388,8 @@
   cursor: pointer;
 }
 .bdlg-copy__list label:hover { border-color: var(--int-neutral-border-hover); }
-.bdlg-copy__list label.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
-.bdlg-copy__list input { margin-top: 3px; accent-color: var(--brand); }
+.bdlg-copy__list label.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.bdlg-copy__list input { margin-top: 3px; accent-color: var(--accent); }
 
 .bdlg-copy__main { min-width: 0; }
 .bdlg-copy__name { display: flex; align-items: center; gap: var(--space-4); font-size: var(--fs-md); color: var(--text-primary); }

@@ -65,8 +65,8 @@
   cursor: pointer;
 }
 .bpb__panel button:hover { background: var(--surface-sunken); }
-.bpb__panel button.is-on { background: var(--brand-subtle-bg); }
-.bpb__panel button.is-on .bpb__name { color: var(--brand-active); }
+.bpb__panel button.is-on { background: var(--accent-soft); }
+.bpb__panel button.is-on .bpb__name { color: var(--accent-strong); }
 
 .bpb__name {
   display: flex;
@@ -116,7 +116,7 @@
   padding: var(--space-4) var(--space-5);
   background: var(--surface-sunken);
   border: 1px solid var(--border-subtle);
-  border-left: 3px solid var(--brand);
+  border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);
   font-size: var(--fs-sm);
 }

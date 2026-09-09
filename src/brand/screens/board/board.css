@@ -1,3 +1,17 @@
+/* The builder's chrome bottoms out at 11px.
+
+   It had labels at 9 and 10 — the WHO / WHEN / THEN row heads, the section
+   titles in the condition catalogue, the AND and OR joiners — all semibold, all
+   letterspaced, all uppercase. Dense chrome is allowed to be smaller than body
+   copy; it is not allowed to be a shape you decode rather than a word you read,
+   and 9px letterspaced caps is the second of those.
+
+   11, not 12: these are structural markers in a workspace where vertical space
+   is what the canvas is for, and every one of them sits in `--text-tertiary` at
+   5.95:1. The letterspacing came down with the size, because tracking that
+   helps 9px caps hold together starts pulling 11px ones apart.
+   --------------------------------------------------------------------------- */
+
 /* -----------------------------------------------------------------------------
    The board — builder v2.
 
@@ -169,7 +183,7 @@
   font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
 }
 .bbtop__name:hover { background: var(--surface-sunken); border-color: var(--border-subtle); color: var(--text-secondary); }
-.bbtop__name:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bbtop__name:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* `.bbtop__gov` and `.bbtop__peek` stood here: the audience as a glyph, a
    phrase, a count and a hover panel. Gone with the markup — see BoardBar.tsx.
@@ -334,8 +348,8 @@
   transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard),
     transform var(--dur-fast) var(--ease-standard);
 }
-.bb__start2:hover { border-color: var(--brand); box-shadow: var(--el-mid); transform: translateY(-2px); }
-.bb__start2:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__start2:hover { border-color: var(--accent); box-shadow: var(--el-mid); transform: translateY(-2px); }
+.bb__start2:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__start2 strong { font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
 /* One line each, and short enough to stay one at every width the two cards are
    drawn at. Both captions ran to two lines under a 30ch cap, which put four
@@ -380,9 +394,9 @@
 .bb__ill__plus { transition: stroke 0.22s var(--ease-standard), opacity 0.22s var(--ease-standard); }
 
 /* One colour, on the one thing each card is offering. */
-.bb__start2:hover .bb__ill__line.is-lead { fill: var(--brand); opacity: 1; }
+.bb__start2:hover .bb__ill__line.is-lead { fill: var(--accent); opacity: 1; }
 .bb__start2:hover .bb__ill__slot,
-.bb__start2:hover .bb__ill__plus { stroke: var(--brand); opacity: 1; }
+.bb__start2:hover .bb__ill__plus { stroke: var(--accent); opacity: 1; }
 
 /* One lift, and the panel behind slides a little further out from under it —
    the only movement in either picture, and the only one a deck has. */
@@ -424,11 +438,11 @@
 }
 .bb__start .bb__pulse {
   position: relative; width: 10px; height: 10px; border-radius: 50%;
-  background: var(--brand);
+  background: var(--accent);
 }
 .bb__start .bb__pulse::after {
   content: ''; position: absolute; inset: -4px; border-radius: 50%;
-  border: 2px solid var(--brand); opacity: 0;
+  border: 2px solid var(--accent); opacity: 0;
   animation: bb-pulse 2.4s ease-out infinite;
 }
 @keyframes bb-pulse { 0% { transform: scale(0.6); opacity: 0.7; } 70% { transform: scale(1.25); opacity: 0; } 100% { opacity: 0; } }
@@ -439,9 +453,9 @@
 .bb__token {
   display: inline-grid; place-items: center;
   width: 22px; height: 22px; border-radius: 50%;
-  background: var(--brand); color: #fff;
+  background: var(--accent); color: #fff;
   box-shadow: 0 0 0 4px rgba(235, 84, 36, 0.18);
-  font-size: 10px; font-weight: var(--fw-semibold);
+  font-size: 11px; font-weight: var(--fw-semibold);
 }
 
 /* A connector: a rule, a line, a `+`, the next rule. */
@@ -507,10 +521,10 @@
 .bb__link__add:focus-visible,
 .bb__link:hover .bb__link__add {
   transform: translateY(-50%) scale(1.06);
-  color: var(--brand);
+  color: var(--accent);
   outline: none;
 }
-.bb__link__add:focus-visible { box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__link__add:focus-visible { box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* `::before`, because `::after` on this button is the 32px hit area — see the
    block near the foot of this file. Two pseudo-elements, two jobs, and the one
@@ -519,7 +533,7 @@
   content: '';
   position: absolute; inset: 0;
   border-radius: 50%;
-  border: 2px solid var(--brand);
+  border: 2px solid var(--accent);
   opacity: 0;
   pointer-events: none;
 }
@@ -546,7 +560,7 @@
 .bb__link__hint {
   position: absolute; left: 20px; top: 50%;
   padding: 4px 2px;
-  background: none; color: var(--brand);
+  background: none; color: var(--accent);
   font-size: 11px; font-weight: var(--fw-semibold); white-space: nowrap;
   opacity: 0; transform: translateY(-50%) translateX(-4px);
   transition: opacity 0.16s var(--ease-standard), transform 0.16s var(--ease-standard);
@@ -574,7 +588,7 @@
   border-color: var(--bb-ring);
   box-shadow: 0 0 0 1px var(--bb-ring), var(--el-mid);
 }
-.bb__card:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring), var(--el-mid); }
+.bb__card:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo), var(--el-mid); }
 .bb__card.is-off { opacity: 0.62; }
 .bb__card.is-off:hover { opacity: 0.85; }
 .bb__card.is-shadowed { opacity: 0.4; }
@@ -685,7 +699,7 @@
 .bb__card:focus-within .bb__idx__grip { opacity: 1; pointer-events: auto; }
 /* The badge itself keeps its hit area — dragging from the number still works,
    which is what it always did and what the accessible name still promises. */
-.bb__idx:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__idx:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__idx.is-home { cursor: default; }
 .bb__idx.is-home:hover { transform: none; }
 /* The two rules that used to sit here undid the global hide for the terminal
@@ -760,9 +774,9 @@
   border: none; background: none; color: var(--text-muted); cursor: pointer;
 }
 .bb__act:hover { background: var(--surface-sunken); color: var(--text-primary); }
-.bb__act:disabled { opacity: 0.35; cursor: default; }
+.bb__act:disabled { opacity: var(--disabled-opacity)5; cursor: default; }
 .bb__act.is-danger:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bb__act:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__act:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 .bb__cardbody { padding: 0 var(--space-5) var(--space-5); display: grid; gap: var(--space-4); }
 
@@ -849,14 +863,14 @@
   color: var(--text-tertiary); cursor: pointer;
 }
 .bb__panetabs > button:hover { color: var(--text-primary); }
-.bb__panetabs > button.is-on { color: var(--text-primary); border-bottom-color: var(--brand); }
-.bb__panetabs > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.bb__panetabs > button.is-on { color: var(--text-primary); border-bottom-color: var(--accent); }
+.bb__panetabs > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
 
 /* A labelled row inside the card: WHEN / THEN. */
 .bb__row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
 .bb__row > dt {
   padding-top: 5px;
-  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase;
+  font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase;
   color: var(--text-tertiary);
 }
 .bb__row > dd { margin: 0; min-width: 0; }
@@ -875,11 +889,11 @@
   width: 16px; height: 16px; border-radius: var(--radius-xs);
   display: grid; place-items: center;
   background: var(--surface-raised); border: 1px solid var(--border-default);
-  font-size: 9px; font-weight: var(--fw-semibold); color: var(--text-tertiary);
+  font-size: 11px; font-weight: var(--fw-semibold); color: var(--text-tertiary);
 }
 .bb__or {
   align-self: flex-start; margin-left: 8px;
-  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase;
+  font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase;
   color: var(--text-tertiary);
 }
 .bb__and { font-size: var(--fs-xs); color: var(--text-muted); padding: 0 1px; }
@@ -990,7 +1004,7 @@
   display: inline-flex; align-items: center; gap: 4px;
   padding: 2px 8px; border-radius: var(--radius-full);
   background: var(--surface-inset); border: 1px solid var(--border-subtle);
-  font-size: 10px; font-weight: var(--fw-medium); color: var(--text-tertiary);
+  font-size: 11px; font-weight: var(--fw-medium); color: var(--text-tertiary);
   white-space: nowrap;
 }
 .bb__lock svg { flex: none; }
@@ -1074,9 +1088,9 @@
    and does not need the action colour; at full strength it also made the
    density pair the loudest object on a canvas whose whole job is showing rules.
    The tint says "this one" without claiming to be a button you should press. */
-.bb__density > button.is-on { background: var(--brand-subtle-bg); color: var(--brand); }
-.bb__density > button.is-on:hover { background: var(--brand-subtle-bg); color: var(--brand); }
-.bb__density > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__density > button.is-on { background: var(--accent-soft); color: var(--accent); }
+.bb__density > button.is-on:hover { background: var(--accent-soft); color: var(--accent); }
+.bb__density > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__float__sep { width: 1px; height: 18px; background: var(--border-subtle); margin: 0 2px; }
 .bb__zoom { min-width: 44px; text-align: center; font-size: var(--fs-xs); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 
@@ -1089,7 +1103,7 @@
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 .bb__pip:hover { border-color: var(--border-strong); }
-.bb__pip.is-on { border-color: var(--brand); color: var(--text-primary); }
+.bb__pip.is-on { border-color: var(--accent); color: var(--text-primary); }
 .bb__pip b { font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bb__pip .bb__grade {
   display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 4px;
@@ -1213,7 +1227,7 @@
   height: 100%; border: none; background: none; padding: 0; text-align: left;
   font-family: inherit; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); cursor: pointer;
 }
-.bb__sechead > button:first-child:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-xs); }
+.bb__sechead > button:first-child:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-xs); }
 .bb__sechead .bb__chev { color: var(--text-muted); transition: transform 0.18s ease; }
 .bb__sec.is-closed .bb__chev { transform: rotate(-90deg); }
 /* The pane headers use the same count and the same `+` in the same shape.
@@ -1230,9 +1244,9 @@
   border: none; background: none; color: var(--text-tertiary); cursor: pointer;
 }
 .bb__sechead .bb__secact:hover,
-.bb__ask__head .bb__secact:hover { background: var(--surface-sunken); color: var(--brand); }
+.bb__ask__head .bb__secact:hover { background: var(--surface-sunken); color: var(--accent); }
 .bb__sechead .bb__secact:focus-visible,
-.bb__ask__head .bb__secact:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__ask__head .bb__secact:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 /* Same arrangement `.bb__rulehead` already makes: the count sits with the
    heading, the action goes to the far edge. */
 .bb__ask__head .bb__count { margin-right: auto; }
@@ -1259,7 +1273,7 @@
   background: var(--surface-raised); color: var(--text-primary);
   font-family: inherit; font-size: var(--fs-sm);
 }
-.bb__input:focus-visible { outline: none; border-color: var(--focus-ring); box-shadow: 0 0 0 1px var(--focus-ring); }
+.bb__input:focus-visible { outline: none; border-color: var(--focus-ring); box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__input--title { height: 36px; font-size: var(--fs-md); font-weight: var(--fw-semibold); }
 textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var(--space-3); resize: vertical; line-height: 1.45; }
 .bb__input--num { width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
@@ -1278,7 +1292,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__seg > button:hover { color: var(--text-primary); }
 .bb__seg > button.is-on { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
-.bb__seg > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__seg > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__seg--block { display: flex; }
 .bb__seg--block > button { flex: 1; justify-content: center; }
 
@@ -1296,9 +1310,9 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
 }
 .bb__decide > button:hover { border-color: var(--border-strong); transform: translateY(-1px); }
-.bb__decide > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__decide > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__decide > button strong { font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bb__decide > button em { font-style: normal; font-size: 10px; color: var(--text-tertiary); line-height: 1.3; }
+.bb__decide > button em { font-style: normal; font-size: 11px; color: var(--text-tertiary); line-height: 1.3; }
 .bb__decide > button svg { color: var(--text-tertiary); }
 .bb__decide > button.is-on { background: var(--tone-bg); border-color: var(--tone-border); }
 .bb__decide > button.is-on strong, .bb__decide > button.is-on svg { color: var(--tone-fg); }
@@ -1362,7 +1376,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__rung:hover .bb__rung__drop, .bb__rung:focus-within .bb__rung__drop { opacity: 1; }
 .bb__rung__drop:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bb__rung__drop:focus-visible { outline: none; opacity: 1; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__rung__drop:focus-visible { outline: none; opacity: 1; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* A rung's own settings sit under it, indented past the number so the ladder
    still reads as a ladder. */
@@ -1383,7 +1397,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
 .bb__addrung:hover { border-style: solid; border-color: var(--fb-notice-fg); background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
-.bb__addrung:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__addrung:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* What happens after the steps — remembering the device, and the opt-out.
    Separated by a rule rather than by a heading: they are settings on the rule,
@@ -1405,7 +1419,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__chip:hover { border-color: var(--border-strong); color: var(--text-primary); }
 .bb__chip.is-on { background: var(--text-primary); border-color: var(--text-primary); color: var(--surface-raised); }
-.bb__chip:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__chip:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__chip svg { opacity: 0.8; }
 .bb__chip.is-removable svg:last-child { opacity: 0.6; }
 .bb__chip.is-removable:hover svg:last-child { opacity: 1; }
@@ -1426,7 +1440,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   background: var(--surface-raised);
 }
 .bb__alt::before { content: ''; position: absolute; left: -1px; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: var(--border-strong); }
-.bb__alt.is-focus::before { background: var(--brand); }
+.bb__alt.is-focus::before { background: var(--accent); }
 .bb__althead { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
 .bb__althead .bb__bracket__letter { position: static; transform: none; }
 .bb__althead input {
@@ -1438,7 +1452,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__althead input::placeholder { color: var(--text-muted); font-weight: var(--fw-regular); }
 .bb__altdiv {
   display: flex; align-items: center; gap: var(--space-3);
-  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary);
+  font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
 }
 .bb__altdiv::before, .bb__altdiv::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
 
@@ -1452,15 +1466,15 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__andpill {
   align-self: flex-start; margin: -8px 0 -8px 8px; position: relative; z-index: 1;
   padding: 1px 6px; border-radius: 3px; background: var(--surface-inset, #eef1f4);
-  font-size: 9px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary);
+  font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
 }
 .bb__addrow {
   display: inline-flex; align-items: center; gap: 6px; margin-top: var(--space-2);
   height: 28px; padding: 0 8px; border-radius: var(--radius-sm); border: 1px dashed var(--border-default);
   background: none; font-family: inherit; font-size: var(--fs-xs); color: var(--text-tertiary); cursor: pointer;
 }
-.bb__addrow:hover { border-color: var(--brand); color: var(--brand); }
-.bb__addrow:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__addrow:hover { border-color: var(--accent); color: var(--accent); }
+.bb__addrow:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__addalt { width: 100%; justify-content: center; margin-top: var(--space-3); }
 .bb__readback {
   margin: var(--space-3) 0 0; padding: var(--space-3) var(--space-4);
@@ -1493,7 +1507,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__catgroups > button:hover { background: var(--surface-sunken); }
 .bb__catgroups > button.is-on { background: var(--text-primary); color: var(--surface-raised); }
 .bb__catlist { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-2); }
-.bb__catsec { margin: var(--space-2) var(--space-2) 2px; font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.bb__catsec { margin: var(--space-2) var(--space-2) 2px; font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary); }
 .bb__catitem {
   display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--space-3); align-items: center;
   width: 100%; padding: 6px var(--space-2); border: none; border-radius: var(--radius-sm); background: none;
@@ -1517,7 +1531,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 
 .bb__reach { display: grid; gap: var(--space-2); }
 .bb__reachbar { height: 6px; border-radius: 3px; background: var(--surface-inset, #eef1f4); overflow: hidden; }
-.bb__reachbar > i { display: block; height: 100%; border-radius: 3px; background: var(--tone-dot, var(--brand)); }
+.bb__reachbar > i { display: block; height: 100%; border-radius: 3px; background: var(--tone-dot, var(--accent)); }
 .bb__reachline { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--text-secondary); }
 .bb__reachline b { font-weight: var(--fw-semibold); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 
@@ -1526,7 +1540,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 
 .bb__ctx { display: grid; gap: var(--space-3); }
 .bb__ctxrow { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
-.bb__ctxrow > span { padding-top: 6px; font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.bb__ctxrow > span { padding-top: 6px; font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary); }
 .bb__ctxrow .bb__chips { gap: 4px; }
 .bb__ctxrow .bb__chip { height: 24px; padding: 0 8px; font-size: 11px; }
 
@@ -1563,7 +1577,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center;
   width: 100%; padding: var(--space-3) 0; border: none; background: none; text-align: left; font-family: inherit; cursor: pointer;
 }
-.bb__round > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-xs); }
+.bb__round > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-xs); }
 .bb__round i { width: 8px; height: 8px; border-radius: 50%; background: var(--fb-positive-dot, #128f43); }
 .bb__round.is-breach i { background: var(--fb-negative-dot, #d01243); }
 .bb__round.is-lockout i { background: var(--fb-negative-dot, #d01243); }
@@ -1577,7 +1591,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__roundbody { padding: 0 0 var(--space-4) 20px; font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.5; }
 .bb__roundbody p { margin: 0 0 var(--space-2); }
 .bb__wantgot { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin: var(--space-2) 0; }
-.bb__wantgot .bb__decision { height: 22px; font-size: 10px; }
+.bb__wantgot .bb__decision { height: 22px; font-size: 11px; }
 .bb__wantgot .bb__decision.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); }
 .bb__wantgot .bb__decision.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); }
 .bb__wantgot .bb__decision.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); }
@@ -1629,7 +1643,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__lane.is-allow .bb__lanebar.is-after > i { background: var(--fb-positive-dot, #128f43); }
 .bb__lane.is-mfa .bb__lanebar.is-after > i { background: var(--fb-notice-dot, #b07a00); }
 .bb__lane.is-deny .bb__lanebar.is-after > i { background: var(--fb-negative-dot, #d01243); }
-.bb__lanelegend { display: flex; gap: var(--space-4); font-size: 10px; color: var(--text-tertiary); margin-top: 2px; }
+.bb__lanelegend { display: flex; gap: var(--space-4); font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
 .bb__lanelegend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; background: var(--border-strong); opacity: 0.55; margin-right: 4px; vertical-align: middle; }
 .bb__lanelegend i.is-after { background: var(--text-primary); opacity: 1; }
 
@@ -1637,7 +1651,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__flow { display: grid; grid-template-columns: auto 14px auto minmax(0, 1fr) auto; gap: 6px; align-items: center; font-size: 11px; color: var(--text-secondary); }
 .bb__flow > svg { color: var(--text-muted); }
 .bb__flow > b { font-weight: var(--fw-semibold); color: var(--text-primary); font-variant-numeric: tabular-nums; text-align: right; }
-.bb__flow .bb__decision { height: 20px; font-size: 10px; padding: 0 8px 0 6px; }
+.bb__flow .bb__decision { height: 20px; font-size: 11px; padding: 0 8px 0 6px; }
 .bb__flow .bb__decision.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); }
 .bb__flow .bb__decision.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); }
 .bb__flow .bb__decision.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); }
@@ -1659,10 +1673,10 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__dot.is-deny { --dot: var(--fb-negative-dot, #d01243); }
 .bb__dot.is-dim { opacity: 0.18; }
 .bb__dot.is-changed { box-shadow: inset 0 0 0 1.5px var(--surface-raised), 0 0 0 1px var(--text-primary); }
-.bb__dot.is-picked { transform: scale(1.6); z-index: 1; box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 3.5px var(--brand); }
+.bb__dot.is-picked { transform: scale(1.6); z-index: 1; box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 3.5px var(--accent); }
 .bb__dot:hover { transform: scale(1.5); z-index: 1; }
-.bb__dot:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-.bb__fieldkey { display: flex; gap: var(--space-4); flex-wrap: wrap; font-size: 10px; color: var(--text-tertiary); }
+.bb__dot:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bb__fieldkey { display: flex; gap: var(--space-4); flex-wrap: wrap; font-size: 11px; color: var(--text-tertiary); }
 .bb__fieldkey i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; background: var(--dot, var(--border-default)); }
 .bb__fieldkey i.is-changed { background: transparent; box-shadow: inset 0 0 0 1.5px var(--surface-raised), 0 0 0 1px var(--text-primary); }
 
@@ -1674,7 +1688,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__situation .bb__wantgot { margin: var(--space-2) 0; }
 .bb__situation button { margin-top: 2px; }
 .bb__sitfacts { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
-.bb__sitfacts span { padding: 1px 7px; border-radius: var(--radius-full); background: var(--surface-sunken); font-size: 10px; color: var(--text-secondary); }
+.bb__sitfacts span { padding: 1px 7px; border-radius: var(--radius-full); background: var(--surface-sunken); font-size: 11px; color: var(--text-secondary); }
 
 .bb__cohorts { display: grid; gap: 4px; }
 .bb__cohort { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-3); align-items: center; font-size: 11px; color: var(--text-secondary); padding: 3px 0; }
@@ -1682,9 +1696,9 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 
 .bb__wins { display: grid; gap: 6px; }
 .bb__win { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; border: none; background: none; padding: 3px 0; text-align: left; font-family: inherit; cursor: pointer; border-radius: var(--radius-xs); }
-.bb__win:hover b { color: var(--brand); }
-.bb__win:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-.bb__win .bb__idx { width: 22px; height: 22px; font-size: 10px; cursor: inherit; }
+.bb__win:hover b { color: var(--accent); }
+.bb__win:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bb__win .bb__idx { width: 22px; height: 22px; font-size: 11px; cursor: inherit; }
 .bb__win .bb__idx:hover { transform: none; }
 .bb__winmid { min-width: 0; display: grid; gap: 3px; }
 .bb__winmid b { font-size: 11px; font-weight: var(--fw-medium); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1894,7 +1908,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__ifkw.is-or {
   height: 18px; padding: 0 7px; border-radius: var(--radius-full);
   display: inline-flex; align-items: center;
-  font-size: 10px; font-weight: var(--fw-semibold);
+  font-size: 11px; font-weight: var(--fw-semibold);
   letter-spacing: 0.04em; text-transform: uppercase;
 }
 /* Notice, not accent. It was violet here and amber in the editor's OR chip —
@@ -1988,7 +2002,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
    spelled. "AND" between two conditions and "and" on the button that makes one
    read as two different words at this size. "another way in" stays a phrase —
    it is not an operator, it is what pressing it gets you. */
-.bb__ifchip.is-tone-and { text-transform: uppercase; letter-spacing: 0.04em; font-size: 10px; }
+.bb__ifchip.is-tone-and { text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; }
 .bb__ifchip.is-tone-and { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
 .bb__ifchip.is-tone-or { background: var(--fb-accent-bg); border-color: var(--fb-accent-border); color: var(--fb-accent-fg); }
 button.bb__ifchip.is-tone-and:hover { background: var(--fb-info-bg); border-style: solid; border-color: var(--fb-info-fg); color: var(--fb-info-fg); }
@@ -2002,8 +2016,8 @@ button.bb__ifchip.is-tone-or:hover { background: var(--fb-accent-bg); border-sty
 button.bb__ifchip { cursor: pointer; transition: background-color 0.12s ease, border-color 0.12s ease; }
 button.bb__ifchip:hover { background: var(--if-chip-hover); border-color: var(--border-strong); color: var(--text-primary); }
 button.bb__ifchip.is-muted:hover { border-style: solid; }
-.bb__ifchip:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-.bb__ifdupe { font-size: 9px; color: var(--if-muted); }
+.bb__ifchip:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bb__ifdupe { font-size: 11px; color: var(--if-muted); }
 
 .bb__ifjourney { display: inline-flex; align-items: center; gap: 4px; color: var(--if-muted); font-size: 11px; min-width: 0; flex-wrap: wrap; }
 .bb__ifjourney svg { opacity: 0.6; }
@@ -2024,7 +2038,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   border: none; background: none; color: var(--if-muted); cursor: pointer;
 }
 .bb__ifact:hover { background: var(--if-chip-hover); color: var(--text-primary); }
-.bb__ifact:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__ifact:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* Live controls inside the block take the chip's clothes. */
 .bb__if .bx-picker__trigger {
@@ -2034,7 +2048,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 }
 .bb__if .bx-picker__trigger:hover { background: var(--if-chip-hover); border-color: var(--border-strong); }
 .bb__if .bx-picker__trigger.is-invalid { border-color: var(--fb-negative-border); border-style: dashed; color: var(--fb-negative-fg); }
-.bb__if .bx-picker__trigger:focus-visible { box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__if .bx-picker__trigger:focus-visible { box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__if .bx-picker__value { color: inherit; }
 .bb__ifop .bx-picker__trigger { background: transparent; border-color: transparent; color: var(--if-muted); font-weight: var(--fw-regular); padding-left: 4px; }
 .bb__ifop .bx-picker__trigger:hover { background: var(--if-chip); color: var(--text-primary); }
@@ -2059,7 +2073,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifinput[type='time'] { width: 92px; }
 .bb__ifinput.is-num { width: 58px; text-align: right; font-variant-numeric: tabular-nums; }
 .bb__ifinput.is-text { flex: 1; min-width: 120px; }
-.bb__ifinput:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__ifinput:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__ifinput::placeholder { color: var(--if-muted); }
 
 /* On the card the block is the body. */
@@ -2133,7 +2147,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifgrouptag {
   display: flex; align-items: center; gap: 5px;
   padding: 1px 0 3px;
-  font-size: 10px; color: var(--text-tertiary);
+  font-size: 11px; color: var(--text-tertiary);
 }
 .bb__ifgrouptag svg { flex: none; opacity: 0.7; }
 .bb__ifgrouptag b { font-weight: var(--fw-semibold); color: var(--text-secondary); letter-spacing: 0.01em; }
@@ -2259,7 +2273,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 }
 .bb__ifutil svg { flex: none; opacity: 0.8; }
 .bb__ifutil:hover { background: var(--surface-sunken); color: var(--text-primary); }
-.bb__ifutil:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__ifutil:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__ifutil.is-danger:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
 
 /* Dashed means one thing on this surface: something is about to be added.
@@ -2280,7 +2294,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
 .bb__ifadd:hover { background: var(--fb-info-bg); color: var(--fb-info-fg); }
-.bb__ifadd:focus-visible, .bb__ifaddgroup:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__ifadd:focus-visible, .bb__ifaddgroup:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 /* Adding a group adds an OR branch, so it wears the OR colour on hover — the
    same tie between a control and the operator it produces that the two
    junctions have. */
@@ -2419,7 +2433,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__reads > summary::-webkit-details-marker { display: none; }
 .bb__reads > summary::marker { content: ''; }
 .bb__reads > summary:hover { background: var(--surface-inset); color: var(--text-secondary); }
-.bb__reads > summary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__reads > summary:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__reads > summary svg { flex: none; transition: transform var(--dur-fast) var(--ease-standard); }
 .bb__reads[open] > summary svg { transform: rotate(180deg); }
 .bb__reads .bb__readback { margin: 4px 0 0; }
@@ -2592,7 +2606,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   display: block;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.bb__titlebtn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__titlebtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* --- The keyboard sheet, and key hints in the palette ----------------------- */
 
@@ -2668,8 +2682,8 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   transition: color 0.14s var(--ease-standard), border-color 0.14s var(--ease-standard);
 }
 .bb__sheettabs > button:hover { color: var(--text-primary); }
-.bb__sheettabs > button.is-on { color: var(--text-primary); border-bottom-color: var(--brand); }
-.bb__sheettabs > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.bb__sheettabs > button.is-on { color: var(--text-primary); border-bottom-color: var(--accent); }
+.bb__sheettabs > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
 
 .bb__sheetbody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
@@ -2813,7 +2827,7 @@ button.bb__idx::after {
 .bb__joinsel.is-and { color: var(--fb-info-fg); border-color: var(--fb-info-border); background: var(--fb-info-bg); }
 .bb__joinsel.is-or { color: var(--fb-notice-fg); border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
 .bb__joinsel svg { opacity: 0.6; }
-.bb__joinsel:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__joinsel:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 .bb__cond__body { min-width: 0; display: block; position: relative; }
 /* The row's own actions — "move into a group of its own" — over the block's
@@ -2902,7 +2916,7 @@ button.bb__idx::after {
   transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
 }
 .bb__whoface:hover { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bb__whoface:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__whoface:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__whoface.is-warn { border-color: var(--fb-notice-border); }
 
 /* The overflow is a COUNT, not more faces. A row that grows with the selection
@@ -2928,7 +2942,7 @@ button.bb__idx::after {
   background: var(--surface-sunken); color: var(--text-tertiary);
   font-weight: var(--fw-semibold); line-height: 1;
 }
-.bb__avatar.is-on { background: var(--brand-subtle-bg); color: var(--brand-active); }
+.bb__avatar.is-on { background: var(--accent-soft); color: var(--accent-strong); }
 .bb__avatar.is-all { width: 18px; height: 18px; }
 
 /* --- The stack: the same width at five names and at five thousand ------------
@@ -2978,14 +2992,14 @@ button.bb__idx::after {
   background: var(--surface-raised); color: var(--text-primary);
   box-shadow: var(--el-low);
 }
-.bb__whopick > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__whopick > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__whopick > button svg { opacity: 0.75; }
 /* The count rides on the control, so the list you are not looking at still
    says how much is in it. */
 .bb__whopick > button b {
   min-width: 16px; padding: 0 4px; border-radius: var(--radius-pill);
-  background: var(--brand-subtle-bg); color: var(--brand-active);
-  font-size: 10px; font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums;
+  background: var(--accent-soft); color: var(--accent-strong);
+  font-size: 11px; font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums;
 }
 
 .bb__whorows {
@@ -3004,7 +3018,7 @@ button.bb__idx::after {
 .bb__whoitem:first-child { border-top: none; }
 .bb__whoitem:hover { background: var(--surface-sunken); }
 .bb__whoitem:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
-.bb__whoitem.is-on { background: var(--brand-subtle-bg); }
+.bb__whoitem.is-on { background: var(--accent-soft); }
 .bb__whoitem b {
   min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-body);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -3024,14 +3038,17 @@ button.bb__idx::after {
   border: 1px solid var(--border-default); background: var(--surface-raised);
   color: #fff;
 }
-.bb__whoitem.is-on .bb__whotick { background: var(--brand); border-color: var(--brand); }
+.bb__whoitem.is-on .bb__whotick { background: var(--accent); border-color: var(--accent); }
 
 /* Informs, never blocks. There are no disabled rows here, because a redundant
    or unusual selection is legal and sometimes deliberate. */
+/* The shared pill geometry - see the --pill-* block in console-theme.css. */
 .bb__whotag {
-  flex: none; padding: 1px 6px; border-radius: var(--radius-pill);
-  background: var(--fb-neutral-bg); border: 1px solid var(--fb-neutral-border);
-  color: var(--fb-neutral-fg); font-size: 10px; white-space: nowrap;
+  flex: none; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  line-height: var(--pill-line);
+  background: var(--fb-neutral-bg); border: var(--bw-thin) solid var(--fb-neutral-border);
+  color: var(--fb-neutral-fg); font-size: var(--pill-fs); font-weight: var(--pill-fw);
+  white-space: nowrap;
 }
 .bb__whotag.is-warn { background: var(--fb-notice-bg); border-color: var(--fb-notice-border); color: var(--fb-notice-fg); }
 
@@ -3040,7 +3057,7 @@ button.bb__idx::after {
   background: var(--surface-inset); border: 1px solid transparent; border-radius: var(--radius-sm);
   font-family: inherit; font-size: var(--fs-md); color: var(--text-primary);
 }
-.bb__whosearch input:focus-visible { outline: none; border-color: var(--brand); }
+.bb__whosearch input:focus-visible { outline: none; border-color: var(--ctl-border-focus); }
 
 .bb__whohint { margin: 0; padding: var(--space-4); font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
 .bb__who > .bb__whohint { padding: 0; }
@@ -3064,7 +3081,7 @@ button.bb__idx::after {
   color: var(--text-tertiary); cursor: pointer;
 }
 .bb__addnote:hover { border-style: solid; border-color: var(--border-strong); color: var(--text-primary); }
-.bb__addnote:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__addnote:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* The stand-down. Not an error and not styled as one: an OR-shaped rule is a
    legitimate rule, and this pane is explaining where its who actually lives. */
@@ -3137,7 +3154,7 @@ button.bb__idx::after {
   color: var(--text-secondary); font-weight: var(--fw-regular);
   padding-left: 0;
 }
-.bb__ifchip.is-val { color: var(--brand); }
+.bb__ifchip.is-val { color: var(--accent); }
 .bb__ifchip.is-val.is-unset { color: var(--fb-negative-fg); }
 
 /* The rule's operator between two members, on the card.

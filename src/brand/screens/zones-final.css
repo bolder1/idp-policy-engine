@@ -23,7 +23,7 @@
   background: none; cursor: pointer; font-size: var(--fs-md); color: var(--text-link);
 }
 .bz7__back:hover { background: var(--surface-inset); }
-.bz7__back:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bz7__back:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* --- Toolbar --------------------------------------------------------------------- */
 
@@ -41,8 +41,8 @@
   background: none; border: 0; font-size: var(--fs-md); color: var(--text-primary);
 }
 .bz7 .bz7__search input:focus-visible { outline: none; }
-.bz7__search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
-.bz7__count { margin-left: auto; font-size: var(--fs-sm); color: var(--text-tertiary); white-space: nowrap; }
+.bz7__search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
+.bz7__count { margin-left: auto; font-size: var(--fs-sm); color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* .bviewswitch is padded 5px 13px for text labels. These are icons. */
 .bz7__viewswitch button { display: grid; place-items: center; width: 30px; height: 26px; padding: 0; }
@@ -62,7 +62,7 @@
   transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
 }
 .bz7__card:hover { border-color: var(--border-strong); box-shadow: var(--el-low); }
-.bz7__card:focus-within { border-color: var(--brand); }
+.bz7__card:focus-within { border-color: var(--accent); }
 
 .bz7__cardhead { display: flex; align-items: center; gap: 10px; min-width: 0; }
 /* The name is the button; ::after stretches its hit area over the tile so the
@@ -73,7 +73,7 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .bz7__card .bz7__open::after { content: ''; position: absolute; inset: 0; border-radius: var(--radius-lg); }
-.bz7__open:hover { color: var(--brand-active); }
+.bz7__open:hover { color: var(--accent-strong); }
 .bz7__open:focus-visible { outline: none; text-decoration: underline; }
 
 .bz7__tile {
@@ -93,10 +93,12 @@
 .bz7__op { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; min-height: 24px; }
 .bz7__op > svg { flex: none; color: var(--text-muted); }
 
+/* The shared pill geometry - see the --pill-* block in console-theme.css. */
 .bz7__chip {
-  font-style: normal; padding: 2px 8px; border-radius: var(--radius-sm);
-  background: var(--surface-inset); border: 1px solid var(--border-subtle);
-  font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap;
+  font-style: normal; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  line-height: var(--pill-line);
+  background: var(--surface-inset); border: var(--bw-thin) solid var(--border-subtle);
+  font-size: var(--pill-fs); font-weight: var(--pill-fw); color: var(--text-secondary); white-space: nowrap;
 }
 .bz7__chip.is-more { background: none; border-style: dashed; color: var(--text-muted); }
 
@@ -110,12 +112,23 @@
    size — so the tint is the only difference between "6 networks" and "Any
    network". A pill shape made it a different KIND of object sitting in a row of
    chips, which is not what it is: it is the same cell saying the other thing. */
+/* "Any network", "Any location" - the absence of a boundary.
+
+   It was a filled blue pill, and on a table where most zones leave one of the
+   two axes open that made the loudest thing in the column the value that
+   carries the least. Blue is information; this is the row saying it has none
+   to give on that axis. So it reads as an OPEN boundary instead: the family's
+   geometry, no fill, a dashed edge. The concrete values beside it - "6
+   networks", "Corporate (private range)", "Germany" - are the solid ones now,
+   which is the right way round for a column somebody scans to find a
+   constraint. */
 .bz7__any {
   flex: none; align-self: center;
   display: inline-flex; align-items: center;
-  padding: 2px 8px; border-radius: var(--radius-sm);
-  background: var(--fb-info-bg); border: 1px solid var(--fb-info-border);
-  font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--fb-info-fg);
+  padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  line-height: var(--pill-line);
+  background: none; border: var(--bw-thin) dashed var(--border-default);
+  font-size: var(--pill-fs); font-weight: var(--fw-regular); color: var(--text-tertiary);
   white-space: nowrap;
 }
 /* Sized to its own words everywhere, including the row.
@@ -180,19 +193,26 @@
    columns cannot drift apart. */
 .bz7__trow {
   display: grid;
-  grid-template-columns: minmax(160px, 1.2fr) minmax(0, 1.3fr) minmax(0, 1.3fr) 92px 62px;
+  /* The name gets the room. It was 1.2fr against two 1.3fr columns of chips, so
+     at ordinary laptop widths the one value that identifies the row — "Office
+     egress · 203.0.113.0/24" — was the one being truncated, while the chips
+     beside it had space to spare. The chip columns wrap; a name cannot. */
+  grid-template-columns: minmax(190px, 1.7fr) minmax(0, 1.15fr) minmax(0, 1.15fr) 92px 56px;
   align-items: center; gap: 12px;
-  padding: 9px 16px; min-height: 46px;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-4) var(--table-cell-x); min-height: var(--table-row-h);
+  border-bottom: 1px solid var(--table-rule);
 }
 .bz7__trow:last-child { border-bottom: none; }
-.bz7__trow:not(.bz7__thead):hover { background: var(--surface-sunken); }
+.bz7__trow:not(.bz7__thead):hover { background: var(--table-row-hover); }
+/* The table recipe in console-theme.css, applied to a grid instead of a
+   `<thead>`. Every value comes from there so this head cannot drift from the
+   policies table's. */
 .bz7__thead {
   min-height: var(--table-header-h); padding-top: 0; padding-bottom: 0;
-  background: var(--surface-raised);
-  border-bottom: var(--bw-thin) solid var(--border-default);
-  font-size: var(--fs-md); font-weight: 500;
-  letter-spacing: 0; text-transform: none; color: var(--text-primary);
+  background: var(--table-head-bg);
+  border-bottom: var(--bw-thin) solid var(--table-head-rule);
+  font-size: var(--table-head-fs); font-weight: var(--table-head-fw);
+  letter-spacing: 0; text-transform: none; color: var(--table-head-fg);
   white-space: nowrap;
 }
 .bz7__tcell { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: nowrap; overflow: hidden; }
@@ -233,7 +253,7 @@
 
 .bz7__field { display: flex; flex-direction: column; gap: 6px; }
 .bz7__field > span { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bz7__field input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bz7__field input:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* --surface-sunken and not --surface-raised: inside a Modal, raised IS the
    modal's own background, so a raised section is invisible in both themes. */
@@ -248,7 +268,7 @@
    you can click once is the whole point of them being here. */
 .bz7__quick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .bz7__quick > span {
-  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.05em;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: 0.05em;
   text-transform: uppercase; color: var(--text-muted);
 }
 .bz7__quickbtn {
@@ -259,8 +279,8 @@
   font-size: var(--fs-xs); color: var(--text-secondary); cursor: pointer;
   transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
 }
-.bz7__quickbtn:hover:not(:disabled) { border-style: solid; border-color: var(--brand); background: var(--brand-subtle-bg); color: var(--brand-active); }
-.bz7__quickbtn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bz7__quickbtn:hover:not(:disabled) { border-style: solid; border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+.bz7__quickbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bz7__quickbtn code { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
 /* Already in the zone. Solid and quiet — done, not offered. */
 .bz7__quickbtn.is-in { border-style: solid; border-color: var(--fb-positive-border); background: var(--fb-positive-bg); color: var(--fb-positive-fg); cursor: default; }
@@ -289,7 +309,7 @@
 /* The examples are the placeholder's whole job, so they have to read as a hint
    rather than as a value somebody typed. */
 .bz7 .bz7__add input::placeholder { color: var(--text-muted); }
-.bz7 .bz7__add input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-subtle-bg); }
+.bz7 .bz7__add input:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* The search field, where the LABEL is the box.
 
@@ -305,7 +325,7 @@ label.bz7__add {
   background: var(--surface-raised);
   border: 1px solid var(--border-default); border-radius: var(--radius-md);
 }
-label.bz7__add:focus-within { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-subtle-bg); }
+label.bz7__add:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
 label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 .bz7 label.bz7__add input {
   border: none; background: none; padding: 0;
@@ -397,7 +417,7 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   border: 1px solid var(--border-default); border-radius: var(--radius-sm);
   font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-primary);
 }
-.bz7__editin:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--focus-ring); }
+.bz7__editin:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
 .bz7__editin[aria-invalid='true'] { border-color: var(--fb-negative-border); }
 .bz7__editerr {
   flex: none; font-size: var(--fs-xs); color: var(--fb-negative-fg); white-space: nowrap;
@@ -422,8 +442,8 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 .bz7__hit > svg { flex: none; color: var(--text-muted); }
 /* Brand tint for the cursor, never a surface step — inside an overlay,
    --surface-raised is the overlay's own colour in both themes. */
-.bz7__hit.is-cursor { background: var(--brand-subtle-bg); }
-.bz7__hit.is-cursor .bz7__hitname { color: var(--brand-active); }
+.bz7__hit.is-cursor { background: var(--accent-soft); }
+.bz7__hit.is-cursor .bz7__hitname { color: var(--accent-strong); }
 .bz7__hitname { font-size: var(--fs-md); color: var(--text-primary); white-space: nowrap; }
 .bz7__hitctx { font-size: var(--fs-xs); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bz7__hitnote {
@@ -482,7 +502,7 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   border: 1px solid var(--border-default); border-radius: var(--radius-md);
   color: var(--text-muted);
 }
-.bz7__filter:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bz7__filter:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
 .bz7 .bz7__filter input {
   flex: 1; min-width: 0; height: auto; padding: 0;
   background: none; border: 0; font-size: var(--fs-sm); color: var(--text-primary);
@@ -494,7 +514,7 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-link);
 }
 .bz7__clear:hover { text-decoration: underline; }
-.bz7__clear:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.bz7__clear:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
 
 /* Scrolls inside itself. Without this a five-hundred-row list owns the panel's
    scrollbar and the name field is a thousand pixels above the Create button. */
@@ -539,10 +559,10 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 }
 .bz7__buildtabs button:hover { color: var(--text-secondary); }
 .bz7__buildtabs button.is-on {
-  color: var(--text-primary); font-weight: var(--fw-semibold); border-bottom-color: var(--brand);
+  color: var(--text-primary); font-weight: var(--fw-semibold); border-bottom-color: var(--accent);
 }
 .bz7__buildtabs button:focus-visible {
-  outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm);
+  outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm);
 }
 .bz7__buildtabs svg { flex: none; }
 /* The count is the whole reason both tabs are always shown: it says which half
@@ -552,7 +572,7 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   background: var(--surface-inset); font-size: var(--fs-xs); color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
-.bz7__buildtabs button.is-on em { background: var(--brand-subtle-bg); color: var(--brand-active); }
+.bz7__buildtabs button.is-on em { background: var(--accent-soft); color: var(--accent-strong); }
 
 @media (prefers-reduced-motion: reduce) {
   .bz7__buildtabs button { transition: none; }}
@@ -600,7 +620,7 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   background: none; border: 0; cursor: pointer;
   color: var(--text-tertiary); font-size: var(--fs-base); line-height: 1;}
 .bz7__kebab:hover { background: var(--surface-inset); color: var(--text-primary); }
-.bz7__kebab:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bz7__kebab:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* The last row's menu would otherwise open below the table and be clipped by
    its own rounded overflow. */
@@ -624,18 +644,18 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   transition: color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
 }
 .bz7__rename:hover { background: var(--surface-inset); color: var(--text-primary); }
-.bz7__rename:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bz7__rename:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* Sized to the heading it replaces, so committing does not move the page. */
 .bz7 .bz7__nameinput {
   width: 100%; max-width: 460px;
   height: auto; padding: 2px 8px;
   background: var(--surface-raised);
-  border: 1px solid var(--brand); border-radius: var(--radius-sm);
+  border: 1px solid var(--accent); border-radius: var(--radius-sm);
   font-family: inherit; font-size: 20px; font-weight: 700; color: var(--text-primary);
   letter-spacing: 0;
 }
-.bz7 .bz7__nameinput:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bz7 .bz7__nameinput:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 @media (prefers-reduced-motion: reduce) {
   .bz7__rename { transition: none; }}
@@ -651,7 +671,7 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
 }
 .bz7__tname .bz7__open:hover {
-  color: var(--brand-active); text-decoration: underline; text-underline-offset: 2px;
+  color: var(--accent-strong); text-decoration: underline; text-underline-offset: 2px;
 }
 /* --- The dialogs ----------------------------------------------------------------- */
 
@@ -668,7 +688,7 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   font-size: var(--fs-base); color: var(--text-primary); font-family: inherit;
 }
 .bz7__field input:focus-visible {
-  outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg);
+  outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo);
 }
 /* Says WHY the primary is disabled, at the moment it is. */
 
@@ -768,8 +788,8 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary);
   transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
-.bz7__addrow:hover { border-style: solid; border-color: var(--brand); background: var(--brand-subtle-bg); color: var(--brand-active); }
-.bz7__addrow:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bz7__addrow:hover { border-style: solid; border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+.bz7__addrow:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bz7__addrow svg { flex: none; }
 
 /* --- A row you can click anywhere on ------------------------------------------
@@ -793,7 +813,7 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   background: none; cursor: pointer; text-align: left;
 }
 .bz7__entries .bz7__entryopen:hover { background: var(--surface-inset); }
-.bz7__entries .bz7__entryopen:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bz7__entries .bz7__entryopen:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 /* Revealed on hover and on keyboard focus, both — a control that only exists
    under a pointer is not a control for anybody navigating by Tab. */
 .bz7__entrypen {

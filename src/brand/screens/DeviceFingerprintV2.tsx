@@ -214,10 +214,7 @@ function ProfileList({
       <header className="bfp2__head">
         <div>
           <h1>Device profiles</h1>
-          <p>
-            A profile is a set of device signals and what to do when they change. Policy rules name
-            a profile the way they name a zone.
-          </p>
+          <p>Device signals, and what to do when they change.</p>
         </div>
         {/* Not while the empty state is up: it offers the same action in
             the middle of the page, and two brand buttons pointing at one
@@ -234,10 +231,11 @@ function ProfileList({
         <EmptyState
           icon={MonitorSmartphone}
           title="No profiles yet"
-          /* The signals by name. "What identifies a device" is the page
-             caption again; a TPM key and an OS build are the things somebody
-             is actually about to choose between. */
-          blurb="The signals that identify a machine — its TPM key, its serial, its OS build — and what should happen on the day they stop matching."
+          /* The signals by name. Both empty states in this section used to be
+             built the same way — a frame, then a dash-list, then a second
+             clause — and two screens using one sentence shape is what makes
+             prose read as generated. This one states the nouns and stops. */
+          blurb="A machine's TPM key, serial and OS build, and what happens when they stop matching."
           action={
             <Button variant="brand" onClick={onCreate}>
               <Plus size={15} strokeWidth={2.2} aria-hidden />

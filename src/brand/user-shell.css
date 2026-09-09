@@ -45,9 +45,9 @@
 .bus__navitem.is-on { color: var(--text-primary); }
 .bus__navitem.is-on::after {
   content: ''; position: absolute; left: 12px; right: 12px; bottom: 0;
-  height: 2px; border-radius: 2px 2px 0 0; background: var(--brand);
+  height: 2px; border-radius: 2px 2px 0 0; background: var(--accent);
 }
-.bus__navitem:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.bus__navitem:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
 
 .bus__right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 
@@ -57,7 +57,7 @@
   background: none; border: 0;
   font-size: var(--fs-sm); color: var(--text-secondary); font-family: inherit; cursor: pointer;
 }
-.bus .bus__lang select:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.bus .bus__lang select:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
 
 /* A column too, so the page inside it is a flex item and can be told to
    take the leftover height. `.bus` guarantees 100vh as a MINIMUM, and a
@@ -88,13 +88,13 @@
   background: none; border: 0; font-size: var(--fs-md); color: var(--text-primary);
 }
 .buapps .buapps__search input:focus-visible { outline: none; }
-.buapps__search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.buapps__search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
 
 .buapps__hidden {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
 }
-.buapps .buapps__hidden input { width: auto; height: auto; accent-color: var(--brand); }
+.buapps .buapps__hidden input { width: auto; height: auto; accent-color: var(--accent); }
 
 .buapps__grid {
   list-style: none; margin: 0; padding: 0;
@@ -110,7 +110,7 @@
   transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
 }
 .buapps__card:hover { border-color: var(--border-strong); box-shadow: var(--el-low); }
-.buapps__card:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.buapps__card:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
 .buapps__name { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .buapps__proto { font-size: var(--fs-xs); color: var(--text-muted); }
 
@@ -118,7 +118,7 @@
 
 .bpm { position: relative; display: inline-flex; }
 .bpm__trigger { cursor: pointer; border: 0; }
-.bpm__trigger:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bpm__trigger:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* Anchored to the right edge under the avatar, which is where both live
    consoles put it. */
@@ -132,7 +132,7 @@
 .bpm__whoav {
   flex: none; display: grid; place-items: center;
   width: 32px; height: 32px; border-radius: var(--radius-full);
-  background: var(--brand-subtle-bg); color: var(--brand-active);
+  background: var(--accent-soft); color: var(--accent-strong);
   font-size: var(--fs-xs); font-weight: var(--fw-semibold);
 }
 .bpm__whotext { display: flex; flex-direction: column; min-width: 0; }

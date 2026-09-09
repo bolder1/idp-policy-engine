@@ -64,13 +64,15 @@
   font-size: var(--fs-sm);
   color: var(--text-body);
 }
+/* Sentence case. These are questions - "If it does not answer", "Gives up
+   after" - and a question set in letterspaced caps stops looking like one. */
 .bhk__fact strong {
   display: block;
   font-size: var(--fs-xs);
-  font-weight: 400;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-weight: var(--fw-regular);
+  color: var(--text-tertiary);
+  text-transform: none;
+  letter-spacing: 0;
 }
 /* Neither failure mode is coloured as danger. They are two defensible answers
    to one question, and tinting one red would make the form read as though the
@@ -99,16 +101,19 @@
 /* --- Used by --------------------------------------------------------------- */
 
 .bhk__uses { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--border-subtle); }
+/* A label, not a section heading. It sits over one line of text; drawn as an
+   eyebrow in caps it announced a section that never arrives. */
 .bhk__useshead {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
   font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
+  font-weight: var(--fw-medium);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-tertiary);
 }
-.bhk__usesnone { margin: var(--space-3) 0 0; font-size: var(--fs-sm); color: var(--text-muted); }
+.bhk__usesnone { margin: var(--space-3) 0 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
 /* The rows this section drew for its used-by list are `.buse` in used-by.css
    now. Removed rather than left: they were `.bhk__uses ul li` and friends, so
    they went on matching the shared list that replaced them and re-flattened its
@@ -153,8 +158,8 @@
 .bhk__field textarea:focus-visible,
 .bhk__field select:focus-visible {
   outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px var(--brand-subtle-bg);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--focus-halo);
 }
 
 .bhk__modes { display: flex; flex-direction: column; gap: var(--space-4); margin: 0; padding: 0; border: none; }
@@ -174,8 +179,8 @@
   cursor: pointer;
 }
 .bhk__modes label:hover { border-color: var(--int-neutral-border-hover); }
-.bhk__modes label.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
-.bhk__modes input { margin-top: 3px; accent-color: var(--brand); }
+.bhk__modes label.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.bhk__modes input { margin-top: 3px; accent-color: var(--accent); }
 .bhk__modes svg { flex: none; margin-top: 2px; color: var(--text-tertiary); }
 .bhk__modes strong { display: block; font-size: var(--fs-md); font-weight: var(--fw-medium); }
 .bhk__modes em {

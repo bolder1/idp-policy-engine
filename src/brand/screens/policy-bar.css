@@ -96,7 +96,7 @@
 .bpbar__fact dt {
   display: inline-flex; align-items: center; gap: var(--space-2);
   flex: none;
-  font-size: 10px; font-weight: var(--fw-semibold); letter-spacing: 0.06em; text-transform: uppercase;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: 0.06em; text-transform: uppercase;
   /* Tertiary, not muted. The tint the label used to sit on was the DARKER
      surface in dark theme, so taking it away lightened the ground under a
      10px label and dropped it to 2.8:1. Tertiary is 4.7:1 on both themes. */
@@ -133,7 +133,7 @@
   text-underline-offset: 4px;
 }
 .bpbar__peek:hover,
-.bpbar__peek.is-open { text-decoration-color: var(--brand); }
+.bpbar__peek.is-open { text-decoration-color: var(--accent); }
 .bpbar__peek:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-xs); }
 
 .bpbar__plist,
@@ -189,7 +189,7 @@
   background: var(--surface-raised);
   font-family: inherit; font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
 }
-.bpbar__edit:hover { border-color: var(--brand); color: var(--brand); }
+.bpbar__edit:hover { border-color: var(--accent); color: var(--accent); }
 
 @media (max-width: 900px) {
   .bpbar { padding: var(--space-5); }

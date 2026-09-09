@@ -49,7 +49,7 @@ export function Templates() {
     <div className="bpage">
       <PageHead
         title="Policy templates"
-        caption="Reusable blueprints. They appear in the scenario picker when creating a new policy."
+        caption="Reusable policy blueprints."
         actions={<Button variant="brand">New template</Button>}
       />
       <div className="btoolbar">

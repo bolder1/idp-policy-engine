@@ -8,14 +8,23 @@
   margin-bottom: var(--space-6);
 }
 .btoolbar__filters { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
-.btoolbar__right { margin-left: auto; display: flex; gap: var(--space-4); }
+.btoolbar__right { margin-left: auto; display: flex; align-items: center; gap: var(--space-5); }
+/* How many rows survived the filters. Every list screen carries one, in the
+   same place and the same voice — Zones had it, nothing else did, so the
+   answer to "is this all of them?" depended on which page you were on. */
+.btoolbar__count {
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .btoolbar__select { width: 168px; }
 /* A filter that is doing something looks different from one that is not — the
    only way to tell an active filter from a default at a glance. */
 .btoolbar__select.is-set {
-  border-color: var(--brand);
-  background: var(--brand-subtle-bg);
-  color: var(--brand-active);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
   font-weight: var(--fw-medium);
 }
 .btoolbar__clear { font-size: var(--fs-md); color: var(--text-link); }
@@ -42,47 +51,103 @@
 .btable__scroll { overflow-x: auto; }
 .btable {
   width: 100%;
-  min-width: 980px;
+  /* 720, not 980.
+
+     980 was set so a policy name would never wrap, and it worked — at the cost
+     of putting the Actions column off the right edge on any laptop narrower
+     than about 1300px, because the rail takes 235 and the page inset takes 64.
+     A row menu you have to scroll sideways to reach is a row menu most people
+     never find.
+
+     The name column still gets everything that is left; what changed is that
+     the columns which are the SAME width whatever is in them — a status pill, a
+     kebab — now say so, instead of each taking an equal share of a table that
+     was too wide to begin with. */
+  min-width: 720px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: var(--fs-md);
 }
+/* Fixed-content columns, sized to their content rather than to their share. */
+.btable__col-status { width: 128px; }
+.btable__col-actions { width: 56px; }
+/* The row menu stays reachable when the table does scroll. It is the only
+   column whose position matters more than its context. */
+.btable thead th.btable__col-actions,
+.btable td.btable__right {
+  position: sticky;
+  right: 0;
+  background: inherit;
+}
+.btable thead th.btable__col-actions { background: var(--table-head-bg); }
+.btable tbody td.btable__right { background: var(--surface-raised); }
+.btable tbody tr:hover td.btable__right { background: var(--table-row-hover); }
+/* Every value from the table recipe in console-theme.css — see the block there
+   for what each one is doing and why. */
 .btable thead th {
   height: var(--table-header-h);
-  padding: 0 var(--space-6);
+  padding: 0 var(--table-cell-x);
   text-align: left;
-  background: var(--surface-sunken);
-  border-bottom: var(--bw-thin) solid var(--border-subtle);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
+  background: var(--table-head-bg);
+  border-bottom: var(--bw-thin) solid var(--table-head-rule);
+  font-size: var(--table-head-fs);
+  font-weight: var(--table-head-fw);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--table-head-fg);
   white-space: nowrap;
 }
+
+/* The sort control fills its cell rather than shrink-wrapping the word.
+
+   As an `inline-flex` it was a target the width of the label, so the eight
+   pixels either side of it — inside the same header cell, over the same column —
+   did nothing on click. A header you have to hit exactly is a header nobody
+   discovers is sortable. It stretches to the cell and keeps its own focus ring.
+
+   The direction glyph sits at the END of the flow rather than beside the word,
+   so the arrows on every sortable column line up in a row instead of tracking
+   the length of each label. */
 .btable__sort {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: var(--space-3);
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  height: 100%;
+  padding: 0;
   font: inherit;
   color: inherit;
   text-transform: inherit;
   letter-spacing: inherit;
 }
-.btable__sort span { opacity: 0.4; }
+.btable__right .btable__sort { flex-direction: row-reverse; }
+/* The un-sorted glyph is a hint, not a state: it appears when the pointer or
+   the keyboard reaches the column and is otherwise out of the way. A column of
+   permanent ⇅ marks reads as four things needing attention. */
+.btable__sort span {
+  flex: none;
+  opacity: 0;
+  color: var(--text-muted);
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.btable thead th:hover .btable__sort span,
+.btable__sort:focus-visible span { opacity: 1; }
 .btable__sort.is-on { color: var(--text-primary); }
-.btable__sort.is-on span { opacity: 1; color: var(--brand); }
+.btable__sort.is-on span { opacity: 1; color: var(--accent); }
 .btable__right { text-align: right; }
+/* Counts and dates line up on the digit, not on the word. */
+.btable__num { text-align: right; font-variant-numeric: tabular-nums; }
 
 .btable tbody td {
   height: var(--table-row-h);
-  padding: var(--space-4) var(--space-6);
-  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  padding: var(--space-4) var(--table-cell-x);
+  border-bottom: var(--bw-thin) solid var(--table-rule);
   vertical-align: middle;
 }
 .btable tbody tr:last-child td { border-bottom: none; }
 .btable tbody tr { transition: background var(--dur-fast) var(--ease-standard); }
-.btable tbody tr:hover { background: var(--surface-sunken); }
+.btable tbody tr:hover { background: var(--table-row-hover); }
 /* The system policy is the FLOOR under the list, not a highlight in it.
 
    It was washed in `--brand-subtle-bg` — the only warm thing in a table of
@@ -110,7 +175,7 @@
   text-align: left;
   white-space: nowrap;
 }
-.btable__link:hover { color: var(--brand-active); text-decoration: underline; text-underline-offset: 2px; }
+.btable__link:hover { color: var(--accent-strong); text-decoration: underline; text-underline-offset: 2px; }
 .btable__marks { display: inline-flex; align-items: center; gap: var(--space-3); }
 .btable__allapps { font-size: var(--fs-sm); color: var(--text-secondary); }
 /* The application, named. This cell held an overlapping stack of marks and a
@@ -122,30 +187,29 @@
 
    Deliberately not a red pill on every failing row. Nine rows of red stop
    meaning danger within a day — the same reason COMPONENTS.md makes destructive
-   row triggers neutral — so the tone lives in a dot and the grade letter, and
-   the row stays readable. The letter is last because the finding is the thing
+   row triggers neutral — so the tone lives in the grade letter and
+   the row stays readable.
+
+   The dot in front of the words is gone. It carried the same tone as the
+   grade letter three words to its right, so the cell stated its severity
+   twice and the left-hand copy was the one with no content in it. The letter is last because the finding is the thing
    worth reading and the grade is the thing worth ranking by. */
 .btable__exposure {
   display: inline-flex; align-items: center; gap: 7px;
-  padding: 3px 8px 3px 7px;
-  border: 1px solid transparent; border-radius: var(--radius-md);
+  padding: 3px var(--space-4);
+  border: var(--bw-thin) solid transparent; border-radius: var(--radius-md);
   background: none; font-size: var(--fs-sm); color: var(--text-secondary);
   cursor: pointer; white-space: nowrap;
 }
 .btable__exposure:hover { border-color: var(--border-default); background: var(--surface-raised); }
-.btable__exposure:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-.btable__exposure i { width: 7px; height: 7px; border-radius: var(--radius-full); flex: none; }
+.btable__exposure:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .btable__exposure b {
   min-width: 15px; padding: 0 4px; border-radius: var(--radius-xs);
   font-size: var(--fs-xs); font-weight: var(--fw-bold); text-align: center;
 }
-.btable__exposure.is-ok i { background: var(--fb-positive-dot); }
 .btable__exposure.is-ok b { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
-.btable__exposure.is-notice i { background: var(--fb-neutral-dot); }
 .btable__exposure.is-notice b { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); }
-.btable__exposure.is-warn i { background: var(--fb-notice-dot); }
 .btable__exposure.is-warn b { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
-.btable__exposure.is-bad i { background: var(--fb-negative-dot); }
 .btable__exposure.is-bad b { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
 .btable__exposure.is-bad { color: var(--fb-negative-fg); }
 
@@ -163,7 +227,7 @@
   text-underline-offset: 3px;
 }
 .btable__rules:hover,
-.btable__rules.is-open { text-decoration-color: var(--brand); color: var(--text-primary); }
+.btable__rules.is-open { text-decoration-color: var(--accent); color: var(--text-primary); }
 .btable__rules:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-xs); }
 
 /* --- Rule peek -------------------------------------------------------------
@@ -186,7 +250,7 @@
 }
 .brpk__head {
   padding: 2px 4px 7px;
-  font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;
+  font-size: var(--fs-xs); letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--text-tertiary);
 }
 .brpk__stack {
@@ -264,7 +328,7 @@
 .bmenu button:hover svg { color: var(--text-secondary); }
 .bmenu button:focus-visible {
   outline: none; background: var(--surface-sunken);
-  box-shadow: 0 0 0 2px var(--focus-ring);
+  box-shadow: 0 0 0 4px var(--focus-halo);
 }
 
 /* The one item that cannot be undone by clicking again.
@@ -306,18 +370,18 @@
   transition: background var(--dur-fast) var(--ease-standard);
 }
 .bnew__item:hover { background: var(--surface-sunken); }
-.bnew__item.is-on { background: var(--brand-subtle-bg); border-color: var(--brand-subtle-border); }
+.bnew__item.is-on { background: var(--accent-soft); border-color: var(--accent-soft-border); }
 .bnew__item-head { display: flex; align-items: center; gap: var(--space-4); }
 .bnew__item-head strong { font-size: var(--fs-md); font-weight: var(--fw-medium); }
 .bnew__item-desc { display: block; margin-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.45; }
 .bnew__item-badge {
   display: inline-block;
   margin-top: var(--space-3);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--brand-active);
+  color: var(--accent-strong);
 }
 .bnew__none { padding: var(--space-6); font-size: var(--fs-sm); color: var(--text-tertiary); }
 
@@ -366,7 +430,7 @@
   text-align: left;
   transition: border-color var(--dur-fast) var(--ease-standard);
 }
-.bnew__opt:hover { border-color: var(--brand); }
+.bnew__opt:hover { border-color: var(--accent); }
 .bnew__opt strong { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
 .bnew__opt span { display: block; margin-top: 2px; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.45; }
 
@@ -374,11 +438,11 @@
 .bname { display: flex; flex-direction: column; gap: var(--space-7); }
 .bname__from {
   padding: var(--space-5);
-  background: var(--brand-subtle-bg);
-  border: var(--bw-thin) solid var(--brand-subtle-border);
+  background: var(--accent-soft);
+  border: var(--bw-thin) solid var(--accent-soft-border);
   border-radius: var(--radius-md);
   font-size: var(--fs-sm);
-  color: var(--brand-active);
+  color: var(--accent-strong);
 }
 .bname__field { display: flex; flex-direction: column; gap: var(--space-4); }
 .bname__hint { font-size: var(--fs-sm); color: var(--text-tertiary); }
@@ -396,7 +460,7 @@
   transition: all var(--dur-fast) var(--ease-standard);
 }
 .bname__app:hover { border-color: var(--border-strong); }
-.bname__app.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bname__app.is-on { border-color: var(--accent); background: var(--accent-soft); }
 .bname__app-name { font-size: var(--fs-sm); font-weight: var(--fw-medium); }
 .bname__app-proto { font-size: var(--fs-xs); color: var(--text-muted); }
 
@@ -458,9 +522,9 @@
   font-weight: var(--fw-semibold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--brand-active);
-  background: var(--brand-subtle-bg);
-  border: var(--bw-thin) solid var(--brand-subtle-border);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border: var(--bw-thin) solid var(--accent-soft-border);
   padding: 1px var(--space-4);
   border-radius: var(--radius-sm);
 }
@@ -491,7 +555,7 @@
   color: var(--text-secondary);
   transition: all var(--dur-fast) var(--ease-standard);
 }
-.bcond__joiner--or { border-color: var(--brand); background: var(--brand-subtle-bg); color: var(--brand-active); }
+.bcond__joiner--or { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
 .bcond__joiner:hover { border-color: var(--border-strong); }
 
 .bcond__row {
@@ -505,7 +569,7 @@
   background: var(--surface-sunken);
 }
 .bcond__type { display: flex; flex-direction: column; min-width: 140px; flex: none; }
-.bcond__group { font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+.bcond__group { font-size: var(--fs-xs); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
 .bcond__type { font-size: var(--fs-sm); font-weight: var(--fw-medium); }
 .bcond__op { width: auto; min-width: 128px; height: var(--ctl-height-sm); font-size: var(--fs-sm); flex: none; }
 .bcond__val { flex: 1; min-width: 0; display: flex; }
@@ -522,7 +586,7 @@
   font-size: var(--fs-xs);
   color: var(--text-secondary);
 }
-.bcond__opt.is-on { background: var(--brand-subtle-bg); border-color: var(--brand); color: var(--brand-active); font-weight: var(--fw-medium); }
+.bcond__opt.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); font-weight: var(--fw-medium); }
 .bcond__time { display: flex; align-items: center; gap: var(--space-3); }
 .bcond__time input { width: 90px; }
 .bcond__time span { font-size: var(--fs-sm); color: var(--text-tertiary); }
@@ -561,7 +625,7 @@
 .bfactors__row select { width: 260px; }
 .bfactors__checks { display: flex; gap: var(--space-8); flex-wrap: wrap; }
 .bfactors__checks label { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer; }
-.bfactors__checks input { accent-color: var(--brand); }
+.bfactors__checks input { accent-color: var(--accent); }
 
 /* --- Condition picker ----------------------------------------------------- */
 
@@ -647,7 +711,7 @@
 }
 .btest__matched { font-size: var(--fs-sm); color: var(--text-secondary); }
 .btest__chain { list-style: none; margin: 0; padding: 0; font-size: var(--fs-xs); color: var(--text-tertiary); display: flex; flex-direction: column; gap: var(--space-2); }
-.btest__chain .is-hit { color: var(--brand-active); font-weight: var(--fw-medium); }
+.btest__chain .is-hit { color: var(--accent-strong); font-weight: var(--fw-medium); }
 .btest__seelabel { margin-top: var(--space-3); }
 .btest__steps { margin: 0; padding-left: var(--space-7); font-size: var(--fs-sm); color: var(--text-secondary); }
 
@@ -744,8 +808,8 @@
   text-decoration: underline dotted var(--border-strong); text-underline-offset: 3px;
 }
 .bz7__usespeek:hover,
-.bz7__usespeek.is-open { color: var(--brand-active); text-decoration-color: var(--brand); }
-.bz7__usespeek:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.bz7__usespeek.is-open { color: var(--accent-strong); text-decoration-color: var(--accent); }
+.bz7__usespeek:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
 
 /* The policy's state, as a dot. `.brpk__where` and a rule count stood here;
    both were answering questions nobody asked of a hover — the NAME is what this

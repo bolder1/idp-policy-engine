@@ -84,7 +84,7 @@
               background var(--dur-fast) var(--ease-standard);
 }
 .bts__user:hover { border-color: var(--border-default); }
-.bts__user.is-on { background: var(--brand-subtle-bg); border-color: var(--brand); }
+.bts__user.is-on { background: var(--accent-soft); border-color: var(--accent); }
 
 .bts__avatar {
   flex: none;
@@ -98,7 +98,7 @@
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
 }
-.bts__user.is-on .bts__avatar { background: var(--brand); color: var(--text-on-brand); }
+.bts__user.is-on .bts__avatar { background: var(--accent); color: var(--text-on-brand); }
 
 .bts__usertext { min-width: 0; display: flex; flex-direction: column; }
 .bts__usertext strong {
@@ -147,9 +147,9 @@
 }
 .bts__opt:hover { border-color: var(--border-strong); color: var(--text-primary); }
 .bts__opt.is-on {
-  background: var(--brand-subtle-bg);
-  border-color: var(--brand);
-  color: var(--brand-active);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
   font-weight: var(--fw-medium);
 }
 

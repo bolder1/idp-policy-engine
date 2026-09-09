@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 
 import { PageHead } from '../Shell'
-import { Button, Toggle } from '../kit'
+import { Button, TipMark, Toggle } from '../kit'
 import { Picker } from '../picker'
 import { TierPick } from '../tier-pick'
 import { PlatformMark } from '../logos/PlatformMark'
@@ -149,7 +149,7 @@ export function RiskSignals() {
     <div className="bpage">
       <PageHead
         title="Risk signal profile"
-        caption="What a suspicious sign-in is worth. Switch a signal off to stop listening to it, or change how hard it pushes when it fires."
+        caption="What a suspicious sign-in is worth."
         actions={
           /* Absent until there is something to restore. A button that resets a
              page nobody has changed is a button whose only possible outcome is
@@ -178,7 +178,7 @@ export function RiskSignals() {
         <div className="brs__scale__what">
           <b>What a risk verdict scores</b>
           <em>
-            Rules compare against these with <strong>Risk score</strong>, the one risk condition. {onCount} of {RISK_SIGNALS.length} signals on.
+            Rules compare against these with <strong>Risk score</strong>. {onCount} of {RISK_SIGNALS.length} signals on.
           </em>
         </div>
         <dl className="brs__bands">
@@ -200,8 +200,8 @@ export function RiskSignals() {
       <p className="brs__gap">
         <Info size={13} strokeWidth={2} aria-hidden />
         <span>
-          These signals come from the mobile SDKs. A sign-in from a browser carries none of them, so its risk verdict is
-          whatever the rest of the policy decides — this page does not change it.
+          Mobile SDKs only.{' '}
+          <TipMark text="A browser sign-in carries none of these signals, so its risk verdict is whatever the rest of the policy decides. This page does not change that." />
         </span>
       </p>
 

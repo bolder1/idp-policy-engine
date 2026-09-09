@@ -28,7 +28,7 @@
 }
 .buse__open > svg { flex: none; color: var(--text-muted); }
 .buse__open:hover { background: var(--surface-hover); }
-.buse__open:hover > svg { color: var(--brand-active); }
+.buse__open:hover > svg { color: var(--accent-strong); }
 .buse__open:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
 
 /* The rules, on an inset strip so the card reads as a policy WITH rules rather

@@ -186,7 +186,7 @@ export function ZonesFinal() {
           <header className="bz7__head">
             <div>
               <h1>Zones</h1>
-              <p>Named boundaries — IP networks and places — that your policy rules reference.</p>
+              <p>IP networks and locations that policy rules reference.</p>
             </div>
             {/* Hidden while the page is empty, because the empty state below
                 already offers this and two brand buttons on one screen make a

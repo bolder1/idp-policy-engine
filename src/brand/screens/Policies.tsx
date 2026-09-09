@@ -5,7 +5,7 @@ import { BookmarkPlus, Copy, Pencil, Trash2, Waypoints } from 'lucide-react'
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
 import { AppLogo } from '../logos/AppLogo'
-import { Badge, Button, InfoDot, StatusPill } from '../kit'
+import { Badge, Button, Callout, InfoDot, StatusPill } from '../kit'
 import { blankPolicy, enforces, type Policy, type PolicyType } from '../data'
 import { NewPolicyDialog } from '../create/NewPolicyDialog'
 import { useBrand } from '../store'
@@ -196,10 +196,15 @@ export function Policies() {
      are failing. */
   const leaking = [...grades.values()].filter((r) => r.breaches > 0).length
 
+  /* `scope` and `aria-sort` are the two things a sortable header owes a screen
+     reader, and neither was here: the column had no association with its cells,
+     and the direction lived only in an arrow glyph marked `aria-hidden`. So the
+     table announced "button, Policy name" and never said it was sorted, or
+     which way. */
   function head(key: SortKey, label: string, extra?: string) {
     const on = sort.key === key
     return (
-      <th className={extra}>
+      <th className={extra} scope="col" aria-sort={on ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
         <button
           type="button"
           className={`btable__sort ${on ? 'is-on' : ''}`}
@@ -309,18 +314,15 @@ export function Policies() {
         <>
       {counts.issues > 0 && (
         <div className="bpolicies__banner">
-          <span className="bx-callout bx-callout--notice">
-            <span className="bx-callout__mark" aria-hidden />
-            <div>
-              <strong>
-                {counts.issues} polic{counts.issues === 1 ? 'y needs' : 'ies need'} attention
-              </strong>
-              <div>
-                They are switched on but cannot take effect as configured. Hover the marker on the
-                row to see why.
-              </div>
-            </div>
-          </span>
+          {/* The kit component, not a hand-built copy of it. This banner
+              reproduced `Callout`'s markup by hand, which is how it kept the
+              dot after the component had moved to an icon. */}
+          <Callout
+            tone="notice"
+            title={`${counts.issues} polic${counts.issues === 1 ? 'y needs' : 'ies need'} attention`}
+          >
+            Switched on, but cannot take effect as configured.
+          </Callout>
         </div>
       )}
 
@@ -370,8 +372,6 @@ export function Policies() {
               Clear filters
             </button>
           )}
-        </div>
-        <div className="btoolbar__right">
           <input
             type="search"
             placeholder="Search policies…"
@@ -380,6 +380,17 @@ export function Policies() {
             onChange={(e) => setQuery(e.target.value)}
             className="btoolbar__search"
           />
+        </div>
+        {/* Everything that narrows the list is on the left; the count of what
+            survived is on the right. Search used to be the right-hand group on
+            this page and the left-hand one on Applications, which is two pages
+            disagreeing about where you type. */}
+        <div className="btoolbar__right">
+          <span className="btoolbar__count">
+            {rows.length === counts.total
+              ? `${counts.total} policies`
+              : `${rows.length} of ${counts.total}`}
+          </span>
         </div>
       </div>
 
@@ -390,12 +401,12 @@ export function Policies() {
             <tr>
               {head('name', 'Policy name')}
 
-              <th>Application</th>
+              <th scope="col">Application</th>
 
               {store.features.exposure && head('exposure', 'Exposure')}
-              <th>Status</th>
+              <th scope="col" className="btable__col-status">Status</th>
 
-              <th className="btable__right">Actions</th>
+              <th scope="col" className="btable__right btable__col-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -505,7 +516,6 @@ function PolicyRow({
                 title={gauntlet.gradeReason}
                 onClick={() => store.go({ name: 'board', policyId: policy.id, open: 'gauntlet' })}
               >
-                <i aria-hidden />
                 {e.label}
                 <b>{gauntlet.grade}</b>
               </button>

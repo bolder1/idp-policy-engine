@@ -537,9 +537,26 @@ export function TerminalCard({
               rather than disabled, because a row of greyed-out buttons invites
               somebody to work out why. */}
           <span className="bb__state">Always on</span>
-          <span className="bb__lock" title="This rule cannot be deleted, reordered or switched off — but what it does is yours">
-            <Lock size={10} strokeWidth={2.2} aria-hidden />
-            Locked
+          {/* A mark, not a pill with a word in it.
+
+              The row read `Always on` · `Locked` · fold: two labelled pills and a
+              button, three things wide, on the one card in the chain that has
+              nothing you can do to it. `Locked` was the least useful of the
+              three — it explains why the buttons this card does NOT have are
+              missing, which is a footnote, not a status. A padlock says it at a
+              glance and the sentence is still there on hover and in the
+              accessible name.
+
+              `role="img"` with an `aria-label`, because a bare `title` is
+              unreachable by keyboard and this is not a control that can take
+              focus. */}
+          <span
+            className="bb__lockmark"
+            role="img"
+            aria-label="Locked. This rule cannot be deleted, reordered or switched off — but what it does is yours."
+            title="This rule cannot be deleted, reordered or switched off — but what it does is yours"
+          >
+            <Lock size={11} strokeWidth={2.2} aria-hidden />
           </span>
           {/* A view control, so it is allowed here.
 

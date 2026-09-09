@@ -1034,14 +1034,16 @@
 
 /* The pill. Neutral, never negative — locked is a lifecycle state, not a
    warning, and this kit keeps those grey. */
-.bb__lock {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 8px; border-radius: var(--radius-full);
-  background: var(--surface-inset); border: 1px solid var(--border-subtle);
-  font-size: 11px; font-weight: var(--fw-medium); color: var(--text-tertiary);
-  white-space: nowrap;
+/* `.bb__lock` was a pill reading “🔒 Locked”. It is the mark alone now — the
+   word explained why buttons this card does not have are missing, which is a
+   footnote rather than a status, and it was taking pill-width on the row beside
+   a second pill and the fold control. Same size and colour as the fold button
+   next to it, so the two read as one quiet cluster at the end of the head. */
+.bb__lockmark {
+  display: grid; place-items: center; flex: none;
+  width: 22px; height: 22px;
+  color: var(--text-tertiary);
 }
-.bb__lock svg { flex: none; }
 
 /* --- Floating chrome over the stage ------------------------------------------ */
 

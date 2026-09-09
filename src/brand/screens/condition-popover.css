@@ -440,6 +440,52 @@
 .cp__fld.is-val.is-unset { border-color: var(--fb-negative-border); border-style: dashed; }
 .cp__fld.is-val.is-unset .cp__fldtext { color: var(--fb-negative-fg); font-style: italic; font-weight: var(--fw-regular); }
 
+/* --- The value, as chips ------------------------------------------------------
+
+   One chip per chosen value, as many as the field's width allows, and the
+   remainder as a count at the end of the same line. `Finance +2` was the shape
+   before, and its argument was about the PILL in the other builder — three
+   segments sharing 200px, where a run of names elides to "Finance, Engi…" and
+   reads as one truncated value rather than as three. This field has the panel's
+   whole width, and at that width the count was discarding names there was room
+   to print.
+
+   The row is `flex: 1` with `min-width: 0`, so its box is a function of the
+   panel rather than of what is in it — which is what lets the fit be measured
+   without the measurement changing the thing being measured. `nowrap` is stated
+   rather than left to the initial value, because a wrap is the exact failure
+   this is defined against. */
+.cp__vchips {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; flex-wrap: nowrap; gap: 4px;
+  position: relative; overflow: hidden;
+}
+/* The ruler: the full list, out of flow and invisible, so a whole chip's width
+   can still be read once the row is showing fewer than it holds. */
+.cp__vruler {
+  position: absolute; left: 0; top: 0;
+  display: flex; align-items: center; gap: 4px;
+  visibility: hidden; pointer-events: none; white-space: nowrap;
+}
+/* A chip's clothes, taken from the one the CARD already draws for a value — same
+   height, same corner, same weight — so a value looks the same on the canvas and
+   in the panel that edits it. The ground is a step darker than the field it sits
+   in, because the field is white and a white chip on white is a border. */
+.cp__vchip {
+  flex: none; max-width: 100%;
+  display: inline-flex; align-items: center;
+  height: 22px; padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-pill);
+  background: var(--surface-inset, var(--surface-sunken));
+  font-style: normal; font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  color: var(--text-primary); white-space: nowrap;
+}
+/* `text-overflow` does not reach an anonymous flex item, so the name needs a box
+   of its own to be clipped in — the same trap the kit's badge documents. */
+.cp__vchip > span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The counter is not a value, and dashed already means "not a value" here. */
+.cp__vchip.is-more { background: none; border-style: dashed; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+
 /* A typed value — a window, a threshold — in the row where a chosen one would
    have been. */
 .cp__inline { display: flex; align-items: center; gap: var(--space-2); }
@@ -478,3 +524,42 @@
 /* A typed value fills the row, the way a chosen one does. */
 .cp__fldinput.is-text { width: 100%; }
 .cp__fldinput::placeholder { color: var(--text-muted); }
+
+/* --- Inside the board's configuration panel, without colour --------------------
+
+   The panel is being drained of hue: it is a form, and a form full of tinted
+   fields spends its loudest signal on saying "this is a field". The canvas
+   beside it keeps its colour — a rule card is a reading, and the tones there
+   carry what a rule decides.
+
+   Scoped on `.bb__insp`, which is the panel: one `<aside>`, rendered from one
+   place, and never on the canvas. The stacked field itself is already board-only
+   — `.cp__fld` exists only when `stacked` is passed, and only `WhenEditor` passes
+   it — but the prefix says WHY these rules are grey rather than leaving it to be
+   rediscovered, and it keeps the trail builder's pill (`.cp__seg`) out of reach
+   by construction rather than by luck. It lands at (0,4,0) against the (0,3,0)
+   rules above, so it wins regardless of which stylesheet loads first — this repo
+   has been bitten by two equal-specificity rules in two files before.
+
+   What CANNOT be reached from here: the menu each field opens is portalled to
+   `document.body`, so its orange ticks and footer link are outside `.bb__insp`
+   and shared with the trail. They are left alone deliberately. */
+.bb__insp .cp__fld.is-val .cp__fldtext { color: var(--text-primary); }
+.bb__insp .cp__fld.is-open { border-color: var(--border-strong); box-shadow: 0 0 0 3px var(--surface-inset, var(--surface-sunken)); }
+.bb__insp .cp__fld:focus-visible { border-color: var(--border-strong); box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__insp .cp__fldinput:focus-visible,
+.bb__insp .cp__fldsel:focus-visible { border-color: var(--border-strong); box-shadow: 0 0 0 2px var(--focus-ring); }
+/* Nothing chosen, said with a dash and a weight rather than with red.
+
+   The dash is the strongest non-hue mark available here — one dashed edge in a
+   column of solid ones is unmissable, and it survives greyscale and a colour
+   deficiency, which a 1px #f5c6ce does not. The text goes QUIETER rather than
+   louder, which is also the more truthful reading: an unanswered field is an
+   absence, and this stylesheet already says exactly that about the select whose
+   value is the tenant default. The linter states the consequence in words. */
+.bb__insp .cp__fld.is-val.is-unset { border-color: var(--border-strong); }
+.bb__insp .cp__fld.is-val.is-unset .cp__fldtext { color: var(--text-tertiary); }
+.bb__insp .cp__del:hover { background: var(--surface-inset, var(--surface-sunken)); color: var(--text-primary); }
+/* The zone-half capsule already says `network` or `map` in words, and it only
+   exists when the condition is narrowed — its presence is the signal. */
+.bb__insp .cp__scopetag { background: var(--surface-inset, var(--surface-sunken)); color: var(--text-secondary); }

@@ -140,6 +140,108 @@ export function summarise(names: string[], placeholder: string): string {
   return `${names[0]} +${names.length - 1}`
 }
 
+/* Every value, spoken. `or`, because the evaluator is `vals.some(…)` — see the
+   argument on `conditionSentence` in predicate-prose.ts, which this follows so
+   the field and the prose read a condition the same way. */
+function spoken(ns: string[]): string {
+  if (ns.length === 0) return ''
+  if (ns.length <= 2) return ns.join(' or ')
+  return `${ns.slice(0, -1).join(', ')} or ${ns[ns.length - 1]}`
+}
+
+/* How many chips fit on one line, and how many are left over.
+
+   Measured from the DOM rather than derived from React state, and that is not a
+   preference. The panel's width is written straight to a custom property during
+   a grip drag — `--bb-insp`, set on the shell, committed to state only when the
+   pointer comes up — and the panel's grid track is `min(var(--bb-insp), 46%)`,
+   so a WINDOW resize moves this field too. Both of those change the row's width
+   with no render in between, which a width-derived count would sleep through:
+   the chips would freeze mid-drag and snap once on release, and never react to
+   the window at all.
+
+   The measurement comes off a RULER — a copy of the full chip list, out of flow
+   and invisible, that is never cut. Measuring the visible row instead would
+   read the widths of whatever survived the last cut, so the row could shrink
+   and never grow back.
+
+   It cannot loop. The row is `flex: 1` inside a fixed-width button with
+   `min-width: 0`, so its own box is a function of the panel and not of what is
+   in it — hiding a chip physically cannot re-fire the observer that hid it. The
+   ruler is absolutely positioned and contributes nothing to that box either.
+
+   `offsetWidth`, not `getBoundingClientRect()`: the panel is never scaled today,
+   but the canvas beside it is, and the unscaled read is the one that stays
+   correct if this is ever drawn on the world. */
+function useFitCount(row: RefObject<HTMLElement | null>, ruler: RefObject<HTMLElement | null>, n: number, key: string) {
+  const [shown, setShown] = useState(n)
+  useLayoutEffect(() => {
+    const el = row.current
+    const rl = ruler.current
+    if (!el || !rl) return
+    const fit = () => {
+      const room = el.clientWidth
+      const kids = [...rl.children] as HTMLElement[]
+      /* The last child of the ruler is the counter at its widest plausible
+         value. Reserving the CURRENT counter's width instead would let dropping
+         a chip widen `+9` to `+10` and re-overflow the row just fitted. */
+      const more = kids.length ? kids[kids.length - 1].offsetWidth + CHIP_GAP : 0
+      const ws = kids.slice(0, -1).map((c) => c.offsetWidth)
+      if (!room || ws.length === 0) return
+      let used = 0
+      let k = 0
+      for (let i = 0; i < ws.length; i++) {
+        const w = ws[i] + (i ? CHIP_GAP : 0)
+        if (used + w + (i < ws.length - 1 ? more : 0) > room) break
+        used += w
+        k++
+      }
+      /* At least one, always. A field showing `+3` and no name says less than
+         the text it replaced; the one chip ellipsizes inside itself instead. */
+      const next = Math.max(1, k)
+      setShown((p) => (p === next ? p : next))
+    }
+    fit()
+    const ro = new ResizeObserver(fit)
+    ro.observe(el)
+    /* A webfont swapping in widens every chip inside a box whose own size never
+       changes, so the observer would never hear about it. */
+    void document.fonts?.ready.then(fit).catch(() => {})
+    return () => ro.disconnect()
+  }, [row, ruler, n, key])
+  return Math.min(shown, n)
+}
+
+/** The gap between two chips, and it has to agree with `.cp__vchips`. */
+const CHIP_GAP = 4
+
+function ValueChips({ names, keys }: { names: string[]; keys: string[] }) {
+  const row = useRef<HTMLSpanElement | null>(null)
+  const ruler = useRef<HTMLSpanElement | null>(null)
+  const shown = useFitCount(row, ruler, names.length, keys.join(' '))
+  const rest = names.length - shown
+  /* Keyed by the VALUE, not by the name. Two groups can be called the same
+     thing, and the id is what the row is actually about. */
+  const chip = (i: number) => (
+    <i className="cp__vchip" key={keys[i] ?? i} title={names[i]}>
+      <span>{names[i]}</span>
+    </i>
+  )
+  return (
+    <span className="cp__vchips" ref={row}>
+      {names.slice(0, shown).map((_, i) => chip(i))}
+      {rest > 0 && <i className="cp__vchip is-more">+{rest}</i>}
+      {/* The ruler. Never cut, never seen, never in flow — it is the only place
+          a whole chip's width can be read once the row is showing fewer than it
+          holds. `+99` stands in for the counter at its widest. */}
+      <span className="cp__vruler" ref={ruler} aria-hidden>
+        {names.map((_, i) => chip(i))}
+        <i className="cp__vchip is-more">+99</i>
+      </span>
+    </span>
+  )
+}
+
 /** Which of the three menus is open. Never two: they share one anchor line. */
 type Part = 'what' | 'op' | 'val'
 
@@ -238,8 +340,20 @@ export function ConditionPopover({
 
   const close = useCallback(() => setOpen(null), [])
 
+  /* Every value, joined the way the evaluator reads them.
+
+     `or`, never commas alone: a condition holds when ANY of its values match —
+     the evaluator is `vals.some(…)` — and a comma-separated list reads as a
+     conjunction. The argument is written out in full on `conditionSentence`.
+
+     And EVERY name, where this said the first one and a count. The field draws
+     as many chips as its width allows and hides the remainder behind a `+N`, so
+     a label that stopped at the first name would leave a screen-reader user
+     knowing strictly less than the chips already say to everybody else — and
+     what the label announces would depend on how wide the panel happened to be,
+     which is not a thing an accessible name may depend on. */
   const valueLabel = `Change what ${t.label} is compared against. Currently ${
-    unset ? 'nothing chosen' : names.length > 1 ? `${names[0]} and ${names.length - 1} more` : names[0] || summary
+    unset && !names.length ? 'nothing chosen' : spoken(names.length ? names : values) || summary
   }.`
 
   /* Which half of a zone, when it is narrower than the zone as written. Absent
@@ -392,7 +506,21 @@ export function ConditionPopover({
           label={valueLabel}
           onOpen={() => setOpen((o) => (o === 'val' ? null : 'val'))}
         >
-          {summary}
+          {/* The chosen values, one chip each, as many as the field is wide
+              enough to hold — and the rest as a count on the same line.
+
+              `Finance +2` was the old answer and its argument was about the
+              PILL: three segments sharing 200px, where a run of names elides to
+              "Finance, Engi…" and reads as one truncated value. The stacked
+              field has the whole panel, and at that width the count was
+              throwing away names there was room to print. A chip also says
+              where one value stops and the next begins, which is the thing a
+              comma cannot do inside a box that may be cut.
+
+              Below the chips it is unchanged: an unanswered field still says
+              `Choose…` in words, because a chip drawn around the absence of a
+              value is a box saying nothing. */}
+          {names.length > 0 ? <ValueChips names={names} keys={values} /> : summary}
           {scopeTag}
         </Field>
       )}

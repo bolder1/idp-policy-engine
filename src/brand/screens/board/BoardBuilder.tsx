@@ -630,6 +630,20 @@ export function BoardBuilder({
       ) : (
       <Board
         policy={draft}
+        /* The one lookup the stage would otherwise need a store for.
+
+           `appById` resolves an unknown id to the first application rather than
+           to nothing, which is a trap two other call sites already note — so the
+           id is checked against the live list here and an application that has
+           been deleted out from under the policy reads as no application, which
+           is what it now is. */
+        destination={
+          draft.appId
+            ? (store.apps.find((a) => a.id === draft.appId)?.name ?? null)
+            : draft.isSystem
+              ? 'any application'
+              : null
+        }
         selection={selection}
         diagnostics={diagnostics}
         shadowed={shadowed}

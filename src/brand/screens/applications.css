@@ -22,7 +22,7 @@
 .bapl__search { width: 340px; max-width: 100%; }
 
 .bapl__viewswitch button:disabled {
-  opacity: var(--disabled-opacity)2;
+  opacity: var(--disabled-opacity);
   cursor: not-allowed;
 }
 

@@ -433,7 +433,7 @@ html[data-theme='dark'] {
 .bx-toggle.is-on { background: var(--fb-positive-fg); border-color: var(--fb-positive-fg); }
 .bx-toggle:not(:disabled):hover { border-color: var(--border-strong); }
 .bx-toggle.is-on:not(:disabled):hover { filter: brightness(0.93); }
-.bx-toggle:disabled { opacity: var(--disabled-opacity)5; cursor: not-allowed; }
+.bx-toggle:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
 
 .bx-toggle__knob {
   position: absolute; left: 2px; top: 50%;

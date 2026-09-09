@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import { Check, Pencil, QrCode, ShieldCheck, Smartphone, X } from 'lucide-react'
 
 import { Button, Toggle } from '../kit'
+import { Picker } from '../picker'
 import type { AuthMethod } from '../methods'
 import { SECURITY_QUESTIONS, enrolShapeFor, type EnrolShape } from '../user-methods'
 import { MethodIcon } from './recovery'
@@ -232,14 +233,14 @@ function EnrolForm({
             <div className="bmu__pair" key={i}>
               <label className="bmu__field">
                 <span className="u-sr-only">Question {i + 1}</span>
-                <select value={draft[`q${i}`] ?? ''} onChange={(e) => set(`q${i}`, e.target.value)}>
-                  <option value="">Select question</option>
-                  {SECURITY_QUESTIONS.map((q) => (
-                    <option key={q} value={q}>
-                      {q}
-                    </option>
-                  ))}
-                </select>
+                <Picker
+                  label={`Security question ${i + 1}`}
+                  width="fill"
+                  value={draft[`q${i}`] ?? ''}
+                  placeholder="Select question"
+                  options={SECURITY_QUESTIONS.map((q) => ({ value: q, label: q }))}
+                  onChange={(v) => set(`q${i}`, v)}
+                />
               </label>
               <label className="bmu__field">
                 <span className="u-sr-only">Answer {i + 1}</span>
@@ -351,3 +352,4 @@ function EnrolForm({
       )
   }
 }
+

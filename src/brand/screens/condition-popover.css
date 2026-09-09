@@ -676,19 +676,10 @@
    which attribute a condition is about, and which timezone a window is read in.
    `Pop` would be the wrong tool: it exists to carry search, multi-select and a
    footer that navigates, and none of those apply to eight timezones. */
-.cp__fldsel {
-  width: 100%; min-width: 0; min-height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
-  background: var(--surface-base, var(--surface-raised));
-  font: inherit; font-size: var(--fs-sm); color: var(--text-primary);
-  cursor: pointer;
-}
-.cp__fldsel:hover { border-color: var(--border-strong); }
-.cp__fldsel:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
-/* The tenant default, and an attribute nobody has named yet, read as absences
-   rather than as values. */
-.cp__fldsel:has(option[value='']:checked) { color: var(--text-tertiary); }
+/* `.cp__fldsel` stood here — the two native `<select>`s this file drew, for an
+   attribute's key and a window's timezone. The comment above argued `Pop` was
+   the wrong tool for eight timezones, and it was; the right one was `Picker`,
+   which the console already had. */
 
 /* A typed value fills the row, the way a chosen one does. */
 .cp__fldinput.is-text { width: 100%; }
@@ -716,8 +707,7 @@
 .bb__insp .cp__fld.is-val .cp__fldtext { color: var(--text-primary); }
 .bb__insp .cp__fld.is-open { border-color: var(--border-strong); box-shadow: 0 0 0 3px var(--surface-inset, var(--surface-sunken)); }
 .bb__insp .cp__fld:focus-visible { border-color: var(--border-strong); box-shadow: 0 0 0 2px var(--focus-ring); }
-.bb__insp .cp__fldinput:focus-visible,
-.bb__insp .cp__fldsel:focus-visible { border-color: var(--border-strong); box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__insp .cp__fldinput:focus-visible { border-color: var(--border-strong); box-shadow: 0 0 0 2px var(--focus-ring); }
 /* Nothing chosen, said with a dash and a weight rather than with red.
 
    The dash is the strongest non-hue mark available here — one dashed edge in a

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Globe } from 'lucide-react'
 
 import { ProfileMenu } from './ProfileMenu'
+import { Picker } from './picker'
 import { useBrand, type BrandScreen } from './store'
 
 /* -----------------------------------------------------------------------------
@@ -65,13 +66,12 @@ export function UserShell({ children }: { children: ReactNode }) {
           <label className="bus__lang">
             <Globe size={18} strokeWidth={1.7} aria-hidden />
             <span className="u-sr-only">Language</span>
-            <select value={lang} onChange={(e) => setLang(e.target.value)}>
-              {LANGUAGES.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
+            <Picker
+              label="Language"
+              value={lang}
+              options={LANGUAGES.map((l) => ({ value: l, label: l }))}
+              onChange={setLang}
+            />
           </label>
           <ProfileMenu initials="MD" />
         </div>
@@ -81,3 +81,4 @@ export function UserShell({ children }: { children: ReactNode }) {
     </div>
   )
 }
+

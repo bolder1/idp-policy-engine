@@ -3,6 +3,7 @@ import { AlertTriangle, Info, Link2, Plus, RefreshCw, Trash2, Zap } from 'lucide
 
 import { PageHead } from '../Shell'
 import { Badge, Button, Modal } from '../kit'
+import { Picker } from '../picker'
 import { useBrand } from '../store'
 import { Webhook } from 'lucide-react'
 import { EmptyState } from '../empty'
@@ -331,10 +332,16 @@ function HookForm({
         <div className="bhk__row">
           <label className="bhk__field bhk__field--method">
             <span>Method</span>
-            <select value={draft.method} onChange={(e) => set({ method: e.target.value as Hook['method'] })}>
-              <option>GET</option>
-              <option>POST</option>
-            </select>
+            <Picker
+              label="HTTP method"
+              width="fill"
+              value={draft.method}
+              options={[
+                { value: 'GET', label: 'GET' },
+                { value: 'POST', label: 'POST' },
+              ]}
+              onChange={(v) => set({ method: v as Hook['method'] })}
+            />
           </label>
           <label className="bhk__field">
             <span>Endpoint</span>

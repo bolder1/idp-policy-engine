@@ -1041,11 +1041,12 @@ export function ThenSection({
 
               {rule.firstFactor === 'Specific' && (
                 <Prop label="Which first-factor method" indent>
-                  <select aria-label="First-factor method" value={rule.firstFactorMethod ?? METHODS[0]} onChange={(e) => onPatch({ firstFactorMethod: e.target.value })}>
-                    {METHODS.map((m) => (
-                      <option key={m}>{m}</option>
-                    ))}
-                  </select>
+                  <Picker
+                    label="First-factor method"
+                    value={rule.firstFactorMethod ?? METHODS[0]}
+                    options={METHODS.map((m) => ({ value: m, label: m }))}
+                    onChange={(firstFactorMethod) => onPatch({ firstFactorMethod })}
+                  />
                 </Prop>
               )}
 
@@ -1096,19 +1097,16 @@ export function ThenSection({
                     {chain.map((step, si) => (
                       <span className="bf__chainstep" key={si}>
                         <b>{si + 1}</b>
-                        <select
-                          aria-label={`Chain step ${si + 1}`}
+                        <Picker
+                          label={`Chain step ${si + 1}`}
                           value={step}
-                          onChange={(e) => {
+                          options={['Password', ...METHODS].map((m) => ({ value: m, label: m }))}
+                          onChange={(v) => {
                             const next = [...chain]
-                            next[si] = e.target.value
+                            next[si] = v
                             onPatch({ methodChain: next })
                           }}
-                        >
-                          {['Password', ...METHODS].map((m) => (
-                            <option key={m}>{m}</option>
-                          ))}
-                        </select>
+                        />
                         <button
                           type="button"
                           disabled={chain.length === 1}
@@ -1129,11 +1127,12 @@ export function ThenSection({
 
               {rule.decision === '2fa' && rule.secondFactor === 'preferred' && (
                 <Prop label="If the user has set no preference" indent>
-                  <select aria-label="Fallback method" value={rule.preferredFallback ?? METHODS[0]} onChange={(e) => onPatch({ preferredFallback: e.target.value })}>
-                    {METHODS.map((m) => (
-                      <option key={m}>{m}</option>
-                    ))}
-                  </select>
+                  <Picker
+                    label="Fallback method"
+                    value={rule.preferredFallback ?? METHODS[0]}
+                    options={METHODS.map((m) => ({ value: m, label: m }))}
+                    onChange={(preferredFallback) => onPatch({ preferredFallback })}
+                  />
                 </Prop>
               )}
 

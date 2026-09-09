@@ -301,12 +301,10 @@
   border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   font-size: var(--fs-md); color: var(--text-body);
 }
-.bfp2__select {
-  height: var(--ctl-height-sm); padding: 0 10px;
-  background: var(--ctl-bg);
-  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
-  font-size: var(--fs-md); color: var(--text-body); font-family: inherit;
-}
+/* The console has ONE list control now: `Picker`. Every native `<select>`
+   in this file is gone, and the rules that dressed them went with it — a
+   `<select>` looked like the console closed and like the operating system
+   open, which is the whole reason `Picker` was written. */
 
 @media (max-width: 720px) {
   .bfp2__head { flex-direction: column; gap: 12px; }
@@ -347,24 +345,13 @@
   background: var(--surface-raised); overflow: hidden;
 }
 .bfp2__rule:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
-.bfp2__rule .bfp2__select {
-  height: 26px; border: 0; border-radius: 0; background: none;
-}
-.bfp2__rule .bfp2__select:focus-visible { outline: none; box-shadow: none; }
-/* Both need an explicit `width: auto`. The kit gives every select width:100% at
-   zero specificity, which is right for a select on its own line in a form and
-   wrong for two of them sharing a row — the first takes the whole box and the
-   second collapses to its chevron. */
-.bfp2__select--op {
-  flex: none; width: auto; min-width: 96px;
-  padding-left: 9px;
-  border-right: 1px solid var(--border-subtle);
-  color: var(--text-tertiary);
-}
-.bfp2__select--val {
-  flex: none; width: auto; min-width: 148px; max-width: 210px;
-  color: var(--text-primary); font-weight: var(--fw-medium);
-}
+/* The rule row is two `Picker`s now — a comparison and a value. They bring
+   their own trigger, so the widths that used to be fought for here (the kit
+   gave every `<select>` `width: 100%` at zero specificity, which collapsed the
+   second of two sharing a row) are the control's own business. */
+.bfp2__rule .bx-picker__trigger { border: 0; background: none; height: 26px; }
+.bfp2__rule .bx-picker:first-child .bx-picker__trigger { min-width: 88px; border-right: 1px solid var(--border-subtle); border-radius: 0; color: var(--text-tertiary); }
+.bfp2__rule .bx-picker:last-child .bx-picker__trigger { min-width: 140px; font-weight: var(--fw-medium); }
 
 /* --- The restriction slide-over --------------------------------------------------
    One surface where there were three steps, in the same dependency order. The
@@ -1021,7 +1008,7 @@
    dropdown ate the row and squeezed the weight beside it down to "Mi…". */
 .bfp2__attctl > * { flex: none; }
 .bfp2__attctl .bx-tierpick { width: 96px; }
-.bfp2__attctl .bfp2__select { width: auto; min-width: 128px; }
+.bfp2__attctl .bx-picker__trigger { min-width: 128px; }
 
 /* --- The summary --------------------------------------------------------------
 
@@ -1298,7 +1285,10 @@ button.bfp2__factval:focus-visible {
 /* The rail, as one control on the bar. `width: auto` because the kit gives a
    bare select `width: 100%` at zero specificity, which in a flex bar means it
    takes everything the search box does not. */
-.bfp2__catfilter { flex: none; width: auto; max-width: 220px; }
+/* A fixed width, since the control inside it fills its wrapper now — `auto`
+   let the trigger collapse to the width of whichever category was chosen, so
+   the filter changed size as you used it. */
+.bfp2__catfilter { flex: none; width: 190px; }
 
 /* Ticked, and not by you.
 

@@ -28,15 +28,10 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.btoolbar__select { width: 168px; }
-/* A filter that is doing something looks different from one that is not — the
-   only way to tell an active filter from a default at a glance. */
-.btoolbar__select.is-set {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  font-weight: var(--fw-medium);
-}
+/* `.btoolbar__select` and its `.is-set` variant stood here, for the native
+   `<select>`s the toolbars used. Both are `Picker`s now; the active-filter mark
+   moved to `.btoolbar__filter` at the foot of this file, where it wraps a
+   control that styles its own trigger. */
 .btoolbar__clear { font-size: var(--fs-md); color: var(--text-link); }
 .btoolbar__clear:hover { text-decoration: underline; }
 /* `.btoolbar__search` stood here at 260px. The box is `SearchBox` in the kit
@@ -936,3 +931,23 @@ button.btable__app--edit:focus-visible { outline: none; box-shadow: 0 0 0 2px va
 /* The name carries the row now, so it reads at full strength rather than as one
    of three competing fragments. */
 .brpk .brpk__name { font-weight: var(--fw-medium); color: var(--text-primary); }
+
+/* A toolbar filter, whichever control draws it.
+
+   The filters were native `<select>`s and carried `.btoolbar__select` with an
+   `.is-set` variant saying "this one is narrowing the list". They are `Picker`s
+   now — one list control for the whole console, so a filter opens the same way
+   here as in the rule editor — and `Picker` styles its own trigger, so the
+   "active" mark moves to a wrapper around it rather than onto the element.
+
+   Same three channels it always had: the accent edge, the tinted ground and the
+   heavier label. A filter doing something has to look different from one at its
+   default, or the only way to know what a list is hiding is to open all of
+   them. */
+.btoolbar__filter { display: inline-flex; width: 168px; }
+.btoolbar__filter.is-set .bx-picker__trigger {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: var(--fw-medium);
+}

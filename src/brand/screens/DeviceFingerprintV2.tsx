@@ -44,6 +44,7 @@ import {
 
 import { Button, Drawer, MenuButton, Modal, NumberStepper, SaveBar, SearchBox, Tabs, TipDot, Toggle } from '../kit'
 import { TierPick } from '../tier-pick'
+import { Picker } from '../picker'
 import {
   categoriesFor,
   DEFAULT_MAX_DEVICES,
@@ -277,19 +278,18 @@ function ProfileList({
             <SearchBox value={q} onChange={setQ} placeholder="Search profiles…" label="Search device profiles" />
           </div>
           <div className="btoolbar__filters btoolbar__filters--end">
-            <select
-              aria-label="Filter by what the profile decides by"
-              value={mode}
-              onChange={(e) => setMode(e.target.value as ProfileMode | 'all')}
-              className={`btoolbar__select ${mode !== 'all' ? 'is-set' : ''}`}
-            >
-              <option value="all">All kinds</option>
-              {MODES.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
+            {/* `Picker`, like every other filter in the console — see the note
+                on the policies toolbar. */}
+            <span className={`btoolbar__filter ${mode !== 'all' ? 'is-set' : ''}`}>
+              <Picker
+                label="Filter by what the profile decides by"
+                value={mode}
+                width="fill"
+                size="md"
+                options={[{ value: 'all', label: 'All kinds' }, ...MODES.map((m) => ({ value: m.id, label: m.label }))]}
+                onChange={(v) => setMode(v as ProfileMode | 'all')}
+              />
+            </span>
             {/* Only once something is filtered — a permanent Clear that clears
                 nothing is one more thing to read. */}
             {(mode !== 'all' || q.trim() !== '') && (
@@ -602,26 +602,38 @@ function AttrStep({
           />
         </label>
 
-        <select
-          className="bfp2__select bfp2__catfilter"
-          aria-label="Filter by category"
-          value={cat}
-          onChange={(e) => setCat(e.target.value as AttrCategory | '')}
-        >
-          <option value="">All categories</option>
-          {categoriesFor(mode).map((c) => {
-            const all = offered.filter((a) => a.category === c.id)
-            /* A category an agentless profile cannot reach at all is offered
-               and says so, rather than being dropped from the list — "why is
-               Security missing" is the support ticket that hiding it writes. */
-            return (
-              <option key={c.id} value={c.id} disabled={all.length === 0}>
-                {c.label} · {all.filter((a) => a.always || picked.includes(a.id)).length}/{all.length}
-                {all.length === 0 ? ' · needs an agent' : ''}
-              </option>
-            )
-          })}
-        </select>
+        {/* `Picker`, like every filter in the console. The counts and the
+            "needs an agent" note ride on each option's `meta` line, where a
+            native `<option>` could only run them into the label. */}
+        <span className="bfp2__catfilter">
+          <Picker
+            label="Filter by category"
+            value={cat}
+            width="fill"
+            /* `''` is a real ANSWER here — every category — not an empty field,
+               so the trigger says so instead of falling back to the "Choose…"
+               placeholder a `Picker` shows when nothing is set. */
+            summary={cat ? (categoriesFor(mode).find((c) => c.id === cat)?.label ?? 'All categories') : 'All categories'}
+            options={[
+              { value: '', label: 'All categories' },
+              ...categoriesFor(mode).map((c) => {
+                const all = offered.filter((a) => a.category === c.id)
+                const on = all.filter((a) => a.always || picked.includes(a.id)).length
+                /* A category an agentless profile cannot reach at all is
+                   offered and says so, rather than being dropped from the list
+                   — "why is Security missing" is the support ticket that hiding
+                   it writes. */
+                return {
+                  value: c.id,
+                  label: c.label,
+                  meta: all.length === 0 ? 'Needs an agent' : `${on} of ${all.length} on`,
+                  disabled: all.length === 0,
+                }
+              }),
+            ]}
+            onChange={(v) => setCat(v as AttrCategory | '')}
+          />
+        </span>
 
         <span className={`bfp2__pickcount ${chosen.length ? 'is-on' : ''}`}>
           {chosen.length} of {offered.length} selected
@@ -2202,16 +2214,12 @@ function AttrControl({
 
   if (c.kind === 'choice') {
     return (
-      <select
-        className="bfp2__select"
-        aria-label={c.label}
+      <Picker
+        label={c.label}
         value={String(raw ?? c.value)}
-        onChange={(e) => onChange(attr.id, e.target.value)}
-      >
-        {c.options.map((o) => (
-          <option key={o}>{o}</option>
-        ))}
-      </select>
+        options={c.options.map((o) => ({ value: o, label: o }))}
+        onChange={(v) => onChange(attr.id, v)}
+      />
     )
   }
 
@@ -2234,30 +2242,20 @@ function AttrControl({
     const set = (next: Partial<AttrRuleValue>) => onChange(attr.id, { ...v, ...next })
     return (
       <span className="bfp2__rule">
-        <select
-          className="bfp2__select bfp2__select--op"
-          aria-label={`${attr.name} — comparison`}
+        <Picker
+          label={`${attr.name} — comparison`}
           value={v.op}
-          onChange={(e) => set({ op: e.target.value })}
-        >
-          {c.operators.map((o) => (
-            <option key={o}>{o}</option>
-          ))}
-        </select>
-        <select
-          className="bfp2__select bfp2__select--val"
-          aria-label={`${attr.name} — value`}
+          options={c.operators.map((o) => ({ value: o, label: o }))}
+          onChange={(op) => set({ op })}
+        />
+        {/* `group` where the native control had `optgroup` — the headings the
+            platform drew, drawn by the console instead. */}
+        <Picker
+          label={`${attr.name} — value`}
           value={v.value}
-          onChange={(e) => set({ value: e.target.value })}
-        >
-          {c.groups.map((g) => (
-            <optgroup key={g.label} label={g.label}>
-              {g.values.map((val) => (
-                <option key={val}>{val}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          options={c.groups.flatMap((g) => g.values.map((val) => ({ value: val, label: val, group: g.label })))}
+          onChange={(value) => set({ value })}
+        />
       </span>
     )
   }
@@ -2306,22 +2304,17 @@ function AttrControl({
             rewritten to whatever happens to sit at the top. It is marked as
             what it is rather than passed off as a current release. */}
         {c.versions ? (
-          <select
-            className="bfp2__select bfp2__exprval"
-            aria-label={c.label}
+          <Picker
+            label={c.label}
             value={v.value}
-            title={c.hint}
-            onChange={(e) => set({ value: e.target.value })}
-          >
-            {!c.versions.some((o) => o.value === v.value) && (
-              <option value={v.value}>{v.value} (not a listed release)</option>
-            )}
-            {c.versions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label ?? o.value}
-              </option>
-            ))}
-          </select>
+            options={[
+              ...(c.versions.some((o) => o.value === v.value)
+                ? []
+                : [{ value: v.value, label: v.value, meta: 'Not a listed release' }]),
+              ...c.versions.map((o) => ({ value: o.value, label: o.label ?? o.value })),
+            ]}
+            onChange={(value) => set({ value })}
+          />
         ) : (
           /* `inputMode="decimal"` and not `type="number"`: 131.0.6778.86 is a
              version, not a number, and a numeric field refuses the second dot.
@@ -2538,12 +2531,16 @@ function EnrolmentFields({
               why, because "this cannot be changed" is a fact somebody will want
               a reason for. */}
           {rosterPossible ? (
-            <select
-              className="bfp2__select"
-              aria-label="How a device gets registered"
+            <Picker
+              label="How a device gets registered"
+              width="fill"
               value={registration}
-              onChange={(e) => {
-                const next = e.target.value as Registration
+              options={(Object.keys(REGISTRATION_LABEL) as Registration[]).map((r) => ({
+                value: r,
+                label: REGISTRATION_LABEL[r],
+              }))}
+              onChange={(v) => {
+                const next = v as Registration
                 /* The console's own branch: a roster REPLACES the allowance
                    rather than sitting beside it. */
                 onChange({
@@ -2551,13 +2548,7 @@ function EnrolmentFields({
                   maxDevices: next === 'pre-approved' ? null : (maxDevices ?? DEFAULT_MAX_DEVICES),
                 })
               }}
-            >
-              {(Object.keys(REGISTRATION_LABEL) as Registration[]).map((r) => (
-                <option key={r} value={r}>
-                  {REGISTRATION_LABEL[r]}
-                </option>
-              ))}
-            </select>
+            />
           ) : (
             <span className="bfp2__setvalue">{REGISTRATION_LABEL[registration]}</span>
           )}

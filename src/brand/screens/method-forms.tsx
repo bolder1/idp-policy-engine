@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import { Eye, EyeOff, Plus, X } from 'lucide-react'
 
 import { NumberStepper, TipDot } from '../kit'
+import { Picker } from '../picker'
 import type { ConfigField } from '../method-config'
 
 /* -----------------------------------------------------------------------------
@@ -122,16 +123,13 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
         )}
 
         {f.kind === 'select' && (
-          <select
-            id={`${uid}-c`}
+          <Picker
+            label={f.label}
+            width="fill"
             value={f.value}
-            aria-describedby={f.help ? `${uid}-help` : undefined}
-            onChange={(e) => onChange(f.id, e.target.value)}
-          >
-            {f.options.map((o) => (
-              <option key={o}>{o}</option>
-            ))}
-          </select>
+            options={f.options.map((o) => ({ value: o, label: o }))}
+            onChange={(v) => onChange(f.id, v)}
+          />
         )}
 
         {f.kind === 'number' && (

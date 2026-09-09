@@ -35,6 +35,7 @@ const operatorIcon = (o: string): LucideIcon =>
 import { EmptyState } from '../empty'
 import { modeLabel } from '../fingerprint'
 import { conditionIcon, conditionTone } from './board/tones'
+import { Picker } from '../picker'
 import type { BrandStore } from '../store'
 import type { NameLookup } from './predicate-prose'
 import {
@@ -441,19 +442,14 @@ export function ConditionPopover({
      product has never heard of. */
   const keyRow =
     t.valueKind !== 'text' ? null : t.keys?.length ? (
-      <select
-        className="cp__fldsel"
-        aria-label="Which attribute"
+      <Picker
+        label="Which attribute"
+        width="fill"
         value={c.key ?? ''}
-        onChange={(e) => onKey(e.target.value)}
-      >
-        <option value="">Choose an attribute…</option>
-        {t.keys.map((k) => (
-          <option key={k} value={k}>
-            {k}
-          </option>
-        ))}
-      </select>
+        placeholder="Choose an attribute…"
+        options={t.keys.map((k) => ({ value: k, label: k }))}
+        onChange={onKey}
+      />
     ) : (
       <input
         className="cp__fldinput is-text"
@@ -472,14 +468,14 @@ export function ConditionPopover({
      window meant before this control existed. */
   const tzRow =
     t.valueKind !== 'time' ? null : (
-      <select className="cp__fldsel" aria-label="Timezone" value={c.tz ?? ''} onChange={(e) => onTz(e.target.value)}>
-        <option value="">Tenant timezone</option>
-        {TIMEZONES.map((z) => (
-          <option key={z} value={z}>
-            {z}
-          </option>
-        ))}
-      </select>
+      <Picker
+        label="Timezone"
+        width="fill"
+        value={c.tz ?? ''}
+        summary={c.tz || 'Tenant timezone'}
+        options={[{ value: '', label: 'Tenant timezone' }, ...TIMEZONES.map((z) => ({ value: z, label: z }))]}
+        onChange={onTz}
+      />
     )
 
   const triggers = stacked ? (

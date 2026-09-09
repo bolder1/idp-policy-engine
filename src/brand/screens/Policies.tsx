@@ -6,6 +6,7 @@ import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
 import { AppLogo } from '../logos/AppLogo'
 import { Badge, Button, Modal, SearchBox, StatusPill } from '../kit'
+import { Picker } from '../picker'
 import { appsLabel, appsOf, blankPolicy, enforces, type Policy, type PolicyType } from '../data'
 import { NewPolicyDialog } from '../create/NewPolicyDialog'
 import { useBrand } from '../store'
@@ -341,30 +342,42 @@ export function Policies() {
               kinds of thing — and the chip row grew a line every time a policy
               type was added. A select costs one row at any number of types. */}
           <div className="btoolbar__filters">
-            <select
-              aria-label="Filter by policy type"
-              value={type}
-              onChange={(e) => setType(e.target.value as PolicyType | 'All')}
-              className={`btoolbar__select ${type !== 'All' ? 'is-set' : ''}`}
-            >
-              {TYPE_FILTERS.map((t) => (
-                <option key={t} value={t}>
-                  {t === 'All' ? 'All types' : t}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label="Filter by status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as typeof status)}
-              className={`btoolbar__select ${status !== 'all' ? 'is-set' : ''}`}
-            >
-              <option value="all">All statuses</option>
-              <option value="draft">Draft</option>
-              <option value="active">Active</option>
-              <option value="monitor">Monitor</option>
-              <option value="inactive">Inactive</option>
-            </select>
+            {/* `Picker`, not `<select>`.
+
+                Both were `<select>`, which closed looked like the console and
+                OPEN was whatever the operating system draws — no ticks, no
+                marks, no search, a different font on every machine. The console
+                has its own list control and its own header calls it "the
+                replacement for the native `<select>`"; it had simply never been
+                finished. Two implementations of one control is the only reason
+                a filter here and a filter in the rule editor behave
+                differently. */}
+            <span className={`btoolbar__filter ${type !== 'All' ? 'is-set' : ''}`}>
+              <Picker
+                label="Filter by policy type"
+                value={type}
+                width="fill"
+                size="md"
+                options={TYPE_FILTERS.map((t) => ({ value: t, label: t === 'All' ? 'All types' : t }))}
+                onChange={(v) => setType(v as PolicyType | 'All')}
+              />
+            </span>
+            <span className={`btoolbar__filter ${status !== 'all' ? 'is-set' : ''}`}>
+              <Picker
+                label="Filter by status"
+                value={status}
+                width="fill"
+                size="md"
+                options={[
+                  { value: 'all', label: 'All statuses' },
+                  { value: 'draft', label: 'Draft' },
+                  { value: 'active', label: 'Active' },
+                  { value: 'monitor', label: 'Monitor' },
+                  { value: 'inactive', label: 'Inactive' },
+                ]}
+                onChange={(v) => setStatus(v as typeof status)}
+              />
+            </span>
             {/* Only appears once something is filtered — a permanent Clear that
                 clears nothing is just another thing to read. */}
             {(type !== 'All' || status !== 'all') && (

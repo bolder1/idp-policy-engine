@@ -530,7 +530,6 @@
   line-height: 1.55;
 }
 .btoolbar { margin-bottom: var(--space-5); }
-.bpolicies__banner { margin-bottom: var(--space-6); }
 /* Top, not centre. The caption makes the left column two lines tall on the
    longer ones, and an action centred against that sits below the title it
    belongs to. */

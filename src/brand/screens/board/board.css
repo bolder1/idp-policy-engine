@@ -867,33 +867,6 @@
 /* --- The panel's two tabs ------------------------------------------------------
 
    The doors between Who and Condition were a row of buttons on the CARD, which
-   put the navigation on the canvas and the thing it navigated in the panel: you
-   looked away from where the editing happens in order to choose what to edit,
-   and every card carried two more controls whether or not it was the one you
-   were working on.
-
-   On the form they cost the chain nothing and sit where the work is. The card
-   goes back to being a reading of the rule — which is what a card on a canvas
-   is for — and clicking one still opens Who, the question people start with.
-
-   Its own class rather than the kit's `Tabs`: this strip sits inside a 400px
-   panel above a form, and `.bb__insp .bx-tabs` was deleted precisely so nobody
-   would reach for that component in here again. */
-.bb__panetabs {
-  display: flex; align-items: center; gap: var(--space-2);
-  padding: 0 var(--space-5);
-  border-bottom: 1px solid var(--border-subtle);
-}
-.bb__panetabs > button {
-  height: 34px; padding: 0 var(--space-3);
-  border: none; background: none;
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
-  font-family: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium);
-  color: var(--text-tertiary); cursor: pointer;
-}
-.bb__panetabs > button:hover { color: var(--text-primary); }
-.bb__panetabs > button.is-on { color: var(--text-primary); border-bottom-color: var(--text-primary); }
-.bb__panetabs > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
 
 /* A labelled row inside the card: WHEN / THEN. */
 .bb__row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
@@ -1423,49 +1396,13 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 }
 .bb__rung__body > b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
 .bb__rung__body .bx-picker { width: 100%; }
-/* Shown on hover or focus, like every other destructive control in the panel.
-   Always visible it reads as part of the step rather than as a way to undo it. */
-.bb__rung__drop {
-  display: grid; place-items: center; width: 24px; height: 24px;
-  border: 0; border-radius: var(--radius-sm); background: none;
-  color: var(--text-tertiary); cursor: pointer;
-  opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard);
-}
-.bb__rung:hover .bb__rung__drop, .bb__rung:focus-within .bb__rung__drop { opacity: 1; }
-.bb__rung__drop:hover { background: var(--surface-inset, var(--surface-sunken)); color: var(--text-primary); }
-.bb__rung__drop:focus-visible { outline: none; opacity: 1; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* A rung's own settings sit under it, indented past the number so the ladder
    still reads as a ladder. */
-.bb__rung.is-sub { grid-template-columns: 22px minmax(0, 1fr); }
-.bb__rung.is-sub > * { grid-column: 2; }
-.bb__rung.is-add { grid-template-columns: 22px minmax(0, 1fr); }
-.bb__rung.is-add > * { grid-column: 2; justify-self: start; }
 /* The rung that is a sentence rather than a control — what stands where the
    adder would, under Flag. Aligned to the adder's column so the ladder does not
    jog sideways when the outcome changes, and quiet, because it is explaining an
    absence rather than offering anything. */
-.bb__rung.is-note { grid-template-columns: 22px minmax(0, 1fr); }
-.bb__rung.is-note > * { grid-column: 2; }
-/* One column, not the label-and-control pair `.bb__rung__body` is. The note
-   is a sentence rather than a labelled setting, and inheriting the 88px label
-   track put it in a column four words wide. */
-.bb__rung.is-note .bb__rung__body { grid-template-columns: minmax(0, 1fr); }
-.bb__rung.is-note em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.45; }
-/* No dashed rectangle. Same reason as the condition pane's adders: a dotted box
-   is the loudest thing on a pane whose problem was boxes, and "add one more of
-   these" is a text button with a mark in front of it everywhere else here. */
-.bb__addrung {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 30px; padding: 0 var(--space-2);
-  border: 0; border-radius: var(--radius-sm);
-  background: none; font-family: inherit;
-  font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary);
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
-}
-.bb__addrung:hover { border-style: solid; border-color: var(--border-strong); background: var(--surface-sunken); color: var(--text-primary); }
-.bb__addrung:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* What happens after the steps — remembering the device, and the opt-out.
    Separated by a rule rather than by a heading: they are settings on the rule,
@@ -3024,54 +2961,6 @@ button.bb__idx::after {
    sections could never do. */
 .bb__who { display: flex; flex-direction: column; gap: var(--space-3); }
 
-/* --- What is chosen, as faces ------------------------------------------------ */
-
-/* Under the lists, not above them — it is the ANSWER they build, and it was
-   sitting between two switchers as a third thing to get past. */
-.bb__whochosen {
-  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
-  min-height: 30px;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-subtle);
-}
-.bb__whochosen.is-empty { color: var(--text-tertiary); gap: var(--space-3); }
-.bb__whochosen.is-empty b { font-size: var(--fs-md); font-weight: var(--fw-regular); }
-
-/* A chosen one is a chip you can press to take off, so the whole thing is the
-   target rather than a small x inside it. */
-.bb__whoface {
-  display: inline-flex; align-items: center; gap: 5px;
-  height: 24px; padding: 0 8px 0 3px;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-pill);
-  background: var(--surface-raised);
-  font-family: inherit; font-size: var(--fs-xs); color: var(--text-body);
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
-}
-.bb__whoface:hover { border-color: var(--border-strong); background: var(--surface-sunken); color: var(--text-primary); }
-.bb__whoface:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-/* The cross is the remove affordance the red used to be. It holds its space at
-   rest so the chip does not change width under the pointer — a row of chips
-   that reflows as you move across it is harder to hit than one that does not. */
-.bb__whoface__x { flex: none; opacity: 0; color: var(--text-tertiary); transition: opacity var(--dur-fast) var(--ease-standard); }
-.bb__whoface:hover .bb__whoface__x,
-.bb__whoface:focus-visible .bb__whoface__x { opacity: 1; color: var(--text-primary); }
-/* Outside the policy's audience: a dashed edge and the word, where an amber
-   border used to carry the whole fact on its own. */
-.bb__whoface.is-warn { border-style: dashed; border-color: var(--border-strong); }
-.bb__whoface__flag {
-  flex: none; font-style: normal; font-size: 11px; letter-spacing: 0.03em;
-  text-transform: uppercase; color: var(--text-tertiary);
-}
-
-/* The overflow is a COUNT, not more faces. A row that grows with the selection
-   stops being a summary at about seven. */
-.bb__whomore {
-  display: inline-flex; align-items: center; height: 24px; padding: 0 8px;
-  border-radius: var(--radius-pill); background: var(--surface-sunken);
-  font-size: var(--fs-xs); color: var(--text-secondary); cursor: default;
-}
-
 /* One colour, two states.
 
    The tint used to be derived from the name, which gave a list of twenty-four
@@ -3402,12 +3291,19 @@ button.bb__idx::after {
    THE INSPECTOR, AS ONE FORM
    ========================================================================== */
 
-/* `.bb__panetabs` — the Who/Condition strip — is gone from the inspector.
+/* `.bb__panetabs` — the Who/Condition strip — is gone, rules and all.
 
    The rule is one sentence and the tabs cut it in half, so the panel shows all
-   three sections at once. The class stays in this stylesheet because the RULE
-   CARD still uses it for its own two-up switcher; only the inspector stopped
-   drawing one. */
+   three sections at once.
+
+   A note here previously kept the rules on the grounds that the RULE CARD still
+   used the class for its own switcher. That was wrong: nothing in any `.tsx`
+   references it. Recording the correction rather than quietly deleting, because
+   a comment that asserts a caller is exactly the kind a later reader trusts
+   instead of checking. The same sweep took `.bb__whochosen` and its faces, our
+   own first `.bb__whochip` attempt, `.bb__addrung`, `.bb__rung__drop` and the
+   `is-add` / `is-sub` / `is-note` rung modifiers — all markup this merge
+   replaced. */
 
 .bb__inspbody { padding-bottom: var(--space-8); }
 
@@ -3471,33 +3367,6 @@ button.bb__idx::after {
 .bb__whonone b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
 .bb__whonone em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.5; }
 
-.bb__whochips { display: flex; flex-wrap: wrap; gap: 6px; }
-.bb__whochip {
-  display: inline-flex; align-items: center; gap: 6px;
-  max-width: 100%; min-width: 0;
-  padding: 3px 4px 3px 4px;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-pill);
-  background: var(--surface-raised);
-}
-.bb__whochip b {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
-}
-.bb__whochip i {
-  flex: none; font-style: normal;
-  padding: 1px 5px; border-radius: var(--radius-pill);
-  background: var(--fb-notice-bg); color: var(--fb-notice-fg);
-  font-size: 10px;
-}
-.bb__whochip.is-warn { border-color: var(--fb-notice-border); }
-.bb__whochip > button {
-  flex: none; display: grid; place-items: center;
-  width: 18px; height: 18px;
-  border: 0; border-radius: var(--radius-full);
-  background: none; color: var(--text-muted); cursor: pointer;
-}
-.bb__whochip > button:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bb__whochip > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
 /* --- Who, in the dialog ------------------------------------------------------ */
 .bb__whopicker { display: flex; flex-direction: column; gap: var(--space-4); }

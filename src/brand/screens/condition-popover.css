@@ -476,3 +476,42 @@
 /* A typed value fills the row, the way a chosen one does. */
 .cp__fldinput.is-text { width: 100%; }
 .cp__fldinput::placeholder { color: var(--text-muted); }
+
+/* --- Inside the board's configuration panel, without colour --------------------
+
+   The panel is being drained of hue: it is a form, and a form full of tinted
+   fields spends its loudest signal on saying "this is a field". The canvas
+   beside it keeps its colour — a rule card is a reading, and the tones there
+   carry what a rule decides.
+
+   Scoped on `.bb__insp`, which is the panel: one `<aside>`, rendered from one
+   place, and never on the canvas. The stacked field itself is already board-only
+   — `.cp__fld` exists only when `stacked` is passed, and only `WhenEditor` passes
+   it — but the prefix says WHY these rules are grey rather than leaving it to be
+   rediscovered, and it keeps the trail builder's pill (`.cp__seg`) out of reach
+   by construction rather than by luck. It lands at (0,4,0) against the (0,3,0)
+   rules above, so it wins regardless of which stylesheet loads first — this repo
+   has been bitten by two equal-specificity rules in two files before.
+
+   What CANNOT be reached from here: the menu each field opens is portalled to
+   `document.body`, so its orange ticks and footer link are outside `.bb__insp`
+   and shared with the trail. They are left alone deliberately. */
+.bb__insp .cp__fld.is-val .cp__fldtext { color: var(--text-primary); }
+.bb__insp .cp__fld.is-open { border-color: var(--border-strong); box-shadow: 0 0 0 3px var(--surface-inset, var(--surface-sunken)); }
+.bb__insp .cp__fld:focus-visible { border-color: var(--border-strong); box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__insp .cp__fldinput:focus-visible,
+.bb__insp .cp__fldsel:focus-visible { border-color: var(--border-strong); box-shadow: 0 0 0 2px var(--focus-ring); }
+/* Nothing chosen, said with a dash and a weight rather than with red.
+
+   The dash is the strongest non-hue mark available here — one dashed edge in a
+   column of solid ones is unmissable, and it survives greyscale and a colour
+   deficiency, which a 1px #f5c6ce does not. The text goes QUIETER rather than
+   louder, which is also the more truthful reading: an unanswered field is an
+   absence, and this stylesheet already says exactly that about the select whose
+   value is the tenant default. The linter states the consequence in words. */
+.bb__insp .cp__fld.is-val.is-unset { border-color: var(--border-strong); }
+.bb__insp .cp__fld.is-val.is-unset .cp__fldtext { color: var(--text-tertiary); }
+.bb__insp .cp__del:hover { background: var(--surface-inset, var(--surface-sunken)); color: var(--text-primary); }
+/* The zone-half capsule already says `network` or `map` in words, and it only
+   exists when the condition is narrowed — its presence is the signal. */
+.bb__insp .cp__scopetag { background: var(--surface-inset, var(--surface-sunken)); color: var(--text-secondary); }

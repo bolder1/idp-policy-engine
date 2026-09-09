@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, UserRound, Users } from 'lucide-react'
+import { Check, UserRound, Users, X } from 'lucide-react'
 
 import { Button } from '../../kit'
 import { useBrand, useNameLookup } from '../../store'
@@ -294,6 +294,19 @@ function WhoChosen({
           >
             <Avatar name={c.name} on />
             <span>{c.name}</span>
+            {/* Outside the policy's audience, in a word.
+
+                This was an amber border and nothing else — no glyph, no text —
+                so the fact lived in a hue and in a `title` that a touch screen
+                and a screen reader never see. The chip says it. */}
+            {flagged && <em className="bb__whoface__flag">outside</em>}
+            {/* What pressing it does, drawn rather than coloured.
+
+                The whole chip is the remove target, and the only thing that
+                said so was the red it turned under the pointer. A cross that
+                appears on hover and focus says the same thing, in the shape
+                this console already uses for it, and says it to a keyboard. */}
+            <X className="bb__whoface__x" size={11} strokeWidth={2.4} aria-hidden />
           </button>
         )
       })}

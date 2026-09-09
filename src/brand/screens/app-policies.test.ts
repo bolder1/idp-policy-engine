@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import { apps, blankPolicy, coversEveryApp, policies, type Policy, type Rule } from '../data'
 import { appsAt, policiesAt, type Depth } from '../fixtures'
 import {
-  NO_APP_ISSUE,
   attachKind,
   attachTo,
   attachableTo,
@@ -78,7 +77,7 @@ describe('policiesForApp', () => {
 
   it('never returns an unattached policy', () => {
     expect(
-      policiesForApp('google-workspace', policiesAt('medium')).every((p) => p.appId === 'google-workspace'),
+      policiesForApp('google-workspace', policiesAt('medium')).every((p) => p.appIds.includes('google-workspace')),
     ).toBe(true)
   })
 
@@ -121,7 +120,7 @@ describe('a draft', () => {
   })
 
   it('is what a new policy starts as', () => {
-    expect(blankPolicy('New one', 'workday').status).toBe('draft')
+    expect(blankPolicy('New one', ['workday']).status).toBe('draft')
   })
 
   it('takes no precedence number, and does not push the ones below it down', () => {
@@ -201,14 +200,22 @@ describe('attachKind', () => {
        fall-through as an unattached draft and offers to attach it to one
        application — which would turn the policy that catches everything into a
        policy that catches Salesforce. */
-    expect(SYSTEM.appId).toBeUndefined()
+    expect(SYSTEM.appIds).toEqual([])
     expect(attachKind(SYSTEM, 'salesforce')).toBe('system')
   })
 
-  it('separates fresh, already-here and move', () => {
-    expect(attachKind(policy({ appId: undefined }), 'workday')).toBe('fresh')
-    expect(attachKind(policy({ appId: 'workday' }), 'workday')).toBe('already-here')
-    expect(attachKind(policy({ appId: 'slack' }), 'workday')).toBe('move')
+  it('separates fresh, already-here and also', () => {
+    expect(attachKind(policy({ appIds: [] }), 'workday')).toBe('fresh')
+    expect(attachKind(policy({ appIds: ['workday'] }), 'workday')).toBe('already-here')
+    /* `also`, not `move`. A policy on Slack gains Workday rather than being
+       taken off Slack, which is the whole of what the list changed here. */
+    expect(attachKind(policy({ appIds: ['slack'] }), 'workday')).toBe('also')
+  })
+
+  it('is already-here when the app is one of several', () => {
+    // The `includes` case: a policy on three applications is already on each of
+    // them, not on the first and moveable to the rest.
+    expect(attachKind(policy({ appIds: ['slack', 'workday', 'jira'] }), 'workday')).toBe('already-here')
   })
 })
 
@@ -223,19 +230,19 @@ describe('attachableTo', () => {
     expect(got).toContain('uc3-country-allowlist')
   })
 
-  it('sorts the unattached above the ones that would have to be moved', () => {
+  it('sorts the unassigned above the ones already protecting something', () => {
     const got = attachableTo('google-workspace', policiesAt('medium'))
-    const firstMove = got.findIndex((p) => p.appId !== undefined)
-    const lastFresh = got.map((p) => p.appId === undefined).lastIndexOf(true)
-    expect(lastFresh).toBeLessThan(firstMove)
+    const firstAlso = got.findIndex((p) => p.appIds.length > 0)
+    const lastFresh = got.map((p) => p.appIds.length === 0).lastIndexOf(true)
+    expect(lastFresh).toBeLessThan(firstAlso)
   })
 
   it('offers the unattached policy to an app nothing protects', () => {
     const got = attachableTo('zoom', policiesAt('medium')).map((p) => p.id)
     /* The break-glass policy is the estate's only unattached one now — the
        document asks it to cover every application and the model has no such
-       policy, so it sits with no app at all. That is what makes it the thing
-       an app with nothing on it is offered first. */
+       policy, so it sits with no app at all, as a draft. That is what makes it
+       the thing an app with nothing on it is offered first. */
     expect(got).toContain('break-glass')
     expect(got).not.toContain('global-default')
   })
@@ -243,38 +250,45 @@ describe('attachableTo', () => {
 
 describe('attachTo', () => {
   it('does not mutate its input', () => {
-    const before = policy({ appId: undefined })
+    const before = policy({ appIds: [] })
     attachTo(before, 'workday', apps)
-    expect(before.appId).toBeUndefined()
+    expect(before.appIds).toEqual([])
   })
 
-  it('changes appId and nothing else a policy is judged by', () => {
-    const before = policy({ appId: undefined, status: 'inactive', rules: [ruleOf(true), ruleOf(false)] })
+  it('changes appIds and nothing else a policy is judged by', () => {
+    const before = policy({ appIds: [], status: 'inactive', rules: [ruleOf(true), ruleOf(false)] })
     const after = attachTo(before, 'workday', apps)
-    expect(after).toEqual({ ...before, appId: 'workday' })
+    expect(after).toEqual({ ...before, appIds: ['workday'] })
   })
 
   it('leaves the timestamp to whoever saves it', () => {
-    const before = policy({ appId: undefined, lastModified: 'Three weeks ago', modifiedBy: 'Priya' })
+    const before = policy({ appIds: [], lastModified: 'Three weeks ago', modifiedBy: 'Priya' })
     const after = attachTo(before, 'jira', apps)
     expect(after.lastModified).toBe('Three weeks ago')
     expect(after.modifiedBy).toBe('Priya')
   })
 
   it('never switches a policy on', () => {
-    expect(attachTo(policy({ appId: undefined, status: 'inactive' }), 'jira', apps).status).toBe('inactive')
+    expect(attachTo(policy({ appIds: [], status: 'inactive' }), 'jira', apps).status).toBe('inactive')
   })
 
-  it('clears the no-application warning', () => {
-    const after = attachTo(policy({ appId: undefined, configIssue: NO_APP_ISSUE }), 'box', apps)
-    expect(after.configIssue).toBeUndefined()
+  it('does not publish a draft it has just given an application to', () => {
+    /* The counterpart to `detachFrom`'s demotion, and the reason the pair is
+       not symmetric. An application is one of the things a draft was missing,
+       not evidence that it is finished — promoting here would publish a policy
+       because a picker was used. */
+    expect(attachTo(policy({ appIds: [], status: 'draft' }), 'box', apps).status).toBe('draft')
   })
 
-  it('keeps a warning that attaching does not fix', () => {
-    // Erasing this would quietly decrement the policies table's "N policies
-    // need attention" banner because a different problem was solved.
-    const other = 'No rules configured — every sign-in falls straight through to the default rule.'
-    expect(attachTo(policy({ appId: undefined, configIssue: other }), 'box', apps).configIssue).toBe(other)
+  it('adds rather than replaces, which is the whole change', () => {
+    expect(attachTo(policy({ appIds: ['slack'] }), 'workday', apps).appIds).toEqual(['slack', 'workday'])
+  })
+
+  it('is a no-op on an application it already has', () => {
+    // A list that could hold a duplicate would draw it twice and let one
+    // removal leave the other behind.
+    const before = policy({ appIds: ['workday'] })
+    expect(attachTo(before, 'workday', apps)).toBe(before)
   })
 
   it('refuses an application the tenant does not have', () => {
@@ -286,31 +300,63 @@ describe('attachTo', () => {
   it('keeps no record of where a moved policy came from', () => {
     // Documenting that the model has nowhere to put one: a policy has an
     // application, not a history of applications.
-    const after = attachTo(policy({ appId: 'slack' }), 'workday', apps)
+    const after = attachTo(policy({ appIds: ['slack'] }), 'workday', apps)
     expect(Object.keys(after).filter((k) => /previous|prior|was/i.test(k))).toEqual([])
-    expect(after.appId).toBe('workday')
+    expect(after.appIds).toEqual(['slack', 'workday'])
   })
 })
 
 describe('detachFrom', () => {
-  it('unsets the application as undefined, not as an empty string', () => {
-    const after = detachFrom(policy({ appId: 'workday' }))
-    expect(after.appId).toBeUndefined()
-    expect('appId' in after).toBe(true)
+  it('removes the one it is given, leaving an empty list', () => {
+    const after = detachFrom(policy({ appIds: ['workday'] }), 'workday')
+    expect(after.appIds).toEqual([])
   })
 
-  it('writes the warning back so the policies table stays truthful', () => {
-    expect(detachFrom(policy({ appId: 'workday' })).configIssue).toBe(NO_APP_ISSUE)
+  it('removes only the one it is given', () => {
+    /* The reason this takes an argument now. Removing GitHub from a policy that
+       also protects AWS must leave AWS alone — the old signature could only
+       empty the policy, which would have switched off enforcement on an
+       application nobody touched. */
+    const after = detachFrom(policy({ appIds: ['github', 'aws'], status: 'active' }), 'github')
+    expect(after.appIds).toEqual(['aws'])
+  })
+
+  it('does not demote while an application is left', () => {
+    expect(detachFrom(policy({ appIds: ['github', 'aws'], status: 'active' }), 'github').status).toBe('active')
+  })
+
+  it('ignores an application the policy does not have', () => {
+    const before = policy({ appIds: ['github'], status: 'active' })
+    const after = detachFrom(before, 'aws')
+    expect(after.appIds).toEqual(['github'])
+    expect(after.status).toBe('active')
+  })
+
+  it('sends the policy back to a draft rather than leaving it on with no app', () => {
+    /* The state this replaces — active, no application, a warning hung off it —
+       is not one the product has. A policy missing something it needs before it
+       can be published is a draft, and nothing else. */
+    const after = detachFrom(policy({ appIds: ['workday'], status: 'active' }), 'workday')
+    expect(after.status).toBe('draft')
+  })
+
+  it('demotes an always-on policy too', () => {
+    // The one status that would otherwise keep enforcing with nothing to enforce on.
+    expect(detachFrom(policy({ appIds: ['workday'], status: 'always-on' }), 'workday').status).toBe('draft')
   })
 
   it('refuses the tenant default', () => {
-    expect(() => detachFrom(SYSTEM)).toThrow()
+    expect(() => detachFrom(SYSTEM, 'salesforce')).toThrow()
   })
 
-  it('round-trips back to where it started, but for the warning', () => {
-    const before = policy({ appId: 'workday' })
-    const round = attachTo(detachFrom(before), 'workday', apps)
-    expect({ ...round, configIssue: undefined }).toEqual({ ...before, configIssue: undefined })
+  it('round-trips the application back, but does not republish', () => {
+    /* Deliberately lossy in one field, and it is the field that decides
+       sign-ins. Re-attaching restores the application; turning the policy back
+       on is a decision an administrator makes, not one a round trip makes for
+       them. */
+    const before = policy({ appIds: ['workday'], status: 'active' })
+    const round = attachTo(detachFrom(before, 'workday'), 'workday', apps)
+    expect(round).toEqual({ ...before, status: 'draft' })
   })
 })
 
@@ -331,7 +377,7 @@ describe('summarise', () => {
      itself. The estate-coupled assertions above are the ones that have to read
      the real seeds; this one never did. */
   it('marks one attached-but-inactive policy off rather than protected', () => {
-    const s = summarise('workday', [policy({ appId: 'workday', status: 'inactive' })])
+    const s = summarise('workday', [policy({ appIds: ['workday'], status: 'inactive' })])
     expect(s.own).toBe(1)
     expect(s.decides).toBe(0)
     expect(s.tag).toBe('Off')
@@ -340,9 +386,9 @@ describe('summarise', () => {
 
   it('names the shortfall when some of several do not decide', () => {
     const list = [
-      policy({ appId: 'workday' }),
-      policy({ appId: 'workday', status: 'inactive' }),
-      policy({ appId: 'workday' }),
+      policy({ appIds: ['workday'] }),
+      policy({ appIds: ['workday'], status: 'inactive' }),
+      policy({ appIds: ['workday'] }),
     ]
     expect(summarise('workday', list)).toMatchObject({
       own: 3,
@@ -354,7 +400,7 @@ describe('summarise', () => {
   })
 
   it('carries no qualification when everything attached decides', () => {
-    const s = summarise('workday', [policy({ appId: 'workday' }), policy({ appId: 'workday' })])
+    const s = summarise('workday', [policy({ appIds: ['workday'] }), policy({ appIds: ['workday'] })])
     expect(s).toMatchObject({ label: '2 policies', tag: null, tone: 'on' })
   })
 
@@ -379,7 +425,9 @@ describe('the fixtures themselves', () => {
     for (const d of DEPTHS) {
       const ids = new Set(appsAt(d).map((a) => a.id))
       for (const p of policiesAt(d)) {
-        if (p.appId !== undefined) expect(`${d}:${p.id}:${p.appId}`).toBe(`${d}:${p.id}:${ids.has(p.appId) ? p.appId : 'MISSING'}`)
+        for (const appId of p.appIds) {
+          expect(`${d}:${p.id}:${appId}`).toBe(`${d}:${p.id}:${ids.has(appId) ? appId : 'MISSING'}`)
+        }
       }
     }
   })

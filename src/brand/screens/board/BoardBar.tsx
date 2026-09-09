@@ -2,7 +2,7 @@ import { Activity, ChevronLeft, ChevronRight, ListChecks, Pencil } from 'lucide-
 import type { ReactNode } from 'react'
 
 import { Button, StatusPill } from '../../kit'
-import type { Policy } from '../../data'
+import { appsOf, type Policy } from '../../data'
 import { AppLogo } from '../../logos/AppLogo'
 import { useBrand } from '../../store'
 
@@ -57,9 +57,11 @@ export function BoardBar({
   actions?: ReactNode
 }) {
   const store = useBrand()
-  /* The system policy is the one that has no application and covers all of
-     them — every other policy protects exactly one. */
-  const app = policy.appId ? store.appById(policy.appId) : null
+  /* The system policy is the one that names no application and covers all of
+     them. Every other policy names a list, and the bar has room for one mark —
+     so the first, with the count carrying the rest. */
+  const named = appsOf(policy, store.apps)
+  const app = named[0] ?? null
 
   return (
     <header className="bbtop">
@@ -105,6 +107,7 @@ export function BoardBar({
           onClick={() => store.go({ name: 'policy-details', policyId: policy.id, from: 'board' })}
         >
           {app && <AppLogo appId={app.id} name={app.name} size={16} />}
+          {named.length > 1 && <i className="bbar__appmore">+{named.length - 1}</i>}
           <b>{policy.name}</b>
           <Pencil size={12} strokeWidth={2} aria-hidden />
         </button>

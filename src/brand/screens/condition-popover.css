@@ -242,7 +242,32 @@
   color: var(--surface-raised);
 }
 .cp__opt.is-on .cp__tick { background: var(--brand); border-color: var(--brand); color: var(--text-on-brand); }
-.cp__icon { display: grid; place-items: center; width: 18px; flex: none; color: var(--text-tertiary); }
+/* The mark, tinted by the family the attribute belongs to.
+
+   Nine attributes across five families were nine grey glyphs: the shape told
+   them apart and nothing said which two were about the same kind of thing. A
+   hue per family does that without a heading per family — which is what the
+   list had before, and what made a nine-row menu four rows of chrome.
+
+   Never red. Every ramp here is a category rather than a state, and a red row
+   in a list of things you may choose reads as one you may not. */
+.cp__icon {
+  display: grid; place-items: center;
+  width: 22px; height: 22px; flex: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  color: var(--text-tertiary);
+}
+.cp__icon.is-library { background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.cp__icon.is-time { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.cp__icon.is-attributes { background: var(--brand-subtle-bg); color: var(--brand); }
+.cp__icon.is-risk { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.cp__icon.is-group, .cp__icon.is-user { background: var(--surface-inset); color: var(--text-secondary); }
+
+/* Chosen, said on the mark rather than in a gutter beside it. The row keeps its
+   tint and gains the ring, so the answer is legible without a column that is
+   empty on every other row. */
+.cp__opt.is-on .cp__icon { box-shadow: 0 0 0 2px var(--brand); }
 .cp__text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 0; }
 .cp__text b {
   font-size: var(--fs-sm);
@@ -388,13 +413,61 @@
    used to be four boxes inside a fifth, each holding three bordered fields —
    twenty-one rectangles to draw four things. The frame that survives is the one
    that carries a second operator, which is the only nesting this model has. */
-.cp__stack { display: flex; flex-direction: column; gap: 6px; }
+/* ONE box per condition, not three stacked ones.
 
-/* The attribute and the way out of it. The delete sits with the attribute
-   rather than with the value, because what it deletes is the whole condition
-   and the attribute is the only row that names the whole condition. */
-.cp__stackhead { display: flex; align-items: center; gap: 6px; }
-.cp__stackhead > .cp__fld { flex: 1; min-width: 0; }
+   Three full-width bordered fields — attribute, operator, value — meant one
+   condition drew three rectangles and four conditions drew twelve, in a 340px
+   column where nothing said which three belonged together. The box is the
+   condition; the fields inside it are its parts, and they are drawn light
+   because the box has already done the separating.
+
+   Taller than any one of the old rows and shorter than all three, which is the
+   trade: a condition is now one thing to scan past rather than three. */
+.cp__stack {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+.cp__stack:hover { border-color: var(--border-default); }
+/* The unset condition says so on its frame rather than only on the value
+   inside it — at a glance down a list, the box is what you see. */
+.cp__stack.is-unset { border-color: var(--fb-negative-border); }
+
+/* ONE row: attribute, operator, value, delete.
+
+   The widths are PROPORTIONAL, not equal, and that is the whole of what makes
+   three dropdowns in a row readable instead of cramped. Equal thirds gives the
+   operator — two words from a closed set — the same room as a zone name, so
+   the two halves that carry the information are the two that truncate.
+
+   The operator never shrinks below its content; the attribute and the value
+   share what is left, with the value taking slightly more because it is the
+   half that holds a library name. `min-width: 0` on both is what lets them
+   ellipsize instead of forcing the row wider than the panel. */
+.cp__stackrow {
+  display: flex; align-items: center; gap: 5px;
+  min-width: 0;
+}
+.cp__stackrow > .cp__fld.is-what { flex: 1 1 34%; min-width: 0; }
+.cp__stackrow > .cp__fld.is-op { flex: 0 0 auto; width: auto; white-space: nowrap; }
+.cp__stackrow > .cp__fld.is-op .cp__fldtext { overflow: visible; }
+.cp__stackrow > .cp__fld.is-val { flex: 1 1 44%; min-width: 0; }
+.cp__stackrow > .cp__inline { flex: 1 1 44%; min-width: 0; }
+.cp__stackrow > .cp__stacklabel { flex: 1 1 34%; min-width: 0; }
+
+/* The one row that is not part of the sentence: an attribute's key, a time
+   window's timezone. Full width under the row they qualify. */
+.cp__stack > .cp__fld,
+.cp__stack > .cp__inline { width: 100%; }
+
+/* The delete, at the end of the row rather than beside the attribute. It is a
+   quiet icon until the condition is hovered, because a bin on every row of a
+   list is a list that looks like it is mostly about deleting. */
+.cp__stackrow > .cp__del { flex: none; width: 26px; height: 26px; opacity: 0; }
+.cp__stack:hover .cp__del,
+.cp__stack:focus-within .cp__del { opacity: 1; }
+.cp__del:focus-visible { opacity: 1; }
 .cp__stacklabel {
   flex: 1; min-width: 0;
   display: inline-flex; align-items: center; gap: var(--space-2);

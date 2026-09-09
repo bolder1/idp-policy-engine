@@ -45,7 +45,12 @@ function match(p: Policy, app: App, group: Group): Cell | null {
      and stops there — counting it as cover would report a tenant as protected
      by a policy that has never refused anything. */
   if (!enforces(p)) return null
-  if (!coversEveryApp(p) && p.appId !== app.id) return null
+  /* `includes`, so one policy legitimately fills several columns of this grid.
+     That used to be the argument AGAINST a list — a policy drawn three times
+     looked like three decisions. It is one decision shown where it lands, and
+     the grid is the surface that makes multi-app policies legible rather than
+     the one they break. */
+  if (!coversEveryApp(p) && !p.appIds.includes(app.id)) return null
 
   // Every rule that could apply, not just the first. Which one wins depends on
   // conditions evaluated at sign-in, so the honest static answer is the range —

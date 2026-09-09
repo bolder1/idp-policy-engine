@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, Download, Minus, Search, X } from 'lucide-react'
 
 import { Button, Chip, Counter, DecisionChip, Modal } from '../kit'
-import { type AccessDecision, type Policy, type Rule } from '../data'
+import { appsOf, type AccessDecision, type Policy, type Rule } from '../data'
 import { useBrand } from '../store'
 import { AppLogo } from '../logos/AppLogo'
 import {
@@ -443,9 +443,9 @@ export function DecisionLogDialog({
   const [range, setRange] = useState<'24h' | '7d'>('24h')
 
   const appPool = useMemo(() => {
-    const named = policy.isSystem ? store.apps : policy.appId ? [store.appById(policy.appId)] : []
+    const named = policy.isSystem ? store.apps : appsOf(policy, store.apps)
     return named.length > 0 ? named : store.apps.slice(0, 3)
-  }, [policy.isSystem, policy.appId, store])
+  }, [policy, store])
 
   const all = useMemo(() => buildLog(policy, appPool), [policy, appPool])
 

@@ -1,7 +1,7 @@
 import { AppWindow, ArrowLeft, Pencil, Users } from 'lucide-react'
 
 import { StatusPill } from '../kit'
-import { audienceSummary, initials, type Policy } from '../data'
+import { appsLabel, appsOf, audienceSummary, initials, type Policy } from '../data'
 import { AppLogo } from '../logos/AppLogo'
 import { useBrand } from '../store'
 import { Peek } from './peek'
@@ -43,9 +43,11 @@ export function PolicyBar({ policy }: { policy: Policy }) {
      that drifts when it is copied. */
   const { label: audienceLabel, total, showTotal, nobody } = audienceSummary(policy.audience, store.groups, store.users)
 
-  /* The system policy is the one that has no application and covers all of
-     them — every other policy protects exactly one. */
-  const app = policy.appId ? store.appById(policy.appId) : null
+  /* The system policy is the one that names no application and covers all of
+     them. Every other policy names a list; this bar shows the first and counts
+     the rest, which is what `appsLabel` spells. */
+  const named = appsOf(policy, store.apps)
+  const app = named[0] ?? null
 
   return (
     /* The trail's header, and only the trail's.
@@ -83,7 +85,7 @@ export function PolicyBar({ policy }: { policy: Policy }) {
                  click away in Edit details. */
               <span className="bpbar__app">
                 <AppLogo appId={app.id} size={16} />
-                {app.name}
+                {appsLabel(named)}
               </span>
             ) : (
               <em>Not chosen — these rules never run</em>

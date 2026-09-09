@@ -13,28 +13,36 @@ export interface LogoSource {
   name: string
   /** Canonical domain. Logo providers key off this. */
   domain: string
-  /** Used when every remote source fails, so the UI never shows a broken image. */
-  fallbackTint: string
-  fallbackMonogram: string
 }
 
+/* `fallbackTint` and `fallbackMonogram` were here, one pair per app, and
+   `AppLogo` painted the initials on the tint whenever a fetch failed.
+
+   Nothing reads them now. The fallback is one generic application icon rather
+   than a per-app monogram, for the reason set out in `AppLogo`: initials are a
+   logo's shape without its content, and for the sixteen internal systems in
+   this tenant they were two letters of a name printed in full beside them.
+   Removing the fields rather than leaving them unread, because a registry
+   carrying a brand colour nothing paints is a registry that will eventually be
+   updated by somebody expecting it to show up. */
+
 export const LOGO_SOURCES: LogoSource[] = [
-  { id: 'salesforce', name: 'Salesforce', domain: 'salesforce.com', fallbackTint: '#00a1e0', fallbackMonogram: 'SF' },
-  { id: 'workday', name: 'Workday', domain: 'workday.com', fallbackTint: '#f38b00', fallbackMonogram: 'WD' },
-  { id: 'github', name: 'GitHub Enterprise', domain: 'github.com', fallbackTint: '#24292e', fallbackMonogram: 'GH' },
-  { id: 'm365', name: 'Microsoft 365', domain: 'microsoft.com', fallbackTint: '#d83b01', fallbackMonogram: 'M3' },
-  { id: 'jira', name: 'Jira', domain: 'atlassian.com', fallbackTint: '#2684ff', fallbackMonogram: 'JR' },
-  { id: 'slack', name: 'Slack', domain: 'slack.com', fallbackTint: '#611f69', fallbackMonogram: 'SL' },
-  { id: 'aws', name: 'AWS Console', domain: 'aws.amazon.com', fallbackTint: '#ff9900', fallbackMonogram: 'AW' },
-  { id: 'zoom', name: 'Zoom', domain: 'zoom.us', fallbackTint: '#2d8cff', fallbackMonogram: 'ZM' },
-  { id: 'box', name: 'Box', domain: 'box.com', fallbackTint: '#0061d5', fallbackMonogram: 'BX' },
-  { id: 'servicenow', name: 'ServiceNow', domain: 'servicenow.com', fallbackTint: '#62d84e', fallbackMonogram: 'SN' },
-  { id: 'okta', name: 'Okta', domain: 'okta.com', fallbackTint: '#007dc1', fallbackMonogram: 'OK' },
-  { id: 'google', name: 'Google Workspace', domain: 'google.com', fallbackTint: '#4285f4', fallbackMonogram: 'GW' },
-  { id: 'dropbox', name: 'Dropbox', domain: 'dropbox.com', fallbackTint: '#0061ff', fallbackMonogram: 'DB' },
-  { id: 'zendesk', name: 'Zendesk', domain: 'zendesk.com', fallbackTint: '#03363d', fallbackMonogram: 'ZD' },
-  { id: 'confluence', name: 'Confluence', domain: 'atlassian.com', fallbackTint: '#1868db', fallbackMonogram: 'CF' },
-  { id: 'miniorange', name: 'miniOrange', domain: 'miniorange.com', fallbackTint: '#eb5424', fallbackMonogram: 'mO' },
+  { id: 'salesforce', name: 'Salesforce', domain: 'salesforce.com' },
+  { id: 'workday', name: 'Workday', domain: 'workday.com' },
+  { id: 'github', name: 'GitHub Enterprise', domain: 'github.com' },
+  { id: 'm365', name: 'Microsoft 365', domain: 'microsoft.com' },
+  { id: 'jira', name: 'Jira', domain: 'atlassian.com' },
+  { id: 'slack', name: 'Slack', domain: 'slack.com' },
+  { id: 'aws', name: 'AWS Console', domain: 'aws.amazon.com' },
+  { id: 'zoom', name: 'Zoom', domain: 'zoom.us' },
+  { id: 'box', name: 'Box', domain: 'box.com' },
+  { id: 'servicenow', name: 'ServiceNow', domain: 'servicenow.com' },
+  { id: 'okta', name: 'Okta', domain: 'okta.com' },
+  { id: 'google', name: 'Google Workspace', domain: 'google.com' },
+  { id: 'dropbox', name: 'Dropbox', domain: 'dropbox.com' },
+  { id: 'zendesk', name: 'Zendesk', domain: 'zendesk.com' },
+  { id: 'confluence', name: 'Confluence', domain: 'atlassian.com' },
+  { id: 'miniorange', name: 'miniOrange', domain: 'miniorange.com' },
 ]
 
 /**

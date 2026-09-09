@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { AlertTriangle, Check } from 'lucide-react'
 
-import type { Policy } from '../data'
+import { appsLabel, appsOf, type Policy } from '../data'
 import { useBrand } from '../store'
 import { impactOf } from './diagnostics'
 import { runGauntlet } from './gauntlet'
@@ -57,7 +57,7 @@ export function Readiness({
   const movement = useMemo(() => (dirty ? compare(sweep(saved, env, 570), after) : null), [dirty, saved, env, after])
 
   const dead = draft.rules.map((r, i) => ({ r, i })).filter(({ r, i }) => r.enabled && after.reach[i] === 0)
-  const app = draft.appId ? store.appById(draft.appId) : null
+  const named = appsOf(draft, store.apps)
 
   const impact = draft.rules.length > 0 ? impactOf(draft, 0, store.groups) : null
 
@@ -113,14 +113,16 @@ export function Readiness({
       />
 
       <Row
-        ok={app !== null}
-        title={app ? `Protects ${app.name}` : 'No application chosen'}
+        ok={named.length > 0}
+        title={named.length > 0 ? `Protects ${appsLabel(named)}` : 'No application chosen'}
         detail={
-          app
-            ? 'Every sign-in to it is checked against these rules.'
-            : 'These rules are saved but never evaluated — nothing reaches them.'
+          named.length > 1
+            ? 'Every sign-in to any of them is checked against these rules.'
+            : named.length > 0
+              ? 'Every sign-in to it is checked against these rules.'
+              : 'These rules are saved but never evaluated — nothing reaches them.'
         }
-        action={{ label: 'Choose the application', run: () => store.go({ name: 'policy-details', policyId: draft.id }) }}
+        action={{ label: 'Choose applications', run: () => store.go({ name: 'policy-details', policyId: draft.id }) }}
       />
 
       {/* The single-user test went with the docked tester: both dealt one

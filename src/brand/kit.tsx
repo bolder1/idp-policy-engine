@@ -1067,37 +1067,13 @@ export function TipMark({ text }: { text: ReactNode }) {
   )
 }
 
-/** Small "why" affordance — the current prototype shows bare red dots. */
-export function InfoDot({ text, tone = 'notice' }: { text: string; tone?: 'notice' | 'negative' }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <span className="bx-infodot-wrap">
-      <button
-        type="button"
-        className={`bx-infodot bx-infodot--${tone}`}
-        aria-label={text}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-      />
-      <AnimatePresence>
-        {open && (
-          <motion.span
-            className="bx-infodot__pop"
-            initial={{ opacity: 0, y: -3 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -3 }}
-            transition={{ duration: 0.14 }}
-            role="tooltip"
-          >
-            {text}
-          </motion.span>
-        )}
-      </AnimatePresence>
-    </span>
-  )
-}
+/* `InfoDot` stood here — a coloured dot whose tooltip named a policy's
+   configuration fault.
+
+   Both of its call sites rendered `policy.configIssue`, and that field is gone:
+   a policy that is not finished is a draft, which the status column states
+   outright. A dot you have to hover to learn is a worse way to say a thing the
+   row already says in a word. */
 
 export function Drawer({
   open,
@@ -1380,21 +1356,38 @@ export function Modal({
   )
 }
 
-/**
- * Unsaved-changes bar. Names what changed rather than saying "unsaved changes",
- * which is the library's "name examples, not only totals" rule applied to the
- * save affordance.
- */
+/* --- The unsaved bar -------------------------------------------------------
+
+   One floating strip, bottom centre, present only while a draft differs from
+   what is stored.
+
+   This existed with no callers, built for a policy builder that ended up doing
+   its committing elsewhere — the button said "Review & enforce". Three screens
+   now edit a named object through a local draft (device profiles, zones, risk
+   profiles), and rather than write a second bar beside a dead one, the dead one
+   became the shared one. What survived from it is the part worth keeping: it
+   NAMES what changed rather than saying "unsaved changes", and it caps the
+   naming at two so a long edit does not produce a long strip.
+
+   `changes` rather than a boolean, for that reason. "You have unsaved changes"
+   is true of every form ever built; "name · 3 added" is the thing somebody is
+   being asked to confirm — and on a tabbed or scrolling page it is what names
+   edits made where they cannot currently see them. */
 export function SaveBar({
   open,
   changes,
   onDiscard,
-  onReview,
+  onSave,
+  saveLabel = 'Save changes',
+  /** Blocks the save without hiding the bar — for a draft that is not valid yet. */
+  blocked = false,
 }: {
   open: boolean
   changes: string[]
   onDiscard: () => void
-  onReview: () => void
+  onSave: () => void
+  saveLabel?: string
+  blocked?: boolean
 }) {
   return (
     <AnimatePresence>
@@ -1405,18 +1398,25 @@ export function SaveBar({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 10 }}
           transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+          /* `status`, not `alert`. It reports a state the reader caused; an
+             alert would interrupt a screen reader mid-word on every keystroke
+             that made a form dirty. */
+          role="status"
         >
           <span className="bx-savebar__text">
             <strong>
               {changes.length} unsaved change{changes.length === 1 ? '' : 's'}
             </strong>
-            <span>{changes.slice(0, 2).join(' · ')}{changes.length > 2 ? ` · +${changes.length - 2} more` : ''}</span>
+            <span>
+              {changes.slice(0, 2).join(' · ')}
+              {changes.length > 2 ? ` · +${changes.length - 2} more` : ''}
+            </span>
           </span>
-          <Button variant="ghost" onClick={onDiscard}>
+          <Button variant="ghost" size="sm" onClick={onDiscard}>
             Discard
           </Button>
-          <Button variant="brand" onClick={onReview}>
-            Review &amp; enforce
+          <Button variant="brand" size="sm" disabled={blocked} onClick={onSave}>
+            {saveLabel}
           </Button>
         </motion.div>
       )}

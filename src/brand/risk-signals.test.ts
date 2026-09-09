@@ -13,7 +13,7 @@ import {
   riskScale,
   tierFor,
   tierKey,
-  type RiskProfile,
+  type RiskTuning,
 } from './risk-signals'
 
 /* -----------------------------------------------------------------------------
@@ -22,7 +22,7 @@ import {
    never opened the screen must grade exactly as they did before it existed.
    -------------------------------------------------------------------------- */
 
-const profile = (over: Partial<RiskProfile> = {}): RiskProfile => ({ ...EMPTY_RISK_PROFILE, ...over })
+const profile = (over: Partial<RiskTuning> = {}): RiskTuning => ({ ...EMPTY_RISK_PROFILE, ...over })
 
 describe('the shipped configuration', () => {
   /* The whole migration argument in one assertion. `RISK_SCORE` was a constant
@@ -118,7 +118,7 @@ describe('the catalogue', () => {
    two different tenant profiles, two different answers.
    -------------------------------------------------------------------------- */
 describe('the profile decides what a rule catches', () => {
-  const env = (profile: RiskProfile): SimEnv => ({
+  const env = (profile: RiskTuning): SimEnv => ({
     zoneName: (id) => id,
     fingerprintName: (id) => id,
     groupName: (id) => id,
@@ -149,7 +149,7 @@ describe('the profile decides what a rule catches', () => {
        same sign-in is no longer caught. That is the consequence of the choice,
        and it is why the weighting had to own RISK_SCORE rather than sit beside
        it. */
-    const quiet: RiskProfile = {
+    const quiet: RiskTuning = {
       off: RISK_SIGNALS.filter((s) => s.category === 'Instrumentation').map((s) => s.id),
       tiers: {},
     }

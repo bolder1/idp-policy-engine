@@ -214,3 +214,51 @@
     font-size: var(--fs-xs); color: var(--text-tertiary); min-width: 62px;
   }
 }
+
+/* --- The library ------------------------------------------------------------
+
+   Added when this screen stopped being one tenant-wide weighting and became a
+   list of them. The table itself is `.btable`, shared with Policies — a third
+   table style for a third library is a third thing to learn for no gain. */
+
+/* Muted, because it qualifies the count beside it rather than competing with
+   it: "12 of 16 signals · 4 off" is one fact said twice, and the second half is
+   the detail. */
+.brs__listoff { font-style: normal; color: var(--text-tertiary); }
+
+/* Tabular and heavier, because the whole point of this column is comparing it
+   down the table — it is the number `Risk score above 60` is measured against,
+   so two profiles differ HERE or nowhere that matters. */
+.brs__listscore {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+}
+
+.brs__namebody { display: flex; flex-direction: column; gap: var(--space-5); }
+.brs__namebody p { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.6; }
+.brs__namebody .bfp2__field > span { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.brs__namebody input {
+  width: 100%; height: var(--ctl-height-md); padding: 0 11px;
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md);
+  font-family: inherit; font-size: var(--fs-md); color: var(--text-primary);
+}
+.brs__namebody input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+
+.brs__confirm { margin: 0; font-size: var(--fs-md); line-height: 1.6; color: var(--text-secondary); }
+.brs__confirm strong { color: var(--text-primary); font-weight: var(--fw-medium); }
+
+/* --- A band that has moved --------------------------------------------------
+
+   The bands are the page's output, so an unsaved edit that changes one is the
+   consequence of the edit made visible. The old value sits under the new one
+   rather than replacing it: a number that has changed with no record of what it
+   changed FROM is a number you have to have memorised to read. */
+.brs__band { position: relative; }
+.brs__band.is-moved { background: var(--brand-subtle-bg); }
+.brs__was {
+  font-style: normal;
+  font-size: 10px; color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}

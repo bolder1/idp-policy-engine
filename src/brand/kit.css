@@ -507,6 +507,48 @@ html[data-theme='dark'] {
   color: var(--text-tertiary);
 }
 
+/* The underline flavour.
+
+   The board's inspector already tabs this way — `Who / Condition` under a rule
+   name — and it got there first. Two shapes for one job across two screens is a
+   tell that neither was chosen, so the pill is now the exception rather than the
+   default: it belongs where a tablist is a control sitting among other controls,
+   and the underline belongs where it divides a page into sections, which is what
+   both of these do.
+
+   The moving element is the same `__bg` span, so the spring that slid the pill
+   slides the bar, and the two variants cannot drift apart in their motion. */
+.bx-tabs--line {
+  gap: var(--space-2);
+  padding: 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+}
+.bx-tabs--line .bx-tabs__tab {
+  height: 34px;
+  padding: 0 var(--space-3);
+  border-radius: 0;
+  /* Over the container's own rule, not above it — the active bar and the
+     divider are the same line. */
+  margin-bottom: -1px;
+  font-size: var(--fs-md);
+}
+.bx-tabs--line .bx-tabs__tab:hover { color: var(--text-primary); }
+.bx-tabs--line .bx-tabs__bg {
+  inset: auto 0 0;
+  height: 2px;
+  background: var(--brand);
+  border-radius: 0;
+  box-shadow: none;
+}
+.bx-tabs--line .bx-tabs__tab:focus-visible {
+  outline: none;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
 /* --- Fields --------------------------------------------------------------- */
 
 .bx-field { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -584,33 +626,6 @@ html[data-theme='dark'] {
 .bx-card__actions { display: flex; gap: var(--space-4); flex: none; }
 .bx-card__body { padding: var(--space-7); }
 .bx-card__body.is-flush { padding: 0; }
-
-/* --- Info dot ------------------------------------------------------------- */
-
-.bx-infodot-wrap { position: relative; display: inline-flex; }
-.bx-infodot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  flex: none;
-}
-.bx-infodot--notice { background: var(--fb-notice-dot); }
-.bx-infodot--negative { background: var(--fb-negative-dot); }
-.bx-infodot__pop {
-  position: absolute;
-  left: 50%;
-  top: calc(100% + 8px);
-  transform: translateX(-50%);
-  width: 248px;
-  padding: var(--space-4) var(--space-5);
-  background: var(--surface-inverse);
-  color: var(--text-inverse);
-  border-radius: var(--radius-md);
-  font-size: var(--fs-xs);
-  line-height: 1.5;
-  box-shadow: var(--el-high);
-  z-index: var(--z-tooltip);
-}
 
 /* --- Overlays ------------------------------------------------------------- */
 
@@ -708,25 +723,50 @@ html[data-theme='dark'] {
 
 /* --- Save bar ------------------------------------------------------------- */
 
+/* Fixed at the bottom centre of the VIEWPORT, and it stays there.
+
+   Sticky was the other option and it is the wrong one for this: it keeps the
+   bar inside the page column, so it is as wide as the content, moves with the
+   document until it pins, and on a short form sits wherever the fields happen
+   to end. Fixed puts it in one place, so "where do I commit this" never depends
+   on how far down the page you are. */
 .bx-savebar {
   position: fixed;
-  left: 50%;
+  /* Centred WITHOUT a transform, and this is load-bearing rather than a style
+     preference. `motion` writes this element's `transform` inline on every
+     frame of the slide-in, so a `translateX(-50%)` in the stylesheet is
+     overwritten and the bar jumps to the left edge the moment the spring
+     settles. This is what that rule looked like before it had a caller to
+     expose it. `left: 0; right: 0` over a `fit-content` width centres the same
+     way and leaves `transform` entirely to the animation. */
+  left: 0;
+  right: 0;
   bottom: var(--space-8);
-  transform: translateX(-50%);
+  margin-inline: auto;
+  width: fit-content;
+  max-width: calc(100vw - var(--space-8) * 2);
   display: flex;
   align-items: center;
   gap: var(--space-5);
   padding: var(--space-4) var(--space-4) var(--space-4) var(--space-7);
-  background: var(--surface-inverse);
+  /* A raised card, not the inverse surface this used to be. The toast is a dark
+     pill at the bottom centre of the same screen, and saving makes this bar
+     leave and a toast arrive — two dark pills in one place, one replacing the
+     other, is two things nobody can tell apart at the moment they swap. */
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-default);
   border-radius: var(--radius-lg);
   box-shadow: var(--el-overlay);
-  z-index: var(--z-toast);
+  /* Under the toast for the same reason: for the moment both exist, the
+     confirmation is the newer fact. */
+  z-index: var(--z-overlay);
 }
-.bx-savebar__text { display: flex; flex-direction: column; color: var(--text-inverse); }
-.bx-savebar__text strong { font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
-.bx-savebar__text span { font-size: var(--fs-xs); opacity: 0.7; }
-.bx-savebar .bx-btn--ghost { color: color-mix(in srgb, var(--text-inverse) 78%, transparent); }
-.bx-savebar .bx-btn--ghost:hover { background: color-mix(in srgb, var(--text-inverse) 10%, transparent); color: var(--text-inverse); }
+.bx-savebar__text { display: flex; flex-direction: column; min-width: 0; }
+.bx-savebar__text strong { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bx-savebar__text span {
+  font-size: var(--fs-xs); color: var(--text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* --- App logos ------------------------------------------------------------ */
 
@@ -739,7 +779,19 @@ html[data-theme='dark'] {
 }
 .applogo--img { background: var(--surface-raised); border: var(--bw-thin) solid var(--border-subtle); }
 .applogo--img img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.applogo--mono { color: #fff; font-weight: var(--fw-semibold); letter-spacing: -0.02em; }
+/* The mark for an app with no mark.
+
+   Same box, same border and same ground as a resolved logo — the square is a
+   slot, and a slot that changes shape depending on whether it is filled makes a
+   column of mixed rows look misaligned when it is not. Only the content
+   differs: a real logo, or an icon saying that this is an application and
+   nothing more. Muted, because it is the one thing in that column with no
+   identity to assert. */
+.applogo--generic {
+  background: var(--surface-inset);
+  border: var(--bw-thin) solid var(--border-subtle);
+  color: var(--text-muted);
+}
 
 .applogo__none { font-size: var(--fs-sm); color: var(--text-muted); }
 

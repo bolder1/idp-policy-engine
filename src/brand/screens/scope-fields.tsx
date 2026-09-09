@@ -1,4 +1,5 @@
 import { AppLogo } from '../logos/AppLogo'
+import { appsLabel } from '../data'
 import { Picker } from '../picker'
 import { useBrand } from '../store'
 
@@ -23,16 +24,31 @@ import { useBrand } from '../store'
    builder's own drawer still edits it for a policy that has one.
    -------------------------------------------------------------------------- */
 
-/** What the policy protects. Required — a policy that protects nothing is inert. */
-export function ApplicationField({ appId, onChange }: { appId: string | null; onChange: (id: string | null) => void }) {
+/* What the policy protects. Required — a policy that protects nothing is inert.
+
+   Multi-select, because `Policy.appIds` is a list: one set of rules can govern
+   several applications, which is what S17 needed and had to fake with two
+   identical policies. `Picker` already had `multiple`, so this is the prop and
+   a toggling `onChange` rather than a new control.
+
+   The trigger states the answer the way every other surface does — one name, or
+   the first name and a count — instead of the built-in "3 selected", which is a
+   number you have to open the control to interpret. */
+export function ApplicationField({ appIds, onChange }: { appIds: string[]; onChange: (ids: string[]) => void }) {
   const store = useBrand()
+  const named = store.apps.filter((a) => appIds.includes(a.id))
   return (
     <Picker
-      label="Application this policy protects"
+      label="Applications this policy protects"
       width="fill"
       size="md"
       searchable
-      value={appId}
+      multiple
+      value={appIds}
+      /* Undefined while empty, deliberately: `summary` overrides the
+         placeholder, so stating one here would replace "Choose applications"
+         with a sentence nobody needs before they have chosen anything. */
+      summary={named.length === 0 ? undefined : appsLabel(named)}
       /* No "No application" row and no sentinel.
 
          There was one, pinned above the list, carrying the check when nothing
@@ -42,8 +58,8 @@ export function ApplicationField({ appId, onChange }: { appId: string | null; on
          policy exists to govern access TO something, and one that names nothing
          is a set of rules no sign-in can ever reach. So the empty state is a
          placeholder again, and the footer will not let you past it. */
-      placeholder="Choose an application"
-      invalid={!appId}
+      placeholder="Choose applications"
+      invalid={appIds.length === 0}
       /* The real marks, back from the list this control replaced.
 
          `AppList` drew them, and answering the same question with a picker had
@@ -57,7 +73,17 @@ export function ApplicationField({ appId, onChange }: { appId: string | null; on
         meta: a.protocol,
         art: <AppLogo appId={a.id} name={a.name} size={18} />,
       }))}
-      onChange={onChange}
+      /* `Picker` in multiple mode reports the row that was pressed, not the new
+         set, so the toggle is the caller's. Order follows the catalogue rather
+         than the clicks — `appsOf` reads it back that way, and two orders for
+         one list is how a "changed" check starts firing on nothing. */
+      onChange={(id) =>
+        onChange(
+          appIds.includes(id)
+            ? appIds.filter((x) => x !== id)
+            : store.apps.filter((a) => a.id === id || appIds.includes(a.id)).map((a) => a.id),
+        )
+      }
     />
   )
 }

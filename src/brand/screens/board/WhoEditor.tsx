@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { Check, UserRound, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, Pencil, Plus, UserRound, Users } from 'lucide-react'
 
-import { Button } from '../../kit'
+import { Button, Modal } from '../../kit'
 import { useBrand, useNameLookup } from '../../store'
 import type { Audience, Predicate, Rule } from '../../data'
 import { cardLetter } from '../../predicate'
@@ -62,8 +62,13 @@ import type { Part } from './model'
    invert the meaning of its own list. */
 const AFFIRMATIVE: Record<WhoType, string> = { group: 'in', user: 'is' }
 
-/** How many avatars are drawn before the rest become a count. */
-const AVATAR_CAP = 6
+/* How many faces the summary draws before the rest become a count.
+
+   Four, and the number is set by the line rather than by taste: four 18px
+   avatars, overlapped, plus a count, a label and an Edit is what fits across a
+   340px panel without wrapping. The summary exists to stay one line — a fifth
+   face would cost the thing it is for. */
+const FACES = 4
 
 export function WhoEditor({
   rule,
@@ -79,11 +84,7 @@ export function WhoEditor({
 }) {
   const store = useBrand()
   const resolve = useNameLookup()
-  const write = (next: Predicate) => onPatch({ when: next })
-
-  const [tab, setTab] = useState<WhoType>('group')
-  const [q, setQ] = useState('')
-
+  const [picking, setPicking] = useState(false)
 
   if (!whoEditable(rule.when)) return <WhoStandDown rule={rule} onOpenPart={onOpenPart} />
 
@@ -91,10 +92,187 @@ export function WhoEditor({
   const userIds = whoIds(rule.when, 'user')
   /* Reads the stored operator and never changes it. Removing the control must
      not silently rewrite a rule that already excludes: an exclusion built in
-     the Condition pane survives every tick and untick here, and is reported
+     the Condition section survives every tick and untick here, and is reported
      below rather than being quietly read as its opposite. */
   const opFor = (k: WhoType) => (whoIds(rule.when, k).length > 0 ? whoOperator(rule.when, k) : AFFIRMATIVE[k])
   const negated = (k: WhoType) => whoIds(rule.when, k).length > 0 && opFor(k).includes('not')
+  const outside = outsideAudience(audience, groupIds, userIds, store.users)
+
+  const chosen = [
+    ...groupIds.map((id) => ({
+      kind: 'group' as WhoType,
+      id,
+      name: resolve('group', id) ?? `deleted · ${id}`,
+      flagged: outside.groups.includes(id),
+    })),
+    ...userIds.map((id) => ({
+      kind: 'user' as WhoType,
+      id,
+      name: resolve('user', id) ?? `deleted · ${id}`,
+      flagged: outside.users.includes(id),
+    })),
+  ]
+
+  /* Counted rather than listed. Which of the fourteen are outside the policy's
+     audience is a question the dialog answers per row; here the useful fact is
+     that some are, and how many. */
+  const flaggedCount = chosen.filter((c) => c.flagged).length
+
+  return (
+    <div className="bb__who">
+      {chosen.length === 0 ? (
+        /* The empty state says what the rule DOES while empty, not what the
+           control is for.
+
+           A rule that names nobody is not broken and is not unfinished — it
+           covers everyone the policy governs, which is the commonest shape a
+           rule has. Saying "no one selected" would report that legitimate
+           default as a gap, and the button beside it is the same offer either
+           way. */
+        <div className="bb__whonone">
+          <Users size={15} strokeWidth={1.8} aria-hidden />
+          <span>
+            <b>Everyone this policy governs</b>
+            <em>Narrow it to particular groups or people, or leave it as it is.</em>
+          </span>
+        </div>
+      ) : (
+        /* A CAP, a count, and the way in — on one line.
+
+           Every chosen group and person was drawn as a named chip with its own
+           remove button, so a rule naming six groups and eight people filled
+           the section with fourteen chips over five rows and pushed the
+           conditions off the panel. The section is a summary; five rows of
+           chips is not a summary of anything.
+
+           Four faces, then "+10". The faces are there because a face is
+           recognisable at a glance where a name has to be read, and four is
+           what fits beside a count and an Edit on one line. Everything past
+           four is a number, and the number is honest about being one — it does
+           not pretend the rest are unimportant, it says how many there are and
+           opens the same dialog.
+
+           No per-chip remove. Removing one of fourteen is an editing gesture,
+           and editing happens in the dialog where the whole set is visible;
+           keeping a delete on each face meant the summary carried the one
+           control that could not be undone from where it stood. */
+        <button
+          type="button"
+          className="bb__whosum"
+          onClick={() => setPicking(true)}
+          title={chosen.map((c) => c.name).join(', ')}
+        >
+          <span className="bb__whosum__faces" aria-hidden>
+            {chosen.slice(0, FACES).map((c) => (
+              <Avatar key={`${c.kind}:${c.id}`} name={c.name} on />
+            ))}
+            {chosen.length > FACES && <i className="bb__whosum__more">+{chosen.length - FACES}</i>}
+          </span>
+          <span className="bb__whosum__text">
+            {chosen.length === 1 ? chosen[0].name : `${chosen.length} groups and people`}
+            {flaggedCount > 0 && (
+              <em title="This policy does not govern them, so this rule can never decide one of their sign-ins.">
+                {flaggedCount} outside
+              </em>
+            )}
+          </span>
+          <span className="bb__whosum__edit">
+            <Pencil size={12} strokeWidth={2} aria-hidden />
+            Edit
+          </span>
+        </button>
+      )}
+
+      {/* An exclusion cannot be BUILT here, but one that already exists must not
+          be drawn as its opposite. A rule can arrive holding `not in` — the
+          Condition section edits who-conditions directly whenever the rule has
+          more than one way in, and deleting an alternative can then hand a
+          negated condition back here. */}
+      {(negated('group') || negated('user')) && (
+        <p className="bb__whohint is-warn">
+          These are <b>excluded</b> — the rule covers everyone else. Change that in the conditions below.
+        </p>
+      )}
+
+      {/* Only while there is nobody. Once there is, the summary above IS the
+          button — a second one beside it would be two ways into one dialog. */}
+      {chosen.length === 0 && (
+        <Button size="sm" variant="secondary" onClick={() => setPicking(true)}>
+          <Plus size={13} strokeWidth={2.4} aria-hidden />
+          Add people
+        </Button>
+      )}
+
+      <WhoPicker
+        open={picking}
+        rule={rule}
+        audience={audience}
+        onClose={() => setPicking(false)}
+        onSave={(when) => {
+          onPatch({ when })
+          setPicking(false)
+        }}
+      />
+    </div>
+  )
+}
+
+/* --- Choosing, in a dialog ---------------------------------------------------
+
+   Both lists live here now, and the reason is room rather than tidiness. In the
+   panel they were a 340px column of checkboxes that pushed the conditions and
+   the outcome below the fold — so the two questions a rule answers after "who"
+   were only reachable by scrolling past the answer to the first one. The dialog
+   has the width for a list and gives the panel back to the rule.
+
+   It keeps its own draft and commits on Save, which is the one place in this
+   panel where that is true. Everything else here writes as it is touched
+   because the board has its own save bar over the whole policy; a dialog that
+   wrote through would make Cancel a lie.
+
+   The two lists are still separate because they answer differently. Groups
+   follow whoever is in them on the day; a named person is a person somebody has
+   to remember to remove. */
+function WhoPicker({
+  open,
+  rule,
+  audience,
+  onClose,
+  onSave,
+}: {
+  open: boolean
+  rule: Rule
+  audience: Audience
+  onClose: () => void
+  onSave: (when: Predicate) => void
+}) {
+  const store = useBrand()
+  const [tab, setTab] = useState<WhoType>('group')
+  const [q, setQ] = useState('')
+  const [draft, setDraft] = useState<Predicate>(rule.when)
+
+  /* The seed as a STRING, and that is what lets the effect below name
+     everything it reads.
+
+     `rule.when` is a fresh object on every render of the panel behind this
+     dialog, so depending on it directly would re-seed — discarding the ticks
+     somebody had just made — every time anything in the policy moved.
+     Depending on `[open]` alone fixes that by lying to the linter about what
+     the effect uses. Serialising gives a value that changes only when the
+     predicate actually changes, so the dependency list can be honest and the
+     effect still runs only when it should. */
+  const seed = JSON.stringify(rule.when)
+
+  useEffect(() => {
+    if (!open) return
+    setDraft(JSON.parse(seed) as Predicate)
+    setTab('group')
+    setQ('')
+  }, [open, seed])
+
+  const groupIds = whoIds(draft, 'group')
+  const userIds = whoIds(draft, 'user')
+  const opFor = (k: WhoType) => (whoIds(draft, k).length > 0 ? whoOperator(draft, k) : AFFIRMATIVE[k])
   const outside = outsideAudience(audience, groupIds, userIds, store.users)
   const ids = tab === 'group' ? groupIds : userIds
 
@@ -103,210 +281,145 @@ export function WhoEditor({
      does not. `new Set` because `whoIds` filters falsy and nothing else — the
      de-duplication is this form's job. */
   const toggle = (kind: WhoType, id: string, on: boolean) => {
-    const now = whoIds(rule.when, kind)
-    write(setWho(rule.when, kind, on ? [...new Set([...now, id])] : now.filter((x) => x !== id), opFor(kind)))
+    const now = whoIds(draft, kind)
+    setDraft(setWho(draft, kind, on ? [...new Set([...now, id])] : now.filter((x) => x !== id), opFor(kind)))
   }
-
-
-  /* Everything chosen, both kinds, in one row above the tabs — which is the
-     whole reason the lists became tabs. Two stacked sections could only ever
-     show you the half you were looking at. */
-  const chosen = [
-    ...groupIds.map((id) => ({ kind: 'group' as WhoType, id, name: resolve('group', id) ?? `deleted · ${id}` })),
-    ...userIds.map((id) => ({ kind: 'user' as WhoType, id, name: resolve('user', id) ?? `deleted · ${id}` })),
-  ]
 
   const query = q.trim().toLowerCase()
   const rows =
     tab === 'group'
-      ? store.groups.map((g) => ({
-          id: g.id,
-          name: g.name,
-          meta: `${g.memberCount.toLocaleString()} members`,
-          empty: g.memberCount === 0,
-        }))
+      ? store.groups
+          .filter((g) => !query || g.name.toLowerCase().includes(query))
+          .map((g) => ({
+            id: g.id,
+            name: g.name,
+            meta: `${g.memberCount.toLocaleString()} members`,
+            empty: g.memberCount === 0,
+          }))
       : store.users
           .filter((u) => !query || u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query))
           .map((u) => ({ id: u.id, name: u.name, meta: u.email, empty: false }))
 
+  const total = groupIds.length + userIds.length
+
   return (
-    <div className="bb__who">
-      {/* A SEGMENTED control, not a second row of tabs.
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Who is this rule about?"
+      width={560}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="brand" onClick={() => onSave(draft)}>
+            {total === 0 ? 'Apply to everyone' : `Save ${total} selected`}
+          </Button>
+        </>
+      }
+    >
+      <div className="bb__whopicker">
+        <p className="bb__whopicker__lede">
+          Leave this empty and the rule covers everyone the policy governs. Narrowing it here writes ordinary
+          conditions, so the rule reads the same way to the linter and the simulator.
+        </p>
 
-          It was an underlined tab strip sitting directly beneath the panel's
-          own underlined tab strip — two identical switchers, back to back,
-          asking two unrelated questions. Nothing said which one moved you
-          between forms and which one moved you inside this one.
+        {/* A segmented control, not tabs. The dialog has one title; this
+            switches a filter within it. */}
+        <div className="bb__whopick" role="radiogroup" aria-label="What this rule is about">
+          {(['group', 'user'] as WhoType[]).map((k) => {
+            const on = tab === k
+            const n = k === 'group' ? groupIds.length : userIds.length
+            const Ico = k === 'group' ? Users : UserRound
+            return (
+              <button
+                key={k}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                className={on ? 'is-on' : ''}
+                onClick={() => {
+                  setTab(k)
+                  setQ('')
+                }}
+              >
+                <Ico size={13} strokeWidth={2} aria-hidden />
+                {k === 'group' ? 'Groups' : 'People'}
+                {n > 0 && <b>{n}</b>}
+              </button>
+            )
+          })}
+        </div>
 
-          One of them had to stop looking like tabs, and it is this one: the
-          panel's strip changes the SUBJECT and this changes a filter within it,
-          which is what a segmented control means everywhere else in this kit. */}
-      <div className="bb__whopick" role="radiogroup" aria-label="What this rule is about">
-        {(['group', 'user'] as WhoType[]).map((k) => {
-          const on = tab === k
-          const n = k === 'group' ? groupIds.length : userIds.length
-          const Ico = k === 'group' ? Users : UserRound
-          return (
-            <button
-              key={k}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              className={on ? 'is-on' : ''}
-              onClick={() => {
-                setTab(k)
-                setQ('')
-              }}
-            >
-              <Ico size={13} strokeWidth={2} aria-hidden />
-              {k === 'group' ? 'Groups' : 'People'}
-              {n > 0 && <b>{n}</b>}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* People are a directory and groups are a list that ends — so only one
-          of them gets a search box. */}
-      {tab === 'user' && store.users.length > 0 && (
+        {/* Both lists get a search now that both are long enough to want one:
+            the dialog shows every group rather than the handful the panel had
+            room for. */}
         <div className="bb__whosearch">
           <input
             type="search"
             value={q}
-            placeholder={`Search the ${store.users.length} people listed`}
-            aria-label="Search people"
+            placeholder={tab === 'group' ? 'Search groups' : `Search the ${store.users.length} people listed`}
+            aria-label={tab === 'group' ? 'Search groups' : 'Search people'}
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
-      )}
 
-      {/* An exclusion cannot be BUILT here any more, but one that already
-          exists must not be drawn as its opposite. A rule can arrive holding
-          `not in` — the Condition pane edits who-conditions directly whenever
-          the rule has more than one way in, and deleting an alternative can
-          then hand a negated condition back to this pane. */}
-      {negated(tab) && (
-        <p className="bb__whohint is-warn">
-          These are <b>excluded</b> — the rule covers everyone else. Change that in Condition.
-        </p>
-      )}
+        <div className="bb__whorows" role="group" aria-label={tab === 'group' ? 'Groups' : 'People'}>
+          {rows.length === 0 && <p className="bb__whohint">Nobody listed matches that.</p>}
+          {rows.map((r) => {
+            const on = ids.includes(r.id)
+            const flagged = tab === 'group' ? outside.groups.includes(r.id) : outside.users.includes(r.id)
+            return (
+              <button
+                key={r.id}
+                type="button"
+                role="checkbox"
+                aria-checked={on}
+                className={`bb__whoitem ${on ? 'is-on' : ''}`}
+                onClick={() => toggle(tab, r.id, !on)}
+              >
+                <span className="bb__whotick" aria-hidden>
+                  {on && <Check size={12} strokeWidth={3} />}
+                </span>
+                <Avatar name={r.name} on={on} />
+                <b>{r.name}</b>
+                <em>{r.meta}</em>
+                {/* Both badges inform and neither blocks — no disabled rows,
+                    because a redundant or unusual selection is legal and is
+                    sometimes deliberate. */}
+                {r.empty && (
+                  <small className="bb__whotag" title="Nobody is in this group today, so a rule that names it decides nothing.">
+                    Empty
+                  </small>
+                )}
+                {flagged && (
+                  <small
+                    className="bb__whotag is-warn"
+                    title="This policy does not govern them, so this rule can never decide one of their sign-ins."
+                  >
+                    Outside
+                  </small>
+                )}
+              </button>
+            )
+          })}
+        </div>
 
-      <div className="bb__whorows" role="group" aria-label={tab === 'group' ? 'Groups' : 'People'}>
-        {rows.length === 0 && <p className="bb__whohint">Nobody listed matches that.</p>}
-        {rows.map((r) => {
-          const on = ids.includes(r.id)
-          const flagged = tab === 'group' ? outside.groups.includes(r.id) : outside.users.includes(r.id)
-          return (
-            <button
-              key={r.id}
-              type="button"
-              role="checkbox"
-              aria-checked={on}
-              className={`bb__whoitem ${on ? 'is-on' : ''}`}
-              onClick={() => toggle(tab, r.id, !on)}
-            >
-              <span className="bb__whotick" aria-hidden>
-                {on && <Check size={12} strokeWidth={3} />}
-              </span>
-              <Avatar name={r.name} on={on} />
-              <b>{r.name}</b>
-              <em>{r.meta}</em>
-              {/* Both badges inform and neither blocks — no disabled rows,
-                  because a redundant or unusual selection is legal and is
-                  sometimes deliberate. */}
-              {r.empty && (
-                <small className="bb__whotag" title="Nobody is in this group today, so a rule that names it decides nothing.">
-                  Empty
-                </small>
-              )}
-              {flagged && (
-                <small
-                  className="bb__whotag is-warn"
-                  title="This policy does not govern them, so this rule can never decide one of their sign-ins."
-                >
-                  Outside
-                </small>
-              )}
-            </button>
-          )
-        })}
+        {/* The one line of prose that survived, and only on the tab it is true
+            of: `unlistedUsers` is a count with no rows behind it, so the search
+            can only ever reach the loaded rows. */}
+        {tab === 'user' && store.unlistedUsers > 0 && (
+          <p className="bb__whohint">
+            {store.users.length} of {(store.users.length + store.unlistedUsers).toLocaleString()} listed. The rest can be
+            reached by naming a group.
+          </p>
+        )}
       </div>
-
-      {/* The one line of prose that survived, and only on the tab it is true
-          of: `unlistedUsers` is a count with no rows behind it, so the search
-          can only ever reach the loaded rows. */}
-      {tab === 'user' && store.unlistedUsers > 0 && (
-        <p className="bb__whohint">
-          {store.users.length} of {(store.users.length + store.unlistedUsers).toLocaleString()} listed. The rest can be
-          reached by the group they are in.
-        </p>
-      )}
-
-      {/* What is chosen, UNDER the lists rather than above them.
-
-          It sat at the top, between two switchers, where it was a third thing
-          in a stack of controls before you had reached the one you came for.
-          Below, it is what it actually is: the answer the lists have been
-          building, both kinds together, so the total is visible whichever
-          filter is showing. */}
-      <WhoChosen chosen={chosen} outside={outside} onRemove={(k, id) => toggle(k, id, false)} />
-    </div>
+    </Modal>
   )
 }
 
-/* The chosen, as faces. Round, one letter, and the overflow says how many
-   more rather than growing the row. */
-function WhoChosen({
-  chosen,
-  outside,
-  onRemove,
-}: {
-  chosen: { kind: WhoType; id: string; name: string }[]
-  outside: { groups: string[]; users: string[] }
-  onRemove: (kind: WhoType, id: string) => void
-}) {
-  if (chosen.length === 0) {
-    return (
-      <div className="bb__whochosen is-empty">
-        <span className="bb__avatar is-all" aria-hidden>
-          <Users size={13} strokeWidth={2} />
-        </span>
-        <b>Everyone this policy governs</b>
-      </div>
-    )
-  }
-
-  const shown = chosen.slice(0, AVATAR_CAP)
-  const rest = chosen.length - shown.length
-
-  return (
-    <div className="bb__whochosen">
-      {shown.map((c) => {
-        const flagged = c.kind === 'group' ? outside.groups.includes(c.id) : outside.users.includes(c.id)
-        return (
-          <button
-            key={`${c.kind}:${c.id}`}
-            type="button"
-            className={`bb__whoface ${flagged ? 'is-warn' : ''}`}
-            title={`${c.name} — remove`}
-            aria-label={`Remove ${c.name}`}
-            onClick={() => onRemove(c.kind, c.id)}
-          >
-            <Avatar name={c.name} on />
-            <span>{c.name}</span>
-          </button>
-        )
-      })}
-      {/* The overflow is a count, not more faces. A row that grows with the
-          selection stops being a summary at about seven. */}
-      {rest > 0 && (
-        <span className="bb__whomore" title={chosen.slice(AVATAR_CAP).map((c) => c.name).join(', ')}>
-          +{rest} more
-        </span>
-      )}
-    </div>
-  )
-}
 
 /* When the rule has more than one way in.
 

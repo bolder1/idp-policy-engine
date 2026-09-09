@@ -45,10 +45,10 @@ export function NewPolicyDialog({
   fixedAppId?: string
   /* Absent in lite, and absent from an application row: the guided build is
      withheld there, and a button that opens nothing is worse than no button. */
-  onGuided?: (appId: string | null) => void
+  onGuided?: (appIds: string[]) => void
 }) {
   const [name, setName] = useState(seedName)
-  const [appId, setAppId] = useState<string | null>(fixedAppId ?? null)
+  const [appIds, setAppIds] = useState<string[]>(fixedAppId ? [fixedAppId] : [])
   const field = useRef<HTMLInputElement>(null)
 
   /* Cleared when it OPENS, not when it closes.
@@ -59,7 +59,7 @@ export function NewPolicyDialog({
   useEffect(() => {
     if (!open) return
     setName(seedName)
-    setAppId(fixedAppId ?? null)
+    setAppIds(fixedAppId ? [fixedAppId] : [])
   }, [open, seedName, fixedAppId])
 
   /* `autoFocus` cannot win here: `Modal` focuses its own panel on the next
@@ -79,7 +79,7 @@ export function NewPolicyDialog({
     return () => cancelAnimationFrame(id)
   }, [open])
 
-  const noApp = appId === null
+  const noApp = appIds.length === 0
 
   return (
     <Modal
@@ -131,7 +131,7 @@ export function NewPolicyDialog({
               moving thing reads as an invitation instead of as noise — and it
               stops entirely under prefers-reduced-motion. */}
           {onGuided && (
-            <button type="button" className="bguided" onClick={() => onGuided(appId)}>
+            <button type="button" className="bguided" onClick={() => onGuided(appIds)}>
               <span className="bguided__sheen" aria-hidden />
               <Wand2 size={14} strokeWidth={1.9} aria-hidden />
               Guided setup
@@ -140,7 +140,7 @@ export function NewPolicyDialog({
 
           <Button
             variant="brand"
-            onClick={() => onCreate(blankPolicy(name.trim() || 'Untitled policy', appId ?? undefined))}
+            onClick={() => onCreate(blankPolicy(name.trim() || 'Untitled policy', appIds))}
             disabled={!name.trim() || noApp}
           >
             Create policy
@@ -198,8 +198,15 @@ export function NewPolicyDialog({
             control reads "you could change this, but not now", which is not
             true either. */}
         <div className="bname2__field">
-          <span className="bname2__label">Application {!fixedAppId && <i>*</i>}</span>
-          {fixedAppId ? <ApplicationFixed appId={fixedAppId} /> : <ApplicationField appId={appId} onChange={setAppId} />}
+          {/* Plural, and it is not cosmetic: the field takes several now, and a
+              label reading "Application" over a control that accepts four is the
+              form telling you it wants one. */}
+          <span className="bname2__label">Applications {!fixedAppId && <i>*</i>}</span>
+          {fixedAppId ? (
+            <ApplicationFixed appId={fixedAppId} />
+          ) : (
+            <ApplicationField appIds={appIds} onChange={setAppIds} />
+          )}
         </div>
 
         {/* The template preview that stood here has gone with the step that

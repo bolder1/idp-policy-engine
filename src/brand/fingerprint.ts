@@ -83,14 +83,23 @@ export type AttrConfig =
       groups: { label: string; values: string[] }[]
       value: AttrRuleValue
     }
-  /* A comparison against a version the admin TYPES.
+  /* A comparison against one of the platform's released versions.
 
-     `rule` offers a dropdown of known values, which is right for a closed set
-     and wrong for a version: the list is never complete, it is stale the week
-     after a release, and the value an admin has in mind is usually the one that
-     just shipped. A free field is also the honest shape — an admin drawing a
-     floor under Android knows the number, and making them find it in thirty
-     options is asking them to recognise what they can already state.
+     This was a free text field, on the argument that a version list is never
+     complete — stale the week after a release, and the number an admin wants is
+     usually the one that just shipped. The argument is real and it lost to a
+     bigger one: a typed version is a typed MISTAKE. "11 " and "Windows 11" and
+     "22h2" all parse as nothing, the field validated none of them, and a policy
+     whose floor is an unparseable string is a policy that silently stops
+     drawing a floor. A closed list cannot produce that state.
+
+     `versions` is the platform's own list, most recent first, because the floor
+     an admin is drawing is nearly always near the top of it. The staleness the
+     old comment worried about is a data edit here rather than a user's problem:
+     a release ships, one line is added to this file, and every profile offering
+     it updates at once. A stored value that is NOT in the list is still shown
+     and still selected — see `AttrControl` — so a fixture or an older profile
+     never has its floor rewritten by a catalogue that moved on.
 
      Operators are shared across the four version attributes because a version
      compares the same way whatever platform it belongs to. */
@@ -108,8 +117,11 @@ export type AttrConfig =
          names the platforms a profile checks, so this is now read rather than
          reconstructed. */
       platform: string
-      /** Real examples for THIS platform, since the formats genuinely differ. */
-      placeholder: string
+      /* What may be chosen, most recent first. Plain version numbers: the
+         marketing name is in the label beside it where one helps, and a value
+         that has to be parsed back out of "macOS 14 (Sonoma)" is a value that
+         will eventually be parsed wrong. */
+      versions: { value: string; label?: string }[]
       hint: string
     }
 
@@ -234,8 +246,21 @@ export const OS_ATTRIBUTES: Attribute[] = [
       platform: 'Windows',
       label: 'Windows version',
       value: { op: 'gte', value: '10' },
-      placeholder: '10, 11, 10.0.19045',
-      hint: 'A build number works as well as a major version — 10, 11, 22H2, 10.0.19045.',
+      /* Windows names its releases twice — the major version and the annual
+         feature update — and an admin drawing a floor means one or the other.
+         Both are here, the feature updates labelled with the build they are,
+         because "22H2" is what the update is called and 10.0.19045 is what the
+         device reports. */
+      versions: [
+        { value: '11', label: 'Windows 11' },
+        { value: '10.0.22631', label: 'Windows 11 · 23H2' },
+        { value: '10.0.22621', label: 'Windows 11 · 22H2' },
+        { value: '10', label: 'Windows 10' },
+        { value: '10.0.19045', label: 'Windows 10 · 22H2' },
+        { value: '10.0.19044', label: 'Windows 10 · 21H2' },
+        { value: '8.1', label: 'Windows 8.1' },
+      ],
+      hint: 'The floor, not the exact build — a device reporting anything at or above this passes.',
     },
   },
   {
@@ -247,8 +272,18 @@ export const OS_ATTRIBUTES: Attribute[] = [
       platform: 'Android',
       label: 'Android version',
       value: { op: 'gte', value: '13' },
-      placeholder: '13, 14, 15',
-      hint: 'Android numbers its releases whole — 13, 14, 15.',
+      /* Whole numbers, which is how Android ships: there is no 14.1 to draw a
+         floor under. */
+      versions: [
+        { value: '16', label: 'Android 16' },
+        { value: '15', label: 'Android 15' },
+        { value: '14', label: 'Android 14' },
+        { value: '13', label: 'Android 13' },
+        { value: '12', label: 'Android 12' },
+        { value: '11', label: 'Android 11' },
+        { value: '10', label: 'Android 10' },
+      ],
+      hint: 'The floor, not the exact release — a handset at or above this passes.',
     },
   },
   {
@@ -260,8 +295,17 @@ export const OS_ATTRIBUTES: Attribute[] = [
       platform: 'iOS',
       label: 'iOS version',
       value: { op: 'gte', value: '17' },
-      placeholder: '17, 18.1, 18.1.2',
-      hint: 'Major, minor and patch all work — 17, 18.1, 18.1.2.',
+      /* Majors only. iOS ships a point release most months, and a list carrying
+         every 18.x would be forty rows deep to express a floor nobody draws at
+         that precision. */
+      versions: [
+        { value: '26', label: 'iOS 26' },
+        { value: '18', label: 'iOS 18' },
+        { value: '17', label: 'iOS 17' },
+        { value: '16', label: 'iOS 16' },
+        { value: '15', label: 'iOS 15' },
+      ],
+      hint: 'The floor, not the exact release — a phone at or above this passes.',
     },
   },
   {
@@ -273,8 +317,18 @@ export const OS_ATTRIBUTES: Attribute[] = [
       platform: 'macOS',
       label: 'macOS version',
       value: { op: 'gte', value: '14' },
-      placeholder: '14, 15.1, 15.1.1',
-      hint: 'The version number, not the cat or the mountain — 14, 15.1.',
+      /* Labelled with the release name as well as the number, because macOS is
+         the one platform where people say the name — "we are on Sonoma" — and
+         the number is what the device reports. Both, so neither has to be
+         translated in somebody's head. */
+      versions: [
+        { value: '26', label: 'macOS 26 · Tahoe' },
+        { value: '15', label: 'macOS 15 · Sequoia' },
+        { value: '14', label: 'macOS 14 · Sonoma' },
+        { value: '13', label: 'macOS 13 · Ventura' },
+        { value: '12', label: 'macOS 12 · Monterey' },
+      ],
+      hint: 'The floor, not the exact release — a Mac at or above this passes.',
     },
   },
 ]

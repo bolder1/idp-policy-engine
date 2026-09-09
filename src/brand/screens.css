@@ -22,9 +22,6 @@
 .btoolbar__clear:hover { text-decoration: underline; }
 .btoolbar__search { width: 260px; }
 
-.bpolicies__banner { margin-bottom: var(--space-6); }
-.bpolicies__banner .bx-callout { width: 100%; }
-
 .bsec { margin: var(--space-8) 0 var(--space-5); }
 
 /* --- Table ---------------------------------------------------------------- */
@@ -117,6 +114,70 @@
    count, which was the right drawing for a policy that covered three of them. */
 .btable__app { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .btable__app > .applogo { flex: none; }
+
+/* The cell as a control.
+
+   `Not assigned` was a grey label, which made the one row saying something
+   needed doing the one row that could not be acted on. Both states open the
+   same dialog now: the assigned cell quietly, on hover, because it is a fact
+   first and a shortcut second; the empty one loudly, because there is nothing
+   else in it. */
+button.btable__app--edit {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  font: inherit; color: inherit; text-align: left;
+  border-radius: var(--radius-xs);
+}
+button.btable__app--edit:hover { text-decoration: underline; text-underline-offset: 2px; }
+button.btable__app--edit:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* Not a Button. A brand or neutral button in every unassigned row would make
+   the table look like a column of calls to action; this is a link with an
+   affordance, sized to the row it sits in. */
+.btable__assign {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 3px 8px 3px 6px;
+  border: var(--bw-thin) dashed var(--border-default);
+  border-radius: var(--radius-md);
+  background: none; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-sm); color: var(--text-secondary);
+}
+.btable__assign:hover { border-style: solid; border-color: var(--brand); color: var(--brand); }
+.btable__assign:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* --- Assigning applications ------------------------------------------------
+
+   A checklist rather than a picker, because here the dialog IS the question:
+   every application is visible without opening a second layer inside it. */
+.bassign { display: flex; flex-direction: column; gap: var(--space-4); }
+.bassign__lede { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55; }
+.bassign__search {
+  height: var(--ctl-height-md); padding: 0 11px;
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md);
+  font-size: var(--fs-md); color: var(--text-primary);
+}
+.bassign__search:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+/* Capped and scrolled, so a tenant with sixty applications gets a dialog the
+   same height as a tenant with six. */
+.bassign__list {
+  display: flex; flex-direction: column;
+  max-height: 320px; overflow-y: auto;
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.bassign__row {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  cursor: pointer;
+}
+.bassign__row:last-child { border-bottom: 0; }
+.bassign__row:hover { background: var(--surface-inset); }
+.bassign__row.is-on { background: var(--brand-subtle-bg); }
+.bassign__row input { flex: none; accent-color: var(--brand); width: 15px; height: 15px; }
+.bassign__name { flex: 1; min-width: 0; font-size: var(--fs-md); color: var(--text-primary); }
+.bassign__meta { flex: none; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bassign__none { margin: var(--space-5); font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bassign__foot { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
 
 /* --- Exposure cell -----------------------------------------------------------
 

@@ -256,7 +256,7 @@ export function Applications() {
         onClose={() => setNaming(false)}
         onCreate={(policy) => {
           store.addPolicy(policy)
-          store.showToast(`${policy.name} created on ${store.appById(policy.appId!).name}`)
+          store.showToast(`${policy.name} created on ${store.appById(policy.appIds[0]).name}`)
           setAdded(policy.id)
           setNaming(false)
         }}

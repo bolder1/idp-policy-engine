@@ -21,7 +21,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { Button, Drawer, Modal } from '../kit'
+import { Button, Drawer, Modal, SaveBar } from '../kit'
 import {
   ASN_DIRECTORY,
   emptyLocation,
@@ -170,11 +170,19 @@ export function ZonesFinal() {
   return (
     <div className="bpage bz7">
       {open ? (
+        /* Keyed, and the key is load-bearing now that the page holds a draft:
+           without it, opening a second zone would hand the same component a new
+           `zone` prop while its `useState` seed kept the first one's unsaved
+           edits. */
         <ZoneDetail
+          key={open.id}
           zone={open}
           policies={store.policies}
           onBack={() => setOpenId(null)}
-          onChange={store.updateZone}
+          onSave={(z) => {
+            store.updateZone(z)
+            store.showToast(`${z.name} saved`)
+          }}
           onDelete={() => {
             store.removeZone(open.id)
             setOpenId(null)
@@ -558,59 +566,85 @@ function ZoneDetail({
   zone,
   policies,
   onBack,
-  onChange,
+  onSave,
   onDelete,
 }: {
   zone: Zone
   policies: Policy[]
   onBack: () => void
-  onChange: (z: Zone) => void
+  onSave: (z: Zone) => void
   onDelete: () => void
 }) {
-  /* For navigation only. "Used by" that cannot be followed makes you memorise a
-     policy name, leave, and search for it — the one thing the list exists to
-     save you. */
-  const store = useBrand()
+  /* The edit buffer.
+
+     Everything on this page used to write straight through to the store as it
+     was typed — `onChange={store.updateZone}` — which is why the header said
+     "the sections below save as they are typed", and why the rename needed its
+     own commit and its own toast to stand apart from them.
+
+     A zone is a boundary policy rules are evaluated against, so every keystroke
+     in that model was a live change to what those rules match. Half-typed CIDR
+     is the ordinary case while typing one — `10.0.` is a prefix of what you
+     mean and matches nothing — and the page had no way to say "I have not
+     finished yet". The draft is that, and it makes the validator's warnings
+     advice about a change you have not committed rather than a report on one
+     you already have. */
+  const [draft, setDraft] = useState<Zone>(zone)
+  const dirty = JSON.stringify(draft) !== JSON.stringify(zone)
+  /* `useBrand` stood here, for the rename's toast. The bar owns saving now, so
+     the only thing this page told the store directly has gone with it — and
+     the toast the rename used to raise is the one the save raises, once, for
+     every change it commits rather than for that one field. */
   /* "Used by" is a panel now, not a section. It is the question you ask BEFORE
      changing something and then not again — so it earns a button at the top and
      none of the page's vertical space the rest of the time. */
   const [showUses, setShowUses] = useState(false)
 
-  /* Renaming, in place. The name was the one thing on this page you could not
-     change: every other field saves as it is typed, and the heading above them
-     was read-only, so fixing a typo meant deleting the zone and building it
-     again. Rules reference zones BY NAME, so the rename is also the one edit
-     here with a consequence worth confirming — hence a commit and a toast
-     rather than a field that saves silently like the rest. */
+  /* Renaming, in place — and it is no longer the exception it was.
+
+     The name used to be the one field here with its own commit and its own
+     toast, because every other field wrote through as it was typed and a
+     rename needed to stand apart from them. Nothing writes through now, so a
+     rename is an edit like the rest: it lands in the draft, and the bar at the
+     bottom commits it with everything else.
+
+     What survives is the local buffer, because the input still needs somewhere
+     to hold a half-typed name that Escape can throw away without touching the
+     draft. */
   const [renaming, setRenaming] = useState(false)
   const [draftName, setDraftName] = useState(zone.name)
 
   const commitName = () => {
     const name = draftName.trim()
     setRenaming(false)
-    /* An empty name is not a rename, it is a mistake — and validateZone already
-       errors on one, so accepting it here would be creating the error the panel
-       below is about to complain about. */
-    if (!name || name === zone.name) {
-      setDraftName(zone.name)
+    /* An empty name is not a rename, it is a mistake — and `validateZone`
+       already errors on one, so accepting it here would be creating the error
+       the panel below is about to complain about. */
+    if (!name || name === draft.name) {
+      setDraftName(draft.name)
       return
     }
-    onChange({ ...zone, name })
-    store.showToast(`Renamed to ${name}`)
+    setDraft((d) => ({ ...d, name }))
   }
-  const issues = validateZone(zone)
+  /* The DRAFT is validated, not the saved zone. The warnings are the reason to
+     look before saving, so judging what is already stored would put them one
+     save behind the thing they are warning about.
+
+     `users` stays keyed on the saved zone: a policy references a zone by id,
+     and an id is the one field this page cannot edit. */
+  const issues = validateZone(draft)
   const users = policiesUsing('zone', zone.id, policies)
 
-  const netCount = zone.ip.length + zone.asn.length
+  const netCount = draft.ip.length + draft.asn.length
   /* A radius is a location. Without this term a zone whose only content is a
      circle on the map read "Locations 0" and opened on the empty networks tab —
      and `locationEmpty`, which this same page's validator uses, has always
      counted it. */
   const placeCount =
-    zone.location.countries.length +
-    zone.location.states.length +
-    zone.location.cities.length +
-    (zone.location.radius ? 1 : 0)
+    draft.location.countries.length +
+    draft.location.states.length +
+    draft.location.cities.length +
+    (draft.location.radius ? 1 : 0)
 
   /* Which half is on screen. Always one of them, including on a zone that has
      just been named and holds nothing.
@@ -663,20 +697,20 @@ function ZoneDetail({
                 /* Escape restores rather than saves. A rename you are halfway
                    through is not a rename you asked for. */
                 if (e.key === 'Escape') {
-                  setDraftName(zone.name)
+                  setDraftName(draft.name)
                   setRenaming(false)
                 }
               }}
             />
           ) : (
             <span className="bz7__nameline">
-              <h1>{zone.name}</h1>
+              <h1>{draft.name}</h1>
               <button
                 type="button"
                 className="bz7__rename"
-                aria-label={`Rename ${zone.name}`}
+                aria-label={`Rename ${draft.name}`}
                 onClick={() => {
-                  setDraftName(zone.name)
+                  setDraftName(draft.name)
                   setRenaming(true)
                 }}
               >
@@ -684,7 +718,7 @@ function ZoneDetail({
               </button>
             </span>
           )}
-          <p>{describeZone(zone)}</p>
+          <p>{describeZone(draft)}</p>
         </div>
         <div className="bz7__actions">
           {/* Carries the count, so the answer to "does anything depend on this"
@@ -696,9 +730,11 @@ function ZoneDetail({
             <i className="buse__count">{users.length}</i>
           </Button>
           {/* No Edit button for the zone's CONTENTS, and none needed: the
-              sections below save as they are typed, so "edit" is just being on
-              the page. The name is the exception, and it has its own control
-              beside the heading it changes. */}
+              sections below ARE the editor, so "edit" is just being on the
+              page. What has changed is the committing — they used to write
+              through as they were typed, and now they fill a draft that the bar
+              at the bottom saves. The name is no longer an exception to that;
+              it lands in the same draft as the rest. */}
           {/* Danger, not neutral. The kit reserves red for the confirming
               control inside a destructive dialog, on the argument that a
               trigger only opens that dialog. It is the one action on this
@@ -715,9 +751,14 @@ function ZoneDetail({
       {/* The adding, on the page rather than behind an Edit button.
 
           This is the half of "New zone 2" that matters. The panel is a form you
-          fill in and submit; here the zone already exists, so every change is
-          saved as it is made and the page can be left and returned to. That is
-          the difference worth comparing — not the modal, which is one field. */}
+          fill in and submit; here the zone already exists, so the page can be
+          left and returned to and the work is not lost between visits. That is
+          the difference worth comparing — not the modal, which is one field.
+
+          It no longer follows that every change is saved as it is made. A zone
+          is what live rules match against, and a half-typed CIDR is the
+          ordinary state of typing one, so the page collects the edit and asks
+          before committing it. */}
       <section className="bz7__build">
             {/* Both tabs, always — including the empty one.
 
@@ -766,9 +807,9 @@ function ZoneDetail({
             <div className="bz7__cols">
               <div className="bz7__work">
                 {tab === 'net' ? (
-                  <AddressSection draft={zone} onChange={onChange} />
+                  <AddressSection draft={draft} onChange={setDraft} />
                 ) : (
-                  <PlaceSection draft={zone} onChange={onChange} />
+                  <PlaceSection draft={draft} onChange={setDraft} />
                 )}
               </div>
 
@@ -797,6 +838,27 @@ function ZoneDetail({
             </div>
       </section>
 
+      {/* The same strip device profiles and risk profiles commit through.
+
+          Blocked while the zone has an ERROR rather than merely a warning. The
+          validator already separates the two: "this zone would match
+          everything" is a warning about a zone somebody may have meant, and an
+          empty name or an unparseable entry is a zone the rest of the product
+          cannot resolve. Letting the second kind save would put a broken
+          boundary behind live rules, which is the one thing this page exists to
+          prevent. */}
+      <SaveBar
+        open={dirty}
+        changes={zoneChanges(zone, draft)}
+        onDiscard={() => {
+          setDraft(zone)
+          setDraftName(zone.name)
+          setRenaming(false)
+        }}
+        onSave={() => onSave(draft)}
+        blocked={issues.some((i) => i.level === 'error')}
+      />
+
       <Drawer
         open={showUses}
         onClose={() => setShowUses(false)}
@@ -818,6 +880,31 @@ function ZoneDetail({
       </Drawer>
     </>
   )
+}
+
+/* What is unsaved, named rather than counted.
+
+   Addresses and locations are counted rather than listed for the same reason
+   the bar caps its own naming at two: pasting a /16 block is routinely twenty
+   entries at once, and a strip listing twenty CIDRs is a strip nobody reads.
+   The name is named, because it is the one edit here that changes what every
+   rule referencing this zone displays. */
+function zoneChanges(before: Zone, after: Zone): string[] {
+  const parts: string[] = []
+  if (before.name !== after.name) parts.push('name')
+
+  const nets = (z: Zone) => [...z.ip, ...z.asn]
+  const added = nets(after).filter((v) => !nets(before).includes(v)).length
+  const removed = nets(before).filter((v) => !nets(after).includes(v)).length
+  if (added > 0) parts.push(`${added} network${added === 1 ? '' : 's'} added`)
+  if (removed > 0) parts.push(`${removed} network${removed === 1 ? '' : 's'} removed`)
+
+  /* Locations compared as a whole rather than per list. A radius, a country and
+     a city are three shapes of one answer — "where" — and an edit that swaps a
+     country for a circle is one change to that answer, not two. */
+  if (JSON.stringify(before.location) !== JSON.stringify(after.location)) parts.push('locations')
+
+  return parts.length > 0 ? parts : ['changes']
 }
 
 /* --- The popup ---------------------------------------------------------------------

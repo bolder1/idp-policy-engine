@@ -114,9 +114,18 @@ export function describeChanges(
   })
 
   /* Named, not counted. "Now applies to 1 app" was true and useless; which
-     application a policy moved to is the whole of what changed. */
-  if (saved.appId !== draft.appId) {
-    out.push(draft.appId ? `Now protects ${draft.appId}` : 'No longer attached to an application')
+     applications a policy gained or lost is the whole of what changed — and
+     with a list there can be one of each in a single edit, so they are reported
+     as two lines rather than as one replacement. */
+  const gained = draft.appIds.filter((id) => !saved.appIds.includes(id))
+  const lost = saved.appIds.filter((id) => !draft.appIds.includes(id))
+  if (gained.length > 0) out.push(`Now protects ${gained.join(', ')}`)
+  if (lost.length > 0) {
+    out.push(
+      draft.appIds.length === 0
+        ? 'No longer attached to an application'
+        : `No longer protects ${lost.join(', ')}`,
+    )
   }
 
   return out

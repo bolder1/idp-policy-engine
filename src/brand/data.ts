@@ -517,6 +517,31 @@ export const EVERYONE: Audience = { everyone: true, groupIds: [], userIds: [] }
    cannot drift from it. */
 export const coversEveryApp = (p: Policy): boolean => p.isSystem === true
 
+/* The applications a policy names, resolved against the catalogue.
+
+   In CATALOGUE order rather than in the order they were assigned, so the same
+   two applications read the same way on every surface — a list whose order
+   depends on which was clicked first is a list two screens can disagree about.
+
+   Unknown ids are dropped rather than rendered. `appById` resolves anything it
+   does not recognise to `apps[0]`, so a stale id would silently draw as
+   Salesforce; a policy naming a deleted application should come up short, and
+   the surfaces that care read `length` to say so. */
+export const appsOf = (p: Policy, apps: App[]): App[] =>
+  apps.filter((a) => p.appIds.includes(a.id))
+
+/* What the application cell says, in one place because six surfaces say it.
+
+   One application is its name. Several is the first name and a count, never a
+   comma-joined list: "Corporate Email, Payroll System, VPN Portal" in a table
+   column is a cell that wraps to three lines and gets truncated anyway, and the
+   count is the part that actually tells you this is a multi-app policy. */
+export function appsLabel(named: App[]): string {
+  if (named.length === 0) return 'Not assigned'
+  if (named.length === 1) return named[0].name
+  return `${named[0].name} +${named.length - 1}`
+}
+
 export const audienceOf = (groupIds: string[], userIds: string[] = []): Audience => ({
   everyone: false,
   groupIds,
@@ -536,19 +561,36 @@ export interface Policy {
   id: string
   name: string
   type: PolicyType
-  /* The one application this policy protects.
+  /* The applications this policy protects. Empty means nobody has assigned one.
 
-     It was `appIds: string[]` with an `allApps` flag beside it, and neither is
-     a thing this product does. A policy is written against an application —
-     that is what makes "Finance Team – High Security" a sentence rather than a
-     folder — and one covering three of them could not be reasoned about: its
-     name described one, its audience described the union, and the coverage grid
-     drew it three times as if three separate decisions had been made.
+     This has been both shapes. It was `appIds: string[]` beside an `allApps`
+     flag; that was narrowed to a single `appId` on the argument that a policy
+     covering three applications could not be reasoned about — its name
+     described one, its audience described the union, and the coverage grid drew
+     it three times as if three separate decisions had been made. It is a list
+     again, without the flag, and the difference between this list and that one
+     is worth being precise about, because the old objection was not wrong.
 
-     Optional, for the two cases that genuinely have no application: a policy
-     before one is chosen, and the tenant's own default, which applies wherever
-     no app-specific policy does. */
-  appId?: string
+     `allApps` was the actual problem. It made breadth a SECOND way of saying
+     where a policy applies, so "everywhere" and "these four" were different
+     kinds of answer and every reader had to check the flag before trusting the
+     list. It is gone and it is not coming back: the tenant fall-through is the
+     `isSystem` singleton, which `coversEveryApp` still tests for, and every
+     other policy names its applications one at a time.
+
+     What the single `appId` cost is in the fixtures below. S17 ships as TWO
+     byte-identical policies because the scenario names two applications, with a
+     comment calling the duplication "the gap, not a modelling choice"; S16 asks
+     for every application and is unrepresentable. Both are the same missing
+     idea — one decision, several applications — and a list is what expresses
+     it. The coverage grid drawing one policy across three columns is now the
+     truth rather than an artefact: it IS one decision, and three columns is
+     where it lands.
+
+     Not optional. `[]` is the empty case and the only one, so "unassigned" has
+     a single spelling and no surface has to decide whether `undefined` and `[]`
+     mean different things. */
+  appIds: string[]
   /** Who this policy governs. Every rule inherits it; no rule can be broader. */
   audience: Audience
   /* What happens to a sign-in that matched no rule — as a RULE.
@@ -571,8 +613,6 @@ export interface Policy {
   lastModified: string
   modifiedBy: string
   rules: Rule[]
-  /** The current prototype shows a red dot with no explanation; here it says why. */
-  configIssue?: string
   isSystem?: boolean
 }
 
@@ -1418,9 +1458,11 @@ export const policies: Policy[] = [
      one policy each: S5 assigns three group policies plus the application's own
      baseline, S9 pairs the Finance policy with a baseline, and S17 covers two
      applications. That is the document's own shape — a policy is reusable and an
-     assignment binds it — and it is the first thing this engine cannot model:
-     there is no assignment table, so a policy carries one `audience` and one
-     `appId`, and "the same policy on two apps" becomes two policies.
+     assignment binds it. There is still no assignment table — a policy carries
+     its own `audience` rather than being bound to one — but the half of that
+     gap that produced duplicate rows is closed: `appIds` is a list, so S17 is
+     one policy over two applications rather than two policies over one each.
+     What is still missing is the reusable binding itself, and priority with it.
 
      Every one of these keeps its Default Rule as `fallback`, which the model
      already had right: the last row of a policy is a rule, so it can DENY with a
@@ -1431,7 +1473,9 @@ export const policies: Policy[] = [
     name: 'Global Default Policy',
     type: 'App Access',
     /* No application, and that is what makes it the default: it is where a
-       sign-in lands when no app-specific policy covers it. */
+       sign-in lands when no app-specific policy covers it. Empty rather than
+       every-app: breadth here is `isSystem`, never a long list. */
+    appIds: [],
     status: 'always-on',
     lastModified: 'System',
     modifiedBy: 'System',
@@ -1457,7 +1501,7 @@ export const policies: Policy[] = [
     id: 's21-oncall',
     name: 'Production Monitoring — On-Call Override',
     type: 'App Access',
-    appId: 'monitoring',
+    appIds: ['monitoring'],
     status: 'active',
     lastModified: '6 hours ago',
     modifiedBy: 'Ravi Menon',
@@ -1523,7 +1567,7 @@ export const policies: Policy[] = [
     id: 's22-employment',
     name: 'Knowledge Base — Employment Type Matrix',
     type: 'App Access',
-    appId: 'knowledge-base',
+    appIds: ['knowledge-base'],
     status: 'active',
     lastModified: 'Yesterday',
     modifiedBy: 'Clara Boucher',
@@ -1577,7 +1621,7 @@ export const policies: Policy[] = [
     id: 's23-vault',
     name: 'Legal Document Vault — Clearance Ladder',
     type: 'App Access',
-    appId: 'vault',
+    appIds: ['vault'],
     status: 'active',
     lastModified: '3 days ago',
     modifiedBy: 'Mehak Garg',
@@ -1624,7 +1668,7 @@ export const policies: Policy[] = [
     id: 's5-admin',
     name: 'Workspace — Admin, office only',
     type: 'App Access',
-    appId: 'google-workspace',
+    appIds: ['google-workspace'],
     audience: audienceOf(['admin']),
     status: 'active',
     lastModified: '3 hours ago',
@@ -1654,7 +1698,7 @@ export const policies: Policy[] = [
     id: 's5-devops',
     name: 'Workspace — DevOps, office network and office device',
     type: 'App Access',
-    appId: 'google-workspace',
+    appIds: ['google-workspace'],
     audience: audienceOf(['devops']),
     status: 'active',
     lastModified: '3 hours ago',
@@ -1687,7 +1731,7 @@ export const policies: Policy[] = [
     id: 's5-endusers',
     name: 'Workspace — End users, office network',
     type: 'App Access',
-    appId: 'google-workspace',
+    appIds: ['google-workspace'],
     /* 'End-Users' has no group. EVERYONE is the only available expression and it
        is WIDER than the scenario: it also covers it-admins and engineering. */
     audience: audienceOf(['end-users']),
@@ -1713,12 +1757,11 @@ export const policies: Policy[] = [
     id: 's5-baseline',
     name: 'Workspace — Application baseline',
     type: 'App Access',
-    appId: 'google-workspace',
+    appIds: ['google-workspace'],
     audience: EVERYONE,
     status: 'active',
     lastModified: '3 hours ago',
     modifiedBy: 'Mehak Garg',
-    configIssue: 'No rules configured — every sign-in falls straight through to the default rule.',
     rules: [],
     fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 0 }),
   },
@@ -1728,7 +1771,7 @@ export const policies: Policy[] = [
     id: 's6-mdm-os',
     name: 'Corporate Email — MDM OS matrix',
     type: 'App Access',
-    appId: 'corporate-email',
+    appIds: ['corporate-email'],
     audience: EVERYONE,            // Default Group → everyone
     status: 'active',
     lastModified: 'Yesterday',
@@ -1772,7 +1815,7 @@ export const policies: Policy[] = [
     type: 'App Access',
     /* There is no VPN portal in `apps`. `aws` is the closest infrastructure
        gateway; the fit is poor and the fixture says so. */
-    appId: 'vpn-portal',
+    appIds: ['vpn-portal'],
     /* `employees` is the document's own target and excludes contractors, which
       EVERYONE would not. */
     audience: audienceOf(['employees']),
@@ -1821,7 +1864,7 @@ export const policies: Policy[] = [
     id: 's8-role-escalation',
     name: 'Admin Console — role escalation',
     type: 'App Access',
-    appId: 'admin-console',
+    appIds: ['admin-console'],
     audience: audienceOf(['it-admins']), // 'IT' → it-admins
     status: 'active',
     lastModified: '2 days ago',
@@ -1864,7 +1907,7 @@ export const policies: Policy[] = [
     id: 's9-finance',
     name: 'Payroll — Finance',
     type: 'App Access',
-    appId: 'payroll',
+    appIds: ['payroll'],
     /* The scenario's claim is "no separate user-to-Policy assignment is required".
        But `inAudience` (simulate.ts:384) short-circuits ABOVE the rules, so a
        rule naming someone outside the audience never runs. Mehak Garg is in
@@ -1910,12 +1953,11 @@ export const policies: Policy[] = [
     id: 's9-baseline',
     name: 'Payroll — Application baseline',
     type: 'App Access',
-    appId: 'payroll',
+    appIds: ['payroll'],
     audience: EVERYONE,
     status: 'active',
     lastModified: '4 days ago',
     modifiedBy: 'Mehak Garg',
-    configIssue: 'No rules configured — every sign-in falls straight through to the default rule.',
     rules: [],
     fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 1154 }),
   },
@@ -1926,15 +1968,16 @@ export const policies: Policy[] = [
     id: 'break-glass',
     name: 'Break-Glass Emergency Access',
     type: 'App Access',
-    /* The document says "All Apps using the emergency Policy". Not
-       expressible: `appId` is one application, and the only every-app policy is
-       the `isSystem` singleton. Left unset, which the console reads as a
-       configuration fault rather than as breadth — the honest encoding, and the
-       gap register's G2. */
-    appId: undefined,
-    configIssue:
-      'No application assigned — this policy cannot take effect until one is attached. The scenario asks for every application; the model has no such policy.',
-    status: 'active',
+    /* The document says "All Apps using the emergency Policy". Still not
+       expressible, and `appIds` being a list does not change it: naming all
+       twenty-six is not the same claim as "every application", because the
+       twenty-seventh added next week would not be covered and nothing would say
+       so. The only every-app policy is the `isSystem` singleton. So it is left
+       unset — and a policy with no application is not finished, which in this
+       product means it is a DRAFT. It is not an active policy carrying a fault;
+       there is no such state. The gap register's G2. */
+    appIds: [],
+    status: 'draft',
     lastModified: '6 weeks ago',
     modifiedBy: 'Ravi Menon',
     /* The doc's shape is a dedicated `Break-Glass Accounts` group. It does not
@@ -1976,15 +2019,24 @@ export const policies: Policy[] = [
     }),
   },
 
-  /* Scenario 17 — Departing Employee. TWO POLICIES, because the scenario names
-     two applications and `Policy.appId` is one app. The rules are byte-identical;
-     the duplication is the gap, not a modelling choice. */
+  /* Scenario 17 — Departing Employee. ONE policy over two applications.
+
+     It shipped as two, byte-identical but for the app and the name, under a
+     comment calling the duplication "the gap, not a modelling choice" — which
+     it was, and the gap is closed: `appIds` is a list, so the one decision the
+     scenario describes is stored once. Two rows to edit and two things to
+     forget to revoke are now one of each.
+
+     The `-github` id is kept rather than renamed to something neutral. Nothing
+     keys off it, and a fixture id that changes is a fixture whose history stops
+     being greppable. */
   {
     id: 'notice-period-github',
-    name: 'Notice Period — Code Repository',
+    name: 'Notice Period — Code and Cloud',
     type: 'App Access',
-    /* Scenario says GitLab. No such app. Closest real id: `github`. */
-    appId: 'github',
+    /* Scenario says GitLab and a production cloud console. No GitLab app;
+       closest real id is `github`. */
+    appIds: ['github', 'aws'],
     status: 'active',
     lastModified: '3 days ago',
     modifiedBy: 'Clara Boucher',
@@ -2023,47 +2075,12 @@ export const policies: Policy[] = [
   },
 
 
-  {
-    /* The identical policy again, because the second application needs its own.
-       Two rows in the list, two things to edit, two things to forget to revoke. */
-    id: 'notice-period-aws',
-    name: 'Notice Period — Production Cloud Console',
-    type: 'App Access',
-    appId: 'aws',
-    status: 'active',
-    lastModified: '3 days ago',
-    modifiedBy: 'Clara Boucher',
-    audience: audienceOf(['notice-period']),
-    rules: [
-      rule({
-        name: 'Office, business hours only',
-        when: when(
-          card(
-            cond('zone', 'in zone', ['office-cidr'], 'ip'),
-            cond('day', 'is', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']),
-            cond('time', 'between', ['09:00', '18:00']),
-          ),
-        ),
-        decision: '2fa',
-        firstFactor: 'Password',
-        secondFactor: 'specific',
-        secondFactorMethods: ['Google Authenticator'],
-        rememberMfa: false,
-        forceMfaEachLogin: true,
-        allowDisable2fa: false,
-        matchEstimate: 1,
-      }),
-    ],
-    fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 0 }),
-  },
-
-
   /* Scenario 18 — Traveling Executive. */
   {
     id: 'japan-travel',
     name: 'Japan Travel Exception',
     type: 'App Access',
-    appId: 'salesforce',
+    appIds: ['salesforce'],
     status: 'active',
     lastModified: 'Yesterday',
     modifiedBy: 'Mehak Garg',
@@ -2135,7 +2152,7 @@ export const policies: Policy[] = [
     id: 'hybrid-work',
     name: 'Hybrid Work Access',
     type: 'App Access',
-    appId: 'jira',
+    appIds: ['jira'],
     status: 'active',
     lastModified: '2 days ago',
     modifiedBy: 'Jaspreet T.',
@@ -2237,7 +2254,7 @@ export const policies: Policy[] = [
     id: 'privileged-gateway',
     name: 'Privileged Access — Red-Flag Guard',
     type: 'App Access',
-    appId: 'pam',
+    appIds: ['pam'],
     status: 'active',
     lastModified: '4 hours ago',
     modifiedBy: 'Ravi Menon',
@@ -2316,7 +2333,7 @@ export const policies: Policy[] = [
     id: 's10-aws-posture',
     name: 'Production Cloud Console — Device Posture',
     type: 'App Access',
-    appId: 'aws',
+    appIds: ['aws'],
     status: 'active',
     lastModified: '6 hours ago',
     modifiedBy: 'Ravi Menon',
@@ -2373,7 +2390,7 @@ export const policies: Policy[] = [
     type: 'App Access',
     // Doc app is "Internal Wiki". No such app; `jira` is the nearest
     // collaboration surface in the fixtures.
-    appId: 'wiki',
+    appIds: ['wiki'],
     status: 'active',
     lastModified: 'Yesterday',
     modifiedBy: 'Jaspreet T.',
@@ -2421,7 +2438,7 @@ export const policies: Policy[] = [
     id: 's12-crm-risk',
     name: 'Customer Database — Risk Tiers',
     type: 'App Access',
-    appId: 'crm',
+    appIds: ['crm'],
     status: 'active',
     lastModified: '2 days ago',
     modifiedBy: 'Clara Boucher',
@@ -2487,7 +2504,7 @@ export const policies: Policy[] = [
     type: 'App Access',
     // Doc app is "Trading Platform". Nothing in the fixtures is in that class;
     // `workday` is the nearest regulated financial system of record.
-    appId: 'trading',
+    appIds: ['trading'],
     status: 'active',
     lastModified: '3 days ago',
     modifiedBy: 'Mehak Garg',
@@ -2548,7 +2565,7 @@ export const policies: Policy[] = [
     // Doc app is "ERP System". No ERP in the fixtures; `servicenow` is the
     // nearest enterprise system-of-record (`workday` is the other candidate and
     // is already standing in for S13's Trading Platform).
-    appId: 'erp',
+    appIds: ['erp'],
     status: 'active',
     lastModified: '1 week ago',
     modifiedBy: 'Mehak Garg',
@@ -2637,7 +2654,7 @@ export const policies: Policy[] = [
     id: 's15-ma-onboarding',
     name: 'M&A Integration — Document Management',
     type: 'App Access',
-    appId: 'dms',
+    appIds: ['dms'],
     status: 'monitor',
     lastModified: '4 days ago',
     modifiedBy: 'Ravi Menon',
@@ -2694,7 +2711,7 @@ export const policies: Policy[] = [
     id: 'uc1-office-only',
     name: 'HR Portal — Office or VPN only',
     type: 'App Access',
-    appId: 'hr-portal',
+    appIds: ['hr-portal'],
     status: 'active',
     lastModified: '2 hours ago',
     modifiedBy: 'Mehak Garg',
@@ -2729,7 +2746,7 @@ export const policies: Policy[] = [
     id: 'uc2-business-hours',
     name: 'Finance Dashboard — working hours only',
     type: 'App Access',
-    appId: 'finance-dashboard',
+    appIds: ['finance-dashboard'],
     status: 'active',
     lastModified: 'Yesterday',
     modifiedBy: 'Jaspreet T.',
@@ -2770,7 +2787,7 @@ export const policies: Policy[] = [
     id: 'uc3-country-allowlist',
     name: 'Salesforce — India and US only',
     type: 'App Access',
-    appId: 'salesforce',
+    appIds: ['salesforce'],
     status: 'active',
     lastModified: '3 days ago',
     modifiedBy: 'Mehak Garg',
@@ -2809,7 +2826,7 @@ export const policies: Policy[] = [
     id: 'uc4-registered-devices',
     name: 'Code repository — trusted device required',
     type: 'App Access',
-    appId: 'github',
+    appIds: ['github'],
     status: 'active',
     lastModified: '4 days ago',
     modifiedBy: 'Mehak Garg',
@@ -3093,12 +3110,12 @@ export function fallbackRule(decision: AccessDecision = '1fa'): Rule {
   return rule({ name: FALLBACK_NAME, decision, matchEstimate: 0 })
 }
 
-export function blankPolicy(name: string, appId?: string): Policy {
+export function blankPolicy(name: string, appIds: string[] = []): Policy {
   return {
     id: `p${Date.now()}`,
     name,
     type: 'App Access',
-    appId,
+    appIds,
     /* A policy nobody has published yet is a DRAFT, not something switched
        off. It has never been on. */
     status: 'draft',

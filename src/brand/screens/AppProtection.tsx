@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Shield } from 'lucide-react'
 
-import { Badge, Button, Callout, Drawer, InfoDot, Modal, StatusPill } from '../kit'
+import { Badge, Button, Callout, Drawer, Modal, StatusPill } from '../kit'
 import { EmptyState } from '../empty'
 import { Picker, type PickerOption } from '../picker'
 import { AppLogo } from '../logos/AppLogo'
 import { useBrand } from '../store'
-import type { Policy } from '../data'
+import { appsLabel, appsOf, type Policy } from '../data'
 import {
   attachKind,
   attachTo,
@@ -14,7 +14,6 @@ import {
   decidesFor,
   detachFrom,
   orderOf,
-  policiesForApp,
   protectionOf,
   whyNotDeciding,
 } from './app-policies'
@@ -84,7 +83,11 @@ export function AppProtection({
   const options = app ? attachableTo(app.id, store.policies) : []
   const none = options.length === 0
   const picked = pickId ? (store.policyById(pickId) ?? null) : null
-  const moving = picked && app ? attachKind(picked, app.id) === 'move' : false
+  /* Whether the chosen policy already protects something else. It used to gate
+     a warning, because attaching here would have TAKEN it from there. It gates
+     nothing now — a policy holds a list, so this application is added to it —
+     and what is left is a wording change: `also` rather than `Attach`. */
+  const alsoOn = picked && app ? attachKind(picked, app.id) === 'also' : false
 
   function submit() {
     if (!app) return
@@ -106,9 +109,15 @@ export function AppProtection({
       return
     }
 
-    const from = live.appId ? store.apps.find((a) => a.id === live.appId) : null
+    /* How many it protected BEFORE, so the toast can say "now protects three"
+       rather than implying this was the only one. */
+    const had = live.appIds.length
     store.savePolicy(attachTo(live, app.id, store.apps))
-    store.showToast(from ? `${live.name} moved from ${from.name} to ${app.name}` : `${live.name} now protects ${app.name}`)
+    store.showToast(
+      had > 0
+        ? `${live.name} now protects ${app.name} as well — ${had + 1} applications`
+        : `${live.name} now protects ${app.name}`,
+    )
     setChoice(null)
     setPickId(null)
     setTried(false)
@@ -118,8 +127,13 @@ export function AppProtection({
   function remove(p: Policy) {
     const live = store.policyById(p.id)
     if (live && app) {
-      store.savePolicy(detachFrom(live))
-      store.showToast(`${live.name} no longer protects ${app.name}`)
+      const next = detachFrom(live, app.id)
+      store.savePolicy(next)
+      store.showToast(
+        next.appIds.length === 0
+          ? `${live.name} no longer protects ${app.name} — back to draft`
+          : `${live.name} no longer protects ${app.name} — still on ${next.appIds.length}`,
+      )
     }
     setRemoving(null)
   }
@@ -133,14 +147,20 @@ export function AppProtection({
         ? 'You will name it next. Created switched off — nothing changes for users until you turn it on.'
         : !picked
           ? 'Pick a policy to attach.'
-          : moving || gone
+          : gone
             ? ''
             : decidesFor(picked)
               ? `This takes effect on the next sign-in to ${app.name}.`
               : `${picked.name} protects nothing today, and it is switched off — nothing changes for users yet.`
 
   const primary =
-    choice === 'new' ? 'Name and create' : moving ? `Move to ${app.name}` : picked ? `Attach to ${app.name}` : 'Attach policy'
+    choice === 'new'
+      ? 'Name and create'
+      : alsoOn
+        ? `Also protect ${app.name}`
+        : picked
+          ? `Attach to ${app.name}`
+          : 'Attach policy'
 
   return (
     <>
@@ -308,7 +328,7 @@ export function AppProtection({
                 The tenant default is not listed — it already applies wherever nothing else does.
               </p>
 
-              {picked && moving && <MoveWarning picked={picked} />}
+              {picked && alsoOn && <AlsoNote picked={picked} />}
             </div>
           )}
         </fieldset>
@@ -385,7 +405,6 @@ function PolicyRow({
           <button type="button" className="bapr__name" onClick={onOpen}>
             {policy.name}
           </button>
-          {policy.configIssue && <InfoDot text={policy.configIssue} />}
         </span>
         <span className="bapr__meta">
           <Badge tone="info">{policy.type}</Badge>
@@ -419,22 +438,28 @@ function PolicyRow({
   )
 }
 
-function MoveWarning({ picked }: { picked: Policy }) {
+/* `MoveWarning` stood here, and its removal is the point of the whole change.
+
+   It said: "Moving, not copying. X protects Salesforce today. A policy protects
+   one application, so attaching it here takes it off Salesforce" — and then
+   counted what Salesforce would be left with, because the answer could be
+   nothing and a sign-in falling through to the tenant default is worth a
+   warning.
+
+   None of that is true any more. Attaching adds; Salesforce keeps what it had.
+   A warning about a consequence that no longer happens is worse than no
+   warning, so what replaces it states the fact plainly and in the `info` ramp:
+   nothing is at stake, there is something to know. */
+function AlsoNote({ picked }: { picked: Policy }) {
   const store = useBrand()
-  const from = picked.appId ? store.apps.find((a) => a.id === picked.appId) : null
-  if (!from) return null
-  const k = policiesForApp(from.id, store.policies).filter((p) => p.id !== picked.id).length
+  const on = appsOf(picked, store.apps)
+  if (on.length === 0) return null
 
   return (
-    /* `notice`, not `negative`. Moving a policy is a legitimate operation, and
-       a red box around a legal act is how people learn to click past red
-       boxes. */
-    <Callout tone="notice" title="Moving, not copying.">
-      <em>{picked.name}</em> protects <strong>{from.name}</strong> today. A policy protects one application, so
-      attaching it here takes it off {from.name} —{' '}
-      {k > 0
-        ? `${from.name} keeps ${k} other polic${k === 1 ? 'y' : 'ies'}.`
-        : `${from.name} will then have no policy of its own — sign-ins there fall through to the tenant default.`}
+    <Callout tone="info" title="Adding, not moving.">
+      <em>{picked.name}</em> already protects <strong>{on.map((a) => a.name).join(', ')}</strong>, and keeps
+      {on.length === 1 ? ' it' : ' them'}. One policy can protect several applications, so the same rules
+      apply here too — and editing it later changes every one of them at once.
     </Callout>
   )
 }
@@ -472,8 +497,9 @@ function RemoveDialog({
       {policy && (
         <div className="bapr__confirm">
           <p>
-            <em>{policy.name}</em> will protect no application. Its rules stay exactly as they are, but no sign-in
-            reaches them until you attach it somewhere.
+            <em>{policy.name}</em> goes back to a draft. Its rules stay exactly as they are, but a policy with no
+            application is not finished, so it stops deciding sign-ins until you attach it somewhere and publish it
+            again.
           </p>
           {/* The consequence a generic confirmation cannot state: what catches
               the sign-ins this policy was deciding. */}
@@ -508,7 +534,8 @@ const STATUS_WORD: Record<Policy['status'], string> = {
 }
 
 function toOption(p: Policy, store: ReturnType<typeof useBrand>): PickerOption {
-  const on = p.appId ? store.apps.find((a) => a.id === p.appId) : null
+  const named = appsOf(p, store.apps)
+  const on = named[0] ?? null
   const rules = `${p.rules.length} rule${p.rules.length === 1 ? '' : 's'}`
   const status = STATUS_WORD[p.status]
   return {
@@ -517,11 +544,11 @@ function toOption(p: Policy, store: ReturnType<typeof useBrand>): PickerOption {
     /* The application's NAME, resolved. A neighbouring surface prints the raw
        id here while its own comment says it means the name; that bug is not
        worth propagating into a second place. */
-    meta: on ? `Protects ${on.name} · ${rules} · ${status}` : `${p.type} · ${rules} · ${status}`,
-    /* The OTHER application's mark, so the move shows what it takes away
-       before anybody clicks. Nothing on the unattached group — there is
-       nothing to take. */
+    meta: on ? `Protects ${appsLabel(named)} · ${rules} · ${status}` : `${p.type} · ${rules} · ${status}`,
+    /* The first application's mark, so a row says what this policy is already
+       doing before anybody clicks. Nothing on the unassigned group — there is
+       nothing to show. */
     art: on ? <AppLogo appId={on.id} name={on.name} size={16} /> : undefined,
-    group: on ? 'Currently on another application' : 'Protecting nothing yet',
+    group: on ? 'Already protecting something else' : 'Protecting nothing yet',
   }
 }

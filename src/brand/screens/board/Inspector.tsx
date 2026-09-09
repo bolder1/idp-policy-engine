@@ -1,12 +1,11 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { ChevronsLeftRight, ChevronsRightLeft, Plus, X } from 'lucide-react'
 
 import { Toggle } from '../../kit'
 import { restConditions } from '../../audience-ops'
-import { fallbackRule, type Audience, type Policy, type Rule } from '../../data'
-import { PARTS, TONE, type Part, type Selection } from './model'
-import { PART_LABEL } from './parts'
+import { fallbackRule, type Policy, type Rule } from '../../data'
+import { TONE, type Part, type Selection } from './model'
 import { WhatEditor } from './WhatEditor'
 import { WhenEditor } from './WhenEditor'
 import { WhoEditor } from './WhoEditor'
@@ -63,14 +62,10 @@ export function Inspector({
   const part = selection.kind === 'rule' ? selection.part : null
   const patch = (p: Partial<Rule>) => onPatchRule(at, p)
 
-  const what = rule && part ? `Rule ${at + 1} · ${PART_LABEL[part]}` : 'The default'
-
-  const pane =
-    !rule || !part ? null : part === 'who' ? (
-      <WhoPane rule={rule} audience={draft.audience} onPatch={patch} onOpenPart={onOpenPart} />
-    ) : (
-      <ConditionPane rule={rule} onPatch={patch} />
-    )
+  /* The bar names the RULE, not a third of it. It used to append the open part
+     — "Rule 1 · Condition" — which was the tab strip saying its own state
+     twice. There is no tab strip. */
+  const what = rule ? `Rule ${at + 1}` : 'The default'
 
   return (
     <aside className="bb__insp" aria-label="Inspector">
@@ -136,34 +131,36 @@ export function Inspector({
             <motion.div key={`head:${rule.id}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
               <RuleHead rule={rule} index={at} onPatch={patch} />
             </motion.div>
-            {/* The two questions, as tabs on the form.
+            {/* ONE panel, three sections, all of them open.
 
-                They were a row of buttons on the CARD, which put the
-                navigation on the canvas and the thing it navigated in the
-                panel — so choosing what to edit meant looking away from where
-                the editing happens, and every card carried two more controls
-                whether or not it was the one you were working on.
+                They were two tabs — Who and Condition, with Then living inside
+                the second. A rule is one sentence: these people, when this
+                holds, do that. Tabs cut it in half and made the reader hold the
+                first half in their head to check the second, and nothing on
+                this panel ever showed the whole rule at once. Worse, the two
+                tabs were the SECOND switcher on the surface: Who's own
+                groups/people control sat directly under them, two near-identical
+                strips back to back asking unrelated questions.
 
-                On the form they are where the work is, they cost the canvas
-                nothing, and the card goes back to being a reading of the rule
-                rather than a control surface. Clicking a card still opens Who,
-                which is the first question and the one people start with. */}
-            <div className="bb__panetabs" role="tablist" aria-label="Which part of this rule">
-              {PARTS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  role="tab"
-                  aria-selected={part === p}
-                  className={part === p ? 'is-on' : ''}
-                  onClick={() => onOpenPart(p)}
-                >
-                  {PART_LABEL[p]}
-                </button>
-              ))}
-            </div>
-            <motion.div key={`pane:${rule.id}:${part}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
-              {pane}
+                Sections instead. Each is a small heading and a hairline, with no
+                box — a bordered card per section is three frames inside a
+                frame, and the boxes were most of why this panel read as a stack
+                of unrelated widgets rather than as one form.
+
+                The selection's part survives and still does its two useful jobs:
+                the card marks which third you opened, and the bracket keys still
+                move between them. What it no longer does is HIDE the other
+                two. */}
+            <motion.div key={`pane:${rule.id}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
+              <Section id="who" title="Who" hint="Leave empty for everyone this policy governs" focused={part === 'who'}>
+                <WhoEditor rule={rule} audience={draft.audience} onPatch={patch} onOpenPart={onOpenPart} />
+              </Section>
+
+              <ConditionSection rule={rule} onPatch={patch} focused={part === 'when'} />
+
+              <Section id="then" title="Then" hint="What happens when the rule matches">
+                <WhatEditor rule={rule} onPatch={patch} />
+              </Section>
             </motion.div>
           </>
         ) : selection.kind === 'fallback' ? (
@@ -179,54 +176,67 @@ export function Inspector({
   )
 }
 
-/* --- The three panes ---------------------------------------------------------
+/* --- A section of the panel --------------------------------------------------
 
-   Three different forms, not one form with two thirds hidden. A two-list picker
-   with its own operators; a predicate builder with an add button in its header;
-   a decision and a numbered ladder at full height with nothing above them
-   competing for the room.
+   A heading, an optional hint, an optional action, and a hairline under the
+   lot. No box: three bordered cards inside a bordered panel is four frames to
+   draw one form, and the boxes were most of why this panel read as a pile of
+   widgets rather than as a sentence.
 
-   And they are separately MOUNTED, which is the point rather than a side
-   effect: leaving Condition throws away the catalogue you left half open, and
-   it should. */
-
-function WhoPane({
-  rule,
-  audience,
-  onPatch,
-  onOpenPart,
+   `focused` carries the selection's part, and it does the one job the tabs did
+   that was worth keeping — saying which third of the rule you arrived at. It
+   tints the heading rather than hiding the other two. */
+function Section({
+  id,
+  title,
+  hint,
+  action,
+  focused,
+  children,
 }: {
-  rule: Rule
-  audience: Audience
-  onPatch: (p: Partial<Rule>) => void
-  onOpenPart: (part: Part) => void
+  id: string
+  title: string
+  hint?: string
+  action?: ReactNode
+  focused?: boolean
+  children: ReactNode
 }) {
   return (
-    /* No heading. The tab directly above says "Who", and a pane whose first
-       line repeats the control that opened it is the panel introducing itself
-       twice. */
-    <div className="bb__ask bb__ask--pane">
-      <WhoEditor rule={rule} audience={audience} onPatch={onPatch} onOpenPart={onOpenPart} />
-    </div>
+    <section className={`bb__sec ${focused ? 'is-focused' : ''}`} aria-labelledby={`bb-sec-${id}`}>
+      <div className="bb__sec__head">
+        <h3 id={`bb-sec-${id}`}>{title}</h3>
+        {hint && <p>{hint}</p>}
+        {action}
+      </div>
+      {children}
+    </section>
   )
 }
 
-function ConditionPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
-  /* `openAt` gets its setter back.
+function ConditionSection({
+  rule,
+  onPatch,
+  focused,
+}: {
+  rule: Rule
+  onPatch: (p: Partial<Rule>) => void
+  focused: boolean
+}) {
+  /* The section header's add button, anchored by a nonce so the same button
+     pressed twice opens twice.
 
-     It was threaded DEAD from here — `const [openAt] = useState(null)`, never
+     It was threaded DEAD from the old pane — declared with no setter, never
      anything but null — so the effect in `WhenEditor` that opens the catalogue
-     could never fire. It was written for a section header's `+` that went with
-     the accordion. A pane of its own has a header again, and this is what it
-     is for. */
+     could never fire from here at all. */
   const [openAt, setOpenAt] = useState<{ nonce: number } | null>(null)
   const n = restConditions(rule.when).length
   return (
-    <div className="bb__ask bb__ask--pane">
-      {/* The head stays because the count and the `+` need somewhere to live;
-          the heading itself goes, for the same reason as the Who pane's. */}
-      <div className="bb__ask__head">
-        {n > 0 && <span className="bb__count">{n}</span>}
+    <Section
+      id="if"
+      title="If"
+      hint={n === 0 ? 'Every sign-in that reaches this rule matches' : undefined}
+      focused={focused}
+      action={
         <button
           type="button"
           className="bb__secact"
@@ -236,25 +246,10 @@ function ConditionPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
         >
           <Plus size={15} strokeWidth={2} />
         </button>
-      </div>
+      }
+    >
       <WhenEditor rule={rule} onPatch={onPatch} openAt={openAt} />
-
-      {/* THEN, in the same pane, because it is the second half of the sentence
-          the condition starts.
-
-          It had a pane of its own for exactly as long as it took to use one:
-          "when this happens, do that" is one thought, and answering it meant
-          changing panes in the middle of it. Two sections under one header,
-          which is the shape they had before the split — and the split's one
-          good idea, that WHO is a different question, is the part that
-          survives. */}
-      <div className="bb__ask bb__ask--next">
-        <div className="bb__ask__head">
-          <h3>Then</h3>
-        </div>
-        <WhatEditor rule={rule} onPatch={onPatch} />
-      </div>
-    </div>
+    </Section>
   )
 }
 

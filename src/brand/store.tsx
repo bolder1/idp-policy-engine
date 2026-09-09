@@ -26,7 +26,7 @@ import {
 import { type FingerprintProfile } from './fingerprint'
 import { EMPTY_RISK_PROFILE, riskScale, type RiskProfile } from './risk-signals'
 import { type Hook } from './hooks'
-import { appsAt, fingerprintsAt, groupsAt, hooksAt, methodSetsAt, methodsAt, policiesAt, usersAt, zonesAt } from './fixtures'
+import { appsAt, fingerprintsAt, groupsAt, hooksAt, methodSetsAt, methodsAt, policiesAt, riskProfilesAt, usersAt, zonesAt } from './fixtures'
 import type { AuthMethod } from './methods'
 import { TAB_SCREEN, personaById, type PersonaId } from './personas'
 import { featuresOf, type Edition, type Features } from './edition'
@@ -184,16 +184,34 @@ export interface BrandStore {
   updateFingerprint: (p: FingerprintProfile) => void
   removeFingerprint: (id: string) => void
 
-  /* One risk-signal weighting for the whole tenant, and the scale it produces.
+  /* A library of risk-signal weightings, and exactly one of them in use.
 
      `riskScale` is the reason this is on the store rather than in the screen's
      own state: it replaces `RISK_SCORE`, which the evaluator reads on every
      rehearsal, every deck card and all 1,440 swept situations. A weighting
      nothing could read would be a second one of those — the device profiles
-     already carry a risk mode whose `scoreOf` has no product callers at all. */
-  riskProfile: RiskProfile
-  setRiskProfile: (p: RiskProfile) => void
-  /** Derived: what Low, Medium and High are worth under the current profile. */
+     already carry a risk mode whose `scoreOf` has no product callers at all.
+
+     Which brings the one real decision a library forces. `Risk score above 60`
+     is a threshold against A scale, and with several profiles something has to
+     say WHICH. Two honest answers existed: let each rule name a profile, the
+     way it names a zone; or keep one tenant-wide answer and let the library be
+     about drafting alternatives to it.
+
+     The second, and not merely because it is smaller. A rule naming its own
+     risk profile would mean two rules in one policy could disagree about what
+     "60" is worth — the number is the same, the scale behind it is not — and
+     the condition renders as a bare number with no room to say whose. That is
+     a footgun the `device-risk` condition has no way to defuse. So: one
+     `activeRiskProfileId`, stated on the row and on the page, and switching it
+     is a deliberate act with a toast. */
+  riskProfiles: RiskProfile[]
+  activeRiskProfileId: string
+  addRiskProfile: (p: RiskProfile) => void
+  updateRiskProfile: (p: RiskProfile) => void
+  removeRiskProfile: (id: string) => void
+  useRiskProfile: (id: string) => void
+  /** Derived: what Low, Medium and High are worth under the profile in use. */
   riskScale: Record<string, number>
   policyById: (id: string) => Policy | undefined
 
@@ -292,7 +310,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
      name them, so the linter and the simulator have to be able to resolve
      one without the Device Fingerprint page being mounted. */
   const [fingerprints, setFingerprints] = useState<FingerprintProfile[]>(() => fingerprintsAt('medium'))
-  const [riskProfile, setRiskProfile] = useState<RiskProfile>(EMPTY_RISK_PROFILE)
+  const [riskProfiles, setRiskProfiles] = useState<RiskProfile[]>(() => riskProfilesAt('medium'))
+  const [activeRiskProfileId, setActiveRiskProfileId] = useState('rp-shipped')
   const [hooks, setHooks] = useState<Hook[]>(() => hooksAt('medium'))
   const [methods, setMethods] = useState<AuthMethod[]>(() => methodsAt('medium'))
   const [apps, setApps] = useState<App[]>(() => appsAt('medium'))
@@ -386,9 +405,27 @@ export function BrandProvider({ children }: { children: ReactNode }) {
          which is a louder and more accurate signal than a rule that silently
          rewrote itself while nobody was looking. */
       removeHook: (id) => setHooks((all) => all.filter((h) => h.id !== id)),
-      riskProfile,
-      setRiskProfile,
-      riskScale: riskScale(riskProfile),
+      riskProfiles,
+      activeRiskProfileId,
+      addRiskProfile: (p) => setRiskProfiles((all) => [...all, p]),
+      updateRiskProfile: (p) => setRiskProfiles((all) => all.map((x) => (x.id === p.id ? p : x))),
+      /* Deleting the profile IN USE would leave the evaluator with no scale, so
+         the active id falls back to the first survivor rather than dangling.
+         The screen refuses the delete before it gets here; this is the guard
+         that makes the refusal a policy rather than the only thing standing
+         between a tenant and an undefined risk scale. */
+      removeRiskProfile: (id) =>
+        setRiskProfiles((all) => {
+          const left = all.filter((p) => p.id !== id)
+          if (id === activeRiskProfileId && left[0]) setActiveRiskProfileId(left[0].id)
+          return left
+        }),
+      useRiskProfile: setActiveRiskProfileId,
+      /* The scale comes from the profile in use, and falls back to the shipped
+         weighting rather than to `undefined` if the id ever points at nothing —
+         a tenant with a broken pointer should grade as they did on day one, not
+         crash the evaluator. */
+      riskScale: riskScale(riskProfiles.find((p) => p.id === activeRiskProfileId) ?? EMPTY_RISK_PROFILE),
       addFingerprint: (p) => setFingerprints((all) => [...all, p]),
       updateFingerprint: (p) => setFingerprints((all) => all.map((x) => (x.id === p.id ? p : x))),
       /* Deleting a profile does not unlink the rules naming it — the linter
@@ -474,7 +511,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
        The three callbacks are `useCallback`-stable, so listing them costs
        nothing and stops the next reader wondering whether they were left out
        on purpose. */
-    [policies, zones, fingerprints, riskProfile, hooks, apps, groups, directory, edition, persona, setPersona, role, setRole, methodSets, methods, screen, go, registerLeaveGuard, pendingNav, confirmNav, cancelNav, showToast, gauntletOverrides],
+    [policies, zones, fingerprints, riskProfiles, activeRiskProfileId, hooks, apps, groups, directory, edition, persona, setPersona, role, setRole, methodSets, methods, screen, go, registerLeaveGuard, pendingNav, confirmNav, cancelNav, showToast, gauntletOverrides],
   )
 
   return (

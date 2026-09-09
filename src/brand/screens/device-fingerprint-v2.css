@@ -18,6 +18,43 @@
 }
 .bfp2__pagehead { display: flex; align-items: center; gap: 12px; min-width: 0; }
 
+/* --- The name, edited in place ---------------------------------------------
+
+   A card with a heading and one text field stood below this, holding the same
+   string the h1 already showed. One rendering now, and it is the heading.
+
+   The pencil is quiet until the header is hovered or it is focused. A permanent
+   button beside a title reads as part of the title; an affordance that appears
+   where you are already looking does the same job without spending weight on
+   it — and it stays reachable by keyboard, which a hover-only control would
+   not. */
+.bfp2__rename {
+  flex: none;
+  display: grid; place-items: center;
+  width: 26px; height: 26px;
+  border: 0; border-radius: var(--radius-sm);
+  background: none; color: var(--text-muted); cursor: pointer;
+  opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.bfp2__head:hover .bfp2__rename,
+.bfp2__rename:focus-visible { opacity: 1; }
+.bfp2__rename:hover { background: var(--surface-inset); color: var(--text-primary); }
+.bfp2__rename:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* Styled as the heading, not as a field. Same 20px/700 the `.bpage h1` rule
+   sets, so swapping one for the other does not move a pixel of the page — the
+   only visible change is that the text is now selectable and has a caret in
+   it. */
+.bfp2__nameinput {
+  min-width: 0; flex: 1 1 auto; max-width: 520px;
+  padding: 2px 8px; margin: -2px -8px;
+  border: 0; border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-family: inherit; font-size: 20px; font-weight: 700; letter-spacing: 0;
+  color: var(--text-primary);
+}
+.bfp2__nameinput:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
 .bfp2__back {
   align-self: flex-start;
   display: inline-flex; align-items: center; gap: 6px;
@@ -1041,51 +1078,43 @@
 
 
 /* =============================================================================
-   THE DETAIL PAGE, IN TWO COLUMNS
+   THE DETAIL PAGE, IN TWO TABS
    ========================================================================== */
 
-/* A page of stated facts and one editable list.
+/* The two-column grid stood here — an editable list at 1fr and a 240px rail of
+   read-only facts beside it, with the controls for those facts in a drawer.
 
-   It was three stacked full-width cards holding six one-row facts between them,
-   each with its own heading floating above it. At 1200px that put a label at
-   the far left of a 950px row and its value at the far right, six times over,
-   with nothing in between — a form with the fields taken out.
+   Its argument was sound and is worth keeping in view: a fact needs its label
+   and its value near each other, an editor needs room, and one column cannot
+   give both. What it could not fix is that the rail was a REPORT. Every row in
+   it had a control somewhere else, so the page spent 240px of its width saying
+   what a form one click away was already asking.
 
-   The shape every console with this job converges on is two columns: the thing
-   you came to change in the main one, everything the page merely STATES in a
-   narrow rail beside it. A fact needs its label and its value near each other;
-   an editor needs room. One column cannot give both, and the facts are the half
-   that suffers, because they are the half made of short strings.
+   Tabs answer the same problem by splitting in time rather than in space. The
+   facts become the fields, both halves get the whole width, and the rail's job
+   — "you can read this page without deciding whether you are about to alter
+   it" — passes to the action bar, which is what now separates looking from
+   committing. */
 
-   260px, which is eleven characters between a label and its value at this type
-   size — and enough for "Users register their own devices" to wrap to two lines
-   rather than three. */
-.bfp2__cols {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
-  gap: var(--space-7);
-  align-items: start;
-}
-.bfp2__main { min-width: 0; display: flex; flex-direction: column; gap: var(--space-6); }
-.bfp2__aside { display: flex; flex-direction: column; gap: var(--space-7); min-width: 0; }
+.bfp2__tabs { margin: var(--space-6) 0 var(--space-6); }
 
-/* Below 1100 the rail goes ON TOP, not underneath.
+/* Room for the action bar to float over, so the last control on the page is not
+   permanently underneath it. Only when there is a bar: the padding is on the
+   panel rather than the page so an unedited profile does not end in 80px of
+   nothing.
 
-   Underneath is what `grid-template-columns: 1fr` gives for free and it is the
-   wrong answer: these facts are what you read to understand the list, so
-   putting them after it means scrolling past the thing they explain to reach
-   the explanation. `order` costs nothing and says the right thing. */
-@media (max-width: 1100px) {
-  .bfp2__cols { grid-template-columns: minmax(0, 1fr); }
-  .bfp2__aside { order: -1; flex-direction: row; flex-wrap: wrap; gap: var(--space-6); }
-  .bfp2__aside > .bfp2__facts { flex: 1 1 260px; }
-}
+   It grew with the bar going `fixed`. Sticky bars sit in the flow until they
+   pin, so the page ended below one; a fixed bar never occupies a line, and the
+   reserved space is the only thing standing between it and the last row. */
+.bfp2__panel { padding-bottom: var(--space-4); }
+.bfp2 .bfp2__panel:has(~ .bx-savebar) { padding-bottom: 84px; }
 
-/* --- The card in the main column ------------------------------------------------
+/* --- The cards --------------------------------------------------------------
 
-   The heading is INSIDE it, on a line with its count and its action. It was
-   above, floating over the panel it named — a fine pattern for a page of
-   several sections and a wasted line for a page with one. */
+   Same card as the attribute list, and deliberately: `Name`, `What it can read`
+   and `How devices enrol` are sections of one form, not three panels of three
+   different kinds. The heading sits inside the card with its explanation on the
+   same line, which is where the attribute list already put its count. */
 .bfp2__card {
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle);
@@ -1101,24 +1130,51 @@
   margin: 0; flex: none;
   font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
 }
-/* The count beside the name rather than as a row of its own in the rail. It is
-   a property of THIS list, and a list that says how long it is at the top of
-   itself does not need a fact stating the same number elsewhere. */
+/* The count beside the name rather than as a row of its own. It is a property
+   of THIS list, and a list that says how long it is at the top of itself does
+   not need a fact stating the same number elsewhere. On the form cards the same
+   slot carries the sentence that used to be a tip behind a dot — there is room
+   for it on a full-width heading, and a sentence you can read beats one you
+   have to hover for. */
 .bfp2__cardcount {
   flex: 1; min-width: 0;
   font-size: var(--fs-sm); color: var(--text-tertiary);
+  line-height: 1.5;
 }
 .bfp2__cardcount i { font-style: normal; color: var(--fb-notice-fg); }
 .bfp2__card > .bfp2__rows { padding: 0 var(--space-6); }
 .bfp2__card > .bx-empty { padding: var(--space-7) var(--space-6); }
+.bfp2__cardbody { padding: var(--space-6); }
+/* The facts keep their own rhythm — flush rows with rules between them — so the
+   body loses its vertical padding and the first rule lands on the header. */
+.bfp2__cardbody--facts { padding: 0 var(--space-6); }
 
-/* --- The rail --------------------------------------------------------------------
+/* Two across, now that there is width for two.
 
-   No pills. Six of them, two in the brand colour, is what this page had — and a
-   brand pill means "look at this", which is not true of "OS and version". Plain
-   text carries a fact; the tint is spent on the two or three that are worth a
-   second look, which is a warning about the profile rather than a decoration on
-   it. */
+   The stacked column was chosen for a 520px drawer, where side-by-side left
+   each card 230px and wrapped both sentences to four lines. On a full-width tab
+   each gets around 450px and the sentence lands in one or two, so the pair is
+   compared side by side as a pair rather than read as a list. Scoped to the
+   tab: the create drawer still shows these at 520px and still wants them
+   stacked. */
+@media (min-width: 860px) {
+  .bfp2__formcard .bfp2__modes { flex-direction: row; align-items: stretch; }
+  .bfp2__formcard .bfp2__modes > .bfp2__mode-card { flex: 1 1 0; min-width: 0; }
+}
+
+/* The action bar's rules moved to `.bx-savebar` in the kit.
+
+   Zones and risk profiles commit through the same strip now, and the one thing
+   in it that is easy to get wrong — centring without a transform, because the
+   animation owns the element's transform — is worth writing once. What stays
+   here is only the space the page reserves for it, above. */
+
+/* --- The facts that stayed facts ---------------------------------------------
+
+   Three rows: the kind, which is fixed for the life of the profile; the
+   platform list, which is derived from the other tab; and Used by, which
+   belongs to the policies. None of the three has a control anywhere, which is
+   what earns them a stated row rather than a field. */
 .bfp2__facts { display: flex; flex-direction: column; }
 .bfp2__facts h3 {
   margin: 0 0 var(--space-3);
@@ -1128,7 +1184,7 @@
 }
 .bfp2__fact {
   display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);
-  padding: var(--space-3) 0;
+  padding: var(--space-4) 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 .bfp2__fact:last-child { border-bottom: 0; }
@@ -1139,12 +1195,12 @@
 .bfp2__factval {
   min-width: 0; text-align: right;
   font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
-  /* Numbers line up down the column, which is most of what a rail of facts is
-     for — and three of these are numbers. */
+  /* Numbers line up down the column, which is most of what a column of facts is
+     for. */
   font-variant-numeric: tabular-nums;
 }
-/* Not a badge. A word in the notice colour, which is as much weight as "the
-   first sign-in enrols silently" needs when the tip beside it says why. */
+/* Not a badge. A word in the notice colour, which is as much weight as "no
+   platform is named" needs when the tip beside it says why. */
 .bfp2__factval.is-warn { color: var(--fb-notice-fg); }
 button.bfp2__factval {
   border: 0; background: none; padding: 0; cursor: pointer;
@@ -1156,10 +1212,11 @@ button.bfp2__factval:focus-visible {
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-.bfp2__factsnone {
-  margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.6;
-}
-.bfp2__factsnone .bfp2__clear { display: block; margin-top: var(--space-2); }
+/* --- The delete confirmation ------------------------------------------------- */
+
+.bfp2__confirmbody { display: flex; flex-direction: column; gap: var(--space-4); }
+.bfp2__confirmbody p { margin: 0; font-size: var(--fs-md); line-height: 1.6; color: var(--text-secondary); }
+.bfp2__confirmbody strong { color: var(--text-primary); font-weight: var(--fw-medium); }
 
 /* --- The agent prerequisite ------------------------------------------------------
 
@@ -1180,11 +1237,6 @@ button.bfp2__factval:focus-visible {
 }
 .bfp2__prereqbody ul { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); }
 .bfp2__prereqbody li { font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.55; }
-
-/* The rail's one action, separated from the facts above it by air rather than
-   by a rule — a rule would make it look like another fact with the label
-   missing. */
-.bfp2__factact { padding: var(--space-4) 0 var(--space-2); }
 
 /* --- The category filter, and the rows that cannot be turned off ----------------- */
 

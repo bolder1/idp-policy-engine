@@ -80,7 +80,7 @@ export function ReviewDialog({
   const errors = diagnostics.filter(
     (d) => d.severity === 'error' && policy.rules[d.ruleIndex]?.enabled !== false,
   )
-  const unassigned = !policy.appId && !policy.isSystem
+  const unassigned = policy.appIds.length === 0 && !policy.isSystem
 
   return (
     <Modal

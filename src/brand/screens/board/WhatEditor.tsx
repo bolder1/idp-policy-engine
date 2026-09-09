@@ -194,14 +194,22 @@ export function WhatEditor({
             </p>
           )}
 
-          {/* The steps, numbered, in the order they are walked.
+          {/* The first factor is a plain row; the second is a CARD.
 
-              First factor and second factor were two settings a screen apart,
-              the second gated on a tile above them — so the thing a person
-              actually experiences, one step and then maybe another, had to be
-              assembled in the reader's head from three controls. It is a ladder
-              now, and the ladder IS the rule: a second rung is what makes this
-              two-factor, so there is no tile left to contradict. */}
+              They were two rungs of one numbered ladder, which said they were
+              two of a kind. They are not. The first factor is always there and
+              has one setting — which method. The second is optional, and
+              choosing it opens four more decisions: the mode, the methods,
+              whether the device is remembered, whether a user may opt out.
+              Drawn as peers, the second rung's four followers hung off the
+              bottom of the ladder as loose rows with nothing saying they
+              belonged to it, and "Add second factor" sat between them as a
+              third rung — an action in a list of settings.
+
+              So: one row for the first factor, and a bordered card for the
+              second holding everything that is about the second. The card is
+              the one box this section draws, and it earns it by containing
+              something. */}
           <ol className="bb__ladder">
             <li className="bb__rung">
               <span className="bb__rung__n" aria-hidden>
@@ -231,13 +239,29 @@ export function WhatEditor({
               </span>
             </li>
 
-            {twoStep ? (
-              <li className="bb__rung">
-                <span className="bb__rung__n" aria-hidden>
+          </ol>
+
+          {twoStep ? (
+            <div className="bb__second">
+              <div className="bb__second__head">
+                <span className="bb__second__n" aria-hidden>
                   2
                 </span>
-                <span className="bb__rung__body">
-                  <b>Second factor</b>
+                <b>Second factor</b>
+                <button
+                  type="button"
+                  className="bb__second__drop"
+                  aria-label="Remove the second factor"
+                  title="Remove the second factor — this becomes single-factor"
+                  onClick={() => onPatch({ decision: '1fa', ...noSecondStep })}
+                >
+                  <X size={13} strokeWidth={2.2} />
+                </button>
+              </div>
+
+              <div className="bb__second__body">
+                <span className="bb__subrow">
+                  <b>Prove it with</b>
                   <Picker
                     label="Second step"
                     width="fill"
@@ -246,68 +270,60 @@ export function WhatEditor({
                     onChange={(v) => onPatch({ secondFactor: v as Rule['secondFactor'] })}
                   />
                 </span>
-                <button
-                  type="button"
-                  className="bb__rung__drop"
-                  aria-label="Remove the second factor"
-                  title="Remove the second factor — this becomes single-factor"
-                  onClick={() => onPatch({ decision: '1fa', ...noSecondStep })}
-                >
-                  <X size={13} strokeWidth={2.2} />
-                </button>
-              </li>
-            ) : (
-              <li className="bb__rung is-add">
-                <button type="button" className="bb__addrung" onClick={() => onPatch({ decision: '2fa' })}>
-                  <Plus size={13} strokeWidth={2.4} aria-hidden />
-                  Add second factor
-                </button>
-              </li>
-            )}
 
-            {/* One editor for both list modes: a row of dropdowns, and a way to
-                add another.
+                {/* One editor for both list modes: a row of dropdowns, and a way
+                    to add another.
 
-                `specific` was a wall of twenty-one toggle chips — every method
-                the catalogue holds, rendered whether or not anybody wanted it,
-                in a 400px panel. It does not scale, and it did not match
-                `chain` one line below it, which asked the same question
-                (which methods, in what order) with a list that grows.
+                    `specific` was a wall of twenty-one toggle chips — every
+                    method the catalogue holds, rendered whether or not anybody
+                    wanted it, in a 400px panel. It does not scale, and it did
+                    not match `chain`, which asks the same question (which
+                    methods, in what order) with a list that grows.
 
-                The two modes differ in what the list MEANS — any one of these
-                versus all of these in order — and that difference is already
-                said by the mode above. It has no business also being said by
-                two different controls. */}
-            {twoStep && (rule.secondFactor === 'specific' || rule.secondFactor === 'chain') && (
-              <li className="bb__rung is-sub">
-                <MethodList
-                  ordered={rule.secondFactor === 'chain'}
-                  values={rule.secondFactor === 'chain' ? chain : methods}
-                  onChange={(next) =>
-                    onPatch(rule.secondFactor === 'chain' ? { methodChain: next } : { secondFactorMethods: next })
-                  }
-                />
-              </li>
-            )}
-
-            {twoStep && rule.secondFactor === 'preferred' && (
-              <li className="bb__rung is-sub">
-                <span className="bb__subrow">
-                  <b>Fallback</b>
-                  <Picker
-                    label="Fallback method"
-                    width="fill"
-                    value={rule.preferredFallback ?? ''}
-                    options={METHODS.map((m) => ({ value: m, label: m }))}
-                    onChange={(preferredFallback) => onPatch({ preferredFallback })}
+                    The two modes differ in what the list MEANS — any one of
+                    these versus all of these in order — and that difference is
+                    already said by the mode above. It has no business also being
+                    said by two different controls. */}
+                {(rule.secondFactor === 'specific' || rule.secondFactor === 'chain') && (
+                  <MethodList
+                    ordered={rule.secondFactor === 'chain'}
+                    values={rule.secondFactor === 'chain' ? chain : methods}
+                    onChange={(next) =>
+                      onPatch(rule.secondFactor === 'chain' ? { methodChain: next } : { secondFactorMethods: next })
+                    }
                   />
-                </span>
-              </li>
-            )}
-          </ol>
+                )}
 
-          {twoStep && (
-            <RememberBlock rule={rule} onPatch={onPatch} />
+                {rule.secondFactor === 'preferred' && (
+                  <span className="bb__subrow">
+                    <b>Fallback</b>
+                    <Picker
+                      label="Fallback method"
+                      width="fill"
+                      value={rule.preferredFallback ?? ''}
+                      options={METHODS.map((m) => ({ value: m, label: m }))}
+                      onChange={(preferredFallback) => onPatch({ preferredFallback })}
+                    />
+                  </span>
+                )}
+
+                {/* Inside the card, because both toggles are about the second
+                    factor and nothing else. They used to sit below the ladder as
+                    two loose rows, so "Remember this device" read as a property
+                    of the whole rule — which it is not: a single-factor rule has
+                    nothing to remember, and the rows vanished when the second
+                    factor did, without ever having said why they were there. */}
+                <RememberBlock rule={rule} onPatch={onPatch} />
+              </div>
+            </div>
+          ) : (
+            /* The offer, once, under the first factor rather than as a third
+               rung inside the ladder. A ladder numbers the steps a person
+               walks; an add button is not a step. */
+            <button type="button" className="bb__addsecond" onClick={() => onPatch({ decision: '2fa' })}>
+              <Plus size={13} strokeWidth={2.4} aria-hidden />
+              Require a second factor
+            </button>
           )}
         </>
       )}

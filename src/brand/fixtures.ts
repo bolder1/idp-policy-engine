@@ -17,6 +17,7 @@ import {
 import { seedProfiles, type FingerprintProfile } from './fingerprint'
 import { seedHooks, type Hook } from './hooks'
 import { AUTH_METHODS, type AuthMethod } from './methods'
+import { type RiskProfile } from './risk-signals'
 import { leaves } from './predicate'
 
 /* -----------------------------------------------------------------------------
@@ -180,7 +181,12 @@ export function policiesAt(depth: Depth): Policy[] {
         .filter((p) => keep.includes(p.id))
         .map((p) => ({
           ...p,
-          appId: appsAt('small').some((a) => a.id === p.appId) ? p.appId : undefined,
+          /* Narrowed to the apps this tenant actually has, rather than dropped
+             wholesale. A policy naming four applications in the full estate
+             keeps whichever of them a small tenant owns, and ends up unassigned
+             only if it owns none of them — which is the same answer the single
+             `appId` gave, arrived at per application instead of all-or-nothing. */
+          appIds: p.appIds.filter((id) => appsAt('small').some((a) => a.id === id)),
           rules: p.rules
             // A Delegator does not write four-rule policies. They take the
             // first two the template gave them and leave.
@@ -280,6 +286,64 @@ export function fingerprintsAt(depth: Depth): FingerprintProfile[] {
      depends on the order of a list nobody thinks of as ordered. */
   if (depth === 'small') return seedProfiles.filter((p) => p.id === 'fp-corp')
   return seedProfiles
+}
+
+/* --- Risk signal profiles --------------------------------------------------
+
+   `rp-shipped` is the one every tenant starts on and it is deliberately empty:
+   nothing off, nothing retuned, so `riskScale` reproduces the `RISK_SCORE`
+   constant it replaced exactly. A tenant who never opens this screen must grade
+   as they did before it existed, which is the property `risk-signals.test.ts`
+   asserts in its first case — seeding the default with an opinion would break
+   it and re-grade every seeded policy.
+
+   The other two are what a library is FOR: alternatives somebody drafted
+   without switching the tenant onto them. Both are the two real shapes of this
+   decision — one that listens to less, one that listens to the same things and
+   pushes harder — rather than two arbitrary tunings. */
+const seedRiskProfiles: RiskProfile[] = [
+  { id: 'rp-shipped', name: 'Shipped weighting', off: [], tiers: {} },
+  {
+    /* Network origin off. The tenant's workforce is remote and half of them are
+       on a corporate VPN, so `vpn` and `datacenter` fire on people doing exactly
+       what they were told to do — the classic reason a tenant turns a family of
+       signals down rather than up. */
+    id: 'rp-remote',
+    name: 'Remote workforce — quieter network signals',
+    off: ['vpn', 'datacenter', 'residential-proxy'],
+    tiers: {},
+  },
+  {
+    /* Everything on, and the signals that ship BELOW High raised to it.
+
+       Deliberately not `rooted` and `jailbroken`, which was the first draft of
+       this fixture and was a no-op: both already ship at High, so writing High
+       over them produced a profile numerically identical to the shipped one —
+       a row claiming to be stricter that scored exactly the same. These four
+       are the ones that actually ship lower. A cloned app and a device in
+       developer mode are tie-breakers by default; for this tenant they are the
+       answer. */
+    id: 'rp-strict',
+    name: 'High assurance — a tampered device is decisive',
+    off: [],
+    tiers: {
+      'cloned:android': 'High',
+      'dev-mode:android': 'High',
+      'dev-mode:ios': 'High',
+      'high-activity:android': 'High',
+      'high-activity:ios': 'High',
+    },
+  },
+]
+
+export function riskProfilesAt(depth: Depth): RiskProfile[] {
+  /* Never empty, at any depth. Every other library here can be empty because
+     nothing breaks without it; this one produces `riskScale`, so a tenant with
+     no risk profile is a tenant with no risk scale — and the `device-risk`
+     condition would have nothing to compare against. `none` gets the shipped
+     weighting alone, which is the same thing as having no opinion. */
+  if (depth === 'none' || depth === 'small') return seedRiskProfiles.slice(0, 1)
+  return seedRiskProfiles
 }
 
 export function methodSetsAt(depth: Depth): MethodSet[] {

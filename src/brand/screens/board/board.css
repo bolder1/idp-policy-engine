@@ -2810,8 +2810,14 @@ button.bb__idx::after {
   text-transform: uppercase; letter-spacing: 0.03em;
   color: var(--text-secondary); cursor: pointer;
 }
-.bb__joinsel.is-and { color: var(--fb-info-fg); border-color: var(--fb-info-border); background: var(--fb-info-bg); }
-.bb__joinsel.is-or { color: var(--fb-notice-fg); border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+/* No tint per value.
+
+   AND was drawn on the info ramp and OR on the notice ramp, which made the
+   operator between two conditions the most saturated object in the section —
+   louder than either condition it joins, and on the notice ramp it read as a
+   warning about a rule that was fine. It is a plain control now; the hairline
+   beside it is what says "this separates two things", which is the job the
+   colour was doing badly. */
 .bb__joinsel svg { opacity: 0.6; }
 .bb__joinsel:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
 
@@ -3169,3 +3175,244 @@ button.bb__idx::after {
 .bb__acts .bb__act.is-off { color: var(--fb-negative-fg); }
 .bb__acts .bb__act.is-off:hover { background: var(--fb-negative-bg); }
 .bb__acts .bb__float__sep { height: 14px; margin: 0 1px; }
+
+/* The count beside the board bar's app mark.
+
+   The bar has room for one logo, so a policy on three applications shows the
+   first and says how many more. A muted pill rather than plain text: it is a
+   number qualifying the name next to it, and unqualified it reads as part of
+   the application's name. */
+.bbar__appmore {
+  flex: none; font-style: normal;
+  padding: 1px 5px; border-radius: var(--radius-pill);
+  background: var(--surface-inset); color: var(--text-tertiary);
+  font-size: 10px; font-weight: var(--fw-medium);
+}
+
+/* =============================================================================
+   THE INSPECTOR, AS ONE FORM
+   ========================================================================== */
+
+/* `.bb__panetabs` — the Who/Condition strip — is gone from the inspector.
+
+   The rule is one sentence and the tabs cut it in half, so the panel shows all
+   three sections at once. The class stays in this stylesheet because the RULE
+   CARD still uses it for its own two-up switcher; only the inspector stopped
+   drawing one. */
+
+.bb__inspbody { padding-bottom: var(--space-8); }
+
+/* --- A section ---------------------------------------------------------------
+
+   A heading and a hairline, and that is the whole device. The panel used to
+   separate its parts with bordered cards, which put three frames inside the
+   panel's own frame — and at 340px a frame costs 2px of width and about 20px of
+   height for nothing but the line. A rule of 1px does the separating; the
+   spacing does the rest. */
+.bb__insp .bb__sec {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-5) var(--space-5) var(--space-6);
+}
+.bb__insp .bb__sec:last-child { border-bottom: 0; }
+
+/* The heading is the smallest thing on the page and the loudest in the
+   hierarchy: uppercase, tracked, tertiary. It is a LABEL for the block below
+   it, not a title competing with the rule's name at the top of the panel. */
+.bb__insp .bb__sec__head {
+  display: flex; align-items: baseline; gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.bb__insp .bb__sec__head h3 {
+  margin: 0; flex: none;
+  font-size: 10px; font-weight: var(--fw-semibold);
+  letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+/* The hint sits on the heading's line rather than under it — one line of
+   chrome, not two — and truncates rather than wrapping the heading away from
+   its own block. */
+.bb__insp .bb__sec__head p {
+  margin: 0; flex: 1; min-width: 0;
+  font-size: var(--fs-xs); color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bb__insp .bb__sec__head p:only-of-type { margin-right: auto; }
+.bb__insp .bb__sec__head .bb__secact { margin-left: auto; flex: none; }
+
+/* Which third of the rule you arrived at, said on the heading.
+
+   This is the one job the tab strip did that was worth keeping. A tab hid the
+   other two sections to answer it; a tinted label answers it and hides
+   nothing. */
+.bb__insp .bb__sec.is-focused .bb__sec__head h3 { color: var(--brand); }
+
+/* --- Who ---------------------------------------------------------------------
+
+   A summary and one button. The two lists moved into a dialog, which is most of
+   why this panel now fits a whole rule: they were a 340px column of checkboxes
+   that pushed the conditions and the outcome below the fold. */
+.bb__who { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }
+
+.bb__whonone {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  color: var(--text-tertiary);
+}
+.bb__whonone > svg { flex: none; margin-top: 1px; }
+.bb__whonone span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.bb__whonone b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bb__whonone em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.5; }
+
+.bb__whochips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bb__whochip {
+  display: inline-flex; align-items: center; gap: 6px;
+  max-width: 100%; min-width: 0;
+  padding: 3px 4px 3px 4px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+}
+.bb__whochip b {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
+}
+.bb__whochip i {
+  flex: none; font-style: normal;
+  padding: 1px 5px; border-radius: var(--radius-pill);
+  background: var(--fb-notice-bg); color: var(--fb-notice-fg);
+  font-size: 10px;
+}
+.bb__whochip.is-warn { border-color: var(--fb-notice-border); }
+.bb__whochip > button {
+  flex: none; display: grid; place-items: center;
+  width: 18px; height: 18px;
+  border: 0; border-radius: var(--radius-full);
+  background: none; color: var(--text-muted); cursor: pointer;
+}
+.bb__whochip > button:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bb__whochip > button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* --- Who, in the dialog ------------------------------------------------------ */
+.bb__whopicker { display: flex; flex-direction: column; gap: var(--space-4); }
+.bb__whopicker__lede { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55; }
+.bb__whopicker .bb__whorows {
+  max-height: 340px; overflow-y: auto;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+
+/* --- The second factor, as a card --------------------------------------------
+
+   The one box this section draws, and it earns it: everything inside is about
+   the second factor and nothing outside it is. The mode, the methods, whether
+   the device is remembered and whether a user may opt out used to be four loose
+   rows under a numbered ladder, so "Remember this device" read as a property of
+   the rule rather than of the factor that gives it meaning. */
+.bb__second {
+  margin-top: var(--space-4);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+.bb__second__head {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-inset);
+}
+.bb__second__head b { flex: 1; min-width: 0; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* The same numeral the first factor's rung carries, so the two read as step one
+   and step two even though only one of them is a rung. */
+.bb__second__n {
+  flex: none; display: grid; place-items: center;
+  width: 20px; height: 20px; border-radius: var(--radius-full);
+  background: var(--brand-subtle-bg); color: var(--brand);
+  font-size: 11px; font-weight: var(--fw-semibold);
+}
+.bb__second__drop {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px;
+  border: 0; border-radius: var(--radius-sm); background: none;
+  color: var(--text-muted); cursor: pointer;
+}
+.bb__second__drop:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bb__second__drop:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.bb__second__body {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+/* The offer, when there is no second factor. Dashed, because it adds something
+   that is not there — the same language the board uses for every add. */
+.bb__addsecond {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: var(--space-4);
+  height: 30px; padding: 0 12px;
+  border: 1px dashed var(--border-default); border-radius: var(--radius-sm);
+  background: none;
+  font-family: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  color: var(--text-secondary); cursor: pointer;
+}
+.bb__addsecond:hover { border-style: solid; border-color: var(--brand); color: var(--brand); background: var(--brand-subtle-bg); }
+.bb__addsecond:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* The select's own affordances, since it is a real <select> now: the platform
+   arrow is suppressed and the pill keeps the shape it had as a button. */
+.bb__joinsel {
+  /* Sized to its two words, not to the row. A <select> in a flex container
+     takes the free space unless told otherwise, so the pill came out as a
+     full-width blue bar between two conditions — louder than either of the
+     conditions it joins, which inverts the hierarchy this panel is for. */
+  flex: none; width: auto; min-width: 0;
+  appearance: none; -webkit-appearance: none;
+  padding: 0 9px;
+  text-align: center; text-align-last: center;
+}
+
+/* --- Who, summarised on one line --------------------------------------------
+
+   Four overlapped faces, a count, and the way in. It was a chip per group and
+   per person, each with its own remove — so a rule naming fourteen filled the
+   section with five rows of chips and pushed the conditions off the panel. A
+   summary that grows with its content is not a summary. */
+.bb__whosum {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; min-width: 0;
+  padding: 5px 6px 5px 8px;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.bb__whosum:hover { border-color: var(--border-default); background: var(--surface-inset); }
+.bb__whosum:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+
+/* Overlapped, because the faces are a GROUP rather than four separate things —
+   and because the overlap is what buys the fourth one its room. */
+.bb__whosum__faces { flex: none; display: inline-flex; align-items: center; }
+.bb__whosum__faces > * { margin-left: -5px; box-shadow: 0 0 0 2px var(--surface-raised); }
+.bb__whosum__faces > *:first-child { margin-left: 0; }
+.bb__whosum__more {
+  display: inline-grid; place-items: center;
+  height: 18px; padding: 0 5px; margin-left: -5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-inset); color: var(--text-tertiary);
+  box-shadow: 0 0 0 2px var(--surface-raised);
+  font-style: normal; font-size: 10px; font-weight: var(--fw-semibold);
+}
+
+.bb__whosum__text {
+  flex: 1; min-width: 0;
+  display: inline-flex; align-items: baseline; gap: var(--space-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
+}
+/* The one qualification worth keeping in the summary, counted rather than
+   repeated on every face. */
+.bb__whosum__text em {
+  flex: none; font-style: normal;
+  padding: 1px 5px; border-radius: var(--radius-pill);
+  background: var(--fb-notice-bg); color: var(--fb-notice-fg);
+  font-size: 10px; font-weight: var(--fw-medium);
+}
+.bb__whosum__edit {
+  flex: none; display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 7px; border-radius: var(--radius-sm);
+  color: var(--text-tertiary); font-size: var(--fs-xs); font-weight: var(--fw-medium);
+}
+.bb__whosum:hover .bb__whosum__edit { color: var(--brand); background: var(--brand-subtle-bg); }

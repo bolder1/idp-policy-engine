@@ -1,12 +1,12 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { Suspense, lazy, useMemo, useState } from 'react'
-import { BookmarkPlus, Copy, Pencil, Trash2, Waypoints } from 'lucide-react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { BookmarkPlus, Copy, Pencil, Plus, Trash2, Waypoints } from 'lucide-react'
 
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
 import { AppLogo } from '../logos/AppLogo'
-import { Badge, Button, InfoDot, StatusPill } from '../kit'
-import { blankPolicy, enforces, type Policy, type PolicyType } from '../data'
+import { Badge, Button, Modal, StatusPill } from '../kit'
+import { appsLabel, appsOf, blankPolicy, enforces, type Policy, type PolicyType } from '../data'
 import { NewPolicyDialog } from '../create/NewPolicyDialog'
 import { useBrand } from '../store'
 import { NoResults } from '../empty'
@@ -84,7 +84,7 @@ export function Policies() {
   const store = useBrand()
   const [view, setView] = useState<'list' | 'coverage'>('list')
   const [type, setType] = useState<PolicyType | 'All'>('All')
-  const [status, setStatus] = useState<'all' | 'active' | 'monitor' | 'inactive'>('all')
+  const [status, setStatus] = useState<'all' | 'draft' | 'active' | 'monitor' | 'inactive'>('all')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'modified', dir: 1 })
   const [menuFor, setMenuFor] = useState<string | null>(null)
@@ -105,7 +105,7 @@ export function Policies() {
   const [naming, setNaming] = useState(false)
   const [interview, setInterview] = useState(false)
   /** The application the form had already collected, carried into the guided build. */
-  const [guidedApp, setGuidedApp] = useState<string | null>(null)
+  const [guidedApps, setGuidedApps] = useState<string[]>([])
 
   /* Keyed on the three collections it reads, not on the store object.
 
@@ -154,6 +154,11 @@ export function Policies() {
          policy is excluded from it — the filter has to mean the same thing the
          pill does or the two teach different models of one state. */
       if (status === 'active' && !enforces(p)) return false
+      /* Draft was an <option> with no branch behind it: choosing it matched
+         every policy, so the one status that means "not finished" was the one
+         the filter could not find. It is the whole of what used to be called a
+         configuration issue, so it has to be findable. */
+      if (status === 'draft' && p.status !== 'draft') return false
       if (status === 'monitor' && p.status !== 'monitor') return false
       if (status === 'inactive' && p.status !== 'inactive') return false
       if (query && !p.name.toLowerCase().includes(query.toLowerCase())) return false
@@ -187,8 +192,7 @@ export function Policies() {
   const counts = useMemo(() => {
     const active = store.policies.filter(enforces).length
     const monitoring = store.policies.filter((p) => p.status === 'monitor').length
-    const issues = store.policies.filter((p) => p.configIssue).length
-    return { total: store.policies.length, active, monitoring, issues }
+    return { total: store.policies.length, active, monitoring }
   }, [store.policies])
 
   /* Counted across everything graded, not just the filtered rows — a filter
@@ -280,7 +284,7 @@ export function Policies() {
           store.showToast(`${policy.name} created`)
           store.go({ name: 'board', policyId: policy.id })
         }}
-        onGuided={store.features.guidedSetup ? (id) => { setGuidedApp(id); setNaming(false); setInterview(true) } : undefined}
+        onGuided={store.features.guidedSetup ? (ids) => { setGuidedApps(ids); setNaming(false); setInterview(true) } : undefined}
       />
 
       <AnimatePresence>
@@ -293,7 +297,7 @@ export function Policies() {
                 /* The application the form had already collected. Without it
                    the guided path silently produced a policy protecting nothing
                    — the one field the form marks required with a red asterisk. */
-                const policy = blankPolicy(builtName, guidedApp ?? undefined)
+                const policy = blankPolicy(builtName, guidedApps)
                 policy.rules = rules
                 policy.audience = audience
                 store.addPolicy(policy)
@@ -307,23 +311,14 @@ export function Policies() {
 
       {(view === 'list' || !store.features.coverage) && (
         <>
-      {counts.issues > 0 && (
-        <div className="bpolicies__banner">
-          <span className="bx-callout bx-callout--notice">
-            <span className="bx-callout__mark" aria-hidden />
-            <div>
-              <strong>
-                {counts.issues} polic{counts.issues === 1 ? 'y needs' : 'ies need'} attention
-              </strong>
-              <div>
-                They are switched on but cannot take effect as configured. Hover the marker on the
-                row to see why.
-              </div>
-            </div>
-          </span>
-        </div>
-      )}
+      {/* An attention banner stood here — "N policies need attention. They are
+          switched on but cannot take effect as configured."
 
+          It counted a state this product does not have. An unfinished policy is
+          not saved and switched on; it is a DRAFT, which the status column
+          already says in a word and the status filter already finds. The banner
+          was reporting a fault class invented by the prototype, and the red dot
+          it told you to hover was the same invention on the row. */}
       <div className="btoolbar">
         {/* Both filters are dropdowns, and they sit together.
 
@@ -463,7 +458,8 @@ function PolicyRow({
   onMenu: (e: React.MouseEvent) => void
 }) {
   const store = useBrand()
-  const app = policy.appId ? store.appById(policy.appId) : null
+  const named = appsOf(policy, store.apps)
+  const [assigning, setAssigning] = useState(false)
 
   return (
     <tr className={policy.isSystem ? 'is-system' : ''}>
@@ -473,23 +469,45 @@ function PolicyRow({
         </button>
         <span className="btable__marks">
           {policy.isSystem && <Badge tone="system">System</Badge>}
-          {policy.configIssue && <InfoDot text={policy.configIssue} />}
         </span>
       </td>
-      {/* The application, named. A stack of three marks and "3 apps" was the
-          right cell for a policy that covered three; a policy covers one, so
-          the cell says which one. */}
+      {/* The applications, named — and the cell is a control when there are
+          none.
+
+          "Not assigned" was a grey label and a dead end: the one row that told
+          you something needed doing was the one row you could not act on, and
+          the fix was three screens away in Policy details. It is a button now,
+          which is the shortest path between noticing and fixing.
+
+          Several applications print as the first mark and a count rather than a
+          stack of marks. A stack was the old shape for `appIds` and it is worth
+          not repeating: three 20px logos in a table cell are three things to
+          identify before you can read the one name beside them, and the count
+          is what actually says "this policy is shared". */}
       <td>
         {policy.isSystem ? (
           <span className="btable__allapps">Every application</span>
-        ) : app ? (
-          <span className="btable__app">
-            <AppLogo appId={app.id} size={20} />
-            {app.name}
-          </span>
+        ) : named.length > 0 ? (
+          <button
+            type="button"
+            className="btable__app btable__app--edit"
+            title={named.map((a) => a.name).join(', ')}
+            onClick={() => setAssigning(true)}
+          >
+            <AppLogo appId={named[0].id} size={20} />
+            {appsLabel(named)}
+          </button>
         ) : (
-          <span className="applogo__none">Not assigned</span>
+          <button type="button" className="btable__assign" onClick={() => setAssigning(true)}>
+            <Plus size={13} strokeWidth={2.2} aria-hidden />
+            Assign apps
+          </button>
         )}
+        <AssignAppsDialog
+          open={assigning}
+          policy={policy}
+          onClose={() => setAssigning(false)}
+        />
       </td>
       {/* The Exposure column is the grade in the list. Withheld in lite, so
           the cell goes with the header rather than leaving an empty column. */}
@@ -600,5 +618,142 @@ function PolicyRow({
         </div>
       </td>
     </tr>
+  )
+}
+
+/* --- Assigning applications from the list ---------------------------------------
+
+   The shortest path between noticing that a policy protects nothing and fixing
+   it. It opens from the Application cell — the cell that states the problem —
+   rather than sending anybody to Policy details, which is where this used to be
+   answered and is two navigations away from the row that raised it.
+
+   A checklist, not a picker. `ApplicationField` is the right control inside a
+   form, where it sits in a column of other fields and has to stay one line
+   tall; here the dialog IS the question, so the list can be the body of it and
+   every application is visible without opening a second layer. The two agree on
+   what they write — an `appIds` array in catalogue order — which is the part
+   that has to match.
+
+   It edits a local set and saves on Save. The rest of this table writes through
+   immediately, and this does not, because assigning applications is the one
+   edit here that changes what gets enforced: a half-finished multi-select
+   landing on the store a click at a time would enforce each intermediate state
+   for as long as it took to make the next click. */
+function AssignAppsDialog({
+  open,
+  policy,
+  onClose,
+}: {
+  open: boolean
+  policy: Policy
+  onClose: () => void
+}) {
+  const store = useBrand()
+  const [picked, setPicked] = useState<string[]>(policy.appIds)
+  const [q, setQ] = useState('')
+
+  /* The seed as a STRING, and that is what makes the effect below honest.
+
+     `policy.appIds` is a fresh array on every store change, so depending on it
+     directly would re-seed — and discard the ticks somebody had just made —
+     every time anything in the tenant moved. Depending on `[open]` alone fixes
+     that by lying to the linter about what the effect reads. Joining gives a
+     value that changes only when the assignment actually changes, so the effect
+     can name everything it uses and still re-run only when it should. */
+  const seed = policy.appIds.join()
+
+  useEffect(() => {
+    if (!open) return
+    setPicked(seed === '' ? [] : seed.split(','))
+    setQ('')
+  }, [open, seed])
+
+  const shown = store.apps.filter((a) => a.name.toLowerCase().includes(q.trim().toLowerCase()))
+  const toggle = (id: string) =>
+    setPicked((p) =>
+      p.includes(id)
+        ? p.filter((x) => x !== id)
+        : store.apps.filter((a) => a.id === id || p.includes(a.id)).map((a) => a.id),
+    )
+
+  const changed = picked.join() !== policy.appIds.join()
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Applications for ${policy.name}`}
+      width={520}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="brand"
+            disabled={!changed}
+            onClick={() => {
+              /* The same demotion rule the rest of the product follows: a policy
+                 left with no application is not finished, and unfinished is a
+                 draft. Assigning one does NOT promote in return — publishing is
+                 a decision somebody makes on the policy, not a side effect of
+                 filling in a field. */
+              const next = { ...policy, appIds: picked }
+              store.savePolicy(picked.length === 0 ? { ...next, status: 'draft' as const } : next)
+              store.showToast(
+                picked.length === 0
+                  ? `${policy.name} has no application — back to draft`
+                  : `${policy.name} now protects ${picked.length} application${picked.length === 1 ? '' : 's'}`,
+              )
+              onClose()
+            }}
+          >
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="bassign">
+        <p className="bassign__lede">Every sign-in to one of these is checked against this policy.</p>
+
+        {/* Only once the list is long enough to need it. Twenty-six rows is
+            past that; a tenant with six would spend a control on nothing. */}
+        {store.apps.length > 8 && (
+          <input
+            type="search"
+            className="bassign__search"
+            placeholder="Search applications…"
+            aria-label="Search applications"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        )}
+
+        <div className="bassign__list">
+          {shown.map((a) => {
+            const on = picked.includes(a.id)
+            return (
+              <label key={a.id} className={`bassign__row ${on ? 'is-on' : ''}`}>
+                <input type="checkbox" checked={on} onChange={() => toggle(a.id)} />
+                <AppLogo appId={a.id} name={a.name} size={22} />
+                <span className="bassign__name">{a.name}</span>
+                <span className="bassign__meta">{a.protocol}</span>
+              </label>
+            )
+          })}
+          {shown.length === 0 && <p className="bassign__none">No application matches “{q}”.</p>}
+        </div>
+
+        {/* Says what the save will do, in the terms the row will read back.
+            A count that only appears once something is ticked, because "0
+            selected" under an empty list is a restatement of the list. */}
+        {picked.length > 0 && (
+          <p className="bassign__foot">
+            {picked.length} selected — {appsLabel(store.apps.filter((a) => picked.includes(a.id)))}
+          </p>
+        )}
+      </div>
+    </Modal>
   )
 }

@@ -96,6 +96,14 @@ export interface ValueOption {
   /** A third, quieter line: what this option would actually match on. */
   note?: string
   icon?: LucideIcon
+  /* Which family this belongs to, for the tint on its mark.
+
+     Only the attribute list sets it, and only the attribute list has families:
+     an operator list is four words about one attribute and a value list is one
+     library. Optional rather than required for that reason — a tint on a list
+     where everything is the same family is a colour that distinguishes
+     nothing. */
+  tone?: string
   /* Shown, and not choosable.
 
      Only one thing uses it today — the ML risk row, which is listed so the
@@ -346,7 +354,22 @@ export function ConditionPopover({
     /* Three rows, top to bottom, in the order they depend on each other:
        what is checked, how it is compared, what it is compared against. */
     <div className={`cp__stack ${unset ? 'is-unset' : ''}`}>
-      <div className="cp__stackhead">
+      {/* All three on ONE line: what is checked, how, and against what.
+
+          This has been two shapes and both were wrong for the panel. Three
+          full-width rows made one condition into three stacked boxes, so four
+          conditions drew twelve rectangles with nothing saying which three
+          belonged together. Putting the attribute on its own line above the
+          other two fixed the counting and broke the alignment: the operator and
+          value lined up down the column while the attribute did not, so a list
+          of conditions had two left edges and no grid.
+
+          One row is the sentence — "Network zone · in zone · Office egress" —
+          and it is the only arrangement in which four conditions have four
+          identical shapes. The widths are proportional rather than equal: the
+          attribute and the value are names and take the room, the operator is a
+          closed set of two or three words and takes what it needs. */}
+      <div className="cp__stackrow">
         {!hideAttribute ? (
           <Field
             ref={whatRef}
@@ -360,42 +383,46 @@ export function ConditionPopover({
           </Field>
         ) : (
           /* The Who pane owns the attribute, so the row opens on its operator
-             and the head is just the label and the way out. */
+             and the head is just the label. */
           <span className="cp__stacklabel">
             <GroupIcon icon={conditionIcon(t.id, t.group)} />
             {t.label}
           </span>
         )}
+
+        <Field
+          ref={opRef}
+          kind="op"
+          open={open === 'op'}
+          label={`Change how ${t.label} is compared. Currently ${c.operator}.`}
+          onOpen={() => setOpen((o) => (o === 'op' ? null : 'op'))}
+        >
+          {c.operator}
+        </Field>
+
+        {typedValue ?? (
+          <Field
+            ref={valRef}
+            kind="val"
+            open={open === 'val'}
+            unset={unset}
+            label={valueLabel}
+            onOpen={() => setOpen((o) => (o === 'val' ? null : 'val'))}
+          >
+            {summary}
+            {scopeTag}
+          </Field>
+        )}
+
         <button type="button" className="cp__del" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
           <Trash2 size={14} strokeWidth={1.9} />
         </button>
       </div>
 
+      {/* The two conditions that need a second line get one: an attribute's key
+          and a time window's zone. Both are qualifiers on the row above rather
+          than parts of the sentence, so they sit under it at full width. */}
       {keyRow}
-
-      <Field
-        ref={opRef}
-        kind="op"
-        open={open === 'op'}
-        label={`Change how ${t.label} is compared. Currently ${c.operator}.`}
-        onOpen={() => setOpen((o) => (o === 'op' ? null : 'op'))}
-      >
-        {c.operator}
-      </Field>
-
-      {typedValue ?? (
-        <Field
-          ref={valRef}
-          kind="val"
-          open={open === 'val'}
-          unset={unset}
-          label={valueLabel}
-          onOpen={() => setOpen((o) => (o === 'val' ? null : 'val'))}
-        >
-          {summary}
-          {scopeTag}
-        </Field>
-      )}
       {tzRow}
     </div>
   ) : (
@@ -447,6 +474,10 @@ export function ConditionPopover({
       {open && !(stacked && open === 'val' && typedValue) && (
         <Pop
           anchor={anchorFor[open]}
+          /* Beside the panel in the stacked layout, which is the inspector's.
+             A 340px pane cannot host a menu under a row without hiding every
+             row below it — including the one being edited. */
+          beside={stacked}
           onClose={() => {
             setOpen(null)
             anchorFor[open].current?.focus()
@@ -485,6 +516,11 @@ export function ConditionPopover({
                   label: x.label,
                   note: x.soon ? 'Coming soon' : undefined,
                   icon: conditionIcon(x.id, x.group),
+                  /* The family, for the tint. Nine rows across five families
+                     were nine identical grey marks — so the glyph told them
+                     apart and nothing said which two were about the same kind
+                     of thing. The colour groups them without a heading. */
+                  tone: x.group,
                   disabled: x.soon,
                 }))}
               picked={[c.typeId]}
@@ -592,12 +628,24 @@ function Pop({
   anchor,
   onClose,
   watch,
+  beside,
   children,
 }: {
   anchor: RefObject<HTMLButtonElement | null>
   onClose: () => void
   /** Anything that changes the panel's size, so it re-measures. */
   watch: string
+  /* Open to the LEFT of the anchor rather than under it.
+
+     For the inspector, and it is the fix to a real complaint: that panel is
+     340px wide, so a menu opening underneath a row covers every row below it —
+     the condition you are editing disappears behind the list you are editing it
+     with. Beside the panel it lands over the canvas, which is empty space, and
+     the row stays visible while you pick.
+
+     Falls back to below when there is not room, so a narrow window degrades to
+     the old behaviour rather than clipping. */
+  beside?: boolean
   children: ReactNode
 }) {
   const pop = useRef<HTMLDivElement | null>(null)
@@ -626,13 +674,32 @@ function Pop({
        options. */
     const room = (up ? above : below) - GAP - MARGIN
     const maxH = Math.max(200, room)
+
+    /* Beside, when it was asked for and there is room for it.
+
+       `shown + GAP + MARGIN` is the test rather than a guessed breakpoint: the
+       question is literally whether this panel fits between the anchor and the
+       left edge, and nothing else about the window matters. Vertically it is
+       TOP-aligned to the anchor and then clamped, so the row you pressed and
+       the list you are picking from start on the same line. */
+    if (beside && a.left - GAP - MARGIN >= shown) {
+      const height = Math.min(h || maxH, window.innerHeight - MARGIN * 2)
+      setPos({
+        top: Math.max(MARGIN, Math.min(a.top, window.innerHeight - height - MARGIN)),
+        left: a.left - shown - GAP,
+        width: w,
+        maxH: window.innerHeight - MARGIN * 2,
+      })
+      return
+    }
+
     setPos({
       top: up ? Math.max(MARGIN, a.top - Math.min(h, maxH) - GAP) : a.bottom + GAP,
       left: Math.max(MARGIN, Math.min(a.left, window.innerWidth - shown - MARGIN)),
       width: w,
       maxH,
     })
-  }, [anchor])
+  }, [anchor, beside])
 
   // Before paint, so the panel is never seen at its unplaced position.
   useLayoutEffect(place, [place, watch])
@@ -824,17 +891,30 @@ function List({
                   The shape is what says whether choosing this unchooses the
                   last — which is the difference between picking an operator and
                   picking a fourth group. */}
-              {single ? (
+              {/* The ICON is the selected mark, when there is an icon.
+
+                  A single-select row carried a 15px tick column that was empty
+                  on every row but one — so nine rows were indented past a gutter
+                  that existed for the tenth. The icon is already in that
+                  position, already one per row, and already the thing the eye
+                  lands on: filling it when the row is chosen says the same thing
+                  in a column that is never empty.
+
+                  The tick column survives for lists with no icons — operators
+                  are four words with no marks, and those genuinely need
+                  somewhere to put the answer. */}
+              {single && !Ico && (
                 <span className="cp__pickmark" aria-hidden>
                   {on && <Check size={12} strokeWidth={3} />}
                 </span>
-              ) : (
+              )}
+              {!single && (
                 <span className="cp__tick" aria-hidden>
                   {on && <Check size={11} strokeWidth={3} />}
                 </span>
               )}
               {Ico && (
-                <i className="cp__icon" aria-hidden>
+                <i className={`cp__icon ${o.tone ? `is-${o.tone.toLowerCase()}` : ''}`} aria-hidden>
                   <Ico size={13} strokeWidth={2} />
                 </i>
               )}

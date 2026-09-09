@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { AlertTriangle, ArrowRight, Check, ChevronDown, Play, RotateCcw, X, XCircle } from 'lucide-react'
 
 import { Button } from '../../kit'
-import type { Policy, Rule } from '../../data'
+import { appsLabel, appsOf, type Policy, type Rule } from '../../data'
 import { useBrand } from '../../store'
 import type { Diagnostic } from '../diagnostics'
 import { DECK, OUTCOME_LABEL, applyFix, proposeFix, runGauntlet, type Outcome, type ProposedFix, type Round } from '../gauntlet'
@@ -93,7 +93,7 @@ export function CheckTab({
   const after = useMemo(() => sweep(draft, env, 570), [draft, env])
   const movement = useMemo(() => (dirty ? compare(sweep(saved, env, 570), after) : null), [dirty, saved, env, after])
   const dead = draft.rules.map((rule, i) => ({ rule, i })).filter(({ rule, i }) => rule.enabled && after.reach[i] === 0)
-  const app = draft.appId ? store.appById(draft.appId) : null
+  const named = appsOf(draft, store.apps)
 
   return (
     <>
@@ -273,7 +273,25 @@ export function CheckTab({
             detail={!movement ? 'No unsaved changes to compare.' : movement.looser === 0 ? 'No situation is treated more leniently than before.' : 'That is the direction worth being sure about.'}
             action={movement && movement.looser > 0 ? { label: 'See what changes', run: () => onTab('impact') } : undefined}
           />
-          <ReadyRow ok={!!app || !!draft.isSystem} title={app ? `Protecting ${app.name}` : draft.isSystem ? 'The tenant default' : 'No application attached'} detail={app || draft.isSystem ? 'The rules are evaluated on every sign-in to it.' : 'These rules are saved but never evaluated.'} />
+          <ReadyRow
+            ok={named.length > 0 || !!draft.isSystem}
+            title={
+              named.length > 0
+                ? `Protecting ${appsLabel(named)}`
+                : draft.isSystem
+                  ? 'The tenant default'
+                  : 'No application assigned'
+            }
+            /* Plural once there is more than one, because "every sign-in to it"
+               is the sentence that stops being true first. */
+            detail={
+              named.length > 1
+                ? 'The rules are evaluated on every sign-in to any of them.'
+                : named.length > 0 || draft.isSystem
+                  ? 'The rules are evaluated on every sign-in to it.'
+                  : 'These rules are saved but never evaluated.'
+            }
+          />
           {dead.length > 0 && <ReadyRow ok={false} warn title={`${dead.length} rule${dead.length === 1 ? '' : 's'} never win`} detail={`${dead.map(({ rule, i }) => `Rule ${i + 1} · ${rule.name}`).join(', ')} decide no modelled situation. Either unreachable, or reading a signal the model does not carry.`} action={{ label: `Open rule ${dead[0].i + 1}`, run: () => { onSelect(ruleAt(dead[0].rule.id, 'when')); onClose() } }} />}
         </div>
       </Section>

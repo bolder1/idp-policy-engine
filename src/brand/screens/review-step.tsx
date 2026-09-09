@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { AlertTriangle, ArrowRight, Check, Swords, Target } from 'lucide-react'
 
 import { Button, DecisionChip, TipDot } from '../kit'
-import type { Policy, PolicyStatus } from '../data'
+import { appsLabel, appsOf, type Policy, type PolicyStatus } from '../data'
 import { useBrand, useNameLookup } from '../store'
 import { ruleSentence } from './builder-dialogs'
 import { describeChanges } from './changes'
@@ -57,7 +57,7 @@ export function ReviewStep({
   const diagnostics = diagnose(draft, store.groups, store.hooks)
   const errors = diagnostics.filter((d) => d.severity === 'error' && draft.rules[d.ruleIndex]?.enabled !== false)
   const dead = draft.rules.map((r, i) => ({ r, i })).filter(({ r, i }) => r.enabled && after.reach[i] === 0)
-  const app = draft.appId ? store.appById(draft.appId) : null
+  const named = appsOf(draft, store.apps)
   const changes = dirty ? describeChanges(saved, draft) : []
 
   const resolve = useNameLookup()
@@ -100,12 +100,15 @@ export function ReviewStep({
     },
     {
       id: 'apps',
-      ok: app !== null,
-      title: app ? `Protects ${app.name}` : 'No application chosen',
-      detail: app
-        ? 'Every sign-in to it is checked against these rules.'
-        : 'These rules are saved but never evaluated — nothing reaches them.',
-      go: { label: 'Choose the application', run: () => store.go({ name: 'policy-details', policyId: draft.id }) },
+      ok: named.length > 0,
+      title: named.length > 0 ? `Protects ${appsLabel(named)}` : 'No application chosen',
+      detail:
+        named.length > 1
+          ? 'Every sign-in to any of them is checked against these rules.'
+          : named.length > 0
+            ? 'Every sign-in to it is checked against these rules.'
+            : 'These rules are saved but never evaluated — nothing reaches them.',
+      go: { label: 'Choose applications', run: () => store.go({ name: 'policy-details', policyId: draft.id }) },
     },
   ]
 

@@ -15,14 +15,6 @@ import { coversEveryApp, enforces, type App, type Policy } from '../data'
    referenced by a condition; it is the subject of the policy.
    -------------------------------------------------------------------------- */
 
-/* The seed's own wording, quoted once.
-
-   `data.ts` writes this string on the policy that ships with no application.
-   Attach clears it and detach restores it, so both have to spell it the same
-   way — and a second copy of a sentence is a second chance to spell it
-   differently. */
-export const NO_APP_ISSUE = 'No application assigned — this policy cannot take effect until one is attached.'
-
 /* Whether a policy actually decides sign-ins.
 
    `enforces` AND at least one enabled rule, which is exactly the pair of tests
@@ -45,7 +37,7 @@ export function decidesFor(p: Policy): boolean {
    fall-through, and it belongs in `Protection.fallback` where it can be said
    once, as what happens when nothing above matched. */
 export function policiesForApp(appId: string, policies: Policy[]): Policy[] {
-  return policies.filter((p) => !p.isSystem && p.appId === appId)
+  return policies.filter((p) => !p.isSystem && p.appIds.includes(appId))
 }
 
 export interface Protection {
@@ -53,7 +45,7 @@ export interface Protection {
   own: Policy[]
   /** The subset that decides sign-ins, same order. */
   decides: Policy[]
-  /** The tenant default. Found by `coversEveryApp`, never by a missing appId. */
+  /** The tenant default. Found by `coversEveryApp`, never by an empty `appIds`. */
   fallback: Policy | null
 }
 
@@ -62,9 +54,9 @@ export function protectionOf(appId: string, policies: Policy[]): Protection {
   return {
     own,
     decides: own.filter(decidesFor),
-    /* By `coversEveryApp`, not by `appId === undefined`. Those are two
-       different facts: a policy somebody created and has not attached yet also
-       has no appId, and calling it the tenant default would be a serious
+    /* By `coversEveryApp`, not by `appIds.length === 0`. Those are two
+       different facts: a policy somebody created and has not assigned yet also
+       has no applications, and calling it the tenant default would be a serious
        misreading of a half-finished draft. */
     fallback: policies.find(coversEveryApp) ?? null,
   }
@@ -98,35 +90,45 @@ export function whyNotDeciding(p: Policy): string | null {
   return null
 }
 
-export type AttachKind = 'fresh' | 'already-here' | 'move' | 'system'
+export type AttachKind = 'fresh' | 'already-here' | 'also' | 'system'
 
-/* What attaching this policy to this app would actually be.
+/* What assigning this policy to this app would actually be.
 
-   `isSystem` is tested FIRST, before the missing-appId branch, and that order is
-   the whole reason this function exists rather than being inlined as a ternary.
-   The tenant default has no `appId` — it covers everything by being the system
-   policy — so a check that asks "is appId undefined?" first classifies it as an
-   unattached draft and offers to attach the fall-through to Salesforce. Every
-   other surface in the product disambiguates with `isSystem` first; so does
-   this. */
+   `isSystem` is tested FIRST, before the empty-`appIds` branch, and that order
+   is the whole reason this function exists rather than being inlined as a
+   ternary. The tenant default names no applications — it covers everything by
+   being the system policy — so a check that asks "is the list empty?" first
+   classifies it as an unassigned draft and offers to attach the fall-through to
+   Salesforce. Every other surface in the product disambiguates with `isSystem`
+   first; so does this.
+
+   `move` was the fourth kind and it has become `also`, which is not a rename.
+   It described taking a policy AWAY from the application it was on, because a
+   policy had one and giving it another meant losing the first. A policy holds a
+   list now, so the same gesture adds. That turns the consequential choice in
+   this picker into a free one, and the copy that warned about it has to stop. */
 export function attachKind(p: Policy, appId: string): AttachKind {
   if (p.isSystem) return 'system'
-  if (p.appId === undefined) return 'fresh'
-  return p.appId === appId ? 'already-here' : 'move'
+  if (p.appIds.length === 0) return 'fresh'
+  return p.appIds.includes(appId) ? 'already-here' : 'also'
 }
 
-/* What the attach picker may offer, unattached first.
+/* What the picker may offer, unassigned first.
 
-   Unattached first because those are the ones attaching costs nothing: a policy
-   with no application is doing nothing at all until it gets one, and a policy
-   with a different application is being TAKEN from somewhere. Putting the free
-   choices above the consequential ones is the list saying which is which before
-   anybody reads a name. */
+   The old reason for that order was that attaching an unassigned policy cost
+   nothing while attaching an assigned one TOOK it from somewhere. Neither half
+   is a cost any more — adding an application to a policy that already has two
+   removes nothing from either.
+
+   The order stays, for a different and smaller reason: a policy with no
+   applications is doing nothing at all until it gets one, so it is the one this
+   list can most usefully offer first. What has gone is the warning that used to
+   ride on the distinction. */
 export function attachableTo(appId: string, policies: Policy[]): Policy[] {
   const kinds = policies
     .map((p) => ({ p, kind: attachKind(p, appId) }))
-    .filter((x) => x.kind === 'fresh' || x.kind === 'move')
-  return [...kinds.filter((x) => x.kind === 'fresh'), ...kinds.filter((x) => x.kind === 'move')].map((x) => x.p)
+    .filter((x) => x.kind === 'fresh' || x.kind === 'also')
+  return [...kinds.filter((x) => x.kind === 'fresh'), ...kinds.filter((x) => x.kind === 'also')].map((x) => x.p)
 }
 
 /* The policy as it would be after attaching. Pure: nothing here reaches a store.
@@ -141,39 +143,46 @@ export function attachTo(p: Policy, appId: string, apps: App[]): Policy {
   if (!apps.some((a) => a.id === appId)) {
     throw new Error(`attachTo: no application with id ${appId}`)
   }
-  return {
-    ...p,
-    appId,
-    /* Cleared only when it is the no-application warning.
-
-       `partner-portal` ships with "No rules configured — every sign-in falls
-       straight through to the default rule", which attaching does not fix. A
-       blunt `configIssue: undefined` would erase an unrelated warning and
-       quietly decrement the policies table's "N policies need attention"
-       banner — a screen reporting less trouble because a different problem was
-       solved elsewhere. */
-    configIssue: p.configIssue === NO_APP_ISSUE ? undefined : p.configIssue,
-  }
+  /* Idempotent, and it has to be: `attachKind` reports `already-here` but the
+     picker is not the only caller, and a list that can hold the same
+     application twice would draw it twice, count it twice, and let one removal
+     leave the other behind. */
+  if (p.appIds.includes(appId)) return p
+  return { ...p, appIds: [...p.appIds, appId] }
   /* `status`, `lastModified` and `modifiedBy` are deliberately untouched. The
      store stamps the timestamp on save — two writers of one field is two
      sources of truth — and a policy that became ACTIVE because somebody
-     attached it would be a silent enforcement change nobody asked for. */
+     attached it would be a silent enforcement change nobody asked for.
+
+     In particular attaching does NOT promote a draft. Giving a policy its
+     application is one of the things a draft was missing, not proof that it is
+     finished, and publishing something because a form was filled in is exactly
+     the silent enforcement change the paragraph above refuses. */
 }
 
-/* Taking a policy off its application.
+/* Taking ONE application off a policy.
 
-   `undefined`, not `''` and not `null`: the field is `string | undefined` and
-   `impact-arena.ts` tests it with `!== undefined`, so an empty string would
-   read as attached-to-nothing-in-particular rather than as unattached.
+   It used to take the only one, so it always emptied the policy and always
+   demoted it to a draft. With a list that is the exception rather than the
+   rule: a policy on GitHub and AWS, removed from GitHub, is still a live policy
+   protecting AWS, and demoting it would switch off enforcement on an
+   application nobody touched. So `appId` is a parameter now — this removes the
+   one it is given — and the demotion is conditional on the list emptying.
 
-   And it writes the warning back on. A policy this panel has just orphaned
-   cannot take effect, the policies table has an `InfoDot` and an attention
-   banner built to say exactly that, and leaving them silent would mean the one
-   screen that can produce this state is the one screen that hides it. */
-export function detachFrom(p: Policy): Policy {
+   When it does empty, the demotion still fires, for the original reason: a
+   policy with no application is missing something it needs before it can be
+   published, and the product has exactly one word for that. It is not left
+   ACTIVE with a warning hung off it; that is a state this product does not
+   have.
+
+   It is also the only demotion here. `attachTo` does not promote in return: an
+   assigned draft is a draft that now has an application. */
+export function detachFrom(p: Policy, appId: string): Policy {
   if (p.isSystem) throw new Error('detachFrom: the tenant default has no application to remove')
-  return { ...p, appId: undefined, configIssue: NO_APP_ISSUE }
+  const appIds = p.appIds.filter((id) => id !== appId)
+  return appIds.length === 0 ? { ...p, appIds, status: 'draft' } : { ...p, appIds }
 }
+
 
 export interface AppSummary {
   own: number

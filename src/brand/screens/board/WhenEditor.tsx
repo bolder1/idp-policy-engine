@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { Braces, ChevronDown, Plus, Split, Trash2, Ungroup } from 'lucide-react'
+import { Braces, Plus, Split, Trash2, Ungroup } from 'lucide-react'
 
 import { cardJoin, cardLetter, ckey, drawsAsBracket, duplicatedAcrossCards, outerJoin } from '../../predicate'
 import {
@@ -105,7 +105,6 @@ export function WhenEditor({
      prose read-back and the card — and what has gone is a way to author them
      from here, not a way to hold them. */
   const outer = outerJoin(rule.when)
-  const flipOuter = () => write(ops.flipOuterJoin(rule.when))
   /* Every edit that changes the SHAPE lands through here, so the lockstep is
      re-established on each one rather than only where somebody remembered. */
   const restructure = (next: Predicate) => write(ops.setOuterJoin(next, outer))
@@ -277,7 +276,7 @@ export function WhenEditor({
               <Fragment key={m.key}>
                 {/* The bracket's operator, in every gap between its members.
                     One control with several handles — see `JoinRow`. */}
-                {i > 0 && <JoinRow join={outer} scope="rule" onFlip={flipOuter} />}
+                {i > 0 && <JoinRow join={outer} scope="rule" onSet={(j) => write(ops.setOuterJoin(rule.when, j))} />}
                 {m.kind === 'cond' ? (
                 <ConditionRow
                   c={m.c}
@@ -320,7 +319,10 @@ export function WhenEditor({
                   onCancelPick={() => setAdding(null)}
                   onUngroup={() => ungroup(m.card.id)}
                   onRemove={() => removeGroup(m.card.id)}
-                  onFlipJoin={() => flipCardJoin(m.card.id)}
+                  /* Set, not flip. The menu names both values, so it hands back
+                     the one that was chosen — and choosing the value already in
+                     force has to be a no-op rather than a swap. */
+                  onSetJoin={(j) => j !== cardJoin(m.card) && flipCardJoin(m.card.id)}
                   patchCondition={patchCondition}
                   removeCondition={removeCondition}
                   retype={(id, typeId) => write(ops.retypeCondition(rule.when, id, typeId, conditionType(typeId).operators[0]))}
@@ -404,7 +406,7 @@ function GroupMember({
   onCancelPick,
   onUngroup,
   onRemove,
-  onFlipJoin,
+  onSetJoin,
   patchCondition,
   removeCondition,
   retype,
@@ -427,7 +429,7 @@ function GroupMember({
   onCancelPick: () => void
   onUngroup: () => void
   onRemove: () => void
-  onFlipJoin: () => void
+  onSetJoin: (j: Joiner) => void
   patchCondition: (id: string, next: Partial<Condition>) => void
   removeCondition: (id: string) => void
   retype: (id: string, typeId: string) => void
@@ -464,7 +466,7 @@ function GroupMember({
                 place a second operator exists on this pane, and drawing it the
                 same way as the outer one — same chip, same gap — is what says
                 they are the same kind of decision at two depths. */}
-            {j > 0 && <JoinRow join={join} scope="group" onFlip={onFlipJoin} />}
+            {j > 0 && <JoinRow join={join} scope="group" onSet={onSetJoin} />}
           <ConditionRow
             c={c}
             fresh={fresh === c.id}
@@ -576,29 +578,57 @@ function GroupMember({
    together, the label says so before you press, and the alternative — a word in
    the first gap and nothing in the rest — leaves a four-condition rule with
    three gaps that do not say how the rows either side of them join. */
+/* The operator between two conditions, as a MENU rather than a toggle.
+
+   It carried a chevron and behaved like a toggle: pressing it flipped straight
+   to the other value. Two things wrong with that, and the chevron is the tell —
+   it promised a list and delivered a swap, so the one way to discover what the
+   alternative was called was to change the rule and read the result.
+
+   With two values a toggle is defensible; with a chevron on it, it is a lie.
+   The menu names both, marks the one in force, and leaves the rule alone until
+   something is chosen. The words are on the rows rather than in a tooltip,
+   which is where "every condition must match" was previously only reachable by
+   hovering. */
 function JoinRow({
   join,
   scope,
-  onFlip,
+  onSet,
 }: {
   join: Joiner
   /** What the operator governs, which is the only thing the two levels say differently. */
   scope: 'rule' | 'group'
-  onFlip: () => void
+  onSet: (j: Joiner) => void
 }) {
   const where = scope === 'group' ? 'in this group' : 'in this rule'
   return (
     <div className="bb__joinrow">
-      <button
-        type="button"
+      {/* A native select, and deliberately not the kit's `MenuButton` or
+          `Picker`.
+
+          Both of those render a button sized like a form control, and this
+          thing has to be a 46px pill sitting in a 24px gutter between two
+          conditions — at that size a bordered trigger with a chevron and a
+          popup is more chrome than the operator it sets. A native select is the
+          smallest control that still opens a real list, and it brings the
+          keyboard and the screen-reader behaviour for nothing.
+
+          It also cannot cover the panel: the platform draws the list, so it is
+          never a 340px overlay dropping over the conditions below. */}
+      <select
         className={`bb__joinsel is-${join}`}
-        aria-label={`${join === 'and' ? `Every condition ${where} must match` : `Any one condition ${where} is enough`}. Switch to ${join === 'and' ? 'OR' : 'AND'} for all of them.`}
-        title={`Everything ${where} is joined by ${join.toUpperCase()}. Click for ${join === 'and' ? 'OR' : 'AND'}.`}
-        onClick={onFlip}
+        value={join}
+        aria-label={`How conditions ${where} are joined`}
+        title={
+          join === 'and'
+            ? `Every condition ${where} must match`
+            : `Any one condition ${where} is enough`
+        }
+        onChange={(e) => onSet(e.target.value as Joiner)}
       >
-        {join}
-        <ChevronDown size={12} strokeWidth={2.2} aria-hidden />
-      </button>
+        <option value="and">AND</option>
+        <option value="or">OR</option>
+      </select>
     </div>
   )
 }

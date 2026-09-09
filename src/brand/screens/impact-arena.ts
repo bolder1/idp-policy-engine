@@ -275,7 +275,7 @@ export function badges(
     id: 'attached',
     label: 'Actually in force',
     claim: 'An application is attached, so the rules are evaluated at all.',
-    earned: policy.appId !== undefined || policy.isSystem === true,
+    earned: policy.appIds.length > 0 || policy.isSystem === true,
     detail: 'No application chosen — these rules are saved but never evaluated.',
   })
 

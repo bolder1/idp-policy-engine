@@ -228,20 +228,54 @@ export const signalById = (id: string) => RISK_SIGNALS.find((s) => s.id === id)
    shipped weight, instead of being invisible because a stored snapshot predates
    it. `off` and `tiers` are both empty on a tenant that has never opened the
    screen, and that is exactly the shipped configuration. */
-export interface RiskProfile {
+/* The weighting itself, with no identity attached.
+
+   Split from `RiskProfile` when the screen went from one tenant-wide profile to
+   a library of named ones. Everything in this module reads only these two
+   fields — `riskScale`, `weightFor`, `countOn`, `isOn`, `tierFor` — so they
+   take the tuning rather than the profile, and a caller holding a bare
+   `{ off, tiers }` (every test in this file) keeps working unchanged. */
+export interface RiskTuning {
   /** Signal ids the tenant has switched off. Everything else is on. */
   off: string[]
   /** Per-signal, per-platform weight overrides. Keyed `${signalId}:${platform}`. */
   tiers: Record<string, Priority>
 }
 
-export const EMPTY_RISK_PROFILE: RiskProfile = { off: [], tiers: {} }
+/* A tuning somebody has named and can point at.
+
+   There was one of these per tenant, unnamed, living on the store as a single
+   object. A library needs two more things: an id, so a row can be opened,
+   duplicated and deleted; and a name, so the row means something before it is
+   opened. Nothing else changes — a profile IS a tuning, which is why the id
+   and the name are the only additions. */
+export interface RiskProfile extends RiskTuning {
+  id: string
+  name: string
+}
+
+/** The shipped weighting: nothing off, nothing retuned. */
+export const EMPTY_RISK_PROFILE: RiskTuning = { off: [], tiers: {} }
+
+/* A new profile, at the shipped weights.
+
+   Deliberately NOT a copy of whatever is currently in use. A profile created
+   from this screen is a fresh answer to "how hard should these signals push",
+   and seeding it from the active one would silently make every new profile a
+   variant of one tenant's tuning — with no way to tell, from the row, which
+   parts were chosen and which were inherited. Duplicate is the gesture for
+   "start from that one", and it says so. */
+export const blankRiskProfile = (name: string, id: string): RiskProfile => ({
+  ...EMPTY_RISK_PROFILE,
+  id,
+  name,
+})
 
 export const tierKey = (signalId: string, p: Platform) => `${signalId}:${p}`
 
-export const isOn = (profile: RiskProfile, signalId: string) => !profile.off.includes(signalId)
+export const isOn = (profile: RiskTuning, signalId: string) => !profile.off.includes(signalId)
 
-export const tierFor = (profile: RiskProfile, s: RiskSignal, p: Platform): Priority =>
+export const tierFor = (profile: RiskTuning, s: RiskSignal, p: Platform): Priority =>
   profile.tiers[tierKey(s.id, p)] ?? s.tier
 
 /* The weight a platform currently carries, and the weight it shipped with.
@@ -253,7 +287,7 @@ export const tierFor = (profile: RiskProfile, s: RiskSignal, p: Platform): Prior
    thirds of the catalogue before the total fell under the cap and anything
    moved. A screen whose controls do nothing for their first ten clicks is worse
    than one that does nothing at all, because it takes longer to find out. */
-export function weightFor(profile: RiskProfile, p: Platform): number {
+export function weightFor(profile: RiskTuning, p: Platform): number {
   return RISK_SIGNALS.filter((s) => s.on.includes(p) && isOn(profile, s.id)).reduce(
     (sum, s) => sum + TIER_WEIGHT[tierFor(profile, s, p)],
     0,
@@ -291,7 +325,7 @@ export function shippedWeightFor(p: Platform): number {
    direction costs a breach. */
 const SHIPPED_BAND: Record<string, number> = { Low: 12, Medium: 48, High: 86 }
 
-export function riskScale(profile: RiskProfile): Record<string, number> {
+export function riskScale(profile: RiskTuning): Record<string, number> {
   const ratio = Math.min(
     ...PLATFORMS.map((p) => {
       const shipped = shippedWeightFor(p.id)
@@ -306,5 +340,5 @@ export function riskScale(profile: RiskProfile): Record<string, number> {
 }
 
 /** How many signals are switched on, for the category headings and the summary. */
-export const countOn = (profile: RiskProfile, within?: SignalCategory) =>
+export const countOn = (profile: RiskTuning, within?: SignalCategory) =>
   RISK_SIGNALS.filter((s) => (within ? s.category === within : true) && isOn(profile, s.id)).length

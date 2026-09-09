@@ -129,7 +129,7 @@ async function main() {
     }
 
     results.push(record)
-    const status = record.file ? `${record.provider}${record.bytes ? ` · ${(record.bytes / 1024).toFixed(1)}kB` : ''}` : 'no source — monogram fallback'
+    const status = record.file ? `${record.provider}${record.bytes ? ` · ${(record.bytes / 1024).toFixed(1)}kB` : ''}` : 'no source — generic mark'
     console.log(`  ${record.file ? '✓' : '·'} ${app.name.padEnd(22)} ${status}`)
   }
 

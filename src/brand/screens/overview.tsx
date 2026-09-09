@@ -64,7 +64,7 @@ export function PolicyOverview({
       open={open}
       onClose={onClose}
       title={policy.name}
-      width={720}
+      width={780}
       padded={false}
       footer={
         <>

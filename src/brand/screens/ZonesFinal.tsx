@@ -893,7 +893,7 @@ function DuplicateZoneModal({
       open
       onClose={onClose}
       title="Duplicate zone"
-      width={460}
+      width={480}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -979,7 +979,7 @@ function NameOnlyModal({
       open={open}
       onClose={close}
       title="Name the zone"
-      width={460}
+      width={480}
       footer={
         <>
           <Button variant="ghost" onClick={close}>

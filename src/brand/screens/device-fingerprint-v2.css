@@ -77,8 +77,8 @@
 .bfp2__field > span { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
 .bfp2 .bfp2__field input, .bfp2__form .bfp2__field input {
   height: var(--ctl-height-md); padding: 0 11px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   font-size: var(--fs-md); color: var(--text-primary);
 }
 .bfp2__field input:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
@@ -256,14 +256,14 @@
 .bfp2__num { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: var(--text-secondary); }
 .bfp2__num input {
   width: 68px; height: var(--ctl-height-sm); padding: 0 8px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   font-size: var(--fs-md); color: var(--text-body);
 }
 .bfp2__select {
   height: var(--ctl-height-sm); padding: 0 10px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   font-size: var(--fs-md); color: var(--text-body); font-family: inherit;
 }
 

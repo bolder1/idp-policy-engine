@@ -79,8 +79,8 @@
   flex: 1; max-width: 420px;
   display: flex; align-items: center; gap: 8px;
   height: var(--ctl-height-md); padding: 0 11px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   color: var(--text-muted);
 }
 .buapps .buapps__search input {

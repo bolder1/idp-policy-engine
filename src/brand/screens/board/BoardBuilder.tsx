@@ -791,7 +791,7 @@ export function BoardBuilder({
           shortcut nobody knows about is a shortcut nobody has. `?` is the
           convention, and it is listed here too so the sheet explains how it
           was reached. */}
-      <Modal open={keys} onClose={() => setKeys(false)} title="Keyboard" width={460}>
+      <Modal open={keys} onClose={() => setKeys(false)} title="Keyboard" width={480}>
         <dl className="bb__keys">
           {SHORTCUTS.map(([k, what]) => (
             <div key={k}>
@@ -846,7 +846,7 @@ export function BoardBuilder({
         open={!!store.pendingNav}
         onClose={store.cancelNav}
         title="Leave without publishing?"
-        width={460}
+        width={480}
         footer={
           <>
             <Button variant="ghost" onClick={store.cancelNav}>

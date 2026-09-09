@@ -705,8 +705,28 @@ html[data-theme='dark'] {
 .bx-drawer__head h2,
 .bx-modal__head h2 { font-size: var(--fs-lg); }
 .bx-drawer__head p { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); }
-.bx-drawer__x { font-size: var(--fs-2xl); line-height: 1; color: var(--text-muted); }
-.bx-drawer__x:hover { color: var(--text-primary); }
+/* A control, not a character.
+
+   It was the multiplication sign at 20px with no padding — a hit target the
+   size of the glyph, roughly 11 by 20 CSS pixels, on the one button in a dialog
+   everybody reaches for without looking. It is a square with a real icon in it
+   now, at the small control height, so it is the same size and shape as every
+   other icon button in the console.
+
+   `bx-dialog__x`, not `bx-drawer__x`: `Modal` was using the drawer's class,
+   which is how the two ended up sharing a bug nobody could find by searching
+   for the component they were looking at. */
+.bx-dialog__x {
+  flex: none;
+  display: grid; place-items: center;
+  width: var(--ctl-height-sm); height: var(--ctl-height-sm);
+  margin: -2px -6px 0 0;
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bx-dialog__x:hover { background: var(--state-hover-bg); color: var(--text-primary); }
+.bx-dialog__x:active { background: var(--state-press-bg); }
 .bx-drawer__body { flex: 1; overflow-y: auto; padding: var(--space-7); }
 .bx-drawer__foot,
 .bx-modal__foot {
@@ -811,8 +831,8 @@ html[data-theme='dark'] {
 .bx-step {
   display: inline-flex; align-items: center; gap: 2px;
   height: var(--ctl-height-md); padding: 0 4px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
 }
 .bx-step.is-focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }

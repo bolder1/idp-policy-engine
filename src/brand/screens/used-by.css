@@ -10,7 +10,7 @@
 
 .buse__card {
   background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
   overflow: hidden;
 }
 

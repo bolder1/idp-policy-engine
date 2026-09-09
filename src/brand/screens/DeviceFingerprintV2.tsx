@@ -1038,7 +1038,7 @@ function CreateDrawer({
          steps do not need 760 and are not hurt by it — the fields inside them
          have their own widths, so the extra space is margin rather than
          stretched controls. */
-      width={760}
+      width={780}
       resizable
       minWidth={560}
       maxWidth={1120}
@@ -2178,7 +2178,7 @@ function EditProfileDrawer({
          "Users register their own devices", and at 520 the label wrapped to two
          lines and pushed its own tip onto a third — a three-line row for one
          dropdown. */
-      width={600}
+      width={680}
       actions={
         <Button
           variant="brand"
@@ -2347,7 +2347,7 @@ function AttributesDrawer({
       onClose={onClose}
       title={`What it ${noun.verb}`}
       caption={profile.name}
-      width={760}
+      width={780}
       resizable
       minWidth={560}
       maxWidth={1120}
@@ -2441,7 +2441,7 @@ function SummaryDrawer({
   ]
 
   return (
-    <Drawer open={open} onClose={onClose} title={profile.name} caption={describeProfile(profile)} width={520}>
+    <Drawer open={open} onClose={onClose} title={profile.name} caption={describeProfile(profile)} width={560}>
       <div className="bfp2__sum">
         <dl className="bfp2__sumfacts">
           {facts.map(([k, v]) => (

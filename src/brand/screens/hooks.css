@@ -141,24 +141,39 @@
   color: var(--text-muted);
   line-height: 1.45;
 }
+/* The shared control recipe — `--ctl-*` in console-theme.css. This block used
+   to restate it with its own numbers, so the hook form's fields were 38.6px on
+   a 4px radius against the console's 35px on 6px: the same control, drawn two
+   ways, on a dialog that opens over a page full of the other one. */
 .bhk__field input,
-.bhk__field textarea,
 .bhk__field select {
+  width: 100%;
+  height: var(--ctl-height-md);
+  padding: 0 var(--space-5);
+  font-family: inherit;
+  font-size: var(--fs-md);
+  color: var(--text-body);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border);
+  border-radius: var(--ctl-radius);
+}
+.bhk__field textarea {
   width: 100%;
   padding: var(--space-4) var(--space-5);
   font-family: inherit;
   font-size: var(--fs-md);
   color: var(--text-body);
-  background: var(--surface-raised);
-  border: 1px solid var(--int-neutral-border);
-  border-radius: var(--radius-sm);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border);
+  border-radius: var(--ctl-radius);
 }
 .bhk__field textarea { line-height: 1.5; resize: vertical; }
 .bhk__field input:focus-visible,
 .bhk__field textarea:focus-visible,
 .bhk__field select:focus-visible {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--ctl-border-focus);
+  background: var(--surface-raised);
   box-shadow: 0 0 0 4px var(--focus-halo);
 }
 

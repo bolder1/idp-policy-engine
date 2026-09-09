@@ -511,7 +511,7 @@ function SetupModal({
       open={method !== null}
       onClose={onClose}
       title={method ? `${method.name} configuration` : 'Configuration'}
-      width={640}
+      width={680}
       footer={
         <>
           {/* Named its missing fields, which is the most defensible version

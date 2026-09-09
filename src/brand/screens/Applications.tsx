@@ -252,14 +252,13 @@ export function Applications() {
           Both sit at `--z-modal`, and equal z-index resolves on DOM order, so
           the dialog must come second to land on top.
 
-          `Drawer` also does not join `Modal`'s Escape stack — its handler is
-          unconditional — so one Escape would close the panel out from under
-          the dialog and take the half-typed name with it. The panel declines
-          to close while the dialog is up; the real repair belongs in the kit,
-          with the five other drawers, not here. */}
+          `Drawer` used to sit outside `Modal`'s Escape stack, so one press
+          closed the panel out from under the dialog and took the half-typed
+          name with it. Both surfaces share one chrome hook now — see
+          `useDialogChrome` in kit.tsx — so Escape peels the innermost layer and
+          this page no longer has to arrange it. */}
       <AppProtection
         appId={panelFor}
-        naming={naming}
         justAdded={added}
         onClose={() => setPanelFor(null)}
         onNew={() => setNaming(true)}

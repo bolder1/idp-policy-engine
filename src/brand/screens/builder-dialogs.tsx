@@ -431,7 +431,7 @@ export function CopyRuleDialog({
       open={open && !!rule}
       onClose={onClose}
       title={rule ? `Copy “${rule.name}” to…` : 'Copy rule'}
-      width={620}
+      width={680}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>

@@ -86,7 +86,7 @@ export function NewPolicyDialog({
       open={open}
       onClose={onClose}
       title="Name your policy"
-      width={520}
+      width={560}
       footer={
         <>
           {/* Only when it explains a control you cannot press.

@@ -479,7 +479,7 @@ export function DecisionLogDialog({
       open={open}
       onClose={onClose}
       title="Decision log"
-      width={860}
+      width={980}
       footer={
         <Button variant="ghost" onClick={onClose}>
           Close

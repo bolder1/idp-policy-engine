@@ -281,7 +281,7 @@ function HookForm({
       open={!!hook}
       onClose={onClose}
       title={hook && hook.name ? `Edit ${hook.name}` : 'New hook'}
-      width={640}
+      width={680}
       footer={
         <>
           {/* The form already lists every issue in `.bhk__formissues`, so

@@ -347,7 +347,7 @@ export function TemplatePreview({
       open={m !== null}
       onClose={onClose}
       title={m?.name ?? ''}
-      width={540}
+      width={560}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

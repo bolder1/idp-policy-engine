@@ -75,8 +75,8 @@
 .bm8__search {
   display: flex; align-items: center; gap: 8px;
   height: var(--ctl-height-md); padding: 0 11px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   color: var(--text-muted);
 }
 .bm8 .bm8__search input {
@@ -703,8 +703,8 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
 .bmu__form .bmu__field input,
 .bmu__form .bmu__field select {
   height: var(--ctl-height-md); padding: 0 11px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   font-size: var(--fs-md); color: var(--text-primary); font-family: inherit;
 }
 .bmu__form .bmu__field input:focus-visible,

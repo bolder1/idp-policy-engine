@@ -105,7 +105,7 @@ export function ImpactArenaDialog({
       open={open}
       onClose={onClose}
       title="Blast radius"
-      width={960}
+      width={980}
       padded={false}
       footer={
         <>

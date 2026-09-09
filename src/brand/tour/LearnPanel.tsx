@@ -65,7 +65,7 @@ export function LearnPanel({
       open={open}
       onClose={onClose}
       title={current ? current.title : 'Learn the builder'}
-      width={520}
+      width={560}
       resizable
       minWidth={420}
       maxWidth={760}

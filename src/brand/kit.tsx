@@ -7,6 +7,7 @@ import {
   useState,
   type CSSProperties,
   type ReactNode,
+  type RefObject,
 } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -17,6 +18,7 @@ import {
   Info,
   Minus,
   Plus,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -1139,7 +1141,7 @@ export function Drawer({
   head,
   actions,
   children,
-  width = 460,
+  width = DIALOG_W.confirm,
   resizable,
   minWidth = 380,
   maxWidth = 900,
@@ -1204,12 +1206,8 @@ export function Drawer({
     [w, minWidth, maxWidth, endResize],
   )
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  const panel = useRef<HTMLElement | null>(null)
+  useDialogChrome(open, onClose, panel)
 
   return (
     <AnimatePresence>
@@ -1224,7 +1222,10 @@ export function Drawer({
             exit={{ x: w }}
             transition={{ type: 'spring', stiffness: 420, damping: 40 }}
             role="dialog"
+            aria-modal="true"
             aria-label={title}
+            ref={panel}
+            tabIndex={-1}
           >
             {resizable && (
               <div
@@ -1254,9 +1255,7 @@ export function Drawer({
                   {caption && <p>{caption}</p>}
                 </div>
               )}
-              <button className="bx-drawer__x" onClick={onClose} aria-label="Close">
-                ×
-              </button>
+              <DialogClose onClose={onClose} />
             </header>
             <div className="bx-drawer__body">{children}</div>
             {actions && <footer className="bx-drawer__foot">{actions}</footer>}
@@ -1270,6 +1269,34 @@ export function Drawer({
 const clampWidth = (want: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Math.min(want, typeof window === 'undefined' ? max : window.innerWidth - 120)))
 
+/* --- How wide a dialog is ------------------------------------------------------
+
+   Fifteen widths were in use across twenty-five surfaces: 460, 480, 520, 540,
+   560, 600, 620, 640, 680, 720, 760, 780, 860, 960, 980. Some of that spread is
+   real — a confirmation and the gauntlet are not the same object — but most of
+   it was two people picking a number forty pixels apart for the same job, and
+   the result is that no two dialogs in the console line up when you open them
+   one after another.
+
+   Five steps, each with a job:
+
+     confirm  480  one question and two buttons
+     form     560  a short form, one column
+     wide     680  a form with structure — sections, a list beside a field
+     work     780  two panes, or a table that needs its columns
+     full     980  a workspace: the gauntlet's cards, a decision log
+
+   Drawers take the same scale. A side panel and a centred dialog are different
+   shapes but they answer the same question — how much room does this need —
+   and a console where those two vocabularies disagree is a console where the
+   app-protection panel and the dialog it opens are 40px out of step.
+
+   Not exported: `kit.tsx` exports components, and a constant leaving it costs
+   fast refresh for every component in the file. It lives here, beside the two
+   surfaces it sizes, because that is where somebody adding a third one looks.
+   Call sites pass the number; this is the list of numbers that exist. */
+const DIALOG_W = { confirm: 480, form: 560, wide: 680, work: 780, full: 980 } as const
+
 /* Every dialog currently open, innermost last.
 
    Module-level rather than a context because it is answering a window-level
@@ -1278,24 +1305,28 @@ const clampWidth = (want: number, min: number, max: number) =>
    inside a dialog visually and beside it in the DOM. */
 const openDialogs: symbol[] = []
 
-export function Modal({
-  open,
-  onClose,
-  title,
-  children,
-  footer,
-  width = 560,
-  padded = true,
-}: {
-  open: boolean
-  onClose: () => void
-  title: string
-  children: ReactNode
-  footer?: ReactNode
-  width?: number
-  padded?: boolean
-}) {
-  const panel = useRef<HTMLDivElement | null>(null)
+/* Escape ownership, a focus trap and focus restoration — the three things any
+   surface with a scrim over it owes a keyboard, and the three things `Drawer`
+   did not have.
+
+   This lived inside `Modal`. `Drawer` had a bare unconditional Escape listener
+   and nothing else, which meant three separate faults across the six panels
+   that use it:
+
+     - Tab walked straight out of an open drawer and into the page behind the
+       scrim, so for a keyboard user the panel was a picture rather than a mode.
+     - Closing one dropped focus to <body>, so the next Tab restarted from the
+       top of the console instead of from the control that opened the panel.
+     - Its Escape did not join the stack, so a dialog opened from inside a
+       drawer — naming a policy from the app-protection panel is the live case —
+       was dismissed together with the drawer underneath it, taking the
+       half-typed name with it. `Applications.tsx` worked around that by
+       refusing to close while a dialog was up, and said in a comment that the
+       repair belonged here. This is that repair; the workaround can go.
+
+   Shared rather than copied, because the failure above is precisely what
+   happens when two surfaces that owe the same debts are written twice. */
+function useDialogChrome(open: boolean, onClose: () => void, panel: RefObject<HTMLElement | null>) {
   const returnTo = useRef<HTMLElement | null>(null)
 
   /* `onClose` is an inline arrow in every caller, so it has a new identity on
@@ -1309,37 +1340,28 @@ export function Modal({
     onCloseRef.current = onClose
   })
 
-  /* Escape, a focus trap, and focus restoration.
-
-     Without the trap, Tab walks straight out of an open dialog and into the
-     page behind it — which for a keyboard user means the modal is a visual
-     effect rather than a mode. Without the restoration, closing a dialog drops
-     focus back to <body>, so the next Tab starts from the top of the console
-     instead of from the control that opened it.
-
-     The trap is a keydown handler rather than inert/aria-hidden on the rest of
-     the page because these dialogs animate in over a live builder, and toggling
-     inertness on an animating tree is where that approach starts fighting
-     motion for control of the same nodes. */
   useEffect(() => {
     if (!open) return
     returnTo.current = document.activeElement as HTMLElement | null
 
-    /* This dialog's place in the stack.
-
-       Every open Modal used to listen for Escape on the window and close
-       itself, so two of them open at once meant one Escape closed both — back
-       out of a picker opened from inside a dialog and the dialog went with it,
-       losing whatever was being edited. Pushing an identity here and answering
-       only when this dialog is the innermost one makes Escape peel one layer,
-       which is what it means everywhere else in the product. */
+    /* This surface's place in the stack. Answering Escape only when innermost
+       makes it peel one layer, which is what it means everywhere else. */
     const me = Symbol('dialog')
     openDialogs.push(me)
 
-    // Focus the panel itself rather than its first control: dialogs here open
-    // with a heading, and starting on a button skips the sentence that says
-    // what the dialog is for.
-    const id = window.requestAnimationFrame(() => panel.current?.focus())
+    /* Focus the panel itself rather than its first control: these open with a
+       heading, and starting on a button skips the sentence that says what the
+       surface is for.
+
+       A frame AND a timer, which is the same guard `Counter` carries and for
+       the same reason: `requestAnimationFrame` does not run in a background
+       tab or an embedded webview, and moving focus into a dialog is not
+       decoration — without it Tab starts from the top of the console with a
+       modal open over it. Whichever lands first does the job; the other finds
+       focus already where it belongs. */
+    const focusPanel = () => panel.current?.focus()
+    const id = window.requestAnimationFrame(focusPanel)
+    const fallback = window.setTimeout(focusPanel, 60)
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -1366,18 +1388,49 @@ export function Modal({
     window.addEventListener('keydown', onKey)
     return () => {
       window.cancelAnimationFrame(id)
+      window.clearTimeout(fallback)
       window.removeEventListener('keydown', onKey)
       const at = openDialogs.indexOf(me)
       if (at !== -1) openDialogs.splice(at, 1)
-      /* Only restore to a control that still exists. Some dialogs are opened by
-         a trigger that navigates — the policy list's exposure cell opens the
+      /* Only restore to a control that still exists. Some of these are opened
+         by a trigger that navigates — the policy list's exposure cell opens the
          gauntlet and unmounts the whole table doing it — and calling focus() on
          a detached node silently drops focus to <body> instead of leaving it
          where the new screen put it. */
       const back = returnTo.current
       if (back?.isConnected) back.focus()
     }
-  }, [open])
+  }, [open, panel])
+}
+
+/** The close control every dialog surface carries. */
+function DialogClose({ onClose }: { onClose: () => void }) {
+  return (
+    <button type="button" className="bx-dialog__x" onClick={onClose} aria-label="Close">
+      <X size={17} strokeWidth={2} aria-hidden />
+    </button>
+  )
+}
+
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  footer,
+  width = DIALOG_W.form,
+  padded = true,
+}: {
+  open: boolean
+  onClose: () => void
+  title: string
+  children: ReactNode
+  footer?: ReactNode
+  width?: number
+  padded?: boolean
+}) {
+  const panel = useRef<HTMLDivElement | null>(null)
+  useDialogChrome(open, onClose, panel)
 
   return (
     <AnimatePresence>
@@ -1399,9 +1452,7 @@ export function Modal({
           >
             <header className="bx-modal__head">
               <h2>{title}</h2>
-              <button className="bx-drawer__x" onClick={onClose} aria-label="Close">
-                ×
-              </button>
+              <DialogClose onClose={onClose} />
             </header>
             <div className={`bx-modal__body ${padded ? '' : 'is-flush'}`}>{children}</div>
             {footer && <footer className="bx-modal__foot">{footer}</footer>}

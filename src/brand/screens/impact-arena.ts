@@ -81,11 +81,19 @@ export const SWEEP_TIMES = [
 export type Lane = AccessDecision
 export const LANES: { id: Lane; label: string; caption: string }[] = [
   { id: '1fa', label: 'Straight in', caption: 'One factor, no further prompt' },
+  { id: 'warn', label: 'Flagged', caption: 'One factor, and the event is raised' },
   { id: '2fa', label: 'Verified', caption: 'A second factor is required' },
   { id: 'deny', label: 'Blocked', caption: 'The sign-in is refused' },
 ]
 
-const STRICTNESS: Record<AccessDecision, number> = { '1fa': 0, '2fa': 1, deny: 2 }
+/* Four steps, not three, and `warn` sits ABOVE a bare allow.
+
+   It grants exactly the same access, so on the axis of "who gets in" it is
+   `1fa`. That is not the axis this number measures. What it measures is how
+   much a rule DOES about a sign-in, because that is what says whether a change
+   loosened something — and a rule that stops recording has loosened, even
+   though nobody's access widened. */
+const STRICTNESS: Record<AccessDecision, number> = { '1fa': 0, warn: 1, '2fa': 2, deny: 3 }
 
 export interface Sweep {
   /** One decision per situation, in SITUATIONS order. */
@@ -115,7 +123,7 @@ export function sweep(policy: Policy, env: SimEnv, nowMinutes: number): Sweep {
   const decisions: AccessDecision[] = new Array(SITUATIONS.length)
   const winners: (number | null)[] = new Array(SITUATIONS.length)
   const reach = new Array(policy.rules.length).fill(0)
-  const counts: Record<Lane, number> = { '1fa': 0, '2fa': 0, deny: 0 }
+  const counts: Record<Lane, number> = { '1fa': 0, warn: 0, '2fa': 0, deny: 0 }
   let fellThrough = 0
 
   for (const s of SITUATIONS) {

@@ -26,6 +26,7 @@ const STEP = 220 // ms between rule lights in a rehearsal
 
 export function Board({
   policy,
+  destination,
   selection,
   diagnostics,
   shadowed,
@@ -44,6 +45,20 @@ export function Board({
   aside,
 }: {
   policy: Policy
+  /* Where a sign-in is arriving, in words — the application this policy
+     protects, or `every application` for the tenant default.
+
+     A PROP rather than a `useBrand()` of its own, which is the one thing that
+     keeps this component a pure function of what it is given: the stage reads
+     policies, not the store, and `resolve` is already threaded the same way
+     from the same caller. `NameLookup` could not carry it — its `RefKind` is
+     the five things a CONDITION can point at, and an application is not one of
+     them.
+
+     `null` is a case, not a gap. A policy that names no application is a set of
+     rules no sign-in can ever reach, and the pill says so rather than opening
+     the chain with an arrival that never happens. */
+  destination: string | null
   selection: Selection
   diagnostics: Diagnostic[]
   /** Rules dimmed because the hovered rule puts them out of reach. */
@@ -308,17 +323,54 @@ export function Board({
               while there are no rules, so the canvas exists only once there is
               something on it. See BoardEmpty.tsx. */}
           <div className="bb__chain">
-            <div className="bb__start" aria-label="A sign-in arrives">
-              {landedOn === null && trace && inAudience ? (
+            {/* The application, said where the sign-in arrives.
+
+                The pill opened the chain with "a sign-in arrives" and never
+                said WHERE. That is the fact which makes every rule under it
+                mean something — a policy is written against an application, and
+                without one named here the chain is a decision about nothing in
+                particular. The bar 48px above carries the application too, as a
+                MARK on the policy's own chip: it says which policy you have
+                open. This says what is about to be decided, in words, at the
+                head of the thing deciding it.
+
+                No mark here, for that reason. Two 16px logos in one vertical
+                column 48px apart is the stutter `BoardBar` deleted when it
+                merged the application's crumb into the policy's chip, and this
+                pill's left slot is spoken for by something that moves — the
+                token flies out of it onto a card during a rehearsal.
+
+                THREE CASES, and the third is not a missing value.
+
+                An application named is named. The tenant default covers all of
+                them: `any application`, not the list's `Every application`,
+                because a sign-in is to one application and "arrives at every
+                application" is not a thing that happens. And a policy naming NO
+                application is a set of rules no sign-in can ever reach — so the
+                pill stops claiming an arrival, drops the pulse that animates
+                one, and says what is true instead. The bar says the same in a
+                crumb; this says it pointing at the chain the sentence is about,
+                which is the half the bar cannot reach. */}
+            <div className="bb__start">
+              {destination === null ? (
+                <span className="bb__pulse is-dead" aria-hidden />
+              ) : landedOn === null && trace && inAudience ? (
                 <motion.span layoutId="bb-token" className="bb__token" aria-hidden transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
                   ●
                 </motion.span>
               ) : (
                 <span className="bb__pulse" aria-hidden />
               )}
-              <span>
-                A sign-in arrives {trace ? <em>— {trace.ctx.user.name}, {trace.ctx.place.toLowerCase()}</em> : <em>— falls through the rules below</em>}
-              </span>
+              {destination === null ? (
+                <span>
+                  <b className="bb__start__at">No application</b> <em>— no sign-in ever reaches these rules</em>
+                </span>
+              ) : (
+                <span>
+                  A sign-in arrives at <b className="bb__start__at">{destination}</b>{' '}
+                  {trace ? <em>— {trace.ctx.user.name}, {trace.ctx.place.toLowerCase()}</em> : <em>— falls through the rules below</em>}
+                </span>
+              )}
             </div>
 
             {trace && !inAudience && (

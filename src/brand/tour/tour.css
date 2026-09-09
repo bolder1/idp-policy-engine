@@ -21,7 +21,7 @@
    the only thing that happens to be bright. */
 .btr__ring {
   position: absolute; border-radius: 12px;
-  box-shadow: 0 0 0 2px var(--brand), 0 0 0 7px rgb(235 84 36 / 0.18);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 7px rgb(235 84 36 / 0.18);
   pointer-events: none;
 }
 
@@ -51,7 +51,7 @@
   height: 168px;
   background:
     radial-gradient(circle at 1px 1px, var(--card-dot, var(--border-subtle)) 1px, transparent 0) 0 0 / 12px 12px,
-    linear-gradient(140deg, var(--brand-subtle-bg) 0%, var(--surface-sunken) 70%);
+    linear-gradient(140deg, var(--accent-soft) 0%, var(--surface-sunken) 70%);
   border-bottom: 1px solid var(--border-subtle);
 }
 .btr__hero svg { display: block; width: 100%; height: 100%; }
@@ -95,8 +95,8 @@
   background: var(--border-strong);
   transition: background var(--dur-fast) var(--ease-standard), width var(--dur-fast) var(--ease-standard);
 }
-.btr__dots i.is-done { background: var(--brand); }
-.btr__dots i.is-on { width: 16px; border-radius: var(--radius-pill); background: var(--brand); }
+.btr__dots i.is-done { background: var(--accent); }
+.btr__dots i.is-on { width: 16px; border-radius: var(--radius-pill); background: var(--accent); }
 
 .btr__skip { font-size: var(--fs-xs); color: var(--text-muted); padding: 0 var(--space-3); }
 .btr__skip:hover { color: var(--text-primary); text-decoration: underline; }
@@ -116,14 +116,14 @@
 .btr__tourcard {
   display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-4) var(--space-5);
   padding: var(--space-5);
-  border: 1px solid var(--brand-subtle-border); border-radius: var(--radius-lg);
-  background: var(--brand-subtle-bg);
+  border: 1px solid var(--accent-soft-border); border-radius: var(--radius-lg);
+  background: var(--accent-soft);
 }
 .btr__tourico {
   display: grid; place-items: center; width: 38px; height: 38px;
   border-radius: var(--radius-md);
-  background: var(--surface-raised); border: 1px solid var(--brand-subtle-border);
-  color: var(--brand-active);
+  background: var(--surface-raised); border: 1px solid var(--accent-soft-border);
+  color: var(--accent-strong);
 }
 .btr__tourcard h3 { margin: 0 0 3px; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .btr__tourcard p { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.5; }
@@ -139,7 +139,7 @@
 .btr__listhead span { font-size: var(--fs-sm); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 
 .btr__meter { height: 4px; margin-bottom: var(--space-5); border-radius: var(--radius-full); background: var(--surface-inset); overflow: hidden; }
-.btr__meter span { display: block; height: 100%; background: var(--brand); border-radius: var(--radius-full); }
+.btr__meter span { display: block; height: 100%; background: var(--accent); border-radius: var(--radius-full); }
 
 .btr__guides { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
 .btr__guides button {
@@ -150,13 +150,13 @@
   transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
 }
 .btr__guides button:hover { border-color: var(--border-strong); box-shadow: var(--el-low); }
-.btr__guides button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.btr__guides button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .btr__guidemark {
   flex: none; display: grid; place-items: center; width: 20px; height: 20px;
   border-radius: var(--radius-full); box-shadow: inset 0 0 0 1px var(--border-strong);
   color: var(--text-on-brand);
 }
-.btr__guidemark.is-done { background: var(--brand); box-shadow: none; }
+.btr__guidemark.is-done { background: var(--accent); box-shadow: none; }
 .btr__guidetext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .btr__guidetext strong { font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-primary); }
 .btr__guidetext em { font-style: normal; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.45; }
@@ -196,11 +196,11 @@
 .btr__tip {
   display: flex; align-items: flex-start; gap: var(--space-3);
   margin-top: var(--space-4) !important; padding: var(--space-4) var(--space-5);
-  border-left: 2px solid var(--brand); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-left: 2px solid var(--accent); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   background: var(--surface-sunken);
   color: var(--text-primary) !important; font-weight: var(--fw-medium);
 }
-.btr__tip svg { flex: none; margin-top: 2px; color: var(--brand-active); }
+.btr__tip svg { flex: none; margin-top: 2px; color: var(--accent-strong); }
 
 .btr__nextguide {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); flex-wrap: wrap;

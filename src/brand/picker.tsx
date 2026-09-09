@@ -3,7 +3,9 @@ import { Fragment, useCallback, useEffect, useId, useRef, useState, type CSSProp
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, type LucideIcon } from 'lucide-react'
 
-import './picker.css'
+/* The stylesheet is imported from main.tsx, in cascade order — see the note
+   there. Importing it from this module put it before kit.css and let the
+   button reset erase every trigger's border. */
 
 /* -----------------------------------------------------------------------------
    Picker — the replacement for the native `<select>`.

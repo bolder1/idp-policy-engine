@@ -355,10 +355,10 @@ function Axis({
 
 // --- Decision log ------------------------------------------------------------
 
-type LogDecision = 'Allow' | 'Deny' | 'Challenge'
+type LogDecision = 'Allow' | 'Deny' | 'Challenge' | 'Flagged'
 
-const DECISION_OF: Record<AccessDecision, LogDecision> = { deny: 'Deny', '2fa': 'Challenge', '1fa': 'Allow' }
-const DECISION_TONE: Record<LogDecision, string> = { Allow: 'allow', Deny: 'deny', Challenge: 'challenge' }
+const DECISION_OF: Record<AccessDecision, LogDecision> = { deny: 'Deny', '2fa': 'Challenge', warn: 'Flagged', '1fa': 'Allow' }
+const DECISION_TONE: Record<LogDecision, string> = { Allow: 'allow', Deny: 'deny', Challenge: 'challenge', Flagged: 'flag' }
 
 interface LogRow {
   id: string
@@ -479,7 +479,7 @@ export function DecisionLogDialog({
       open={open}
       onClose={onClose}
       title="Decision log"
-      width={860}
+      width={980}
       footer={
         <Button variant="ghost" onClick={onClose}>
           Close

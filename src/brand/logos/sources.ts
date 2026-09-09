@@ -10,6 +10,19 @@
 export interface LogoSource {
   /** Matches the app id used everywhere else in the app data. */
   id: string
+  /**
+   * Other ids in `data.ts` that mean the same product.
+   *
+   * The catalogue and this registry were written at different times and do not
+   * always agree on a name: the registry calls it `google`, the app list calls
+   * it `google-workspace`, and the consequence was silent — `AppLogo` found no
+   * entry, fell through to the generic mark, and Google Workspace showed a
+   * placeholder on eleven rows while its logo sat unused in `public/logos`.
+   *
+   * An alias fixes it without renaming the fetched file or invalidating the
+   * generated manifest, both of which are keyed on `id`.
+   */
+  aliases?: string[]
   name: string
   /** Canonical domain. Logo providers key off this. */
   domain: string
@@ -38,7 +51,7 @@ export const LOGO_SOURCES: LogoSource[] = [
   { id: 'box', name: 'Box', domain: 'box.com' },
   { id: 'servicenow', name: 'ServiceNow', domain: 'servicenow.com' },
   { id: 'okta', name: 'Okta', domain: 'okta.com' },
-  { id: 'google', name: 'Google Workspace', domain: 'google.com' },
+  { id: 'google', name: 'Google Workspace', domain: 'google.com', aliases: ['google-workspace'] },
   { id: 'dropbox', name: 'Dropbox', domain: 'dropbox.com' },
   { id: 'zendesk', name: 'Zendesk', domain: 'zendesk.com' },
   { id: 'confluence', name: 'Confluence', domain: 'atlassian.com' },

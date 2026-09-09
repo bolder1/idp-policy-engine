@@ -200,10 +200,15 @@ export function Policies() {
      are failing. */
   const leaking = [...grades.values()].filter((r) => r.breaches > 0).length
 
+  /* `scope` and `aria-sort` are the two things a sortable header owes a screen
+     reader, and neither was here: the column had no association with its cells,
+     and the direction lived only in an arrow glyph marked `aria-hidden`. So the
+     table announced "button, Policy name" and never said it was sorted, or
+     which way. */
   function head(key: SortKey, label: string, extra?: string) {
     const on = sort.key === key
     return (
-      <th className={extra}>
+      <th className={extra} scope="col" aria-sort={on ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
         <button
           type="button"
           className={`btable__sort ${on ? 'is-on' : ''}`}
@@ -365,8 +370,6 @@ export function Policies() {
               Clear filters
             </button>
           )}
-        </div>
-        <div className="btoolbar__right">
           <input
             type="search"
             placeholder="Search policies…"
@@ -375,6 +378,17 @@ export function Policies() {
             onChange={(e) => setQuery(e.target.value)}
             className="btoolbar__search"
           />
+        </div>
+        {/* Everything that narrows the list is on the left; the count of what
+            survived is on the right. Search used to be the right-hand group on
+            this page and the left-hand one on Applications, which is two pages
+            disagreeing about where you type. */}
+        <div className="btoolbar__right">
+          <span className="btoolbar__count">
+            {rows.length === counts.total
+              ? `${counts.total} policies`
+              : `${rows.length} of ${counts.total}`}
+          </span>
         </div>
       </div>
 
@@ -385,12 +399,12 @@ export function Policies() {
             <tr>
               {head('name', 'Policy name')}
 
-              <th>Application</th>
+              <th scope="col">Application</th>
 
               {store.features.exposure && head('exposure', 'Exposure')}
-              <th>Status</th>
+              <th scope="col" className="btable__col-status">Status</th>
 
-              <th className="btable__right">Actions</th>
+              <th scope="col" className="btable__right btable__col-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -523,7 +537,6 @@ function PolicyRow({
                 title={gauntlet.gradeReason}
                 onClick={() => store.go({ name: 'board', policyId: policy.id, open: 'gauntlet' })}
               >
-                <i aria-hidden />
                 {e.label}
                 <b>{gauntlet.grade}</b>
               </button>

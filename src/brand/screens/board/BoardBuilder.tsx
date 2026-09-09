@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, Keyboard, ListOrdered, PanelRightClose, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
 import { Button, Modal } from '../../kit'
-import { fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
+import { appsLabel, appsOf, fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
 import { useBrand, useNameLookup } from '../../store'
 import { TemplateSheet } from '../../create/TemplateSheet'
 import { ReviewDialog } from '../builder-dialogs'
@@ -630,6 +630,24 @@ export function BoardBuilder({
       ) : (
       <Board
         policy={draft}
+        /* The one lookup the stage would otherwise need a store for.
+
+           `appById` resolves an unknown id to the first application rather than
+           to nothing, which is a trap two other call sites already note — so the
+           id is checked against the live list here and an application that has
+           been deleted out from under the policy reads as no application, which
+           is what it now is. */
+        destination={
+          /* The chain's first node names ONE application, so a policy on
+             several says the first and how many more — the same summary the
+             policies table and the board bar print, from `appsLabel`, so the
+             three cannot disagree about how a multi-app policy is spoken. */
+          draft.appIds.length > 0
+            ? (appsLabel(appsOf(draft, store.apps)) ?? null)
+            : draft.isSystem
+              ? 'any application'
+              : null
+        }
         selection={selection}
         diagnostics={diagnostics}
         shadowed={shadowed}
@@ -791,7 +809,7 @@ export function BoardBuilder({
           shortcut nobody knows about is a shortcut nobody has. `?` is the
           convention, and it is listed here too so the sheet explains how it
           was reached. */}
-      <Modal open={keys} onClose={() => setKeys(false)} title="Keyboard" width={460}>
+      <Modal open={keys} onClose={() => setKeys(false)} title="Keyboard" width={480}>
         <dl className="bb__keys">
           {SHORTCUTS.map(([k, what]) => (
             <div key={k}>
@@ -846,7 +864,7 @@ export function BoardBuilder({
         open={!!store.pendingNav}
         onClose={store.cancelNav}
         title="Leave without publishing?"
-        width={460}
+        width={480}
         footer={
           <>
             <Button variant="ghost" onClick={store.cancelNav}>

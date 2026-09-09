@@ -42,7 +42,7 @@ import {
 import { Button, Drawer, MenuButton, Modal, NumberStepper, SaveBar, Tabs, TipDot, Toggle } from '../kit'
 import { TierPick } from '../tier-pick'
 import {
-  CATEGORIES,
+  categoriesFor,
   DEFAULT_MAX_DEVICES,
   MODES,
   MODE_META,
@@ -226,10 +226,7 @@ function ProfileList({
       <header className="bfp2__head">
         <div>
           <h1>Device profiles</h1>
-          <p>
-            A profile is a set of device signals and what to do when they change. Policy rules name
-            a profile the way they name a zone.
-          </p>
+          <p>Device signals, and what to do when they change.</p>
         </div>
         {/* Not while the empty state is up: it offers the same action in
             the middle of the page, and two brand buttons pointing at one
@@ -246,10 +243,11 @@ function ProfileList({
         <EmptyState
           icon={MonitorSmartphone}
           title="No profiles yet"
-          /* The signals by name. "What identifies a device" is the page
-             caption again; a TPM key and an OS build are the things somebody
-             is actually about to choose between. */
-          blurb="The signals that identify a machine — its TPM key, its serial, its OS build — and what should happen on the day they stop matching."
+          /* The signals by name. Both empty states in this section used to be
+             built the same way — a frame, then a dash-list, then a second
+             clause — and two screens using one sentence shape is what makes
+             prose read as generated. This one states the nouns and stops. */
+          blurb="A machine's TPM key, serial and OS build, and what happens when they stop matching."
           action={
             <Button variant="brand" onClick={onCreate}>
               <Plus size={15} strokeWidth={2.2} aria-hidden />
@@ -557,7 +555,7 @@ function AttrStep({
           onChange={(e) => setCat(e.target.value as AttrCategory | '')}
         >
           <option value="">All categories</option>
-          {CATEGORIES.map((c) => {
+          {categoriesFor(mode).map((c) => {
             const all = offered.filter((a) => a.category === c.id)
             /* A category an agentless profile cannot reach at all is offered
                and says so, rather than being dropped from the list — "why is
@@ -624,7 +622,7 @@ function AttrStep({
               <section className="bfp2__pang">
                 {lockedShown.length > 0 && (
                   <header className="bfp2__panghead">
-                    <h4>{cat ? CATEGORIES.find((c) => c.id === cat)?.label : 'Everything else'}</h4>
+                    <h4>{cat ? categoriesFor(mode).find((c) => c.id === cat)?.label : 'Everything else'}</h4>
                     <span>
                       {free.filter((a) => picked.includes(a.id)).length}/{free.length}
                     </span>
@@ -1052,7 +1050,7 @@ function CreateDrawer({
          steps do not need 760 and are not hurt by it — the fields inside them
          have their own widths, so the extra space is margin rather than
          stretched controls. */
-      width={760}
+      width={780}
       resizable
       minWidth={560}
       maxWidth={1120}
@@ -2179,26 +2177,47 @@ function AttrControl({
           items={VERSION_OPS.map((o) => ({ id: o.id, label: o.label, kbd: o.symbol }))}
           onSelect={(id) => set({ op: id })}
         />
-        {/* The stored value first when the catalogue does not carry it, so a
-            profile's floor is never quietly rewritten to whatever happens to be
-            at the top of the list. It is marked as what it is rather than
-            passed off as a current release. */}
-        <select
-          className="bfp2__select bfp2__exprval"
-          aria-label={c.label}
-          value={v.value}
-          title={c.hint}
-          onChange={(e) => set({ value: e.target.value })}
-        >
-          {!c.versions.some((o) => o.value === v.value) && (
-            <option value={v.value}>{v.value} (not a listed release)</option>
-          )}
-          {c.versions.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label ?? o.value}
-            </option>
-          ))}
-        </select>
+        {/* Chosen where there is a list, typed where there is not — see the
+            `versions` field for why an OS and a browser differ on that.
+
+            When there IS a list, the stored value goes in first if the
+            catalogue does not carry it, so a profile's floor is never quietly
+            rewritten to whatever happens to sit at the top. It is marked as
+            what it is rather than passed off as a current release. */}
+        {c.versions ? (
+          <select
+            className="bfp2__select bfp2__exprval"
+            aria-label={c.label}
+            value={v.value}
+            title={c.hint}
+            onChange={(e) => set({ value: e.target.value })}
+          >
+            {!c.versions.some((o) => o.value === v.value) && (
+              <option value={v.value}>{v.value} (not a listed release)</option>
+            )}
+            {c.versions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label ?? o.value}
+              </option>
+            ))}
+          </select>
+        ) : (
+          /* `inputMode="decimal"` and not `type="number"`: 131.0.6778.86 is a
+             version, not a number, and a numeric field refuses the second dot.
+             Nothing is validated on the way in — the formats genuinely differ
+             per platform, so the placeholder carries real examples for THIS
+             one. */
+          <input
+            type="text"
+            inputMode="decimal"
+            className="bfp2__exprval"
+            aria-label={c.label}
+            value={v.value}
+            placeholder={c.placeholder}
+            title={c.hint}
+            onChange={(e) => set({ value: e.target.value })}
+          />
+        )}
       </span>
     )
   }
@@ -2543,7 +2562,7 @@ function AttributesDrawer({
       onClose={onClose}
       title={`What it ${noun.verb}`}
       caption={profile.name}
-      width={760}
+      width={780}
       resizable
       minWidth={560}
       maxWidth={1120}

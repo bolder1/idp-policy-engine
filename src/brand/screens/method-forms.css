@@ -50,12 +50,12 @@
 .bmc__control input[type='text'], .bmc__control input[type='password'], .bmc__control input[type='number'],
 .bmc__control input[type='email'], .bmc__control select, .bmc__control textarea {
   width: 100%; height: var(--ctl-height-md); padding: 0 var(--space-4);
-  background: var(--surface-raised); border: 1px solid var(--border-default);
-  border-radius: var(--radius-md); font-size: var(--fs-md); color: var(--text-primary); font-family: inherit;
+  background: var(--ctl-bg); border: var(--bw-thin) solid var(--ctl-border);
+  border-radius: var(--ctl-radius); font-size: var(--fs-md); color: var(--text-primary); font-family: inherit;
 }
 .bmc__control textarea { height: auto; padding: var(--space-4); line-height: 1.6; resize: vertical; }
 .bmc__control input:focus-visible, .bmc__control select:focus-visible, .bmc__control textarea:focus-visible {
-  outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg);
+  outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo);
 }
 /* No error styling on a field that is merely still empty.
 
@@ -96,7 +96,7 @@
   padding: var(--space-4) var(--space-5);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-md); cursor: pointer;
 }
-.bmc__radios label.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bmc__radios label.is-on { border-color: var(--accent); background: var(--accent-soft); }
 .bmc__radios label > span { display: flex; flex-direction: column; gap: 2px; }
 .bmc__radios strong { font-size: var(--fs-md); color: var(--text-primary); }
 .bmc__radios em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
@@ -113,13 +113,13 @@
 .bmc__list li button { display: grid; place-items: center; width: 22px; height: 22px; border-radius: var(--radius-sm); color: var(--text-muted); }
 .bmc__list li button:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
 .bmc__listadd { display: flex; gap: var(--space-3); padding: var(--space-3); background: var(--surface-sunken); }
-.bmc__listadd input { flex: 1; height: var(--ctl-height-sm); padding: 0 var(--space-4); background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: var(--radius-sm); font-size: var(--fs-md); font-family: inherit; color: var(--text-primary); }
+.bmc__listadd input { flex: 1; height: var(--ctl-height-sm); padding: 0 var(--space-4); background: var(--ctl-bg); border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius); font-size: var(--fs-md); font-family: inherit; color: var(--text-primary); }
 .bmc__listadd button {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 0 var(--space-5); height: var(--ctl-height-sm);
   border: 1px solid var(--border-default); border-radius: var(--radius-sm);
   background: var(--surface-raised); font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
 }
-.bmc__listadd button:disabled { opacity: 0.4; cursor: default; }
+.bmc__listadd button:disabled { opacity: var(--disabled-opacity); cursor: default; }
 
 .bmc__foot { flex: 1; display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); }

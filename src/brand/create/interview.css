@@ -20,7 +20,7 @@
 /* --- The rail -------------------------------------------------------------- */
 
 .biv__rail { height: 3px; background: var(--surface-inset); }
-.biv__railfill { display: block; height: 100%; background: var(--brand); border-radius: 0 var(--radius-full) var(--radius-full) 0; }
+.biv__railfill { display: block; height: 100%; background: var(--accent); border-radius: 0 var(--radius-full) var(--radius-full) 0; }
 
 /* --- The header ------------------------------------------------------------ */
 
@@ -93,8 +93,8 @@
 .biv__qico {
   display: grid; place-items: center; width: 40px; height: 40px;
   border-radius: var(--radius-lg);
-  background: var(--brand-subtle-bg); border: 1px solid var(--brand-subtle-border);
-  color: var(--brand-active);
+  background: var(--accent-soft); border: 1px solid var(--accent-soft-border);
+  color: var(--accent-strong);
 }
 
 /* --- The sentence ---------------------------------------------------------- */
@@ -106,7 +106,7 @@
   font-family: inherit; font-size: var(--fs-lg); color: var(--text-primary); line-height: 1.5;
   resize: none;
 }
-.biv__input:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.biv__input:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
 
 .biv__orlabel { margin: 0 0 var(--space-4); font-size: var(--fs-sm); color: var(--text-muted); }
 .biv__examples { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); }
@@ -118,9 +118,9 @@
   transition: border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
 .biv__examples button svg { color: var(--text-muted); }
-.biv__examples button:hover { border-color: var(--brand); color: var(--text-primary); }
-.biv__examples button:hover svg, .biv__examples button.is-on svg { color: var(--brand); }
-.biv__examples button.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); color: var(--text-primary); }
+.biv__examples button:hover { border-color: var(--accent); color: var(--text-primary); }
+.biv__examples button:hover svg, .biv__examples button.is-on svg { color: var(--accent); }
+.biv__examples button.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--text-primary); }
 
 /* --- The questions --------------------------------------------------------- */
 
@@ -128,7 +128,7 @@
   display: inline-flex; align-items: center; gap: var(--space-3);
   margin: var(--space-5) 0 0; padding: 4px 11px;
   border-radius: var(--radius-pill);
-  background: var(--brand-subtle-bg); color: var(--brand-active);
+  background: var(--accent-soft); color: var(--accent-strong);
   font-size: var(--fs-xs);
 }
 
@@ -143,22 +143,22 @@
     box-shadow var(--dur-fast) var(--ease-standard);
 }
 .biv__option:hover { border-color: var(--border-strong); box-shadow: var(--el-low); }
-.biv__option.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
-.biv__option:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.biv__option.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.biv__option:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .biv__option kbd {
   flex: none; display: grid; place-items: center; width: 24px; height: 24px;
   border-radius: var(--radius-sm); background: var(--surface-inset);
   font-family: inherit; font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary);
   transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
-.biv__option.is-on kbd { background: var(--brand); color: var(--text-on-brand); }
+.biv__option.is-on kbd { background: var(--accent); color: var(--text-on-brand); }
 .biv__option > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .biv__option strong { font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-primary); }
 .biv__option em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
 .biv__tick {
   position: absolute; top: 10px; right: 10px;
   display: grid; place-items: center; width: 17px; height: 17px;
-  border-radius: var(--radius-full); background: var(--brand); color: var(--text-on-brand);
+  border-radius: var(--radius-full); background: var(--accent); color: var(--text-on-brand);
 }
 
 /* --- The live panel -------------------------------------------------------- */
@@ -223,7 +223,7 @@
 }
 .biv__record button:hover { background: var(--surface-sunken); }
 .biv__record button > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.biv__record em { font-style: normal; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+.biv__record em { font-style: normal; font-size: var(--fs-xs); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
 /* --fw-regular, not --fw-normal. The latter is not a token, so this declaration
    was invalid at computed-value time and the weight fell back to inherited —
    which is bold, from the <strong>, i.e. the exact opposite of what it asks
@@ -246,7 +246,7 @@
   font-variant-numeric: tabular-nums;
 }
 .biv__bar { height: 6px; margin: var(--space-6) 0; border-radius: var(--radius-full); background: var(--surface-inset); overflow: hidden; }
-.biv__bar span { display: block; height: 100%; background: var(--brand); border-radius: var(--radius-full); }
+.biv__bar span { display: block; height: 100%; background: var(--accent); border-radius: var(--radius-full); }
 
 .biv__tasks { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-4); }
 .biv__tasks li {
@@ -258,14 +258,14 @@
 .biv__tasks li.is-run { color: var(--text-primary); font-weight: var(--fw-medium); }
 .biv__taskico {
   flex: none; display: grid; place-items: center; width: 18px; height: 18px;
-  border-radius: var(--radius-full); color: var(--brand);
+  border-radius: var(--radius-full); color: var(--accent);
 }
 /* A pending task is an empty well, not a blank space — the list has to read as
    work that is queued rather than work that failed to appear. */
 .biv__tasks li.is-wait .biv__taskico { box-shadow: inset 0 0 0 1px var(--border-default); }
 .biv__taskdone {
   display: grid; place-items: center; width: 18px; height: 18px;
-  border-radius: var(--radius-full); background: var(--brand); color: var(--text-on-brand);
+  border-radius: var(--radius-full); background: var(--accent); color: var(--text-on-brand);
 }
 
 /* --- The spine ------------------------------------------------------------- */
@@ -298,7 +298,7 @@
 
 .biv__order {
   margin: var(--space-6) 0 0; padding: var(--space-5);
-  border-left: 2px solid var(--brand); background: var(--surface-sunken);
+  border-left: 2px solid var(--accent); background: var(--surface-sunken);
   font-size: var(--fs-md); color: var(--text-body); line-height: 1.55;
 }
 
@@ -375,7 +375,7 @@
   .biv__peek > span { display: inline-flex; align-items: center; gap: var(--space-4); }
   .biv__peek b {
     display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px;
-    border-radius: var(--radius-full); background: var(--brand); color: var(--text-on-brand);
+    border-radius: var(--radius-full); background: var(--accent); color: var(--text-on-brand);
     font-size: var(--fs-xs); font-weight: var(--fw-semibold);
   }
   .biv__peek svg { color: var(--text-muted); transition: transform var(--dur-normal) var(--ease-standard); }

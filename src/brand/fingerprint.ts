@@ -37,7 +37,16 @@
 
 /* Back, and only for the device catalogue. See DEVICE_ATTRIBUTES below: the two
    kinds ask different questions and were never well served by one list. */
-export type AttrCategory = 'Hardware' | 'Browser' | 'Security' | 'Network' | 'Behaviour'
+/* Seven, and two of them belong to the requirements catalogue rather than the
+   risk one.
+
+   `Platform` and `Client` are not filing for the risk list — a machine's OS is
+   `Hardware` there, because what that list wants to know is how hard a signal
+   is to forge. They exist because the requirements list now asks two questions
+   the risk list never does: what is this device RUNNING, and what miniOrange
+   software is on it. See `categoriesFor`, which is why one union can serve two
+   catalogues that file differently. */
+export type AttrCategory = 'Platform' | 'Hardware' | 'Browser' | 'Security' | 'Client' | 'Network' | 'Behaviour'
 
 export type Priority = 'High' | 'Medium' | 'Low'
 
@@ -117,11 +126,28 @@ export type AttrConfig =
          names the platforms a profile checks, so this is now read rather than
          reconstructed. */
       platform: string
-      /* What may be chosen, most recent first. Plain version numbers: the
-         marketing name is in the label beside it where one helps, and a value
-         that has to be parsed back out of "macOS 14 (Sonoma)" is a value that
-         will eventually be parsed wrong. */
-      versions: { value: string; label?: string }[]
+      /* What may be chosen, most recent first — WHEN there is a list worth
+         offering. Plain version numbers: the marketing name goes in the label
+         beside it where one helps, and a value that has to be parsed back out
+         of "macOS 14 (Sonoma)" is a value that will eventually be parsed wrong.
+
+         Optional, and the two cases are genuinely different rather than one
+         being unfinished.
+
+         An OPERATING SYSTEM has a handful of majors that everybody knows and
+         that change once a year: Windows 10 and 11, iOS 17 and 18. A list there
+         is complete, short, and stops a typed floor — "Windows 11", "11 ",
+         "22h2" — from silently parsing as nothing, which is what a free field
+         allowed and never validated.
+
+         A BROWSER does not. Chrome ships a major every four weeks, so any list
+         is stale within the month and the floor somebody wants is usually the
+         one that shipped after this file was last edited. The same is true of
+         the client apps. Those keep the typed field and its `placeholder`,
+         which is what `AttrControl` falls back to when this is absent. */
+      versions?: { value: string; label?: string }[]
+      /** Real examples, for the attributes that are typed rather than chosen. */
+      placeholder?: string
       hint: string
     }
 
@@ -165,28 +191,46 @@ export interface Attribute {
   config?: AttrConfig
 }
 
-/* --- The master, and why it is five --------------------------------------------
-   This was thirty-eight in the sheet, then fourteen on the screen, and it is
-   five here. That is not attrition, it is the list narrowing onto the two
-   questions a device profile is actually asked in this product:
+/* --- The requirements catalogue, and why it grew from five to thirteen ----------
+   This was thirty-eight in the sheet, then fourteen on the screen, then five,
+   and it is thirteen. The five were one form-factor question and four version
+   questions, and the argument for stopping there was that a device profile is
+   asked two things: what KIND of device is this, and what is it RUNNING.
 
-     what KIND of device is this, and what is it RUNNING?
+   That argument was right and the list was still short of it, in a way this
+   file already said out loud. The note above `seedProfiles` names three
+   requirements that had nowhere to live — screen lock, browser floors, and
+   posture generally — records that the rules needing them were shipped with
+   those clauses simply dropped, and says the fix is a catalogue change with its
+   own argument. This is that change, and the argument is that "what is it
+   running" was being read too narrowly. An operating system is one answer. A
+   browser is another, and on a web SSO it is the thing actually rendering the
+   session. Whether the OS is still the one the vendor shipped is a third, and
+   it is the one that decides whether the other two can be believed at all.
 
-   Everything else the sheet offered — canvas hashes, ISP, MAC, TPM, geolocation
-   — answers "is this the same machine as last time", which is a different
-   product surface with different plumbing. They are not deleted from the sheet;
-   they are simply not what this screen configures today.
+   So the list is four groups rather than one flat five, and it is filed now —
+   five rows do not need a taxonomy and thirteen do:
 
-   The five are one form-factor question and four version questions, one per
-   platform. Four rather than one combined "OS version" because a comparison
-   only means anything inside a platform: "greater than 14" is a coherent thing
-   to ask of Android and of iOS, and asking it of both at once is not a
-   question. A profile names the platforms it cares about and leaves the rest
-   alone.
+     Platform  what the device is and what OS it runs
+     Browser   a version floor per family, which is the allowlist that was cut
+     Security  integrity and screen lock — the posture checks with no home
+     Client    the miniOrange app and agent, by version
 
-   Everything here is readable without an agent — a form factor and an OS
-   version arrive with the request — so nothing in this list carries
-   `needsAgent`, and an agentless profile can use all five. */
+   Still no `needsAgent` on anything here, and that is a deliberate answer to an
+   obvious objection: only the miniOrange client can report a jailbreak or a
+   screen lock, so surely those need an agent? They do — and in a REQUIREMENTS
+   catalogue that is not a reason to hide the row, it is the requirement itself.
+   A handset with no client cannot show a screen lock is set, so it fails "a
+   screen lock is set", exactly as a handset on Android 12 fails "≥ 13". The
+   risk catalogue is the one where a signal that never arrives is dangerous —
+   there it silently never mismatches, and the profile is quietly weaker than it
+   reads. Here an absent signal is a failed condition, which is the whole point.
+
+   The consequence, said plainly: `asksReach('os')` stays false, an OS profile
+   is still never asked the agent question, and this list is still offered
+   whole. What changes is that it is now longer than the small-catalogue path
+   allows, so it arrives with a search field and a category filter — which at
+   thirteen rows is the right control and at five was not. */
 /* The comparisons a version supports — a symbol, and the words for it.
 
    Stored as an id and shown as a SYMBOL, which is the shape Figma's conditional
@@ -224,7 +268,7 @@ export const versionOp = (id: string): VersionOp =>
 
 export const OS_ATTRIBUTES: Attribute[] = [
   {
-    id: 'device-type', name: 'Device type',
+    id: 'device-type', category: 'Platform', name: 'Device type',
     purpose: 'The form factor the request came from. A laptop and a phone are not the same risk, and some apps have no business being opened on one of them.',
     priority: 'Low', weight: 5, phase: 1,
     /* Three, and no "Desktop". The distinction that pays is portable versus
@@ -238,7 +282,7 @@ export const OS_ATTRIBUTES: Attribute[] = [
     },
   },
   {
-    id: 'os-windows', name: 'Windows OS version',
+    id: 'os-windows', category: 'Platform', name: 'Windows OS version',
     purpose: 'The Windows build the request came from. Compare it to draw a floor under what may sign in.',
     priority: 'High', weight: 20, phase: 1,
     config: {
@@ -264,7 +308,7 @@ export const OS_ATTRIBUTES: Attribute[] = [
     },
   },
   {
-    id: 'os-android', name: 'Android OS version',
+    id: 'os-android', category: 'Platform', name: 'Android OS version',
     purpose: 'The Android version the request came from. Compare it to keep unpatched handsets out.',
     priority: 'High', weight: 20, phase: 1,
     config: {
@@ -287,7 +331,7 @@ export const OS_ATTRIBUTES: Attribute[] = [
     },
   },
   {
-    id: 'os-ios', name: 'iOS version',
+    id: 'os-ios', category: 'Platform', name: 'iOS version',
     purpose: 'The iOS version the request came from. Compare it to keep unpatched phones out.',
     priority: 'High', weight: 20, phase: 1,
     config: {
@@ -309,7 +353,7 @@ export const OS_ATTRIBUTES: Attribute[] = [
     },
   },
   {
-    id: 'os-macos', name: 'macOS version',
+    id: 'os-macos', category: 'Platform', name: 'macOS version',
     purpose: 'The macOS version the request came from. Compare it to draw a floor under what may sign in.',
     priority: 'High', weight: 20, phase: 1,
     config: {
@@ -329,6 +373,170 @@ export const OS_ATTRIBUTES: Attribute[] = [
         { value: '12', label: 'macOS 12 · Monterey' },
       ],
       hint: 'The floor, not the exact release — a Mac at or above this passes.',
+    },
+  },
+
+  /* --- Browser: the allowlist that was cut, in the shape that works ----------
+
+     Four, one per family, and it is the OS argument again: a version
+     comparison only means something inside a product. "≥ 120" is a floor for
+     Chrome and a floor for Edge and they are not the same number in the same
+     week, so asking it of "the browser" is not a question.
+
+     Deliberately a floor rather than a list of permitted names, which is what
+     the cut condition was. A tenant enforcing browser hygiene is not saying
+     "Chrome only" — it is saying "not the Chrome from eighteen months ago",
+     and a name allowlist cannot express that at all. It is also the cheapest
+     control in this catalogue: the browser states its version on every
+     request, with nothing installed and nothing to enrol.
+
+     A family a profile says nothing about is unconstrained. That is the same
+     rule the OS floors follow, and it is what makes these safe to add: a
+     profile naming a Chrome floor does not thereby ban Firefox. */
+  {
+    id: 'browser-chrome', category: 'Browser', name: 'Chrome version',
+    purpose: 'The Chrome build the request came from. Chrome ships a major version roughly every four weeks, so a floor here decays into a patch-level control on its own.',
+    priority: 'Medium', weight: 10, phase: 1,
+    config: {
+      kind: 'version',
+      platform: 'Chrome',
+      label: 'Chrome version',
+      value: { op: 'gte', value: '120' },
+      placeholder: '120, 131, 131.0.6778.86',
+      hint: 'The major number is usually what you mean — 120, 131.',
+    },
+  },
+  {
+    id: 'browser-edge', category: 'Browser', name: 'Edge version',
+    purpose: 'The Edge build the request came from. Numbered alongside Chrome since it moved to Chromium, and still worth stating separately — a managed Windows estate updates it on its own schedule.',
+    priority: 'Medium', weight: 10, phase: 1,
+    config: {
+      kind: 'version',
+      platform: 'Edge',
+      label: 'Edge version',
+      value: { op: 'gte', value: '120' },
+      placeholder: '120, 131, 131.0.2903.70',
+      hint: 'The major number — 120, 131.',
+    },
+  },
+  {
+    id: 'browser-firefox', category: 'Browser', name: 'Firefox version',
+    purpose: 'The Firefox build the request came from. Its own release train and its own numbers, which is why it is not folded in with the Chromium pair.',
+    priority: 'Medium', weight: 10, phase: 1,
+    config: {
+      kind: 'version',
+      platform: 'Firefox',
+      label: 'Firefox version',
+      value: { op: 'gte', value: '128' },
+      placeholder: '128, 133, 133.0.3',
+      hint: 'The major number — 128, 133. ESR builds report their own.',
+    },
+  },
+  {
+    id: 'browser-safari', category: 'Browser', name: 'Safari version',
+    purpose: 'The Safari build the request came from. Tied to the OS release rather than shipped on its own, so a floor here and a macOS floor usually move together.',
+    priority: 'Medium', weight: 10, phase: 1,
+    config: {
+      kind: 'version',
+      platform: 'Safari',
+      label: 'Safari version',
+      value: { op: 'gte', value: '17' },
+      placeholder: '17, 18, 18.1.1',
+      hint: 'Major, or major and minor — 17, 18.1.',
+    },
+  },
+
+  /* --- Security: the two posture checks that had nowhere to live -------------
+
+     Both are stated as a REQUIREMENT rather than as a detection with an
+     outcome attached, and that is the difference between this catalogue and
+     the risk one. The risk list's `root` carries "When detected → Deny /
+     Challenge / Flag only", which puts the decision inside the library object:
+     a rule saying "matches profile X" cannot then say what happens, because X
+     already said. Here the profile states a condition and the RULE decides —
+     which is the division of labour every other condition in this product
+     follows, and the reason a policy can now answer a rooted handset with a
+     flag on one app and a deny on another. */
+  {
+    id: 'integrity', category: 'Security', name: 'Device integrity',
+    purpose: 'Whether the operating system is still the one the vendor shipped. A rooted, jailbroken or tampered device can report whatever it likes about every other check in this profile, so this is the row that decides whether the rest mean anything.',
+    priority: 'High', weight: 30, phase: 1,
+    /* `phase: 1` — this collects today, and the contrast with the risk
+       catalogue's `root` is the point rather than an inconsistency.
+
+       That row is `phase: 2` and `needsAgent`, because the collector it names
+       is the Windows desktop agent, which does not inspect handsets. This one
+       is read by the miniOrange Authenticator on the device itself, which
+       attests its own integrity as part of doing its job. Same fact, two
+       collectors, and only one of them exists on a phone. */
+    /* A ladder rather than three tick boxes, and the ladder is ordered: each
+       option is the one above it plus one more class of device. Three
+       independent switches would let somebody build "tampered is fine but
+       rooted is not", which is not a posture anybody holds — tampering is the
+       broader fact and rooting is one way to achieve it. */
+    config: {
+      kind: 'choice',
+      label: 'Require',
+      value: 'Not rooted or jailbroken',
+      options: [
+        'Not rooted or jailbroken',
+        'Not rooted, jailbroken or tampered',
+        'Not rooted, tampered, or running in an emulator',
+      ],
+    },
+  },
+  {
+    id: 'screen-lock', category: 'Security', name: 'Screen lock',
+    purpose: 'Whether the device locks itself when it is put down. A handset with no passcode is not a device that might be stolen — it is a signed-in session that anybody who picks it up inherits.',
+    priority: 'High', weight: 20, phase: 1,
+    config: {
+      kind: 'choice',
+      label: 'Require',
+      value: 'A screen lock is set',
+      options: ['A screen lock is set', 'PIN, passcode or password', 'Biometric unlock'],
+    },
+  },
+
+  /* --- Client: the miniOrange software, by version ---------------------------
+
+     Two rows, not one, and the reason is the reason there are four OS rows.
+     The app and the agent are separate products on separate release trains,
+     and "≥ 6.4" is a sentence about one of them. A single "miniOrange version"
+     floor would be a number that means one thing on a phone and another on a
+     laptop, which is the shape this catalogue has refused everywhere else.
+
+     Worth stating plainly because it is easy to read this as bureaucracy: a
+     version floor on the client is not housekeeping, it is what makes the
+     other controls enforceable. Number matching, verified push and the
+     integrity checks above each arrived in a release. A tenant that has
+     switched them on has switched them on for the handsets that can do them,
+     and has no way to say so — until it can require the release. */
+  {
+    id: 'mo-authenticator', category: 'Client', name: 'miniOrange Authenticator version',
+    purpose: 'The version of the authenticator app on the handset. Number matching, verified push and the integrity signals above each shipped in a release — a floor here is what turns them from settings into requirements.',
+    /* The app reports its own version on every request it takes part in, which
+       is as close to free as a signal gets. */
+    priority: 'High', weight: 20, phase: 1,
+    config: {
+      kind: 'version',
+      platform: 'miniOrange Authenticator',
+      label: 'Authenticator version',
+      value: { op: 'gte', value: '6.4' },
+      placeholder: '6.4, 6.4.1',
+      hint: 'Major and minor — 6.4 — unless a specific build is what you mean.',
+    },
+  },
+  {
+    id: 'mo-agent', category: 'Client', name: 'miniOrange Agent version',
+    purpose: 'The version of the desktop agent. Separate from the app because they are separate products, and a floor meant for one must not be readable as a floor on the other.',
+    priority: 'Medium', weight: 20, phase: 1,
+    config: {
+      kind: 'version',
+      platform: 'miniOrange Agent',
+      label: 'Agent version',
+      value: { op: 'gte', value: '4.2' },
+      placeholder: '4.2, 4.2.7',
+      hint: 'The version the console reports for the agent — 4.2, 4.2.7.',
     },
   },
 ]
@@ -583,13 +791,37 @@ export const DEVICE_ATTRIBUTES: Attribute[] = [
   },
 ]
 
-export const CATEGORIES: { id: AttrCategory; label: string; blurb: string }[] = [
+/* The filing scheme, PER CATALOGUE, and it has to be per catalogue.
+
+   It was one list, which was correct while only one catalogue had categories.
+   The requirements list files differently — an OS version is `Platform` there
+   and `Hardware` in the risk list, because the two lists sort by different
+   questions: one asks what the device must be, the other asks how hard a signal
+   is to forge.
+
+   One shared list would also have lied in a specific, visible way. The picker's
+   filter counts `offered.filter(a => a.category === c.id)` and labels an empty
+   category "needs an agent" — true for Security on an agentless risk profile,
+   and nonsense for Behaviour on a requirements profile, which has no behaviour
+   rows and never will. A category that does not apply to a catalogue should not
+   be in that catalogue's filter at all. */
+const OS_CATEGORIES: { id: AttrCategory; label: string; blurb: string }[] = [
+  { id: 'Platform', label: 'Platform', blurb: 'What the device is, and what it runs. Arrives with the request.' },
+  { id: 'Browser', label: 'Browser', blurb: 'A version floor per family. The cheapest patch-level control there is.' },
+  { id: 'Security', label: 'Security', blurb: 'Whether the device is still the one the vendor shipped, and whether it locks.' },
+  { id: 'Client', label: 'Client', blurb: 'The miniOrange app and agent, by version.' },
+]
+
+const DEVICE_CATEGORIES: { id: AttrCategory; label: string; blurb: string }[] = [
   { id: 'Hardware', label: 'Hardware', blurb: 'The machine itself. The strongest signals and the slowest to change.' },
   { id: 'Browser', label: 'Browser', blurb: 'What the browser reports. Easy to collect, easy to change.' },
   { id: 'Security', label: 'Security', blurb: 'Whether the device can be trusted to report the rest honestly.' },
   { id: 'Network', label: 'Network', blurb: 'Where the sign-in came from. Moves with the person.' },
   { id: 'Behaviour', label: 'Behaviour', blurb: 'Patterns over time. Needs history before it says anything.' },
 ]
+
+export const categoriesFor = (mode: ProfileMode): { id: AttrCategory; label: string; blurb: string }[] =>
+  mode === 'os' ? OS_CATEGORIES : DEVICE_CATEGORIES
 
 /* Which catalogue a profile draws from. The two are disjoint in intent and
    overlap in one id — `device-type` is a sensible signal either way — so this
@@ -917,9 +1149,17 @@ export function valueLabel(a: Attribute, v: AttrConfigValue | undefined): string
    signing in passes every condition on it — and the old subtitle printed that
    state as "Attribute match · 1 attribute", which reads like a configured
    profile. */
+/* `category === 'Platform'`, not "every version attribute".
+
+   It was the latter, and that was the same statement while the only version
+   rows were the four operating systems. There are ten now — four browsers and
+   two miniOrange clients joined them — and a subtitle reading "Windows, Chrome,
+   miniOrange Authenticator" would be calling three different kinds of thing a
+   platform. The sentence this feeds is about which operating systems a profile
+   pins; the other floors are counted with everything else. */
 export const platformsNamed = (p: FingerprintProfile): string[] =>
   CATALOGUE[p.mode]
-    .filter((a) => a.config?.kind === 'version' && p.enabled.includes(a.id))
+    .filter((a) => a.category === 'Platform' && a.config?.kind === 'version' && p.enabled.includes(a.id))
     .map((a) => (a.config as { platform: string }).platform)
 
 /* A roster keyed on an address the profile never reads.
@@ -1265,6 +1505,199 @@ export const seedProfiles: FingerprintProfile[] = [
     reach: 'agentless',
     registration: 'self',
     maxDevices: 3,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: true,
+    usedIn: 0,
+  },
+
+  /* --- The profiles the new requirements exist for --------------------------
+
+     Five, and they are deliberately NARROW. Each one names as few requirements
+     as it can and still be worth referencing, because a rule composes profiles
+     — `matches A and matches B` — and the alternative is a handful of fat
+     profiles that overlap, so that changing an OS floor for one policy silently
+     moves it for four others. `fp-compliant` is the exception and says so.
+
+     The floor VALUES are one release behind current, on purpose. A demo estate
+     where every device passes every requirement demonstrates nothing: the point
+     of an adaptive policy is the population that sits between "fine" and
+     "refused", and these floors are set so that population exists. */
+
+  {
+    id: 'fp-os-floor',
+    name: 'Minimum supported OS',
+    /* The FLOOR, as distinct from `fp-patched`, which is the current builds.
+       Two profiles rather than one because the interesting population is
+       between them: a device that satisfies this and fails that is behind but
+       supported, which is the only state a "warn" outcome has anything to say
+       about. With one profile a policy can only sort devices into two piles,
+       and the whole argument for the third outcome is that two is not enough. */
+    mode: 'os',
+    enabled: ['os-windows', 'os-macos', 'os-ios', 'os-android'],
+    config: {
+      'os-windows': { op: 'gte', value: '10' },
+      'os-macos': { op: 'gte', value: '13' },
+      'os-ios': { op: 'gte', value: '16' },
+      'os-android': { op: 'gte', value: '12' },
+    },
+    weights: {},
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: DEFAULT_MAX_DEVICES,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: true,
+    usedIn: 0,
+  },
+
+  {
+    id: 'fp-mobile',
+    name: 'Any phone or tablet',
+    /* One requirement and no floor of any kind, which makes it look pointless
+       until you need to say "on a handset" in a rule.
+
+       A screen-lock policy is the case. "Does not match `fp-mobile-locked`" is
+       true of every laptop in the tenant, because a laptop is not a locked
+       handset — so a rule written with that condition alone denies the entire
+       desktop estate. Pairing it with this profile is what narrows the
+       statement to the population it was written about. A profile that names a
+       form factor and nothing else is the honest way to say "when this is a
+       phone". */
+    mode: 'os',
+    enabled: ['device-type'],
+    config: { 'device-type': 'Mobile' },
+    weights: {},
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: DEFAULT_MAX_DEVICES,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: true,
+    usedIn: 0,
+  },
+
+  {
+    id: 'fp-integrity',
+    name: 'Untampered device',
+    /* One requirement, and the narrowest profile here. It is separate from
+       every other posture check because it is the one that decides whether the
+       others can be believed: a rooted handset reports a screen lock it does
+       not have. A rule that wants both states both, in that order, and the
+       order is visible on the card. */
+    mode: 'os',
+    enabled: ['integrity'],
+    config: { integrity: 'Not rooted, jailbroken or tampered' },
+    weights: {},
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: DEFAULT_MAX_DEVICES,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: true,
+    usedIn: 0,
+  },
+
+  {
+    id: 'fp-mobile-locked',
+    name: 'Phones and tablets with a screen lock',
+    /* The form factor is part of the requirement rather than incidental to it.
+       "A screen lock is set" is a condition a laptop answers differently and
+       mostly trivially; the case this exists for is the handset somebody
+       carries, and pinning the device type is what stops the profile reading as
+       a claim about the whole estate. */
+    mode: 'os',
+    enabled: ['device-type', 'screen-lock'],
+    config: { 'device-type': 'Mobile', 'screen-lock': 'PIN, passcode or password' },
+    weights: {},
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: DEFAULT_MAX_DEVICES,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: true,
+    usedIn: 0,
+  },
+
+  {
+    id: 'fp-client-current',
+    name: 'Current miniOrange client',
+    /* Both products, one profile, and this is the one place the two-row split
+       in the catalogue pays visibly: the app floor and the agent floor are
+       different numbers, and a tenant that pinned "6.4" across both would be
+       pinning a version the agent has never had. */
+    mode: 'os',
+    enabled: ['mo-authenticator', 'mo-agent'],
+    config: {
+      'mo-authenticator': { op: 'gte', value: '6.4' },
+      'mo-agent': { op: 'gte', value: '4.2' },
+    },
+    weights: {},
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: DEFAULT_MAX_DEVICES,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: true,
+    usedIn: 0,
+  },
+
+  {
+    id: 'fp-browser-current',
+    name: 'Supported browser versions',
+    /* Four floors, one per family, and a family this profile says nothing about
+       is unconstrained — which is the property that makes a browser floor safe
+       to apply broadly. This is not "Chrome only"; it is "not the Chrome from
+       eighteen months ago", which is the control a tenant actually wants and
+       the one the cut condition could never express. */
+    mode: 'os',
+    enabled: ['browser-chrome', 'browser-edge', 'browser-firefox', 'browser-safari'],
+    config: {
+      'browser-chrome': { op: 'gte', value: '126' },
+      'browser-edge': { op: 'gte', value: '126' },
+      'browser-firefox': { op: 'gte', value: '128' },
+      'browser-safari': { op: 'gte', value: '17' },
+    },
+    weights: {},
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: DEFAULT_MAX_DEVICES,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: true,
+    usedIn: 0,
+  },
+
+  {
+    id: 'fp-compliant',
+    name: 'Fully compliant device',
+    /* The fat one, and the exception to the rule above it.
+
+       It exists because "device compliance" is a thing tenants ask for as one
+       word — OS current, not tampered, locked, running a client that can be
+       trusted — and a rule that spelled all four out would carry four
+       conditions saying one thing. Referencing this says the one thing.
+
+       The cost is real and is the cost of every composite: raising the Android
+       floor here moves it for every policy pointing at this profile, and a
+       policy that wanted three of the four legs cannot use it. Those policies
+       compose the narrow profiles above instead, which is why both shapes
+       exist. */
+    mode: 'os',
+    enabled: ['os-windows', 'os-macos', 'os-ios', 'os-android', 'integrity', 'screen-lock', 'mo-authenticator'],
+    config: {
+      'os-windows': { op: 'gte', value: '11' },
+      'os-macos': { op: 'gte', value: '15' },
+      'os-ios': { op: 'gte', value: '18' },
+      'os-android': { op: 'gte', value: '14' },
+      integrity: 'Not rooted, jailbroken or tampered',
+      'screen-lock': 'A screen lock is set',
+      'mo-authenticator': { op: 'gte', value: '6.4' },
+    },
+    weights: {},
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: DEFAULT_MAX_DEVICES,
     roster: null,
     autoRegister: false,
     restrictionSet: true,

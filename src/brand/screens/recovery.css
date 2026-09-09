@@ -39,8 +39,8 @@
 .bv5__seclabel span {
   display: grid; place-items: center;
   width: 18px; height: 18px; border-radius: var(--radius-sm);
-  background: var(--brand-subtle-bg); border: 1px solid var(--brand-subtle-border);
-  color: var(--brand-active); letter-spacing: 0;
+  background: var(--accent-soft); border: 1px solid var(--accent-soft-border);
+  color: var(--accent-strong); letter-spacing: 0;
 }
 .bv5__seccard {
   background: var(--surface-raised);
@@ -83,7 +83,7 @@
 /* The border and tint carry the selection; the tick confirms it without
    relying on colour alone. No paired radio dot — with three cards that is
    three affordances doing one card's job. */
-.bv5__radio.is-on { border-color: var(--brand); background: var(--brand-subtle-bg); }
+.bv5__radio.is-on { border-color: var(--accent); background: var(--accent-soft); }
 .bv5__radio.is-blocked { opacity: 0.55; cursor: not-allowed; }
 .bv5__radio-body { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
 .bv5__radio strong {
@@ -95,7 +95,7 @@
   display: grid; place-items: center;
   width: 17px; height: 17px; border-radius: var(--radius-full);
 }
-.bv5__radio-tick { background: var(--brand); color: var(--text-on-brand); }
+.bv5__radio-tick { background: var(--accent); color: var(--text-on-brand); }
 .bv5__radio-lock { color: var(--text-muted); }
 
 /* Hugs its text. A pill radius stretched the full width of the pane reads as a
@@ -154,4 +154,4 @@
 
    These cards are `align-items: center` rather than flex-start, so unlike the
    device profile's there is no optical correction to make. */
-.bv5__radio.is-on .bv5__radio-ico { color: var(--brand-active); }
+.bv5__radio.is-on .bv5__radio-ico { color: var(--accent-strong); }

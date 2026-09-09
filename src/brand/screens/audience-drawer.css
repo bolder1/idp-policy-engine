@@ -57,7 +57,7 @@
   background: var(--surface-inset); border: 1px solid transparent; border-radius: var(--radius-sm);
   font-family: inherit; font-size: var(--fs-md); color: var(--text-primary);
 }
-.baud__search input:focus-visible { outline: none; border-color: var(--brand); }
+.baud__search input:focus-visible { outline: none; border-color: var(--ctl-border-focus); }
 
 .baud__tabs {
   flex: none; display: flex; gap: var(--space-5);
@@ -70,11 +70,11 @@
   background: none; border: none; border-bottom: 2px solid transparent;
   font-family: inherit; font-size: var(--fs-md); color: var(--text-secondary); cursor: pointer;
 }
-.baud__tabs button.is-on { color: var(--text-primary); border-bottom-color: var(--brand); }
+.baud__tabs button.is-on { color: var(--text-primary); border-bottom-color: var(--accent); }
 .baud__tabs em {
   font-style: normal; font-size: var(--fs-xs);
   padding: 1px 6px; border-radius: var(--radius-full);
-  background: var(--brand-subtle-bg); color: var(--brand);
+  background: var(--accent-soft); color: var(--accent);
 }
 
 .baud__list { flex: 1; min-height: 0; margin: 0; padding: var(--space-3) var(--space-4); list-style: none; overflow-y: auto; }
@@ -88,7 +88,7 @@
   flex: none; display: grid; place-items: center; width: 16px; height: 16px;
   border: 1.5px solid var(--border-strong); border-radius: 4px;
 }
-.baud__list > li > button.is-on .baud__box { background: var(--brand); border-color: var(--brand); }
+.baud__list > li > button.is-on .baud__box { background: var(--accent); border-color: var(--accent); }
 .baud__list > li > button.is-on .baud__box::after {
   content: ''; width: 8px; height: 4px;
   border-left: 2px solid var(--text-on-brand); border-bottom: 2px solid var(--text-on-brand);
@@ -103,7 +103,7 @@
 .baud__avatar {
   flex: none; display: grid; place-items: center; width: 26px; height: 26px;
   border-radius: var(--radius-full);
-  background: var(--brand-subtle-bg); color: var(--brand);
+  background: var(--accent-soft); color: var(--accent);
   font-size: 10px; font-weight: var(--fw-semibold);
 }
 .baud__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }

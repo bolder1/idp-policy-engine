@@ -34,8 +34,8 @@
   transition: color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
 }
 .bm8__tab:hover { color: var(--text-secondary); }
-.bm8__tab.is-on { color: var(--text-primary); font-weight: var(--fw-semibold); border-bottom-color: var(--brand); }
-.bm8__tab:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.bm8__tab.is-on { color: var(--text-primary); font-weight: var(--fw-semibold); border-bottom-color: var(--accent); }
+.bm8__tab:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
 
 .bm8__pane { display: flex; flex-direction: column; gap: 14px; }
 
@@ -60,12 +60,14 @@
    would read as a pair of buttons. */
 .bm8__sectitle { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+/* The shared pill geometry - see the --pill-* block in console-theme.css. */
 .bm8__chip {
-  flex: none; padding: 3px 9px; border-radius: var(--radius-pill);
+  flex: none; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  line-height: var(--pill-line);
   background: var(--surface-inset);
-  border: 1px solid var(--border-subtle);
+  border: var(--bw-thin) solid var(--border-subtle);
   color: var(--text-secondary);
-  font-size: var(--fs-xs); font-weight: var(--fw-medium); white-space: nowrap;
+  font-size: var(--pill-fs); font-weight: var(--pill-fw); white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .bm8__chip.is-quiet { background: var(--surface-inset); color: var(--text-tertiary); }
@@ -73,8 +75,8 @@
 .bm8__search {
   display: flex; align-items: center; gap: 8px;
   height: var(--ctl-height-md); padding: 0 11px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   color: var(--text-muted);
 }
 .bm8 .bm8__search input {
@@ -83,7 +85,7 @@
   font-size: var(--fs-md); color: var(--text-primary);
 }
 .bm8 .bm8__search input:focus-visible { outline: none; }
-.bm8__search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bm8__search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* --- The primary factor ---------------------------------------------------------
    Password, above the eleven and outside them.
@@ -102,12 +104,15 @@
 .bm8__card--locked { cursor: default; }
 
 /* The row carries no control at all, so its whole state has to be in words. */
+/* The shared pill geometry - see the --pill-* block in console-theme.css. */
 .bm8__always {
   display: inline-flex; align-items: center;
-  padding: 2px 8px; border-radius: var(--radius-sm);
+  padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  line-height: var(--pill-line);
   background: var(--fb-positive-bg); color: var(--fb-positive-fg);
-  font-style: normal; font-size: 10px; font-weight: var(--fw-medium);
-  letter-spacing: 0.02em; white-space: nowrap;
+  border: var(--bw-thin) solid var(--fb-positive-border);
+  font-style: normal; font-size: var(--pill-fs); font-weight: var(--pill-fw);
+  letter-spacing: 0; white-space: nowrap;
 }
 
 /* --- The rows ------------------------------------------------------------------ */
@@ -172,8 +177,8 @@ button.bm8__card:hover { background: var(--surface-sunken); }
 button.bm8__card:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
 
 /* The chevron leans the way the click goes. */
-button.bm8__card:hover .bm8__right > svg { transform: translateX(3px); color: var(--brand-active); }
-button.bm8__card:hover .bm8__name { color: var(--brand-active); }
+button.bm8__card:hover .bm8__right > svg { transform: translateX(3px); color: var(--accent-strong); }
+button.bm8__card:hover .bm8__name { color: var(--accent-strong); }
 .bm8__card > svg, .bm8__right > svg { color: var(--text-muted); transition: transform var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard); }
 .bm8__name { transition: color var(--dur-fast) var(--ease-standard); }
 
@@ -200,7 +205,7 @@ button.bm8__card:hover .bm8__name { color: var(--brand-active); }
    the left edge of both; two different chips down one column is a difference
    the reader has to account for and there is nothing behind it. Scoped to these
    rows, because `.bv5__mico` is also the recovery screen's, on other surfaces. */
-.bm8__card .bv5__mico { background: var(--brand-subtle-bg); color: var(--brand-active); }
+.bm8__card .bv5__mico { background: var(--accent-soft); color: var(--accent-strong); }
 
 /* Brand where the family has something switched on.
 
@@ -219,7 +224,7 @@ button.bm8__card:hover .bm8__name { color: var(--brand-active); }
 
    `live > 0` still drives `.is-off`, which dims the NAME and the description.
    That is the row saying it, once, in the place a reader is already looking. */
-.bm8__tile.is-brand { background: var(--brand-subtle-bg); color: var(--brand-active); }
+.bm8__tile.is-brand { background: var(--accent-soft); color: var(--accent-strong); }
 
 /* Untouched: is-warn, is-error and the --fb-* feedback colours. Those are the
    linter's verdict and a control's state, not decoration. */
@@ -243,10 +248,12 @@ button.bm8__card:hover .bm8__name { color: var(--brand-active); }
 .bm8__usage.is-quiet { color: var(--text-muted); }
 
 .bm8__badge {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 1px 7px; border-radius: var(--radius-sm);
+  display: inline-flex; align-items: center; gap: var(--pill-gap);
+  padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  line-height: var(--pill-line);
   background: var(--fb-positive-bg); color: var(--fb-positive-fg);
-  font-style: normal; font-size: 10px; font-weight: var(--fw-medium); white-space: nowrap;
+  border: var(--bw-thin) solid var(--fb-positive-border);
+  font-style: normal; font-size: var(--pill-fs); font-weight: var(--pill-fw); white-space: nowrap;
 }
 
 /* --- The tenant default ----------------------------------------------------------
@@ -254,7 +261,7 @@ button.bm8__card:hover .bm8__name { color: var(--brand-active); }
    property of the method and true whether or not anyone chose it, while this is
    a decision somebody made. Two green badges on one row would read as two
    grades of the same thing. */
-.bm8__badge--default { background: var(--brand-subtle-bg); color: var(--brand-active); }
+.bm8__badge--default { background: var(--accent-soft); color: var(--accent-strong); }
 
 /* --- Newly added ------------------------------------------------------------------
    A new integration is worth showing off, and eleven identical white cards is
@@ -275,11 +282,15 @@ button.bm8__card:hover .bm8__name { color: var(--brand-active); }
    card or an active row means everywhere else in this console. A promotional
    marker that impersonates a state is worse than no marker, because the state
    is the thing an admin acts on. The row stays white; the pill does the work. */
+/* The one solid-brand pill on the screen, and it keeps that - but at the
+   family size and case. It was 9px uppercase, the smallest type in the product,
+   on the one label whose whole job is to be noticed. */
 .bm8__new {
-  flex: none; padding: 1px 7px; border-radius: var(--radius-pill);
-  background: var(--brand); color: var(--text-on-brand);
-  font-style: normal; font-size: 9px; font-weight: var(--fw-semibold);
-  letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap;
+  flex: none; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  line-height: var(--pill-line);
+  background: var(--brand-on-fill); color: var(--text-on-brand);
+  font-style: normal; font-size: var(--pill-fs); font-weight: var(--fw-semibold);
+  letter-spacing: 0; white-space: nowrap;
 }
 
 .bm8__right {
@@ -311,12 +322,14 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
 
    Outlined rather than filled, so a row can carry two chips without them
    competing; the enabled chip is the primary state and this qualifies it. */
+/* The shared pill geometry - see the --pill-* block in console-theme.css. */
 .bm8__txn {
   display: inline-flex; align-items: center;
-  padding: 3px 9px; border-radius: var(--radius-pill);
-  border: 1px solid var(--border-default);
+  padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  line-height: var(--pill-line);
+  border: var(--bw-thin) solid var(--border-default);
   color: var(--text-tertiary);
-  font-size: var(--fs-xs); font-weight: var(--fw-medium); white-space: nowrap;
+  font-size: var(--pill-fs); font-weight: var(--pill-fw); white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .bm8__txn.is-low { border-color: var(--fb-notice-border); color: var(--fb-notice-fg); background: var(--fb-notice-bg); }
@@ -336,9 +349,14 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
   font-size: var(--fs-lg); font-weight: var(--fw-semibold);
   color: var(--text-primary); font-variant-numeric: tabular-nums; line-height: 1.15;
 }
+/* 12px, sentence case, tertiary. It was 10px uppercase in `--text-muted`, which
+   is 3.3:1 - under the 4.5:1 any word somebody is expected to read has to
+   clear - and letterspaced caps at that size are the hardest combination in the
+   product to read. It is the unit on a number; it has to be legible or the
+   number is just a number. */
 .bm8__reach em {
-  font-style: normal; font-size: 10px; letter-spacing: 0.04em;
-  text-transform: uppercase; color: var(--text-muted);
+  font-style: normal; font-size: var(--fs-xs); letter-spacing: 0;
+  color: var(--text-tertiary);
 }
 /* A category nobody has enrolled in. The dash holds the column open so the
    chips beside it stay in line. */
@@ -412,13 +430,13 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
   transition: color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
 }
 .bm8__dwtab:hover { color: var(--text-secondary); }
-.bm8__dwtab.is-on { color: var(--text-primary); font-weight: var(--fw-semibold); border-bottom-color: var(--brand); }
-.bm8__dwtab:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); border-radius: var(--radius-sm); }
+.bm8__dwtab.is-on { color: var(--text-primary); font-weight: var(--fw-semibold); border-bottom-color: var(--accent); }
+.bm8__dwtab:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
 .bm8__dwtab em {
   font-style: normal; padding: 0 6px; border-radius: var(--radius-sm);
   background: var(--surface-inset); font-size: var(--fs-xs); color: var(--text-muted);
 }
-.bm8__dwtab.is-on em { background: var(--brand-subtle-bg); color: var(--brand-active); }
+.bm8__dwtab.is-on em { background: var(--accent-soft); color: var(--accent-strong); }
 
 /* The settings list. The row brings its own dividers, so this only stacks. */
 .bm8__setlist { display: flex; flex-direction: column; }
@@ -427,11 +445,14 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
 /* The category holding it. Brand-tinted rather than green: the enabled chip
    beside it is a count, and this is a choice somebody made. */
 .bm8__defchip {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 8px; border-radius: var(--radius-pill);
-  background: var(--brand-subtle-bg); color: var(--brand-active);
-  font-style: normal; font-size: 10px; font-weight: var(--fw-semibold);
-  white-space: nowrap;}
+  display: inline-flex; align-items: center; gap: var(--pill-gap);
+  padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  line-height: var(--pill-line);
+  background: var(--accent-soft); color: var(--accent-strong);
+  border: var(--bw-thin) solid var(--accent-soft-border);
+  font-style: normal; font-size: var(--pill-fs); font-weight: var(--pill-fw);
+  white-space: nowrap;
+}
 
 /* --- The setup form ---------------------------------------------------------------
    Behind the Set up button. The blurb states what the integration actually
@@ -656,7 +677,7 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
    which is what the live page does and the right call for a form this small. */
 .bmu__card { flex-direction: column; align-items: stretch; gap: 0; }
 .bmu__head { display: flex; align-items: flex-start; gap: 14px; }
-.bmu__card.is-open { border-color: var(--brand-subtle-border); background: var(--surface-raised); }
+.bmu__card.is-open { border-color: var(--accent-soft-border); background: var(--surface-raised); }
 
 /* Enrolled, which is a different fact from the tenant having configured the
    method — hence a different word and a different colour from the admin chip. */
@@ -682,13 +703,13 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
 .bmu__form .bmu__field input,
 .bmu__form .bmu__field select {
   height: var(--ctl-height-md); padding: 0 11px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   font-size: var(--fs-md); color: var(--text-primary); font-family: inherit;
 }
 .bmu__form .bmu__field input:focus-visible,
 .bmu__form .bmu__field select:focus-visible {
-  outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-subtle-bg);
+  outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo);
 }
 .bmu__field--code input { max-width: 140px; font-family: var(--font-mono); letter-spacing: 0.18em; }
 

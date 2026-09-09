@@ -60,7 +60,7 @@
   color: var(--text-tertiary);
   min-width: 240px;
 }
-.brs__search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--focus-ring); }
+.brs__search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
 .brs__search input {
   flex: 1; min-width: 0;
   border: 0; background: none; outline: none;
@@ -94,9 +94,19 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 190px 190px 64px;
   align-items: center; gap: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--border-subtle);
+  /* The cell inset is the table recipe's, so a signal name starts on the same
+     pixel as a zone name and a policy name. It was 8px here — half of what
+     every other table in the console uses, which made this the one table whose
+     content ran into its own border. */
+  /* 10px, not 6px. Every row here is two lines — a name and a sentence — and
+     at 6px the descender of one row sat 12px from the cap-height of the next,
+     which is closer than the two lines INSIDE a row are to each other. The gap
+     between records has to beat the gap within one or the column stops reading
+     as rows at all. */
+  padding: 10px var(--table-cell-x);
+  border-top: 1px solid var(--table-rule);
 }
+.brs__row:not(.brs__row--head):hover { background: var(--table-row-hover); }
 .brs__row:first-child { border-top: 0; }
 /* The zones table's header, to the letter.
 
@@ -117,10 +127,10 @@
 .brs__row--head {
   min-height: var(--table-header-h);
   padding-top: 0; padding-bottom: 0;
-  background: var(--surface-raised);
-  border-bottom: var(--bw-thin) solid var(--border-default);
-  font-size: var(--fs-md); font-weight: 500;
-  letter-spacing: 0; text-transform: none; color: var(--text-primary);
+  background: var(--table-head-bg);
+  border-bottom: var(--bw-thin) solid var(--table-head-rule);
+  font-size: var(--table-head-fs); font-weight: var(--table-head-fw);
+  letter-spacing: 0; text-transform: none; color: var(--table-head-fg);
   white-space: nowrap;
 }
 /* The first body row would otherwise draw its own hairline directly under the
@@ -174,16 +184,17 @@
    turns out the information was always wanted per row: a signal's family is
    what tells you whether "Not collected" on iOS is expected or surprising. */
 .brs__name { display: flex; align-items: center; gap: var(--space-2); min-height: 20px; min-width: 0; flex-wrap: wrap; }
+/* The shared pill geometry - see the --pill-* block in console-theme.css. The
+   fixed 16px height it used to carry was there to centre a 10px label on the
+   row's 20px line; at the family's size and line-height it centres on its own. */
 .brs__cat {
   flex: none;
-  /* An explicit height and `line-height: 1`, so the pill centres on the shared
-     20px line rather than on whatever its padding and font happen to add up
-     to. Measured before this, it sat 8px above the name beside it. */
-  display: inline-flex; align-items: center; height: 16px;
-  font-style: normal; font-size: 10px; font-weight: var(--fw-medium);
-  line-height: 1; letter-spacing: 0.01em;
-  padding: 0 7px; border-radius: var(--radius-full);
+  display: inline-flex; align-items: center;
+  font-style: normal; font-size: var(--pill-fs); font-weight: var(--pill-fw);
+  line-height: var(--pill-line); letter-spacing: 0;
+  padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
   background: var(--fb-neutral-bg);
+  border: var(--bw-thin) solid var(--fb-neutral-border);
   color: var(--fb-neutral-fg);
 }
 

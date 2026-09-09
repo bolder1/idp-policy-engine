@@ -15,6 +15,7 @@
 .bcov__statvalue { display: block; margin-top: 3px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
 .bcov__statvalue em { font-style: normal; font-size: var(--fs-md); font-weight: 400; color: var(--text-muted); }
 .bcov__statvalue.is-mfa { color: var(--fb-notice-fg); }
+.bcov__statvalue.is-flag { color: var(--fb-info-fg); }
 .bcov__statvalue.is-deny { color: var(--fb-negative-fg); }
 
 /* The head column and head row both stick, so a wide tenant can be scrolled in
@@ -27,38 +28,43 @@
 }
 .bcov { border-collapse: separate; border-spacing: 0; width: 100%; }
 
-.bcov th, .bcov td { border-bottom: 1px solid var(--border-subtle); }
+.bcov th, .bcov td { border-bottom: 1px solid var(--table-rule); }
 .bcov tbody tr:last-child th, .bcov tbody tr:last-child td { border-bottom: none; }
 
+/* The table recipe in console-theme.css. The matrix is the one table whose head
+   is a scroll-locked band rather than a strip at the top of a card, so the grey
+   is doing more work here than anywhere else: it is what tells you the row that
+   stayed behind while the data moved is a header. */
 .bcov__corner, .bcov__colhead {
   position: sticky; top: 0; z-index: 2;
-  background: var(--surface-sunken);
+  background: var(--table-head-bg);
   padding: 10px 12px;
-  font-size: var(--fs-xs);
-  font-weight: 500;
+  font-size: var(--table-head-fs);
+  font-weight: var(--table-head-fw);
+  color: var(--table-head-fg);
   text-align: left;
   white-space: nowrap;
+  border-bottom: 1px solid var(--table-head-rule);
 }
-.bcov__corner { left: 0; z-index: 3; min-width: 168px; color: var(--text-tertiary); }
-.bcov__corner span { text-transform: uppercase; letter-spacing: 0.06em; }
+.bcov__corner { left: 0; z-index: 3; min-width: 168px; }
+.bcov__corner span { letter-spacing: 0; }
 .bcov__corner em { font-style: normal; margin-left: 6px; opacity: 0.7; }
 .bcov__corner::after { content: '↘'; margin-left: 4px; opacity: 0.5; }
 
-.bcov__colhead { color: var(--text-secondary); }
 .bcov__colhead span { display: inline-flex; align-items: center; gap: 6px; }
-.bcov__colhead.is-hot { background: var(--brand-subtle-bg); color: var(--brand-active); }
+.bcov__colhead.is-hot { background: var(--accent-soft); color: var(--accent-strong); }
 
 .bcov__rowhead {
   position: sticky; left: 0; z-index: 1;
   background: var(--surface-raised);
   padding: 9px 12px;
   text-align: left;
-  border-right: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--table-head-rule);
   min-width: 168px;
 }
 .bcov__rowhead span { display: block; font-size: var(--fs-sm); font-weight: 500; }
 .bcov__rowhead em { display: block; font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
-.bcov__rowhead.is-hot { background: var(--brand-subtle-bg); }
+.bcov__rowhead.is-hot { background: var(--accent-soft); }
 
 .bcov__cell {
   display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -71,6 +77,7 @@
 .bcov__cell i { width: 7px; height: 7px; border-radius: 999px; flex: none; }
 .bcov__cell.is-allow i { background: var(--fb-positive-dot); }
 .bcov__cell.is-mfa i { background: var(--fb-notice-dot); }
+.bcov__cell.is-flag i { background: var(--fb-info-dot); }
 .bcov__cell.is-deny i { background: var(--fb-negative-dot); }
 
 /* Reached only by the always-on global policy. Not a gap, but not cover
@@ -87,8 +94,8 @@
   border: 1px dashed var(--border-default);
   font-size: 13px; line-height: 1;
 }
-.bcov__cell.is-empty:hover { background: var(--brand-subtle-bg); color: var(--brand-active); }
-.bcov__cell.is-empty:hover .bcov__plus { border-color: var(--brand); border-style: solid; }
+.bcov__cell.is-empty:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.bcov__cell.is-empty:hover .bcov__plus { border-color: var(--accent); border-style: solid; }
 
 .bcov__foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-top: 12px; flex-wrap: wrap; }
 .bcov__legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: var(--fs-sm); color: var(--text-secondary); }
@@ -96,6 +103,7 @@
 .bcov__legend i { width: 7px; height: 7px; border-radius: 999px; }
 .bcov__legend .is-allow i { background: var(--fb-positive-dot); }
 .bcov__legend .is-mfa i { background: var(--fb-notice-dot); }
+.bcov__legend .is-flag i { background: var(--fb-info-dot); }
 .bcov__legend .is-deny i { background: var(--fb-negative-dot); }
 .bcov__legend .is-fallback i { box-shadow: inset 0 0 0 1px var(--border-strong); }
 .bcov__legend .is-empty i { border: 1px dashed var(--border-strong); background: none; }

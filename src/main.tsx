@@ -6,6 +6,24 @@ import { BrandApp } from './brand/BrandApp'
 // Brand revamp (default) — tokens generated from the design-system repo.
 import './brand/tokens.css'
 import './brand/kit.css'
+/* picker.css belongs HERE, not in picker.tsx, and the reason is a bug it caused
+   for as long as it lived there.
+
+   `main.tsx` imports `BrandApp` on its first line, so the entire eager module
+   graph — Shell, Policies, kit.tsx, picker.tsx — is evaluated before the CSS
+   imports below it are reached. picker.css therefore landed BEFORE kit.css.
+
+   That matters because `.bx-picker__trigger` (0,1,0) and kit's
+   `.brand-root :where(button)` reset (also 0,1,0 — `:where()` contributes
+   nothing but `.brand-root` is a class) are a specificity TIE, resolved on
+   source order. The reset won, and it says `border: none; background: none`.
+
+   Every Picker in the product was rendering as bare text: no box, no edge, no
+   fill. Thirty-two of them on the risk-signal screen alone, where they are the
+   controls that set what a signal is worth. Nothing catches this — it type-
+   checks, it lints, the stylesheet test only reads braces, and a dropdown that
+   looks like a label looks deliberate in a screenshot. */
+import './brand/picker.css'
 import './brand/setting-field.css'
 import './brand/shell.css'
 import './brand/user-shell.css'

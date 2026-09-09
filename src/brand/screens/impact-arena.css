@@ -78,7 +78,7 @@
   font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
 }
 .bia__views button.is-on { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
-.bia__views button:disabled { opacity: 0.4; cursor: default; }
+.bia__views button:disabled { opacity: var(--disabled-opacity); cursor: default; }
 
 .bia__legend { display: flex; gap: var(--space-6); margin: 0 0 0 auto; padding: 0; list-style: none; }
 .bia__legend li { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text-tertiary); }
@@ -86,6 +86,7 @@
 .bia__legend b { color: var(--text-body); font-variant-numeric: tabular-nums; }
 .bia__legend .is-allow, .bia__dot.is-allow { background: var(--fb-positive-dot); }
 .bia__legend .is-mfa, .bia__dot.is-mfa { background: var(--fb-notice-dot); }
+.bia__legend .is-flag, .bia__dot.is-flag { background: var(--fb-info-dot); }
 .bia__legend .is-deny, .bia__dot.is-deny { background: var(--fb-negative-dot); }
 
 /* 72 columns × 20 rows = the 1,440 situations exactly, at a pitch that reads as
@@ -131,6 +132,7 @@
 .bia__lane { padding: 2px 8px; border-radius: var(--radius-pill); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
 .bia__lane.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
 .bia__lane.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bia__lane.is-flag { background: var(--fb-info-bg); color: var(--fb-info-fg); }
 .bia__lane.is-deny { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
 
 .bia__cohorts li { color: var(--text-body); }
@@ -161,6 +163,7 @@
 .bia__reachbar i { display: block; height: 100%; }
 .bia__reachbar .is-allow { background: var(--fb-positive-dot); }
 .bia__reachbar .is-mfa { background: var(--fb-notice-dot); }
+.bia__reachbar .is-flag { background: var(--fb-info-dot); }
 .bia__reachbar .is-deny { background: var(--fb-negative-dot); }
 .bia__reach li b { font-size: var(--fs-xs); color: var(--text-tertiary); font-variant-numeric: tabular-nums; text-align: right; }
 .bia__reach li.is-dead b { color: var(--fb-negative-fg); }

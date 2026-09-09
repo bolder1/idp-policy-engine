@@ -150,6 +150,12 @@ function firstDefaultable(all: AuthMethod[], exclude?: string): string | null {
   return all.find(ok)?.id ?? null
 }
 
+/** The first sentence, without its full stop. Everything after it is the tail. */
+function lede(text: string): string {
+  const cut = text.search(/\.\s/)
+  return cut === -1 ? text : text.slice(0, cut + 1)
+}
+
 export function AuthMethods({ role = 'admin' }: { role?: Role }) {
   const store = useBrand()
   const isUser = role === 'user'
@@ -294,13 +300,15 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
 
   return (
     <div className="bpage bm8">
+      {/* Title wrapped, so this head is structurally the same object as the
+          Zones and Device-profiles heads: a title block on the left, room for
+          an action on the right. It had bare children, which is why it was the
+          one page head that could not grow a button without being rebuilt. */}
       <header className="bm8__head">
-        <h1>{isUser ? 'Two-step verification' : 'Authentication methods'}</h1>
-        <p>
-          {isUser
-            ? 'How you prove it is you. Set up as many as you like — one of them runs.'
-            : 'Choose how people prove who they are. Anything you enable here can be named by a policy rule.'}
-        </p>
+        <div>
+          <h1>{isUser ? 'Two-step verification' : 'Authentication methods'}</h1>
+          <p>{isUser ? 'How you prove it is you.' : 'How people prove who they are.'}</p>
+        </div>
       </header>
 
       {/* Horizontal, per the brief. V5 ran these down the left, which reads as
@@ -503,7 +511,7 @@ function SetupModal({
       open={method !== null}
       onClose={onClose}
       title={method ? `${method.name} configuration` : 'Configuration'}
-      width={640}
+      width={680}
       footer={
         <>
           {/* Named its missing fields, which is the most defensible version
@@ -1308,7 +1316,17 @@ function MethodCard({
             </i>
           )}
         </span>
-        <span className="bm8__desc">{m.description}</span>
+        {/* The first sentence on the row, the rest on hover.
+
+            Every description here is built the same way: what the method is,
+            then the security caveat that goes with it — "…and only ever as
+            strong as the mailbox behind it". Both are worth having and only one
+            of them is worth two lines of every row in a list of twenty-four.
+            The row states the method; the caveat is a hover away and rides on
+            the row's accessible name for anyone not using a pointer. */}
+        <span className="bm8__desc" title={m.description}>
+          {lede(m.description)}
+        </span>
         {uses > 0 ? (
           <span className="bm8__usage">
             Used in {uses} policy rule{uses === 1 ? '' : 's'}

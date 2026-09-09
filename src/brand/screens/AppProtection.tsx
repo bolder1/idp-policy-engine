@@ -39,14 +39,11 @@ import {
 
 export function AppProtection({
   appId,
-  naming,
   justAdded,
   onClose,
   onNew,
 }: {
   appId: string | null
-  /** True while the name dialog sits over this panel. */
-  naming: boolean
   /* A policy the CALLER just created, so it lands with the same tint as one
      attached from inside this panel. Two ways in, one arrival. */
   justAdded?: string | null
@@ -166,16 +163,15 @@ export function AppProtection({
     <>
       <Drawer
         open={!!appId}
-        /* Declines to close while the name dialog is up. `Drawer`'s Escape
-           handler is unconditional and does not join `Modal`'s innermost-wins
-           stack, so without this one Escape would close both and take the
-           half-typed name with it. The repair belongs in the kit, with the
-           five other drawers. */
-        onClose={() => {
-          if (!naming) onClose()
-        }}
+        /* Plainly `onClose` again. This used to decline to close while the name
+           dialog was up, because `Drawer`'s Escape handler was unconditional
+           and one press closed both — taking the half-typed name with it. The
+           repair landed in the kit: `Drawer` joins the same innermost-wins
+           stack `Modal` uses, so Escape peels the dialog and leaves the panel
+           standing, and the panel no longer has to know the dialog exists. */
+        onClose={onClose}
         title={`Protection for ${app.name}`}
-        width={520}
+        width={560}
         resizable
         head={
           <div className="bapr__head">

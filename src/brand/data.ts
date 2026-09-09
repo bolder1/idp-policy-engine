@@ -429,18 +429,41 @@ export interface Predicate {
 
 // --- Rules -------------------------------------------------------------------
 
-export type AccessDecision = 'deny' | '1fa' | '2fa'
+/* Four dispositions, and the fourth is not about factors.
+
+   Three of them answer "how much proof": the first factor alone, a second
+   factor as well, or nothing that gets anybody in. `warn` answers a different
+   question. The sign-in is allowed on the first factor AND the event is
+   raised, so somebody sees it — which is the only honest outcome for a device
+   that is out of compliance without being dangerous. An estate a month past
+   its OS floor is the case that asks for it: too far behind to ignore, not far
+   enough to lock a person out of their own inbox over, and the answer the
+   product has been giving until now was to pick one of those two anyway.
+
+   A peer of the other three rather than a flag beside them, and that is a
+   trade worth stating. As a peer it is mutually exclusive with them, so
+   "verify AND raise" cannot be written — a rule either steps up or flags, not
+   both. As a flag it could combine, but then every surface that reads a
+   decision would have to read two fields to know what a rule does, and the
+   thing an administrator picks would stop being one choice. One choice, and
+   the combination is the cost. */
+export type AccessDecision = 'deny' | '1fa' | '2fa' | 'warn'
 
 export const DECISION_LABEL: Record<AccessDecision, string> = {
   deny: 'Deny',
   '1fa': '1 factor',
   '2fa': '2 factors',
+  /* Still one factor, which is what this label counts — the flag is what makes
+     it a different outcome and the label has to carry it, or two rules that
+     behave differently read identically in every list that prints this. */
+  warn: '1 factor, flagged',
 }
 
 export const DECISION_CAPTION: Record<AccessDecision, string> = {
   deny: 'Block access',
   '1fa': 'One step',
   '2fa': 'Two steps',
+  warn: 'One step, raised',
 }
 
 export interface Rule {
@@ -1488,6 +1511,570 @@ export const policies: Policy[] = [
         matchEstimate: 1240,
       }),
     ],
+  },
+
+  /* --- The showcase, at the head of the list ---------------------------------
+
+     Ten policies, and they are first in the array on purpose: the table's
+     default sort returns 0 for the "modified" key, so a stable sort leaves the
+     array order alone and the system policy is pinned above everything by
+     `Policies.tsx`. These sit directly under it.
+
+     They exist to demonstrate a specific list of requirements end to end, and
+     the first seven are deliberately SMALL — one requirement each, two or three
+     rules, nothing else going on. A policy that demonstrates four things
+     demonstrates none of them, because a reader cannot tell which clause
+     produced the outcome they are looking at. The three at the end are the
+     opposite and are labelled so: they compose the same profiles into chains
+     long enough to be worth reading as chains.
+
+     Every one of them reaches the device through a profile from the Device
+     profiles library rather than through inline values, which is the rule this
+     catalogue was narrowed to enforce. That is also what makes them honest as a
+     demonstration: the requirement is configured in one place, the policy names
+     it, and the "used by" count on the profile is true. */
+
+  {
+    id: 'sc1-os-compliance',
+    name: 'Device OS Compliance — allow, flag or deny',
+    type: 'App Access',
+    appIds: ['corporate-email'],
+    status: 'active',
+    lastModified: '2 hours ago',
+    modifiedBy: 'Priya Sharma',
+    audience: EVERYONE,
+    /* THREE outcomes on one axis, which is the whole reason `warn` exists.
+
+       The two profiles are what make the middle band expressible: `fp-patched`
+       is the current builds and `fp-os-floor` is the oldest supported ones, so
+       a device between them satisfies the second and fails the first. Before
+       the flag outcome this policy had to pick — let the whole middle band
+       straight in and say nothing, or step them up and train an entire estate
+       to treat a version notice as an MFA prompt. */
+    rules: [
+      rule({
+        name: 'Current builds — straight in',
+        when: when(card(cond('fingerprint', 'matches', ['fp-patched']))),
+        decision: '1fa',
+        matchEstimate: 812,
+      }),
+      rule({
+        name: 'Behind, but still supported — let in and flag',
+        when: when(card(cond('fingerprint', 'matches', ['fp-os-floor']))),
+        decision: 'warn',
+        matchEstimate: 305,
+      }),
+    ],
+    /* Below the floor. Nothing above matched, which on this policy means the
+       device failed even the oldest supported build — so the default is the
+       deny rather than a catch-all allow. */
+    fallback: rule({ name: 'Below the supported floor', when: anySignIn(), decision: 'deny', matchEstimate: 123 }),
+  },
+
+  {
+    id: 'sc2-device-integrity',
+    name: 'Untrusted device — rooted, jailbroken or tampered',
+    type: 'App Access',
+    appIds: ['pam'],
+    status: 'active',
+    lastModified: '4 hours ago',
+    modifiedBy: 'Ravi Menon',
+    audience: audienceOf(['privileged', 'it-admins']),
+    /* One rule, and the point is WHERE the deny lives.
+
+       The risk catalogue's `root` attribute carries "When detected → Deny /
+       Challenge / Flag only", which puts the outcome inside the library object:
+       every policy referencing that profile inherits the same answer, and a
+       tenant that wants a rooted phone denied on the privileged gateway and
+       flagged on the wiki cannot have both. `fp-integrity` states the condition
+       and says nothing about consequences, so this policy can answer deny and
+       the next one can answer something else. */
+    rules: [
+      rule({
+        name: 'Integrity check failed',
+        when: when(card(cond('fingerprint', 'does not match', ['fp-integrity']))),
+        decision: 'deny',
+        matchEstimate: 18,
+      }),
+    ],
+    fallback: rule({
+      name: 'Trusted device',
+      when: anySignIn(),
+      decision: '2fa',
+      firstFactor: 'Password',
+      secondFactor: 'specific',
+      secondFactorMethods: ['FIDO2 / Passkey', 'CAC Card'],
+      matchEstimate: 14,
+    }),
+  },
+
+  {
+    id: 'sc3-screen-lock',
+    name: 'Mobile access requires a screen lock',
+    type: 'App Access',
+    appIds: ['box'],
+    status: 'active',
+    lastModified: 'Yesterday',
+    modifiedBy: 'Priya Sharma',
+    audience: EVERYONE,
+    /* TWO conditions, and the first one is not decoration.
+
+       "Does not match `fp-mobile-locked`" is true of every laptop in the
+       tenant — a laptop is not a locked handset — so that condition alone
+       denies the desktop estate. `fp-mobile` narrows the statement to the
+       population this rule was written about, which is why a profile that names
+       a form factor and nothing else earns its place in the library. */
+    rules: [
+      rule({
+        name: 'Handset with no passcode',
+        when: when(
+          card(
+            cond('fingerprint', 'matches', ['fp-mobile']),
+            cond('fingerprint', 'does not match', ['fp-mobile-locked']),
+          ),
+        ),
+        decision: 'deny',
+        matchEstimate: 47,
+      }),
+    ],
+    fallback: rule({ name: 'Locked handset, or not a handset', when: anySignIn(), decision: '2fa', matchEstimate: 1193 }),
+  },
+
+  {
+    id: 'sc4-client-version',
+    name: 'Minimum miniOrange Authenticator and Agent version',
+    type: 'App Access',
+    appIds: ['monitoring'],
+    status: 'active',
+    lastModified: 'Yesterday',
+    modifiedBy: 'Jaspreet T.',
+    audience: audienceOf(['engineering', 'devops']),
+    /* A flag rather than a deny, and this is the case the third outcome was
+       argued from.
+
+       A client version floor is a rollout control: the tenant switched number
+       matching on, the handsets that predate the release cannot do it, and the
+       answer is to find those people — not to lock an on-call engineer out of
+       the monitoring console at three in the morning because their phone has
+       not taken an app update. The flag is what turns "we should upgrade
+       everyone" into a list of who. */
+    rules: [
+      rule({
+        name: 'Client behind the floor',
+        when: when(card(cond('fingerprint', 'does not match', ['fp-client-current']))),
+        decision: 'warn',
+        matchEstimate: 96,
+      }),
+    ],
+    fallback: rule({
+      name: 'Current client',
+      when: anySignIn(),
+      decision: '2fa',
+      firstFactor: 'Password',
+      secondFactor: 'specific',
+      secondFactorMethods: ['miniOrange Push'],
+      matchEstimate: 242,
+    }),
+  },
+
+  {
+    id: 'sc5-risk-factors',
+    name: 'Risk-tiered verification — stronger factors as risk rises',
+    type: 'App Access',
+    appIds: ['crm'],
+    status: 'active',
+    lastModified: '3 hours ago',
+    modifiedBy: 'Ravi Menon',
+    audience: EVERYONE,
+    /* The risk-tier requirement, and `secondFactor: 'specific'` is the half of
+       it that is easy to miss.
+
+       "Map risk tiers to allowed factors" is the ordering of these rules.
+       "Disallow fallback to weaker methods" is the mode: a named list is a
+       closed list, so a user enrolled in both a passkey and email OTP is
+       offered the passkey and nothing else on the top rule. `'any'` would have
+       let the tier be satisfied by whatever the person happened to have, which
+       is the failure the requirement is written against.
+
+       Thresholds descend, because the chain stops at the first match and a
+       low threshold written first would swallow every tier below it. */
+    rules: [
+      rule({
+        name: 'High risk — phishing-resistant only',
+        when: when(card(cond('device-risk', 'above', ['70']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['FIDO2 / Passkey', 'CAC Card'],
+        matchEstimate: 34,
+      }),
+      rule({
+        name: 'Elevated risk — verified push',
+        /* One method, deliberately. The tenant's Push method is configured with
+           number matching on, so naming Push here is naming the number-matched
+           ceremony — and naming it ALONE is what stops a user falling back to a
+           plain OTP that the same enrolment would otherwise satisfy. */
+        when: when(card(cond('device-risk', 'above', ['40']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['miniOrange Push'],
+        matchEstimate: 168,
+      }),
+      rule({
+        name: 'Low risk — one factor',
+        when: when(card(cond('device-risk', 'below', ['20']))),
+        decision: '1fa',
+        matchEstimate: 604,
+      }),
+    ],
+    fallback: rule({ name: 'Everything in between', when: anySignIn(), decision: '2fa', matchEstimate: 434 }),
+  },
+
+  {
+    id: 'sc6-device-compliance',
+    name: 'Device compliance — OS, integrity, lock and client together',
+    type: 'App Access',
+    appIds: ['vault'],
+    status: 'active',
+    lastModified: '5 hours ago',
+    modifiedBy: 'Priya Sharma',
+    audience: audienceOf(['legal', 'executives']),
+    /* The composite requirement, and the one policy here that references the
+       fat profile.
+
+       `fp-compliant` carries all four legs — OS floors, integrity, screen lock,
+       client version — because "is this device compliant" is asked as one
+       question. Spelling the legs out as four conditions would produce a card
+       that reads as four separate tests when it is one policy decision, and
+       would drift from the next policy that asked the same question.
+
+       The ladder underneath is where the composite pays: compliant AND risky is
+       not the same as compliant, and a device that is merely untampered is a
+       third state worth naming rather than folding into the deny. */
+    rules: [
+      rule({
+        name: 'Compliant, but the sign-in looks risky',
+        when: when(
+          card(
+            cond('fingerprint', 'matches', ['fp-compliant']),
+            cond('device-risk', 'above', ['50']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['FIDO2 / Passkey'],
+        matchEstimate: 11,
+      }),
+      rule({
+        name: 'Fully compliant',
+        when: when(card(cond('fingerprint', 'matches', ['fp-compliant']))),
+        decision: '1fa',
+        matchEstimate: 24,
+      }),
+      rule({
+        name: 'Untampered, but not fully compliant',
+        when: when(card(cond('fingerprint', 'matches', ['fp-integrity']))),
+        decision: 'warn',
+        matchEstimate: 9,
+      }),
+    ],
+    fallback: rule({ name: 'Compliance could not be established', when: anySignIn(), decision: 'deny', matchEstimate: 4 }),
+  },
+
+  {
+    id: 'sc7-browser-floor',
+    name: 'Outdated browser enforcement',
+    type: 'App Access',
+    appIds: ['wiki'],
+    /* Monitoring, not enforcing, and that is the honest status for this one.
+
+       A browser floor is the requirement most likely to catch somebody the
+       tenant did not expect — a contractor on a locked-down build, a kiosk that
+       has not updated. Monitor evaluates every rule and records every verdict
+       and refuses nothing, so the estate can be measured before the deny below
+       is switched on. */
+    status: 'monitor',
+    lastModified: '2 days ago',
+    modifiedBy: 'Jaspreet T.',
+    audience: EVERYONE,
+    /* DISJOINT, not nested, and the second condition on the warn rule is the
+       whole reason.
+
+       It was written as the natural pair — a specific deny, then a broader warn
+       catching the rest — which is the right shape for a chain read top to
+       bottom and the wrong shape for a chain anything might REORDER. The
+       gauntlet's retune moves a rule it has changed, and the moment the broad
+       warn sits above the narrow deny the deny can never run: same conditions
+       plus one more, evaluated second. The linter says so, which is how this
+       was caught.
+
+       Naming the network on both rules makes them mutually exclusive instead of
+       nested. Neither can shadow the other whatever order they end up in, and
+       the pair reads better besides — "off the network" and "on the network"
+       are the two halves of a stated decision, where a bare "everything else"
+       leaves a reader working out what is left. */
+    rules: [
+      rule({
+        name: 'Outdated browser, off the corporate network',
+        when: when(
+          card(
+            cond('fingerprint', 'does not match', ['fp-browser-current']),
+            cond('zone', 'not in zone', ['office']),
+          ),
+        ),
+        decision: 'deny',
+        matchEstimate: 58,
+      }),
+      rule({
+        name: 'Outdated browser, on the corporate network',
+        when: when(
+          card(
+            cond('fingerprint', 'does not match', ['fp-browser-current']),
+            cond('zone', 'in zone', ['office']),
+          ),
+        ),
+        decision: 'warn',
+        matchEstimate: 141,
+      }),
+    ],
+    fallback: rule({ name: 'Supported browser', when: anySignIn(), decision: '1fa', matchEstimate: 1041 }),
+  },
+
+  /* --- The three that compose ------------------------------------------------
+
+     Everything above demonstrates one requirement. These demonstrate what the
+     requirements do to each other, which is a different thing and is the reason
+     an access policy is a chain rather than a form.
+
+     Two properties are on show. Order carries meaning — a rule that runs second
+     only sees what the first did not claim, so "compliant" further down means
+     "compliant and not already denied for something worse". And every rule is
+     DISJOINT from or strictly narrower-than-and-above its neighbours: a broad
+     rule sitting above a narrow one puts the narrow one out of reach, which the
+     linter reports as an error and which `sc7` was authored wrongly for before
+     the linter caught it. */
+
+  {
+    id: 'sc8-trading-posture',
+    name: 'Trading Platform — full posture ladder',
+    type: 'App Access',
+    appIds: ['trading'],
+    status: 'active',
+    lastModified: '1 hour ago',
+    modifiedBy: 'Ravi Menon',
+    audience: audienceOf(['traders']),
+    /* Six rules, read as a ladder of severity: the two things that end the
+       conversation, then the two that describe a good sign-in, then the two
+       that are worth recording.
+
+       Integrity is FIRST and that ordering is the argument, not a preference. A
+       tampered device can report a screen lock it does not have and an OS
+       version it is not running, so every check below this one is worthless
+       until it passes. Putting it anywhere else would let a rooted handset
+       satisfy rule 3 and walk in on one factor. */
+    rules: [
+      rule({
+        name: 'Tampered device — nothing else matters',
+        when: when(card(cond('fingerprint', 'does not match', ['fp-integrity']))),
+        decision: 'deny',
+        matchEstimate: 3,
+      }),
+      rule({
+        name: 'Handset with no passcode',
+        when: when(
+          card(
+            cond('fingerprint', 'matches', ['fp-mobile']),
+            cond('fingerprint', 'does not match', ['fp-mobile-locked']),
+          ),
+        ),
+        decision: 'deny',
+        matchEstimate: 2,
+      }),
+      rule({
+        name: 'Compliant, on the floor, in market hours',
+        /* Three conditions and all three are load-bearing: the desk, the clock
+           and the device. A trader at the desk during the session on a
+           compliant machine is the one population this platform lets through on
+           a single factor, and every clause narrows it to exactly them. */
+        when: when(
+          card(
+            cond('fingerprint', 'matches', ['fp-compliant']),
+            cond('zone', 'in zone', ['office']),
+            cond('time', 'between', ['08:00', '17:00'], undefined, { tz: 'Asia/Kolkata' }),
+          ),
+        ),
+        decision: '1fa',
+        matchEstimate: 29,
+      }),
+      rule({
+        name: 'Compliant, but off the floor or out of hours',
+        when: when(card(cond('fingerprint', 'matches', ['fp-compliant']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['FIDO2 / Passkey'],
+        matchEstimate: 8,
+      }),
+      rule({
+        name: 'Client behind the floor — let in and flag',
+        when: when(card(cond('fingerprint', 'does not match', ['fp-client-current']))),
+        decision: 'warn',
+        matchEstimate: 4,
+      }),
+    ],
+    fallback: rule({
+      name: 'Anything else — phishing-resistant only',
+      when: anySignIn(),
+      decision: '2fa',
+      firstFactor: 'Password',
+      secondFactor: 'specific',
+      secondFactorMethods: ['FIDO2 / Passkey', 'CAC Card'],
+      matchEstimate: 1,
+    }),
+  },
+
+  {
+    id: 'sc9-contractor-onboarding',
+    name: 'Contractor devices — compliance gate before access',
+    type: 'App Access',
+    /* Not `dms`, and the reason is a fixture rather than a preference: Document
+       Management is the estate's only app whose single policy is in monitor,
+       which is the state `summarise` reports as 'off' and the only place that
+       branch is demonstrated. Attaching an active policy there would have taken
+       the tenant's one example of it away. */
+    appIds: ['jira'],
+    status: 'active',
+    lastModified: '8 hours ago',
+    modifiedBy: 'Jaspreet T.',
+    audience: audienceOf(['contractors']),
+    /* The same requirements pointed at a population the tenant does not manage,
+       which changes which answer is right at almost every step.
+
+       On a corporate estate an outdated client is a flag, because IT can push
+       the update and wants the list. A contractor's phone is not IT's to push,
+       so the same finding is a hard floor here — the difference is not the
+       requirement, it is who can act on it. The browser rule goes the other
+       way for the same reason: nobody can update a contractor's browser
+       remotely either, and denying on it would lock out the population this
+       policy exists to admit. */
+    rules: [
+      rule({
+        name: 'Rooted, jailbroken or tampered',
+        when: when(card(cond('fingerprint', 'does not match', ['fp-integrity']))),
+        decision: 'deny',
+        matchEstimate: 11,
+      }),
+      rule({
+        name: 'Handset with no passcode',
+        when: when(
+          card(
+            cond('fingerprint', 'matches', ['fp-mobile']),
+            cond('fingerprint', 'does not match', ['fp-mobile-locked']),
+          ),
+        ),
+        decision: 'deny',
+        matchEstimate: 19,
+      }),
+      rule({
+        name: 'Below the supported OS floor',
+        when: when(card(cond('fingerprint', 'does not match', ['fp-os-floor']))),
+        decision: 'deny',
+        matchEstimate: 14,
+      }),
+      rule({
+        name: 'Current OS and client, low risk',
+        when: when(
+          card(
+            cond('fingerprint', 'matches', ['fp-patched']),
+            cond('fingerprint', 'matches', ['fp-client-current']),
+            cond('device-risk', 'below', ['30']),
+          ),
+        ),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['miniOrange Push'],
+        matchEstimate: 63,
+      }),
+      rule({
+        name: 'Outdated browser — recorded, not refused',
+        when: when(card(cond('fingerprint', 'does not match', ['fp-browser-current']))),
+        decision: 'warn',
+        matchEstimate: 22,
+      }),
+    ],
+    fallback: rule({
+      name: 'Supported, but not current',
+      when: anySignIn(),
+      decision: '2fa',
+      firstFactor: 'Password',
+      secondFactor: 'specific',
+      secondFactorMethods: ['miniOrange Push', 'Google Authenticator'],
+      matchEstimate: 25,
+    }),
+  },
+
+  {
+    id: 'sc10-exec-adaptive',
+    name: 'Executives — risk and posture together',
+    type: 'App Access',
+    appIds: ['m365'],
+    status: 'active',
+    lastModified: '30 minutes ago',
+    modifiedBy: 'Priya Sharma',
+    audience: audienceOf(['executives']),
+    /* Both axes at once, and the interesting rules are the ones where they
+       disagree.
+
+       Risk and posture are usually discussed as if they ranked the same
+       sign-ins, and they do not: a compliant laptop in an unfamiliar city
+       scores high risk, and a neglected handset on the office wifi scores low.
+       Rules 1 and 2 are those two cases. Taking the strict answer in both is
+       what stops the two axes cancelling each other out — which is exactly
+       what a single combined score would do. */
+    rules: [
+      rule({
+        name: 'High risk — phishing-resistant, whatever the device',
+        when: when(card(cond('device-risk', 'above', ['70']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['FIDO2 / Passkey', 'CAC Card'],
+        matchEstimate: 2,
+      }),
+      rule({
+        name: 'Non-compliant device — verify, however calm it looks',
+        when: when(card(cond('fingerprint', 'does not match', ['fp-compliant']))),
+        decision: '2fa',
+        firstFactor: 'Password',
+        secondFactor: 'specific',
+        secondFactorMethods: ['FIDO2 / Passkey'],
+        matchEstimate: 3,
+      }),
+      rule({
+        name: 'Compliant and quiet, from a known place',
+        when: when(
+          card(
+            cond('device-risk', 'below', ['20']),
+            cond('zone', 'in zone', ['home-countries']),
+          ),
+        ),
+        decision: '1fa',
+        firstFactor: 'Any',
+        matchEstimate: 6,
+      }),
+    ],
+    fallback: rule({
+      name: 'Everything else',
+      when: anySignIn(),
+      decision: '2fa',
+      firstFactor: 'Password',
+      secondFactor: 'specific',
+      secondFactorMethods: ['FIDO2 / Passkey', 'miniOrange Push'],
+      matchEstimate: 1,
+    }),
   },
 
   /* Appended to `policies` in data.ts. `rule` is module-private, so this cannot

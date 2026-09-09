@@ -33,21 +33,19 @@ import { LOGO_SOURCES } from './sources'
    application", which is the only thing that square honestly knows.
    -------------------------------------------------------------------------- */
 
-const BY_ID = new Map(LOGO_SOURCES.map((s) => [s.id, s]))
+/* Keyed on the registry id AND on every alias, so a catalogue that calls an app
+   something slightly different still finds its mark. */
+const BY_ID = new Map(LOGO_SOURCES.flatMap((s) => [[s.id, s] as const, ...(s.aliases ?? []).map((a) => [a, s] as const)]))
 
-/* App ids that are the same product under a different name in the tenant data.
+/* An `ALIASES` map stood here — `{ 'google-workspace': 'google' }` — resolving
+   the tenant's id to the registry's before either lookup.
 
-   The tenant calls it `google-workspace`; the logo registry keys the file on
-   the domain it was fetched from, which is `google`. Without this the console
-   drew a placeholder over a logo that was already sitting in public/logos —
-   which is exactly what it was doing on four rows of the policies table.
-
-   An alias rather than a second registry entry, because there is one file and
-   one domain: a second entry would fetch google.com twice and give two ids a
-   chance to disagree about which mark is Google's. */
-const ALIASES: Record<string, string> = {
-  'google-workspace': 'google',
-}
+   The registry carries its own aliases now (`LogoSource.aliases`), which is the
+   better home for the same fact: the alias lives on the entry it belongs to
+   rather than in a second table this component has to keep in step, and adding
+   a second aliased app is a field rather than a map entry plus a lookup. Both
+   fixes were written for the same bug — Google Workspace drawing a placeholder
+   over a logo already sitting in `public/logos`. */
 
 export function AppLogo({
   appId,
@@ -60,9 +58,10 @@ export function AppLogo({
   size?: number
   rounded?: boolean
 }) {
-  const id = ALIASES[appId] ?? appId
-  const meta = BY_ID.get(id)
-  const resolved = RESOLVED_LOGOS[id]
+  const meta = BY_ID.get(appId)
+  /* Through the registry entry, not the raw id: an aliased app resolves to the
+     file its canonical id was fetched under. */
+  const resolved = RESOLVED_LOGOS[meta?.id ?? appId]
   const [failed, setFailed] = useState(false)
 
   const label = name ?? meta?.name ?? appId
@@ -82,12 +81,30 @@ export function AppLogo({
     )
   }
 
-  /* Neutral, not tinted. The tint was the app's brand colour, which is a claim
-     this square can no longer make: it is saying "unidentified application",
-     and saying it in Salesforce blue would be the same false note as the
-     monogram. The icon scales with the box — 62% of it, which is the ratio the
-     fetched favicons sit at inside their own padding, so a generic row and a
-     branded row have the same optical weight in a column of both. */
+  /* One generic mark, and it settles the contrast bug main found here rather
+     than keeping the two monograms that were the fix for it.
+
+     Main's finding was real and worth recording: the unbranded monogram took
+     `--surface-inset` and kept the white letters meant for a saturated tint, so
+     #ffffff on #eef1f4 is 1.13:1 — eleven of the sixteen rows on Applications
+     were rendering what looked like an image that had failed to load. Its fix
+     was a second monogram flavour: a neutral tile with the initials in
+     secondary ink.
+
+     This goes further and deletes the monogram entirely, which removes the
+     unreadable case by removing the case. Initials are a logo's shape without
+     its content — they sit in the same square at the same size, so a row
+     reading "GO · Google Workspace" looks like a brand mark until you read it —
+     and for the sixteen internal systems in this tenant they were two letters
+     of a name printed in full an inch to the right. The icon says "this is an
+     application", which is the only thing that square honestly knows, and it
+     says it at `--text-muted` on `--surface-inset`, which is legible.
+
+     Neutral, not tinted, for the same reason: the tint was the app's brand
+     colour, and this square can no longer make that claim. The icon scales with
+     the box — 62% of it, the ratio the fetched favicons sit at inside their own
+     padding — so a generic row and a branded row carry the same optical weight
+     in a column of both. */
   return (
     <span className="applogo applogo--generic" style={box} title={label} aria-hidden>
       <AppWindow size={Math.round(size * 0.62)} strokeWidth={1.7} />

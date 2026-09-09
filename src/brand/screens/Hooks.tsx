@@ -83,7 +83,7 @@ export function Hooks() {
     <div className="bpage bhk">
       <PageHead
         title="External hooks"
-        caption="A condition the engine cannot answer itself, answered by a system that can."
+        caption="Conditions answered by a system outside the engine."
         /* Withheld while the empty state is showing, which offers the same
            action with the sentence that explains it. */
         actions={
@@ -100,10 +100,9 @@ export function Hooks() {
         <EmptyState
           icon={Webhook}
           title="No hooks yet"
-          /* Three real callees. The caption above already says "a condition
-             the engine cannot answer itself" — naming a fraud score and a
-             CMDB is what turns that into something you can picture wanting. */
-          blurb="Call a service this console does not hold — a fraud score, a CMDB, your own risk API — and let a policy rule decide on the answer it returns."
+          /* Three real callees, named. See the note on the Device profiles
+             empty state for why the framing around them is gone. */
+          blurb="Call a fraud score, a CMDB or your own risk API, and let a rule decide on the answer."
           action={
             <Button variant="brand" onClick={() => setEditing(blank())}>
               <Plus size={15} strokeWidth={2.2} aria-hidden />
@@ -127,7 +126,11 @@ export function Hooks() {
                     <h3>{h.name}</h3>
                     <p>{describeHook(h)}</p>
                   </div>
-                  <Badge tone={h.mode === 'sync' ? 'info' : 'accent'}>{MODE[h.mode].label}</Badge>
+                  {/* Neutral. A hook's mode is a fact about how it is wired,
+                      not information the reader is being alerted to, and the
+                      two modes were wearing the console's info and accent tones
+                      for no reason beyond being two of them. */}
+                  <Badge tone="neutral">{MODE[h.mode].label}</Badge>
                   <Button variant="secondary" size="sm" onClick={() => setEditing(h)}>
                     Edit
                   </Button>
@@ -188,9 +191,7 @@ export function Hooks() {
                     Used by
                   </span>
                   {users.length === 0 ? (
-                    <p className="bhk__usesnone">
-                      No rule references this hook. It can be changed or deleted without affecting any sign-in.
-                    </p>
+                    <p className="bhk__usesnone">No rule references this hook.</p>
                   ) : (
                     <UsedByList users={users} />
                   )}
@@ -280,7 +281,7 @@ function HookForm({
       open={!!hook}
       onClose={onClose}
       title={hook && hook.name ? `Edit ${hook.name}` : 'New hook'}
-      width={640}
+      width={680}
       footer={
         <>
           {/* The form already lists every issue in `.bhk__formissues`, so

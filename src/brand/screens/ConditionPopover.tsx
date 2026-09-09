@@ -1068,7 +1068,7 @@ function List({
                 </span>
               )}
               {!single && (
-                <span className="cp__tick" aria-hidden>
+                <span className="bx-tick" aria-hidden>
                   {on && <Check size={11} strokeWidth={3} />}
                 </span>
               )}

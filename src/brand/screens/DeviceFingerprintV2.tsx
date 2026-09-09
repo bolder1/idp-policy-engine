@@ -779,7 +779,7 @@ function AttrPickRow({
         disabled={fixed}
         onClick={onToggle}
       >
-        <span className="bfp2__picktick" aria-hidden>
+        <span className="bx-tick" aria-hidden>
           <Check size={11} strokeWidth={3.2} />
         </span>
         {/* No attribute mark on a picker row.

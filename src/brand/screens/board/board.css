@@ -3226,16 +3226,8 @@ button.bb__idx::after {
 
 /* A real tick box, because this is a multi-select and the shape is what says
    so — a check with no box reads as "the current one". */
-.bb__whotick {
-  flex: none; display: grid; place-items: center;
-  width: 15px; height: 15px; border-radius: 4px;
-  border: 1px solid var(--border-default); background: var(--surface-raised);
-  color: #fff;
-}
-/* Ink, not brand — and it has to be ink rather than a pale neutral, because
-   the check inside it is hard-coded white. A tick box filled #eef1f4 with a
-   white glyph on it is an empty box. */
-.bb__whoitem.is-on .bb__whotick { background: var(--text-primary); border-color: var(--text-primary); }
+/* `.bb__whotick` stood here. Every tick in the console is `.bx-tick` from the kit now;
+   see the note there for the five shapes this replaced. */
 
 /* Informs, never blocks. There are no disabled rows here, because a redundant
    or unusual selection is legal and sometimes deliberate. */

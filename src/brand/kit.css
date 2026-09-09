@@ -1023,3 +1023,38 @@ html[data-theme='dark'] {
 @media (max-width: 720px) {
   .bx-tier { padding: 0 8px; }
 }
+
+/* --- The tick ------------------------------------------------------------- */
+
+/* ONE checkbox mark, for every multi-select list in the console.
+
+   There were five. `.bb__whotick` in the Who dialog was 15px with a 4px radius
+   and filled with ink; `.cp__tick` in the value menu was 15px, a 3px radius and
+   a 1.5px edge, filled with the accent; `.bfp2__picktick` in the attribute
+   drawer was 16px with a 2px radius, filled `--accent-strong`; and Assign
+   applications used a native `<input type="checkbox">`, which is whatever the
+   operating system draws. Five marks for one idea, and four of them were within
+   a pixel of each other — close enough that nobody would call it a decision and
+   far enough that the dialogs never quite matched.
+
+   The tick glyph is `--surface-raised`, not white, and that is load-bearing:
+   the accent ramp has a light half in one theme, and a white check on it is an
+   empty box. The device drawer's rule already knew this; the others did not. */
+.bx-tick {
+  flex: none;
+  display: grid; place-items: center;
+  width: 16px; height: 16px;
+  border-radius: var(--radius-xs);
+  border: var(--bw-thin) solid var(--border-strong);
+  background: var(--surface-raised);
+  /* Always in the DOM, invisible until ticked, so a label never shifts
+     sideways as it is chosen. */
+  color: transparent;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.is-on > .bx-tick,
+.is-on .bx-tick {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: var(--surface-raised);
+}

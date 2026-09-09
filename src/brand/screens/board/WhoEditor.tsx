@@ -423,7 +423,7 @@ function WhoPicker({
                 className={`bb__whoitem ${on ? 'is-on' : ''}`}
                 onClick={() => toggle(tab, r.id, !on)}
               >
-                <span className="bb__whotick" aria-hidden>
+                <span className="bx-tick" aria-hidden>
                   {on && <Check size={12} strokeWidth={3} />}
                 </span>
                 <Avatar name={r.name} on={on} />

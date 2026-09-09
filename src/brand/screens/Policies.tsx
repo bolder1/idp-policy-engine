@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
-import { BookmarkPlus, Copy, Pencil, Plus, Trash2, Waypoints } from 'lucide-react'
+import { BookmarkPlus, Check, Copy, Pencil, Plus, Trash2, Waypoints } from 'lucide-react'
 
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
@@ -768,12 +768,25 @@ function AssignAppsDialog({
           {shown.map((a) => {
             const on = picked.includes(a.id)
             return (
-              <label key={a.id} className={`bassign__row ${on ? 'is-on' : ''}`}>
-                <input type="checkbox" checked={on} onChange={() => toggle(a.id)} />
+              /* A button with the console's own tick, not a native
+                 `<input type="checkbox">` — which is whatever the operating
+                 system draws, and was the only OS control left in a dialog
+                 otherwise entirely of this console's making. */
+              <button
+                key={a.id}
+                type="button"
+                role="checkbox"
+                aria-checked={on}
+                className={`bassign__row ${on ? 'is-on' : ''}`}
+                onClick={() => toggle(a.id)}
+              >
+                <span className="bx-tick" aria-hidden>
+                  <Check size={11} strokeWidth={3.2} />
+                </span>
                 <AppLogo appId={a.id} name={a.name} size={22} />
                 <span className="bassign__name">{a.name}</span>
                 <span className="bassign__meta">{a.protocol}</span>
-              </label>
+              </button>
             )
           })}
           {shown.length === 0 && <p className="bassign__none">No application matches “{q}”.</p>}

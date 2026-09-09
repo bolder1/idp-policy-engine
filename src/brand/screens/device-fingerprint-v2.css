@@ -881,23 +881,8 @@
   box-shadow: inset 0 0 0 2px var(--focus-ring);
 }
 
-.bfp2__picktick {
-  flex: none; margin-top: 1px;
-  display: grid; place-items: center; width: 16px; height: 16px;
-  border-radius: var(--radius-xs);
-  border: 1px solid var(--border-strong);
-  background: var(--surface-raised);
-  /* The tick is always in the DOM and only visible when ticked, so the label
-     never shifts sideways on selection. */
-  color: transparent;
-}
-.bfp2__pickrow.is-on .bfp2__picktick {
-  border-color: var(--accent-strong);
-  background: var(--accent-strong);
-  /* The raised surface rather than white: a white tick fails contrast against
-     the lighter half of the category ramp in one of the two themes. */
-  color: var(--surface-raised);
-}
+/* `.bfp2__picktick` stood here. Every tick in the console is `.bx-tick` from the kit now;
+   see the note there for the five shapes this replaced. */
 
 
 .bfp2__pickmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }

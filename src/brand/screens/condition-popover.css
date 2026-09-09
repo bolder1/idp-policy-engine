@@ -232,18 +232,8 @@
 }
 .cp__opt:hover { background: var(--surface-sunken); }
 .cp__opt:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
-.cp__tick {
-  display: grid;
-  place-items: center;
-  width: 15px;
-  height: 15px;
-  flex: none;
-  border: 1.5px solid var(--border-strong);
-  border-radius: 3px;
-  background: var(--surface-raised);
-  color: var(--surface-raised);
-}
-.cp__opt.is-on .cp__tick { background: var(--accent); border-color: var(--accent); color: var(--text-on-brand); }
+/* `.cp__tick` stood here. Every tick in the console is `.bx-tick` from the kit now;
+   see the note there for the five shapes this replaced. */
 /* The mark, tinted by the family the attribute belongs to.
 
    Nine attributes across five families were nine grey glyphs: the shape told

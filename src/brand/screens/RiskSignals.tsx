@@ -27,7 +27,7 @@ import {
 } from 'lucide-react'
 
 import { PageHead } from '../Shell'
-import { Badge, Button, MenuButton, Modal, SaveBar, Toggle } from '../kit'
+import { Badge, Button, MenuButton, Modal, SaveBar, TipMark, Toggle } from '../kit'
 import { Picker } from '../picker'
 import { TierPick } from '../tier-pick'
 import { PlatformMark } from '../logos/PlatformMark'
@@ -256,8 +256,8 @@ function RiskProfileList({
       <p className="brs__gap">
         <Info size={13} strokeWidth={2} aria-hidden />
         <span>
-          These signals come from the mobile SDKs. A sign-in from a browser carries none of them, so its risk verdict is
-          whatever the rest of the policy decides — no profile here changes it.
+          Mobile SDKs only.{' '}
+          <TipMark text="A browser sign-in carries none of these signals, so its risk verdict is whatever the rest of the policy decides. No profile here changes that." />
         </span>
       </p>
 
@@ -515,7 +515,7 @@ function RiskProfileDetail({
           <em>
             {inUse ? (
               <>
-                Rules compare against these with <strong>Risk score</strong>, the one risk condition. {onCount} of{' '}
+                Rules compare against these with <strong>Risk score</strong>. {onCount} of{' '}
                 {RISK_SIGNALS.length} signals on.
               </>
             ) : (
@@ -568,6 +568,25 @@ function RiskProfileDetail({
           onChange={setCat}
         />
       </div>
+
+      {/* The caveat belongs HERE as well as on the list, and this is the half
+          that was missing.
+
+          The em dashes it explains — "Not collected" on a platform that does not
+          report a signal — are drawn in the table below, on this page. The
+          sentence was rendering only on the list, so somebody editing a profile
+          met a column of dashes with the explanation one navigation away.
+
+          Condensed to four words and a mark, which is the form the rest of this
+          console settled on: the sentence is on the mark, on hover, on focus and
+          in the accessible name. */}
+      <p className="brs__gap">
+        <Info size={13} strokeWidth={2} aria-hidden />
+        <span>
+          Mobile SDKs only.{' '}
+          <TipMark text="A browser sign-in carries none of these signals, so its risk verdict is whatever the rest of the policy decides. A dash below means the platform does not report that signal at all." />
+        </span>
+      </p>
 
       {shown.length === 0 ? (
         <p className="brs__none">No signal matches “{q.trim()}”.</p>

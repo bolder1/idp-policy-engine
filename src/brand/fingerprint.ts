@@ -1167,7 +1167,11 @@ export const platformsNamed = (p: FingerprintProfile): string[] =>
    The roster is matched on MAC. `fp-kiosk` shipped holding a roster of 24
    machines and watching only `device-type`, so the roster matched nothing and
    the screen said so nowhere. */
-export const rosterNeedsMac = (p: FingerprintProfile): boolean =>
+/* Structural, not the whole profile, and for the same reason `enforces` in
+   data.ts takes `{ status }`: this reads exactly two fields, and the enrolment
+   form that asks the question holds those two before a profile exists to put
+   them on. Demanding the full record there would mean building a fake one. */
+export const rosterNeedsMac = (p: Pick<FingerprintProfile, 'registration' | 'enabled'>): boolean =>
   p.registration === 'pre-approved' && !p.enabled.includes('mac')
 
 /* The page's one-line description of a whole profile.

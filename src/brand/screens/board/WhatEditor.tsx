@@ -335,6 +335,21 @@ export function WhatEditor({
                 <RememberBlock rule={rule} onPatch={onPatch} />
               </div>
             </div>
+          ) : flagged ? (
+            /* No adder under Flag, and a sentence rather than a disabled
+               button.
+
+               `warn` and `2fa` are two values of ONE field, so "flag and also
+               verify" is not a rule this model can hold. The button below is
+               `onPatch({ decision: '2fa' })` — on a flagged rule that does not
+               add a step, it silently converts the rule to Allow-plus-verify
+               and un-lights the Flag tile. This arm existed upstream, was lost
+               when this pane was restructured, and `walksFactors` is
+               `decision !== 'deny'` — so a flagged rule fell straight through to
+               the adder. */
+            <p className="bb__addnote">
+              One factor, then the attempt is raised. Choose <b>Allow</b> to add a second factor.
+            </p>
           ) : (
             /* The offer, once, under the first factor rather than as a third
                rung inside the ladder. A ladder numbers the steps a person

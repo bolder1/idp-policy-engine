@@ -3494,3 +3494,14 @@ button.bb__idx::after {
   color: var(--text-tertiary); font-size: var(--fs-xs); font-weight: var(--fw-medium);
 }
 .bb__whosum:hover .bb__whosum__edit { color: var(--brand); background: var(--brand-subtle-bg); }
+
+/* Why there is no adder under Flag.
+
+   A sentence rather than a disabled button, because the reason is a property of
+   the model — `warn` and `2fa` are two values of one field — and a greyed
+   control invites the reader to work out what would un-grey it. */
+.bb__addnote {
+  margin: var(--space-4) 0 0;
+  font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55;
+}
+.bb__addnote b { font-weight: var(--fw-medium); color: var(--text-secondary); }

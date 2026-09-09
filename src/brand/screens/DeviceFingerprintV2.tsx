@@ -17,6 +17,7 @@ import {
   Globe,
   Hash,
   IdCard,
+  Link2,
   Languages,
   Lock,
   MapPin,
@@ -60,6 +61,8 @@ import {
   modeLabel,
   offeredAttributes,
   pruneValues,
+  rosterNeedsMac,
+  platformsNamed,
   reachLabel,
   stepsFor,
   tierOf,
@@ -1229,6 +1232,7 @@ function CreateDrawer({
               />
             </h4>
             <EnrolmentFields
+              enabled={picked}
               mode={mode}
               reach={reach}
               registration={registration}
@@ -1363,6 +1367,9 @@ function ProfilePage({
     .map((id) => attrOf(draft.mode, id))
     .filter((a): a is Attribute => Boolean(a))
   const users = policiesUsing('fingerprint', profile.id, policies)
+  /* Back, and only for the OS surface. It went with the summary drawer, which
+     took the "Platforms named" warning with it — see the foot of that surface. */
+  const platforms = platformsNamed(draft)
 
   const setConfig = (id: string, v: AttrConfigValue) =>
     setDraft((d) => ({ ...d, config: { ...d.config, [id]: v } }))
@@ -1497,6 +1504,38 @@ function ProfilePage({
             onWeight={setWeight}
             onDrop={drop}
           />
+
+          {/* The two things an OS profile still has to be able to say, which
+              the single surface had quietly dropped.
+
+              Both lived in the rail this page used to carry, and the rail only
+              renders on the tabbed shape now — so on an OS-and-version profile
+              there was nowhere to learn that the profile checks nothing, and no
+              way to reach the policies that name it before renaming it.
+
+              A profile naming no platform is the sharper of the two: it is not
+              a draft or a mistake, it is a live profile that passes every device
+              it is asked about, which reads as protection and is not. */}
+          {platforms.length === 0 ? (
+            <p className="bfp2__enrolwarn">
+              <AlertTriangle size={13} strokeWidth={2} aria-hidden />
+              <span>
+                No platform is named, so nothing is checked — a device running anything signs in.
+              </span>
+            </p>
+          ) : (
+            <p className="bfp2__osfoot">
+              Checks <b>{platforms.join(', ')}</b>. A platform it does not name is not checked.
+            </p>
+          )}
+
+          <div className="bfp2__osuses">
+            <Button variant="secondary" size="sm" onClick={() => setShowUses(true)} disabled={users.length === 0}>
+              <Link2 size={14} strokeWidth={1.9} aria-hidden />
+              Used by
+              <i className="buse__count">{users.length}</i>
+            </Button>
+          </div>
         </div>
       )}
 
@@ -1818,6 +1857,7 @@ function BasicDetailsTab({
         </header>
         <div className="bfp2__cardbody">
           <EnrolmentFields
+            enabled={draft.enabled}
             mode={draft.mode}
             reach={draft.reach}
             registration={draft.registration}
@@ -2356,6 +2396,7 @@ function FormRow({
    is in the device catalogue only. So an OS-and-version profile cannot use one
    at any reach, and an agentless device profile cannot either. */
 function EnrolmentFields({
+  enabled,
   mode,
   reach,
   registration,
@@ -2364,6 +2405,9 @@ function EnrolmentFields({
   roster,
   onChange,
 }: {
+  /* The chosen attributes, and the only reason this form reads them: whether a
+     roster can be matched depends on whether MAC is one of them. */
+  enabled: string[]
   mode: ProfileMode
   /** Null while the collector question is still unanswered on the step above. */
   reach: ProfileReach | null
@@ -2488,6 +2532,35 @@ function EnrolmentFields({
               </Button>
             )}
           </FormRow>
+        )}
+
+        {/* The two ways a pre-approved profile can be inert, said beside the
+            control that makes it so.
+
+            Both of these were `Fact` rows in a rail on the old detail page, and
+            both were lost when the rail became a form — the rail was the only
+            surface in the product that carried them. They are worth more here
+            than they were there: a warning next to the roster row is next to
+            the thing you would change, where in the rail it was a sentence
+            about a control three inches away.
+
+            NEITHER blocks. A roster you have not uploaded yet is the ordinary
+            state of setting one up, and this is a prototype with no upload
+            behind the button. */}
+        {registration === 'pre-approved' && !roster && (
+          <p className="bfp2__enrolwarn">
+            <AlertTriangle size={13} strokeWidth={2} aria-hidden />
+            <span>Nothing can sign in against this profile until a roster is uploaded.</span>
+          </p>
+        )}
+        {registration === 'pre-approved' && rosterNeedsMac({ registration, enabled }) && (
+          <p className="bfp2__enrolwarn">
+            <AlertTriangle size={13} strokeWidth={2} aria-hidden />
+            <span>
+              The roster is matched on <b>MAC address</b>, and this profile does not read it — so nothing on the
+              roster can be recognised.
+            </span>
+          </p>
         )}
       </div>
     </>

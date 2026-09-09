@@ -1283,3 +1283,34 @@ button.bfp2__factval:focus-visible {
   font-size: var(--pill-fs); font-weight: var(--pill-fw);
   letter-spacing: 0; white-space: nowrap;
 }
+
+/* --- Warnings that lost their rail -------------------------------------------
+
+   Three of these lived as `Fact` rows with a `warn` flag on the old detail
+   page's right-hand rail. The rail became a form and they had nowhere to go, so
+   for one release a pre-approved profile with no roster, a roster that can
+   never match, and an OS profile naming no platform were all silent.
+
+   They sit next to the control that causes them now, which is a better home
+   than the rail was: a warning beside the roster row is beside the thing you
+   would change. None of them blocks — all three are states somebody passes
+   through while setting a profile up. */
+.bfp2__enrolwarn {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--fb-notice-border); border-radius: var(--radius-md);
+  background: var(--fb-notice-bg);
+  font-size: var(--fs-sm); color: var(--fb-notice-fg); line-height: 1.5;
+}
+.bfp2__enrolwarn > svg { flex: none; margin-top: 1px; }
+.bfp2__enrolwarn b { font-weight: var(--fw-semibold); }
+
+/* The same fact when it is not a warning: what the profile does check. */
+.bfp2__osfoot {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55;
+}
+.bfp2__osfoot b { font-weight: var(--fw-medium); color: var(--text-secondary); }
+
+.bfp2__osuses { margin-top: var(--space-5); }

@@ -433,6 +433,22 @@
 }
 @keyframes bb-pulse { 0% { transform: scale(0.6); opacity: 0.7; } 70% { transform: scale(1.25); opacity: 0; } 100% { opacity: 0; } }
 .bb__start em { font-style: normal; color: var(--text-muted); font-weight: var(--fw-regular); }
+/* The application is the only noun in the pill, so it is the only thing in it
+   set at the page's own weight and colour. The words either side of it are
+   grammar: "a sign-in arrives at" is the same on every board, and what follows
+   the dash is a caption. Three weights in one line, and the eye lands on the
+   one word that differs between two policies. */
+.bb__start__at { font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* A pulse that does not pulse, for the policy nothing arrives at.
+
+   The dot is the arrival: it is brand-coloured and it rings, twice a second,
+   because a sign-in reaching this chain is the event the whole canvas is about.
+   On a policy naming no application that event never happens, so the ring is
+   switched off and the dot goes the colour of the border beside it — the mark
+   stays, because the pill still has a left slot and a hole in it reads as a
+   bug, but it stops advertising something that cannot occur. */
+.bb__start .bb__pulse.is-dead { background: var(--border-strong); }
+.bb__start .bb__pulse.is-dead::after { display: none; }
 
 /* The token: the sign-in itself, travelling. Rendered in the start node until
    the rehearsal lands it on a card. */

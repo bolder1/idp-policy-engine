@@ -1024,7 +1024,7 @@ function List({
             <button
               key={o.value}
               type="button"
-              className={`cp__opt ${on ? 'is-on' : ''} ${single ? 'is-single' : ''} ${o.disabled ? 'is-soon' : ''}`}
+              className={`cp__opt ${on ? 'is-on' : ''} ${single ? 'is-single' : ''} ${o.disabled ? 'is-soon' : ''} ${o.tone ? `is-tone-${o.tone}` : ''}`}
               role={single ? 'option' : 'checkbox'}
               aria-selected={single ? on : undefined}
               aria-checked={single ? undefined : on}
@@ -1058,7 +1058,7 @@ function List({
                 </span>
               )}
               {Ico && (
-                <i className={`cp__icon ${o.tone ? `is-tone-${o.tone}` : ''}`} aria-hidden>
+                <i className="cp__icon" aria-hidden>
                   <Ico size={13} strokeWidth={2} />
                 </i>
               )}
@@ -1389,7 +1389,7 @@ export function ConditionList({
           <button
             key={t.id}
             type="button"
-            className={`cp__catrow ${t.soon ? 'is-soon' : ''}`}
+            className={`cp__catrow is-tone-${conditionTone(t.id, t.group)} ${t.soon ? 'is-soon' : ''}`}
             disabled={t.soon}
             onClick={() => onPick(t.id)}
           >
@@ -1398,7 +1398,7 @@ export function ConditionList({
                 source for both. It was a bare grey glyph here, so the list that
                 INTRODUCES the eleven conditions was the only one of the three
                 surfaces showing them uncoloured. */}
-            <i className={`cp__icon is-tone-${conditionTone(t.id, t.group)}`} aria-hidden>
+            <i className="cp__icon" aria-hidden>
               <Ico size={13} strokeWidth={2} />
             </i>
             <span className="cp__catname">

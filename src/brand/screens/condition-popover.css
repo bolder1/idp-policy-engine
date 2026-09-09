@@ -260,6 +260,14 @@
   background: var(--surface-inset);
   color: var(--text-tertiary);
 }
+/* A pill round the NAME was tried here and taken back out.
+
+   The device-profile table's `.bfp2__modechip` — a bordered tinted pill with
+   the label inside — is the right shape for a table column, where the chip IS
+   the cell. In a menu the name is the thing you read down, and boxing eleven of
+   them turns a list into a wall of coloured blocks. The colour stays on the
+   mark, which is the one object per row that is only there to identify. */
+
 /* Keyed by the tone, not by the group name.
 
    These were `.is-library`, `.is-time`, `.is-attributes`, `.is-risk`,
@@ -272,7 +280,10 @@
    needs to know what a group is called — and the card, this menu and the
    catalogue below all read the same map. `--cond-*` is set by the `.is-tone-*`
    block in board.css, which is loaded on every screen that draws a condition. */
-.cp__icon[class*='is-tone-'] {
+/* The tile takes its colours from the ROW, which is where the tone class now
+   sits — `--cond-bg` and `--cond-fg` cascade down to it, so the same rule
+   serves the catalogue and the attribute menu with no per-family selector. */
+.cp__icon {
   background: var(--cond-bg, var(--surface-inset));
   color: var(--cond-fg, var(--text-tertiary));
 }
@@ -695,3 +706,4 @@
 /* The zone-half capsule already says `network` or `map` in words, and it only
    exists when the condition is narrowed — its presence is the signal. */
 .bb__insp .cp__scopetag { background: var(--surface-inset, var(--surface-sunken)); color: var(--text-secondary); }
+

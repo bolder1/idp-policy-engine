@@ -101,6 +101,14 @@ export function IfSub({ children, className }: { children: ReactNode; className?
   return <div className={`bb__ifbody ${className ?? ''}`}>{children}</div>
 }
 
+/* How many values a card prints before the rest become a count.
+
+   Four, the same cap the Who summary uses and for the same reason: a card is a
+   SUMMARY, and a condition naming eleven zones filled three lines of it with
+   names nobody reads at that size. The panel beside it lists all of them, which
+   is where a list belongs. */
+const VALUES = 4
+
 /** The value(s) of a condition, as chips. */
 function valueChips(c: Condition, resolve: NameLookup): { text: string; unset: boolean }[] {
   const t = conditionType(c.typeId)
@@ -117,17 +125,33 @@ export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup 
   const t = conditionType(c.typeId)
   const Ico = conditionIcon(t.id, t.group)
   const tone = conditionTone(t.id, t.group)
+  const chips = valueChips(c, resolve)
+  const shown = chips.slice(0, VALUES)
+  const rest = chips.length - shown.length
   return (
     <>
       <IfChip tone={tone} variant="attr" icon={<Ico size={11} strokeWidth={2.2} />} title={t.group}>
         {t.label}
       </IfChip>
       <IfKw tone="op">{c.operator}</IfKw>
-      {valueChips(c, resolve).map((v, i) => (
+      {/* Four names, then how many more.
+
+          Every value was a chip, so a condition naming eleven zones drew
+          eleven — three wrapped lines inside a card whose whole job is to be
+          read at a glance, and the eleventh name is no more useful than the
+          fifth at that size. The overflow is honest about being a count: it
+          says how many are not shown rather than trailing off, and the full
+          list is on the chip's title and in the panel. */}
+      {shown.map((v, i) => (
         <IfChip key={i} variant="val" unset={v.unset}>
           {v.text}
         </IfChip>
       ))}
+      {rest > 0 && (
+        <IfChip variant="val" title={chips.map((v) => v.text).join(', ')}>
+          +{rest}
+        </IfChip>
+      )}
       {/* Which half of the zone, when it is narrower than the zone as written.
 
           A zone is an AND of a network section and a geographic one, and a

@@ -515,6 +515,34 @@ export function TerminalCard({
             <Home size={13} strokeWidth={2} />
           </span>
         </span>
+
+        {/* The fold, at the LEADING edge, beside the index — where every other
+            card in the chain puts it.
+
+            It was the last thing in the meta cluster on the right, so the one
+            card whose head has no actions and no switch was also the one card
+            whose disclosure was somewhere else. Two cards apart in the same
+            column, the same control at two different x positions.
+
+            A view control, so it is allowed on a card that carries no others.
+            The argument for this card having no buttons is about the POLICY:
+            move, duplicate, delete and the switch would all promise a change
+            the default cannot make. Folding changes nothing about the rule,
+            only how much of it is drawn. */}
+        <button
+          type="button"
+          className={`bb__act bb__fold__btn ${expanded ? 'is-open' : ''}`}
+          aria-expanded={expanded}
+          aria-controls="bb-terminal-body"
+          aria-label={expanded ? 'Hide what the default does' : 'Show what the default does'}
+          title={expanded ? 'Fold this rule' : 'Show what it does'}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleExpand()
+          }}
+        >
+          {expanded ? <ChevronsDownUp size={14} strokeWidth={2.2} /> : <ChevronsUpDown size={14} strokeWidth={2.2} />}
+        </button>
         <div className="bb__title">
           <button
             type="button"
@@ -558,28 +586,6 @@ export function TerminalCard({
           >
             <Lock size={11} strokeWidth={2.2} aria-hidden />
           </span>
-          {/* A view control, so it is allowed here.
-
-              The argument for this card carrying no buttons is about the
-              POLICY: move, duplicate, delete and the switch would all promise
-              a change the default cannot make. Folding changes nothing about
-              the rule, only how much of it is drawn — and a chain set to
-              Outline with one card still at full height reads as a card that
-              did not hear the instruction. */}
-          <button
-            type="button"
-            className={`bb__act bb__fold__btn ${expanded ? 'is-open' : ''}`}
-            aria-expanded={expanded}
-            aria-controls="bb-terminal-body"
-            aria-label={expanded ? 'Hide what the default does' : 'Show what the default does'}
-            title={expanded ? 'Fold this rule' : 'Show what it does'}
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggleExpand()
-            }}
-          >
-            {expanded ? <ChevronsDownUp size={14} strokeWidth={2.2} /> : <ChevronsUpDown size={14} strokeWidth={2.2} />}
-          </button>
         </div>
       </div>
       <div className="bb__fold bb__fold--sum" aria-hidden={expanded} inert={expanded}>

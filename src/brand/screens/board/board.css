@@ -22,14 +22,23 @@
    tokens and nothing else.
    -------------------------------------------------------------------------- */
 
-/* 560 so a condition row is ONE row out of the box. The container query below
-   is on the content box, so the block's 12px padding comes off before the
-   430px test — a 560px panel leaves 510px inside, which is what five controls
-   need to be legible side by side. BoardBuilder writes this inline from its own
-   state; the two are kept in step deliberately. */
+/* `--bb-insp` is written inline by BoardBuilder from its own state; the value
+   here and that one are kept in step deliberately.
+
+   `--bb-card` was 560, chosen so a condition row cleared a 430px container
+   query and stayed on one line. That query is gone — the row is one pill now
+   and fits at every width, as the note on `container-type` further down says —
+   so the number was outliving its reason. What 560 bought after that was empty
+   ground: a card is a name, an index and a state pill, and the longest rule
+   name in the seeded estate ends around 340. The rest was gap.
+
+   440 is measured off the CONTENT rather than off a threshold that no longer
+   exists: the longest name plus the state pill, plus room for a condition row's
+   three parts without wrapping. Narrower cards also mean more of the chain is
+   on screen at once, which is what the canvas is for. */
 .bb {
   --bb-insp: 560px;
-  --bb-card: 560px;
+  --bb-card: 440px;
   --bb-dot: #d3dae1;
   --bb-stage: #f6f7f9;
   --bb-link: var(--border-default);
@@ -454,6 +463,16 @@
 .bb__start {
   display: flex; align-items: center; gap: var(--space-4);
   align-self: flex-start;
+  /* Sized to its sentence, not to the card column.
+
+     The chain is `--bb-card` wide and the start node is a child of it, so
+     narrowing the cards to 440 wrapped this one line of prose onto two inside a
+     pill — a shape that reads as a paragraph in a lozenge. It is a standalone
+     node rather than a card in the stack, so it is allowed to be wider than
+     they are; the canvas pans, and Fit measures the world's box, which now
+     includes it. The ceiling stops a very long application name from making a
+     node nobody can read across. */
+  width: max-content; max-width: min(680px, 78vw);
   padding: var(--space-3) var(--space-5) var(--space-3) var(--space-4);
   border: 1px solid var(--border-default); border-radius: var(--radius-full);
   background: var(--surface-raised);
@@ -666,14 +685,18 @@
 .bb__reach.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-dot: var(--fb-positive-dot, #128f43); }
 
 .bb__cardhead {
-  /* Four columns: the index, the fold, the title, and the toggle.
+  /* Three columns: the index, the fold, and the title.
 
-     The fourth used to hold the hover actions as well, reserving their width at
-     zero opacity so the head would not reflow when they appeared. They are
-     outside the card now — see `.bb__acts` — so the column is the toggle's own
-     width and the title gets the rest. The fold stays on the leading edge: it
-     moved there because the right-hand cluster stranded it mid-head, and it
-     reads better beside the index either way. */
+     There were four. The fourth held the on/off switch and, before that, the
+     hover actions as well — reserving their width at zero opacity so the head
+     would not reflow when they appeared. Both are outside the card now (see
+     `.bb__acts`), so the title takes the rest. The fold sits on the leading
+     edge: it moved there because the right-hand cluster stranded it mid-head,
+     and it reads better beside the index either way.
+
+     The comment here said "four" long after the fourth had gone, which is the
+     kind of thing that sends the next person looking for a track that is not
+     there. */
   display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: var(--space-4);
   /* The right padding is the small one now. The fourth column held the on/off
      switch and is gone with it — on/off is an action, and it lives in the
@@ -682,6 +705,13 @@
   padding: var(--space-4) var(--space-4) var(--space-3) var(--space-4);
 }
 .bb__cardhead > .bb__idx + .bb__fold__btn { margin-left: calc(var(--space-4) * -1 + var(--space-2)); }
+/* The terminal card has a fourth item: the `Always on` state and its padlock.
+
+   It is the only head that does, so the track is added where it is needed
+   rather than declared on every card and left empty — an empty explicit track
+   still pays for its gap, which would put 8px of nothing on the right of every
+   other card in the chain. */
+.bb__cardhead:has(> .bb__cardmeta) { grid-template-columns: auto auto minmax(0, 1fr) auto; }
 .bb__idx {
   display: inline-grid; place-items: center;
   width: 30px; height: 30px; border-radius: var(--radius-md);
@@ -763,14 +793,32 @@
 .bb__title em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .bb__cardmeta { display: flex; align-items: center; gap: var(--space-3); }
+/* A pill, not a dot beside a word.
+
+   It was a 7px coloured circle and grey text, which is two objects saying one
+   thing and the coloured half saying it in the one channel a reader may not
+   have. Colour alone is also the whole distinction between `Ready` and `Needs
+   setup` at a glance — the words differ, but the dot is what the eye catches,
+   and a green dot and an amber dot at 7px are one shape twice.
+
+   The pill carries the tone on its own ground, which is how every other state
+   in this console is drawn — see the `--pill-*` block in console-theme.css,
+   whose geometry this uses so the board does not invent a fourth pill shape.
+   The word does the work and the tint agrees with it. */
 .bb__state {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: var(--fs-xs); color: var(--text-tertiary); white-space: nowrap;
+  display: inline-flex; align-items: center;
+  flex: none; white-space: nowrap;
+  padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line);
+  background: var(--fb-positive-bg); color: var(--fb-positive-fg);
 }
-.bb__state::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--fb-positive-dot, #128f43); }
-.bb__state.is-setup::before { background: var(--fb-notice-dot, #b07a00); }
-.bb__state.is-warn::before { background: var(--fb-negative-dot, #d01243); }
-.bb__state.is-off::before { background: var(--border-strong); }
+.bb__state.is-setup { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bb__state.is-warn { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bb__state.is-off { background: var(--fb-neutral-bg); color: var(--text-tertiary); }
+/* The terminal card's `Always on` carries no modifier. It is a fact about a row
+   nothing can change rather than a readiness verdict, so it takes the neutral
+   ground rather than reading as a green pass. */
+.bb__cardmeta > .bb__state { background: var(--fb-neutral-bg); color: var(--text-tertiary); }
 
 /* Card actions: shown on hover or selection, never a hidden menu. */
 /* Outside the card, on its right edge, only while it is the card in hand.
@@ -2928,15 +2976,32 @@ button.bb__idx::after {
 
 /* The joiner, drawn as the select it behaves like: press it and the level
    flips. */
+/* A caret, so it looks like the dropdown it is.
+
+   It is a native `<select>`, and the kit's own reset strips the platform arrow
+   from every select in the console — which is right, because the console draws
+   its own. This one was missing it: two uppercase letters in a small box, with
+   nothing saying they could be changed, sitting between two conditions that
+   plainly could. The chevron is drawn as a background image rather than as a
+   sibling element, because a `<select>` may not contain one.
+
+   `stroke='%235A6775'` is `--text-tertiary` written out. A `var()` cannot be
+   interpolated into a `url()`, so the one place in this sheet where a colour is
+   spelled twice is here; if the token moves, this moves with it. */
 .bb__joinsel {
-  display: inline-flex; align-items: center; gap: 1px;
-  height: 30px; padding: 0 5px 0 9px;
+  appearance: none; -webkit-appearance: none;
+  display: inline-flex; align-items: center;
+  height: 30px; padding: 0 22px 0 9px;
   border: 1px solid var(--border-default); border-radius: var(--radius-sm);
-  background: var(--surface-raised);
+  background-color: var(--surface-raised);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235A6775' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
   font-family: inherit; font-size: 11px; font-weight: var(--fw-medium);
   text-transform: uppercase; letter-spacing: 0.03em;
   color: var(--text-secondary); cursor: pointer;
 }
+.bb__joinsel:hover { border-color: var(--border-strong); }
 /* No tint per value.
 
    AND was drawn on the info ramp and OR on the notice ramp, which made the
@@ -3528,8 +3593,12 @@ button.bb__idx::after {
      conditions it joins, which inverts the hierarchy this panel is for. */
   flex: none; width: auto; min-width: 0;
   appearance: none; -webkit-appearance: none;
-  padding: 0 9px;
-  text-align: center; text-align-last: center;
+  /* Room on the right for the caret the block above paints. This rule is the
+     later of the two `.bb__joinsel` blocks in this sheet and so wins the
+     padding outright — a shorthand here with no room for the chevron drew it
+     straight through the second letter of "AND". */
+  padding: 0 22px 0 9px;
+  text-align: left; text-align-last: left;
 }
 
 /* --- Who, summarised on one line --------------------------------------------
@@ -3594,3 +3663,24 @@ button.bb__idx::after {
   font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55;
 }
 .bb__addnote b { font-weight: var(--fw-medium); color: var(--text-secondary); }
+
+/* Select-all, over the Who list rather than in it.
+
+   A row at the top of the scroller would scroll away, and a checkbox whose job
+   is to tick the other checkboxes reads as one of them. Above the box, on the
+   line that says how many are on, it is plainly a control ABOUT the list. */
+.bb__whoall {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.bb__whoall > button {
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  color: var(--text-link);
+}
+.bb__whoall > button:hover { text-decoration: underline; text-underline-offset: 2px; }
+.bb__whoall > button:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 4px var(--focus-halo); }
+.bb__whoall > span {
+  margin-left: auto;
+  font-size: var(--fs-xs); color: var(--text-tertiary); font-variant-numeric: tabular-nums;
+}

@@ -294,6 +294,24 @@ function WhoPicker({
     setDraft(setWho(draft, kind, on ? [...new Set([...now, id])] : now.filter((x) => x !== id), opFor(kind)))
   }
 
+  /* Every row the list is SHOWING, on or off in one press.
+
+     Scoped to the filtered rows on purpose, and the label says so: with a
+     search typed, "Select all 4 matching" selects those four and leaves the
+     other fourteen alone. A select-all that quietly reached past the filter
+     would be the one control on this dialog that ignores what you just typed.
+
+     A toggle, not a one-way button. Ticking eighteen groups by accident is a
+     plausible slip, and the way back from it cannot be eighteen clicks. */
+  const allOn = (list: { id: string }[]) => list.length > 0 && list.every((r) => ids.includes(r.id))
+  const setMany = (list: { id: string }[], on: boolean) => {
+    const now = whoIds(draft, tab)
+    const next = on
+      ? [...new Set([...now, ...list.map((r) => r.id)])]
+      : now.filter((x) => !list.some((r) => r.id === x))
+    setDraft(setWho(draft, tab, next, opFor(tab)))
+  }
+
   const query = q.trim().toLowerCase()
   const rows =
     tab === 'group'
@@ -373,6 +391,25 @@ function WhoPicker({
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
+
+        {/* Select-all, over the list rather than in it.
+
+            Not a row at the top of the scroller: it would scroll away, and a
+            checkbox whose job is to tick the other checkboxes reads as one of
+            them. Above the box, on the line that says how many are on, it is
+            plainly a control ABOUT the list. */}
+        {rows.length > 0 && (
+          <div className="bb__whoall">
+            <button type="button" onClick={() => setMany(rows, !allOn(rows))}>
+              {allOn(rows)
+                ? `Clear ${rows.length}`
+                : query
+                  ? `Select all ${rows.length} matching`
+                  : `Select all ${rows.length}`}
+            </button>
+            <span>{ids.length} selected</span>
+          </div>
+        )}
 
         <div className="bb__whorows" role="group" aria-label={tab === 'group' ? 'Groups' : 'People'}>
           {rows.length === 0 && <p className="bb__whohint">Nobody listed matches that.</p>}

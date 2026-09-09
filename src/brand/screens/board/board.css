@@ -1606,13 +1606,8 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   padding: 1px 6px; border-radius: 3px; background: var(--surface-inset, #eef1f4);
   font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
 }
-.bb__addrow {
-  display: inline-flex; align-items: center; gap: 6px; margin-top: var(--space-2);
-  height: 28px; padding: 0 8px; border-radius: var(--radius-sm); border: 1px dashed var(--border-default);
-  background: none; font-family: inherit; font-size: var(--fs-xs); color: var(--text-tertiary); cursor: pointer;
-}
-.bb__addrow:hover { border-color: var(--border-strong); color: var(--text-primary); }
-.bb__addrow:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+/* `.bb__addrow` stood here — the dashed `Add method` under the method list.
+   The list is a multi-select now, so there is no row to add. */
 .bb__addalt { width: 100%; justify-content: center; margin-top: var(--space-3); }
 .bb__readback {
   margin: var(--space-3) 0 0; padding: var(--space-3) var(--space-4);
@@ -2208,14 +2203,13 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifjsub::before { content: '· '; }
 .bb__ifaction .bb__token { margin-right: 2px; }
 
-/* Row actions. `.bb__ifacts` — the plural, one letter from this — was the
-   container they used to sit in, and nothing has emitted it for some time. */
-.bb__ifact {
-  display: grid; place-items: center; width: 26px; height: 26px; border-radius: var(--radius-sm);
-  border: none; background: none; color: var(--if-muted); cursor: pointer;
-}
-.bb__ifact:hover { background: var(--if-chip-hover); color: var(--text-primary); }
-.bb__ifact:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+/* `.bb__ifact` stood here — the 26px icon button a condition row's own actions
+   used. Its last emitter was the `Move into a group of its own` Split, and it
+   went with the gesture.
+
+   Note how close it was to `.bb__ifaction`, which is live and four characters
+   longer. The old comment here recorded the same hazard about `.bb__ifacts`,
+   the plural. Deleting rather than reserving is the point. */
 
 /* Live controls inside the block take the chip's clothes. */
 .bb__if .bx-picker__trigger {
@@ -2928,12 +2922,10 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    for the `::after` hit area exactly as `relative` does, which is the only
    reason any of these are here. */
 .bb__act,
-.bb__ifact,
 .bb__secact,
 button.bb__idx { position: relative; }
 
 .bb__act::after,
-.bb__ifact::after,
 .bb__secact::after,
 .bb__link__add::after,
 button.bb__idx::after {
@@ -3061,16 +3053,9 @@ button.bb__idx::after {
 .bb__joinsel:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 .bb__cond__body { min-width: 0; display: block; position: relative; }
-/* The row's own actions — "move into a group of its own" — over the block's
-   top-right corner, level with the delete inside it, revealed on hover the way
-   they always were. Absolute, because the block is a form now and a trailing
-   column beside it would take width off every field in it. */
-.bb__cond__acts {
-  position: absolute; top: 6px; right: 40px;
-  display: flex; align-items: center; gap: 2px; opacity: 0;
-}
-.bb__cond:hover .bb__cond__acts, .bb__cond:focus-within .bb__cond__acts { opacity: 1; }
-.bb__ifact.is-danger:hover { color: var(--fb-negative-fg); }
+/* `.bb__cond__acts` stood here — the hover-revealed `Move into a group of its
+   own` over the block's top-right corner. The gesture is withdrawn until it has
+   a better home; see the note in `WhenEditor`. */
 
 /* --- The form, as numbered steps ---------------------------------------------
 
@@ -3338,28 +3323,12 @@ button.bb__idx::after {
 .bb__ask--pane { padding: var(--space-4) var(--space-5) var(--space-5); }
 
 
-/* --- The second factor's methods, as rows ------------------------------------
+/* --- The second factor's methods -------------------------------------------
 
-   One dropdown per method, numbered when the order is walked. Indented under
-   the rung it belongs to, and quiet: the rung above already said what this list
-   means, so the list itself only has to be legible and easy to lengthen. */
-.bb__methods { display: grid; gap: 4px; min-width: 0; }
-.bb__methodrow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 26px;
-  align-items: center; gap: var(--space-2);
-  min-width: 0;
-}
-.bb__methodrow:has(> .bb__methodn) { grid-template-columns: 16px minmax(0, 1fr) 26px; }
-.bb__methodn {
-  font-size: 11px; font-weight: var(--fw-semibold); color: var(--text-tertiary);
-  font-variant-numeric: tabular-nums; text-align: right;
-}
-.bb__methodrow .bx-picker { width: 100%; }
-/* Always visible, not on hover. A row here is one of two or three the author
-   put in deliberately, and a delete that appears only under the pointer makes a
-   short list feel like it cannot be shortened. */
-.bb__methodrow .bb__act { opacity: 1; }
+   `.bb__methods`, `.bb__methodrow` and `.bb__methodn` stood here — one dropdown
+   per chosen method, numbered when the order was walked. The control is a
+   single multi-select now: the list is the catalogue and the ticks are the
+   answer, so there are no rows to lay out. */
 
 /* A label and a control on one line, for a rung's single sub-setting. */
 .bb__subrow {
@@ -3616,19 +3585,9 @@ button.bb__idx::after {
   padding: var(--space-4);
 }
 
-/* The offer, when there is no second factor. Dashed, because it adds something
-   that is not there — the same language the board uses for every add. */
-.bb__addsecond {
-  display: inline-flex; align-items: center; gap: 6px;
-  margin-top: var(--space-4);
-  height: 30px; padding: 0 12px;
-  border: 1px dashed var(--border-default); border-radius: var(--radius-sm);
-  background: none;
-  font-family: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium);
-  color: var(--text-secondary); cursor: pointer;
-}
-.bb__addsecond:hover { border-style: solid; border-color: var(--brand); color: var(--brand); background: var(--brand-subtle-bg); }
-.bb__addsecond:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+/* `.bb__addsecond` stood here — the dashed `Require a second factor` under the
+   tiles. It is a tile now, which is what stopped the pane offering three
+   choices while presenting two. */
 
 /* The select's own affordances, since it is a real <select> now: the platform
    arrow is suppressed and the pill keeps the shape it had as a button. */

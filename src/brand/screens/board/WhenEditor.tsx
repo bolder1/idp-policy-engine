@@ -61,7 +61,11 @@ export function WhenEditor({
   /* `'loose'` adds a condition at the top level, `'group'` starts a new group,
      and an id adds into that card. Three destinations, because there are three
      things a person can mean by "add". */
-  const [adding, setAdding] = useState<{ cardId: string | 'loose' | 'group' } | null>(null)
+  /* `open` belongs to the 'group' destination alone: a new group appears as a
+     frame holding one empty slot, and the catalogue opens when that slot is
+     pressed. Until a condition is chosen the group exists only here, on screen —
+     never in the rule, which is what keeps a group from ever being saved empty. */
+  const [adding, setAdding] = useState<{ cardId: string | 'loose' | 'group'; open?: boolean } | null>(null)
   const [fresh, setFresh] = useState<string | null>(null)
 
   useEffect(() => {
@@ -173,7 +177,21 @@ export function WhenEditor({
      where they are in reading order and join the bracket around them. */
   const ungroup = (id: string) => restructure(ops.setGrouped(rule.when, id, false))
   const removeGroup = (id: string) => restructure(ops.removeBranch(rule.when, id))
-  const addGroup = () => restructure(ops.addBranch(rule.when))
+  /* Not `addBranch`. That wrote an empty group into the rule immediately, and
+     an empty group matches every sign-in — the pane then had to apologise for
+     it in a sentence while the linter flagged it. The group is pending instead,
+     and the first condition chosen for it is what creates it. */
+  const addGroup = () => setAdding({ cardId: 'group', open: false })
+  const pendingGroup =
+    adding?.cardId === 'group' ? (
+      <PendingGroup
+        letter={cardLetter(cards.length)}
+        open={!!adding.open}
+        onOpen={() => setAdding({ cardId: 'group', open: true })}
+        onPick={add}
+        onCancel={() => setAdding(null)}
+      />
+    ) : null
 
   const dupes = duplicatedAcrossCards(rule.when)
   const openCatalogue = (cardId: string | 'new') => () => setAdding({ cardId })
@@ -236,7 +254,9 @@ export function WhenEditor({
 
                 So: a button, then the list, exactly as the foot does it. One
                 catalogue, one component, two places that open it. */}
-            {adding ? (
+            {pendingGroup ? (
+              <div className="bb__ifblank__pick">{pendingGroup}</div>
+            ) : adding ? (
               <div className="bb__ifblank__pick">
                 <ConditionList label="Add a condition" onPick={add} onCancel={() => setAdding(null)} />
               </div>
@@ -341,7 +361,14 @@ export function WhenEditor({
                 opened it — so the thing you are choosing appears where the
                 thing you chose is about to land, and the bracket does not
                 change height twice. */}
-            {adding?.cardId === 'loose' ? (
+            {pendingGroup ? (
+              <>
+                {/* A pending group is a pending MEMBER, so it takes the
+                    bracket's operator in the gap above it like any other. */}
+                <JoinRow join={outer} scope="rule" onSet={(j) => write(ops.setOuterJoin(rule.when, j))} />
+                {pendingGroup}
+              </>
+            ) : adding?.cardId === 'loose' ? (
               <div className="bb__ifpick">
                 <ConditionList label="Add a condition" onPick={add} onCancel={() => setAdding(null)} />
               </div>
@@ -373,6 +400,58 @@ export function WhenEditor({
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+/* --- A group that does not exist yet ---------------------------------------------
+
+   What "Add condition group" draws: the frame a group will have, its name, and
+   one empty slot where its first condition goes. Pressing the slot opens the
+   catalogue in its place; choosing from it is what writes the group into the
+   rule, with that condition already inside. Discarding it, or cancelling the
+   catalogue, simply stops drawing it — nothing was ever written, so there is
+   nothing to undo.
+
+   A group is never empty in the rule, because an empty group matches every
+   sign-in and no sentence makes that safe to leave lying around. */
+function PendingGroup({
+  letter,
+  open,
+  onOpen,
+  onPick,
+  onCancel,
+}: {
+  letter: string
+  open: boolean
+  onOpen: () => void
+  onPick: (typeId: string) => void
+  onCancel: () => void
+}) {
+  const name = `Group ${letter}`
+  return (
+    <div className="bb__ifgroup is-pending" role="group" aria-label={`${name}, not yet created: choose its first condition`}>
+      <div className="bb__ifgrouphead">
+        <span className="bb__ifgroupname">
+          <Braces size={12} strokeWidth={2.2} aria-hidden />
+          {name}
+        </span>
+        <span className="bb__ifgroupacts">
+          <button type="button" className="bb__ifutil is-danger" aria-label={`Discard ${name}`} title="Discard this group" onClick={onCancel}>
+            <Trash2 size={13} strokeWidth={2} aria-hidden />
+          </button>
+        </span>
+      </div>
+      {open ? (
+        <div className="bb__ifpick">
+          <ConditionList label={`First condition in ${name}`} onPick={onPick} onCancel={onCancel} />
+        </div>
+      ) : (
+        <button type="button" className="bb__ifslot" onClick={onOpen}>
+          <Plus size={12} strokeWidth={2.4} aria-hidden />
+          Choose a condition
+        </button>
+      )}
     </div>
   )
 }
@@ -477,12 +556,16 @@ function GroupMember({
           </Fragment>
         ))}
 
-        {/* A group with nothing in it says so, rather than rendering as an
-            empty frame somebody has to guess the purpose of. The linter reports
-            the same fact as PE320 at the same moment, so this is the friendly
-            half of a finding that also blocks publishing. */}
+        {/* An empty group shows the slot its first condition goes in — the
+            same box a new group opens with — rather than a sentence explaining
+            that it is empty. The builder no longer creates empty groups, so
+            this only ever meets one left over in older data, and pressing the
+            box is the whole fix. */}
         {rows.length === 0 && !picking && (
-          <p className="bb__ifempty">Nothing in this group yet — it matches everything until you add a condition.</p>
+          <button type="button" className="bb__ifslot" onClick={onAdd}>
+            <Plus size={12} strokeWidth={2.4} aria-hidden />
+            Choose a condition
+          </button>
         )}
 
         {/* Inside the frame, above the foot. A group is a bracket, and what you
@@ -506,10 +589,15 @@ function GroupMember({
               something is about to be added. The two controls that RESTRUCTURE
               are quiet, labelled, and clustered at the other end where a
               group's own housekeeping belongs. */}
-          <button type="button" className="bb__ifadd" onClick={onAdd}>
-            <Plus size={12} strokeWidth={2.4} aria-hidden />
-            Add condition
-          </button>
+          {/* Only once the group holds something. Empty, the slot above is the
+              way in, and a second "Add condition" beside it would be two doors
+              to one room. */}
+          {rows.length > 0 && (
+            <button type="button" className="bb__ifadd" onClick={onAdd}>
+              <Plus size={12} strokeWidth={2.4} aria-hidden />
+              Add condition
+            </button>
+          )}
           <span className="bb__ifgroupacts">
             <button
               type="button"

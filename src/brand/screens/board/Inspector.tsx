@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
-import { ChevronsLeftRight, ChevronsRightLeft, Plus, X } from 'lucide-react'
+import { ChevronsLeftRight, ChevronsRightLeft, CornerDownRight, Plus, Split, Users, X, type LucideIcon } from 'lucide-react'
 
 import { Toggle } from '../../kit'
 import { fallbackRule, type Policy, type Rule } from '../../data'
@@ -154,13 +154,13 @@ export function Inspector({
                 move between them. What it no longer does is HIDE the other
                 two. */}
             <motion.div key={`pane:${rule.id}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
-              <Section id="who" title="Who" focused={part === 'who'}>
+              <Section id="who" title="Who" icon={Users} tour="insp-who" focused={part === 'who'}>
                 <WhoEditor rule={rule} audience={draft.audience} onPatch={patch} onOpenPart={onOpenPart} />
               </Section>
 
               <ConditionSection rule={rule} onPatch={patch} focused={part === 'when'} />
 
-              <Section id="then" title="Then">
+              <Section id="then" title="Then" icon={CornerDownRight} tour="insp-then">
                 <WhatEditor rule={rule} onPatch={patch} />
               </Section>
             </motion.div>
@@ -198,27 +198,49 @@ export function Inspector({
 
    `focused` carries the selection's part, and it does the one job the tabs did
    that was worth keeping — saying which third of the rule you arrived at. It
-   tints the heading rather than hiding the other two. */
+   darkens that section's mark and guide rule rather than hiding the other two. */
 function Section({
   id,
   title,
+  icon: Icon,
   action,
   focused,
+  tour,
   children,
 }: {
   id: string
   title: string
+  /* The same mark the card beside this panel prints against the same word —
+     `who` with people, `if` with a fork — so the heading here and the line on
+     the card read as one vocabulary in two places. */
+  icon: LucideIcon
   action?: ReactNode
   focused?: boolean
+  /* What the board's guided demo lights when it talks about this section.
+
+     A data attribute rather than a class, and passed rather than derived from
+     `id`, for the reason `tour.test.ts` gives about the trail's anchors: a
+     walkthrough breaks silently. Nobody opens it after their first week, so a
+     section renamed out from under one just stops lighting anything and no
+     test fails. Spelt out here, `board-tour.test.ts` can assert the literal. */
+  tour?: string
   children: ReactNode
 }) {
   return (
-    <section className={`bb__sec ${focused ? 'is-focused' : ''}`} aria-labelledby={`bb-sec-${id}`}>
+    <section className={`bb__sec ${focused ? 'is-focused' : ''}`} data-tour={tour} aria-labelledby={`bb-sec-${id}`}>
       <div className="bb__sec__head">
-        <h3 id={`bb-sec-${id}`}>{title}</h3>
+        <h3 id={`bb-sec-${id}`}>
+          <Icon size={15} strokeWidth={2} aria-hidden />
+          {title}
+        </h3>
         {action}
       </div>
-      {children}
+      {/* Everything that answers the heading hangs off it: set in past the
+          mark, with a guide rule down its left — the card's own drawing, where
+          `who`, `if` and `then` sit at the margin and what belongs to each is
+          indented against a line. It is what makes three sections of controls
+          read as three parts of one rule rather than as one long form. */}
+      <div className="bb__sec__body">{children}</div>
     </section>
   )
 }
@@ -243,6 +265,12 @@ function ConditionSection({
     <Section
       id="if"
       title="If"
+      icon={Split}
+      /* `insp-when`, matching the MODEL's word for this part rather than the
+         heading's. Ids follow the model and labels follow the person — see
+         PART_LABEL in parts.ts, which draws the same distinction for the same
+         field. */
+      tour="insp-when"
       focused={focused}
       action={
         <button

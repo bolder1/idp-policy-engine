@@ -72,15 +72,16 @@ describe('an emptied branch', () => {
     expect(removeCondition(w, A.id).cards).toHaveLength(1)
   })
 
-  /* A group is a bracket somebody asked for. Clearing it out to refill it must
-     not delete it under them — there is no way back but starting again. */
-  it('stays, empty, when somebody did', () => {
+  /* A group cannot be empty. The builder only creates one once its first
+     condition is chosen, so emptying one is removing it — and undo is the way
+     back, as it is for every other removal. An empty group matches every sign-in
+     and the linter reports it as PE320; leaving one behind was shipping that. */
+  it('goes too when somebody made it, because a group cannot be empty', () => {
     const g = { ...emptyGroup(), conditions: [A] }
     const w = when(g, card(B))
     const next = removeCondition(w, A.id)
-    expect(next.cards).toHaveLength(2)
-    expect(next.cards[0].conditions).toHaveLength(0)
-    expect(next.cards[0].grouped).toBe(true)
+    expect(next.cards).toHaveLength(1)
+    expect(next.cards[0].conditions.map((c) => c.id)).toEqual([B.id])
   })
 })
 

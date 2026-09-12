@@ -78,7 +78,7 @@
   width: 28px; height: 28px; border-radius: var(--radius-sm);
   background: var(--surface-inset); color: var(--text-tertiary);
 }
-.bz7__tile--sm { width: 22px; height: 22px; }
+
 /* No tint rule here on purpose: the resting tile is the neutral in the base
    above, and brand is spent only on what is current. */
 /* A zone constraining neither half matches everything. That is not a category,
@@ -150,7 +150,7 @@
    did not read as emphasis, it read as a different kind of object. The tint
    already does the work the width was doing. */
 .bz7__op > .bz7__any,
-.bz7__tcell > .bz7__any { align-self: center; min-height: 0; }
+.blist__meta .bz7__any { align-self: center; min-height: 0; }
 
 /* And the section context, where it is not.
 
@@ -191,42 +191,6 @@
    neither do these. Same header height, same weight, same rule under it, and
    the same raised card around it — radius-lg with the low shadow, not the flat
    radius-md box these had. */
-.bz7__table {
-  background: var(--surface-raised);
-  border: var(--bw-thin) solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  /* Flat, like the console. console-theme.css takes the shadow off
-     .btable-wrap explicitly, so a shadow here would out-dress the table it is
-     meant to match. */
-  overflow: hidden;
-}
-/* One template, declared once, shared by the header and every row so the
-   columns cannot drift apart. */
-.bz7__trow {
-  display: grid;
-  /* The name gets the room. It was 1.2fr against two 1.3fr columns of chips, so
-     at ordinary laptop widths the one value that identifies the row — "Office
-     egress · 203.0.113.0/24" — was the one being truncated, while the chips
-     beside it had space to spare. The chip columns wrap; a name cannot. */
-  grid-template-columns: minmax(190px, 1.7fr) minmax(0, 1.15fr) minmax(0, 1.15fr) 92px 56px;
-  align-items: center; gap: 12px;
-  padding: var(--space-4) var(--table-cell-x); min-height: var(--table-row-h);
-  border-bottom: 1px solid var(--table-rule);
-}
-.bz7__trow:last-child { border-bottom: none; }
-.bz7__trow:not(.bz7__thead):hover { background: var(--table-row-hover); }
-/* The table recipe in console-theme.css, applied to a grid instead of a
-   `<thead>`. Every value comes from there so this head cannot drift from the
-   policies table's. */
-.bz7__thead {
-  min-height: var(--table-header-h); padding-top: 0; padding-bottom: 0;
-  background: var(--table-head-bg);
-  border-bottom: var(--bw-thin) solid var(--table-head-rule);
-  font-size: var(--table-head-fs); font-weight: var(--table-head-fw);
-  letter-spacing: 0; text-transform: none; color: var(--table-head-fg);
-  white-space: nowrap;
-}
-.bz7__tcell { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: nowrap; overflow: hidden; }
 .bz7__tuses { font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; }
 .bz7__tuses.is-quiet { color: var(--text-muted); }
 
@@ -468,11 +432,6 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 
 
 @media (max-width: 860px) {
-  /* Declared once. There were two of these, the first dead — and the columns
-     hidden below are indexed off this template, so a stale one is a table that
-     drops the wrong cells. */
-  .bz7__trow { grid-template-columns: minmax(0, 1fr) 70px 62px; }
-  .bz7__trow > :nth-child(2), .bz7__trow > :nth-child(3) { display: none; }
   .bz7__head { flex-direction: column; gap: 12px; }}
 
 
@@ -624,9 +583,9 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 .bz7__kebab:hover { background: var(--surface-inset); color: var(--text-primary); }
 .bz7__kebab:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
-/* The last row's menu would otherwise open below the table and be clipped by
-   its own rounded overflow. */
-.bz7__table { overflow: visible; }
+/* `.bz7__table`, `.bz7__trow`, `.bz7__thead` and `.bz7__tcell` stood near the top of
+   this file. The list is `.blist` in screens.css now, which does not clip, so the
+   overflow override that followed the table here went with it. */
 
 /* --- The name, renameable in place ---------------------------------------------
    The pencil sits beside the heading rather than in the actions on the right,

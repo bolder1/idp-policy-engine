@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, Keyboard, ListOrdered, PanelRightClose, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
 import { Button, Modal } from '../../kit'
@@ -19,7 +19,21 @@ import { Board } from './Board'
 import { Inspector } from './Inspector'
 import { nextPart, ruleAt, type Part, type Selection, type Tab, type Trace } from './model'
 
+import { boardTourSeen } from '../../tour/board-tour'
+
 import './board.css'
+
+/* Lazy, the way the trail loads its own.
+
+   The walkthrough carries five animated figures and six thumbnails, and the
+   overwhelming majority of arrivals at this screen are somebody who has taken
+   it already — `boardTourSeen` short-circuits before any of it is fetched. */
+const BoardTour = lazy(() => import('../../tour/BoardTour').then((m) => ({ default: m.BoardTour })))
+/* The player is lazy for a stronger reason than the tour is: it exists to load
+   a two-minute video, and the code that does it should not be in the bundle of
+   somebody who never presses play. `DemoButton` is NOT lazy — it is a 28px
+   control on the top row of every visit, and suspending that would flash. */
+const DemoPlayer = lazy(() => import('../../tour/DemoPlayer').then((m) => ({ default: m.DemoPlayer })))
 
 /* -----------------------------------------------------------------------------
    The board's host — state, and the two regions it feeds.
@@ -97,6 +111,15 @@ export function BoardBuilder({
      it goes through `commitDraft` like every other one, undo puts it back, and
      nothing is saved until you publish. */
   const [picking, setPicking] = useState(false)
+  /* The guided demo — see src/brand/tour/board-tour.ts. */
+  const [tour, setTour] = useState(false)
+  /* And the recording, which is NOT inside the tour.
+
+     It is reachable from the bar whether or not a walkthrough is running, and
+     it has to outlive one — closing the player must put you back on the step
+     you were reading, not end the tour. Owning it here is what makes both
+     true. */
+  const [demo, setDemo] = useState(false)
   const [inspOpen, setInspOpen] = useState(true)
   /* The inspector's width, dragged rather than fixed.
 
@@ -248,6 +271,22 @@ export function BoardBuilder({
 
      Cleared on unmount, or the guard would keep answering for whatever screen
      came next. */
+  /* First arrival only, and never on top of something else.
+
+     Arriving with a sheet already asked for — "this policy has four holes",
+     from the policy list — is somebody who knows what they came for, and
+     interrupting them with a walkthrough would be the product talking over a
+     question it was just asked. The settle delay is so the spotlight measures a
+     laid-out screen rather than a mounting one.
+
+     Its own key, not the trail's: the two teach different surfaces, and
+     somebody who took the trail's tour has not been shown this one. */
+  useEffect(() => {
+    if (openSheet || boardTourSeen()) return
+    const t = window.setTimeout(() => setTour(true), 600)
+    return () => window.clearTimeout(t)
+  }, [openSheet])
+
   useEffect(() => {
     registerLeaveGuard(() => !dirty)
     return () => registerLeaveGuard(null)
@@ -529,6 +568,17 @@ export function BoardBuilder({
   /* --- Edits -------------------------------------------------------------------- */
   const commitDraft = (next: Policy) => setHist((h) => commit(h, next))
   const patchRule = (i: number, p: Partial<Rule>) => commitDraft({ ...draft, rules: draft.rules.map((r, j) => (j === i ? { ...r, ...p } : r)) })
+  /* By id, for the walkthrough.
+
+     Everything else on this surface holds an index, because it got one from the
+     list it was rendering. The tour does not: it follows ONE rule across five
+     steps while the reader stays free to reorder, duplicate and delete around
+     it, and an index would silently re-point at whatever took the slot. The
+     same argument `model.ts` makes for keying the selection by id. */
+  const patchRuleById = (id: string, p: Partial<Rule>) => {
+    const i = draft.rules.findIndex((r) => r.id === id)
+    if (i >= 0) patchRule(i, p)
+  }
   const patchFallback = (p: Partial<Rule>) => commitDraft({ ...draft, fallback: { ...(draft.fallback ?? fallbackRule()), ...p } })
 
   const insert = (rule: Rule, at: number) => {
@@ -624,6 +674,8 @@ export function BoardBuilder({
           than the page above it. */}
       <BoardBar
         policy={draft}
+        onLearn={() => setTour(true)}
+        onWatchDemo={() => setDemo(true)}
         actions={
           <BoardBarActions
             test={test}
@@ -722,9 +774,9 @@ export function BoardBuilder({
            in its own container it reads as the choice it is.
 
            A radiogroup, not a toggle button. Both states are worth naming:
-           "Outline" is a claim about what you get, and a single button reading
-           "Outline" cannot say whether that is what you are in or what you
-           would switch to. */
+           "Collapse cards" is a claim about what you get, and a single button
+           reading "Collapse cards" cannot say whether that is what you are in
+           or what you would switch to. */
         aside={
           <div className="bb__float bb__density" role="radiogroup" aria-label="How much of each rule to show">
               {(['outline', 'detailed'] as const).map((d) => (
@@ -743,7 +795,7 @@ export function BoardBuilder({
                     setChainDensity(d === 'outline' ? 'detailed' : 'outline')
                   }}
                 >
-                  {d === 'outline' ? 'Outline' : 'Detailed'}
+                  {d === 'outline' ? 'Collapse cards' : 'Expand cards'}
                 </button>
               ))}
           </div>
@@ -879,6 +931,43 @@ export function BoardBuilder({
           templates would leave Del, ⌘D and the arrow keys live on the rule
           underneath. */}
       <TemplateSheet open={picking} onClose={() => setPicking(false)} onChoose={applyTemplate} />
+
+      {/* The guided demo.
+
+          Everything it can do to the board is something the board already
+          exposes to its own controls — insert, patch, select, open a sheet — so
+          "Do it for me" lands an ordinary edit that undo puts back, and there is
+          no second door into the draft for the tour to be kept in step with. */}
+      {tour && (
+        <Suspense fallback={null}>
+          <BoardTour
+            open={tour}
+            onClose={() => setTour(false)}
+            onWatch={() => setDemo(true)}
+            host={{
+              draft,
+              selection,
+              addRule: (r) => insert(r, draft.rules.length),
+              patchRuleById,
+              select,
+              density,
+              setDensity: setChainDensity,
+              review,
+              /* Raise only. The walkthrough shows the door and stops — going
+                 through with it on somebody's behalf would be the one action on
+                 this screen they cannot take back from here. */
+              openReview: () => setReview(true),
+            }}
+          />
+        </Suspense>
+      )}
+
+      {/* A sibling of the walkthrough, not a child of it — see `demo` above. */}
+      {demo && (
+        <Suspense fallback={null}>
+          <DemoPlayer open={demo} onClose={() => setDemo(false)} />
+        </Suspense>
+      )}
 
       <ReviewDialog open={review} policy={draft} onClose={() => setReview(false)} onConfirm={publish} />
 

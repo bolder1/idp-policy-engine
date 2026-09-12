@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { ArrowLeft, ArrowRight, Swords, X } from 'lucide-react'
 
 import { Button } from '../kit'
+import { measureAnchor, place, type Rect } from './spotlight'
 import { TourHero } from './TourHero'
 import { STOPS, markTourSeen } from './tour-stops'
 
@@ -44,26 +45,14 @@ import { STOPS, markTourSeen } from './tour-stops'
    · Escape closes from anywhere on the page, not only from inside the card.
    -------------------------------------------------------------------------- */
 
-interface Placement {
-  centred: boolean
-  top: number
-  left: number
-  /** Which edge of the card the anchor is on, so the beak grows from it. */
-  side: 'left' | 'right' | 'none'
-  /** Distance from the card's top to the beak. */
-  caret: number
-}
+/* The card's own measurements, and the only part of placing it that is local.
 
-interface Rect {
-  top: number
-  left: number
-  width: number
-  height: number
-}
-
-const PAD = 8
-const CARD_W = 372
-const GAP = 18
+   The RULES — which side has room, the viewport clamp, the beak level with the
+   anchor's middle — moved to spotlight.ts when the board grew a tour of its
+   own, because two walkthroughs placing cards by two subtly different copies
+   of one algorithm is the drift this codebase keeps deleting. Placement,
+   carrying the side the beak reads, lives there now. */
+const CARD = { w: 372, h: 372, lead: 150 }
 /* Stable, because the lit element points at it from outside the card. */
 const COPY_ID = 'btr-copy'
 
@@ -102,11 +91,7 @@ export function Tour({
   }, [open, stop])
 
   const measure = useCallback(() => {
-    if (!stop.anchor) return setRect(null)
-    const el = document.querySelector<HTMLElement>(`[data-tour="${stop.anchor}"]`)
-    if (!el) return setRect(null)
-    const r = el.getBoundingClientRect()
-    setRect({ top: r.top - PAD, left: r.left - PAD, width: r.width + PAD * 2, height: r.height + PAD * 2 })
+    setRect(measureAnchor(stop.anchor))
   }, [stop.anchor])
 
   /* The card explains the lit element, so say so on the element itself. Anybody
@@ -177,7 +162,7 @@ export function Tour({
 
   if (!open) return null
 
-  const pos = place(rect)
+  const pos = place(rect, CARD)
 
   return (
     <div className="btr">
@@ -234,7 +219,9 @@ export function Tour({
           aria-modal="false"
           aria-label={`Builder tour, stop ${i + 1} of ${STOPS.length}`}
           className={`btr__card ${pos.centred ? 'is-centred' : ''} ${pos.side !== 'none' ? `is-${pos.side}` : ''}`}
-          style={pos.centred ? undefined : { top: pos.top, left: pos.left }}
+          /* Always positioned from the numbers, centred or not — see the note
+             in `place`. A CSS transform here would be overwritten by motion. */
+          style={{ top: pos.top, left: pos.left }}
           initial={{ opacity: 0, y: reduce ? 0 : 10, scale: reduce ? 1 : 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: reduce ? 0 : 0.2, ease: [0.2, 0, 0, 1] }}
@@ -280,37 +267,3 @@ export function Tour({
   )
 }
 
-/* Beside the anchor where there is room, below it where there is not, centred
-   when there is no anchor at all. Clamped so the card is never half off-screen
-   on a laptop. */
-function place(rect: Rect | null): Placement {
-  if (!rect || typeof window === 'undefined') return { centred: true, top: 0, left: 0, side: 'none', caret: 0 }
-
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const roomRight = vw - (rect.left + rect.width)
-  const roomLeft = rect.left
-
-  let left: number
-  let side: Placement['side']
-  if (roomRight >= CARD_W + GAP) {
-    left = rect.left + rect.width + GAP
-    side = 'left'
-  } else if (roomLeft >= CARD_W + GAP) {
-    left = rect.left - CARD_W - GAP
-    side = 'right'
-  } else {
-    left = Math.max(GAP, Math.min(vw - CARD_W - GAP, rect.left))
-    side = 'none'
-  }
-
-  // Vertically centred on the anchor, then clamped into the viewport.
-  const top = Math.max(GAP, Math.min(vh - 372, rect.top + rect.height / 2 - 150))
-
-  /* Where the beak sits on the card's edge: level with the anchor's middle,
-     which is not the card's middle once the clamp above has moved the card.
-     Kept off the rounded corners, because a beak growing out of a radius reads
-     as a rendering fault rather than as a pointer. */
-  const caret = Math.max(22, Math.min(330, rect.top + rect.height / 2 - top))
-  return { centred: false, top, left, side, caret }
-}

@@ -89,7 +89,7 @@ export const QUESTIONS: Question[] = [
     hint: 'Deny is final — there is no alternate path once a rule denies. The other two ask for more proof instead.',
     options: [
       { id: 'deny', label: 'Refuse the sign-in', caption: 'Nothing gets through' },
-      { id: 'mfa', label: 'Ask for a second factor', caption: 'Any enrolled method' },
+      { id: 'mfa', label: 'Ask for a second factor', caption: 'Any enabled method' },
       { id: 'strong', label: 'Ask for a phishing-resistant factor', caption: 'WebAuthn or a security key' },
     ],
   },

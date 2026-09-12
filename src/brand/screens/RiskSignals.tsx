@@ -260,74 +260,66 @@ function RiskProfileList({
         </span>
       </p>
 
-      <div className="btable-wrap">
-        <table className="btable">
-          <thead>
-            <tr>
-              <th>Profile</th>
-              <th>Listening to</th>
-              <th>Scores High at</th>
-              <th scope="col" className="btable__actions btable__col-actions">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {profiles.map((p) => {
-              const inUse = p.id === activeId
-              const on = countOn(p)
-              const scale = riskScale(p)
-              return (
-                <tr key={p.id}>
-                  <td className="btable__primary">
-                    <button type="button" className="btable__link" onClick={() => onOpen(p.id)}>
-                      {p.name}
-                    </button>
-                    <span className="btable__marks">
-                      {/* Not a status pill. "In use" is not a state this profile
-                          is IN, it is a relationship between it and the tenant —
-                          exactly one row can carry it, and that is the whole
-                          information. */}
-                      {inUse && <Badge tone="system">In use</Badge>}
-                    </span>
-                  </td>
-                  <td>
-                    {on} of {RISK_SIGNALS.length} signals
+      {/* A list, not a table — the shape Authentication methods uses. See
+          `.blist` in screens.css. The score keeps a fixed slot on the right so
+          it can still be compared straight down the list, which was the one
+          thing its column was for. */}
+      <ul className="blist">
+        {profiles.map((p) => {
+          const inUse = p.id === activeId
+          const on = countOn(p)
+          const scale = riskScale(p)
+          return (
+            <li className="blist__row" key={p.id}>
+              <span className="blist__tile brs__tile" aria-hidden>
+                <Activity size={18} strokeWidth={1.8} />
+              </span>
+              <span className="blist__main">
+                <span className="blist__name">
+                  <button type="button" className="blist__open" onClick={() => onOpen(p.id)}>
+                    {p.name}
+                  </button>
+                  {/* Not a status pill. "In use" is a relationship between this
+                      profile and the tenant — exactly one row can carry it. */}
+                  {inUse && <Badge tone="system">In use</Badge>}
+                </span>
+                <span className="blist__meta">
+                  <span>
+                    Listening to {on} of {RISK_SIGNALS.length} signals
                     {p.off.length > 0 && <i className="brs__listoff"> · {p.off.length} off</i>}
-                  </td>
-                  {/* Tabular, because the whole point of the column is comparing
-                      it down the table. */}
-                  <td className="brs__listscore">{scale.High}</td>
-                  <td className="btable__actions" onClick={(e) => e.stopPropagation()}>
-                    <MenuButton
-                      iconOnly
-                      size="sm"
-                      align="end"
-                      label={`Actions for ${p.name}`}
-                      items={[
-                        /* Absent on the row that already carries it, rather
-                           than present and disabled: a menu item whose only
-                           outcome is nothing happening is a menu item to read
-                           and skip every time. */
-                        ...(inUse ? [] : [{ id: 'use', label: 'Use this profile' }]),
-                        { id: 'duplicate', label: 'Duplicate' },
-                        /* The tenant must always have a scale, so the profile
-                           producing it cannot be deleted. Withheld rather than
-                           disabled for the same reason, and the row says why by
-                           carrying the badge. */
-                        ...(inUse ? [] : [{ id: 'delete', label: 'Delete', danger: true }]),
-                      ]}
-                      onSelect={(id) => {
-                        if (id === 'use') onUse(p)
-                        if (id === 'duplicate') onDuplicate(p)
-                        if (id === 'delete') onDelete(p)
-                      }}
-                    />
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+                  </span>
+                </span>
+              </span>
+              <span className="blist__side">
+                <span className="brs__listscore">
+                  <b>{scale.High}</b>
+                  <span>Scores High at</span>
+                </span>
+                <MenuButton
+                  iconOnly
+                  size="sm"
+                  align="end"
+                  label={`Actions for ${p.name}`}
+                  items={[
+                    /* Absent on the row that already carries it, rather than
+                       present and disabled. */
+                    ...(inUse ? [] : [{ id: 'use', label: 'Use this profile' }]),
+                    { id: 'duplicate', label: 'Duplicate' },
+                    /* The tenant must always have a scale, so the profile
+                       producing it cannot be deleted; the badge says why. */
+                    ...(inUse ? [] : [{ id: 'delete', label: 'Delete', danger: true }]),
+                  ]}
+                  onSelect={(id) => {
+                    if (id === 'use') onUse(p)
+                    if (id === 'duplicate') onDuplicate(p)
+                    if (id === 'delete') onDelete(p)
+                  }}
+                />
+              </span>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }

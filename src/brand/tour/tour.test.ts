@@ -5,6 +5,7 @@ import mainShell from '../screens/PolicyBuilderMain.tsx?raw'
 import flow from '../screens/flow-rail.tsx?raw'
 import policyBar from '../screens/policy-bar.tsx?raw'
 import tourSource from './Tour.tsx?raw'
+import spotlightSource from './spotlight.ts?raw'
 import learnSource from './LearnPanel.tsx?raw'
 import figureSource from './TutorialFigure.tsx?raw'
 import kitCss from '../kit.css?inline'
@@ -105,7 +106,11 @@ describe('the builder tour', () => {
     // A floating card near a lit box is two things near each other until
     // something connects them.
     expect(tourSource).toContain('btr__beak')
-    expect(tourSource).toMatch(/side: 'left' \| 'right' \| 'none'/)
+    // Which edge it grows from is decided by the placement rules, and those
+    // moved to spotlight.ts when the board grew a walkthrough of its own —
+    // one algorithm, two callers, rather than two copies free to drift.
+    expect(spotlightSource).toMatch(/side: 'left' \| 'right' \| 'none'/)
+    expect(tourSource).toContain("from './spotlight'")
   })
 
   /* The tour is non-modal on purpose: it dims the page but leaves it usable, so

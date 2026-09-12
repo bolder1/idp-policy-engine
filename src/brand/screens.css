@@ -41,6 +41,87 @@
 
 /* --- Table ---------------------------------------------------------------- */
 
+/* --- The list -----------------------------------------------------------------
+
+   For pages that list OBJECTS rather than records — zones, device profiles, risk
+   signal profiles. A table is the right shape when the reader compares a value
+   down a column; these pages are read one object at a time, name first, so they
+   take the shape Authentication methods already uses (`.bm8__list` in
+   auth-methods.css): one panel edge for the whole list, rows on white, a hairline
+   between them, and no column headings.
+
+   Two differences from that sheet, and both are forced rather than chosen:
+
+   · No `overflow: hidden` on the panel. Zones and Device profiles open their row
+     menu inside the row, and a clipping panel cuts the last row's menu off — the
+     zones table had to override exactly that. The first and last rows round
+     their own corners instead, so a hover tint never squares off the radius.
+
+   · The whole row opens, but the row is not a button: it also holds a Used-by
+     button and a menu, and a button inside a button is invalid HTML. The name
+     button's `::after` stretches its hit area over the row, and the right-hand
+     cluster sits above it — the pattern the attribute picker rows already use in
+     device-fingerprint-v2.css. A row whose menu is open is lifted over the rows
+     below it, or their controls would paint through the menu.
+   ------------------------------------------------------------------------------- */
+.blist {
+  display: flex; flex-direction: column;
+  margin: 0; padding: 0; list-style: none;
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+.blist__row {
+  position: relative;
+  display: flex; align-items: center; gap: 16px;
+  min-height: 84px; padding: 20px;
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+.blist__row:last-child { border-bottom: 0; }
+.blist__row:first-child { border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0; }
+.blist__row:last-child { border-radius: 0 0 calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px); }
+.blist__row:only-child { border-radius: calc(var(--radius-lg) - 1px); }
+.blist__row:hover { background: var(--surface-sunken); }
+.blist__row:has([role="menu"]) { z-index: 2; }
+/* Focus is drawn on the ROW, because the row is what pressing the name opens. */
+.blist__row:has(.blist__open:focus-visible) { box-shadow: inset 0 0 0 2px var(--focus-ring); }
+
+/* The tile, at the Authentication methods size. Two classes, so it wins over a
+   page's own tile rule that loads after this sheet. */
+.blist .blist__tile {
+  flex: none; display: grid; place-items: center;
+  width: 36px; height: 36px; border-radius: var(--radius-md);
+}
+
+.blist__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.blist__name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.blist__open {
+  min-width: 0; padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
+  font: inherit; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.blist__open::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+.blist__open:focus-visible { outline: none; box-shadow: none; }
+.blist__row:hover .blist__open { color: var(--accent-strong); }
+
+/* The second line: the facts a column used to carry, each with the word its
+   heading used to supply. */
+.blist__meta {
+  display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; min-width: 0;
+  font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.45;
+}
+.blist__fact { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.blist__label { font-size: var(--fs-sm); color: var(--text-tertiary); white-space: nowrap; }
+
+/* The right-hand cluster: counts and the menu, above the name's stretched hit
+   area so each keeps its own press. */
+.blist__side { flex: none; position: relative; z-index: 1; display: flex; align-items: center; gap: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .blist__row, .blist__open { transition: none; }
+}
 .btable-wrap {
   background: var(--surface-raised);
   border: var(--bw-thin) solid var(--border-subtle);
@@ -194,47 +275,63 @@
 .btable__link:hover { color: var(--accent-strong); text-decoration: underline; text-underline-offset: 2px; }
 .btable__marks { display: inline-flex; align-items: center; gap: var(--space-3); }
 .btable__allapps { font-size: var(--fs-sm); color: var(--text-secondary); }
-/* The application, named. This cell held an overlapping stack of marks and a
-   count, which was the right drawing for a policy that covered three of them. */
+/* A logo and a name side by side. The Applications screen uses it for its own
+   first column, and the policy list's cell uses it for the one-application case. */
 .btable__app { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .btable__app > .applogo { flex: none; }
 
-/* The cell as a control.
+/* The policy list's cell, as the trigger for its application panel.
 
-   `Not assigned` was a grey label, which made the one row saying something
-   needed doing the one row that could not be acted on. Both states open the
-   same dialog now: the assigned cell quietly, on hover, because it is a fact
-   first and a shortcut second; the empty one loudly, because there is nothing
-   else in it. */
-button.btable__app--edit {
-  border: 0; background: none; padding: 0; cursor: pointer;
+   The pencil that used to appear on row hover is gone with the behaviour it
+   announced. Pressing the cell no longer edits, it opens the list, and Edit is
+   inside that. What marks the cell as live is a grey ground on hover and while
+   the panel is open. It is greyscale because the panel is a place to look, not
+   a selection, and this console keeps its one colour for the button that
+   publishes.
+
+   Padded and pulled back by the same amount, so the ground has room around the
+   marks without the marks moving off the column's left edge. */
+button.btable__app--peek {
+  padding: 3px var(--space-3);
+  margin: -3px calc(-1 * var(--space-3));
+  border: 0; background: none; cursor: pointer;
   font: inherit; color: inherit; text-align: left;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-md);
+  transition: background var(--dur-fast) var(--ease-standard);
 }
-/* A pencil on row hover, not an underline on cell hover.
+button.btable__app--peek:hover,
+button.btable__app--peek.is-open { background: var(--surface-inset); }
+button.btable__app--peek:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+/* Every AppLogo carries a native `title`. Over a trigger whose whole job is to
+   open a panel of names, that meant a second, browser-drawn label arriving a
+   second later on top of the first. Letting the pointer pass through the marks
+   leaves the panel as the only thing that answers. The same applies inside the
+   panel, where the name is already printed beside each mark. */
+.btable__app--peek .applogo,
+.bapk .applogo { pointer-events: none; }
 
-   The underline said "link", and this is not one — it does not navigate, it
-   opens the dialog that changes which applications the policy covers. It also
-   only appeared once the pointer was on the four words themselves, so the fact
-   that the cell does anything at all was discoverable exactly where nobody
-   looks for it.
-
-   The mark answers both: it says EDIT rather than "go", and it appears while
-   the pointer is anywhere on the row, which is where reading happens. It holds
-   its space when hidden so nothing shifts under the pointer.
-
-   `:focus-within` keeps it for the keyboard, where there is no hover at all. */
-.btable__appedit {
-  flex: none; margin-left: var(--space-1);
-  color: var(--text-tertiary);
-  opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-standard);
+/* The stack. Each mark overlaps the one before and is cut out of it by a ring
+   in the colour of whatever is behind the cell. That colour changes under row
+   hover and under the trigger's own hover, so the ring changes with it.
+   Without that the ring shows as a white halo on a grey row. */
+.btable__logos { display: inline-flex; align-items: center; }
+.btable__logos > .applogo {
+  box-shadow: 0 0 0 2px var(--surface-raised);
+  transition: box-shadow var(--dur-fast) var(--ease-standard);
 }
-.btable tbody tr:hover .btable__appedit,
-button.btable__app--edit:focus-visible .btable__appedit { opacity: 1; }
-button.btable__app--edit:hover { color: var(--accent-strong); }
-button.btable__app--edit:hover .btable__appedit { color: var(--accent-strong); }
-button.btable__app--edit:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.btable__logos > .applogo + .applogo { margin-left: -5px; }
+.btable tbody tr:hover .btable__logos > .applogo { box-shadow: 0 0 0 2px var(--table-row-hover); }
+button.btable__app--peek:hover .btable__logos > .applogo,
+button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2px var(--surface-inset); }
+/* Plain text, not a pill. The status column already holds this row's one pill,
+   and a second rounded chip beside a stack of rounded squares would be one more
+   shape to parse, saying only a number. */
+.btable__more {
+  font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 /* Not a Button. A brand or neutral button in every unassigned row would make
    the table look like a column of calls to action; this is a link with an
@@ -249,6 +346,90 @@ button.btable__app--edit:focus-visible { outline: none; box-shadow: 0 0 0 2px va
 }
 .btable__assign:hover { border-style: solid; border-color: var(--brand); color: var(--brand); }
 .btable__assign:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* --- Application panel -----------------------------------------------------
+
+   Every application a policy covers, opened from the cell. See apps-peek.tsx.
+
+   Portalled to the body with fixed coordinates, like `.brpk` and the Picker
+   popup, because `.btable__scroll` is an overflow-x container that would clip
+   it. Unlike `.brpk` it takes the pointer, because it holds a button and a list
+   that scrolls. */
+.bapk {
+  position: fixed;
+  z-index: var(--z-popover);
+  /* The portal is outside `.brand-root`, so the border-box reset does not reach
+     it. Without this the border sits outside the width the placement code
+     clamps to the viewport, and the right edge runs 2px off screen. */
+  box-sizing: border-box;
+  width: 264px; max-width: calc(100vw - 16px);
+  /* The cap before placement has measured anything. After that, placement caps
+     it to the room on the side it opened. The viewport term is what stops a
+     short window from ever getting a panel taller than itself. */
+  max-height: min(380px, calc(100vh - 16px));
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-overlay, var(--surface-raised));
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--el-high);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.bapk *,
+.bapk *::before,
+.bapk *::after { box-sizing: border-box; }
+/* The two things `.brand-root` gives every button that a portal does not get.
+   Only the family and the cursor: `.bx-btn` sets its own size and weight at
+   this same specificity, and the shorthand would reset both. */
+.bapk :where(button) { font-family: inherit; cursor: pointer; }
+/* The console's focus ring, restated for the same reason. */
+.bapk :focus-visible {
+  outline: var(--bw-thin) solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--focus-halo);
+}
+
+/* The count and the one action, pinned above the list so that neither scrolls
+   away with it. */
+.bapk__head {
+  flex: none;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+}
+.bapk__count { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+
+/* Capped and scrolled, so a policy with a hundred and twenty applications gets
+   a panel the same height as one with twelve. The list shrinks further when
+   placement has less room than the cap.
+
+   `overscroll-behavior` keeps a wheel that reaches the end of the list from
+   scrolling the page behind it. That would move the trigger out from under the
+   panel and re-place it while somebody is still reading. */
+.bapk__list {
+  flex: 1 1 auto; min-height: 0;
+  max-height: 296px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0; padding: var(--space-2);
+  list-style: none;
+}
+/* Inside the edge. The panel clips its overflow, so an outline drawn outside
+   the list would be cut off. */
+.bapk__list:focus-visible { outline-offset: -2px; box-shadow: none; border-radius: var(--radius-md); }
+/* No hover on a row. The rows are not controls, and a highlight that follows
+   the pointer down a list says each line can be pressed. */
+.bapk__row {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-3);
+  min-width: 0;
+}
+.bapk__name {
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-md); color: var(--text-body);
+}
 
 /* --- Assigning applications ------------------------------------------------
 

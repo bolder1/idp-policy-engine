@@ -195,7 +195,7 @@ export function journeyOf(rule: Rule): JourneyStep[] {
           ? { id: 'second', label: chain.join(' → ') || 'Empty chain', sub: 'every step, in order', kind: 'second' }
           : rule.secondFactor === 'preferred'
             ? { id: 'second', label: 'Their preferred method', sub: rule.preferredFallback ? `else ${rule.preferredFallback}` : undefined, kind: 'second' }
-            : { id: 'second', label: 'Any enrolled method', kind: 'second' }
+            : { id: 'second', label: 'Any enabled method', kind: 'second' }
     out.push(second)
     if (rule.rememberMfa) {
       out.push({

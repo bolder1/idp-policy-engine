@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
+  ArrowLeft,
   Check,
   ChevronDown,
   ChevronRight,
@@ -11,10 +13,9 @@ import {
   Mail,
   MessageSquare,
   Phone,
-  ArrowUpRight,
   Search,
   Pencil,
-  Sliders,
+  Settings,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -22,7 +23,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { Button, Drawer, MenuButton, Modal, TipMark, Toggle } from '../kit'
+import { Button, Drawer, IconButton, MenuButton, TipMark, Toggle } from '../kit'
 import { methodBlocker, type AuthMethod } from '../methods'
 import { useBrand, type Role } from '../store'
 import { NoResults } from '../empty'
@@ -36,6 +37,9 @@ import { ConfigFields } from './method-forms'
 import { configFor, isMissing, missingFields, setField, type ConfigField } from '../method-config'
 import { familySettingsFor, methodSettingsFor, mfaMethodFor, settingKey, type MfaValue, type MfaValues } from '../mfa-join'
 import { fieldValue, type MfaSetting } from '../mfa-settings'
+import { familyRow, hasConfigPage, pageKey, rowTarget, type FamilyRow, type PanelPage } from './auth-panel'
+import { NPS_SERVERS, setupCardFor, setupReady } from '../setup-guide'
+import { AppSetupCard, NpsSetupCard } from './setup-card'
 
 /* -----------------------------------------------------------------------------
    Authentication methods · final.
@@ -79,20 +83,10 @@ interface Family {
   blurb: string
   icon: LucideIcon
   tint: string
-  /* Whether the blurb earns a line on the card, or goes on a tip beside the
-     name.
-
-     The test is whether it says something the NAME does not. "SMS — one-time
-     codes and links sent to the phone number on the account" is the word SMS
-     spelled out. "Grid Pattern — a personal grid card; the user reads a
-     remembered path off it" is the only way to know what a grid pattern is.
-
-     Everything went to the tip for one revision and it read worse, which is the
-     useful thing this flag now records: a list of eleven names and nothing else
-     is tidy and tells you nothing, and the rows that needed explaining were
-     exactly the ones a reader stops on. Uniform row height is not worth a list
-     you cannot read. */
-  explains?: true
+  /* What sits in the tip beside the name: what the family holds, what it needs
+     and what it costs. Every row carries its `blurb` as a line and this as the
+     detail — the line to scan by, the detail for the row a reader stops on. */
+  detail: string
   /* Newly added to the product. Drives the pill and the position — a new
      integration nobody scrolls to is a new integration nobody knows about. The
      row itself stays white; see the note in the stylesheet for why.
@@ -116,17 +110,95 @@ const FAMILIES: Family[] = [
      only member in common is the position of the row.
 
      So they are rows, beside the cards rather than inside one. */
-  { channel: 'SMS', blurb: 'One-time codes and links sent to the phone number on the account.', icon: MessageSquare, tint: 'green' },
-  { channel: 'Email', blurb: 'One-time codes and links sent to a mailbox the user already reads.', icon: Mail, tint: 'blue' },
-  { channel: 'Authenticator App', blurb: 'Time-based codes from Google, Microsoft or Authy — no network needed.', icon: Smartphone, tint: 'teal' , explains: true },
-  { channel: 'miniOrange Authenticator', blurb: 'Our own app: push approval, a code, or a barcode scan.', icon: Sparkles, tint: 'indigo' , explains: true },
-  { channel: 'RSA Authenticator', blurb: 'SecurID tokencodes, softtokens and push, via RSA Authentication Manager.', icon: ShieldCheck, tint: 'slate', isNew: true , explains: true },
-  { channel: 'Call Verification', blurb: 'An automated voice call reading the code aloud.', icon: Phone, tint: 'amber' },
-  { channel: 'Hardware Token', blurb: 'A physical device the user carries and the tenant assigns.', icon: KeyRound, tint: 'slate' },
-  { channel: 'Security Questions', blurb: 'Answers the user set at enrolment. Weak alone, useful as a fallback.', icon: HelpCircle, tint: 'slate' , explains: true },
-  { channel: 'Biometric', blurb: 'Bound to the device and the origin. Nothing to type, nothing to intercept.', icon: Fingerprint, tint: 'indigo' , explains: true },
-  { channel: 'Grid Pattern', blurb: 'A personal grid card; the user reads a remembered path off it.', icon: Grid3x3, tint: 'teal' , explains: true },
-  { channel: 'Smart Cards', blurb: 'A certificate on a physical card, presented by the browser.', icon: CreditCard, tint: 'blue' , explains: true },
+  {
+    channel: 'SMS',
+    blurb: 'One-time codes and links sent to the phone number on the account.',
+    detail:
+      'A 4 to 8 digit code, a link to accept or deny the sign-in, or one code sent by text and email at once. Each message draws on the SMS transactions, and a text is the easiest factor to intercept.',
+    icon: MessageSquare,
+    tint: 'green',
+  },
+  {
+    channel: 'Email',
+    blurb: 'One-time codes and links sent to a mailbox the user already reads.',
+    detail:
+      'A 4 to 8 digit code, a link to accept or deny the sign-in, or a code to the backup address, which also works for recovery. Only ever as strong as the mailbox behind it.',
+    icon: Mail,
+    tint: 'blue',
+  },
+  {
+    channel: 'Authenticator App',
+    blurb: 'Time-based codes from Google, Microsoft or Authy — no network needed.',
+    detail:
+      'The user scans a QR code once, then the app makes a new 6-digit code every 30 seconds on the phone, so nothing is sent at sign-in. Microsoft Push is the exception: it sends an approval through an Azure NPS server.',
+    icon: Smartphone,
+    tint: 'teal',
+  },
+  {
+    channel: 'miniOrange Authenticator',
+    blurb: 'Our own app: push approval, a code, or a barcode scan.',
+    detail:
+      'A push to accept or deny in one tap, a 6 to 8 digit code, or a barcode scanned off the sign-in screen. The one app where both ends are ours, so its push can require a fingerprint or number matching.',
+    icon: Sparkles,
+    tint: 'indigo',
+  },
+  {
+    channel: 'RSA Authenticator',
+    blurb: 'SecurID tokencodes, softtokens and push, via RSA Authentication Manager.',
+    detail:
+      'Accepts whichever the user holds: a SecurID tokencode, an RSA display token, or a push. Codes are checked by RSA Authentication Manager, so the connection to it has to be set up before anything can be verified.',
+    icon: ShieldCheck,
+    tint: 'slate',
+    isNew: true,
+  },
+  {
+    channel: 'Call Verification',
+    blurb: 'An automated voice call reading the code aloud.',
+    detail:
+      'Calls the phone number on the account and reads out a 4-digit code. Useful where a text does not arrive, and each call draws on the call transactions.',
+    icon: Phone,
+    tint: 'amber',
+  },
+  {
+    channel: 'Hardware Token',
+    blurb: 'A physical device the user carries and the tenant assigns.',
+    detail:
+      'A Yubikey that types a one-time key, or a keyfob showing a rotating code. A token does nothing until it is assigned to a user by serial number.',
+    icon: KeyRound,
+    tint: 'slate',
+  },
+  {
+    channel: 'Security Questions',
+    blurb: 'Answers the user set at enrolment. Weak alone, useful as a fallback.',
+    detail:
+      'The user answers the questions they chose at enrolment. Answers can often be guessed or looked up, so it is best kept as a fallback, and the same questions are used for recovery.',
+    icon: HelpCircle,
+    tint: 'slate',
+  },
+  {
+    channel: 'Biometric',
+    blurb: 'Bound to the device and the origin. Nothing to type, nothing to intercept.',
+    detail:
+      'A passkey on the device or a FIDO2 security key, unlocked with a fingerprint, face or PIN. Bound to the site it was made for, so a lookalike page cannot use it.',
+    icon: Fingerprint,
+    tint: 'indigo',
+  },
+  {
+    channel: 'Grid Pattern',
+    blurb: 'A personal grid card; the user reads a remembered path off it.',
+    detail:
+      'At setup the user picks a sequence of squares on a grid, then repeats it to sign in. Changing the grid size or the pattern length makes everyone set their pattern again.',
+    icon: Grid3x3,
+    tint: 'teal',
+  },
+  {
+    channel: 'Smart Cards',
+    blurb: 'A certificate on a physical card, presented by the browser.',
+    detail:
+      'The user taps a CAC or PIV card and picks the certificate the browser presents. Trust comes from the issuing CA, so a revocation check is what stops a lost card from working.',
+    icon: CreditCard,
+    tint: 'blue',
+  },
 ]
 
 /* Which method the tenant starts on, and where it falls back to.
@@ -176,8 +248,19 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
   const [use, setUse] = useState<UseFilter>('all')
 
   const [tab, setTab] = useState<Tab>('methods')
-  /* The open category, by channel. Null closes the slide-over. */
-  const [openChannel, setOpenChannel] = useState<string | null>(null)
+  /* The slider, as a stack of pages — a family, its settings, or a method's
+     setup — deepest last. Empty closes it. See `PanelPage`. */
+  const [panel, setPanel] = useState<PanelPage[]>([])
+
+  /* Which end a settings row wears: the chevron it has always worn, or a gear
+     with the switch moved out to the edge beside it. See `GEAR_ROWS` below for
+     the two rows this actually reaches and why it is only those two.
+
+     A piece of state and not a build flag, because the point of it is to be
+     flipped while looking at the list. It is deliberately NOT persisted: this
+     is a comparison being made now, not a preference somebody holds — a
+     variant that survives a reload is a variant people forget they are in. */
+  const [gearEnds, setGearEnds] = useState(false)
 
   /* The person's own enrolment, which is a different fact from the tenant's
      configuration. The admin decides a method may exist; this records whether
@@ -221,17 +304,19 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
     if (!on && defaultMethod === id) setDefaultMethod(firstDefaultable(methods, id))
   }
 
-  /* "Set up" opens the integration's own form.
+  /* "Set up" opens the integration's own form, as a page in the slider.
 
      It used to toast the destination, because there was no form to open. There
      is now: `configFor` has carried a field list per method all along, and the
-     RSA one was extended from the console's own dialog. */
-  const [setupOf, setSetupOf] = useState<AuthMethod | null>(null)
+     RSA one was extended from the console's own dialog.
 
-  const goToSetup = (m: AuthMethod) => {
-    setOpenChannel(null)
-    setSetupOf(m)
-  }
+     It was a centred modal, and opening it closed the slider underneath — so the
+     family you were working through was gone by the time you pressed Save. From
+     a row on the list the form is now the slider's first page; from inside a
+     family it is pushed over that family, and Back returns to it. */
+  const openSetup = (m: AuthMethod) => setPanel([{ kind: 'setup', methodId: m.id }])
+  const pushSetup = (m: AuthMethod) => setPanel((s) => [...s, { kind: 'setup', methodId: m.id }])
+  const back = () => setPanel((s) => s.slice(0, -1))
 
   /* Saving marks the method configured, which is what the rest of the screen
      reads to decide between a Set up button and a toggle. The values
@@ -253,10 +338,24 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
     const first = !m.configured
     setSavedConfig((prev) => ({ ...prev, [m.id]: fields }))
     setMethods((all) => all.map((x) => (x.id === m.id ? { ...x, configured: true } : x)))
-    setSetupOf(null)
+    back()
     store.showToast(
       first ? `${m.name} configured — it can be switched on now` : `${m.name} settings updated`,
     )
+  }
+
+  /* What a setup card chose, per method — Microsoft Push's server, so its card
+     reopens on it. A code app keeps nothing: the code it showed is checked and
+     spent. */
+  const [setupChoice, setSetupChoice] = useState<Record<string, string>>({})
+
+  const finishCard = (m: AuthMethod, server: string) => {
+    const card = setupCardFor(m.id)
+    if (card?.kind === 'nps') setSetupChoice((prev) => ({ ...prev, [m.id]: server }))
+    setMethods((all) => all.map((x) => (x.id === m.id ? { ...x, configured: true } : x)))
+    back()
+    const via = card?.kind === 'nps' ? NPS_SERVERS.find((x) => x.id === server)?.name : undefined
+    store.showToast(via ? `${m.name} will send through ${via}` : `${m.name} is set up`)
   }
 
   /* What this viewer may see at all.
@@ -276,7 +375,26 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
     ? methods.filter((m) => m.use !== 'primary' && !methodBlocker(m))
     : methods
 
-  const openFamily = openChannel ? FAMILIES.find((f) => f.channel === openChannel) ?? null : null
+  /* Which rows the gear variant actually reaches, by name.
+
+     Read off the same three primitives the list itself uses — `FAMILIES`,
+     `familyRow`, `rowTarget` — rather than typed out, because the set is two
+     rows today and is a consequence of the data: a family has to narrow to ONE
+     method (so its switch is on the row) and that family has to have settings
+     (so the row has a page to open). Add a second Grid method and Grid Pattern
+     leaves this list on its own; give Call Verification a setting and it joins.
+     A hard-coded pair would go quietly wrong on either. */
+  const gearRows = useMemo(
+    () =>
+      FAMILIES.flatMap((f) => {
+        const inside = reachable.filter(
+          (m) => m.use === 'second' && m.channel === f.channel && matchesUse(m, use),
+        )
+        const shape = familyRow(f.channel, inside)
+        return !shape.opens && rowTarget(shape)?.kind === 'settings' ? [shape.method.name] : []
+      }),
+    [reachable, use],
+  )
 
   const activate = (id: string, on: boolean) => {
     /* One active method at a time. Switching one on switches the last one off
@@ -309,6 +427,31 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
           <h1>{isUser ? 'Two-step verification' : 'Authentication methods'}</h1>
           <p>{isUser ? 'How you prove it is you.' : 'How people prove who they are.'}</p>
         </div>
+
+        {/* The comparison switch, in the slot this head was rebuilt to have.
+
+            It is the one control on this screen that is about the screen rather
+            than about authentication, which is a thing the console's copy rule
+            otherwise forbids — so it is labelled as narrowly as it can be and
+            says which rows it reaches, because two of eleven is not something
+            anybody would find by flipping it and looking.
+
+            A person's own Two-step verification page never shows it: their rows
+            all open onto an enrolment form and none of them carries a switch,
+            so there is no row here for the variant to change. */}
+        {!isUser && gearRows.length > 0 && (
+          <div className="bm8__variant">
+            <Toggle size="sm" checked={gearEnds} onChange={setGearEnds} label="Gear on settings rows" />
+            {/* Not a `<label>`: `Toggle` renders a `<button role="switch">`, and
+                a label does not forward a click to a button — it would have
+                looked like a hit target and been dead. The switch carries its
+                own accessible name and these words are the visible copy. */}
+            <span>
+              Gear on settings rows
+              <i>{gearRows.join(' · ')}</i>
+            </span>
+          </div>
+        )}
       </header>
 
       {/* Horizontal, per the brief. V5 ran these down the left, which reads as
@@ -329,7 +472,7 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
               className={`bm8__tab ${tab === t.id ? 'is-on' : ''}`}
               onClick={() => {
                 setTab(t.id)
-                setOpenChannel(null)
+                setPanel([])
               }}
             >
               {t.label}
@@ -356,14 +499,16 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
         <>
           <CategoryList
             methods={reachable}
-            onOpen={setOpenChannel}
+            onOpen={(channel) => setPanel([{ kind: 'family', channel }])}
+            onSettings={(channel) => setPanel([{ kind: 'settings', channel }])}
+            gearEnds={gearEnds}
             defaultMethod={defaultMethod}
             use={use}
             onUse={setUse}
             isUser={isUser}
             policies={store.policies}
             onToggle={setEnabled}
-            onSetup={goToSetup}
+            onSetup={openSetup}
             onMakeDefault={setDefaultMethod}
             enrolment={enrolment}
             openCard={openCard}
@@ -372,22 +517,20 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
             onSaveEnrolment={saveEnrolment}
           />
 
-          <SetupModal
-            method={setupOf}
-            saved={savedConfig}
-            onClose={() => setSetupOf(null)}
-            onSave={finishSetup}
-          />
-
           <CategoryDrawer
-            family={openFamily}
+            pages={panel}
             methods={reachable}
             policies={store.policies}
-            onClose={() => setOpenChannel(null)}
+            onBack={back}
+            onClose={() => setPanel([])}
             onToggle={setEnabled}
             defaultMethod={defaultMethod}
-            onSetup={goToSetup}
+            onSetup={pushSetup}
             onMakeDefault={setDefaultMethod}
+            saved={savedConfig}
+            onSaveSetup={finishSetup}
+            choices={setupChoice}
+            onSaveCard={finishCard}
             behaviour={behaviour}
             onBehaviour={(p) => setBehaviour((v) => ({ ...v, ...p }))}
             use={use}
@@ -461,37 +604,37 @@ const GROUPS: { id: 'connect' | 'policy' | 'advanced'; label: string; blurb: str
 ]
 
 /* --- Setting an integration up ------------------------------------------------------
-   The form behind the Set up button, in a modal rather than a page.
+   The form behind the Set up button, as a page in the slider.
 
-   A page would be the right weight if these were long, and two of them are —
-   RSA asks for seven fields. But the surrounding task is "walk the catalogue
-   and turn things on", and sending someone to a page for one of eleven
-   categories loses the list they were working through. The modal keeps it
-   behind them.
+   It was a modal, on the argument that a page for one of eleven categories loses
+   the list somebody is working through. The argument was right and the modal
+   did not honour it: opening it closed the slider, so the family was lost
+   anyway. A page pushed inside the slider keeps both — the list behind the
+   scrim, and the family one Back away.
 
    Required fields decide the primary button, not a validation pass on submit:
    the console's own dialog lets you press Save on an empty form and then tells
    you off, which is a round trip to learn something the button already knew. */
-function SetupModal({
-  method,
-  saved,
-  onClose,
-  onSave,
-}: {
-  method: AuthMethod | null
-  /** What this method was saved with last time, per id. */
-  saved: Record<string, ConfigField[]>
-  onClose: () => void
-  onSave: (m: AuthMethod, fields: ConfigField[]) => void
-}) {
+
+/* The form's working copy. Held by the slider rather than by the form, because
+   the Save button that reads it lives in the slider's footer. */
+function useSetupDraft(
+  method: AuthMethod | null,
+  saved: Record<string, ConfigField[]>,
+  /* What a setup card chose last time, per method — see `finishCard`. */
+  chosen: Record<string, string>,
+) {
   const [fields, setFields] = useState<ConfigField[]>([])
   const [seeded, setSeeded] = useState<string | null>(null)
   /* Which sections are collapsed. Advanced starts closed because its
      seventeen fields all ship with working defaults; the other two start open
      because nothing can be saved until they are filled in. */
   const [shut, setShut] = useState<string[]>(['advanced'])
+  /* A setup card's input: the code an app showed, or Microsoft Push's server. */
+  const [passcode, setPasscode] = useState('')
+  const [server, setServer] = useState('')
 
-  /* Re-seed when the modal opens on a different method, the same way the other
+  /* Re-seed when the page opens on a different method, the same way the other
      forms on this screen do — keyed on the id, because the object identity
      changes on every store write without the subject changing. */
   const subject = method?.id ?? null
@@ -501,122 +644,113 @@ function SetupModal({
        that opens on defaults is not an edit form. */
     setFields(subject ? saved[subject] ?? configFor(subject)?.fields ?? [] : [])
     setShut(['advanced'])
+    setPasscode('')
+    setServer(subject ? chosen[subject] ?? '' : '')
   }
 
-  const missing = missingFields(fields)
-  const cfg = method ? configFor(method.id) : null
+  return {
+    fields,
+    setFields,
+    shut,
+    setShut,
+    missing: missingFields(fields),
+    cfg: method ? configFor(method.id) : null,
+    passcode,
+    setPasscode,
+    server,
+    setServer,
+  }
+}
+
+type SetupDraft = ReturnType<typeof useSetupDraft>
+
+function SetupForm({ draft }: { draft: SetupDraft }) {
+  const { cfg, fields, setFields, shut, setShut } = draft
+  if (!cfg) return null
 
   return (
-    <Modal
-      open={method !== null}
-      onClose={onClose}
-      title={method ? `${method.name} configuration` : 'Configuration'}
-      width={680}
-      footer={
-        <>
-          {/* Named its missing fields, which is the most defensible version
-              of this line anywhere in the console — and still redundant. Every
-              required field carries its own marker, and each collapsed group
-              header carries its own "N required", so a closed section still
-              says whether anything in it is outstanding. */}
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="brand"
-            disabled={missing.length > 0}
-            onClick={() => method && onSave(method, fields)}
-          >
-            Save
-          </Button>
-        </>
-      }
-    >
-      {cfg && (
-        <div className="bm8__setup">
-          <p className="bm8__setupblurb">{cfg.blurb}</p>
+    <div className="bm8__setup">
+      <p className="bm8__setupblurb">{cfg.blurb}</p>
 
-          {/* What has to be true elsewhere before any of this can be filled in.
+      {/* What has to be true elsewhere before any of this can be filled in.
 
-              RSA is the only integration that ships these, and it needs them:
-              half its fields are values you can only read off the RSA Security
-              Console, so without the list this is a form you cannot complete
-              and cannot tell why. First, and open by default — a checklist
-              behind a disclosure is a checklist nobody reads. */}
-          {cfg.prereqs && cfg.prereqs.length > 0 && (
-            <div className="bm8__prereqs">
-              <p className="bm8__prereqhead">Before you begin</p>
-              <ol>
-                {cfg.prereqs.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          {/* Grouped when the integration says so, flat when it does not.
-
-              RSA is twenty-six fields of which two are required; the rest have
-              working defaults. Ungrouped that is one scroll where the two that
-              matter look exactly like the twenty-four that do not.
-
-              Each section is its own panel and each one closes, so the form can
-              be collapsed down to three headers once it has been filled in —
-              and a header carries its own count, so closing one never hides
-              whether it is finished. */}
-          {GROUPS.filter((g) => fields.some((f) => (f.group ?? 'connect') === g.id)).length > 1 ? (
-            GROUPS.map((g) => {
-              const own = fields.filter((f) => (f.group ?? 'connect') === g.id)
-              if (own.length === 0) return null
-              const closed = shut.includes(g.id)
-              const gaps = own.filter(isMissing).length
-              return (
-                <section
-                  key={g.id}
-                  className={`bm8__setupgroup ${closed ? 'is-shut' : ''} ${gaps ? 'has-gap' : ''}`}
-                >
-                  <button
-                    type="button"
-                    className="bm8__setupgrouphead"
-                    aria-expanded={!closed}
-                    onClick={() =>
-                      setShut((cur) =>
-                        cur.includes(g.id) ? cur.filter((x) => x !== g.id) : [...cur, g.id],
-                      )
-                    }
-                  >
-                    <ChevronDown size={15} strokeWidth={2.2} className="bm8__setupchev" aria-hidden />
-                    <span>{g.label}</span>
-                    <em>{g.blurb}</em>
-                    {/* A closed section still has to say whether anything inside
-                        it is outstanding. Without this, collapsing Connection
-                        hides the only explanation for why Save is dead. */}
-                    <i className={`bm8__setupcount ${gaps ? 'is-gap' : ''}`}>
-                      {gaps
-                        ? `${gaps} required`
-                        : `${own.length} field${own.length === 1 ? '' : 's'}`}
-                    </i>
-                  </button>
-                  {!closed && (
-                    <div className="bm8__setupgroupbody">
-                      <ConfigFields
-                        fields={own}
-                        onChange={(id, value) => setFields((f) => setField(f, id, value))}
-                      />
-                    </div>
-                  )}
-                </section>
-              )
-            })
-          ) : (
-            <ConfigFields
-              fields={fields}
-              onChange={(id, value) => setFields((f) => setField(f, id, value))}
-            />
-          )}
+          RSA is the only integration that ships these, and it needs them:
+          half its fields are values you can only read off the RSA Security
+          Console, so without the list this is a form you cannot complete
+          and cannot tell why. First, and open by default — a checklist
+          behind a disclosure is a checklist nobody reads. */}
+      {cfg.prereqs && cfg.prereqs.length > 0 && (
+        <div className="bm8__prereqs">
+          <p className="bm8__prereqhead">Before you begin</p>
+          <ol>
+            {cfg.prereqs.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ol>
         </div>
       )}
-    </Modal>
+
+      {/* Grouped when the integration says so, flat when it does not.
+
+          RSA is twenty-six fields of which two are required; the rest have
+          working defaults. Ungrouped that is one scroll where the two that
+          matter look exactly like the twenty-four that do not.
+
+          Each section is its own panel and each one closes, so the form can
+          be collapsed down to three headers once it has been filled in —
+          and a header carries its own count, so closing one never hides
+          whether it is finished. */}
+      {GROUPS.filter((g) => fields.some((f) => (f.group ?? 'connect') === g.id)).length > 1 ? (
+        GROUPS.map((g) => {
+          const own = fields.filter((f) => (f.group ?? 'connect') === g.id)
+          if (own.length === 0) return null
+          const closed = shut.includes(g.id)
+          const gaps = own.filter(isMissing).length
+          return (
+            <section
+              key={g.id}
+              className={`bm8__setupgroup ${closed ? 'is-shut' : ''} ${gaps ? 'has-gap' : ''}`}
+            >
+              <button
+                type="button"
+                className="bm8__setupgrouphead"
+                aria-expanded={!closed}
+                onClick={() =>
+                  setShut((cur) =>
+                    cur.includes(g.id) ? cur.filter((x) => x !== g.id) : [...cur, g.id],
+                  )
+                }
+              >
+                <ChevronDown size={15} strokeWidth={2.2} className="bm8__setupchev" aria-hidden />
+                <span>{g.label}</span>
+                <em>{g.blurb}</em>
+                {/* A closed section still has to say whether anything inside
+                    it is outstanding. Without this, collapsing Connection
+                    hides the only explanation for why Save is dead. */}
+                <i className={`bm8__setupcount ${gaps ? 'is-gap' : ''}`}>
+                  {gaps
+                    ? `${gaps} required`
+                    : `${own.length} field${own.length === 1 ? '' : 's'}`}
+                </i>
+              </button>
+              {!closed && (
+                <div className="bm8__setupgroupbody">
+                  <ConfigFields
+                    fields={own}
+                    onChange={(id, value) => setFields((f) => setField(f, id, value))}
+                  />
+                </div>
+              )}
+            </section>
+          )
+        })
+      ) : (
+        <ConfigFields
+          fields={fields}
+          onChange={(id, value) => setFields((f) => setField(f, id, value))}
+        />
+      )}
+    </div>
   )
 }
 
@@ -632,12 +766,14 @@ function CategoryList({
   policies,
   onToggle,
   onSetup,
+  onSettings,
   onMakeDefault,
   enrolment,
   openCard,
   onOpenCard,
   onActivate,
   onSaveEnrolment,
+  gearEnds = false,
 }: {
   methods: AuthMethod[]
   onOpen: (channel: string) => void
@@ -650,12 +786,16 @@ function CategoryList({
   policies: Policy[]
   onToggle: (id: string, on: boolean) => void
   onSetup: (m: AuthMethod) => void
+  /** A family of one's settings, opened straight from its row. */
+  onSettings: (channel: string) => void
   onMakeDefault: (id: string) => void
   enrolment: UserEnrolment
   openCard: string | null
   onOpenCard: (id: string | null) => void
   onActivate: (id: string, on: boolean) => void
   onSaveEnrolment: (id: string, values: Record<string, string>) => void
+  /** The variant switch in the page head. See `gearEnds` on the screen. */
+  gearEnds?: boolean
 }) {
   const [q, setQ] = useState('')
 
@@ -676,8 +816,13 @@ function CategoryList({
          to send have no pool and get no tag. */
       const pools = new Map<string, number>()
       for (const m of inside) if (m.balance) pools.set(m.balance.label, m.balance.remaining)
+      /* Whether the row opens the slider or carries its one method's controls.
+         A person's rows all open: what sits in their panel is an enrolment form,
+         not a switch, and it does not fit on a row. */
+      const shape: FamilyRow = isUser ? { opens: true } : familyRow(f.channel, inside)
       return {
         f,
+        shape,
         total: inside.length,
         live: live.length,
         enrolled: inside.reduce((n, m) => n + (m.enrolled ?? 0), 0),
@@ -696,7 +841,7 @@ function CategoryList({
              nothing and reads as "we do not have that". */
           methods.some((m) => m.channel === r.f.channel && m.name.toLowerCase().includes(needle)),
       )
-  }, [methods, q, use])
+  }, [methods, q, use, isUser])
 
   const countOf = (f: UseFilter) => methods.filter((m) => matchesUse(m, f)).length
   /* Recovery is a tenant policy, and the primaries are not in a person's
@@ -800,7 +945,12 @@ function CategoryList({
         />
       </div>
 
-      <div className="bm8__list">
+      {/* `is-gear` on the LIST, not on the rows it changes. The end of every row
+          reserves one width so the enrolment figures beside them read as a
+          column, and a gear is wider than the chevron it stands in for — so the
+          reservation has to move for all eleven rows or the two that grow a gear
+          would push their own figures out of line with the other nine. */}
+      <div className={`bm8__list ${isUser ? 'is-person' : ''} ${gearEnds ? 'is-gear' : ''}`}>
         {/* The three ways a session starts, as rows.
 
             They are method rows, not cards, so they carry what a method row
@@ -834,111 +984,205 @@ function CategoryList({
           ),
         )}
 
-        {rows.map(({ f, live, enrolled, txns }) => {
-          const holdsDefault =
-            defaultMethod !== null &&
-            methods.some((m) => m.id === defaultMethod && m.channel === f.channel)
+        {rows.map(({ f, live, enrolled, txns, shape }) => {
+          /* A family of one is named for its method — "CAC Card", not "Smart
+             Cards" — because that is the thing the switch on the row turns on.
+             The family rides beside it as a chip, so the word an admin scans the
+             list for is still on the row. */
+          const single = shape.opens ? null : shape.method
+          /* A row named for its method wears Default only for that method. A
+             filter can leave a family showing one method while the default is
+             another it has hidden, and the chip beside a method name reads as
+             that method's. */
+          const holdsDefault = single
+            ? defaultMethod === single.id
+            : defaultMethod !== null && methods.some((m) => m.id === defaultMethod && m.channel === f.channel)
+          const title = single ? single.name : f.channel
+          /* Where the row goes, if anywhere: its family, its settings, or a
+             configuration worth returning to. See `rowTarget`. */
+          const target = rowTarget(shape)
+          const open = !target
+            ? null
+            : target.kind === 'family'
+              ? () => onOpen(f.channel)
+              : target.kind === 'settings'
+                ? () => onSettings(f.channel)
+                : () => onSetup(target.method)
           return (
-          <button
-            key={f.channel}
-            type="button"
-            className={`bm8__card ${live === 0 ? 'is-off' : ''}`}
-            onClick={() => onOpen(f.channel)}
-          >
-            {/* Brand on every tile, live or not.
+            <div
+              key={f.channel}
+              className={`bm8__card bm8__card--family ${open ? 'is-link' : ''} ${live === 0 ? 'is-off' : ''}`}
+            >
+              {/* Brand on every tile, live or not.
 
-                `f.tint` was here and had not resolved to anything for a while —
-                the per-family hues were deleted from the sheet and the class
-                kept being emitted, so every tile fell back to grey whatever its
-                state. It was briefly conditional on `live > 0`, which made the
-                tile a second copy of a status the row already states twice: the
-                toggle on the right, and the enrolment figure beside it. The
-                mark is identity, and identity does not switch off. */}
-            <span className="bm8__tile is-brand" aria-hidden>
-              <f.icon size={19} strokeWidth={1.7} />
-            </span>
-
-            <span className="bm8__info">
-              <span className="bm8__name">
-                {f.channel}
-                {/* The same pill the sidebar already uses for a new section, so
-                    "new" looks the same wherever the product says it. */}
-                {f.isNew && <i className="bm8__new">New</i>}
-
-                {/* Which category holds the tenant default. On the row rather
-                    than only in the dropdown, so the answer is visible while
-                    scanning the list instead of only while changing it. */}
-                {holdsDefault && (
-                  <i className="bm8__defchip">
-                    <Star size={10} strokeWidth={2.4} aria-hidden />
-                    Default
-                  </i>
-                )}
-                {/* The sentence, where the name does not carry it. A tip
-                    rather than a deletion: somebody meeting "Grid Pattern" for
-                    the first time still needs telling, and somebody who already
-                    knows what SMS is should not have to read it eleven times to
-                    get down the list.
-
-                    Everything went to the tip for one revision, on the argument
-                    that a list where some rows are two lines and some are one
-                    has no rhythm to scan down. The rhythm was real and the
-                    price was not worth it: eleven names and nothing else is
-                    tidy and mute, and the rows that lost their line were the
-                    ones a reader stops on. */}
-                {/* TipMark, not TipDot: this row is itself a button, and
-                    a button inside a button is invalid HTML that React refuses
-                    to hydrate — the same fault the filter pill had. */}
-                {!f.explains && <TipMark text={f.blurb} />}
+                  `f.tint` was here and had not resolved to anything for a while —
+                  the per-family hues were deleted from the sheet and the class
+                  kept being emitted, so every tile fell back to grey whatever its
+                  state. It was briefly conditional on `live > 0`, which made the
+                  tile a second copy of a status the row already states twice: the
+                  toggle on the right, and the enrolment figure beside it. The
+                  mark is identity, and identity does not switch off. */}
+              <span className="bm8__tile is-brand" aria-hidden>
+                <f.icon size={19} strokeWidth={1.7} />
               </span>
-              {f.explains && <span className="bm8__desc">{f.blurb}</span>}
-              {/* The tip is a mouse affordance and cannot be tabbed to, so the
-                  sentence behind it rides on the card's own accessible name. */}
-              {!f.explains && <span className="u-sr-only">{f.blurb}</span>}
 
-            </span>
+              <span className="bm8__info">
+                <span className="bm8__name">
+                  {/* The row's one link, stretched over the whole row by its
+                      `::after`, so the row opens from anywhere while the switch
+                      at its end stays a control of its own. The row cannot be
+                      the button: a switch inside a button is a button inside a
+                      button, which is invalid HTML. */}
+                  {open ? (
+                    <button type="button" className="bm8__open" aria-haspopup="dialog" onClick={open}>
+                      {title}
+                    </button>
+                  ) : (
+                    title
+                  )}
+                  {single && single.name !== f.channel && (
+                    <i className="bm8__badge bm8__badge--use">{f.channel}</i>
+                  )}
+                  {/* The same pill the sidebar already uses for a new section, so
+                      "new" looks the same wherever the product says it. */}
+                  {f.isNew && <i className="bm8__new">New</i>}
 
-            {/* The two numbers the row exists to report, moved out of the text
-                and given a column of their own.
-
-                They were a third line of grey under the description and a muted
-                string on the right — the same weight as the blurb, which is the
-                one thing on the row nobody rereads. Scanning eleven categories
-                for "what is on" and "who is on it" meant reading eleven
-                paragraphs. Now both are chips and figures at a fixed position,
-                so the column can be read straight down. */}
-            <span className="bm8__right">
-              {/* Funding, above the enrolment figure it qualifies.
-
-                  It was a chip on its own row under the description, which was
-                  the right call while the name also carried an "enabled" chip —
-                  three chips across the row pushed the name into wrapping. That
-                  chip is gone, so the constraint is gone with it, and the
-                  transactions belong here: "can it afford to run" and "how many
-                  people are on it" are the two numbers this column exists to
-                  report, and they are read together. */}
-              {txns !== null && (
-                <span className={`bm8__txn ${txns === 0 ? 'is-empty' : txns <= 50 ? 'is-low' : ''}`}>
-                  {txns === 0 ? 'No transactions left' : `${txns.toLocaleString()} left`}
+                  {/* Which category holds the tenant default. On the row rather
+                      than only in the dropdown, so the answer is visible while
+                      scanning the list instead of only while changing it. */}
+                  {holdsDefault && (
+                    <i className="bm8__defchip">
+                      <Star size={10} strokeWidth={2.4} aria-hidden />
+                      Default
+                    </i>
+                  )}
+                  {/* The detail, one hover away: what the family holds, what it
+                      needs and what it costs — worth knowing before switching it
+                      on, and too long to carry on every row. */}
+                  {/* TipMark, not TipDot: a focusable dot on every row would be
+                      eleven more tab stops. The same words follow in the row's
+                      text for a screen reader instead. */}
+                  <TipMark text={f.detail} />
                 </span>
-              )}
-
-              {/* Reserved even at zero, so the figure stays in one column down
-                  the list rather than sliding about per row. */}
-              <span className="bm8__reach">
-                {enrolled > 0 ? (
-                  <>
-                    <b>{enrolled.toLocaleString()}</b>
-                    <em>enrolled</em>
-                  </>
-                ) : (
-                  <i>—</i>
-                )}
+                {/* One line on every row. Some rows went without one, on the
+                    argument that their name already said it, and the list read
+                    as two kinds of row; a line each is what lets it be scanned. */}
+                <span className="bm8__desc">{f.blurb}</span>
+                <span className="u-sr-only">{f.detail}</span>
               </span>
 
-              <ChevronRight size={17} strokeWidth={2} aria-hidden />
-            </span>
-          </button>
+              {/* The two numbers the row exists to report, moved out of the text
+                  and given a column of their own.
+
+                  They were a third line of grey under the description and a muted
+                  string on the right — the same weight as the blurb, which is the
+                  one thing on the row nobody rereads. Scanning eleven categories
+                  for "what is on" and "who is on it" meant reading eleven
+                  paragraphs. Now both are chips and figures at a fixed position,
+                  so the column can be read straight down. */}
+              <span className="bm8__right">
+                {/* Funding, above the enrolment figure it qualifies.
+
+                    It was a chip on its own row under the description, which was
+                    the right call while the name also carried an "enabled" chip —
+                    three chips across the row pushed the name into wrapping. That
+                    chip is gone, so the constraint is gone with it, and the
+                    transactions belong here: "can it afford to run" and "how many
+                    people are on it" are the two numbers this column exists to
+                    report, and they are read together. */}
+                {txns !== null && (
+                  <span className={`bm8__txn ${txns === 0 ? 'is-empty' : txns <= 50 ? 'is-low' : ''}`}>
+                    {txns === 0 ? 'No transactions left' : `${txns.toLocaleString()} left`}
+                  </span>
+                )}
+
+                {/* Reserved even at zero, so the figure stays in one column down
+                    the list rather than sliding about per row. */}
+                <span className="bm8__reach">
+                  {enrolled > 0 ? (
+                    <>
+                      <b>{enrolled.toLocaleString()}</b>
+                      <em>enrolled</em>
+                    </>
+                  ) : (
+                    <i>—</i>
+                  )}
+                </span>
+
+                {/* The end of the row: its switch, then its chevron, against the
+                    edge. With no chevron the switch takes the edge itself, rather
+                    than sitting beside an empty place for one.
+
+                    --- The gear variant ------------------------------------------
+
+                    `gear` is true on exactly the rows that have BOTH: a switch of
+                    their own, because the family narrowed to one method, AND a
+                    settings page to open. Not a family row — those have no switch
+                    to move. Not a switch-only row — those have nowhere to go, so
+                    a gear would open nothing. Not RSA's `setup` target, which is
+                    a configuration form rather than the settings page. Two rows
+                    in the shipped catalogue satisfy that; the head names them.
+
+                    When it is on, the order inverts. The switch goes LAST and so
+                    takes the row's right edge — which is where every switch-only
+                    row already puts its switch, so in this variant every switch
+                    in the list lines up rather than two of them sitting a
+                    chevron's width short of the rest.
+
+                    The gear is a real button and the row still opens. That looks
+                    like the "separate Settings button" this list was told not to
+                    grow, and it is a different thing: the chevron it replaces was
+                    already only a SIGN — `aria-hidden`, unclickable, with the
+                    row's own stretched `::after` taking the press. Making that
+                    sign pressable adds an entrance; it does not add a
+                    destination, and it does not take the 870px target away from
+                    the row. */}
+                {(() => {
+                  const gear = Boolean(gearEnds && single && target?.kind === 'settings' && open)
+                  const ctl = single && (
+                    <span className="bm8__rowctl">
+                      <MethodControls
+                        compact
+                        m={single}
+                        isDefault={defaultMethod === single.id}
+                        onToggle={onToggle}
+                        onSetup={onSetup}
+                        onMakeDefault={open ? undefined : onMakeDefault}
+                      />
+                    </span>
+                  )
+                  return (
+                    <span className={`bm8__rowend ${gear ? 'is-gear' : ''}`}>
+                      {gear ? (
+                        <>
+                          <span className="bm8__rowgear">
+                            <IconButton
+                              icon={Settings}
+                              label={`${title} settings`}
+                              size="sm"
+                              tone="ghost"
+                              /* `gear` is only true where `open` is set, but the
+                                 flag is a boolean and cannot narrow it. */
+                              onClick={open ?? undefined}
+                            />
+                          </span>
+                          {ctl}
+                        </>
+                      ) : (
+                        <>
+                          {ctl}
+                          {open && (
+                            <span className="bm8__rowchev" aria-hidden>
+                              <ChevronRight size={17} strokeWidth={2} />
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </span>
+                  )
+                })()}
+              </span>
+            </div>
           )
         })}
       </div>
@@ -954,17 +1198,30 @@ function CategoryList({
 
 /* --- The slide-over ------------------------------------------------------------ */
 
+/* The standard ease, as the tuple motion wants it. */
+const PAGE_EASE: [number, number, number, number] = [0.2, 0, 0, 1]
+
 /* The category, as a slide-over: its methods on one pane, and — for the five
-   families that have any — the settings the MFA sheet says belong to them. */
+   families that have any — the settings the MFA sheet says belong to them.
+
+   One panel with pages rather than a surface per job (see `PanelPage`). A
+   method's setup is pushed over its family and Back pops it. A family of one
+   opens straight onto its settings or its setup, because its row already
+   carries everything a Methods pane would have shown. */
 function CategoryDrawer({
-  family,
+  pages,
   methods,
   policies,
+  onBack,
   onClose,
   onToggle,
   defaultMethod,
   onSetup,
   onMakeDefault,
+  saved,
+  onSaveSetup,
+  choices,
+  onSaveCard,
   behaviour,
   onBehaviour,
   use,
@@ -975,14 +1232,22 @@ function CategoryDrawer({
   onActivate,
   onSaveEnrolment,
 }: {
-  family: Family | null
+  pages: PanelPage[]
   methods: AuthMethod[]
   policies: Policy[]
+  onBack: () => void
   onClose: () => void
   onToggle: (id: string, on: boolean) => void
   defaultMethod: string | null
+  /** Pushes a method's setup over the page it was pressed on. */
   onSetup: (m: AuthMethod) => void
   onMakeDefault: (id: string) => void
+  /** What each method's setup was last saved with, per id. */
+  saved: Record<string, ConfigField[]>
+  onSaveSetup: (m: AuthMethod, fields: ConfigField[]) => void
+  /** What each method's setup card chose last time — Microsoft Push's server. */
+  choices: Record<string, string>
+  onSaveCard: (m: AuthMethod, server: string) => void
   behaviour: MfaValues
   onBehaviour: (p: MfaValues) => void
   /* The same filter the cards were counted under. A panel that opens showing
@@ -995,13 +1260,70 @@ function CategoryDrawer({
   onActivate: (id: string, on: boolean) => void
   onSaveEnrolment: (id: string, values: Record<string, string>) => void
 }) {
+  const reduce = useReducedMotion()
+  const top = pages.length > 0 ? pages[pages.length - 1] : null
+  const under = pages.length > 1 ? pages[pages.length - 2] : null
+  const key = top ? pageKey(top) : 'closed'
+
+  const setupOf = top?.kind === 'setup' ? (methods.find((m) => m.id === top.methodId) ?? null) : null
+  /* Setup belongs to a family too — it is what the head names when there is no
+     Back to name it. A primary has no family, and gets no line. */
+  const channel = top === null ? null : top.kind === 'setup' ? (setupOf?.channel ?? null) : top.channel
+  const family = channel ? (FAMILIES.find((f) => f.channel === channel) ?? null) : null
+  const backTo = under && under.kind !== 'setup' ? under.channel : null
+
+  /* An authenticator app's one-card setup, where it has one — see setup-guide.ts. */
+  const card = setupOf ? setupCardFor(setupOf.id) : null
+  const draft = useSetupDraft(setupOf, saved, choices)
+
   const [pane, setPane] = useState<'methods' | 'settings'>('methods')
+  /* A panel opens on Methods. Keyed on the page at the bottom of the stack, not
+     the top, so coming Back from a setup lands on the pane it was pressed from. */
+  const root = pages.length > 0 ? pageKey(pages[0]) : null
+  const [paneFor, setPaneFor] = useState(root)
+  if (root !== paneFor) {
+    setPaneFor(root)
+    setPane('methods')
+  }
+
+  /* Deeper pages arrive from the right and Back arrives from the left, so the
+     content moves the way the stack does. */
+  const depth = pages.length
+  const [lastDepth, setLastDepth] = useState(depth)
+  const [dir, setDir] = useState(1)
+  if (depth !== lastDepth) {
+    setLastDepth(depth)
+    setDir(depth > lastDepth ? 1 : -1)
+  }
+
+  /* Each page starts at its top, and focus follows the page. The button that
+     pushed it has just unmounted, and focus left on a detached node falls to
+     <body> — outside the panel, where Tab walks the console behind the scrim.
+
+     Not on opening. The dialog moves focus in itself and remembers what to hand
+     it back to on close, and focusing the panel first would overwrite that with
+     the panel. */
+  const pageRef = useRef<HTMLDivElement>(null)
+  const lastKey = useRef(key)
+  useLayoutEffect(() => {
+    const was = lastKey.current
+    lastKey.current = key
+    const el = pageRef.current
+    if (!el || was === key || key === 'closed') return
+    el.closest('.bx-drawer__body')?.scrollTo({ top: 0 })
+    if (was !== 'closed') el.closest<HTMLElement>('.bx-drawer')?.focus({ preventScroll: true })
+  }, [key])
+
   const inside = family
     ? methods.filter((m) => m.channel === family.channel && matchesUse(m, use))
     : []
   const live = inside.filter((m) => !methodBlocker(m)).length
   const enrolled = inside.reduce((n, m) => n + (m.enrolled ?? 0), 0)
   const unconfigured = inside.filter((m) => !m.configured).length
+  /* A family of one is headed by its method, the way its row is named — on the
+     admin's list. A person's row keeps the family's name, so their panel does
+     too, and its "On" would be the tenant's state above the person's own switch. */
+  const single = !isUser && inside.length === 1 ? inside[0] : null
 
   /* Settings from the MFA sheet. Two scopes: some belong to the whole family —
      an OTP length is a property of SMS, not of any one SMS method — and a few
@@ -1020,129 +1342,218 @@ function CategoryDrawer({
      you failed to find it. */
   const hasSettings = famSettings.length > 0 || ownSettings.length > 0
 
+  const slide = {
+    initial: { opacity: 0, x: reduce ? 0 : 24 * dir },
+    animate: { opacity: 1, x: 0 },
+    transition: { duration: reduce ? 0 : 0.2, ease: PAGE_EASE },
+  }
+  /* A card has no required fields; what its Save needs is `setupReady`. */
+  const missing = card ? 0 : draft.missing.length
+
   return (
     <Drawer
-      open={family !== null}
-      onClose={() => {
-        setPane('methods')
-        onClose()
-      }}
+      open={top !== null}
+      onClose={onClose}
       /* 680, not 620. The settings rows carry an icon, a label, a tip and a
          provenance chip before the control even starts, and a segmented
-         control needs its options on one line to be worth using. */
+         control needs its options on one line to be worth using. It is also
+         the width the setup modal was, so RSA's form did not have to reflow to
+         move in here. */
       width={680}
-      title={family?.channel ?? ''}
+      title={setupOf ? `${setupOf.name} ${card ? 'setup' : 'configuration'}` : (single?.name ?? family?.channel ?? '')}
       /* One header, not two.
 
          The panel had the kit's own head (name + count + close) and then a
          banner immediately under it repeating the same two facts beside a tile.
          Merged: the tile, the name, the blurb and the numbers are one block, and
          the segment bar is gone — three grey slabs restated a count that is
-         already written next to them in words. */
+         already written next to them in words.
+
+         It moves with the page, so a pushed page never shows the head of the
+         one under it. */
       head={
-        family ? (
-          <div className={`bm8__dwhead is-${family.tint}`}>
-            <span className="bm8__dwtile" aria-hidden>
-              <family.icon size={22} strokeWidth={1.7} />
-            </span>
-            <div className="bm8__dwtext">
-              <h2>{family.channel}</h2>
-              <p>{family.blurb}</p>
-              <div className="bm8__dwstats">
-                <span>
-                  <strong>{live}</strong> of {inside.length} enabled
+        top ? (
+          <motion.div key={key} className="bm8__dwstack" {...slide}>
+            {/* Named for where it goes. "Back" alone asks you to remember what
+                was under this page; the family's name says it. On the line the
+                close button already sits on — the panel's two ways out, level
+                with each other. */}
+            {backTo && (
+              <button type="button" className="bm8__back" onClick={onBack}>
+                <ArrowLeft size={14} strokeWidth={2} aria-hidden />
+                {backTo}
+              </button>
+            )}
+            {setupOf ? (
+              <div className="bm8__dwhead">
+                <span className="bm8__dwtile bm8__dwtile--logo" aria-hidden>
+                  <MethodIcon name={setupOf.name} size={38} />
                 </span>
-                <span>
-                  <strong>{enrolled.toLocaleString()}</strong> enrolled
-                </span>
-                {unconfigured > 0 && (
-                  <span className="is-warn">
-                    <strong>{unconfigured}</strong> need setup
-                  </span>
-                )}
+                <div className="bm8__dwtext">
+                  <h2>{setupOf.name}</h2>
+                  {/* The family, where there is no Back already naming it — a
+                      row that said "RSA Authenticator" opens a page headed with
+                      the method's own name, and this is what joins the two. */}
+                  {!backTo && family && <p>{family.channel}</p>}
+                  <div className="bm8__dwstats">
+                    <span>{setupOf.configured ? 'Configured' : 'Not configured yet'}</span>
+                    {/* Why Save is dead, stated where it stays in view. Each
+                        section says it too, but a closed or scrolled-past
+                        section says it to nobody. */}
+                    {missing > 0 && (
+                      <span className="is-warn">
+                        <strong>{missing}</strong> required {missing === 1 ? 'field' : 'fields'} left
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            ) : family ? (
+              <div className={`bm8__dwhead is-${family.tint}`}>
+                <span className="bm8__dwtile" aria-hidden>
+                  <family.icon size={22} strokeWidth={1.7} />
+                </span>
+                <div className="bm8__dwtext">
+                  <h2 className="bm8__dwtitle">
+                    {single ? single.name : family.channel}
+                    {single && single.name !== family.channel && (
+                      <i className="bm8__badge bm8__badge--use">{family.channel}</i>
+                    )}
+                  </h2>
+                  <p>{family.blurb}</p>
+                  <div className="bm8__dwstats">
+                    <span>
+                      {single ? <strong>{live ? 'On' : 'Off'}</strong> : <><strong>{live}</strong> of {inside.length} enabled</>}
+                    </span>
+                    <span>
+                      <strong>{enrolled.toLocaleString()}</strong> enrolled
+                    </span>
+                    {unconfigured > 0 && (
+                      <span className="is-warn">
+                        <strong>{unconfigured}</strong> need setup
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </motion.div>
         ) : undefined
       }
       actions={
-        <Button variant="brand" onClick={onClose}>
-          Done
-        </Button>
+        setupOf ? (
+          <>
+            {/* Cancel goes where Back goes when there is somewhere to go back
+                to. Closing the whole panel from a pushed page would throw away
+                the family along with the form. */}
+            <Button variant="ghost" onClick={under ? onBack : onClose}>
+              Cancel
+            </Button>
+            <Button
+              variant="brand"
+              disabled={card ? !setupReady(card, draft) : missing > 0}
+              onClick={() => (card ? onSaveCard(setupOf, draft.server) : onSaveSetup(setupOf, draft.fields))}
+            >
+              Save
+            </Button>
+          </>
+        ) : (
+          <Button variant="brand" onClick={onClose}>
+            Done
+          </Button>
+        )
       }
     >
-      {family && (
-        <div className="bm8__dw">
-          {hasSettings && (
-            <div className="bm8__dwtabs" role="tablist" aria-label={`${family.channel} panes`}>
-              <button
-                role="tab"
-                type="button"
-                aria-selected={pane === 'methods'}
-                className={`bm8__dwtab ${pane === 'methods' ? 'is-on' : ''}`}
-                onClick={() => setPane('methods')}
-              >
-                Methods <em>{inside.length}</em>
-              </button>
-              <button
-                role="tab"
-                type="button"
-                aria-selected={pane === 'settings'}
-                className={`bm8__dwtab ${pane === 'settings' ? 'is-on' : ''}`}
-                onClick={() => setPane('settings')}
-              >
-                Settings <em>{famSettings.length + ownSettings.reduce((n, x) => n + x.settings.length, 0)}</em>
-              </button>
-            </div>
-          )}
-
-          {pane === 'methods' || !hasSettings ? (
-            <>
-              {/* Same list, same panel, and a row that means two different
-                  things depending on who opened it. The admin's toggle enables
-                  a method for the tenant; the person's picks the one that runs
-                  for them, and Edit opens their own details inline rather than
-                  the tenant's connection to a provider. */}
-              <div className="bm8__list">
-                {inside.map((m) =>
-                  isUser ? (
-                    <UserMethodCard
-                      key={m.id}
-                      m={m}
-                      enrolled={enrolment.configured.includes(m.id)}
-                      isActive={enrolment.active === m.id}
-                      values={enrolment.values[m.id] ?? {}}
-                      open={openCard === m.id}
-                      onOpen={(o) => onOpenCard(o ? m.id : null)}
-                      onActivate={(on) => onActivate(m.id, on)}
-                      onSave={(v) => onSaveEnrolment(m.id, v)}
-                    />
-                  ) : (
-                    <MethodCard
-                      key={m.id}
-                      m={m}
-                      policies={policies}
-                      onToggle={onToggle}
-                      isDefault={defaultMethod === m.id}
-                      onSetup={onSetup}
-                      onMakeDefault={onMakeDefault}
-                    />
-                  ),
-                )}
-              </div>
-              {inside.length === 0 && <NoResults>No methods in this group yet.</NoResults>}
-            </>
+      <motion.div key={key} ref={pageRef} {...slide}>
+        {setupOf ? (
+          card?.kind === 'app' ? (
+            <AppSetupCard method={setupOf} card={card} passcode={draft.passcode} onPasscode={draft.setPasscode} />
+          ) : card?.kind === 'nps' ? (
+            <NpsSetupCard servers={NPS_SERVERS} value={draft.server} onChange={draft.setServer} />
           ) : (
-            <SettingsPane
-              family={family}
-              famSettings={famSettings}
-              ownSettings={ownSettings}
-              behaviour={behaviour}
-              onBehaviour={onBehaviour}
-            />
-          )}
-        </div>
-      )}
+            <SetupForm draft={draft} />
+          )
+        ) : family && top?.kind === 'settings' ? (
+          <SettingsPane
+            family={family}
+            famSettings={famSettings}
+            ownSettings={ownSettings}
+            behaviour={behaviour}
+            onBehaviour={onBehaviour}
+          />
+        ) : family ? (
+          <div className="bm8__dw">
+            {hasSettings && (
+              <div className="bm8__dwtabs" role="tablist" aria-label={`${family.channel} panes`}>
+                <button
+                  role="tab"
+                  type="button"
+                  aria-selected={pane === 'methods'}
+                  className={`bm8__dwtab ${pane === 'methods' ? 'is-on' : ''}`}
+                  onClick={() => setPane('methods')}
+                >
+                  Methods <em>{inside.length}</em>
+                </button>
+                <button
+                  role="tab"
+                  type="button"
+                  aria-selected={pane === 'settings'}
+                  className={`bm8__dwtab ${pane === 'settings' ? 'is-on' : ''}`}
+                  onClick={() => setPane('settings')}
+                >
+                  Settings <em>{famSettings.length + ownSettings.reduce((n, x) => n + x.settings.length, 0)}</em>
+                </button>
+              </div>
+            )}
+
+            {pane === 'methods' || !hasSettings ? (
+              <>
+                {/* Same list, same panel, and a row that means two different
+                    things depending on who opened it. The admin's toggle enables
+                    a method for the tenant; the person's picks the one that runs
+                    for them, and Edit opens their own details inline rather than
+                    the tenant's connection to a provider. */}
+                <div className="bm8__list">
+                  {inside.map((m) =>
+                    isUser ? (
+                      <UserMethodCard
+                        key={m.id}
+                        m={m}
+                        enrolled={enrolment.configured.includes(m.id)}
+                        isActive={enrolment.active === m.id}
+                        values={enrolment.values[m.id] ?? {}}
+                        open={openCard === m.id}
+                        onOpen={(o) => onOpenCard(o ? m.id : null)}
+                        onActivate={(on) => onActivate(m.id, on)}
+                        onSave={(v) => onSaveEnrolment(m.id, v)}
+                      />
+                    ) : (
+                      <MethodCard
+                        key={m.id}
+                        m={m}
+                        policies={policies}
+                        onToggle={onToggle}
+                        isDefault={defaultMethod === m.id}
+                        onSetup={onSetup}
+                        onMakeDefault={onMakeDefault}
+                      />
+                    ),
+                  )}
+                </div>
+                {inside.length === 0 && <NoResults>No methods in this group yet.</NoResults>}
+              </>
+            ) : (
+              <SettingsPane
+                family={family}
+                famSettings={famSettings}
+                ownSettings={ownSettings}
+                behaviour={behaviour}
+                onBehaviour={onBehaviour}
+              />
+            )}
+          </div>
+        ) : null}
+      </motion.div>
     </Drawer>
   )
 }
@@ -1238,7 +1649,6 @@ function MethodCard({
   isDefault,
   onSetup,
   onMakeDefault,
-  onSettings,
 }: {
   m: AuthMethod
   policies: Policy[]
@@ -1246,37 +1656,9 @@ function MethodCard({
   isDefault: boolean
   onSetup: (m: AuthMethod) => void
   onMakeDefault: (id: string) => void
-  /* Only where the method has settings of its own. Absent is not "disabled" —
-     the control is not drawn at all, because a row that offers a panel holding
-     nothing is worse than a row that offers nothing. */
-  onSettings?: () => void
 }) {
   const blocked = methodBlocker(m)
 
-  /* Whether this method could be the default, on the same rule the section that
-     used to own this decision applied: the sheet says which methods qualify, and
-     a default that is switched off or not yet configured is a default that
-     cannot run.
-
-     The decision moved onto the card because it is a fact ABOUT a method, and it
-     was being made in a full-width section of its own that listed the methods
-     again in order to ask about them. Two places showing the same catalogue, one
-     of them only so you could point at a row in it. Now the row is the control:
-     the one that holds it wears the badge, and the handful that could take it
-     offer to. */
-  const canBeDefault = Boolean(mfaMethodFor(m.id)?.canBeDefault) && !blocked
-
-  /* RSA only.
-
-     Nearly every method in the catalogue has a config schema, so keying this on
-     "has a form" put an Edit button on twenty-one rows — and for most of them
-     the form is four fields nobody revisits. RSA is the one integration whose
-     configuration is genuinely worth returning to: twenty-six fields, half of
-     them values you have to read off the RSA Security Console.
-
-     Display Token is the other method that ships unconfigured and gets a Set up
-     button; if it should gain Edit too, this is the line to widen. */
-  const canEdit = m.id === 'rsa'
   /* Computed by walking the rules. The catalogue carries a stored count and it
      disagrees with reality. */
   const uses = useMemo(() => rulesUsing(m.name, policies), [m.name, policies])
@@ -1337,77 +1719,150 @@ function MethodCard({
 
       </div>
 
-      {/* Two states, and only one control each.
-
-          A method that has not been configured cannot be switched on, so the
-          switch was rendered disabled next to a button that could actually be
-          pressed — a dead control sitting above the live one, both competing
-          for the same corner. The switch is not "off" in that state, it is
-          absent: there is nothing yet to turn on. So the row shows the one
-          thing you can do, and earns its switch by being set up.
-
-          The knock-on is that enabling is no longer reachable from this row
-          until setup completes, which is the truth the disabled switch was
-          only gesturing at. */}
       <div className="bm8__right">
-        {/* No switch on the one method that is not a choice. A disabled toggle
-            was here to say "on, but not yours to change" — and a control you
-            cannot operate is still a control: it invites the click it then
-            refuses. The chip says the same thing in words and cannot be misread
-            as broken. */}
-        {m.locked ? (
-          <i className="bm8__always">Always on</i>
-        ) : m.configured ? (
-          <>
-            {/* Edit is the same control Set up was, in the same corner.
+        <MethodControls
+          m={m}
+          isDefault={isDefault}
+          onToggle={onToggle}
+          onSetup={onSetup}
+          onMakeDefault={onMakeDefault}
+        />
+      </div>
+    </div>
+  )
+}
 
-                It was an underlined word at the end of a line of monospace
-                values — which is a link inside a label, not a button, and it
-                sat in the text column where nothing else is clickable. Every
-                action on this card lives on the right: Set up did before the
-                method was configured, and Edit is the same action afterwards.
-                Putting it back there costs one row of card height and makes the
-                two states read as one control that changes its name. */}
-            <div className="bm8__ctlrow">
-              {/* Offered only where it is available and not already true. The
-                  method that IS the default says so with the badge on its name
-                  and needs no button — there is nothing to press. */}
-              {canBeDefault && !isDefault && (
+/* A method's own controls — the switch, and whatever else it offers beside it.
+
+   On the method row, and on a family row whose family holds only this method
+   (see `familyRow`). One component, so a method reads the same wherever its
+   controls turn up. */
+function MethodControls({
+  m,
+  isDefault,
+  onToggle,
+  onSetup,
+  onMakeDefault,
+  compact,
+}: {
+  m: AuthMethod
+  isDefault: boolean
+  onToggle: (id: string, on: boolean) => void
+  onSetup: (m: AuthMethod) => void
+  /* Absent on a list row that also opens a page: a star, a switch and a
+     chevron do not fit the end of one row, and the family it belongs to is
+     where that method is made the default. */
+  onMakeDefault?: (id: string) => void
+  /* On a list row, where it shares a column with the switches down the page:
+     "Make default" becomes a star, and there is no Edit — the row itself opens
+     the configuration. */
+  compact?: boolean
+}) {
+  const blocked = methodBlocker(m)
+
+  /* Whether this method could be the default, on the same rule the section that
+     used to own this decision applied: the sheet says which methods qualify, and
+     a default that is switched off or not yet configured is a default that
+     cannot run.
+
+     The decision moved onto the card because it is a fact ABOUT a method, and it
+     was being made in a full-width section of its own that listed the methods
+     again in order to ask about them. Two places showing the same catalogue, one
+     of them only so you could point at a row in it. Now the row is the control:
+     the one that holds it wears the badge, and the handful that could take it
+     offer to. */
+  const canBeDefault = Boolean(mfaMethodFor(m.id)?.canBeDefault) && !blocked
+
+  /* Edit only where the configuration is worth returning to — see
+     `hasConfigPage`. A compact row opens that page itself, so it carries no
+     button for it. */
+  const canEdit = hasConfigPage(m) && !compact
+
+  /* Two states, and only one control each.
+
+     A method that has not been configured cannot be switched on, so the
+     switch was rendered disabled next to a button that could actually be
+     pressed — a dead control sitting above the live one, both competing
+     for the same corner. The switch is not "off" in that state, it is
+     absent: there is nothing yet to turn on. So the row shows the one
+     thing you can do, and earns its switch by being set up.
+
+     The knock-on is that enabling is no longer reachable from this row
+     until setup completes, which is the truth the disabled switch was
+     only gesturing at. */
+  return (
+    <>
+      {/* No switch on the one method that is not a choice. A disabled toggle
+          was here to say "on, but not yours to change" — and a control you
+          cannot operate is still a control: it invites the click it then
+          refuses. The chip says the same thing in words and cannot be misread
+          as broken. */}
+      {m.locked ? (
+        <i className="bm8__always">Always on</i>
+      ) : m.configured ? (
+        <>
+          {/* Edit is the same control Set up was, in the same corner.
+
+              It was an underlined word at the end of a line of monospace
+              values — which is a link inside a label, not a button, and it
+              sat in the text column where nothing else is clickable. Every
+              action on this card lives on the right: Set up did before the
+              method was configured, and Edit is the same action afterwards.
+              Putting it back there costs one row of card height and makes the
+              two states read as one control that changes its name. */}
+          <div className="bm8__ctlrow">
+            {/* Offered only where it is available and not already true. The
+                method that IS the default says so with the badge on its name
+                and needs no button — there is nothing to press. */}
+            {canBeDefault &&
+              !isDefault &&
+              onMakeDefault &&
+              (compact ? (
+                /* A star rather than the words: on a list row it sits in the
+                   column the switches line up in, and "Make default" in text
+                   would push the row's figures out of theirs. The label is
+                   the tooltip. */
+                <IconButton
+                  icon={Star}
+                  label={`Make ${m.name} the default`}
+                  size="sm"
+                  tone="ghost"
+                  onClick={() => onMakeDefault(m.id)}
+                />
+              ) : (
                 <Button variant="ghost" size="sm" onClick={() => onMakeDefault(m.id)}>
                   <Star size={13} strokeWidth={2} aria-hidden />
                   Make default
                 </Button>
-              )}
-              {canEdit && (
-                <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
-                  <Pencil size={13} strokeWidth={2} aria-hidden />
-                  Edit
-                </Button>
-              )}
-              {/* The method's own behaviour — retry limits, token length, which
-                  gateway. It reached these through the category panel before,
-                  which meant opening a family to change one method's settings. */}
-              {onSettings && (
-                <Button variant="ghost" size="sm" onClick={onSettings}>
-                  <Sliders size={13} strokeWidth={2} aria-hidden />
-                  Settings
-                </Button>
-              )}
-              <Toggle
-                checked={m.active}
-                onChange={(v) => onToggle(m.id, v)}
-                label={`Enable ${m.name}`}
-              />
-            </div>
-          </>
-        ) : (
-          <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
-            Set up
-            <ArrowUpRight size={14} strokeWidth={2} aria-hidden />
-          </Button>
-        )}
-      </div>
-    </div>
+              ))}
+            {/* The authenticator apps' one-card setup — install and scan, or
+                Microsoft Push's server — on a button of its own beside the
+                switch, because it is something you do rather than somewhere
+                you go. */}
+            {setupCardFor(m.id) && (
+              <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
+                Set up
+              </Button>
+            )}
+            {canEdit && (
+              <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
+                <Pencil size={13} strokeWidth={2} aria-hidden />
+                Edit
+              </Button>
+            )}
+            <Toggle
+              checked={m.active}
+              onChange={(v) => onToggle(m.id, v)}
+              label={`Enable ${m.name}`}
+            />
+          </div>
+        </>
+      ) : (
+        <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
+          Set up
+        </Button>
+      )}
+    </>
   )
 }
 

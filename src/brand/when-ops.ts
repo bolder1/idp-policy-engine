@@ -83,7 +83,16 @@ export function removeCondition(w: Predicate, conditionId: string): Predicate {
       if (!k.conditions.some((c) => c.id === conditionId)) return [k]
       const conditions = k.conditions.filter((c) => c.id !== conditionId)
       if (conditions.length > 0) return [{ ...k, conditions }]
-      return k.grouped ? [{ ...k, conditions }] : []
+      /* Emptied, it goes — grouped or not.
+
+         A group used to survive its last condition, on the argument that it was
+         a bracket somebody asked for and clearing it out to refill it should not
+         delete it under them. The builder no longer lets a group exist empty at
+         all: a new group is not created until its first condition is chosen, so
+         an empty one could only ever be this — a leftover that matches every
+         sign-in, which the linter then reports as PE320. Undo is the way back,
+         as it is for every other removal. */
+      return []
     }),
   )
 }

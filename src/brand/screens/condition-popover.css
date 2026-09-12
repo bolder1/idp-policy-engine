@@ -504,15 +504,27 @@
 .cp__stackrow > .cp__fld.is-op { flex: 0 0 auto; width: auto; white-space: nowrap; }
 .cp__stackrow > .cp__fld.is-op .cp__fldtext { overflow: visible; }
 .cp__stackrow > .cp__fld.is-val { flex: 1 1 44%; min-width: 0; }
-.cp__stackrow > .cp__inline { flex: 1 1 44%; min-width: 0; padding: 0 8px; }
-.cp__stackrow > .cp__stacklabel { flex: 1 1 34%; min-width: 0; padding: 0 10px; }
+.cp__stackrow > .cp__inline { flex: 1 1 44%; min-width: 0; padding: 0 var(--space-5); }
+.cp__stackrow > .cp__stacklabel { flex: 1 1 34%; min-width: 0; padding: 0 var(--space-5); }
 
 /* A segment, not a field. No border, no radius, no ground of its own — the
    frame supplies all three. The hairline between segments is the only mark
    that separates them, and it is one pixel where four borders used to be. */
+/* 42px, with the same inner padding on every segment.
+
+   It was 36px with each segment keeping its own horizontal padding, so the
+   attribute, the operator and an inline value started their text at three
+   different distances from their own hairline, and the row sat 4px shorter
+   than every other control in the panel beside it. One height and one inset
+   is what makes four segments read as one field with room to press. */
 .cp__stackrow > .cp__fld {
   border: 0; border-radius: 0; background: none;
-  min-height: 36px;
+  min-height: 42px;
+  /* `--space-5`, which is 12px. `--space-4` looks like the roomier token and is
+     8px in this scale — the same inset the base `.cp__fld` already had — so the
+     first pass at this changed the height and left the crowding exactly where
+     it was. */
+  padding-inline: var(--space-5);
 }
 .cp__stackrow > .cp__fld + .cp__fld,
 .cp__stackrow > .cp__fld + .cp__inline,
@@ -532,14 +544,14 @@
 .cp__stack > .cp__inline { width: 100%; }
 .cp__stack > .cp__fld,
 .cp__stack > .cp__inline { border-top: 1px solid var(--border-subtle); }
-.cp__stack > .cp__fld { border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; background: none; min-height: 34px; }
+.cp__stack > .cp__fld { border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; background: none; min-height: 40px; padding-inline: var(--space-5); }
 .cp__stack > .cp__fld:hover { background: var(--surface-sunken); }
-.cp__stack > .cp__inline { padding: 6px 8px; }
+.cp__stack > .cp__inline { padding: var(--space-4) var(--space-5); }
 
 /* The delete, at the end of the row rather than beside the attribute. It is a
    quiet icon until the condition is hovered, because a bin on every row of a
    list is a list that looks like it is mostly about deleting. */
-.cp__stackrow > .cp__del { flex: none; align-self: center; width: 26px; height: 26px; margin: 0 4px; opacity: 0; }
+.cp__stackrow > .cp__del { flex: none; align-self: center; width: 28px; height: 28px; margin: 0 var(--space-3); opacity: 0; }
 .cp__stack:hover .cp__del,
 .cp__stack:focus-within .cp__del { opacity: 1; }
 .cp__del:focus-visible { opacity: 1; }

@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
+  Activity,
   AlertTriangle,
   AppWindow,
   ArrowLeft,
-  BadgeCheck,
-  Brush,
   Check,
-  CircuitBoard,
   Copy,
   Download,
   Pencil,
@@ -16,19 +14,14 @@ import {
   FileSpreadsheet,
   Fingerprint,
   Globe,
-  Hash,
-  IdCard,
   Link2,
-  Languages,
   Lock,
-  MapPin,
   Microchip,
   MonitorCog,
   MonitorSmartphone,
   Monitor,
   Network,
   Plus,
-  RadioTower,
   Repeat,
   Server,
   ShieldCheck,
@@ -41,7 +34,7 @@ import {
   UserRound,
 } from 'lucide-react'
 
-import { Button, Drawer, MenuButton, Modal, NumberStepper, SaveBar, SearchBox, Tabs, TipDot, Toggle } from '../kit'
+import { Button, Drawer, MenuButton, Modal, NumberStepper, SaveBar, SearchBox, Tabs, TipDot, TipMark, Toggle } from '../kit'
 import { TierPick } from '../tier-pick'
 import { Picker } from '../picker'
 import {
@@ -324,103 +317,77 @@ function ProfileList({
           }
         />
       ) : (
-        <div className="bfp2__table" role="table" onClick={() => setMenuFor(null)}>
-            <div className="bfp2__trow bfp2__thead" role="row">
-              <span role="columnheader">Profile</span>
-              <span role="columnheader">Decides by</span>
-              {/* `Attributes` stood here — the raw length of `enabled`.
-
-                  A number with no unit and no threshold: six is not better or
-                  worse than two, it does not say whether the profile is
-                  finished, and nothing on this page acts on it. What the column
-                  cost is the width it took from the two that are read — the
-                  name, and what depends on it. */}
-              <span role="columnheader">Used by</span>
-              {/* Named, like every other table here. It was a blank cell, which
-                  leaves a screen reader announcing "column five" and a sighted
-                  reader guessing what the dots do until they press one. */}
-              <span role="columnheader" className="btable__center">Actions</span>
-            </div>
-            {shown.map((p) => {
-              const users = policiesUsing('fingerprint', p.id, policies)
-              return (
-              <div className="bfp2__trow" role="row" key={p.id}>
-                {/* One cell, as on the zones table — the icon belongs to the
-                    name rather than to a column of its own. */}
-                <span role="cell" className="bfp2__tname">
-                  {/* No `is-${p.mode}` on the tile. It never had a rule — the
-                      tile is deliberately grey, because the chip beside it
-                      already names the kind in that kind's colour — so the
-                      class was a mode name emitted into the DOM for nothing,
-                      and one more place a rename could break. */}
-                  <span className="bfp2__tile bfp2__tile--sm" aria-hidden>
-                    {renderModeIcon(p.mode, 13)}
+        /* A list, not a table — the shape Authentication methods uses. See
+           `.blist` in screens.css. The "Decides by" chip rides beside the name,
+           where the method rows carry their pills. */
+        <ul className="blist" onClick={() => setMenuFor(null)}>
+          {shown.map((p) => {
+            const users = policiesUsing('fingerprint', p.id, policies)
+            return (
+              <li className="blist__row" key={p.id}>
+                <span className="blist__tile bfp2__tile" aria-hidden>
+                  {renderModeIcon(p.mode, 18)}
+                </span>
+                <span className="blist__main">
+                  <span className="blist__name">
+                    <button type="button" className="blist__open" onClick={() => onOpen(p.id)}>
+                      {p.name}
+                    </button>
+                    {/* The TINT, not the id — see the note on `.bfp2__modechip`. */}
+                    <i className={`bfp2__modechip is-${MODE_META[p.mode].tint}`}>{modeLabel(p)}</i>
                   </span>
-                  <button type="button" className="bfp2__gname" onClick={() => onOpen(p.id)}>
-                    {p.name}
-                  </button>
                 </span>
-                <span role="cell">
-                  {/* The TINT, not the id. `is-${p.mode}` meant a rename had
-                      to be mirrored in the stylesheet, and a class matching
-                      nothing renders an untinted chip — no error, no failing
-                      test, a chip that quietly stops saying anything. */}
-                  <i className={`bfp2__modechip is-${MODE_META[p.mode].tint}`}>{modeLabel(p)}</i>
-                </span>
-                {/* The count, and what is behind it — the same peek the zones
-                    table and the policies table use. */}
-                <span role="cell">
+                <span className="blist__side">
                   <UsedByPeek users={users} />
+                  {/* The same three actions the zones list carries, in the same
+                      order: a profile and a zone are the same kind of thing to an
+                      admin, a library object a rule points at. */}
+                  <span className="bfp2__menuwrap">
+                    <button
+                      type="button"
+                      className="bfp2__kebab"
+                      aria-label={`Actions for ${p.name}`}
+                      aria-expanded={menuFor === p.id}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setMenuFor((m) => (m === p.id ? null : p.id))
+                      }}
+                    >
+                      ⋯
+                    </button>
+                    <AnimatePresence>
+                      {menuFor === p.id && (
+                        <motion.div
+                          className="bmenu"
+                          initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                          transition={{ duration: 0.13 }}
+                          onClick={(e) => e.stopPropagation()}
+                          role="menu"
+                        >
+                          <button role="menuitem" onClick={() => choose(() => onOpen(p.id))}>
+                            <Eye size={14} strokeWidth={1.9} aria-hidden />
+                            View details
+                          </button>
+                          <button role="menuitem" onClick={() => choose(() => onDuplicate(p))}>
+                            <Copy size={14} strokeWidth={1.9} aria-hidden />
+                            Duplicate
+                          </button>
+                          <span className="bmenu__rule" />
+                          <button role="menuitem" className="is-danger" onClick={() => choose(() => onDelete(p))}>
+                            <Trash2 size={14} strokeWidth={1.9} aria-hidden />
+                            Delete profile
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </span>
                 </span>
-
-                {/* The same three actions the zones table carries, in the same
-                    order, because a profile and a zone are the same kind of
-                    thing to an admin: a library object a rule points at. */}
-                <span role="cell" className="bfp2__menuwrap">
-                  <button
-                    type="button"
-                    className="bfp2__kebab"
-                    aria-label={`Actions for ${p.name}`}
-                    aria-expanded={menuFor === p.id}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setMenuFor((m) => (m === p.id ? null : p.id))
-                    }}
-                  >
-                    ⋯
-                  </button>
-                  <AnimatePresence>
-                    {menuFor === p.id && (
-                      <motion.div
-                        className="bmenu"
-                        initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                        transition={{ duration: 0.13 }}
-                        onClick={(e) => e.stopPropagation()}
-                        role="menu"
-                      >
-                        <button role="menuitem" onClick={() => choose(() => onOpen(p.id))}>
-                          <Eye size={14} strokeWidth={1.9} aria-hidden />
-                          View details
-                        </button>
-                        <button role="menuitem" onClick={() => choose(() => onDuplicate(p))}>
-                          <Copy size={14} strokeWidth={1.9} aria-hidden />
-                          Duplicate
-                        </button>
-                        <span className="bmenu__rule" />
-                        <button role="menuitem" className="is-danger" onClick={() => choose(() => onDelete(p))}>
-                          <Trash2 size={14} strokeWidth={1.9} aria-hidden />
-                          Delete profile
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </span>
-              </div>
+              </li>
             )
-            })}
-        </div>
+          })}
+        </ul>
       )}
     </>
   )
@@ -455,27 +422,39 @@ const REACH_ICON: Record<ProfileReach, typeof Sliders> = {
   agent: Microchip,
 }
 
-/* `CAT_META` and `metaOf` — an icon and a tint per category — stood here, and
-   went when the categories did. What is left is `ATTR_ICON`: a mark per
-   attribute, which is the identifying the tint was helping with anyway, at
-   fourteen rows and no groups to tell apart. */
+/* The mark on an attribute row is its CATEGORY's, not its own.
 
-const ATTR_ICON: Record<string, typeof Cpu> = {
-  'device-type': Smartphone,
-  mac: Network,
-  os: Monitor,
-  tpm: Lock,
-  motherboard: CircuitBoard,
-  'machine-sid': IdCard,
-  browser: AppWindow,
-  locale: Languages,
-  canvas: Brush,
-  'secure-boot': BadgeCheck,
-  ip: Hash,
-  isp: RadioTower,
-  geo: MapPin,
-  vpn: ShieldOff,
+   `ATTR_ICON` stood here — a hand-picked glyph for fourteen of the fifty-one
+   attributes, with everything else falling back to a shield. On the profile
+   page, which shows at most fourteen chosen rows, that was defensible. On the
+   picker it would have been twenty-four identical shields in a column of
+   thirty-eight, and a column of identical marks is noise with a cost.
+
+   A category mark is the better answer for a reason beyond arithmetic. The
+   group headings that used to file this list are gone — they were furniture
+   around three-word rows — and their one real job was saying which family a row
+   belongs to. This column does that job in 16px, on every row, at every width,
+   with no heading and no scroll position to lose. The name already says WHICH
+   member; the mark says which family.
+
+   `CAT_META` before it carried an icon AND a tint per category, and the tint is
+   what was wrong: five hues down a flat list is a list wearing its filing scheme
+   as decoration, which is the thing 60/30/10 forbids. The glyph was never the
+   problem, so the glyph comes back on its own. */
+const CAT_ICON: Record<AttrCategory, typeof Cpu> = {
+  Platform: Monitor,
+  Hardware: Cpu,
+  Browser: AppWindow,
+  Security: ShieldCheck,
+  Network: Network,
+  Client: Smartphone,
+  Behaviour: Activity,
 }
+
+/* A category is optional on the type, so the shield stays as the floor — it is
+   reached by nothing in either catalogue today. */
+const markFor = (a: Attribute) => (a.category ? CAT_ICON[a.category] : ShieldCheck) ?? ShieldCheck
+
 
 /* `AttrFilter` — a search and a row of category pills, shared by the picker and
    the profile page — stood here.
@@ -530,8 +509,23 @@ function AttrStep({
   const [q, setQ] = useState('')
   /* '' is every category, and it is the default. The rail this replaces made
      you pick one before you could see anything, which is a filing scheme
-     presented as a prerequisite. */
-  const [cat, setCat] = useState<AttrCategory | ''>('')
+     presented as a prerequisite.
+
+     `@selected` rides in the same control. It is not a category — it is the
+     other question you ask of a long list, "what have I actually chosen" — and
+     on a 38-row catalogue answering it used to mean scrolling past the
+     thirty-two you did not choose. `Picker` already groups its options, so it
+     is one more option rather than one more control. */
+  const [cat, setCat] = useState<AttrCategory | '' | '@selected'>('')
+
+  /* Where the last press landed, so the next one can shift-select a run.
+
+     A catalogue this long is picked in runs — "all of Hardware except the two
+     serials", "the four browsers" — and thirty-eight individual presses is the
+     part of this panel that is actually slow. The anchor is an id rather than
+     an index: the list reorders under grouping and filtering, and an index into
+     a list that moved selects the wrong rows. */
+  const anchor = useRef<string | null>(null)
 
   const offered = offeredAttributes(mode, reach)
   const blocked = blockedAttributes(mode, reach)
@@ -543,35 +537,96 @@ function AttrStep({
   const chosen = picked.filter((id) => offered.some((a) => a.id === id))
 
   const needle = q.trim().toLowerCase()
+  const onlyPicked = cat === '@selected'
   const shown = offered.filter(
     (a) =>
-      (!cat || a.category === cat) &&
+      (onlyPicked ? a.always || picked.includes(a.id) : !cat || a.category === cat) &&
       (!needle ||
         a.name.toLowerCase().includes(needle) ||
         a.purpose.toLowerCase().includes(needle) ||
         (a.category ?? '').toLowerCase().includes(needle)),
   )
 
-  const toggle = (id: string) =>
-    setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id])
+  /* One press, or a run of them.
 
-  const row = (a: Attribute) => (
-    <AttrPickRow key={a.id} attr={a} on={a.always || picked.includes(a.id)} onToggle={() => toggle(a.id)} />
-  )
+     Shift extends from the last row pressed to this one and writes the SAME
+     state across the span — the state this row is moving to, not a blanket on.
+     Dragging a shift-selection back over itself therefore clears the run, which
+     is what every list that does this does, and the alternative (always
+     selecting) makes the gesture a one-way trip.
 
-  /* --- The small catalogue: no bar at all -----------------------------------
+     Always-on rows are filtered out of the span rather than skipped over: they
+     are not a state anybody can write, and a range that stops dead at one would
+     make the four of them walls through the middle of the list. */
+  const toggle = (id: string, span: boolean) => {
+    const want = !picked.includes(id)
+    const from = span && anchor.current ? shown.findIndex((a) => a.id === anchor.current) : -1
+    const to = shown.findIndex((a) => a.id === id)
+    anchor.current = id
 
-     Five rows, all of them on screen, every one of them a condition somebody is
-     about to state. A search box over five rows is a control that can only ever
-     hide four of them, and a category filter over a list with no categories is
-     a control with one option. */
-  if (!asksReach(mode) && offered.length <= 8) {
-    return <div className="bfp2__pickrows">{offered.map(row)}</div>
+    if (from < 0 || to < 0 || from === to) {
+      setPicked(want ? [...picked, id] : picked.filter((x) => x !== id))
+      return
+    }
+    const run = shown
+      .slice(Math.min(from, to), Math.max(from, to) + 1)
+      .filter((a) => !a.always)
+      .map((a) => a.id)
+    setPicked(want ? [...new Set([...picked, ...run])] : picked.filter((x) => !run.includes(x)))
   }
 
-  const free = shown.filter((a) => !a.always)
-  const lockedShown = shown.filter((a) => a.always)
-  const blockedShown = cat ? blocked.filter((a) => a.category === cat) : blocked
+  /* --- The list, as one list ---------------------------------------------------
+
+     Two `<section>` wrappers stood here — "Always collected" and "Everything
+     else" — and a wrapper is what invites a border, which is what both of them
+     grew. The groups survive; the containers do not. A heading is now a ROW in
+     the same column as the rows it heads, and its single top hairline is the
+     only horizontal rule anywhere in the list.
+
+     "Everything else" is retired with them. It was a group named for not being
+     the other group, and on the device catalogue it ran to thirty-four rows —
+     precisely the scroll nobody finishes. The real categories are already in
+     the data and already counted for the filter above, so this costs nothing
+     and turns one 34-row run into five named ones.
+
+     Under a search the headings collapse entirely: five groups of one is a
+     filing scheme pretending to be structure, and a row read out of its group
+     still carries "Always on" on the row itself. */
+  /* --- No groups, and no headings -----------------------------------------------
+
+     Two `<section>` wrappers stood here — "Always collected" and "Everything
+     else" — each with a sticky ruled header, and a first pass at this replaced
+     them with six named category headings. Both are gone, and the second one is
+     the more interesting deletion: it was a real improvement over the boxes and
+     it was still too much furniture. Six headings, six counts, six select-alls
+     and six one-line blurbs is a screenful of chrome wrapped around a list whose
+     rows are three words each.
+
+     What answers "which family is this" is already on the bar: the category
+     filter narrows the list to one, and the search finds anything by name,
+     purpose or category. A heading that repeats what a filter does costs a row
+     each time and cannot be switched off.
+
+     Order carries what is left. The catalogue is written in family order, so
+     related rows still arrive together — and the always-collected ones are
+     lifted to the front, because they are the only rows nobody is choosing and
+     a locked row between two tickable ones reads as one you failed to untick.
+     Each carries "Always on" where a heading used to say it for the group. */
+  const ordered = [...shown.filter((a) => a.always), ...shown.filter((a) => !a.always)]
+
+  /* A bare-list branch for a catalogue of eight or fewer stood here, on the
+     argument that a search box over five rows can only ever hide four of them.
+
+     It has been unreachable for a while and nobody noticed, which is the real
+     reason it goes rather than the argument being wrong. `asksReach` is false
+     only for the OS kind, and that catalogue is thirteen entries now — its
+     comment still described "five rows". A branch that cannot fire is a branch
+     that is not maintained: it was the one path still rendering the deleted
+     `.bfp2__pickrows`, and it would have rendered a list with no bar, no
+     grouping and no count if anything ever reached it. */
+
+  const blockedShown =
+    cat && cat !== '@selected' ? blocked.filter((a) => a.category === cat) : blocked
 
   return (
     <div className="bfp2__pick">
@@ -608,9 +663,27 @@ function AttrStep({
             /* `''` is a real ANSWER here — every category — not an empty field,
                so the trigger says so instead of falling back to the "Choose…"
                placeholder a `Picker` shows when nothing is set. */
-            summary={cat ? (categoriesFor(mode).find((c) => c.id === cat)?.label ?? 'All categories') : 'All categories'}
+            summary={
+              onlyPicked
+                ? 'Selected only'
+                : cat
+                  ? (categoriesFor(mode).find((c) => c.id === cat)?.label ?? 'All categories')
+                  : 'All categories'
+            }
             options={[
-              { value: '', label: 'All categories' },
+              /* Two questions in one control, kept apart by `Picker`'s own
+                 option groups: what KIND of signal (the categories), and what
+                 have I already chosen. The second is not a category and must not
+                 read as one — on a 38-row catalogue, reviewing six picks used to
+                 mean scrolling past the thirty-two you did not make. */
+              { value: '', label: 'All categories', group: 'Show' },
+              {
+                value: '@selected',
+                label: 'Selected only',
+                group: 'Show',
+                meta: `${chosen.length} of ${offered.length}`,
+                disabled: chosen.length === 0,
+              },
               ...categoriesFor(mode).map((c) => {
                 const all = offered.filter((a) => a.category === c.id)
                 const on = all.filter((a) => a.always || picked.includes(a.id)).length
@@ -621,12 +694,13 @@ function AttrStep({
                 return {
                   value: c.id,
                   label: c.label,
+                  group: 'Categories',
                   meta: all.length === 0 ? 'Needs an agent' : `${on} of ${all.length} on`,
                   disabled: all.length === 0,
                 }
               }),
             ]}
-            onChange={(v) => setCat(v as AttrCategory | '')}
+            onChange={(v) => setCat(v as AttrCategory | '' | '@selected')}
           />
         </span>
 
@@ -648,106 +722,85 @@ function AttrStep({
         )}
       </div>
 
-      <div className="bfp2__pane">
-        {shown.length === 0 ? (
+      {/* --- One list, two or three to a line ----------------------------------
+
+          A sunken bordered pane stood here, holding bordered sections, holding a
+          column of white bordered cards: thirteen attributes arrived as one grey
+          box containing thirteen white boxes, each spending about a sixth of a
+          724px row on its text.
+
+          Nothing is boxed now and nothing is grouped. A row is a tick, a name and
+          — where there is something to say — a pill. No fill, no border, no
+          divider, no heading above it.
+
+          The width is spent on COLUMNS rather than on prose. A first pass filled
+          it with each attribute's purpose sentence, which read well at thirteen
+          rows and turned thirty-eight into a wall of grey prose; the sentence is
+          back on its mark, where it costs nothing until it is wanted. Two to a
+          line at the default width turns the device catalogue from a 38-row
+          scroll into 19, and the OS one into 7 — which is the whole list on
+          screen at once, with no scrolling and no grouping to need. */}
+      <div className="bfp2__picklist">
+        {ordered.length === 0 ? (
           <p className="bfp2__none">Nothing matches that.</p>
         ) : (
-          <>
-            {/* --- Always collected, at the top --------------------------------
-
-                Pinned rather than left in category order, because they are the
-                one part of this list nobody is choosing — a locked row sitting
-                between two you can tick reads as one you have failed to
-                untick. Grouped, labelled, and above the line, they read as what
-                they are: the floor this profile is built on.
-
-                They still carry their settings. What a profile decides about
-                these is not WHETHER they are collected but how much each one
-                counts, and that is the more interesting half. */}
-            {lockedShown.length > 0 && (
-              <section className="bfp2__pang">
-                <header className="bfp2__panghead">
-                  <Lock size={12} strokeWidth={2} aria-hidden />
-                  <h4>Always collected</h4>
-                  <span>{lockedShown.length}</span>
-                  <TipDot
-                    label="Always collected"
-                    text="These arrive with every request before any profile is consulted, so they cannot be switched off. What this profile decides is how much each one counts."
-                  />
-                </header>
-                <div className="bfp2__pickrows">{lockedShown.map(row)}</div>
-              </section>
-            )}
-
-            {free.length > 0 && (
-              <section className="bfp2__pang">
-                {lockedShown.length > 0 && (
-                  <header className="bfp2__panghead">
-                    <h4>{cat ? categoriesFor(mode).find((c) => c.id === cat)?.label : 'Everything else'}</h4>
-                    <span>
-                      {free.filter((a) => picked.includes(a.id)).length}/{free.length}
-                    </span>
-                    <button
-                      type="button"
-                      className="bfp2__selectall"
-                      onClick={() => {
-                        const ids = free.map((a) => a.id)
-                        const full = ids.every((id) => picked.includes(id))
-                        setPicked(
-                          full
-                            ? picked.filter((x) => !ids.includes(x))
-                            : [...new Set([...picked, ...ids])],
-                        )
-                      }}
-                    >
-                      {free.every((a) => picked.includes(a.id)) ? 'Clear these' : 'Select all'}
-                    </button>
-                  </header>
-                )}
-                <div className="bfp2__pickrows">{free.map(row)}</div>
-              </section>
-            )}
-          </>
-        )}
-
-        {/* Named, not counted. "12 more need an agent" is a number you cannot
-            act on; the names are what tell you whether the ones you are missing
-            are ones you wanted. */}
-        {blockedShown.length > 0 && (
-          <p className="bfp2__locked">
-            <Lock size={12} strokeWidth={2} aria-hidden />
-            <span>
-              {blockedShown.length} more need an agent —{' '}
-              {blockedShown
-                .slice(0, 3)
-                .map((a) => a.name)
-                .join(', ')}
-              {blockedShown.length > 3 && ` and ${blockedShown.length - 3} others`}.
-            </span>
-            {onBack && (
-              <button type="button" className="bfp2__clear" onClick={onBack}>
-                Change what it reads
-              </button>
-            )}
-          </p>
+          ordered.map((a) => (
+            <AttrPickRow
+              key={a.id}
+              attr={a}
+              on={a.always || picked.includes(a.id)}
+              onToggle={(span) => toggle(a.id, span)}
+            />
+          ))
         )}
       </div>
+
+      {/* Named, not counted. "12 more need an agent" is a number you cannot act
+          on; the names are what tell you whether the ones you are missing are
+          ones you wanted. */}
+      {blockedShown.length > 0 && (
+        <p className="bfp2__locked">
+          <Lock size={12} strokeWidth={2} aria-hidden />
+          <span>
+            {blockedShown.length} more need an agent —{' '}
+            {blockedShown
+              .slice(0, 3)
+              .map((a) => a.name)
+              .join(', ')}
+            {blockedShown.length > 3 && ` and ${blockedShown.length - 3} others`}.
+          </span>
+          {onBack && (
+            <button type="button" className="bfp2__clear" onClick={onBack}>
+              Change what it reads
+            </button>
+          )}
+        </p>
+      )}
     </div>
   )
 }
 
-/* One row in the catalogue: the tick, and — once ticked — what it is set to.
+/* One row in the catalogue: a tick, a name, and what the attribute is for.
 
-   The settings render only when the row is on. A catalogue where every row
-   carries two controls is a form, not a list, and thirty-eight of them is a
-   form nobody reads to the bottom of. Ticking is what says "I want this one",
-   and it is the moment the question "set to what?" becomes worth asking.
+   --- The row is the button now -------------------------------------------------
 
-   Nothing is WRITTEN on tick. `AttrControl` already falls back to the master's
-   own default, and storing that default would make "nobody has touched this"
-   indistinguishable from "somebody chose exactly the default" — which is the
-   distinction `restrictionSet` exists for one panel further down. It matters
-   here too: `pruneValues` can then tell a real setting from a ghost. */
+   It used to be a `<div>` holding a SHRUNKEN `<button>` plus a `TipDot`
+   sibling, with `::after` stretching the toggle's hit area back across the row
+   and a `z-index` on the mark so the row would not swallow its press. Every
+   line of that was machinery to keep one real `<button>` out of another, and
+   the only reason a second button was on the row at all is that the attribute's
+   purpose had nowhere to live except behind a `?`.
+
+   The purpose is ON the row now, so the mark goes, and all of it goes with the
+   mark: the shrunken toggle, the `::after`, the `z-index`, the `margin-top: 11px`
+   optical nudge, and `.bfp2__pickmain`. One element, one press — and thirteen
+   to thirty-eight fewer tab stops, which is the same objection this file
+   already records against putting a focusable dot on every row of a list.
+
+   What survives of the mark is `TipMark`, which renders a `<span>` rather than
+   a button and is therefore legal inside this one. It is `display: none` at
+   every width where the sentence is on the row, and returns only below the
+   width where the sentence has nowhere to live. */
 /* Six props went with the settings block: `mode`, `config`, `weights`,
    `settings`, `onValue` and `onWeight`. A row chooses; it does not configure,
    so it needs the attribute, whether it is on, and a way to say otherwise. */
@@ -758,107 +811,101 @@ function AttrPickRow({
 }: {
   attr: Attribute
   on: boolean
-  onToggle: () => void
+  /** The shift key: extend the last press to this row. See `toggle`. */
+  onToggle: (span: boolean) => void
 }) {
-  /* An always-collected row is ticked and cannot be untucked, so the toggle is
-     a disabled button rather than a live one with a handler that refuses.
+  /* Everything the row says, and it is three things at most.
 
-     `disabled` and not `aria-disabled`: there is nothing to announce and
-     nothing to explain on press. Where settings are shown at all, the row still
-     opens them — what a profile decides about an always-collected signal is not
-     WHETHER it is read but how much it counts, which is the more interesting
-     half — so the control that is dead is exactly the one with no decision
-     behind it. */
-  const fixed = Boolean(attr.always)
-  return (
-    <div className={`bfp2__pickrow ${on ? 'is-on' : ''} ${fixed ? 'is-fixed' : ''}`}>
-      <button
-        type="button"
-        className="bfp2__picktoggle"
-        aria-pressed={on}
-        disabled={fixed}
-        onClick={onToggle}
-      >
+     A pass at this put the attribute's whole `purpose` sentence in a third lane
+     across the width the cards used to waste. At thirteen rows it read well. At
+     thirty-eight it was a wall of grey prose, and the panel's job is not to be
+     read — it is to be ticked. The sentence is back on its mark, where it costs
+     nothing until somebody wants it, and the width goes to a second column
+     instead, which is worth more to a list of short names than any amount of
+     text beside them.
+
+     `Not collected yet` stays on the row rather than only on the inner page:
+     whether a signal is collected at all is part of deciding to include it, and
+     learning it afterwards is learning it too late. */
+  const state = (attr.always || attr.phase === 2) && (
+    <span className="bfp2__pickstate">
+      {attr.always && <i className="bfp2__fixedtag">Always on</i>}
+      {attr.phase === 2 && <i className="bfp2__soon">Not collected yet</i>}
+    </span>
+  )
+
+  /* An always-collected row is not a disabled button. It is not a button.
+
+     `disabled` was right while the mark was a sibling OUTSIDE the toggle: there
+     was nothing to announce and nothing to explain on press, and the sentence
+     stayed reachable on a control of its own. The row IS the button now and the
+     mark is inside it — and a disabled button suppresses the pointer events its
+     descendants need, so a locked row's `?` would have gone quietly dead.
+
+     There is no decision on this row, so there is no control: a `<div>`, a real
+     `TipDot` that keeps a keyboard path to the sentence, and no dead entry in
+     the tab order. It wears "Always on" because there is no longer a heading
+     above it saying so for the group. */
+  const Mark = markFor(attr)
+
+  if (attr.always) {
+    return (
+      <div className="bfp2__pickrow is-fixed is-on">
         <span className="bx-tick" aria-hidden>
           <Check size={11} strokeWidth={3.2} />
         </span>
-        {/* No attribute mark on a picker row.
-
-            It was a second glyph beside the tick, at the same size, on every
-            row — so a column of thirty-eight rows opened with two small shapes
-            per line and the one that MATTERS is the checkbox. A mark earns its
-            place where it distinguishes one row from another at a glance; here
-            it competed with the control that says whether the row is chosen.
-
-            The detail page keeps its icons: those rows have no checkbox, so the
-            mark is the only thing in that column and it is doing the
-            identifying work rather than fighting for it. */}
-        <span className="bfp2__pickmain">
-          <span className="bfp2__pickname">
-            {attr.name}
-            {/* Says why the tick will not move, on the row where it will not
-                move. The section heading above says it once for the group; a
-                row read on its own — after a search, say, where the grouping is
-                gone — still has to answer it. */}
-            {fixed && <i className="bfp2__fixedtag">Always on</i>}
-            {/* Marked here rather than only on the inner page. Whether a signal
-                is collected at all is part of deciding to include it, and
-                learning it afterwards is learning it too late. */}
-            {attr.phase === 2 && <i className="bfp2__soon">Not collected yet</i>}
-          </span>
-          {/* On a mark, not under the name — and only where the sentence adds
-              something the name does not.
-
-              This was a full line of prose under every row. Thirteen rows each
-              carrying two lines meant the list was mostly sentences, and the
-              sentences are the part you read once: "Device type — desktop,
-              laptop, mobile or tablet" tells somebody who has read the name
-              almost nothing, so it doubled the height of the list to restate
-              it. Scanning thirteen names is the job here; understanding one is
-              the exception.
-
-              `TipDot` rather than a `title`, because the old objection to a tip
-              was that `title` is unreachable by keyboard. This one is a real
-              button — hover, focus and the accessible name all reach it — so
-              the sentence is still there for anybody who wants it, and gone for
-              everybody who does not.
-
-              On every row that has a purpose, which in both catalogues is all
-              of them — a rule that withheld the mark where the sentence merely
-              restates the name was drafted here and cut, because no row is
-              actually in that state: every purpose carries a risk framing the
-              name does not ("a laptop and a phone are not the same risk"). A
-              heuristic that never fires is a heuristic to maintain for nothing.
-              The "only where needed" is done by the tip being on demand rather
-              than on screen. */}
+        <span className="bfp2__pickico" aria-hidden>
+          <Mark size={15} strokeWidth={1.7} />
         </span>
-      </button>
+        <span className="bfp2__pickname">
+          <span className="bfp2__pickword">{attr.name}</span>
+          <TipDot label={attr.name} text={attr.purpose} />
+        </span>
+        {state}
+      </div>
+    )
+  }
 
-      {/* Outside the toggle, not inside it.
+  /* --- The row is the button --------------------------------------------------
 
-          `TipDot` renders a real button, and it was sitting in the middle of
-          the toggle button — a nested `<button>`, which is invalid HTML that
-          React reports as a hydration error, and which meant a press on the
-          mark ticked the attribute as well as opening the tip. The row is a
-          flex row now: the toggle takes the width, the mark sits at the end,
-          and the two controls are two controls. */}
-      <TipDot label={attr.name} text={attr.purpose} />
+     It used to be a `<div>` holding a SHRUNKEN `<button>` plus a `TipDot`
+     sibling, with `::after` stretching the toggle's hit area back across the row
+     and a `z-index` on the mark so the row would not swallow its press. Every
+     line of that was machinery to keep one real `<button>` out of another.
 
-      {/* The settings block stood here — a weight and a configuration under
-          every ticked row.
+     `TipMark` is that same dot rendered as a `<span>`, which is legal inside a
+     button — so the row becomes one element with one press, and the `::after`,
+     the `z-index` and the `margin-top: 11px` optical nudge all go with it. It is
+     also thirteen to thirty-eight fewer tab stops, which is the objection this
+     codebase already records against a focusable dot on every row of a list.
 
-          This picker CHOOSES; the page behind it configures. Two surfaces
-          editing one setting meant the same dropdown existed twice, and the
-          dialog copy had to be reconciled with the row copy every time either
-          moved. Ticking thirteen attributes with a dropdown unfolding under
-          each one also made the list grow as you used it, which is the opposite
-          of what a chooser should do — the thing you are scanning gets longer
-          the more of it you have answered.
-
-          So a row is a tick, a name and a mark. Everything a chosen attribute
-          is SET to is on the profile page, where the list is short because it
-          holds only what was chosen. */}
-    </div>
+     The mark beside the tick is the row's CATEGORY — see `CAT_ICON`. An earlier
+     pass argued it out on the grounds that two small shapes per line compete and
+     the checkbox is the one that matters. That held while the list was grouped
+     under named headings; with the headings gone this column is the only thing
+     left saying which family a row belongs to, and it is 16px against the
+     heading rows it replaced. The two shapes do not in fact compete: the tick is
+     a filled square that changes on press, the mark is a hairline glyph that
+     never changes, and they are 8px apart in a fixed order. */
+  return (
+    <button
+      type="button"
+      className={`bfp2__pickrow ${on ? 'is-on' : ''}`}
+      aria-pressed={on}
+      onClick={(e) => onToggle(e.shiftKey)}
+    >
+      <span className="bx-tick" aria-hidden>
+        <Check size={11} strokeWidth={3.2} />
+      </span>
+      <span className="bfp2__pickico" aria-hidden>
+        <Mark size={15} strokeWidth={1.7} />
+      </span>
+      <span className="bfp2__pickname">
+        <span className="bfp2__pickword">{attr.name}</span>
+        <TipMark text={attr.purpose} />
+      </span>
+      {state}
+    </button>
   )
 }
 
@@ -1476,7 +1523,7 @@ function ProfilePage({
             tells one row from another at a glance; on a page about a single
             profile there is nothing to tell it apart from, so it was 48px of
             ground between the back link and the heading somebody came here to
-            read and rename. The list keeps its `.bfp2__tile--sm`. */}
+            read and rename. The list draws it in the shared `.blist__tile`. */}
         <div className="bfp2__pagehead">
           <EditableName value={draft.name} onChange={(name) => setDraft((d) => ({ ...d, name }))} />
         </div>
@@ -2027,7 +2074,8 @@ function AttributesTab({
       ) : (
         <div className="bfp2__rows">
           {chosen.map((a) => {
-            const AIcon = ATTR_ICON[a.id] ?? ShieldCheck
+            /* One mark rule across the flow — see `CAT_ICON`. */
+            const AIcon = markFor(a)
             return (
               <div className="bfp2__attrow" key={a.id}>
                 <span className="bfp2__attico" aria-hidden>

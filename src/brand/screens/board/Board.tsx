@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
-import { AppWindow, Maximize2, Minus, Plus } from 'lucide-react'
+import { AppWindow, Minus, Plus, RotateCcw } from 'lucide-react'
 
 import { fallbackRule, type Policy } from '../../data'
 import { AppLogo } from '../../logos/AppLogo'
@@ -16,8 +16,9 @@ import { RuleCard, TerminalCard } from './RuleCard'
 
    A viewport with one transform. The chain is ordinary flow layout inside the
    world — cards stack, connectors are CSS — so nothing here ever computes a
-   coordinate for a rule. Pan moves the world; zoom scales it about the cursor;
-   Fit measures the world once and centres it. That is the whole canvas.
+   coordinate for a rule. The column is always centred; a drag or the wheel
+   moves it up and down, zoom scales it, and reset returns the zoom. That is the
+   whole canvas.
    -------------------------------------------------------------------------- */
 
 const ZMIN = 0.5
@@ -119,14 +120,16 @@ export function Board({
     viewRef,
     zoomLabel,
     panning,
-    fit,
     zoomBy,
+    resetZoom,
     onPointerDown,
     onPointerMove,
     onPointerUp,
   } = useCanvasView(stage, world, {
     bounds: () => ({ w: world.current?.offsetWidth ?? 0, h: world.current?.offsetHeight ?? 0 }),
     axis: 'width',
+    /* A column, read top to bottom: no sideways pan, and always centred. */
+    lockX: true,
     /* Only the stage and the world's own padding pan. A card, a button, an
        input — anything interactive — keeps the gesture for itself. */
     isPannableTarget: (t: HTMLElement) => t === stage.current || t === world.current || t.classList.contains('bb__chain'),
@@ -512,15 +515,20 @@ export function Board({
 
           Two slots because there are two pills — a single list could not say
           which control belonged in which. */}
-      <div className="bb__dock">
+      {/* `board-dock` is the lite edition's last tour stop: with Check and
+          What changes withheld, this strip IS the board's instrument panel. */}
+      <div className="bb__dock" data-tour="board-dock">
         {aside}
         <div className="bb__float" role="toolbar" aria-label="View">
           {tools}
           {tools && <span className="bb__float__sep" />}
-          <button type="button" className="bb__act" aria-label="Fit the chain in view" title="Fit" onClick={fit}>
-            <Maximize2 size={14} strokeWidth={2} />
-          </button>
-          <button type="button" className="bb__act" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.15)}>
+          {/* Zoom out, the level, zoom in, reset — and nothing else.
+
+              Fit stood first. It measured the chain and re-framed it, which on a
+              column that is already centred and cannot be panned sideways is a
+              reset with a surprise in it: it also scrolled you back to the top.
+              Reset keeps your place. */}
+          <button type="button" className="bb__act" aria-label="Zoom out" title="Zoom out" onClick={() => zoomBy(1 / 1.15)}>
             <Minus size={14} strokeWidth={2} />
           </button>
           {/* Written by `paint`, not by a render. `aria-live` is deliberately
@@ -529,8 +537,11 @@ export function Board({
           <span className="bb__zoom" ref={zoomLabel}>
             {Math.round(viewRef.current.z * 100)}%
           </span>
-          <button type="button" className="bb__act" aria-label="Zoom in" onClick={() => zoomBy(1.15)}>
+          <button type="button" className="bb__act" aria-label="Zoom in" title="Zoom in" onClick={() => zoomBy(1.15)}>
             <Plus size={14} strokeWidth={2} />
+          </button>
+          <button type="button" className="bb__act" aria-label="Reset zoom" title="Reset zoom" onClick={resetZoom}>
+            <RotateCcw size={14} strokeWidth={2} />
           </button>
         </div>
       </div>
@@ -547,6 +558,12 @@ function Link({ lit, at, onInsert, last }: { lit: string; at: number; onInsert: 
       <button
         type="button"
         className="bb__link__add"
+        /* Only the last one is an anchor. The demo's first step says "add a
+           rule", and a chain of six would otherwise offer six identical
+           targets with the spotlight landing on whichever came first in the
+           DOM — which is the top of the chain, the one place a rule you are
+           being taught to write should NOT go. */
+        data-tour={last ? 'add-rule' : undefined}
         aria-label={last ? 'Add a rule at the end' : `Insert a rule at position ${at + 1}`}
         onClick={(e) => {
           e.stopPropagation()

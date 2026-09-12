@@ -248,7 +248,7 @@ export const FAMILIES: MfaFamily[] = [
           {
             id: 'push-number',
             label: 'Number matching',
-            help: 'The sign-in screen shows a number the user has to pick in the app. Without it, a push prompt can be approved by reflex.',
+            help: 'The user picks the number shown, so no push is approved by reflex.',
             source: 'advanced',
             field: { kind: 'toggle', value: true },
           },
@@ -278,7 +278,7 @@ export const FAMILIES: MfaFamily[] = [
       {
         id: 'token-assign',
         label: 'Assign hardware tokens',
-        help: 'Bind a Yubikey, display token or Vasco device to a user. A token does nothing until it is assigned.',
+        help: 'Bind each hardware token to the user who carries it.',
         source: '2fa',
         field: { kind: 'link', cta: 'Open assignment' },
       },
@@ -297,20 +297,21 @@ export const FAMILIES: MfaFamily[] = [
       {
         id: 'kba-verify',
         label: 'Questions to verify',
-        help: 'How many of the configured questions a user must answer to get in.',
+        help: 'How many of their questions a user must answer to get in.',
         source: 'prod',
         field: { kind: 'number', value: 2, min: 1, max: 5, unit: 'questions', options: [1, 2, 3, 4, 5] },
       },
       {
         id: 'kba-limit',
         label: 'Questions to configure',
-        help: 'How many the user sets during enrolment.',
+        help: 'How many questions a user sets up during enrolment.',
         source: 'prod',
         field: { kind: 'number', value: 3, min: 1, max: 10, unit: 'questions', options: [3, 5, 8, 10] },
       },
       {
         id: 'kba-change',
         label: 'Let users change their questions',
+        help: 'Whether users can replace their questions after enrolment.',
         source: 'prod',
         field: { kind: 'toggle', value: true },
       },
@@ -329,14 +330,14 @@ export const FAMILIES: MfaFamily[] = [
       {
         id: 'grid-size',
         label: 'Grid size',
-        help: 'Changing it forces every user who has already set a pattern to configure it again.',
+        help: 'Changing it makes everyone set their pattern up again.',
         source: 'advanced',
         field: { kind: 'choice', value: '5x5', options: ['4x4', '5x5', '6x6', '7x7', '8x8'] },
       },
       {
         id: 'grid-length',
         label: 'Pattern length',
-        help: 'How many tiles the user picks. Also forces a reconfigure for anyone already set up.',
+        help: 'How many tiles a pattern has; changing it resets existing ones.',
         source: 'advanced',
         field: { kind: 'number', value: 4, min: 4, max: 8, unit: 'tiles', options: [4, 5, 6, 7, 8] },
       },

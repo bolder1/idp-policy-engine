@@ -38,6 +38,28 @@ export interface View {
   z: number
 }
 
+/* The locked view, as arithmetic — the whole of what `lockX` does, with no DOM
+   in it, so the rule can be tested on its own. `clampView` reads the four sizes
+   off the stage and the world and hands them here.
+
+   · Centred at THIS zoom, even when the world is wider than the stage. An
+     overflow shared equally by both edges reads as "too big"; one pinned to the
+     left edge reads as "scrolled", which a column that cannot scroll sideways
+     never is.
+   · The top of the world may rise until its bottom meets the stage's bottom, and
+     never fall below the stage's top. A chain shorter than the stage sits at
+     the top, which is where a list is read from. */
+export function lockedView(
+  v: View,
+  size: { stageW: number; stageH: number; worldW: number; worldH: number },
+  zRange: { min: number; max: number },
+): View {
+  const z = Math.min(zRange.max, Math.max(zRange.min, v.z))
+  const x = (size.stageW - size.worldW * z) / 2
+  const minY = Math.min(0, size.stageH - size.worldH * z)
+  return { x, y: Math.min(0, Math.max(minY, v.y)), z }
+}
+
 /* Read once, at module load. Every glide checks it, and a canvas that animates
    when somebody has asked it not to is worse than one that never animated. */
 const REDUCED =
@@ -77,6 +99,16 @@ export interface CanvasViewOpts {
   cssPrefix?: string
   /** Padding kept around the world when fitting. */
   pad?: number
+  /* Vertical only, and horizontally centred.
+
+     A chain is a single column read top to bottom, so a sideways pan has
+     nothing to find — it only lets the column drift off the middle, where it
+     then has to be dragged back. With this set, `x` is never really stored:
+     every view that is applied or glided to is re-centred on the stage's width
+     at its own zoom, and `y` is held inside the world so the chain cannot be
+     scrolled out of sight past either end. Wheel and drag move only `y`; zoom
+     anchors only vertically. A graph, which is wide, leaves it off. */
+  lockX?: boolean
 }
 
 export function useCanvasView(
@@ -104,8 +136,18 @@ export function useCanvasView(
   const pan = useRef<{ px: number; py: number; x: number; y: number } | null>(null)
 
   const clampView = useCallback(
-    (v: View): View => ({ ...v, z: Math.min(o.current.zMax ?? zMax, Math.max(o.current.zMin ?? zMin, v.z)) }),
-    [zMax, zMin],
+    (v: View): View => {
+      const z = Math.min(o.current.zMax ?? zMax, Math.max(o.current.zMin ?? zMin, v.z))
+      const s = stage.current
+      if (!o.current.lockX || !s) return { ...v, z }
+      const { w: ww, h: wh } = o.current.bounds()
+      return lockedView(
+        v,
+        { stageW: s.clientWidth, stageH: s.clientHeight, worldW: ww, worldH: wh },
+        { min: o.current.zMin ?? zMin, max: o.current.zMax ?? zMax },
+      )
+    },
+    [stage, zMax, zMin],
   )
 
   const paint = useCallback(() => {
@@ -239,11 +281,26 @@ export function useCanvasView(
       const now = { w: s.clientWidth, h: s.clientHeight }
       size.current = now
       if (!prev || (prev.w === now.w && prev.h === now.h)) return
-      apply((v) => ({ ...v, x: v.x + (now.w - prev.w) / 2, y: v.y + (now.h - prev.h) / 2 }))
+      /* Locked, the centring is `clampView`'s job and the reading position is
+         the reader's — so only the re-clamp happens, and y stays where they
+         left it. */
+      apply((v) =>
+        o.current.lockX ? v : { ...v, x: v.x + (now.w - prev.w) / 2, y: v.y + (now.h - prev.h) / 2 },
+      )
     })
     ro.observe(s)
-    return () => ro.disconnect()
-  }, [apply, stage])
+    /* The WORLD changes height too — a rule added, every card expanded — and a
+       view clamped against the old height can leave the chain scrolled past its
+       own end into empty canvas. Re-clamping on the world's resize is what keeps
+       `y` honest without the host having to remember to ask. */
+    const w = world.current
+    const wro = o.current.lockX && w ? new ResizeObserver(() => apply((v) => v)) : null
+    if (w && wro) wro.observe(w)
+    return () => {
+      ro.disconnect()
+      wro?.disconnect()
+    }
+  }, [apply, stage, world])
 
   /* --- Keeping focus inside the stage ---------------------------------------
 
@@ -343,8 +400,9 @@ export function useCanvasView(
       } else {
         /* Shift turns a vertical wheel into a horizontal pan, which is what
            every canvas does and what a mouse with one wheel needs. */
-        const dx = e.shiftKey ? e.deltaY : e.deltaX
-        const dy = e.shiftKey ? 0 : e.deltaY
+        const locked = !!o.current.lockX
+        const dx = locked ? 0 : e.shiftKey ? e.deltaY : e.deltaX
+        const dy = locked ? e.deltaY : e.shiftKey ? 0 : e.deltaY
         apply((v) => ({ ...v, x: v.x - dx, y: v.y - dy }))
       }
     }
@@ -366,5 +424,21 @@ export function useCanvasView(
     [glide, stage, zMax, zMin],
   )
 
-  return { viewRef, zoomLabel, panning, paint, apply, glide, fit, fitTo, zoomBy, onPointerDown, onPointerMove, onPointerUp }
+  /* Back to the zoom the canvas opened at — the width fit, capped at 100% —
+     about the stage's vertical middle, so what you were reading stays where it
+     was and only the size changes. Not a re-fit: a re-fit also scrolls back to
+     the top, and "reset zoom" is not a request to lose your place. */
+  const resetZoom = useCallback(() => {
+    const s = stage.current
+    if (!s) return
+    const { w: ww } = o.current.bounds()
+    if (!ww) return
+    const p = o.current.pad ?? pad
+    const z = Math.min(1, Math.max(o.current.zMin ?? zMin, (s.clientWidth - p) / ww))
+    const py = s.clientHeight / 2
+    const v = viewRef.current
+    glide({ y: py - (py - v.y) * (z / v.z), z }, 240)
+  }, [glide, pad, stage, zMin])
+
+  return { viewRef, zoomLabel, panning, paint, apply, glide, fit, fitTo, zoomBy, resetZoom, onPointerDown, onPointerMove, onPointerUp }
 }

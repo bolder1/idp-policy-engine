@@ -458,107 +458,86 @@ function ZoneTable({
   }
 
   return (
-    <div className="bz7__table" role="table" onClick={() => setMenuFor(null)}>
-      <div className="bz7__trow bz7__thead" role="row">
-        <span role="columnheader">Zone</span>
-        <span role="columnheader">IP networks</span>
-        <span role="columnheader">Locations</span>
-        <span role="columnheader">Used by</span>
-        {/* Named, the way the policies table names it — an unlabelled
-            columnheader over the only route to Duplicate and Delete. */}
-        <span role="columnheader" className="btable__center">
-          Actions
-        </span>
-      </div>
+    /* A list, not a table — the shape Authentication methods uses. See `.blist`
+       in screens.css for why these pages read one object at a time. */
+    <ul className="blist" onClick={() => setMenuFor(null)}>
       {zones.map((z) => {
         const meta = SHAPE[shapeOf(z)]
         const users = policiesUsing('zone', z.id, policies)
         return (
-          <div className="bz7__trow" role="row" key={z.id}>
-            {/* Icon and name in ONE cell, not two.
-
-                The icon had a column of its own, which meant the header's first
-                column was empty and every name started 30px further right than
-                the word "Zone" above it — a gutter down the left of the table
-                holding nothing but a 22px square. The icon is a property of the
-                name, so it lives with it. */}
-            <span role="cell" className="bz7__tname">
-              <span className={`bz7__tile bz7__tile--sm is-${meta.tint}`} aria-hidden>
-                <meta.icon size={13} strokeWidth={1.9} />
+          <li className="blist__row" key={z.id}>
+            <span className={`blist__tile bz7__tile is-${meta.tint}`} aria-hidden>
+              <meta.icon size={18} strokeWidth={1.8} />
+            </span>
+            <span className="blist__main">
+              <span className="blist__name">
+                <button type="button" className="blist__open" onClick={() => onOpen(z.id)}>
+                  {z.name}
+                </button>
               </span>
-              <button type="button" className="bz7__open" onClick={() => onOpen(z.id)}>
-                {z.name}
-              </button>
+              {/* What the two columns said, on one line, each with the word its
+                  heading used to supply. */}
+              <span className="blist__meta">
+                <span className="blist__fact">
+                  <span className="blist__label">Networks</span>
+                  {ipSectionEmpty(z) ? <AnyBand what="network" /> : <Chips items={addressBits(z)} max={2} />}
+                </span>
+                <span className="blist__fact">
+                  <span className="blist__label">Locations</span>
+                  {locationEmpty(z.location) ? <AnyBand what="location" /> : <Chips items={placeBits(z.location)} max={2} />}
+                </span>
+              </span>
             </span>
-            <span role="cell" className="bz7__tcell">
-              {ipSectionEmpty(z) ? <AnyBand what="network" /> : <Chips items={addressBits(z)} max={2} />}
-            </span>
-            <span role="cell" className="bz7__tcell">
-              {locationEmpty(z.location) ? (
-                <AnyBand what="location" />
-              ) : (
-                <Chips items={placeBits(z.location)} max={2} />
-              )}
-            </span>
-            {/* Policies, not rules, and the count opens.
-
-                A number states a size and hides the answer: WHICH policies is
-                the question, and finding out meant opening the zone, reading
-                its Used-by drawer and coming back. The device-profile table
-                already does it this way; this was the last one left counting
-                rules as plain text. */}
-            <span role="cell">
+            <span className="blist__side">
+              {/* Policies, not rules, and the count opens — WHICH policies is the
+                  question, not how many. */}
               <UsedByPeek users={users} />
+              <span className="bz7__menuwrap">
+                <button
+                  type="button"
+                  className="bz7__kebab"
+                  aria-label={`Actions for ${z.name}`}
+                  aria-expanded={menuFor === z.id}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setMenuFor((m) => (m === z.id ? null : z.id))
+                  }}
+                >
+                  ⋯
+                </button>
+                <AnimatePresence>
+                  {menuFor === z.id && (
+                    <motion.div
+                      className="bmenu"
+                      initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                      transition={{ duration: 0.13 }}
+                      onClick={(e) => e.stopPropagation()}
+                      role="menu"
+                    >
+                      <button role="menuitem" onClick={() => choose(() => onOpen(z.id))}>
+                        <Pencil size={14} strokeWidth={1.9} aria-hidden />
+                        Edit
+                      </button>
+                      <button role="menuitem" onClick={() => choose(() => onDuplicate(z))}>
+                        <Copy size={14} strokeWidth={1.9} aria-hidden />
+                        Duplicate
+                      </button>
+                      <span className="bmenu__rule" />
+                      <button role="menuitem" className="is-danger" onClick={() => choose(() => onDelete(z))}>
+                        <Trash2 size={14} strokeWidth={1.9} aria-hidden />
+                        Delete zone
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </span>
             </span>
-
-            {/* The row's own actions. They were only reachable by opening the
-                zone first, which made "delete the one I just made by mistake" a
-                two-page job. */}
-            <span role="cell" className="bz7__menuwrap">
-              <button
-                type="button"
-                className="bz7__kebab"
-                aria-label={`Actions for ${z.name}`}
-                aria-expanded={menuFor === z.id}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setMenuFor((m) => (m === z.id ? null : z.id))
-                }}
-              >
-                ⋯
-              </button>
-              <AnimatePresence>
-                {menuFor === z.id && (
-                  <motion.div
-                    className="bmenu"
-                    initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                    transition={{ duration: 0.13 }}
-                    onClick={(e) => e.stopPropagation()}
-                    role="menu"
-                  >
-                    <button role="menuitem" onClick={() => choose(() => onOpen(z.id))}>
-                      <Pencil size={14} strokeWidth={1.9} aria-hidden />
-                      Edit
-                    </button>
-                    <button role="menuitem" onClick={() => choose(() => onDuplicate(z))}>
-                      <Copy size={14} strokeWidth={1.9} aria-hidden />
-                      Duplicate
-                    </button>
-                    <span className="bmenu__rule" />
-                    <button role="menuitem" className="is-danger" onClick={() => choose(() => onDelete(z))}>
-                      <Trash2 size={14} strokeWidth={1.9} aria-hidden />
-                      Delete zone
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </span>
-          </div>
+          </li>
         )
       })}
-    </div>
+    </ul>
   )
 }
 

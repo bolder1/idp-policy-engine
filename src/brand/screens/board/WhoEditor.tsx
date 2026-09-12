@@ -141,13 +141,36 @@ export function WhoEditor({
            The row now reads as the sentence it is: everyone, unless you choose.
            `Choose people` rather than `Add people`, because nothing is being
            added to a set — it is being narrowed from everyone to some. */
-        <div className="bb__whonone">
-          <Users size={15} strokeWidth={1.8} aria-hidden />
-          <b>Everyone this policy governs</b>
-          <button type="button" className="bb__wholink" onClick={() => setPicking(true)}>
-            <Plus size={12} strokeWidth={2.4} aria-hidden />
-            Choose people
-          </button>
+        /* A note, not a one-line status.
+
+           This was a single row — a glyph, "Everyone this policy governs", and
+           a link — and it read as a LABEL rather than as an answer. Somebody
+           arriving at a rule saw the heading Who and then a bold phrase
+           immediately under it, and could not tell whether that phrase was the
+           question, the current setting, or an instruction.
+
+           So it says the whole thing. The sentence is about the MODEL, which is
+           the one kind of prose this console's copy rule allows: a rule that
+           names nobody is not unfinished, it inherits the policy's audience,
+           and that is a fact about how evaluation works rather than a caption
+           explaining a control. Somebody has to be told it once, and this is
+           the only place it is true.
+
+           Tinted, and violet rather than blue or amber. It is not a warning and
+           not an error — nothing is wrong — and the info blue is spent on the
+           linter's notes elsewhere in this panel, so a second blue box here
+           would read as a finding. `--fb-accent-*` is the theme's own violet
+           ramp and is otherwise unused on this surface, which is exactly what
+           makes it legible as "this is context, not a problem". */
+        <div className="bb__whonote">
+          <Users size={15} strokeWidth={1.9} aria-hidden />
+          <p>
+            <b>This rule covers everyone the policy governs.</b> Leave it that way, or narrow it to particular groups
+            and people so the rule only matches some of them.
+          </p>
+          <Button variant="secondary" size="sm" icon={Plus} onClick={() => setPicking(true)}>
+            Add people
+          </Button>
         </div>
       ) : (
         /* A CAP, a count, and the way in — on one line.

@@ -544,48 +544,53 @@ export function TerminalCard({
           {expanded ? <ChevronsDownUp size={14} strokeWidth={2.2} /> : <ChevronsUpDown size={14} strokeWidth={2.2} />}
         </button>
         <div className="bb__title">
-          <button
-            type="button"
-            id="bb-terminal-title"
-            className="bb__titlebtn"
-            aria-expanded={selected}
-            onClick={(e) => {
-              e.stopPropagation()
-              onSelect()
-            }}
-          >
-            <strong>Nothing else matched</strong>
-          </button>
+          {/* The state and the padlock ride beside the heading, where every
+              other card in the chain carries its state pill — not at the far
+              edge of the row, where they read as belonging to a different card. */}
+          <div className="bb__titlerow">
+            <button
+              type="button"
+              id="bb-terminal-title"
+              className="bb__titlebtn"
+              aria-expanded={selected}
+              onClick={(e) => {
+                e.stopPropagation()
+                onSelect()
+              }}
+            >
+              <strong>Nothing else matched</strong>
+            </button>
+            <div className="bb__cardmeta">
+              {/* Says the two things that are true of this row and of no other:
+                  it always runs, and it cannot be removed. The rest of the card's
+                  controls — move, duplicate, delete, the on/off switch — are absent
+                  rather than disabled, because a row of greyed-out buttons invites
+                  somebody to work out why. */}
+              <span className="bb__state">Always on</span>
+              {/* A mark, not a pill with a word in it.
+
+                  The row read `Always on` · `Locked` · fold: two labelled pills and a
+                  button, three things wide, on the one card in the chain that has
+                  nothing you can do to it. `Locked` was the least useful of the
+                  three — it explains why the buttons this card does NOT have are
+                  missing, which is a footnote, not a status. A padlock says it at a
+                  glance and the sentence is still there on hover and in the
+                  accessible name.
+
+                  `role="img"` with an `aria-label`, because a bare `title` is
+                  unreachable by keyboard and this is not a control that can take
+                  focus. */}
+              <span
+                className="bb__lockmark"
+                role="img"
+                aria-label="Locked. This rule cannot be deleted, reordered or switched off — but what it does is yours."
+                title="This rule cannot be deleted, reordered or switched off — but what it does is yours"
+              >
+                <Lock size={11} strokeWidth={2.2} aria-hidden />
+              </span>
+            </div>
+          </div>
           <em>Every sign-in that no rule above caught</em>
-        </div>
-        <div className="bb__cardmeta">
-          {/* Says the two things that are true of this row and of no other:
-              it always runs, and it cannot be removed. The rest of the card's
-              controls — move, duplicate, delete, the on/off switch — are absent
-              rather than disabled, because a row of greyed-out buttons invites
-              somebody to work out why. */}
-          <span className="bb__state">Always on</span>
-          {/* A mark, not a pill with a word in it.
-
-              The row read `Always on` · `Locked` · fold: two labelled pills and a
-              button, three things wide, on the one card in the chain that has
-              nothing you can do to it. `Locked` was the least useful of the
-              three — it explains why the buttons this card does NOT have are
-              missing, which is a footnote, not a status. A padlock says it at a
-              glance and the sentence is still there on hover and in the
-              accessible name.
-
-              `role="img"` with an `aria-label`, because a bare `title` is
-              unreachable by keyboard and this is not a control that can take
-              focus. */}
-          <span
-            className="bb__lockmark"
-            role="img"
-            aria-label="Locked. This rule cannot be deleted, reordered or switched off — but what it does is yours."
-            title="This rule cannot be deleted, reordered or switched off — but what it does is yours"
-          >
-            <Lock size={11} strokeWidth={2.2} aria-hidden />
-          </span>
         </div>
       </div>
       <div className="bb__fold bb__fold--sum" aria-hidden={expanded} inert={expanded}>

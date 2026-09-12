@@ -1,6 +1,7 @@
-import { Activity, ChevronLeft, ChevronRight, ListChecks, Pencil } from 'lucide-react'
+import { Activity, ChevronLeft, ChevronRight, GraduationCap, ListChecks, Pencil } from 'lucide-react'
 import type { ReactNode } from 'react'
 
+import { DemoButton } from '../../tour/DemoButton'
 import { Button, StatusPill } from '../../kit'
 import { appsOf, type Policy } from '../../data'
 import { AppLogo } from '../../logos/AppLogo'
@@ -49,12 +50,25 @@ import { useBrand } from '../../store'
 export function BoardBar({
   policy,
   actions,
+  onLearn,
+  onWatchDemo,
 }: {
   policy: Policy
   /* The publishing verbs, which belong to the builder's draft rather than to
      the policy. Passed in rather than reached for: this component knows what a
      policy IS, and the host knows what is unsaved about it. */
   actions?: ReactNode
+  /* The way back into the guided demo.
+
+     On the bar rather than in a menu, for the reason the trail's tour button
+     was moved onto its bar: the person who needs it is the person least likely
+     to know which menu it is in. Optional, so a caller that has no walkthrough
+     to offer simply does not draw one. */
+  onLearn?: () => void
+  /* And the way to the recording, which is a peer of it rather than something
+     inside it: watching and doing are two answers to one question, and burying
+     one of them a click behind the other makes the product pick for you. */
+  onWatchDemo?: () => void
 }) {
   const store = useBrand()
   /* The system policy is the one that names no application and covers all of
@@ -132,7 +146,21 @@ export function BoardBar({
           name chip, and the rules themselves say who they cover on the Who
           pane, per rule, which is where the narrowing actually happens. */}
 
-      <div className="bbtop__acts">{actions}</div>
+      <div className="bbtop__acts">
+        {onWatchDemo && <DemoButton onClick={onWatchDemo} />}
+        {onLearn && (
+          <button
+            type="button"
+            className="bbtop__learn"
+            aria-label="Learn the board"
+            title="Learn the board — a two-minute demo, or five steps that build a rule"
+            onClick={onLearn}
+          >
+            <GraduationCap size={16} strokeWidth={1.9} aria-hidden />
+          </button>
+        )}
+        {actions}
+      </div>
     </header>
   )
 }
@@ -168,6 +196,15 @@ export function BoardBarActions({
   const features = useBrand().features
   return (
     <>
+      {/* The two readings, in one box so the demo can light them together.
+
+          A wrapper with a real box rather than `display: contents`: a contents
+          element has no rect at all, so the spotlight would measure zeros and
+          fall back to a centred card pointing at nothing. When BOTH readings
+          are withheld by the edition it collapses to an empty span, measures
+          zero, and the tour centres its last card — which is the correct
+          degradation, since there is then nothing to point at. */}
+      <span className="bbtop__pips" data-tour="board-tools">
       {features.gauntlet && (
         <button
           type="button"
@@ -199,6 +236,7 @@ export function BoardBarActions({
           <span className="bb__n">{movement ? movement.changed.toLocaleString() : '—'}</span>
         </button>
       )}
+      </span>
       {(features.gauntlet || features.blastRadius) && <span className="bbtop__sep" />}
 
       {dirty && (
@@ -208,16 +246,25 @@ export function BoardBarActions({
       )}
       {/* The same two labels the trail uses, chosen the same way. Lite has no
           publish gate, so the button says what it actually does there rather
-          than promising a review step that does not exist. */}
-      <Button
-        variant="brand"
-        size="sm"
-        disabled={!dirty}
-        title={blockers > 0 ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first` : undefined}
-        onClick={onReview}
-      >
-        {features.publish ? 'Review & publish' : 'Review & Save'}
-      </Button>
+          than promising a review step that does not exist.
+
+          The anchor is on a WRAPPER rather than on the button, because `Button`
+          takes a fixed set of props and does not spread the rest — a
+          `data-tour` handed to it would be dropped silently, and a walkthrough
+          whose last step lights nothing is exactly the failure the anchor tests
+          exist to catch. The span is `display: contents`-free on purpose: it
+          needs a real box for the spotlight to measure. */}
+      <span className="bbtop__reviewwrap" data-tour="review">
+        <Button
+          variant="brand"
+          size="sm"
+          disabled={!dirty}
+          title={blockers > 0 ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first` : undefined}
+          onClick={onReview}
+        >
+          {features.publish ? 'Review & publish' : 'Review & Save'}
+        </Button>
+      </span>
     </>
   )
 }

@@ -22,8 +22,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { Button, Toggle, TipDot } from './kit'
-import { SOURCE_LABEL, fieldValue, type MfaSetting } from './mfa-settings'
+import { Button, Toggle } from './kit'
+import { fieldValue, type MfaSetting } from './mfa-settings'
 import type { MfaValue } from './mfa-join'
 
 /* -----------------------------------------------------------------------------
@@ -131,34 +131,19 @@ export function SettingField({
           <Icon size={15} strokeWidth={1.9} />
         </span>
 
-        <span className="bsf__label">
-          {setting.label}
-          {/* The help sentence, one hover away. It used to sit under every
-              label as a second line of grey, which is what made a column of
-              these read as a wall rather than a form. */}
-          {/* Help and provenance share one tip. The "Moved from Product
-              Settings" chip used to sit on the row and it was the busiest thing
-              on it — a footnote about where a setting used to live, drawn at
-              the same weight as the setting. It still matters during the
-              migration, so it is folded into the same hover rather than
-              dropped. */}
-          {(setting.help || setting.source) && (
-            <TipDot
-              label={`About ${setting.label}`}
-              text={
-                <>
-                  {setting.help}
-                  {setting.source && (
-                    <>
-                      {setting.help && <br />}
-                      <em className="bsf__tipsrc">{SOURCE_LABEL[setting.source]}</em>
-                    </>
-                  )}
-                </>
-              }
-            />
-          )}
-          {extra}
+        {/* The setting, and one line about it underneath.
+
+            The line went into a hover for a revision, with where the setting had
+            moved from folded in beside it. Both were the wrong call: the line is
+            the one thing on the row that says what the control does, and which
+            old screen a setting used to live on is history, not configuration.
+            The line is back, one sentence long, and the history is gone. */}
+        <span className="bsf__main">
+          <span className="bsf__label">
+            {setting.label}
+            {extra}
+          </span>
+          {setting.help && <span className="bsf__about">{setting.help}</span>}
         </span>
 
         <span className="bsf__ctl">

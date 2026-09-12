@@ -30,7 +30,7 @@ export function BoardEmpty({ onUseTemplate, onScratch }: { onUseTemplate?: () =>
             choice is made on the words and the pictures rather than on which
             button looks louder. Taking a template writes its rules into THIS
             policy, so it is an edit like any other and undo puts it back. */}
-        <div className="bb__starts">
+        <div className="bb__starts" data-tour="empty-start">
           {onUseTemplate && (
             <button type="button" className="bb__start2" onClick={onUseTemplate}>
               <TemplateArt />

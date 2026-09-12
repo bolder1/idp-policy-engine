@@ -81,7 +81,6 @@ export function NewPolicyDialog({
 
   /* Still read, for the line under the field — an optional question is
      allowed to say what leaving it blank will do. */
-  const noApp = appIds.length === 0
 
   return (
     <Modal
@@ -91,32 +90,16 @@ export function NewPolicyDialog({
       width={560}
       footer={
         <>
-          {/* Only when it explains a control you cannot press.
+          {/* No sentence here.
 
-              The third state said "Created switched off. Nothing changes for
-              users until you turn it on." — true, and reassurance for a worry
-              nobody has while naming a thing. It sat in the footer of every
-              valid form, so the note was on screen almost always and the two
-              sentences that MATTER — the ones naming what is stopping the
-              button — were the exception rather than the point.
+              Two lived in this footer. The last said "Give the policy a name
+              to continue.", which the starred label above already says, to a
+              reader who is looking at the field rather than at the footer. A
+              form that marks a field required and then writes out what the
+              marker means is explaining its own interface, which is the one
+              thing the copy rule on this console forbids.
 
-              Nothing when the form is ready. The button is enabled; that is
-              the message. */}
-          {/* Only the name blocks now.
-
-              Choosing an application used to be the second gate: the field was
-              starred, the picker went red while empty, and Create stayed
-              disabled until something was ticked. It is optional, and the model
-              already had the state it produces — `blankPolicy` mints a DRAFT,
-              and a policy with no application is exactly what a draft is. The
-              form was refusing to create a shape the product carries on
-              purpose, which is how the break-glass fixture is stored.
-
-              The consequence is also already handled everywhere it lands: the
-              policies table offers "Assign apps" on an unassigned row, and the
-              board's readiness gate says the rules are saved but never
-              evaluated. Neither of those needed a required field to work. */}
-          {!name.trim() && <p className="bnp__note">Give the policy a name to continue.</p>}
+              The button being disabled is the message. */}
 
           {/* Cancel, from both callers.
 
@@ -221,11 +204,13 @@ export function NewPolicyDialog({
           ) : (
             <ApplicationField appIds={appIds} onChange={setAppIds} />
           )}
-          {noApp && !fixedAppId && (
-            <span className="bnp__optional">
-              Optional. Left blank it is created as a draft, and you can assign applications later.
-            </span>
-          )}
+          {/* An "Optional. Left blank it is created as a draft…" caption stood
+              here. The absent asterisk is what says optional — see the note on
+              the label — and the draft consequence is already told where it
+              lands: the policies table offers "Assign apps" on an unassigned
+              row, and the board says the rules are saved but never evaluated.
+              Saying it a third time, in advance, to somebody who has not yet
+              decided, is the form talking about itself. */}
         </div>
 
         {/* The template preview that stood here has gone with the step that

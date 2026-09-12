@@ -64,6 +64,9 @@ import './brand/screens/applications.css'
 import './brand/create/create.css'
 import './brand/create/interview.css'
 import './brand/tour/tour.css'
+// After tour.css, which owns the card, scrim, ring and beak this one extends.
+import './brand/tour/board-tour.css'
+import './brand/tour/demo-player.css'
 // Last — it overrides both the token values and a handful of shell rules to
 // match the console in production. See above for what depends on that.
 import './brand/console-theme.css'

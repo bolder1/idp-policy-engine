@@ -712,6 +712,18 @@ html[data-theme='dark'] {
   top: 0;
   right: 0;
   bottom: 0;
+  /* The caller's width is a pixel number and nothing was clamping it to the
+     window. On a phone every drawer in the console opened at its desktop width
+     — 780px inside a 375px viewport — so the panel ran off the right edge, the
+     page grew a horizontal scrollbar, and the half of the content past the fold
+     was reachable only by scrolling the whole document sideways. Every screen
+     behind it looked correct, which is why it survived: nothing but a narrow
+     window shows it.
+
+     `100%` and not `100vw`: a fixed element resolves both against the viewport,
+     but `100vw` counts the classic scrollbar's width and would overflow by
+     ~15px on the desktop widths this is meant to leave alone. */
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   background: var(--surface-overlay);

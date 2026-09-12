@@ -459,13 +459,7 @@
   color: var(--text-tertiary);
 }
 
-.bnp__note {
-  margin-right: auto;
-  max-width: 32ch;
-  font-size: var(--fs-sm);
-  color: var(--text-tertiary);
-  line-height: 1.45;
-}
+/* `.bnp__note` is gone with the footer sentence it styled — see NewPolicyDialog. */
 
 /* --- Bottom bar ------------------------------------------------------------ */
 

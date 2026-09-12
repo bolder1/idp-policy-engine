@@ -235,6 +235,14 @@
 /* The verbs, hard right. `margin-left: auto` rather than a spacer element, so
    the row collapses correctly when the crumbs are long. */
 .bbtop__acts { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); flex: none; }
+/* The two readings, boxed together so the guided demo has one thing to light.
+   Same gap as the row it sits in, so grouping them changes nothing visually —
+   which is the point: this is an anchor, not a new piece of chrome. */
+.bbtop__pips { display: flex; align-items: center; gap: var(--space-3); }
+/* A box for the walkthrough's last step to light. `inline-flex` rather than
+   `contents`: an element with no box measures zero, and the spotlight would
+   fall back to a centred card pointing at nothing. */
+.bbtop__reviewwrap { display: inline-flex; }
 .bbtop__sep { width: 1px; height: 20px; background: var(--border-subtle); }
 /* No pill around the readings. They sat inside `.bb__float` — a bordered,
    shadowed capsule — because they were floating over a canvas and needed an
@@ -549,6 +557,11 @@
    enough to say "this one"; it does not need to be the loudest thing on
    screen. */
 .bb__link.is-lit::before { background: var(--border-strong); }
+/* The whole connector answers the pointer, not only its glyph: the segment of
+   line, the `+` and the words take the brand together, so the place a rule will
+   land is the one coloured thing on the canvas while you are choosing it. Hover
+   only — at rest the connector is grey. */
+.bb__link:not(.is-dead):hover::before { background: var(--brand); }
 .bb__link.is-dead::before { background: var(--border-subtle); }
 /* A bare `+` on the line, and a button only when you reach for it.
 
@@ -590,7 +603,7 @@
 .bb__link__add:focus-visible,
 .bb__link:hover .bb__link__add {
   transform: translateY(-50%) scale(1.06);
-  color: var(--accent);
+  color: var(--brand);
   outline: none;
 }
 .bb__link__add:focus-visible { box-shadow: 0 0 0 4px var(--focus-halo); }
@@ -602,7 +615,7 @@
   content: '';
   position: absolute; inset: 0;
   border-radius: 50%;
-  border: 2px solid var(--accent);
+  border: 2px solid var(--brand);
   opacity: 0;
   pointer-events: none;
 }
@@ -629,7 +642,7 @@
 .bb__link__hint {
   position: absolute; left: 20px; top: 50%;
   padding: 4px 2px;
-  background: none; color: var(--accent);
+  background: none; color: var(--brand);
   font-size: 11px; font-weight: var(--fw-semibold); white-space: nowrap;
   opacity: 0; transform: translateY(-50%) translateX(-4px);
   transition: opacity 0.16s var(--ease-standard), transform 0.16s var(--ease-standard);
@@ -714,13 +727,11 @@
   padding: var(--space-4) var(--space-4) var(--space-3) var(--space-4);
 }
 .bb__cardhead > .bb__idx + .bb__fold__btn { margin-left: calc(var(--space-4) * -1 + var(--space-2)); }
-/* The terminal card has a fourth item: the `Always on` state and its padlock.
-
-   It is the only head that does, so the track is added where it is needed
-   rather than declared on every card and left empty — an empty explicit track
-   still pays for its gap, which would put 8px of nothing on the right of every
-   other card in the chain. */
-.bb__cardhead:has(> .bb__cardmeta) { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+/* The terminal card's `Always on` and padlock used to be a fourth item on this
+   grid, pushed to the far edge by the title's `1fr`. They sit in the title row
+   now, beside the heading, exactly where every other card puts its state pill —
+   so the default reads as a card in the same chain rather than as one with a
+   layout of its own. See `.bb__titlerow .bb__cardmeta`. */
 .bb__idx {
   display: inline-grid; place-items: center;
   width: 30px; height: 30px; border-radius: var(--radius-md);
@@ -765,7 +776,19 @@
    with no vertical offset to keep in step. */
 .bb__idx__grip {
   position: absolute;
-  right: calc(100% + var(--space-4) + 6px); top: 0;
+  /* Against the CARD's trailing edge, not the badge's leading one.
+
+     It sat outside the card on the LEFT, anchored to `.bb__idx` — which is the
+     nearest positioned ancestor and therefore the containing block. Moving it
+     to the other end means anchoring it to the card instead, which is why
+     `button.bb__idx` no longer declares `position: relative` a few hundred
+     lines down; see the note there for what that cost.
+
+     `left: 100%` is the card's right edge, and the gap matches the one the grip
+     used to leave on the left, so the handle sits the same distance clear of
+     the card it moves. `top` lines it up with the head's first row: the head's
+     own top padding, and a pixel of the 30px badge's slack. */
+  left: calc(100% + var(--space-4)); top: var(--space-4);
   z-index: 2;
   display: grid; place-items: center;
   width: 26px; height: 30px;
@@ -795,6 +818,7 @@
 .bb__titlerow { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .bb__titlerow .bb__titlebtn { width: auto; min-width: 0; flex: 0 1 auto; }
 .bb__titlerow .bb__state { flex: none; }
+.bb__titlerow .bb__cardmeta { flex: none; gap: var(--space-2); }
 .bb__title strong {
   font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1170,7 +1194,10 @@
   /* 24px, not 26 — the same square as `.bb__act` next door, so the two pills
      are the same height. At 26 the density pill stood 2px taller than the
      toolbar and the pair read as two unrelated objects rather than one dock. */
-  height: 24px; padding: 0 var(--space-3);
+  height: 24px; padding: 0 var(--space-4);
+  /* Two-word labels now — "Collapse cards", "Expand cards" — and without this
+     each wrapped into two stacked lines inside a one-line 24px dock. */
+  white-space: nowrap;
   border: none; border-radius: var(--radius-md);
   background: transparent; color: var(--text-secondary);
   font-size: var(--fs-xs); font-weight: var(--fw-medium);
@@ -1424,66 +1451,9 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__seg--block > button { flex: 1; justify-content: center; }
 
 /* Decision choice: three tiles, one row, each in its tone when chosen. */
-/* `auto-columns`, not `repeat(3, …)`. The third tile — a permanently disabled
-   "Coming soon" — was deleted a while ago and the track count was not, so two
-   tiles sat in two thirds of the panel with an empty third beside them. The
-   grid takes its column count from what is actually in it now. */
-.bb__decide { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
-.bb__decide > button {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
-  padding: var(--space-3) var(--space-3);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-raised);
-  font-family: inherit; text-align: left; cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
-}
-.bb__decide > button:hover { border-color: var(--border-strong); transform: translateY(-1px); }
-.bb__decide > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.bb__decide > button strong { font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bb__decide > button em { font-style: normal; font-size: 11px; color: var(--text-tertiary); line-height: 1.3; }
-.bb__decide > button svg { color: var(--text-tertiary); }
-/* Colour on the MARK, always; the chosen state said without needing it.
-
-   These filled green for Allow and red for Deny, and the fill WAS the chosen
-   state — `is-on` set nothing else. That had to go: a chosen tile and an
-   unchosen one were told apart by hue alone, on a pane where "nothing chosen
-   yet" is a third real state. The fix drained the tone entirely, which fixed
-   the fault and took the outcome's colour with it — three grey tiles, and the
-   only difference between letting somebody in and refusing them was the word.
-
-   Both, then. The glyph carries the outcome's tone at rest, so the row reads
-   green-amber-red down the marks before any of it is read. The chosen state is
-   still said in three channels that are not hue — a sunken ground, an ink edge
-   doubled by an inset hairline, and the label at full weight — so it survives a
-   greyscale screen and does not depend on the tone it sits beside.
-
-   `box-shadow`, not `border-width`: thickening the border would shift the
-   tile's contents half a pixel on each side as it is chosen. */
-.bb__decide > button.is-allow svg { color: var(--fb-positive-fg); }
-.bb__decide > button.is-mfa svg { color: var(--fb-notice-fg); }
-.bb__decide > button.is-deny svg { color: var(--fb-negative-fg); }
-/* And the chosen one takes its tone's ground, faintly, under the ink edge that
-   is doing the actual work. */
-.bb__decide > button.is-on {
-  background: var(--surface-inset, var(--surface-sunken));
-  border-color: var(--text-primary);
-  box-shadow: inset 0 0 0 1px var(--text-primary);
-}
-.bb__decide > button.is-allow.is-on { background: var(--fb-positive-bg); }
-.bb__decide > button.is-mfa.is-on { background: var(--fb-notice-bg); }
-.bb__decide > button.is-deny.is-on { background: var(--fb-negative-bg); }
-.bb__decide > button.is-on strong { color: var(--text-primary); }
-.bb__decide > button.is-on em { color: var(--text-secondary); }
-
-/* The placeholder. Dashed and quiet, and it does not lift on hover — a tile
-   that answers a pointer looks pressable, and this one is not. */
-.bb__decide > button.is-soon {
-  border-style: dashed;
-  background: none;
-  cursor: default;
-}
-.bb__decide > button.is-soon:hover { transform: none; border-color: var(--border-default); }
-.bb__decide > button.is-soon strong, .bb__decide > button.is-soon svg { color: var(--text-muted); }
-.bb__decide > button.is-soon em { color: var(--text-muted); }
+/* `.bb__decide` — three bordered, tinted outcome tiles — stood here. The
+   outcome is a dropdown now, on the same grid as the first factor above it;
+   see the note at the Picker in WhatEditor.tsx. */
 
 /* --- The steps, as a ladder ---------------------------------------------------
 
@@ -1883,7 +1853,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 @media (prefers-reduced-motion: reduce) {
   /* The start pill's forever-ripple was switched off here. It is a static
      application logo now, so there is nothing left in that slot to still. */
-  .bb__card, .bb__link::before, .bb__dot, .bb__decide > button { transition: none; }
+  .bb__card, .bb__link::before, .bb__dot { transition: none; }
   /* The ripple is the one thing on this surface that repeats, which makes it
      the one somebody who asked for no motion would notice most. The colour
      change carries the whole message without it. */
@@ -2782,15 +2752,24 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    about a policy that is wrong — the linter is what says the second kind of
    thing, and it says it in its own list. A dashed edge on a sunken ground reads
    as unfinished, which is exactly what this is. */
-.bb__ifempty {
-  margin: 0 0 var(--space-2);
-  padding: var(--space-3) var(--space-4);
+/* The slot a group's first condition goes in.
+
+   It replaces `.bb__ifempty`, a dashed box holding the sentence "Nothing in this
+   group yet — it matches everything until you add a condition". That was a
+   group apologising for existing. A group is never created empty now, so the
+   box is the way in rather than a warning: pressed, it becomes the catalogue.
+   Dashed because on this surface dashed means exactly one thing — something is
+   about to be added here. */
+.bb__ifslot {
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; min-height: 42px; padding: 0 var(--space-4);
   border: 1px dashed var(--border-default); border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-  color: var(--text-secondary);
-  font-size: var(--fs-xs);
-  line-height: 1.45;
+  background: var(--surface-raised);
+  font: inherit; font-size: var(--fs-sm); text-align: left;
+  color: var(--text-tertiary); cursor: pointer;
 }
+.bb__ifslot:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.bb__ifslot:focus-visible { outline: none; border-color: var(--border-strong); box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* The card's title, as the button it now is.
 
@@ -2921,14 +2900,23 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    Nothing was lost by dropping it: `absolute` establishes a containing block
    for the `::after` hit area exactly as `relative` does, which is the only
    reason any of these are here. */
+/* `button.bb__idx` was in both of these and has been taken out of both.
+
+   It was `position: relative` for one reason — to be the containing block for
+   the `::after` that widened its hit area to 32px — and being that containing
+   block is exactly what pinned the drag grip to the badge's left. The card is
+   the containing block now and the grip sits at the card's trailing edge.
+
+   The cost is honest and small: the badge's hit area drops from 32px to its
+   own 30px. Neither number clears the 44px a target-size guideline asks for,
+   so the 2px was never the thing making this reachable — the grip beside it is
+   26x30 and the arrow keys reorder from either. */
 .bb__act,
-.bb__secact,
-button.bb__idx { position: relative; }
+.bb__secact { position: relative; }
 
 .bb__act::after,
 .bb__secact::after,
-.bb__link__add::after,
-button.bb__idx::after {
+.bb__link__add::after {
   content: '';
   position: absolute; left: 50%; top: 50%;
   width: max(32px, 100%); height: max(32px, 100%);
@@ -3486,7 +3474,29 @@ button.bb__idx::after {
    This is the one job the tab strip did that was worth keeping. A tab hid the
    other two sections to answer it; a tinted label answers it and hides
    nothing. */
-.bb__insp .bb__sec.is-focused .bb__sec__head h3 { color: var(--brand); }
+.bb__insp .bb__sec__head h3 { display: inline-flex; align-items: center; gap: var(--space-3); }
+.bb__insp .bb__sec__head h3 svg { flex: none; color: var(--text-tertiary); }
+.bb__insp .bb__sec.is-focused .bb__sec__head h3 svg { color: var(--text-primary); }
+
+/* What answers the heading, set in under it against a guide rule.
+
+   The card draws a rule this way — `who`, `if` and `then` at the margin with a
+   mark each, and everything belonging to one indented against a line — while
+   this panel drew the same three parts as flush headings over flush controls,
+   so the two did not read as one rule. The rule sits under the centre of the
+   heading's mark (7px into a 15px icon), which is what makes the line read as
+   coming FROM the word.
+
+   Greyscale on purpose. The focused section used to take the brand on its
+   heading; with decision tones and a violet note already on this panel, an
+   orange word was one colour too many. The part you arrived at is said by a
+   darker mark and a darker rule instead. */
+.bb__insp .bb__sec__body {
+  margin-left: 7px;
+  padding-left: calc(var(--space-4) + 4px);
+  border-left: 1px solid var(--border-default);
+}
+.bb__insp .bb__sec.is-focused .bb__sec__body { border-left-color: var(--border-strong); }
 
 /* --- Who ---------------------------------------------------------------------
 
@@ -3500,26 +3510,48 @@ button.bb__idx::after {
    It was a two-line stack with a button underneath — four rows to say "nobody
    in particular", on the section that is answered by leaving it alone. The
    second line explained what the button does, which the button says. */
-.bb__whonone {
-  display: flex; align-items: center; gap: var(--space-3);
-  width: 100%;
-  color: var(--text-tertiary);
+/* The empty Who: a tinted note that says what the rule does, and the way out.
+
+   It was `.bb__whonone` — one flex row, a glyph, a bold phrase and a link — and
+   the phrase sat close enough under the `Who` heading to read as part of it.
+
+   Violet, from the theme's own `--fb-accent-*` ramp. Not blue: the linter's
+   notes in this panel are blue, and a second blue box here would read as a
+   finding about the rule rather than as context. Not amber or red: nothing is
+   wrong. The ramp is otherwise unused on this surface, which is what lets it
+   mean one thing.
+
+   The button is a real `Button` rather than the old bare link. On a single-line
+   status a filled control would have claimed to be the section's primary
+   action, which was the argument for the link; inside a note that already
+   explains itself, a link at the end of two lines of prose is the thing nobody
+   sees. */
+.bb__whonote {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  width: 100%; padding: var(--space-4);
+  border: 1px solid var(--fb-accent-border);
+  border-radius: var(--radius-md);
+  background: var(--fb-accent-bg);
+  color: var(--fb-accent-fg);
 }
-.bb__whonone > svg { flex: none; }
-.bb__whonone b { flex: 1; min-width: 0; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
-/* A link, not a Button. The row is a sentence and this is its last clause; a
-   filled or outlined control at the end of it would read as the section's
-   primary action, which is wrong — leaving this alone is the commonest answer
-   a rule gives. */
-.bb__wholink {
-  flex: none;
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  padding: 0; border: 0; background: none; cursor: pointer;
-  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium);
-  color: var(--text-link);
+/* Optically on the first line of the sentence, not on the top of the box. */
+.bb__whonote > svg { flex: none; margin-top: 2px; color: var(--fb-accent-dot); }
+.bb__whonote p {
+  flex: 1; min-width: 0; margin: 0;
+  font-size: var(--fs-sm); line-height: 1.5; color: var(--fb-accent-fg);
 }
-.bb__wholink:hover { text-decoration: underline; text-underline-offset: 2px; }
-.bb__wholink:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 4px var(--focus-halo); }
+.bb__whonote b { font-weight: var(--fw-semibold); }
+/* The button keeps the panel's own colours — a violet-on-violet control would
+   dissolve into the note it sits in. */
+.bb__whonote > .bx-btn { flex: none; background: var(--surface-raised); }
+
+/* Below ~360px the note stacks: a two-line sentence and a button side by side
+   in a narrowed inspector leaves the sentence four words wide. */
+@container (max-width: 360px) {
+  .bb__whonote { flex-wrap: wrap; }
+  .bb__whonote > .bx-btn { margin-left: auto; }
+}
+/* `.bb__wholink` is gone with the bare link the note replaced. */
 
 
 /* --- Who, in the dialog ------------------------------------------------------ */
@@ -3554,7 +3586,7 @@ button.bb__idx::after {
 .bb__second__n {
   flex: none; display: grid; place-items: center;
   width: 20px; height: 20px; border-radius: var(--radius-full);
-  background: var(--brand-subtle-bg); color: var(--brand);
+  background: var(--surface-sunken); color: var(--text-tertiary);
   font-size: 11px; font-weight: var(--fw-semibold);
 }
 .bb__second__drop {
@@ -3569,9 +3601,185 @@ button.bb__idx::after {
   padding: var(--space-4);
 }
 
-/* `.bb__addsecond` stood here — the dashed `Require a second factor` under the
-   tiles. It is a tile now, which is what stopped the pane offering three
-   choices while presenting two. */
+/* `Add second factor`, back under the first factor.
+
+   It was folded into the outcome dropdown for a while — "Require a second
+   factor" beside Allow and Deny — which made one control write two decisions.
+   It is an action again, and drawn as one.
+
+   Quiet rather than dashed. The dashed border it wore said "a thing is missing
+   here", which is wrong: a single-factor rule is a complete rule and most of
+   the estate's are. A full-width ghost button in the place the card it opens
+   will take says "there is more you may add" without implying a gap. */
+.bb__addsecond {
+  display: flex; align-items: center; justify-content: center; gap: var(--space-3);
+  width: 100%; padding: var(--space-4);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  background: none; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+  transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+.bb__addsecond:hover {
+  background: var(--state-hover-bg); border-color: var(--border-default); color: var(--text-primary);
+}
+.bb__addsecond:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+
+
+/* --- The options, stacked --------------------------------------------------------
+
+   These were a `auto-fill` grid of small tiles — two or three to a line — which
+   packed ten methods into a short block and read as a palette. Stacked, they
+   read as what they are: a list of answers, one of which is the rule's.
+
+   A list also gives each option room for its own sentence and, where it has
+   one, its own follow-up control indented underneath. The grid could do
+   neither: a tile 132px wide has room for two words. */
+.bb__opts { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+/* A labelled field whose control is a LIST rather than a one-line input, so the
+   label sits above it instead of in `.bb__subrow`'s 88px left column.
+
+   `.bb__subfield` and not `.bb__field`, which is taken: `.bb__field` is the
+   Impact view's 36-column heatmap, sunken background and all. Reusing the name
+   put "Prove it with" inside a `repeat(36, 1fr)` grid — the label crushed into a
+   10px column and the options stacked beside it — and it type-checked, linted
+   and built, because a class name is a string. The file already records this
+   failure mode twice; this is the third. */
+.bb__subfield { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.bb__subfield > b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+
+.bb__opt {
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+}
+.bb__opt:hover { border-color: var(--border-default); }
+.bb__opt.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.bb__opt:has(> .bb__opt__btn:focus-visible) { border-color: var(--focus-ring); box-shadow: 0 0 0 4px var(--focus-halo); }
+
+.bb__opt__btn {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  width: 100%; padding: var(--space-4);
+  border: 0; background: none; cursor: pointer; text-align: left;
+  font-family: inherit;
+}
+.bb__opt__btn:focus-visible { outline: none; }
+
+/* --- How one-of differs from any-of ----------------------------------------------
+
+   `.bb__opt__dot` stood here — a round mark in the leading column, the radio to
+   the tick's checkbox. It went, and so did the tick for single-select groups,
+   because both were answering the question in the wrong place.
+
+   A leading column of empty marks is what makes a list read as multi-select. It
+   does not matter whether those marks are square or round: N empty controls down
+   the left says "here are N things you may each answer". Rounding the corners
+   off does not change the count.
+
+   So the difference is structural. Any-of keeps a box on EVERY row, chosen or
+   not, because ticking more is the whole point and an empty box is the
+   invitation. One-of has no leading column at all: the unchosen rows are plain,
+   and the chosen one carries a bare check at its far end. One check on one row
+   has nothing above or below it to be mistaken for. */
+.bb__opt .bx-tick { margin-top: 1px; }
+/* Pushed to the trailing edge by the text column's grow. */
+.bb__opt__on { flex: none; margin-top: 1px; color: var(--accent-strong); }
+.bb__opt.is-on.is-allow .bb__opt__on { color: var(--fb-positive-fg); }
+.bb__opt.is-on.is-deny .bb__opt__on { color: var(--fb-negative-fg); }
+
+.bb__opt__ico { flex: none; display: grid; place-items: center; margin-top: 1px; color: var(--text-muted); }
+.bb__opt.is-on .bb__opt__ico { color: var(--accent-strong); }
+.bb__opt__txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bb__opt__txt b { font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-secondary); }
+.bb__opt.is-on .bb__opt__txt b { font-weight: var(--fw-medium); color: var(--text-primary); }
+.bb__opt__txt em {
+  font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.4;
+}
+
+/* The chosen option's own follow-up, indented to the text column so it reads as
+   part of the answer above it rather than as the next question. */
+.bb__opt__more {
+  padding: 0 var(--space-4) var(--space-4) calc(var(--space-4) + 16px + var(--space-4));
+}
+
+/* Allow and Deny keep the feedback ramps, because here the colour IS the
+   meaning — everywhere else on this list, chosen is the console's greyscale. */
+.bb__opt.is-on.is-allow {
+  border-color: var(--fb-positive-border); background: var(--fb-positive-bg);
+}
+.bb__opt.is-on.is-allow .bb__opt__ico,
+.bb__opt.is-on.is-allow .bb__opt__txt b { color: var(--fb-positive-fg); }
+.bb__opt.is-on.is-deny {
+  border-color: var(--fb-negative-border); background: var(--fb-negative-bg);
+}
+.bb__opt.is-on.is-deny .bb__opt__ico,
+.bb__opt.is-on.is-deny .bb__opt__txt b { color: var(--fb-negative-fg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bb__opt { transition: none; }
+}
+
+/* --- The three parts of Then, on one recipe ------------------------------------
+
+   `.bb__factor`, `.bb__factor__head` and `.bb__factor__n` stood here, and the
+   outcome was a bare `.bb__rung` beside them — so the section drew a loose row,
+   a loose block, and one bordered card, which read as two settings and a panel
+   rather than as the three parts of one answer.
+
+   One card each: a head that names the part and a body that holds its controls.
+   `.bb__second` keeps its own class because it also carries a remove button and
+   an inset body, but it is the same shape and the same two paddings. */
+.bb__part {
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+.bb__part__head {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-inset);
+}
+.bb__part__head b { flex: 1; min-width: 0; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* The same 20px numeral the second factor's head carries, so "1" and "2" read
+   as a pair. The outcome puts its own mark in the slot instead of a number —
+   it is not a step, it is what the steps are for. */
+.bb__part__n {
+  flex: none; display: grid; place-items: center;
+  width: 20px; height: 20px; border-radius: var(--radius-full);
+  background: var(--surface-sunken); color: var(--text-tertiary);
+  font-size: 11px; font-weight: var(--fw-semibold);
+}
+.bb__part__body {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+/* `.bb__outs` and `.bb__outopt` stood here — Allow and Deny as two cards side by
+   side. They are rows in the shared list above now, carrying their tone through
+   `is-allow` / `is-deny`, so there is one option recipe on this pane instead of
+   one for the outcome and another for everything else. */
+
+/* --- Colour on the outcome, because here the colour IS the meaning -------------
+
+   The console's rule is that selection is greyscale and the feedback ramps are
+   spent only where the colour carries the meaning rather than decorating it —
+   allow, verify, deny. This is that case: the one thing a reader wants from a
+   rule at a glance is whether it lets somebody in, and green-versus-red answers
+   it before the word is read.
+
+   It is on the TRIGGER, so it shows in the closed state, which is the state the
+   panel is in while a rule is being read. The tint is the subtle fill and the
+   border of the ramp, not the solid — a filled green bar in a 400px panel would
+   be the loudest thing on it, which is the mistake the three tiles made. */
+/* The tinted picker trigger stood here. The outcome is two cards again, so the
+   tone is on them; there is no trigger left to colour. */
+
+@media (prefers-reduced-motion: reduce) {
+  .bb__addsecond, .bb__outcome .bx-picker__trigger { transition: none; }
+}
 
 /* The select's own affordances, since it is a real <select> now: the platform
    arrow is suppressed and the pill keeps the shape it had as a button. */
@@ -3605,7 +3813,7 @@ button.bb__idx::after {
   font: inherit; text-align: left; cursor: pointer;
 }
 .bb__whosum:hover { border-color: var(--border-default); background: var(--surface-inset); }
-.bb__whosum:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-subtle-bg); }
+.bb__whosum:focus-visible { outline: none; border-color: var(--border-strong); box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* Overlapped, because the faces are a GROUP rather than four separate things —
    and because the overlap is what buys the fourth one its room. */
@@ -3635,12 +3843,24 @@ button.bb__idx::after {
   background: var(--fb-notice-bg); color: var(--fb-notice-fg);
   font-size: 10px; font-weight: var(--fw-medium);
 }
+/* A link, not a chip.
+
+   It was padded and rounded, and grew a tinted brand BACKGROUND on hover — so
+   pointing at the summary lit a small orange tablet inside a row that is itself
+   a button. Two nested pressable-looking things, and the inner one looked more
+   pressable than the outer one that actually does the work.
+
+   Now it is what it reads as: the last clause of the row, in link colour, going
+   darker and underlined when the row is pointed at. The colour carries the
+   affordance; nothing needs a fill to say it is live. */
 .bb__whosum__edit {
   flex: none; display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 7px; border-radius: var(--radius-sm);
-  color: var(--text-tertiary); font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  color: var(--text-link); font-size: var(--fs-xs); font-weight: var(--fw-medium);
 }
-.bb__whosum:hover .bb__whosum__edit { color: var(--brand); background: var(--brand-subtle-bg); }
+.bb__whosum:hover .bb__whosum__edit {
+  color: var(--text-primary);
+  text-decoration: underline; text-underline-offset: 2px;
+}
 
 /* Why there is no adder under Flag.
 

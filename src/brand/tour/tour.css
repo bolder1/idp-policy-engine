@@ -34,7 +34,15 @@
   box-shadow: var(--el-high);
   overflow: hidden;
 }
-.btr__card.is-centred { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+/* `.is-centred` carries no position any more.
+
+   It was `top: 50%; left: 50%; transform: translate(-50%, -50%)`, on an element
+   motion animates — and motion owns `transform` on those, writing
+   `transform: none` at rest. The centring half of that rule never applied, so
+   an unanchored card sat with its top-left corner at the middle of the screen
+   and its bottom half off the edge. The coordinates come from `place()` now;
+   the class stays only as a hook for the beak-less state. */
+.btr__card.is-centred { /* positioned from JS — see spotlight.ts */ }
 .btr__card:focus-visible { outline: none; box-shadow: var(--el-high), 0 0 0 2px var(--focus-ring); }
 
 .btr__x {

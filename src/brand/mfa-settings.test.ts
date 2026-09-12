@@ -172,3 +172,15 @@ describe('the catalogue as a whole', () => {
     )
   })
 })
+
+describe('help', () => {
+  /* The one line a settings row shows under its label. It sits beside a control
+     as narrow as a 421px column, so a line longer than this wraps to two and the
+     page stops reading as one line per setting. */
+  it('gives every setting one line about it, short enough to stay on one line', () => {
+    for (const s of settings()) {
+      const help = s.help ?? ''
+      expect(`${named(s)}: present=${help.length > 0} short=${help.length <= 70}`).toBe(`${named(s)}: present=true short=true`)
+    }
+  })
+})

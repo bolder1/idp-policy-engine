@@ -1380,6 +1380,16 @@ function useDialogChrome(open: boolean, onClose: () => void, panel: RefObject<HT
   useEffect(() => {
     if (!open) return
     returnTo.current = document.activeElement as HTMLElement | null
+    const panelNode = panel.current
+    /* Where the trigger sat, a few levels up. A dialog can replace the control
+       that opened it — Set up becomes a switch once setup is saved — and focus
+       should come back to that spot rather than fall to <body>. Kept short: a
+       trigger that navigated took its whole screen with it, and an ancestor that
+       far up is not "where it was". */
+    const trail: HTMLElement[] = []
+    for (let el = returnTo.current?.parentElement ?? null; el && trail.length < 4; el = el.parentElement) {
+      trail.push(el)
+    }
 
     /* This surface's place in the stack. Answering Escape only when innermost
        makes it peel one layer, which is what it means everywhere else. */
@@ -1435,7 +1445,20 @@ function useDialogChrome(open: boolean, onClose: () => void, panel: RefObject<HT
          a detached node silently drops focus to <body> instead of leaving it
          where the new screen put it. */
       const back = returnTo.current
-      if (back?.isConnected) back.focus()
+      if (back?.isConnected) {
+        back.focus()
+      } else {
+        /* Only when nothing else has taken focus. A new screen may have put it
+           somewhere on purpose, and that beats a guess at where the trigger was. */
+        const active = document.activeElement
+        const lost = !active || active === document.body || Boolean(panelNode?.contains(active))
+        const home = lost ? trail.find((el) => el.isConnected) : undefined
+        home
+          ?.querySelector<HTMLElement>(
+            'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          )
+          ?.focus()
+      }
     }
   }, [open, panel])
 }

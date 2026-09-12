@@ -103,11 +103,88 @@ export function IfSub({ children, className }: { children: ReactNode; className?
 
 /* How many values a card prints before the rest become a count.
 
-   Four, the same cap the Who summary uses and for the same reason: a card is a
-   SUMMARY, and a condition naming eleven zones filled three lines of it with
-   names nobody reads at that size. The panel beside it lists all of them, which
-   is where a list belongs. */
-const VALUES = 4
+   It was four, flat, and four is the wrong number in both directions. Four
+   zones called "HQ", "EU", "APAC" and "VPN" leave half the row empty. Four
+   groups called "Acquired-Co-Employees" and "Matter-Acme-Litigation" do not
+   come close to fitting — and the condition row does not wrap (see
+   `.bb__ifrow.is-cond`), so what arrived instead was a run of pills all
+   squeezed to ellipses: the exact failure a cap exists to prevent, dressed up
+   as a cap being obeyed.
+
+   What is actually scarce is WIDTH, so the budget is width. It is spent in
+   CHARACTERS rather than pixels, because the row is one line, one size, one
+   face — a character is a fair unit of it — and because counting characters
+   keeps this pure: no ResizeObserver, no layout read, no second paint, and the
+   same answer in a test as on the stage. A measured cap would be exact and
+   would also flicker on every card the first frame after mount, which on a
+   canvas of twenty cards is worse than being a few pixels conservative.
+
+   The numbers are calibrated against the running board, not guessed. A
+   condition row measures 448px — `--bb-card` is 520 and the card spends 72 on
+   padding and the guide indent, exactly as the note on that token says — and
+   the value chips in the seeded estate average 5.6px a character at this size
+   and weight.
+
+     ROW    448 / 5.6            the whole line, in characters
+     ATTR   30px of chip chrome (padding, border, the category mark) + the gap
+     OP     the gap after a bare keyword — an operator is text and nothing else
+     CHIP   14px of chip chrome + the gap
+     MORE   what "+17" itself costs, charged only once something overflows
+
+   ATTR and OP each carry a known error and they are opposite ones: an
+   attribute LABEL is narrow for its length (5.1px a character — `Device
+   profile` measures 101px) so charging it at the average over-states it, while
+   an operator is semibold and short (`does not match` measures 90px, 6.4px a
+   character) so charging it at the average under-states it. Every real row
+   pairs one with the other, and they cancel to within a pixel or two:
+   `Device profile · does not match` is charged 202px and measures 203, and
+   `Device profile · matches` is charged 162 and measures 162. Do not "fix" one
+   of them alone.
+
+   The two chip costs are rounded UP, so the estimate errs towards printing one
+   value fewer. A card with a little room to spare is right; a card that elides
+   is not. */
+const ROW = 80
+const ATTR = 7
+const OP = 1
+const CHIP = 4
+const MORE = 7
+
+/* And a ceiling, for the degenerate end of it. Sixteen values named "A" fit the
+   row arithmetically and read as a handful of confetti. Past six pills nobody
+   is reading a phrase any more, they are counting — and counting is what the
+   `+N` already does better. It only ever binds on very short values; the width
+   budget decides every real row. */
+const MAX = 6
+
+/* How many of `chips` the row can print, given `head` characters already spent.
+
+   Private, and deliberately: `oxlint`'s `only-export-components` is on for this
+   file, so exporting a helper out of it to reach from a test costs a warning
+   the gate does not allow. If it ever needs pinning it moves to `parts.ts`,
+   which is the board's pure module and already has a spec beside it. */
+function valuesShown(chips: { text: string }[], head: number): number {
+  const fit = (budget: number) => {
+    let used = 0
+    let n = 0
+    for (const c of chips) {
+      /* Always at least one, whatever it costs. A single value wider than the
+         whole card is a real case — the chip ellipsizes, which is the row's own
+         promise — and a condition drawn as nothing but "+1" says less than
+         nothing about what the rule tests. */
+      if (n > 0 && used + c.text.length + CHIP > budget) break
+      used += c.text.length + CHIP
+      n++
+    }
+    return Math.min(n, MAX)
+  }
+  const room = Math.max(0, ROW - head)
+  const all = fit(room)
+  /* Two passes, because the `+N` costs nothing until it exists. Reserving for
+     it up front hides a last value that would have fitted exactly, and the card
+     then spends the width it just saved on a chip that says "+1". */
+  return all >= chips.length ? chips.length : fit(room - MORE)
+}
 
 /** The value(s) of a condition, as chips. */
 function valueChips(c: Condition, resolve: NameLookup): { text: string; unset: boolean }[] {
@@ -126,22 +203,28 @@ export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup 
   const Ico = conditionIcon(t.id, t.group)
   const tone = conditionTone(t.id, t.group)
   const chips = valueChips(c, resolve)
-  const shown = chips.slice(0, VALUES)
-  const rest = chips.length - shown.length
+  /* What the rest of the row has already claimed, before a single value is
+     drawn. The attribute and the operator never shrink — the CSS says so — and
+     a zone asking about one of its two halves adds a third phrase on the same
+     line, which is the one most likely to push the values off it. */
+  const scope = c.scope ? (c.scope === 'ip' ? 'on the network only' : 'by location only') : ''
+  const head = t.label.length + ATTR + c.operator.length + OP + (scope ? scope.length + OP : 0)
+  const n = valuesShown(chips, head)
+  const shown = chips.slice(0, n)
+  const rest = chips.length - n
   return (
     <>
       <IfChip tone={tone} variant="attr" icon={<Ico size={11} strokeWidth={2.2} />} title={t.group}>
         {t.label}
       </IfChip>
       <IfKw tone="op">{c.operator}</IfKw>
-      {/* Four names, then how many more.
+      {/* As many names as the line holds, then how many more.
 
           Every value was a chip, so a condition naming eleven zones drew
-          eleven — three wrapped lines inside a card whose whole job is to be
-          read at a glance, and the eleventh name is no more useful than the
-          fifth at that size. The overflow is honest about being a count: it
-          says how many are not shown rather than trailing off, and the full
-          list is on the chip's title and in the panel. */}
+          eleven, and the eleventh name is no more useful than the fifth at this
+          size. The overflow is honest about being a count: it says how many are
+          not shown rather than trailing off, and the full list is on the
+          chip's title and in the panel — which is where a list belongs. */}
       {shown.map((v, i) => (
         <IfChip key={i} variant="val" unset={v.unset}>
           {v.text}
@@ -160,7 +243,7 @@ export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup 
           thing a card must never do — and the card is where somebody decides
           whether they need to open the panel at all. Absent when it is both,
           because that is what the zone already means. */}
-      {c.scope && <IfKw tone="op">{c.scope === 'ip' ? 'on the network only' : 'by location only'}</IfKw>}
+      {scope && <IfKw tone="op">{scope}</IfKw>}
     </>
   )
 }
@@ -287,7 +370,7 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
 
      A rule you had just added carried four rows and eleven words before you
      touched it: `who everyone`, `if any sign-in reaches it`, `then Let in,
-     then verify · Password → Any enrolled method → Signed in`, and an `else`
+     then verify · Password → Any enabled method → Signed in`, and an `else`
      naming the default. Every one of those was a DEFAULT reported as though it
      were a decision — so the emptiest rule on the board was also the busiest
      card on it, and the card whose whole job is to say what a rule does was

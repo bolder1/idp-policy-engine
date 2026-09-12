@@ -4,6 +4,7 @@ import { BookmarkPlus, Check, Copy, Pencil, Plus, Trash2, Waypoints } from 'luci
 
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
+import { AppsPeek } from './apps-peek'
 import { AppLogo } from '../logos/AppLogo'
 import { Badge, Button, Modal, SearchBox, StatusPill } from '../kit'
 import { Picker } from '../picker'
@@ -494,45 +495,32 @@ function PolicyRow({
           {policy.isSystem && <Badge tone="system">System</Badge>}
         </span>
       </td>
-      {/* The applications, named — and the cell is a control when there are
-          none.
+      {/* The applications, as marks. When there are none, the cell is a
+          control.
 
-          "Not assigned" was a grey label and a dead end: the one row that told
+          "Not assigned" was a grey label and a dead end. The one row that told
           you something needed doing was the one row you could not act on, and
           the fix was three screens away in Policy details. It is a button now,
           which is the shortest path between noticing and fixing.
 
-          Several applications print as the first mark and a count rather than a
-          stack of marks. A stack was the old shape for `appIds` and it is worth
-          not repeating: three 20px logos in a table cell are three things to
-          identify before you can read the one name beside them, and the count
-          is what actually says "this policy is shared". */}
+          Several applications print as a stack of up to four marks and a count.
+          This cell used to print the first name and "+N", on the reasoning that
+          a stack is several things to identify before you can read anything.
+          That held while the only way to learn the other names was to open the
+          edit dialog. Policies now carry dozens of applications, and the cell
+          opens a list of every one of them on hover, so the stack no longer has
+          to name anything. It only has to show that the policy is shared, and
+          roughly with what. A lone application keeps its name. See apps-peek.tsx.
+
+          The cell no longer goes straight into editing. Looking and changing
+          were one gesture, so reading the list meant hovering over the control
+          that starts an edit. Edit lives inside the panel now, and opens the
+          same dialog as before. */}
       <td>
         {policy.isSystem ? (
           <span className="btable__allapps">Every application</span>
         ) : named.length > 0 ? (
-          <button
-            type="button"
-            className="btable__app btable__app--edit"
-            title={`Change the applications this policy covers — currently ${named.map((a) => a.name).join(', ')}`}
-            onClick={() => setAssigning(true)}
-          >
-            <AppLogo appId={named[0].id} size={20} />
-            {appsLabel(named)}
-            {/* The affordance, as a mark rather than as an underline.
-
-                The cell used to underline itself on hover, which says "link" —
-                and this is not a link, it does not go anywhere. It opens the
-                dialog that CHANGES which applications the policy covers, so the
-                mark that says so is a pencil, and it appears when the pointer
-                is anywhere on the ROW rather than only on the four words
-                themselves: you notice a row is editable while reading the row,
-                not after finding the exact glyph to point at.
-
-                `aria-hidden`, because the button's accessible name already says
-                what pressing it does. */}
-            <Pencil className="btable__appedit" size={12} strokeWidth={2} aria-hidden />
-          </button>
+          <AppsPeek apps={named} policyName={policy.name} onEdit={() => setAssigning(true)} />
         ) : (
           <button type="button" className="btable__assign" onClick={() => setAssigning(true)}>
             <Plus size={13} strokeWidth={2.2} aria-hidden />

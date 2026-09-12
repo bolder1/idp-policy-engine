@@ -36,10 +36,10 @@
   font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
 }
 
-/* Provenance, inside the tip rather than on the row. It was a chip beside every
-   label and it made a column of six settings read as a column of twelve
-   things. */
-.bsf__tipsrc { display: inline-block; margin-top: 4px; font-style: normal; opacity: 0.8; }
+/* The label and its one line about the setting, stacked. The line is a single
+   sentence by rule — see `help` in mfa-settings.ts — so it never needs clipping. */
+.bsf__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bsf__about { font-size: var(--fs-sm); line-height: 1.45; color: var(--text-tertiary); }
 
 .bsf__ctl { flex: none; display: flex; align-items: center; gap: 8px; }
 

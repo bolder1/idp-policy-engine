@@ -284,15 +284,21 @@
   font-size: 10px; white-space: nowrap;
 }
 
+/* The remove button, always drawn.
+
+   It sat at `opacity: 0` until the row was hovered — and stayed clickable while
+   invisible, so a click in the blank space right of the dropdown removed the
+   attribute without anybody having seen a bin, and on a touch screen it never
+   appeared at all. Quiet at rest, one step darker while its row is under the
+   pointer, red only under the pointer itself. */
 .bfp2__drop {
   flex: none; display: grid; place-items: center; width: 28px; height: 28px;
   border-radius: var(--radius-sm); background: none; cursor: pointer; color: var(--text-muted);
-  opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard);
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
-.bfp2__attrow:hover .bfp2__drop,
-.bfp2__attrow:focus-within .bfp2__drop { opacity: 1; }
+.bfp2__attrow:hover .bfp2__drop { color: var(--text-tertiary); }
 .bfp2__drop:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bfp2__drop:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); opacity: 1; }
+.bfp2__drop:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 .bfp2__num { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: var(--text-secondary); }
 .bfp2__num input {
@@ -386,13 +392,6 @@
 /* The profile name, in the table's second column. */
 /* Matches .btable__link on the policies screen — 14px medium, not 15px
    semibold. This one is table-only, so it changes at the source. */
-.bfp2__gname {
-  min-width: 0; background: none; cursor: pointer; text-align: left;
-  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bfp2__gname:hover { color: var(--accent-strong); text-decoration: underline; text-underline-offset: 2px; }
-.bfp2__gname:focus-visible { outline: none; text-decoration: underline; }
 
 /* One template, header and rows, so the columns cannot drift apart. */
 /* Matched to the policies table, which is the one measured off the console.
@@ -408,39 +407,7 @@
    neither do these. Same header height, same weight, same rule under it, and
    the same raised card around it — radius-lg with the low shadow, not the flat
    radius-md box these had. */
-.bfp2__table {
-  background: var(--surface-raised);
-  border: var(--bw-thin) solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  /* Flat, like the console. console-theme.css takes the shadow off
-     .btable-wrap explicitly, so a shadow here would out-dress the table it is
-     meant to match. */
-  overflow: hidden;
-}
-.bfp2__trow {
-  display: grid;
-  /* Same as the zones table beside it: the name is the row's identity, so it
-     takes the slack rather than sharing it evenly with three fixed columns. */
-  /* Four columns, not five. `Attributes` was a bare count with no unit and
-     no threshold — six is not better than two — so its width went to the two
-     columns anybody reads. */
-  grid-template-columns: minmax(190px, 1.7fr) 170px 130px 64px;
-  align-items: center; gap: 12px;
-  padding: var(--space-4) var(--table-cell-x); min-height: var(--table-row-h);
-  border-bottom: 1px solid var(--table-rule);
-}
-.bfp2__trow:last-child { border-bottom: none; }
-.bfp2__trow:not(.bfp2__thead):hover { background: var(--table-row-hover); }
-/* The table recipe in console-theme.css. See the note on `.bz7__thead`. */
-.bfp2__thead {
-  min-height: var(--table-header-h); padding-top: 0; padding-bottom: 0;
-  background: var(--table-head-bg);
-  border-bottom: var(--bw-thin) solid var(--table-head-rule);
-  font-size: var(--table-head-fs); font-weight: var(--table-head-fw);
-  letter-spacing: 0; text-transform: none; color: var(--table-head-fg);
-  white-space: nowrap;
-}
-.bfp2__tile--sm { width: 24px; height: 24px; border-radius: var(--radius-sm); }
+
 /* The mode as a chip, in the same colour as its own tile in the first column,
    so a row states its kind twice in one colour rather than once in colour and
    once in grey. The border is what keeps a pale tint legible where the row
@@ -499,13 +466,6 @@
 .bfp2__kebab:hover { background: var(--surface-inset); color: var(--text-primary); }
 .bfp2__kebab:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
-@media (max-width: 860px) {
-  /* The kebab keeps its column here — it is the only way to delete from the
-     list, so it is the last thing that should be dropped for width. */
-  .bfp2__trow { grid-template-columns: minmax(0, 1fr) 100px 64px; }
-  /* Indexed off the template above. Only Decides-by goes now — Attributes is
-     no longer a column, so the old rule was hiding Used-by instead. */
-  .bfp2__trow > :nth-child(2) { display: none; }}
 
 /* --- Used by ---------------------------------------------------------------
 
@@ -603,8 +563,7 @@
 .bfp2__file-body em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* The name cell, which now carries the icon too. */
-.bfp2__tname { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.bfp2__tname .bfp2__tile { flex: none; }
+
 
 /* `.bfp2__steps` stood here, and half of it was inside a comment that never
    closed — which is how four rules for a control nothing rendered survived a
@@ -714,55 +673,66 @@
 
 */
 
-/* The whole body, where it used to be the right half of a grid beside the
-   rail. */
-/* The whole body, and it does not scroll on its own — see `.bfp2__pick`. */
-.bfp2__pane {
+/* --- One list, and nothing around it ------------------------------------------
+
+   `.bfp2__pane`, `.bfp2__pang` and `.bfp2__panghead` stood here: a sunken
+   bordered pane, a `<section>` per group, and a sticky ruled header on each.
+   Three frames, and the rows inside them were bordered cards — so thirteen
+   attributes arrived as a grey box holding thirteen white boxes.
+
+   `.bfp2__pickhead`, `.bfp2__pickall`, `.bfp2__pickblurb` and `.bfp2__pickn`
+   stood here too, and they are the more interesting deletion: they were the
+   REPLACEMENT for those sections — six flat category headings, each with a
+   tri-state select-all, a count and a one-line blurb. Better than the boxes and
+   still too much furniture: a screenful of chrome wrapped around rows that are
+   three words each.
+
+   What a heading answered is already on the bar. The category filter narrows
+   the list to one family; the search finds anything by name, purpose or
+   category. A heading that repeats what a filter does costs a row every time
+   and cannot be switched off.
+
+   So: no pane, no sections, no headings, no dividers, no per-row box, and no
+   fill on anything that is not under the pointer. The list is a grid because
+   the names are short and the panel is wide — see below. */
+.bfp2__picklist {
+  /* Two to a line at the default 724px, three when the drawer is dragged out,
+     one when it is dragged in — so the device catalogue is a 19-line block
+     instead of a 38-row scroll and the OS one fits on screen whole.
+
+     `auto-fill` with a 320px floor rather than a fixed count: this drawer is
+     resizable 560-1120 and the same panel also renders inside the create
+     wizard, so the column count has to come from the width it actually gets.
+
+     Row gap 0 — the rows have their own padding and a hover tint that has to
+     meet its neighbours, or the tint reads as a chip rather than a row. Column
+     gap is wide, because that gap is the only thing separating two columns of
+     names and it is doing the work a rule would otherwise do. */
+  display: grid;
+  /* Bled by the row's own padding, so the tint has somewhere to go while the
+     names stay on the margin the search box above them uses. */
+  margin: 0 calc(var(--space-5) * -1);
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  /* 20px and not 24: at the 780px default the panel is two 360px cells, and the
+     longest name in the catalogue — "Session duration and navigation", wearing
+     a "Not collected yet" pill — needs 359 of them. The four pixels are the
+     difference between thirty-eight names reading whole and one of them
+     ellipsising for no reason a reader could work out. */
+  column-gap: var(--space-7);
+  align-content: start;
   min-height: 0;
-  padding: 0 12px 12px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
 }
-.bfp2__pang + .bfp2__pang { margin-top: 6px; }
+/* The empty state spans whatever the grid is that day. */
+.bfp2__picklist > .bfp2__none { grid-column: 1 / -1; }
 
-/* Sticky, because a search can put five groups in the pane and the heading is
-   what tells you which family the card under your cursor belongs to. */
-.bfp2__panghead {
-  position: sticky; top: 0; z-index: 1;
-  display: flex; align-items: center; gap: 9px;
-  padding: 10px 0 8px;
-  background: var(--surface-sunken);
-  border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 8px;
-}
-.bfp2__panghead > svg { flex: none; }
-/* No category tint on the heading any more: there are two groups now — the
-   always-collected floor and everything else — and neither is a family. The
-   `--cat-*` tints still colour a SELECTED ROW, which is where they do work: a
-   search returning hits from four families reads as four families. */
-.bfp2__panghead h4 {
-  margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--text-secondary);
-}
-.bfp2__panghead > svg { color: var(--text-muted); }
-.bfp2__panghead > .bx-tip { margin-left: -4px; }
-/* The heading and its icon take the category tint together — the same mark the
-   rail uses, so a search showing four groups reads as four families. */
-.bfp2__panghead > span {
-  flex: 1; min-width: 0;
-  font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums;
-}
-
-.bfp2__selectall {
-  flex: none; background: none; cursor: pointer;
-  font-size: var(--fs-xs); color: var(--text-link); white-space: nowrap;
-}
-.bfp2__selectall:hover { text-decoration: underline; }
-.bfp2__selectall:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
+/* `.bfp2__selectall` stood here — the per-group "Select all / Clear these"
+   link. It went with the group headings that carried it. Selecting in bulk is
+   not lost: shift-click writes a run, "Clear the rest" is on the bar, and the
+   category filter plus shift-click is the same intent with one fewer control on
+   the screen. */
 
 
-.bfp2__none { padding: 22px; text-align: center; font-size: var(--fs-md); color: var(--text-tertiary); }
+.bfp2__none { padding: var(--space-9) 0; text-align: center; font-size: var(--fs-md); color: var(--text-tertiary); }
 
 
 /* =============================================================================
@@ -846,49 +816,125 @@
    Two columns went with it. A row is a name, a sentence and up to two controls
    now; two of those side by side at 1000px is four controls across the pane
    fighting for one glance. */
-.bfp2__pickrows { display: flex; flex-direction: column; gap: 6px; }
+/* --- The row, which is now the button ------------------------------------------
 
-/* A row is two controls side by side: the toggle, which takes the width, and
-   the mark carrying the purpose sentence, which sits at the end in a column of
-   its own. They used to be nested — see the note in the TSX. */
+   `.bfp2__pickrows`, `.bfp2__picktoggle` (and its `::after`), `.bfp2__pickmain`
+   and `.bfp2__pickrow > .bx-tip` stood here.
+
+   The row used to be a `<div>` holding a shrunken `<button>` and a `TipDot`
+   beside it, with `::after` stretching the button's hit area back over the row
+   and a `z-index` lifting the mark above that stretch. Every rule of it existed
+   to keep one real `<button>` out of another — and the only reason a second
+   button was on the row is that the attribute's purpose had nowhere to live
+   except behind a `?`. The purpose is on the row now, so the mark went, and the
+   machinery went with the mark.
+
+   What is left is one element: no border, no fill, no radius until it is
+   hovered or focused, and no gap to the row above it. */
 .bfp2__pickrow {
-  display: flex; align-items: flex-start; gap: 2px;
-  padding-right: 8px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
-}
-/* Vertically on the name's line, not on the top of the box. */
-.bfp2__pickrow > .bx-tip { flex: none; margin-top: 11px; }
-.bfp2__pickrow:hover { border-color: var(--border-strong); }
-/* Selected takes the CATEGORY's colour where there is one — the same tint as
-   the rail icon and the group heading, so a search showing hits from four
-   categories reads as four categories rather than one long orange smear. The
-   five-row catalogue has no categories and falls back to the brand. */
-.bfp2__pickrow.is-on {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
+  /* 6px between the four things on a row — tick, mark, name, pill. It is tight
+     on purpose: every pixel here is a pixel the longest name in the catalogue
+     does not have, and at this size the four are read as one line rather than
+     as four columns. */
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%;
+  /* 12px all round, and the height follows from it rather than being set: a
+     20px content line inside 24px of padding is a 44px row and a 44px hit area.
 
-.bfp2__picktoggle {
-  display: flex; align-items: flex-start; gap: 10px;
-  width: 100%; padding: 10px 12px;
-  border: 0; background: none; text-align: left; cursor: pointer;
+     It was `6px 0` — a 34px row with no horizontal padding at all, so the hover
+     tint stopped flush with the text and there was nothing to press but the
+     words themselves. Thirty-eight of those in two columns read as a wall. The
+     list is bled back out by the same 12px below, so the names still start on
+     the drawer body's own left margin and only the pressable area grew. */
+  padding: var(--space-5);
+  border: 0; border-radius: var(--radius-sm);
+  background: none; text-align: left; cursor: pointer;
   font: inherit; color: inherit;
+  transition: background var(--dur-fast) var(--ease-standard);
 }
-.bfp2__picktoggle:focus-visible {
-  outline: none; border-radius: var(--radius-md);
-  box-shadow: inset 0 0 0 2px var(--focus-ring);
-}
+/* console-theme's own states, used literally. Fill now means exactly one
+   thing — under the pointer — because selection no longer takes one. */
+.bfp2__pickrow:hover { background: var(--state-hover-bg); }
+.bfp2__pickrow:active { background: var(--state-press-bg); }
+.bfp2__pickrow:hover .bx-tick { border-color: var(--accent); }
+.bfp2__pickrow:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
 
 /* `.bfp2__picktick` stood here. Every tick in the console is `.bx-tick` from the kit now;
    see the note there for the five shapes this replaced. */
 
+/* Lane one, on a fixed basis rather than shrink-to-fit — so every sentence
+   beside it starts on one line running the length of the list. A column edge
+   the eye can track is what replaces the per-row border; it is the same job,
+   done vertically, by something that was already going to be there.
 
-.bfp2__pickmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+   A fixed 264px basis stood here, sized to hold the longest name in either
+   catalogue beside a sentence lane. The sentence lane is gone and the grid cell
+   is the measure now, so the name simply takes what its column gives it and the
+   pill sits at the end of the cell. */
+/* The family mark, between the tick and the name — see `CAT_ICON` in the TSX.
+
+   A fixed 18px box around a 15px glyph, rather than letting each icon size
+   itself. Lucide glyphs are drawn on a 24px grid but their INK is not the same
+   width — a monitor fills the box edge to edge, a shield does not — so
+   shrink-to-fit puts every name on a very slightly different x and the column
+   reads as ragged even though every measurement is identical. The box is the
+   column; the glyph centres in it.
+
+   `--text-muted` because it is a filing aid rather than a thing to read: it has
+   to be findable down the column without competing with the tick 6px to its
+   left, which is the one mark on the row that changes when you press it. */
+.bfp2__pickico {
+  flex: none; display: grid; place-items: center;
+  width: 18px; color: var(--text-muted);
+}
+
 .bfp2__pickname {
-  display: flex; align-items: center; gap: 7px; min-width: 0;
-  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: var(--pill-gap);
+  font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-secondary);
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+/* The ellipsis belongs on the text, not on the flex box holding it — a bare
+   text node inside a flex container becomes an anonymous flex item, which
+   `text-overflow` cannot reach. This file has been bitten by that once already;
+   see `.bfp2__attword`. */
+.bfp2__pickword { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* `.bfp2__pickwhy` stood here: the whole `purpose` sentence in a third lane
+   across the width the cards used to waste. It read well at thirteen rows and
+   turned thirty-eight into a wall of grey prose — the panel's job is to be
+   ticked, not read. The sentence is back on `TipMark`, which costs nothing
+   until it is wanted, and the width goes to a second column instead. */
+
+/* Lane three, pushed to the edge by lane two's flex-grow, so the pills align
+   into a column of their own rather than shoving each name sideways by however
+   long its own label happens to be. */
+.bfp2__pickstate { flex: none; display: flex; align-items: center; gap: var(--pill-gap); }
+
+/* Selected is the tick and the name's weight, and that is all it is.
+
+   `.is-on` used to take an `--accent` border and an `--accent-soft` fill. Both
+   go. On the device catalogue twenty selected rows in a soft grey is twenty
+   bands, which is lines by another name — a fill that is right for 3 of 13 is
+   wrong for 24 of 38, and this component has to be right at both.
+
+   `.is-on .bx-tick` in the kit already fills to `--accent-strong`: a solid
+   near-black square in a column of empty hairline ones, greyscale by
+   construction, and the loudest thing on the row. The name stepping from
+   secondary/regular to primary/medium makes the chosen set readable straight
+   down the column without looking at a single tick. */
+.bfp2__pickrow.is-on .bfp2__pickname {
+  font-weight: var(--fw-medium); color: var(--text-primary);
+}
+
+/* A container query hiding the sentence lane below 600px stood here. There is
+   no sentence lane to hide — the grid's own `auto-fill` is what responds to
+   width now, dropping to one column when the panel cannot hold two, which is
+   the same adaptation with no rule to write. The mark is on every row at every
+   width, so nothing has to reappear. */
+
+@media (prefers-reduced-motion: reduce) {
+  .bfp2__pickrow, .bfp2__pickname { transition: none; }
 }
 /* `.bfp2__pickpurpose`, `.bfp2__pickvals` and the five `.bfp2__pickcfg` rules
    stood here — the purpose sentence under each attribute name, and the settings
@@ -911,11 +957,15 @@
    reach lived on another screen and the refusal could not be acted on from
    here. The reach was answered one step ago now, so this line carries the way
    back to it — which is the affordance the greyed rows never had. */
+/* De-boxed with everything else. It was a filled, rounded band under the list —
+   one more box on a panel whose whole brief was that nothing is boxed. A
+   hairline and a line of quiet text says the same thing and draws nothing. */
 .bfp2__locked {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin: 8px 0 0; padding: 9px 11px;
-  border-radius: var(--radius-sm); background: var(--surface-sunken);
-  font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5;
+  display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap;
+  margin: var(--space-6) 0 0; padding: var(--space-5) 0 0;
+  border-top: var(--bw-thin) solid var(--border-subtle);
+  background: none; border-radius: 0;
+  font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.5;
 }
 .bfp2__locked svg { flex: none; }
 .bfp2__locked span { flex: 1; min-width: 12ch; }
@@ -934,11 +984,16 @@
    count, the filter and the search are what you use to get back to a manageable
    one. It sticks to the drawer body's own scroll, which is the only scroll
    there is. */
+/* A real hairline, instead of `padding-bottom: 10px; margin-bottom: -10px`
+   faking one so rows would not scroll under the bar unannounced. The pane
+   beneath it used to be sunken, which drew that edge for free; nothing is
+   tinted now, so the edge has to be an edge. */
 .bfp2__pickbar {
   position: sticky; top: 0; z-index: 2;
-  flex: none; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding-bottom: 10px; margin-bottom: -10px;
+  flex: none; display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap;
+  padding: 0 0 var(--space-5);
   background: var(--surface-raised);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
 }
 /* `.bfp2__search` stood here — this drawer's own magnifier-and-field. It is
    `SearchBox` from the kit now, like every other search in the console; what
@@ -1262,19 +1317,26 @@ button.bfp2__factval:focus-visible {
    the filter changed size as you used it. */
 .bfp2__catfilter { flex: none; width: 190px; }
 
-/* Ticked, and not by you.
+/* Ticked, and not by you — which this screen has not actually been saying.
 
-   The row is not dimmed — it is not disabled information, it is information
-   that happens to be settled, and half of it (how much it counts) is still
-   yours. Only the tick reads as fixed: filled like any selected row, but with
-   the cursor and the hover of something that does not move. */
-.bfp2__pickrow.is-fixed .bfp2__picktoggle { cursor: default; }
-.bfp2__pickrow.is-fixed .bfp2__picktick {
+   `.bfp2__pickrow.is-fixed .bfp2__picktick` stood here and has been INERT since
+   the tick became `.bx-tick`: the class it named no longer exists, so the
+   always-on four have been rendering identically to a row somebody chose. Its
+   intent was right and only its selector was stale. Mid-grey against near-black
+   is the distinction it was written to draw, and (0,3,0) beats the kit's
+   `.is-on .bx-tick` without an `!important`.
+
+   The row is a `<div>` rather than a disabled `<button>` now, so there is
+   nothing here about cursors on a control — there is no control. */
+.bfp2__pickrow.is-fixed { cursor: default; }
+.bfp2__pickrow.is-fixed:hover { background: none; }
+.bfp2__pickrow.is-fixed:hover .bx-tick { border-color: var(--border-strong); }
+.bfp2__pickrow.is-fixed .bx-tick {
   border-color: var(--border-strong);
   background: var(--border-strong);
   color: var(--surface-raised);
 }
-.bfp2__pickrow.is-fixed.is-on { border-color: var(--border-default); background: var(--surface-sunken); }
+.bfp2__pickrow.is-fixed .bfp2__pickname { font-weight: var(--fw-regular); color: var(--text-secondary); }
 
 /* Says why, on the row, in the two words it takes. The group heading says it
    once for the group; after a search there is no group. */

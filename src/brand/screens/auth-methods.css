@@ -17,6 +17,27 @@
   font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55;
 }
 
+/* --- The row-end variant switch ---------------------------------------------
+   In the head's action slot, and deliberately the quietest thing in it: a
+   comparison between two shapes of the same row is not an authentication
+   decision, and it should not read like one. Tertiary text at the size the
+   blurb under the title uses, with the rows it reaches named underneath in the
+   same muted 12px the rest of the screen gives a qualifier.
+
+   `align-items: center` against the head's own `flex-start`, so the switch sits
+   on the first line of its label rather than at the top of a two-line block. */
+.bm8__variant {
+  flex: none; display: flex; align-items: center; gap: var(--space-5);
+  font-size: var(--fs-md); color: var(--text-secondary);
+}
+.bm8__variant > span { display: flex; flex-direction: column; gap: 1px; white-space: nowrap; }
+.bm8__variant i { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+@media (max-width: 900px) {
+  /* The names go first: at this width the head is already stacking and the
+     switch's own label says enough to find the rows by flipping it. */
+  .bm8__variant i { display: none; }}
+
 /* --- Tabs, horizontal ---------------------------------------------------------
    The brief's one explicit layout change. Underline rather than a pill group:
    two tabs in a pill group read as a segmented control, which implies switching
@@ -166,26 +187,55 @@
    a pixel above it and read as a double rule. */
 .bm8__list > .bm8__card:last-child { border-bottom: 0; }
 
-/* The category row is a button and goes somewhere; the method row is not, and
-   only the one that goes somewhere gets a hover.
+/* A row that goes somewhere gets a hover; a row that does not, gets none.
+
+   The row is a `<div>` and its link is the name, stretched over the whole row by
+   an `::after` — a row holding a switch cannot also be a button. The switch and
+   the tip sit above the stretch, so they stay controls of their own, and the
+   row only lights up while the pointer is on the part that opens.
 
    A tint, and nothing else. The lift and the shadow a free-standing card had
    are wrong for a row in a list — a row cannot rise off a surface it is part of
    without tearing the divider above it. */
-button.bm8__card { cursor: pointer; }
-button.bm8__card:hover { background: var(--surface-sunken); }
-button.bm8__card:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.bm8__card--family { position: relative; }
+.bm8__open {
+  appearance: none; margin: 0; padding: 0; border: 0; background: none;
+  font: inherit; color: inherit; text-align: inherit; cursor: pointer;
+}
+.bm8__open::after { content: ''; position: absolute; inset: 0; }
+/* The row draws the focus ring, so the name draws none — not even the kit's halo. */
+.bm8__open:focus-visible { outline: none; box-shadow: none; }
+/* Lifted above the name's stretched `::after`, or the row would swallow the
+   press. The gear joins them: it opens the same page the row does, so a press
+   landing on the overlay instead would still work — but the BUTTON has to get
+   the event or it never takes focus and never announces its own name. */
+.bm8__card--family .bm8__rowctl,
+.bm8__card--family .bm8__rowgear,
+.bm8__card--family .bx-tip { position: relative; z-index: 1; }
 
-/* The chevron leans the way the click goes. */
-button.bm8__card:hover .bm8__right > svg { transform: translateX(3px); color: var(--accent-strong); }
-button.bm8__card:hover .bm8__name { color: var(--accent-strong); }
-.bm8__card > svg, .bm8__right > svg { color: var(--text-muted); transition: transform var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard); }
+/* The gear is excluded from the row tint alongside the switch and the tip. It
+   is the one exclusion that is arguable — the gear and the row go to the same
+   place, so lighting the row while the gear is hovered would be honest — and it
+   is excluded anyway, because the gear draws its own hover and two of them
+   firing at once on one control is the busier read. One hover at a time. */
+.bm8__card--family.is-link:hover:not(:has(.bm8__rowctl:hover, .bm8__rowgear:hover, .bx-tip:hover)) { background: var(--surface-sunken); }
+.bm8__card--family:has(.bm8__open:focus-visible) { box-shadow: inset 0 0 0 2px var(--focus-ring); }
+
+/* The chevron leans the way the click goes — only for someone who has not asked
+   for less motion. Its colour moves either way. The lean lives in its own query
+   rather than being undone in a `reduce` one: this selector outweighs any short
+   override, and an override that loses is a promise the page does not keep. */
+.bm8__card--family.is-link:hover:not(:has(.bm8__rowctl:hover, .bx-tip:hover)) .bm8__rowchev > svg { color: var(--accent-strong); }
+@media (prefers-reduced-motion: no-preference) {
+  .bm8__card--family.is-link:hover:not(:has(.bm8__rowctl:hover, .bx-tip:hover)) .bm8__rowchev > svg { transform: translateX(3px); }}
+/* The two chevron rules above are left keyed on the old exclusion on purpose: a
+   row that has a chevron never has a gear, so adding `.bm8__rowgear:hover` to
+   them would be a condition that cannot fire. The NAME darkens on every row that
+   opens, gear or chevron, so that one takes the exclusion. */
+.bm8__card--family.is-link:hover:not(:has(.bm8__rowctl:hover, .bm8__rowgear:hover, .bx-tip:hover)) .bm8__name { color: var(--accent-strong); }
+.bm8__card > svg, .bm8__rowchev > svg { color: var(--text-muted); transition: transform var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard); }
 .bm8__name { transition: color var(--dur-fast) var(--ease-standard); }
 
-/* Nothing lifts for someone who asked for no motion; the colour still moves. */
-@media (prefers-reduced-motion: reduce) {
-  button.bm8__card:hover { transform: none; }
-  button.bm8__card:hover .bm8__right > svg { transform: none; }}
 
 /* --- The tile ------------------------------------------------------------------
    Identity, not status: a family keeps its colour whether or not anything in it
@@ -296,8 +346,46 @@ button.bm8__card:hover .bm8__name { color: var(--accent-strong); }
 .bm8__right {
   flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
 }
-/* The category row's chevron sits beside the count, not under it. */
-button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16px; }
+/* A family row's end sits beside the count, not under it — whether that end is
+   a chevron or the one method's controls. */
+.bm8__card--family .bm8__right { flex-direction: row; align-items: center; gap: var(--bm8-endgap); }
+/* The end of a family row: its switch, then its chevron, against the edge. A row
+   with no chevron puts its switch at the edge rather than beside an empty place
+   for one. The end keeps one width down the list — room for a switch and a
+   chevron together — so the figures beside it still read as a single column
+   whatever the row ends in. */
+.bm8__list { --bm8-endgap: 16px; --bm8-chev: 17px; --bm8-switch: 56px; --bm8-gear: var(--ctl-height-sm); }
+.bm8__rowend {
+  flex: none; display: flex; align-items: center; justify-content: flex-end; gap: var(--bm8-endgap);
+  min-width: calc(var(--bm8-switch) + var(--bm8-endgap) + var(--bm8-chev));
+}
+.bm8__rowctl { display: flex; align-items: center; }
+.bm8__rowchev { display: flex; align-items: center; width: var(--bm8-chev); }
+
+/* --- The gear variant ------------------------------------------------------------
+   The same row end with its order inverted: a gear where the chevron was, and
+   the switch moved past it to the edge. See the note in AuthMethods.tsx for
+   which two rows this reaches and why it is a variant rather than a change.
+
+   The reservation moves for the WHOLE list, because a gear is 31px against the
+   chevron's 17px: widen it only on the rows that grow one and those two rows'
+   enrolment figures step 14px left of the nine above them. The gap closes at
+   the right edge instead, where nothing is lined up against it.
+
+   `justify-content: flex-end` on the end means the extra width is absorbed on
+   the left, so a chevron row keeps its chevron against the edge and only the
+   empty space in front of it grows. */
+.bm8__list.is-gear .bm8__rowend {
+  min-width: calc(var(--bm8-switch) + var(--bm8-endgap) + var(--bm8-gear));
+}
+/* Tighter than `--bm8-endgap`: the gear and the switch are one cluster — the
+   two things you can do to this row — against the 16px that separates that
+   cluster from the figures it is not part of. */
+.bm8__rowend.is-gear { gap: var(--space-4); }
+.bm8__rowgear { display: flex; align-items: center; }
+/* A person's rows end in a chevron and never a switch, so their end reserves no
+   room for one. */
+.bm8__list.is-person .bm8__rowend { min-width: 0; }
 
 /* --- Status and reach, on the category row --------------------------------------
    The two facts the row reports: whether anything in this category is on, and
@@ -369,7 +457,7 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
      the row is for. */
   .bm8__card .bm8__desc { display: none; }
   .bm8__reach { min-width: 0; }
-  button.bm8__card .bm8__right { gap: 10px; }}
+  .bm8__list { --bm8-endgap: 10px; }}
 
 /* A family with nothing on, or a method that is off. Dimmed by desaturating the
    text, never by `opacity` on the row — opacity would take the toggle down with
@@ -405,6 +493,9 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
 
 .bm8__dwtext { flex: 1; min-width: 0; }
 .bm8__dwtext h2 { margin: 0; font-size: var(--fs-lg); }
+/* A family of one is headed by its method, with the family as a chip — the
+   same way its row is named on the list. */
+.bm8__dwtitle { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .bm8__dwtext p { margin: 3px 0 0; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.45; }
 
 .bm8__dwstats { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
@@ -440,6 +531,34 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
 
 /* The settings list. The row brings its own dividers, so this only stacks. */
 .bm8__setlist { display: flex; flex-direction: column; }
+
+/* --- Pages inside the panel --------------------------------------------------------
+   The panel pushes and pops (see `PanelPage` in auth-panel.ts). Head and body
+   move as one page, and Back sits above the title it leaves, on the line the
+   close button already occupies. */
+.bm8__dwstack { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.bm8__dwstack > .bm8__dwhead { flex: none; }
+
+.bm8__back {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: var(--ctl-height-sm); margin: -2px 0 0 -8px; padding: 0 10px 0 8px;
+  border: 0; border-radius: var(--radius-md); background: none; cursor: pointer;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary);
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bm8__back:hover { background: var(--state-hover-bg); color: var(--text-primary); }
+.bm8__back:active { background: var(--state-press-bg); }
+.bm8__back:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bm8__back svg { transition: transform var(--dur-fast) var(--ease-standard); }
+/* The arrow leans the way the click goes, as the row chevron does. */
+.bm8__back:hover svg { transform: translateX(-2px); }
+@media (prefers-reduced-motion: reduce) {
+  .bm8__back svg { transition: none; }
+  .bm8__back:hover svg { transform: none; }}
+
+/* A vendor mark in place of the family glyph — MethodIcon brings its own box. */
+.bm8__dwtile--logo { width: auto; height: auto; background: none; }
 
 
 /* The category holding it. Brand-tinted rather than green: the enabled chip
@@ -524,6 +643,64 @@ button.bm8__card .bm8__right { flex-direction: row; align-items: center; gap: 16
 }
 .bm8__setupgrouphead:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
 .bm8__setupgroupbody { padding: 4px 13px 12px; }
+
+/* --- A setup card ------------------------------------------------------------------
+   An authenticator app's whole setup, on one card in the slider: a code app's
+   install, scan and code, or Microsoft Push's server. One card, one step's worth
+   of controls. */
+.bm8__setcard {
+  display: flex; flex-direction: column; gap: 16px;
+  padding: 18px 20px;
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg);
+}
+.bm8__setcardtitle { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bm8__setcardlabel { font-weight: var(--fw-medium); color: var(--text-primary); }
+
+.bm8__steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.bm8__step { position: relative; display: flex; gap: 12px; padding-bottom: 20px; }
+.bm8__step:last-child { padding-bottom: 0; }
+/* The rail that joins the numbers, as the console draws it: it says the three
+   are one sequence rather than three separate notes. */
+.bm8__step:not(:last-child)::before {
+  content: ''; position: absolute; left: 11px; top: 28px; bottom: 4px;
+  width: 1px; background: var(--border-subtle);
+}
+.bm8__stepn {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--surface-inverse); color: var(--text-inverse);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums;
+}
+.bm8__stepbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding-top: 2px; }
+.bm8__stepbody > p, .bm8__stepbody > label { margin: 0; font-size: var(--fs-md); line-height: 1.45; color: var(--text-body); }
+
+.bm8__stores { display: flex; flex-wrap: wrap; gap: 8px; }
+.bm8__store {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: var(--ctl-height-sm); padding: 0 12px;
+  background: var(--int-neutral-bg); border: var(--bw-thin) solid var(--int-neutral-border); border-radius: var(--ctl-radius);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bm8__store:hover { background: var(--int-neutral-bg-hover); border-color: var(--int-neutral-border-hover); }
+.bm8__store:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bm8__store svg { color: var(--text-tertiary); }
+
+.bm8__scan { display: flex; align-items: center; flex-wrap: wrap; gap: 20px; }
+.bm8__qr {
+  flex: none; width: 116px; height: 116px; padding: 4px;
+  color: var(--text-primary); background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.bm8__key { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bm8__keylabel { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bm8__keyrow { display: inline-flex; align-items: center; gap: 4px; }
+.bm8__keyrow code { font-family: var(--font-mono); font-size: var(--fs-md); letter-spacing: 0.06em; color: var(--text-primary); }
+
+/* Six characters wide, not the width of the card: a field sized to what it holds
+   says how much to type before anybody reads the label. */
+.bm8__codefield { max-width: 180px; }
+.bm8__codefield input { font-family: var(--font-mono); letter-spacing: 0.24em; }
 
 @media (prefers-reduced-motion: reduce) {
   .bm8__setupchev, .bm8__setupgrouphead { transition: none; }}

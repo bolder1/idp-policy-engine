@@ -1036,6 +1036,14 @@
 .bfp2__attctl > * { flex: none; }
 .bfp2__attctl .bx-tierpick { width: 96px; }
 .bfp2__attctl .bx-picker__trigger { min-width: 128px; }
+/* The floor above is for the PRECISION dropdown, whose values are long enough
+   to need it. On the weight it was 32px wider than the 96px wrapper holding it,
+   so the trigger overflowed its own box and painted over the delete button 20px
+   to its right — the button stayed clickable, which is why this survived: it
+   looked like a trash can inside the dropdown rather than a broken layout.
+
+   The tier trigger fills its wrapper instead, and the wrapper is the width. */
+.bfp2__attctl .bx-tierpick .bx-picker__trigger { min-width: 0; width: 100%; }
 
 /* --- The summary --------------------------------------------------------------
 

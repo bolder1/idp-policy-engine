@@ -355,8 +355,22 @@
 [data-brand='rebrand'] .bx-card { border-color: var(--border-subtle); box-shadow: none; }
 [data-brand='rebrand'] .bx-card__head { border-bottom: 0; padding-bottom: 0; }
 
-/* --- Tables: no outer box; the head is a rounded band over hairline rows ------------------------------ */
-[data-brand='rebrand'] .btable-wrap { border-color: transparent; border-radius: 0; box-shadow: none; }
+/* --- Tables: the outer line stays; the head is a rounded band over hairline rows ---------------------
+
+   This dropped the outer box entirely — rule 3, space and fill rather than
+   lines — and it went too far on the one object that needs an edge. A table
+   bleeding straight into the page has nothing holding its columns together at
+   the left and right, so the rows read as loose text rather than as a table,
+   and the head's rounded band floats with nothing under it to belong to.
+
+   So the box comes back, in the rebrand's own control edge rather than the
+   current look's heavier one, and everything else rule 3 removed stays removed:
+   no shadow, no rule under the head, hairlines between rows and nowhere else. */
+[data-brand='rebrand'] .btable-wrap {
+  border-color: var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+}
 [data-brand='rebrand'] .btable thead th:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
 [data-brand='rebrand'] .btable thead th:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
 [data-brand='rebrand'] .btable thead th { border-bottom-color: transparent; }
@@ -449,14 +463,19 @@
    Zones, Device profiles, Risk signals and Authentication methods each drew a
    bordered card around their rows. The rows already carry a hairline each, so
    the card was a second line saying the same thing. */
+/* The list panels keep their edge for the same reason the table does — see the
+   note there. The FILL still goes: the rows sit on the page's own white, which
+   is what stops the panel reading as a raised card, and the line is doing the
+   one job a line is for here, which is saying where the list stops. */
 [data-brand='rebrand'] .bz7__table,
 [data-brand='rebrand'] .bfp2__table,
 [data-brand='rebrand'] .brs__table,
 [data-brand='rebrand'] .bm8__list,
+[data-brand='rebrand'] .blist,
 [data-brand='rebrand'] .bcov__wrap {
   background: none;
-  border-color: transparent;
-  border-radius: 0;
+  border-color: var(--border-default);
+  border-radius: var(--radius-lg);
 }
 [data-brand='rebrand'] .bz7__thead,
 [data-brand='rebrand'] .bfp2__thead,

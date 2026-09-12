@@ -321,7 +321,29 @@
    One value, on .bpage, so it lands on every screen at once — the tables, the
    tabbed screens, the builder and the end-user pages all take their outer inset
    from here and none of them should disagree about where a page starts. */
-.bpage { padding: 32px 32px 56px; }
+/* --- One grid, every page ------------------------------------------------------
+
+   Ten columns, stated once here, so every screen lays out on the same measure
+   instead of each one inventing its own. Children span the full ten by default;
+   anything that wants to be narrower opts in by naming a span, which is the
+   only reason a column count is worth having.
+
+   `.bpage` was a bare block and the three library screens each set
+   `display: flex` with a gap of their own — 18px on two of them, 16px on the
+   third — so "the space between sections" was a different number depending on
+   which page you were reading. The gap is the grid's now, and it is one number.
+
+   `align-content: start` because a grid whose rows would otherwise stretch puts
+   a short page's sections in the middle of the viewport. */
+.bpage {
+  padding: 32px 32px 56px;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  column-gap: var(--space-6);
+  row-gap: var(--space-6);
+  align-content: start;
+}
+.bpage > * { grid-column: 1 / -1; min-width: 0; }
 
 /* Where the rail has already narrowed, the sides narrow with it: 32px of margin
    is air on a wide page and width you cannot spare on a cramped one.
@@ -541,7 +563,9 @@
    One gap for the three, and the toolbar contributes nothing on top of it. The
    margin stays for the pages that are still block-flow. */
 .btoolbar { margin-bottom: var(--space-5); }
-.bpage.bz7, .bpage.bfp2, .bpage.bm8 { gap: var(--space-6); }
+/* `.bpage.bz7, .bpage.bfp2, .bpage.bm8 { gap }` stood here — the three library
+   screens' own section spacing. `.bpage` is a grid with one row-gap now, so the
+   three no longer need a rule saying they are different. */
 .bz7 > .btoolbar, .bfp2 > .btoolbar, .bm8 > .btoolbar { margin-bottom: 0; }
 /* Top, not centre. The caption makes the left column two lines tall on the
    longer ones, and an action centred against that sits below the title it
@@ -556,22 +580,19 @@
   line-height: 1.55;
 }
 
-/* --- Side spacing on the library screens ------------------------------------
-   Zones, device profiles and authentication methods sit further in from both
-   edges than the rest of the console, matching the live product: on the SIEM
-   Management page the content starts about 9% of the content area in, on each
-   side, rather than the 32px this theme gives every other page.
+/* --- Side spacing on the library screens ---------------------------------------
 
-   `clamp` rather than a fixed inset, because 148px is right at 1920 and absurd
-   at 1100 — the floor keeps a narrow window usable and the ceiling stops the
-   measure drifting on a very wide one. Only these three: it is a deliberate
-   difference for the screens being revamped, not a new default, and applying it
-   everywhere would silently re-lay-out the builders and the gallery too. */
-.bpage.bz7,
-.bpage.bfp2,
-.bpage.bm8 {
-  padding-inline: clamp(20px, 9%, 148px);
-}
+   `padding-inline: clamp(20px, 9%, 148px)` stood here, on `.bz7`, `.bfp2` and
+   `.bm8` — Zones, Device profiles and Authentication methods sat about 9% in
+   from each edge, matching the live SIEM page, where the rest of the console
+   sits 32px in.
+
+   It went because it made three screens a different SHAPE from every other one
+   rather than a different density: at 1060px it resolved to 95px a side, so a
+   heading on Authentication methods started three inches further in than the
+   identical heading on Policies, and no grid could be shared across the two.
+   One padding, one grid, one measure — and the compactness the inset was
+   reaching for is the grid's job now. */
 
 /* --- The selection ramp in dark ------------------------------------------------
 

@@ -1,0 +1,140 @@
+/* ---------------------------------------------------------------------------
+   The board's guided demo. Prefix `btb`, on top of `btr`.
+
+   It reuses the trail tour's card, scrim, ring, beak and footer wholesale —
+   `.btr__card`, `.btr__hero`, `.btr__body`, `.btr__foot` — and adds only what
+   this one has that the other does not: a task strip, and a taller card to
+   hold it. Re-declaring the shared pieces under a second prefix would be two
+   coats of paint on one component, and they would drift.
+
+   Everything here is a token. The console's language is 60/30/10 with selection
+   in greyscale, so the orange is spent on two things only: the spotlight ring,
+   inherited, and the one primary button per card. The task strip's done state
+   is `--fb-positive-*`, which is feedback rather than selection, and is the
+   same green the rest of the console reports success in.
+
+   **Two sections used to live here and no longer do.** The nutshell — a
+   contents card of six tiles in front of step 1 — is gone with the phase it
+   belonged to: a summary of five steps shown immediately before those five
+   steps is the same information twice, and the copy nobody can act on is the
+   one that goes. And the video frame moved to demo-player.css, because a
+   `<video>` in a padded dialog body was never the right shape for the one thing
+   on this surface somebody watches rather than reads.
+   --------------------------------------------------------------------------- */
+
+/* The board's card carries a task strip between the copy and the footer, so it
+   is taller than the trail's — and taller by a different amount on every step,
+   because the copy is a different length each time. Nothing here needs to state
+   that: `BoardTour.tsx` measures the rendered height and feeds it to the
+   viewport clamp, which is the only thing that ever needed the number. */
+.btb__card { width: 384px; }
+
+/* The illustration band. Taller than the trail's 168px, because these figures
+   are drawings of the product rather than diagrams, and the extra 18px is what
+   keeps a four-card chain off its own edges.
+
+   The ground is NEUTRAL, and getting there took two wrong answers.
+
+   These figures are made of product surfaces — white cards with hairline
+   borders — and the trail's band is very nearly that same white, so the first
+   draft rendered as pale outlines on pale nothing. The fix for that was a warm
+   `--brand-subtle-bg` wash, and it was worse: at 384px wide, an orange field
+   under every card made the illustration the loudest thing on a card whose job
+   is to explain a screen. The console's own rule is 60/30/10 with selection in
+   greyscale, and a permanently orange 186px band is not a 10.
+
+   So: the canvas dot grid the board itself draws, over a plain sunken grey,
+   with the faintest ink vignette from the top-left to put the light where every
+   card's drop shadow already implies it is. White cards have something to be
+   raised above, and nothing competes with the figure's own two or three
+   deliberate colours. */
+.btb__hero {
+  height: 186px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--card-dot) 1px, transparent 0) 0 0 / 14px 14px,
+    radial-gradient(120% 90% at 4% -14%, color-mix(in srgb, var(--text-primary) 7%, transparent) 0%, transparent 62%),
+    var(--surface-sunken);
+}
+
+/* The step count and the way out to the recording, on one line.
+
+   The demo chip used to sit ON the illustration, top-left. It collided with
+   every figure that has something in that corner, which is four of the five —
+   the chain's spine, the directory's first row, the condition box's own header.
+   Here it is always clear, and it pairs with the count, which is the other
+   piece of "where am I and how long is this". */
+.btb__countrow {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 6px;
+}
+
+/* --- The task strip --------------------------------------------------------- */
+
+.btb__task {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 11px 16px 12px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+.btb__task p {
+  flex: 1; margin: 0;
+  font-size: var(--fs-sm); line-height: 1.45; color: var(--text-secondary);
+}
+
+/* The mark. An open ring while the task is outstanding, a filled tick when it
+   is done — the two states of a checkbox, which is what this is. */
+.btb__mark {
+  flex: none; display: grid; place-items: center;
+  width: 17px; height: 17px; margin-top: 1px;
+  border-radius: 50%;
+  /* Ink, not brand. An outstanding task is not a selection and not a warning —
+     it is simply the next thing, and the console says that in greyscale. The
+     one colour on this strip arrives with the tick, where it means "done". */
+  border: 1.5px solid color-mix(in srgb, var(--text-primary) 32%, transparent);
+  color: var(--fb-positive-fg);
+}
+.btb__task.is-done .btb__mark {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--fb-positive-dot) 16%, transparent);
+}
+.btb__task.is-done p { color: var(--text-primary); }
+
+/* Waiting reads as waiting. A slow pulse on the ring only — the strip itself
+   stays still, because a panel that breathes is a panel nobody can read next
+   to. Stopped for anybody who asked for less motion. */
+.btb__task:not(.is-done) .btb__mark { animation: btb-wait 2.1s ease-in-out infinite; }
+@keyframes btb-wait {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--text-primary) 22%, transparent); }
+  50%      { box-shadow: 0 0 0 4px color-mix(in srgb, var(--text-primary) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btb__task:not(.is-done) .btb__mark { animation: none; }
+}
+
+/* "Do it for me". A quiet outline button rather than a second filled one: the
+   card already has one primary, and a strip with two competing buttons makes
+   the reader choose between Next and the task before understanding either. */
+.btb__doit {
+  flex: none; align-self: center;
+  padding: 4px 9px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--surface-raised);
+  font-size: var(--fs-xs); font-weight: 500; color: var(--text-secondary);
+  white-space: nowrap;
+}
+.btb__doit:hover { background: var(--surface-hover, var(--surface-sunken)); color: var(--text-primary); }
+.btb__doit:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+
+/* --- The two ways in, on the board's top row -------------------------------- */
+
+/* Sits with the readings rather than with the publishing verbs: it is a thing
+   you READ the board with, like Check and What changes, not a thing you do to
+   the draft. Icon-only because it is the one control in that row whose meaning
+   survives losing its label, and the row is meant to be quiet. */
+.bbtop__learn {
+  display: grid; place-items: center;
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+}
+.bbtop__learn:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bbtop__learn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }

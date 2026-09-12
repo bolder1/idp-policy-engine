@@ -1,0 +1,279 @@
+/* ---------------------------------------------------------------------------
+   The demo player. Prefix `dpl`.
+
+   The one surface in this console that is deliberately DARK. Everything else
+   here is light — the console has no dark mode and every colour decision is
+   judged on light — but a video is a lit rectangle, and a lit rectangle on a
+   white field reads as a picture of a screen rather than as something playing.
+   So the room goes dark and the frame is the only lit thing in it, which is the
+   convention every player worth copying already follows.
+
+   That is why the raw colours below are raw. They are not theme values that
+   drifted out of the token file: they are the inside of a light box, and a
+   `--surface-raised` in here would be the console's white leaking into the one
+   place that has to stay out of its way.
+   --------------------------------------------------------------------------- */
+
+.dpl {
+  position: fixed; inset: 0; z-index: calc(var(--z-modal) + 10);
+  display: grid; place-items: center;
+  /* Named, because the ambient wash below has to know it. The room between the
+     frame and the edge of the screen IS this padding, and a glow sized in
+     absolute pixels either clips against it or wastes it. */
+  --dpl-pad: clamp(16px, 4vw, 56px);
+  padding: var(--dpl-pad);
+  background: rgb(6 8 11 / 0.86);
+  /* Blur rather than only dim. The board behind stays recognisable as the
+     place you are still in, which a flat black would take away. */
+  backdrop-filter: blur(18px) saturate(0.7);
+  -webkit-backdrop-filter: blur(18px) saturate(0.7);
+}
+
+.dpl__stage {
+  position: relative;
+  width: min(1180px, 100%);
+  isolation: isolate;
+}
+
+/* --- Ambient light -----------------------------------------------------------
+
+   A second copy of the video, spread past the frame and blurred into a wash, so
+   the picture throws its own colour onto the dark around it. Underneath
+   everything (`z-index: -1` inside the stage's own isolation), unclickable, and
+   invisible to assistive technology.
+
+   --- It was invisible, and there were four reasons ------------------------
+
+   Measured in the running player: the ambient was 1148x717 behind an OPAQUE
+   1063x664 frame, so only 43px of it could ever escape on each side — against a
+   70px blur radius. Most of the wash was painted underneath the picture.
+
+   Worse, `border-radius: 50%` made it an ELLIPSE inscribed in that box, and an
+   ellipse retreats inside a rectangle everywhere except the four edge
+   midpoints: it missed the frame's corners by some 315px horizontally and was
+   already behind the frame edge a fifth of the way down. What could escape was
+   four tapering slivers, at 0.55 opacity, through a 70px blur. Nothing.
+
+   --- What it is now --------------------------------------------------------
+
+   · **A rectangle, not an ellipse.** The frame is a rectangle; the glow behind
+     it has to be one too or the corners stay dark.
+   · **Sized to the room that exists.** The overhang is derived from `--dpl-pad`
+     rather than picked — that padding IS the gap between the frame and the
+     screen edge, so the wash fades out inside it instead of being cut off
+     mid-strength at the viewport. A 149px overhang was tried and is wrong for
+     exactly this reason: at a 1155px viewport there are only 46px of room.
+   · **`object-fit: cover`.** Chromium's UA stylesheet gives `<video>`
+     `object-fit: contain`, so the moment a recording's aspect ratio stops
+     matching the box the wash would letterbox — a hard black band inside a
+     glow. Cover cannot.
+   · **Less blur, more opacity.** 34px over a ~46px overhang spends the wash
+     where it can be seen; 70px over 43px spent it where it could not.
+
+   `translateZ(0)` is load-bearing rather than superstition: a large blur on a
+   playing video repaints every frame, and without its own layer it drags the
+   whole stage — controls included — through the compositor with it.
+   `will-change: filter` was NOT load-bearing and is gone: it pins a
+   filter-sized texture for the life of the element, on top of the layer
+   `translateZ(0)` already creates. */
+.dpl__ambient {
+  position: absolute; z-index: -1;
+  /* Stated overhangs rather than a scale, because a uniform scale on a 16:10
+     box gives a side overhang two thirds larger than the top one — which is not
+     a choice anybody made.
+
+     Offset AND size, not `inset`. A bare negative `inset` is correct for a
+     normal element and silently wrong for a REPLACED one: `<video>` with
+     `width: auto` takes its INTRINSIC width, which over-constrains the box, so
+     the `right` offset is dropped and the wash hangs off one side. Measured
+     when it was written that way: 27px of overhang on the left and 299px on the
+     right, running 218px off the screen. Sizing it explicitly is what makes the
+     four overhangs actually equal. */
+  top: calc(var(--dpl-pad) * -0.6);
+  left: calc(var(--dpl-pad) * -0.6);
+  width: calc(100% + var(--dpl-pad) * 1.2);
+  height: calc(100% + var(--dpl-pad) * 1.2);
+  object-fit: cover;
+  transform: translateZ(0);
+  filter: blur(34px) saturate(2.1) brightness(1.1);
+  opacity: 0.8;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The glow still helps; the constant churn of a saturated one does not. */
+  .dpl__ambient { filter: blur(34px) saturate(1.4); opacity: 0.55; }
+}
+
+/* --- The frame --------------------------------------------------------------- */
+
+.dpl__frame {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0a0d11;
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.08),
+    0 40px 90px -20px rgb(0 0 0 / 0.7);
+  aspect-ratio: 16 / 10;
+}
+.dpl__frame.is-full { border-radius: 0; aspect-ratio: auto; height: 100%; }
+
+.dpl__video {
+  display: block; width: 100%; height: 100%;
+  object-fit: contain;
+  background: #0a0d11;
+  cursor: pointer;
+}
+
+/* --- The centre button -------------------------------------------------------
+
+   Glass rather than a solid disc: the frame behind it is the thing being
+   offered, and a filled circle in the middle of a paused video hides the frame
+   somebody is deciding whether to watch. */
+.dpl__big {
+  position: absolute; top: 50%; left: 50%; margin: -38px 0 0 -38px;
+  display: grid; place-items: center;
+  width: 76px; height: 76px; border-radius: 50%;
+  color: #fff;
+  background: rgb(255 255 255 / 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.22), 0 10px 40px rgb(0 0 0 / 0.45);
+  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), background 0.18s;
+}
+.dpl__big:hover { background: rgb(255 255 255 / 0.22); transform: scale(1.06); }
+.dpl__big:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--brand), 0 10px 40px rgb(0 0 0 / 0.45); }
+/* Optically centred: a play triangle's mass sits left of its bounding box. */
+.dpl__big svg { margin-left: 4px; }
+.dpl__big svg.lucide-rotate-ccw { margin-left: 0; }
+
+/* --- The control bar --------------------------------------------------------- */
+
+.dpl__bar {
+  position: absolute; inset: auto 0 0 0;
+  padding: 34px 14px 12px;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.82) 0%, rgb(0 0 0 / 0.45) 45%, transparent 100%);
+  opacity: 0; transform: translateY(6px);
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.2, 0, 0, 1);
+  pointer-events: none;
+}
+.dpl__frame.is-awake .dpl__bar { opacity: 1; transform: none; pointer-events: auto; }
+
+/* The scrubber. 4px at rest and 7px under the pointer — the target is the
+   14px hit area around it either way, which is what `padding` buys. */
+.dpl__track {
+  position: relative; height: 4px; margin: 0 4px 10px;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.24);
+  cursor: pointer;
+  transition: height 0.14s ease;
+  touch-action: none;
+}
+.dpl__track:hover, .dpl__track.is-scrubbing { height: 7px; }
+.dpl__track:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--brand); }
+
+.dpl__buf {
+  position: absolute; inset: 0 auto 0 0;
+  border-radius: 3px; background: rgb(255 255 255 / 0.22);
+}
+.dpl__fill {
+  position: absolute; inset: 0 auto 0 0;
+  border-radius: 3px; background: var(--brand);
+}
+.dpl__knob {
+  position: absolute; right: -6px; top: 50%;
+  width: 12px; height: 12px; margin-top: -6px;
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 5px rgb(0 0 0 / 0.5);
+  opacity: 0; transform: scale(0.6);
+  transition: opacity 0.14s ease, transform 0.14s cubic-bezier(0.2, 0, 0, 1);
+}
+.dpl__track:hover .dpl__knob, .dpl__track.is-scrubbing .dpl__knob { opacity: 1; transform: scale(1); }
+
+.dpl__row { display: flex; align-items: center; gap: 6px; }
+
+.dpl__btn {
+  display: grid; place-items: center;
+  width: 32px; height: 32px; border-radius: 8px;
+  color: rgb(255 255 255 / 0.88);
+}
+.dpl__btn:hover { background: rgb(255 255 255 / 0.14); color: #fff; }
+.dpl__btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--brand); }
+
+.dpl__time {
+  padding: 0 6px;
+  font-size: 12.5px; font-variant-numeric: tabular-nums;
+  color: #fff; white-space: nowrap;
+}
+.dpl__time em { font-style: normal; color: rgb(255 255 255 / 0.55); }
+
+.dpl__spacer { flex: 1; }
+
+/* The caption rides in the bar rather than under the frame. Under it, it was a
+   line of console-grey text on the dark, which read as a rendering fault. */
+.dpl__cap {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 46ch; padding-right: 6px;
+  font-size: 12px; color: rgb(255 255 255 / 0.6);
+}
+@media (max-width: 720px) { .dpl__cap { display: none; } }
+
+/* --- Close, and the failure case --------------------------------------------- */
+
+.dpl__x {
+  position: absolute; top: -6px; right: -6px;
+  transform: translate(100%, -100%);
+  display: grid; place-items: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  color: rgb(255 255 255 / 0.75);
+  background: rgb(255 255 255 / 0.08);
+}
+.dpl__x:hover { background: rgb(255 255 255 / 0.18); color: #fff; }
+.dpl__x:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--brand); }
+/* Off the corner is fine on a roomy screen and off the SCREEN is not, so on a
+   narrow one it comes back inside the frame. */
+@media (max-width: 900px) {
+  .dpl__x { top: 8px; right: 8px; transform: none; background: rgb(0 0 0 / 0.5); }
+}
+
+.dpl__fail {
+  display: grid; place-content: center; gap: 8px;
+  height: 100%; padding: 40px; text-align: center;
+  color: rgb(255 255 255 / 0.75); font-size: var(--fs-sm); line-height: 1.6;
+}
+.dpl__fail strong { color: #fff; font-weight: 600; }
+.dpl__fail code {
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.92em;
+  padding: 1px 5px; border-radius: 4px;
+  background: rgb(255 255 255 / 0.1); color: #fff;
+}
+
+/* --- The way in --------------------------------------------------------------
+
+   An icon and a duration. It said "Watch the 2-minute demo", which is a
+   sentence where a label belongs — the play mark already says "watch" and the
+   timestamp already says how long, so the words between them were carrying
+   nothing. `tabular-nums` so the digits do not shift the button's width as the
+   real duration replaces the estimate. */
+.dpl__open {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 9px 0 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--surface-raised);
+  font-size: var(--fs-xs); font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.dpl__open:hover { background: var(--surface-sunken); color: var(--text-primary); border-color: var(--border-strong, var(--border-default)); }
+.dpl__open:hover svg { color: var(--brand); }
+.dpl__open:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+.dpl__open svg { color: var(--text-tertiary); transition: color 0.14s ease; }
+
+/* A variant of this sat ON the walkthrough card's illustration, absolutely
+   placed in the top-left corner. It is gone: four of the five figures have
+   something in that corner — the chain's spine, the directory's first row, the
+   condition box's own header — so it collided with most of them. The button
+   now shares a line with the step count, which is always clear and is where
+   "how long is this" already lives. */

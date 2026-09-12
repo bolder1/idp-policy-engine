@@ -1,0 +1,9 @@
+/* ============================================================================
+   Rebrand · Board
+
+   The board builder: canvas, rule cards, the inspector and its editors, the bar and dialogs.
+
+   Every rule here starts with [data-brand='rebrand']. This sheet loads after
+   rebrand.css, so at equal weight a rule here wins over one there. The rules
+   it follows are in docs/rebrand-guideline.md.
+   ========================================================================== */

@@ -22,7 +22,9 @@
   gap: 4px;
   height: var(--nav-topbar-h);
   padding: 0 12px 0 8px;
-  background: #fff;
+  /* Tokens, not hex. White, #495057 and #212529 are these tokens' light values;
+     as hex the bar stayed white on a dark page when the theme flipped. */
+  background: var(--surface-raised);
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
   z-index: 60;
 }
@@ -30,9 +32,9 @@
   width: 37px; height: 37px; flex: none;
   display: grid; place-items: center;
   border-radius: var(--radius-md);
-  color: #495057;
+  color: var(--text-secondary);
 }
-.bshell__burger:hover { background: #f1f3f5; }
+.bshell__burger:hover { background: var(--surface-inset); }
 .bshell__logo { display: flex; align-items: center; padding: 0 8px; }
 .bshell__logo img { height: 40px; width: auto; display: block; }
 
@@ -41,9 +43,9 @@
   width: 37px; height: 37px;
   display: grid; place-items: center;
   border-radius: var(--radius-md);
-  color: #495057;
+  color: var(--text-secondary);
 }
-.bshell__icon:hover { background: #f1f3f5; color: #212529; }
+.bshell__icon:hover { background: var(--surface-inset); color: var(--text-primary); }
 /* Slate, not brand. It sat in the top-right corner of every screen as a solid
    orange disc — the largest continuous area of brand colour in the product, on
    the one element that is not an action and never needs finding. */
@@ -173,6 +175,23 @@
   font-size: 9px; font-weight: var(--fw-semibold); letter-spacing: 0.04em;
   color: rgba(255, 255, 255, 0.55);
 }
+
+/* Focus on the dark ground. The global ring is slate on slate here, about 1.9:1,
+   so a keyboard user could not see which row they were on. Drawn inside the
+   row, because the rail and the sub-menu clip anything outside it. */
+.bshell__item:focus-visible,
+.bshell__subitem:focus-visible {
+  outline: var(--bw-thin) solid var(--shell-text);
+  outline-offset: -3px;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+/* A row wrapped in a Tip still spans the rail. `.bx-tip` is inline-flex, which
+   would shrink the row, and its hover, to the label. */
+.bshell__nav .bx-tip { display: flex; }
+.bshell__nav .bx-tip > button { flex: 1; min-width: 0; }
+
 /* --- Collapsed ------------------------------------------------------------ */
 
 /* One rule used to squash the label, the badge, the chevron AND the section
@@ -234,9 +253,15 @@
 
 .bshell__toast {
   position: fixed;
-  left: 50%;
+  /* Centred without a transform. Motion writes `transform` inline to animate y
+     and scale, so a translateX here was dropped and the toast sat right of
+     centre. The same fix as `.bx-savebar` in kit.css. */
+  left: 0;
+  right: 0;
   bottom: var(--space-8);
-  transform: translateX(-50%);
+  margin-inline: auto;
+  width: fit-content;
+  max-width: calc(100vw - var(--space-8) * 2);
   padding: var(--space-4) var(--space-7);
   background: var(--surface-inverse);
   color: var(--text-inverse);
@@ -248,8 +273,9 @@
 
 /* --- Page chrome ---------------------------------------------------------- */
 
-.bpage { padding: var(--space-8) var(--space-8) var(--space-14); max-width: 1560px; }
-.bpage__head { margin-bottom: var(--space-7); }
+/* The page's padding, the head's margin and the caption's type are stated once,
+   in console-theme.css, which loads last. The copies here never applied. */
+.bpage { max-width: 1560px; }
 .bpage__crumb {
   display: flex;
   align-items: center;
@@ -267,17 +293,15 @@
   gap: var(--space-8);
 }
 .bpage__headrow h1 { font-size: var(--fs-3xl); letter-spacing: -0.02em; }
-.bpage__headrow p { margin-top: var(--space-2); font-size: var(--fs-base); color: var(--text-secondary); max-width: 64ch; }
 .bpage__actions { display: flex; align-items: center; gap: var(--space-4); flex: none; }
 
 /* --- Narrow --------------------------------------------------------------- */
 
-/* Narrow the rail by changing the variable, not the grid — the fixed commit bar
-   and anything else positioned against the rail reads the same value. */
+/* Narrow the rail by changing the variable the grid reads, as the collapsed state
+   does. The page's narrow inset is in console-theme.css, which loads last. */
 @media (max-width: 1120px) {
   .bshell { --nav-sidebar-w: 200px; }
   .bshell.is-collapsed { --nav-sidebar-w: 64px; }
-  .bpage { padding: var(--space-7) var(--space-6) var(--space-12); }
 }
 
 /* `.bshell__quick` — a floating rail of two icon buttons down the right edge —
@@ -287,3 +311,32 @@
    gone. The dev server tolerated the empty rule and lightningcss did not, so
    `npm run build` failed on it — invisible in development, fatal in
    production. */
+
+/* --- Rebrand switch ----------------------------------------------------------
+   Prototype furniture beside the persona switch, drawn the same way so the two
+   read as a pair: a 30px outlined control with its state inside it. */
+.bshell__brand {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  height: 30px; padding: 0 var(--space-4) 0 var(--space-3);
+  background: var(--surface-raised);
+  border: 1px solid var(--int-neutral-border); border-radius: var(--radius-md);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary);
+  white-space: nowrap;
+}
+.bshell__brand:hover { border-color: var(--int-neutral-border-hover); color: var(--text-primary); }
+.bshell__brand.is-on { color: var(--text-primary); }
+.bshell__brand-track {
+  position: relative; flex: none; width: 26px; height: 14px;
+  border-radius: var(--radius-full); background: var(--border-strong);
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+.bshell__brand-knob {
+  position: absolute; top: 2px; left: 2px; width: 10px; height: 10px;
+  border-radius: var(--radius-full); background: #fff;
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+/* The rebrand's own blue, in both looks: the switch previews that colour. */
+.bshell__brand.is-on .bshell__brand-track { background: #0d6efd; }
+.bshell__brand.is-on .bshell__brand-knob { transform: translateX(12px); }
+@media (prefers-reduced-motion: reduce) {
+  .bshell__brand-track, .bshell__brand-knob { transition: none; }}

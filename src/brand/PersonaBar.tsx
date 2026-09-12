@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Users } from 'lucide-react'
 
 import { DEPTHS } from './fixtures'
+import { Tip } from './kit'
 import { PERSONAS, TAB_LABEL, personaById, tabsFor } from './personas'
 import { useBrand } from './store'
 
@@ -48,25 +49,28 @@ export function PersonaBar() {
 
   return (
     <div className="bpb" ref={wrap}>
-      <button
-        type="button"
-        className="bpb__trigger"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        title="Load a different persona's tenant into every tab"
-      >
-        <Users size={14} strokeWidth={1.9} aria-hidden />
-        <span className="bpb__label">Persona</span>
-        <strong>{current.label}</strong>
-        <ChevronDown size={14} strokeWidth={2} aria-hidden />
-      </button>
+      {/* The caveat in a Tip, like the Rebrand switch beside it. It was a native
+          title, which a keyboard never reached. */}
+      <Tip text="Prototype only: loads another persona’s tenant into every tab.">
+        <button
+          type="button"
+          className="bpb__trigger"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+        >
+          <Users size={14} strokeWidth={1.9} aria-hidden />
+          <span className="bpb__label">Persona</span>
+          <strong>{current.label}</strong>
+          <ChevronDown size={14} strokeWidth={2} aria-hidden />
+        </button>
+      </Tip>
 
       {open && (
         <div className="bpb__panel" role="listbox" aria-label="Persona">
           <p className="bpb__intro">
-            Loads that persona’s tenant into every tab — policies, zones, fingerprints, method sets and hooks —
-            and lands where they start. Prototype furniture; it would not ship.
+            {PERSONAS.length} personas, one tenant each. Picking one loads that tenant into every tab and opens where
+            they start.
           </p>
           <ul>
             {PERSONAS.map((p) => {

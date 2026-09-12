@@ -1,0 +1,560 @@
+/* =============================================================================
+   The rebrand.
+
+   Copied from the live console (login.xecurify.com/moas/admin/customer/home),
+   measured September 2026, and applied only while `data-brand="rebrand"` is on
+   <html> — the Rebrand switch in the top bar. Loaded after console-theme.css, so
+   it has the last word on every token it restates.
+
+   Four rules, and everything below is one of them:
+
+   1. THE LIVE CONSOLE'S MATERIALS. White page, #f8f9fa tiles, #dee2e6 control
+      edges, the Bootstrap grey ramp for text, DM Sans with 14px content.
+   2. ONE BLUE FOR STATE. #0d6efd is the console's blue — links, text buttons,
+      the "New" and "Default" badges, the selected card. Here it is also every
+      active and selected state: tabs, chips, switches, ticks, chosen options,
+      focus. Orange is kept for the primary action and the rail's edge.
+   3. SPACE AND FILL SEPARATE THINGS, NOT LINES. Pills, callouts, cards, table
+      boxes and dialog heads lose their borders. A line stays only where content
+      scrolls under something (a dialog footer) or where a field needs an edge.
+   4. ONE ANSWER PER COMPONENT. One pill geometry, one control height per size,
+      one tooltip, one radius per kind of object.
+   ========================================================================== */
+
+:root[data-brand='rebrand'] {
+  /* The rebrand is light only, like the live console. */
+  color-scheme: light;
+
+  /* --- Type ------------------------------------------------------------------ */
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-base: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 18px;
+  --fs-2xl: 20px;
+  --fs-3xl: 24px;
+
+  /* --- Surfaces -------------------------------------------------------------- */
+  --surface-page: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f8f9fa;
+  --surface-inset: #f1f3f5;
+  --surface-overlay: #ffffff;
+  --surface-inverse: #212529;
+
+  /* --- Lines: a hairline and a control edge, nothing heavier ------------------ */
+  --border-subtle: #eef0f2;
+  --border-default: #dee2e6;
+  --border-strong: #ced4da;
+
+  /* --- Text: the console's Bootstrap ramp -------------------------------------
+     Muted is one step darker than Bootstrap's #6c757d, which is 4.2:1 on the
+     inset grey; #646c75 clears 4.5:1 on white, sunken and inset alike. */
+  --text-primary: #212529;
+  --text-body: #212529;
+  --text-secondary: #495057;
+  --text-tertiary: #5c636a;
+  --text-muted: #646c75;
+  --text-placeholder: #6c757d;
+  --text-link: #0d6efd;
+
+  /* --- Blue ------------------------------------------------------------------- */
+  --blue: #0d6efd;
+  --blue-hover: #0b5ed7;
+  --blue-strong: #0a58ca;
+  --blue-soft: #e7f1ff;
+  --blue-soft-hover: #d7e7ff;
+
+  /* Selection is blue. These names are what every screen already reads for a
+     chosen or active thing, so changing them here reaches all of them. */
+  --accent: #0d6efd;
+  --accent-hover: #0b5ed7;
+  --accent-strong: #0a58ca;
+  --accent-soft: #e7f1ff;
+  --accent-soft-border: #b6d4fe;
+
+  --focus-ring: #0d6efd;
+  --focus-halo: rgba(13, 110, 253, 0.2);
+  --focus-ring-danger: #b02a37;
+
+  /* --- Everything the dark theme also overrides ---------------------------------
+     The rebrand is light only, and the theme toggle can still stamp
+     data-theme="dark" beside it. Each token a dark block sets is restated here
+     with its light value, so nothing dark leaks into the rebrand — tooltip text
+     on the inverse surface was the visible casualty. The unused --tint-* and
+     --pri-* families are left out. */
+  --text-inverse: #ffffff;
+  --text-on-brand: #ffffff;
+  --text-disabled: #adb5bd;
+  --card-dot: rgba(33, 37, 41, 0.13);
+
+  /* One orange: every primary fill reads the rebrand's action colour, so a
+     bespoke primary button cannot drift from the kit's. The rail edge keeps the
+     console's own #eb5424. */
+  --brand: #eb5424;
+  --brand-hover: #d64c21;
+  --brand-active: #a73c1a;
+  --brand-on-fill: #cc4b1d;
+  --brand-subtle-bg: #fdeee9;
+  --brand-subtle-border: #f9cabb;
+  --int-brand-bg: #cc4b1d;
+  --int-brand-bg-hover: #b8411a;
+  --int-brand-bg-active: #9e3715;
+  --int-brand-text: #ffffff;
+  --int-danger-text: #ffffff;
+
+  /* The rail, as the live console draws it. */
+  --shell-bg: #1e2c38;
+  --shell-bg-deep: #16212b;
+  --shell-raised: #263746;
+  --shell-border: rgba(255, 255, 255, 0.08);
+  --shell-border-strong: rgba(255, 255, 255, 0.14);
+  --shell-text: #ffffff;
+  --shell-text-secondary: rgba(255, 255, 255, 0.88);
+  --shell-text-muted: #cbcbcb;
+  --shell-item-hover: rgba(0, 0, 0, 0.22);
+  --shell-item-active: rgba(0, 0, 0, 0.4);
+
+  /* --- Controls: the live form-control ---------------------------------------- */
+  --ctl-bg: #ffffff;
+  --ctl-bg-hover: #ffffff;
+  --ctl-border: #dee2e6;
+  --ctl-border-hover: #ced4da;
+  --ctl-border-focus: #86b7fe;
+  --ctl-radius: 6px;
+  --ctl-height-sm: 30px;
+  --ctl-height-md: 36px;
+  --ctl-height-lg: 40px;
+
+  /* --- Actions ----------------------------------------------------------------
+     The primary keeps the console's orange hue, one step deeper than #eb5424 so
+     its white label clears 4.5:1. The secondary is the console's light button:
+     a grey fill and no edge. */
+  --rb-cta: #cc4b1d;
+  --rb-cta-hover: #b8411a;
+  --rb-cta-active: #9e3715;
+  --int-neutral-bg: #f1f3f5;
+  --int-neutral-bg-hover: #e9ecef;
+  --int-neutral-bg-active: #dee2e6;
+  --int-neutral-border: #dee2e6;
+  --int-neutral-border-hover: #ced4da;
+  --int-neutral-text: #212529;
+  --int-ghost-text: #495057;
+  --int-ghost-bg-hover: #f1f3f5;
+  --int-ghost-bg-active: #e9ecef;
+  --int-danger-bg: #dc3545;
+  --int-danger-bg-hover: #bb2d3b;
+  --state-hover-bg: #f1f3f5;
+  --state-press-bg: #e9ecef;
+
+  /* --- Feedback: the console's tones, as tints ---------------------------------
+     Info and the attention family (New, Beta, Recommended) are the same blue as
+     selection, so the page carries one blue rather than a blue and a violet. */
+  --fb-positive-bg: #e8f5ee;
+  --fb-positive-border: #bcdfca;
+  --fb-positive-fg: #146c43;
+  --fb-positive-dot: #198754;
+  --fb-negative-bg: #fcebec;
+  --fb-negative-border: #f1b0b7;
+  --fb-negative-fg: #b02a37;
+  --fb-negative-dot: #dc3545;
+  --fb-notice-bg: #fff6e0;
+  --fb-notice-border: #ffe0a3;
+  --fb-notice-fg: #7a5a00;
+  --fb-notice-dot: #e0a800;
+  --fb-info-bg: #e7f1ff;
+  --fb-info-border: #b6d4fe;
+  --fb-info-fg: #0a58ca;
+  --fb-info-dot: #0d6efd;
+  --fb-accent-bg: #e7f1ff;
+  --fb-accent-border: #b6d4fe;
+  --fb-accent-fg: #0a58ca;
+  --fb-accent-dot: #0d6efd;
+  --fb-neutral-bg: #f1f3f5;
+  --fb-neutral-border: #dee2e6;
+  --fb-neutral-fg: #495057;
+  --fb-neutral-dot: #6c757d;
+  /* Category tints (a profile's mode, a template's kind) were lime and magenta.
+     A category is not a state, and the console marks every non-state chip in its
+     one blue — so both join it, and the word on the chip carries the category. */
+  --fb-lime-bg: #e7f1ff;
+  --fb-lime-border: #b6d4fe;
+  --fb-lime-fg: #0a58ca;
+  --fb-lime-dot: #0d6efd;
+  --fb-magenta-bg: #e7f1ff;
+  --fb-magenta-border: #b6d4fe;
+  --fb-magenta-fg: #0a58ca;
+  --fb-magenta-dot: #0d6efd;
+
+  /* --- One pill: the console's badge -------------------------------------------- */
+  --pill-fs: 12px;
+  --pill-fw: 500;
+  --pill-py: 2px;
+  --pill-px: 8px;
+  --pill-radius: 6px;
+  --pill-line: 16px;
+  --pill-gap: 4px;
+  --radius-pill: 6px;
+
+  /* --- One table: a grey head band and hairline rows, no box ---------------------- */
+  --table-head-bg: #f8f9fa;
+  --table-head-fg: #495057;
+  --table-head-fs: 13px;
+  --table-head-fw: 500;
+  --table-head-rule: #eef0f2;
+  --table-rule: #eef0f2;
+  --table-row-hover: #f8f9fa;
+  --table-header-h: 44px;
+  --table-row-h: 52px;
+  --table-cell-x: 16px;
+
+  /* --- Radii: controls and pills 6, containers 8, dialogs 12 ---------------------- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* --- Elevation: only what floats casts a shadow ----------------------------------- */
+  /* A zero shadow, not `none`: this token is used inside shadow lists
+     (`inset 0 0 0 1px …, var(--el-low)`), where `none` voids the whole list. */
+  --el-low: 0 0 0 0 transparent;
+  --el-mid: 0 2px 8px rgba(33, 37, 41, 0.06);
+  --el-high: 0 8px 24px rgba(33, 37, 41, 0.12);
+  --el-overlay: 0 16px 48px rgba(33, 37, 41, 0.18);
+}
+
+/* =============================================================================
+   Components
+   ========================================================================== */
+
+/* --- Links ----------------------------------------------------------------- */
+[data-brand='rebrand'] .brand-root a:hover { color: var(--blue-hover); }
+
+/* --- Labels: sentence case, like every label in the console ------------------- */
+[data-brand='rebrand'] .u-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-secondary);
+}
+
+/* --- Buttons ------------------------------------------------------------------ */
+[data-brand='rebrand'] .bx-btn {
+  height: var(--ctl-height-md);
+  padding: 0 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+[data-brand='rebrand'] .bx-btn--sm { height: var(--ctl-height-sm); padding: 0 12px; font-size: 13px; }
+
+[data-brand='rebrand'] .bx-btn--brand { background: var(--rb-cta); border-color: var(--rb-cta); color: #fff; }
+[data-brand='rebrand'] .bx-btn--brand:not(:disabled):hover { background: var(--rb-cta-hover); border-color: var(--rb-cta-hover); }
+[data-brand='rebrand'] .bx-btn--brand:not(:disabled):active { background: var(--rb-cta-active); border-color: var(--rb-cta-active); }
+
+[data-brand='rebrand'] .bx-btn--neutral { background: var(--int-neutral-bg); border-color: transparent; color: var(--int-neutral-text); }
+[data-brand='rebrand'] .bx-btn--neutral:not(:disabled):hover { background: var(--int-neutral-bg-hover); border-color: transparent; }
+[data-brand='rebrand'] .bx-btn--neutral:not(:disabled):active { background: var(--int-neutral-bg-active); }
+
+[data-brand='rebrand'] .bx-btn--ghost { color: var(--int-ghost-text); }
+[data-brand='rebrand'] .bx-btn--ghost:not(:disabled):hover { background: var(--int-ghost-bg-hover); color: var(--text-primary); }
+
+[data-brand='rebrand'] .bx-btn--danger { background: var(--int-danger-bg); border-color: var(--int-danger-bg); }
+[data-brand='rebrand'] .bx-btn--danger:not(:disabled):hover { background: var(--int-danger-bg-hover); border-color: var(--int-danger-bg-hover); }
+
+/* An open trigger is an active state. */
+[data-brand='rebrand'] .bx-menu__trigger.is-open { background: var(--blue-soft); border-color: transparent; color: var(--blue-strong); }
+
+/* --- Icon buttons ----------------------------------------------------------------- */
+[data-brand='rebrand'] .bx-iconbtn { border-radius: 6px; }
+[data-brand='rebrand'] .bx-iconbtn--neutral { background: transparent; border-color: transparent; }
+[data-brand='rebrand'] .bx-iconbtn--neutral:not(:disabled):hover { background: var(--state-hover-bg); border-color: transparent; }
+[data-brand='rebrand'] .bx-iconbtn.is-on { background: var(--blue-soft); border-color: transparent; color: var(--blue-strong); }
+
+/* --- Menus ---------------------------------------------------------------------- */
+[data-brand='rebrand'] .bx-menu__pop { border-color: var(--border-subtle); border-radius: 8px; }
+[data-brand='rebrand'] .bx-menu__item.is-cursor:not(:disabled) { background: var(--state-hover-bg); }
+[data-brand='rebrand'] .bx-menu__item.is-divided { border-top-color: var(--border-subtle); }
+
+/* --- Tooltips: one dark tip, one mark -------------------------------------------- */
+[data-brand='rebrand'] .bx-tip__pop {
+  width: auto;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 8px 10px;
+  background: #212529;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+[data-brand='rebrand'] .bx-tipdot {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  background: var(--surface-inset);
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+[data-brand='rebrand'] .bx-tipdot:hover { background: var(--blue-soft); color: var(--blue-strong); }
+
+/* --- Search ------------------------------------------------------------------------ */
+[data-brand='rebrand'] .bx-search:hover { border-color: var(--ctl-border-hover); }
+
+/* --- Pills: badges, decisions, statuses ------------------------------------------- */
+[data-brand='rebrand'] .bx-badge,
+[data-brand='rebrand'] .bx-decision,
+[data-brand='rebrand'] .bx-status--always,
+[data-brand='rebrand'] .bx-status--monitor {
+  border-color: transparent;
+}
+[data-brand='rebrand'] .bx-badge--system { background: var(--surface-inset); color: var(--text-tertiary); }
+/* Draft is unfinished, not a fault: a neutral fill instead of a dashed box. */
+[data-brand='rebrand'] .bx-status--draft {
+  border-color: transparent;
+  background: var(--surface-inset);
+  color: var(--text-tertiary);
+}
+
+/* --- Switch: on is the blue ---------------------------------------------------------- */
+[data-brand='rebrand'] .bx-toggle { background: var(--border-default); border-color: transparent; }
+[data-brand='rebrand'] .bx-toggle:not(:disabled):hover { background: var(--border-strong); border-color: transparent; }
+[data-brand='rebrand'] .bx-toggle.is-on { background: var(--blue); border-color: var(--blue); }
+[data-brand='rebrand'] .bx-toggle.is-on:not(:disabled):hover { background: var(--blue-hover); border-color: var(--blue-hover); filter: none; }
+[data-brand='rebrand'] .bx-toggle__knob { box-shadow: 0 1px 2px rgba(33, 37, 41, 0.2); }
+
+/* --- Filter chips ---------------------------------------------------------------------- */
+[data-brand='rebrand'] .bx-chip { background: var(--surface-inset); border-color: transparent; }
+[data-brand='rebrand'] .bx-chip.is-clickable:hover { background: var(--int-neutral-bg-hover); border-color: transparent; }
+[data-brand='rebrand'] .bx-chip.is-on { background: var(--blue-soft); border-color: transparent; }
+[data-brand='rebrand'] .bx-chip__main em { background: var(--surface-raised); }
+
+/* --- Tabs --------------------------------------------------------------------------------
+   Segmented where a tablist is a control among controls; underlined where it
+   divides a page. Both mark the chosen tab in blue. */
+[data-brand='rebrand'] .bx-tabs { background: var(--surface-inset); border-color: transparent; }
+[data-brand='rebrand'] .bx-tabs__bg { box-shadow: 0 1px 2px rgba(33, 37, 41, 0.08); }
+[data-brand='rebrand'] .bx-tabs--line { background: none; border-bottom-color: var(--border-subtle); }
+[data-brand='rebrand'] .bx-tabs--line .bx-tabs__tab { height: 40px; font-size: 14px; color: var(--text-tertiary); }
+[data-brand='rebrand'] .bx-tabs--line .bx-tabs__tab.is-on { color: var(--blue-strong); }
+[data-brand='rebrand'] .bx-tabs--line .bx-tabs__bg { background: var(--blue); box-shadow: none; }
+
+/* --- Fields ----------------------------------------------------------------------------------- */
+[data-brand='rebrand'] .bx-field__label { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+[data-brand='rebrand'] .bx-field__hint { font-size: 13px; color: var(--text-muted); }
+
+/* --- Callouts: a tint, no box ------------------------------------------------------------------- */
+[data-brand='rebrand'] .bx-callout {
+  border-color: transparent;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+/* --- Cards: a hairline at most, and no rule under the head ----------------------------------------- */
+[data-brand='rebrand'] .bx-card { border-color: var(--border-subtle); box-shadow: none; }
+[data-brand='rebrand'] .bx-card__head { border-bottom: 0; padding-bottom: 0; }
+
+/* --- Tables: no outer box; the head is a rounded band over hairline rows ------------------------------ */
+[data-brand='rebrand'] .btable-wrap { border-color: transparent; border-radius: 0; box-shadow: none; }
+[data-brand='rebrand'] .btable thead th:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+[data-brand='rebrand'] .btable thead th:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+[data-brand='rebrand'] .btable thead th { border-bottom-color: transparent; }
+
+/* --- Dialogs and drawers ------------------------------------------------------------------------------ */
+[data-brand='rebrand'] .bx-scrim { background: rgba(33, 37, 41, 0.4); }
+[data-brand='rebrand'] .bx-drawer { border-left: 0; }
+[data-brand='rebrand'] .bx-drawer__head,
+[data-brand='rebrand'] .bx-modal__head { border-bottom: 0; padding-bottom: var(--space-4); }
+/* The one line a dialog keeps: its body scrolls under the footer. */
+[data-brand='rebrand'] .bx-drawer__foot,
+[data-brand='rebrand'] .bx-modal__foot { background: var(--surface-raised); border-top-color: var(--border-subtle); }
+[data-brand='rebrand'] .bx-modal { border-radius: 12px; }
+[data-brand='rebrand'] .bx-savebar { border-color: transparent; }
+
+/* --- Ticks and pickers ------------------------------------------------------------------------------- */
+[data-brand='rebrand'] .bx-tick { border-color: var(--border-strong); }
+[data-brand='rebrand'] .bx-picker__trigger:hover { background: var(--ctl-bg); }
+[data-brand='rebrand'] .bx-picker__pop { border-color: var(--border-subtle); border-radius: 8px; }
+[data-brand='rebrand'] .bx-picker__search { border-bottom: 0; }
+[data-brand='rebrand'] .bx-picker__opt.is-cursor { background: var(--state-hover-bg); }
+[data-brand='rebrand'] .bx-picker__opt.is-on { background: var(--blue-soft); color: var(--blue-strong); }
+[data-brand='rebrand'] .bx-picker__footer { background: var(--surface-raised); border-top-color: var(--border-subtle); color: var(--blue); }
+
+/* =============================================================================
+   Shell
+   ========================================================================== */
+
+[data-brand='rebrand'] .bshell__top { box-shadow: 0 2px 8px rgba(33, 37, 41, 0.08); }
+
+/* The rail keeps the console's signature — dark ground, orange edge, orange
+   sub-item — and gains the weight that makes the current page legible without
+   relying on colour alone. */
+[data-brand='rebrand'] .bshell__subitem.is-active { font-weight: 500; }
+
+/* "New" is the console's blue badge. */
+[data-brand='rebrand'] .bshell__badge {
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--blue);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 16px;
+}
+[data-brand='rebrand'] .bshell.is-collapsed .bshell__item:has(.bshell__badge)::after { background: var(--blue); }
+
+/* Prototype furniture, quieter: a fill, no edge. */
+[data-brand='rebrand'] .bpb__trigger,
+[data-brand='rebrand'] .bshell__brand {
+  background: var(--surface-inset);
+  border-color: transparent;
+}
+[data-brand='rebrand'] .bpb__trigger:hover,
+[data-brand='rebrand'] .bshell__brand:hover { background: var(--int-neutral-bg-hover); border-color: transparent; }
+[data-brand='rebrand'] .bpb__label { font-size: 12px; letter-spacing: 0; text-transform: none; }
+[data-brand='rebrand'] .bpb__panel { border-color: var(--border-subtle); }
+[data-brand='rebrand'] .bpb__intro { border-bottom: 0; }
+[data-brand='rebrand'] .bpb__strip { border: 0; border-radius: 6px; }
+
+/* =============================================================================
+   Page hierarchy
+   ========================================================================== */
+
+/* One scale: the page title, a one-liner of at most two lines, then sections. */
+[data-brand='rebrand'] .bpage h1 { font-size: 20px; font-weight: 700; letter-spacing: 0; }
+[data-brand='rebrand'] .bpage h2 { font-size: 16px; font-weight: 600; }
+[data-brand='rebrand'] .bpage h3 { font-size: 14px; font-weight: 600; }
+[data-brand='rebrand'] .bpage__title p,
+[data-brand='rebrand'] .bz7__head p,
+[data-brand='rebrand'] .bfp2__head p,
+[data-brand='rebrand'] .bm8__head p {
+  max-width: 72ch;
+  font-size: 14px;
+  color: var(--text-tertiary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* =============================================================================
+   Pages
+   Screen sheets that draw their own containers. Same four rules, applied where
+   the shared layer cannot reach.
+   ========================================================================== */
+
+/* --- Lists and grid tables: no outer box; the head is a rounded band ------------
+   Zones, Device profiles, Risk signals and Authentication methods each drew a
+   bordered card around their rows. The rows already carry a hairline each, so
+   the card was a second line saying the same thing. */
+[data-brand='rebrand'] .bz7__table,
+[data-brand='rebrand'] .bfp2__table,
+[data-brand='rebrand'] .brs__table,
+[data-brand='rebrand'] .bm8__list,
+[data-brand='rebrand'] .bcov__wrap {
+  background: none;
+  border-color: transparent;
+  border-radius: 0;
+}
+[data-brand='rebrand'] .bz7__thead,
+[data-brand='rebrand'] .bfp2__thead,
+[data-brand='rebrand'] .brs__row--head {
+  border-radius: 8px;
+  border-bottom-color: transparent;
+}
+
+/* --- Tiles: a grey fill, no edge — the live dashboard's card ---------------------- */
+[data-brand='rebrand'] .bz7__card,
+[data-brand='rebrand'] .bhk__card,
+[data-brand='rebrand'] .buse__card,
+[data-brand='rebrand'] .bv5__seccard {
+  background: var(--surface-sunken);
+  border-color: transparent;
+}
+[data-brand='rebrand'] .bz7__card:hover { background: var(--surface-inset); border-color: transparent; box-shadow: none; }
+[data-brand='rebrand'] .bz7__card:focus-within { border-color: transparent; box-shadow: 0 0 0 2px var(--blue); }
+
+/* --- Choosing one card of several: the live console's selected card --------------- */
+[data-brand='rebrand'] .bfp2__mode-card { background: var(--surface-sunken); border-color: transparent; }
+[data-brand='rebrand'] .bfp2__mode-card:hover { background: var(--surface-inset); border-color: transparent; }
+[data-brand='rebrand'] .bfp2__mode-card.is-on { background: var(--blue-soft); border-color: var(--blue); }
+
+/* --- Inner-page sections: a heading and its content, separated by space ------------- */
+[data-brand='rebrand'] .bfp2__card { background: none; border-color: transparent; border-radius: 0; overflow: visible; }
+[data-brand='rebrand'] .bfp2__cardhead { padding: 0 0 var(--space-4); border-bottom: 0; }
+[data-brand='rebrand'] .bfp2__card > .bfp2__rows,
+[data-brand='rebrand'] .bfp2__cardbody--facts { padding: 0; }
+[data-brand='rebrand'] .bfp2__cardbody { padding: var(--space-4) 0 0; }
+
+/* --- "New" is the console's blue badge, wherever it appears --------------------------- */
+[data-brand='rebrand'] .bm8__new { background: var(--blue); color: #fff; }
+
+/* --- Page tabs: the chosen one in blue ------------------------------------------------ */
+[data-brand='rebrand'] .bm8__tab.is-on,
+[data-brand='rebrand'] .bm8__dwtab.is-on { color: var(--blue-strong); border-bottom-color: var(--blue); }
+
+/* --- The last uppercase labels ----------------------------------------------------------- */
+[data-brand='rebrand'] .bv5__seclabel,
+[data-brand='rebrand'] .bz7__quick > span {
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-secondary);
+}
+
+/* --- Every bespoke label pill: the one pill, no edge ------------------------------
+   Forty-two pill rules outside the kit drew a border. The display labels among
+   them lose it here. Those that were white or unfilled take the inset grey,
+   written through `:where()` so it lands at the base rule's own weight and every
+   tinted variant (low balance, deny, lime category) still paints its own fill.
+
+   Kept, because the edge is the message: a condition with no value yet, a who
+   tag with a warning, an audience that no longer exists. Clickable options keep
+   their edges too; they are controls, and the page pass settles them. */
+[data-brand='rebrand'] .bgal__section em,
+[data-brand='rebrand'] .bgcard__cat,
+[data-brand='rebrand'] .bm8__chip,
+[data-brand='rebrand'] .bm8__always,
+[data-brand='rebrand'] .bm8__badge,
+[data-brand='rebrand'] .bm8__txn,
+[data-brand='rebrand'] .bm8__defchip,
+[data-brand='rebrand'] .bm8__setupcount,
+[data-brand='rebrand'] .bb__decision,
+[data-brand='rebrand'] .bb__wantgot .bb__decision,
+[data-brand='rebrand'] .bb__flow .bb__decision,
+[data-brand='rebrand'] .bb__ifchip:not(.is-unset),
+[data-brand='rebrand'] button.bb__ifchip:not(.is-unset):hover,
+[data-brand='rebrand'] .bb__whotag:not(.is-warn),
+[data-brand='rebrand'] .bts__group,
+[data-brand='rebrand'] .bdl__chip,
+[data-brand='rebrand'] .bf__flowcount,
+[data-brand='rebrand'] .bf__flowstart,
+[data-brand='rebrand'] .bf__linklabel,
+[data-brand='rebrand'] .bf__or span,
+[data-brand='rebrand'] .bf__audchip:not(.is-gone),
+[data-brand='rebrand'] .cp__vchip,
+[data-brand='rebrand'] .bfp2__modechip,
+[data-brand='rebrand'] .bgt__streak,
+[data-brand='rebrand'] .brs__cat,
+[data-brand='rebrand'] .bz7__chip,
+[data-brand='rebrand'] .bz7__any,
+[data-brand='rebrand'] .bz7__entries em {
+  border-color: transparent;
+}
+:where([data-brand='rebrand']) .bgal__section em,
+:where([data-brand='rebrand']) .bm8__txn,
+:where([data-brand='rebrand']) .bm8__setupcount,
+:where([data-brand='rebrand']) .bdl__chip,
+:where([data-brand='rebrand']) .bf__flowcount,
+:where([data-brand='rebrand']) .bf__flowstart,
+:where([data-brand='rebrand']) .bf__linklabel,
+:where([data-brand='rebrand']) .bf__audchip {
+  background: var(--surface-inset);
+}
+
+/* A chosen filter chip on the board is an active state: blue, not ink. */
+[data-brand='rebrand'] .bb__chip { background: var(--surface-inset); border-color: transparent; }
+[data-brand='rebrand'] .bb__chip:hover { background: var(--int-neutral-bg-hover); border-color: transparent; }
+[data-brand='rebrand'] .bb__chip.is-on { background: var(--blue-soft); border-color: transparent; color: var(--blue-strong); }

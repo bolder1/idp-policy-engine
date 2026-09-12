@@ -70,6 +70,24 @@ import './brand/tour/demo-player.css'
 // Last — it overrides both the token values and a handful of shell rules to
 // match the console in production. See above for what depends on that.
 import './brand/console-theme.css'
+// After that, and only while the Rebrand switch is on: the live-console rebrand.
+import './brand/rebrand.css'
+// One partial per area, after the shared layer, so an area rule wins a tie with it.
+import './brand/rebrand/shell.css'
+import './brand/rebrand/policies.css'
+import './brand/rebrand/applications.css'
+import './brand/rebrand/zones.css'
+import './brand/rebrand/devices.css'
+import './brand/rebrand/risk.css'
+import './brand/rebrand/auth-methods.css'
+import './brand/rebrand/trail-builder.css'
+import './brand/rebrand/board.css'
+import './brand/rebrand/create.css'
+import { applyBrand, readBrand } from './brand/brand-mode'
+
+/* Before the first paint, so a reload in the rebrand does not flash the current
+   look for a frame. */
+applyBrand(readBrand())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

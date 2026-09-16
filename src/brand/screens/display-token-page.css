@@ -1,0 +1,225 @@
+/* =============================================================================
+   Display tokens — the page (screens/DisplayTokensPage.tsx) and its four
+   sliders (screens/display-token-forms.tsx).
+
+   Built from what the console already draws: the page head and toolbar, the
+   `.blist` rows paged to fit the window, the line tabs, the method form's fields
+   (`.bmc__*`) and the kit's tick. What is here is only what those do not cover —
+   a denser row, since an inventory is scanned by serial rather than read, and
+   the upload and sync controls, which nothing else in the console has.
+
+   Replaces display-tokens.css, which styled the same things as pages inside
+   the Authentication methods slider. Loaded from main.tsx with the other screen
+   sheets, for the cascade reason written there.
+   ========================================================================== */
+
+/* --- Page ----------------------------------------------------------------------- */
+
+/* The head's own bottom margin sits on top of the page grid's row gap; the tabs
+   belong to the head, so they sit at the gap alone. Two classes, over
+   console-theme's one. */
+.bdt > .bpage__head { margin-bottom: 0; }
+.bdt > .bdt__tabs { margin-top: calc(var(--space-2) * -1); }
+
+.bdt__panel { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.bdt__panel > .btoolbar { margin-bottom: 0; }
+/* Buttons in the toolbar's right half keep their own gap, not the filters'. */
+.bdt__panel .btoolbar__right { gap: var(--space-4); flex-wrap: wrap; justify-content: flex-end; }
+
+/* The selection's actions, at the end of the Select all line. */
+.bdt__bulk { display: inline-flex; align-items: center; gap: var(--space-4); }
+/* Why the bulk Delete is off, beside it rather than on hover: a disabled button
+   fires no hover in most browsers, so a tooltip would be seen by nobody. */
+.bdt__why { font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+.bdt__mono,
+.bdt__serial,
+/* The serial where it is typed, too. method-forms.css gives every text field
+   `font-family: inherit` at two classes and an attribute, which one class loses to. */
+.bmc__control input.bdt__mono[type='text'] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Selection ------------------------------------------------------------------ */
+
+.bdt__selbar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+  min-height: var(--ctl-height-sm);
+  /* The row's padding plus the list's edge, so Select all sits over the row ticks. */
+  padding: 0 calc(20px + var(--bw-thin));
+  margin-bottom: calc(var(--space-3) * -1);
+}
+
+.bdt__check {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  flex: none; padding: 4px; margin: -4px;
+  border: 0; border-radius: var(--radius-sm); background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-sm); color: var(--text-secondary);
+}
+.bdt__check:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bdt__check--all { font-weight: var(--fw-medium); }
+.bdt__check--all.is-on { color: var(--text-primary); }
+
+/* --- Rows -------------------------------------------------------------------------
+   `.blist--paged` at inventory density: a row is two short lines, so the 84px
+   library row would put four tokens on a screen. The height is `ROW_H` in the
+   screen, which is what paging divides by. */
+
+.blist--paged.bdt__list { --blist-row-h: 64px; }
+.bdt__list .bdt__row { padding-block: 0; gap: var(--space-5); }
+.bdt__row.is-selected { background: var(--surface-sunken); }
+
+.bdt__row .blist__main { gap: 2px; }
+
+.bdt__who,
+.bdt__mail,
+.bdt__serial {
+  max-width: 100%; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bdt__who { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bdt__mail { font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* The token half of an assignment row, and the whole of a token row's main. */
+.bdt__token,
+.bdt__tokenmain { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bdt__token { flex: 0 1 240px; }
+.bdt__serial { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bdt__token .bdt__serial { font-weight: var(--fw-medium); }
+.bdt__type {
+  display: inline-flex; align-items: baseline; gap: var(--space-4);
+  min-width: 0; white-space: nowrap; overflow: hidden;
+  font-size: var(--fs-sm); color: var(--text-tertiary);
+}
+.bdt__quiet { font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* "Assigned to Priya Sharma" is a name, not a status word, so the column lifts
+   the kit's 14ch badge cap (the `--badge-max` hook in kit.css); a name longer
+   than the column still clips, with the whole of it on the label's title. */
+.bdt__status { flex: 0 1 260px; min-width: 0; display: flex; --badge-max: 32ch; }
+
+@media (max-width: 720px) {
+  .bdt__token { flex-basis: 150px; }
+  .bdt__status { flex-basis: 120px; }
+}
+
+/* --- Forms ------------------------------------------------------------------------- */
+
+/* "← Assign tokens" over a pushed Add token: the page back link, in a slider. */
+.bdt__sliderback { margin-bottom: var(--space-6); }
+
+.bdt__label { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-body); }
+.bdt__label b { margin-left: 2px; color: var(--fb-negative-fg); }
+.bdt__labelrow { justify-content: space-between; }
+.bdt__count { font-size: var(--fs-sm); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.bdt__error { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--fb-negative-fg); }
+.bdt__sublabel { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+
+/* The assign slider's three rules, one per line, without bullets. */
+.bdt__rules { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+
+/* The tokens to assign: a checklist, one row per token. */
+.bdt__picks {
+  display: flex; flex-direction: column;
+  margin: 0; padding: 0; list-style: none;
+  max-height: 320px; overflow-y: auto;
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md);
+}
+.bdt__picks li + li { border-top: var(--bw-thin) solid var(--border-subtle); }
+.bdt__pick {
+  display: flex; align-items: center; gap: var(--space-4); width: 100%;
+  padding: 10px var(--space-4);
+  border: 0; background: none; cursor: pointer; text-align: left; font: inherit;
+}
+.bdt__pick:hover { background: var(--surface-sunken); }
+.bdt__pick:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.bdt__pick .bdt__serial { flex: 1; font-weight: var(--fw-medium); }
+
+.bdt__held { display: flex; flex-direction: column; gap: var(--space-3); }
+.bdt__held ul { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.bdt__held li { display: flex; align-items: baseline; gap: var(--space-4); }
+.bdt__held .bdt__serial { font-weight: var(--fw-regular); color: var(--text-secondary); }
+
+/* --- Upload ------------------------------------------------------------------------ */
+
+.bdt__upload { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-5); }
+.bdt__columns {
+  align-self: stretch;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3);
+}
+.bdt__columns p { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+.bdt__columns .bdt__mono { margin-left: var(--space-2); color: var(--text-primary); }
+
+.bdt__drop {
+  align-self: stretch;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3);
+  min-height: 120px; padding: var(--space-6);
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-lg);
+  background: none; cursor: pointer; font: inherit;
+  font-size: var(--fs-md); color: var(--text-secondary);
+  transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bdt__drop:hover,
+.bdt__drop.is-over { background: var(--surface-sunken); border-color: var(--ctl-border-focus); color: var(--text-primary); }
+.bdt__drop:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-color: var(--ctl-border-focus); }
+
+.bdt__file {
+  align-self: stretch;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-sunken); border-radius: var(--radius-md);
+  color: var(--text-secondary);
+}
+.bdt__filename {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-md); color: var(--text-primary);
+}
+
+/* What an upload would do, and what it passes over: one short list each. */
+.bdt__preview { align-self: stretch; display: flex; flex-direction: column; gap: var(--space-3); }
+.bdt__preview ul {
+  display: flex; flex-direction: column;
+  margin: 0; padding: 0; list-style: none;
+  max-height: 220px; overflow-y: auto;
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md);
+}
+.bdt__preview li {
+  display: flex; align-items: baseline; gap: var(--space-4);
+  padding: 8px var(--space-4);
+  font-size: var(--fs-sm); color: var(--text-secondary);
+}
+.bdt__preview li + li { border-top: var(--bw-thin) solid var(--border-subtle); }
+.bdt__preview li > .bdt__mono {
+  flex: 0 1 170px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary);
+}
+.bdt__line { flex: none; width: 56px; color: var(--text-tertiary); white-space: nowrap; }
+
+/* --- Sync -------------------------------------------------------------------------- */
+
+/* The fields' 16px between the two groups, as `.bmc__fields` has; a field's
+   own gap inside each. */
+.bdt__sync { display: flex; flex-direction: column; gap: var(--space-6); }
+.bdt__syncgroup { display: flex; flex-direction: column; gap: var(--space-3); }
+.bdt__tokenline {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-4);
+  margin: 0; font-size: var(--fs-md); color: var(--text-secondary);
+}
+.bdt__tokenline .bdt__mono { font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bdt__lede { margin: 0; font-size: var(--fs-md); line-height: 1.5; color: var(--text-secondary); }
+
+.bdt__codes { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+.bdt__code { display: flex; flex-direction: column; gap: var(--space-2); }
+.bdt__code label { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-body); }
+.bdt__code input {
+  width: 128px; height: var(--ctl-height-md); padding: 0 var(--space-4);
+  background: var(--ctl-bg); border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
+  font-family: var(--font-mono); font-size: var(--fs-lg); letter-spacing: 0.12em; color: var(--text-primary);
+}
+.bdt__code input::placeholder { color: var(--text-placeholder); }
+.bdt__code input:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bdt__drop { transition: none; }
+}

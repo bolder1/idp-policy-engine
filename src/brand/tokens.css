@@ -231,9 +231,18 @@
 }
 
 :root {
-  --ctl-height-sm: 30px;
-  --ctl-height-md: 36px;
-  --ctl-height-lg: 42px;
+  /* One step taller across the board (owner, 16 Sep 2026: "create the height
+     of all input box and dropdown and other things a little ... make things
+     consistent"), measured against the live console's own forms, whose fields
+     are 48px at a 16px base — 42 at ours.
+
+     Three sheets set these: here, `console-theme.css` and `rebrand.css`. They
+     had drifted to 30/36/42, 31/35/42 and 30/36/40, so a dropdown and a text
+     input on one row were a pixel apart in one look and four in another. One
+     set of numbers now, in all three. */
+  --ctl-height-sm: 34px;
+  --ctl-height-md: 40px;
+  --ctl-height-lg: 46px;
   --table-row-h: 48px;
   --table-header-h: 40px;
   --nav-sidebar-w: 248px;
@@ -417,8 +426,8 @@
 
 /* Compact density — opt-in via [data-density="compact"]. */
 [data-density="compact"] {
-  --ctl-height-sm: 28px;
-  --ctl-height-md: 32px;
+  --ctl-height-sm: 30px;
+  --ctl-height-md: 36px;
   --table-row-h: 40px;
   --table-header-h: 36px;
 }

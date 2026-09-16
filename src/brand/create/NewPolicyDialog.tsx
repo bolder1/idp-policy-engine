@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Wand2 } from 'lucide-react'
 
 import { Button, Modal } from '../kit'
-import { blankPolicy, type Policy } from '../data'
+import { blankPolicy, nameTaken, type Policy } from '../data'
+import { useBrand } from '../store'
 import { ApplicationField, ApplicationFixed } from '../screens/scope-fields'
 
 /* -----------------------------------------------------------------------------
@@ -79,8 +80,14 @@ export function NewPolicyDialog({
     return () => cancelAnimationFrame(id)
   }, [open])
 
-  /* Still read, for the line under the field — an optional question is
-     allowed to say what leaving it blank will do. */
+  /* Policies are told apart by name everywhere — the list, delete and status
+     dialogs, toasts — so a second policy with the same name is refused here. */
+  const store = useBrand()
+  const taken = nameTaken(name, store.policies.map((p) => p.name))
+  const ready = name.trim().length > 0 && !taken
+  const create = () => {
+    if (ready) onCreate(blankPolicy(name.trim(), appIds))
+  }
 
   return (
     <Modal
@@ -133,11 +140,7 @@ export function NewPolicyDialog({
             </button>
           )}
 
-          <Button
-            variant="brand"
-            onClick={() => onCreate(blankPolicy(name.trim() || 'Untitled policy', appIds))}
-            disabled={!name.trim()}
-          >
+          <Button variant="brand" onClick={create} disabled={!ready}>
             Create policy
           </Button>
         </>
@@ -178,8 +181,21 @@ export function NewPolicyDialog({
             value={name}
             maxLength={50}
             onChange={(e) => setName(e.target.value)}
+            /* Enter creates, as in any one-field form. */
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              create()
+            }}
+            aria-invalid={taken || undefined}
+            aria-describedby={taken ? 'np-name-error' : undefined}
             placeholder="Finance Team – High Security"
           />
+          {taken && (
+            <p id="np-name-error" className="bnp__error" role="alert">
+              A policy with this name already exists.
+            </p>
+          )}
         </div>
 
         {/* Asked, or stated.

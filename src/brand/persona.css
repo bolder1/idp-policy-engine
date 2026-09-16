@@ -24,7 +24,6 @@
 }
 .bpb__trigger:hover { border-color: var(--int-neutral-border-hover); color: var(--text-primary); }
 .bpb__trigger svg { color: var(--text-muted); }
-.bpb__label { text-transform: uppercase; letter-spacing: 0.06em; font-size: var(--fs-xs); color: var(--text-muted); }
 .bpb__trigger strong { font-weight: var(--fw-medium); color: var(--text-primary); }
 
 /* Wide, because every row carries four things a name alone cannot: the
@@ -104,7 +103,6 @@
   font-size: var(--fs-xs);
   color: var(--text-muted);
 }
-.bpb__tabs em + em::before { content: '·'; margin-right: var(--space-3); }
 
 /* `.bpb__strip`, a persona banner above the page, was styled here. Nothing
    renders it any more, so its rules went with it. */

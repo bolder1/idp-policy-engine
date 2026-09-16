@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'motion/react'
 /* -----------------------------------------------------------------------------
    Recovery, and the method mark.
 
@@ -14,26 +15,27 @@
    method should look the same wherever it appears.
    -------------------------------------------------------------------------- */
 
-import { AnimatePresence, motion } from 'motion/react'
-import { useState } from 'react'
 import {
   Check,
   CreditCard,
   Fingerprint,
   HelpCircle,
   KeyRound,
+  Layers,
   Lock,
+  type LucideIcon,
   Mail,
   MessageSquare,
   Phone,
   ShieldCheck,
   Smartphone,
   Ticket,
-  type LucideIcon,
 } from 'lucide-react'
 
 import { TipDot, Toggle } from '../kit'
 import { methodBlocker, type AuthMethod } from '../methods'
+import { useBrand } from '../store'
+import { recoveryBlocker } from './auth-panel'
 
 /* -----------------------------------------------------------------------------
    V5 · MFA experience.
@@ -152,7 +154,7 @@ const RECOVERY_OPTIONS: {
        user was also the one whose label said the least. */
     name: 'Questions and email code',
     sub: 'Questions and a code from the backup address. The hardest to social-engineer, and the slowest for a locked-out user.',
-    icon: ShieldCheck,
+    icon: Layers,
   },
 ]
 
@@ -193,39 +195,33 @@ const CODE_KINDS: { id: string; name: string; sub: string; icon: LucideIcon }[] 
     /* Same fix as the recovery-method row above: say the two things. */
     name: 'Reusable and one-time',
     sub: 'Users get a reusable code and a one-time set, and may sign in with either.',
-    icon: ShieldCheck,
+    icon: Layers,
   },
 ]
 
 export function RecoveryTab({ methods }: { methods: AuthMethod[] }) {
-  /* Everything off to begin with.
+  /* On the store, not in this component: the tab unmounts on every tab change
+     and every navigation, and these are tenant settings that commit as they
+     change. Everything starts off — see RECOVERY_DEFAULTS. */
+  const { recovery, setRecovery } = useBrand()
+  const { forgot, choice, userPick, codes, codeKind } = recovery
+  const set = (patch: Partial<typeof recovery>) => setRecovery((r) => ({ ...r, ...patch }))
 
-     These three shipped on, which meant a tenant that had never opened this tab
-     was already letting people recover an account and sign in with a static
-     code — a self-service path to a live account, switched on by a default
-     nobody chose. Recovery is a deliberate decision in both directions, so the
-     starting position is the one that grants nothing.
-
-     `choice` and `codeKind` stay seeded: they are what the section shows once
-     its switch is on, and a revealed section with nothing selected is a second
-     empty decision rather than a safer one. */
-  const [forgot, setForgot] = useState(false)
-  const [choice, setChoice] = useState('kba')
-  const [userPick, setUserPick] = useState(false)
-  const [codes, setCodes] = useState(false)
-  const [codeKind, setCodeKind] = useState('static')
-
-  const kba = methods.find((m) => m.id === 'kba' || m.name.startsWith('Security Question'))
-  const kbaOn = kba ? !methodBlocker(kba) : false
+  const isOn = (id: string, name: string) => {
+    const m = methods.find((x) => x.id === id || x.name.startsWith(name))
+    return m ? !methodBlocker(m) : false
+  }
+  const kbaOn = isOn('kba', 'Security Question')
+  const altEmailOn = isOn('otp-alt-email', 'OTP over Alternate Email')
 
   return (
     <div className="bv5__pane">
-      <Section letter="A" title="Recovery method">
+      <Section title="Recovery method">
         <Row
           name="Enable Forgot Phone"
           desc="Let users recover access when they can't use their enrolled device."
           on={forgot}
-          onChange={setForgot}
+          onChange={(v) => set({ forgot: v })}
         />
         {forgot && (
           <>
@@ -241,8 +237,8 @@ export function RecoveryTab({ methods }: { methods: AuthMethod[] }) {
                 than pairing every card with a radio dot. */}
             <div className="bv5__radios" role="radiogroup" aria-label="Recovery method">
               {RECOVERY_OPTIONS.map((o) => {
-                const needsKba = o.id !== 'email'
-                const blocked = needsKba && !kbaOn
+                const why = recoveryBlocker(o.id, kbaOn, altEmailOn)
+                const blocked = why !== null
                 const on = choice === o.id
                 return (
                   <button
@@ -252,12 +248,8 @@ export function RecoveryTab({ methods }: { methods: AuthMethod[] }) {
                     aria-checked={on}
                     disabled={blocked}
                     className={`bv5__radio ${on ? 'is-on' : ''} ${blocked ? 'is-blocked' : ''}`}
-                    onClick={() => setChoice(o.id)}
-                    title={
-                      blocked
-                        ? `${o.sub} Needs Security Questions, which is switched off in Methods.`
-                        : o.sub
-                    }
+                    onClick={() => set({ choice: o.id })}
+                    title={why ? `${o.sub} ${why}` : o.sub}
                   >
                     <span className="bv5__radio-ico" aria-hidden>
                       <o.icon size={18} strokeWidth={1.8} />
@@ -312,8 +304,15 @@ export function RecoveryTab({ methods }: { methods: AuthMethod[] }) {
             {!kbaOn && (
               <p className="bv5__dep is-warn">
                 <Lock size={13} strokeWidth={2.2} aria-hidden />
-                Security Questions is <strong>off</strong> in Methods
-                <TipDot text="Both KBA options depend on it. Switch Security Questions on in Methods to use either one." />
+                Security Questions is off in Methods
+                <TipDot text="Two recovery options need it. Turn it on in Methods." />
+              </p>
+            )}
+            {!altEmailOn && (
+              <p className="bv5__dep is-warn">
+                <Lock size={13} strokeWidth={2.2} aria-hidden />
+                OTP over Alternate Email is off in Methods
+                <TipDot text="Two recovery options need it. Turn it on in Methods." />
               </p>
             )}
           </>
@@ -325,18 +324,20 @@ export function RecoveryTab({ methods }: { methods: AuthMethod[] }) {
           sentence repeated, and neither is scannable. They lead with the verb
           that separates them now, and each says what the user gets rather than
           what the checkbox does. */}
-      <Section letter="B" title="What users can do for themselves" last>
+      <Section title="What users can do for themselves" last>
         <Row
           name="Let users choose their recovery method"
           desc="Without this, everyone gets the method selected above. With it, users pick from the ones you allow."
-          on={userPick}
-          onChange={setUserPick}
+          on={forgot && userPick}
+          onChange={(v) => set({ userPick: v })}
+          disabled={!forgot}
+          disabledWhy="Turn on Enable Forgot Phone first."
         />
         <Row
           name="Let users sign in with a security code"
           desc="A code issued ahead of time, for when the enrolled device is not to hand."
           on={codes}
-          onChange={setCodes}
+          onChange={(v) => set({ codes: v })}
         />
 
         {/* The console pairs this switch with three radios and we had the
@@ -354,7 +355,7 @@ export function RecoveryTab({ methods }: { methods: AuthMethod[] }) {
                   aria-checked={on}
                   className={`bv5__radio ${on ? 'is-on' : ''}`}
                   title={k.sub}
-                  onClick={() => setCodeKind(k.id)}
+                  onClick={() => set({ codeKind: k.id })}
                 >
                   <span className="bv5__radio-ico" aria-hidden>
                     <k.icon size={18} strokeWidth={1.8} />
@@ -381,21 +382,17 @@ export function RecoveryTab({ methods }: { methods: AuthMethod[] }) {
 /* --- Shared bits ------------------------------------------------------------ */
 
 function Section({
-  letter,
   title,
   children,
   last,
 }: {
-  letter: string
   title: string
   children: React.ReactNode
   last?: boolean
 }) {
   return (
     <section className={`bv5__sec ${last ? 'is-last' : ''}`}>
-      <p className="bv5__seclabel">
-        <span>{letter}</span> {title}
-      </p>
+      <h2 className="bv5__seclabel">{title}</h2>
       <div className="bv5__seccard">{children}</div>
     </section>
   )
@@ -412,19 +409,24 @@ function Row({
   desc,
   on,
   onChange,
+  disabled,
+  disabledWhy,
 }: {
   name: string
   desc: string
   on: boolean
   onChange: (v: boolean) => void
+  disabled?: boolean
+  /** Why the switch is off limits, in the row's tip. */
+  disabledWhy?: string
 }) {
   return (
-    <div className="bv5__row">
+    <div className={`bv5__row ${disabled ? 'is-disabled' : ''}`}>
       <span className="bv5__rn">
         {name}
-        <TipDot text={desc} />
+        <TipDot text={disabled && disabledWhy ? `${desc} ${disabledWhy}` : desc} />
       </span>
-      <Toggle checked={on} onChange={onChange} label={name} />
+      <Toggle checked={on} onChange={onChange} label={name} disabled={disabled} />
     </div>
   )
 }

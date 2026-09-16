@@ -17,8 +17,15 @@ import {
   categoriesFor,
   withAlwaysOn,
   blockedAttributes,
+  blankProfile,
   countLabel,
-  describeProfile,
+  dayLabel,
+  invalidVersion,
+  nameIssue,
+  profileChangeParts,
+  profileIssue,
+  profileReview,
+  rosterFromCsv,
   isRuleValue,
   modeLabel,
   offeredAttributes,
@@ -35,6 +42,7 @@ import {
   type FingerprintProfile,
   type ProfileMode,
 } from './fingerprint'
+import { CHECK_BRAND } from './logos/check-brands'
 
 /* The attribute master is a transcription of somebody else's spreadsheet, and a
    transcription drifts silently: a weight typo or a lost category reads as a
@@ -331,7 +339,6 @@ describe('the seeded profiles', () => {
   })
 })
 
-
 /* -----------------------------------------------------------------------------
    The agent question, and why only one kind is asked it.
    -------------------------------------------------------------------------- */
@@ -363,8 +370,8 @@ describe('what a kind can collect', () => {
      step is named after what that kind actually holds, so the ladder reads
      "Requirements" on one and "Attributes" on the other. */
   it('gives the collector step to the kind that is asked one', () => {
-    expect(stepsFor('os')).toEqual(['Profile', 'Requirements'])
-    expect(stepsFor('device')).toEqual(['Profile', 'Devices', 'Attributes'])
+    expect(stepsFor('os')).toEqual(['Profile', 'Checks'])
+    expect(stepsFor('device')).toEqual(['Profile', 'Devices', 'Signals'])
     for (const m of MODES) {
       expect(stepsFor(m.id).at(-1)?.toLowerCase()).toBe(ITEM_NOUN[m.id].many)
       expect(stepsFor(m.id).includes('Devices')).toBe(asksReach(m.id))
@@ -449,21 +456,9 @@ describe('what the page says about a profile', () => {
   })
 
   it('counts in the noun the kind actually uses', () => {
-    expect(countLabel('os', 1)).toBe('1 requirement')
-    expect(countLabel('os', 2)).toBe('2 requirements')
-    expect(countLabel('device', 1)).toBe('1 attribute')
-  })
-
-  it('names the reach only where it is asked, and enrolment only once answered', () => {
-    const os = describeProfile(
-      profile({ mode: 'os', enabled: ['os-windows'], restrictionSet: false }),
-    )
-    expect(os).toBe('OS and version · 1 requirement')
-
-    const dev = describeProfile(profile({ mode: 'device', reach: 'agentless', enabled: ['browser'] }))
-    expect(dev).toBe(
-      'Device attributes · Agentless · 1 attribute · Users register their own devices',
-    )
+    expect(countLabel('os', 1)).toBe('1 check')
+    expect(countLabel('os', 2)).toBe('2 checks')
+    expect(countLabel('device', 1)).toBe('1 signal')
   })
 
   /* The create dialog and every other surface used to hold different strings
@@ -473,7 +468,6 @@ describe('what the page says about a profile', () => {
     for (const m of MODES) expect(modeLabel({ mode: m.id as ProfileMode })).toBe(m.label)
   })
 })
-
 
 /* -----------------------------------------------------------------------------
    The signals a profile cannot switch off.
@@ -515,5 +509,159 @@ describe('always-on attributes', () => {
     expect(next.slice(0, alwaysOn('device').length)).toEqual(alwaysOn('device').map((a) => a.id))
     expect(new Set(next).size).toBe(next.length)
     expect(next).toContain('mac')
+  })
+})
+
+/* The brand marks are keyed by check id, so an id that drifts would quietly
+   swap a logo for the generic glyph. Every key names a real check, and every
+   brand-named requirement has a mark. */
+describe('check brand marks', () => {
+  it('keys only real check ids', () => {
+    const ids = new Set(ALL_ATTRIBUTES.map((a) => a.id))
+    expect(Object.keys(CHECK_BRAND).filter((id) => !ids.has(id))).toEqual([])
+  })
+
+  it('gives every OS, browser and client version check a brand', () => {
+    const versions = OS_ATTRIBUTES.filter((a) => a.config?.kind === 'version').map((a) => a.id)
+    expect(versions.filter((id) => !(id in CHECK_BRAND))).toEqual([])
+  })
+
+  it('leaves the checks that are not about a brand alone', () => {
+    expect(['device-type', 'integrity', 'screen-lock'].filter((id) => id in CHECK_BRAND)).toEqual([])
+  })
+})
+
+/* What stops a profile from saving. The create drawer, the save bar and the
+   leave dialog all read this one answer, so each rule is pinned here. */
+describe('what stops a profile from saving', () => {
+  const seed = (id: string) => {
+    const p = seedProfiles.find((x) => x.id === id)
+    if (!p) throw new Error(`no seed ${id}`)
+    return p
+  }
+
+  it('lets every seeded profile save as it is', () => {
+    for (const p of seedProfiles) {
+      const others = seedProfiles.filter((x) => x.id !== p.id).map((x) => x.name)
+      expect([p.id, profileIssue(p, others)]).toEqual([p.id, null])
+    }
+  })
+
+  it('refuses a blank name and a name another profile has, ignoring case and spaces', () => {
+    expect(nameIssue('   ', [])).toBe('Enter a profile name.')
+    expect(nameIssue(' corporate MANAGED ', ['Corporate managed'])).toBe('A profile with this name already exists.')
+    expect(nameIssue('Corporate managed (copy)', ['Corporate managed'])).toBeNull()
+  })
+
+  it('refuses a health profile with no checks, but not a trusted device holding only its always-on signals', () => {
+    expect(profileIssue({ ...seed('fp-corp'), enabled: [], config: {} }, [])).toBe('Add at least one check.')
+    expect(profileIssue(profile({ enabled: withAlwaysOn('device', []) }), [])).toBeNull()
+  })
+
+  it('refuses a typed version that is blank or not a version', () => {
+    const browsers = seed('fp-browser-current')
+    const withChrome = (value: string) => ({
+      ...browsers,
+      config: { ...browsers.config, 'browser-chrome': { op: 'gte', value } },
+    })
+    expect(invalidVersion(withChrome('131.0.6778.86'))).toBeUndefined()
+    expect(invalidVersion(withChrome(''))?.id).toBe('browser-chrome')
+    expect(profileIssue(withChrome('latest!!'), [])).toBe('Enter a version for Chrome.')
+    expect(profileIssue(withChrome(' 131 '), [])).toBeNull()
+  })
+
+  it('refuses a pre-approved profile with no roster, or one that does not read MAC', () => {
+    const kiosk = seed('fp-kiosk')
+    expect(profileIssue({ ...kiosk, roster: null }, [])).toBe('Upload a device roster.')
+    expect(profileIssue({ ...kiosk, enabled: kiosk.enabled.filter((id) => id !== 'mac') }, [])).toBe(
+      'Add MAC address to match the roster.',
+    )
+  })
+})
+
+/* The seed both new-profile flows start from: the name-first page and the
+   wizard's draft. */
+describe('a blank profile', () => {
+  it('holds the always-on signals, runs on the defaults, and leaves the id to the caller', () => {
+    const p = blankProfile('Laptops', 'device')
+    expect(p.id).toBe('')
+    expect(p.enabled).toEqual(alwaysOn('device').map((a) => a.id))
+    expect([p.reach, p.registration, p.maxDevices, p.roster, p.autoRegister, p.restrictionSet]).toEqual([
+      'agentless',
+      'self',
+      3,
+      null,
+      false,
+      false,
+    ])
+    expect(blankProfile('Laptops', 'os').enabled).toEqual([])
+  })
+
+  it('is valid as a trusted device once named, and needs a check as a health profile', () => {
+    expect(profileIssue(blankProfile('Laptops', 'device'), [])).toBeNull()
+    expect(profileIssue(blankProfile('Laptops', 'os'), [])).toBe('Add at least one check.')
+    expect(profileIssue(blankProfile('Laptops', 'device'), ['laptops'])).toBe('A profile with this name already exists.')
+  })
+})
+
+describe('a roster read from a CSV', () => {
+  const now = new Date(2026, 8, 15)
+
+  it('counts one device per line and skips a header', () => {
+    const csv = 'device,email,mac\r\nKiosk 1,a@acme.com,00:1A:2B:3C:4D:5E\n\nKiosk 2,b@acme.com,00-1A-2B-3C-4D-5F\n'
+    expect(rosterFromCsv('floor.csv', csv, now)).toEqual({ fileName: 'floor.csv', rows: 2, uploadedAt: '15 Sep 2026' })
+  })
+
+  it('keeps a first line that is already a device', () => {
+    expect(rosterFromCsv('a.csv', 'Kiosk 1,a@acme.com,00:1A:2B:3C:4D:5E', now).rows).toBe(1)
+    expect(rosterFromCsv('empty.csv', '\n\n', now).rows).toBe(0)
+    expect(dayLabel(new Date(2026, 0, 3))).toBe('3 Jan 2026')
+  })
+})
+
+describe('what changed, for the save bar and Review changes', () => {
+  const corp = seedProfiles.find((p) => p.id === 'fp-corp') as FingerprintProfile
+
+  it('has nothing to say about an unchanged profile', () => {
+    expect(profileReview(corp, corp)).toEqual([])
+    expect(profileChangeParts(corp, corp)).toEqual([])
+  })
+
+  it('names each change with its saved and new value', () => {
+    const next: FingerprintProfile = {
+      ...corp,
+      name: 'Corporate laptops',
+      enabled: ['device-type', 'browser-chrome'],
+      config: { 'device-type': 'Laptop', 'browser-chrome': { op: 'gte', value: '120' } },
+    }
+    expect(profileReview(corp, next)).toEqual([
+      { label: 'Name', before: 'Corporate managed', after: 'Corporate laptops' },
+      { label: 'Checks: added Chrome version', before: '', after: '≥ 120' },
+      { label: 'Checks: removed Windows OS version', before: '≥ 10', after: '' },
+    ])
+    expect(profileChangeParts(corp, next)).toEqual(['Name', '1 check added', '1 check removed'])
+
+    const tuned = { ...corp, config: { ...corp.config, 'os-windows': { op: 'gte', value: '11' } } }
+    expect(profileReview(corp, tuned)).toEqual([{ label: 'Windows OS version', before: '≥ 10', after: '≥ 11' }])
+    expect(profileChangeParts(corp, tuned)).toEqual(['Values changed'])
+  })
+
+  /* The profile page counts a draft as unsaved only when this has a row, so a
+     stored difference the page never shows is not a change. */
+  it('has nothing to say when a stored value differs but what the page shows does not', () => {
+    const kiosk = seedProfiles.find((p) => p.id === 'fp-kiosk') as FingerprintProfile
+    expect(profileReview(kiosk, { ...kiosk, weights: { ...kiosk.weights, mac: 35 } })).toEqual([])
+    expect(profileReview(corp, { ...corp, config: { ...corp.config, 'os-windows': { value: '10', op: 'gte' } } })).toEqual([])
+  })
+
+  it('reviews a trusted device by weight and enrolment', () => {
+    const kiosk = seedProfiles.find((p) => p.id === 'fp-kiosk') as FingerprintProfile
+    const next: FingerprintProfile = { ...kiosk, weights: { mac: 10 }, autoRegister: true, roster: null }
+    expect(profileReview(kiosk, next)).toEqual([
+      { label: 'Register silently on first sign-in', before: 'Off', after: 'On' },
+      { label: 'Approved device roster', before: 'kiosks-floor-3.csv, 24 devices', after: '' },
+      { label: 'MAC address weight', before: 'High weight', after: 'Low weight' },
+    ])
+    expect(profileChangeParts(kiosk, next)).toEqual(['How devices enrol', 'Weights changed'])
   })
 })

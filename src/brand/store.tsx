@@ -11,22 +11,54 @@ import {
 } from 'react'
 
 import {
+  newId,
   reidRule,
   templates as seedTemplates,
+  uniqueName,
   type AccessDecision,
   type App,
   type Group,
   type MethodSet,
   type Policy,
+  type PolicyStatus,
   type Rule,
+  type Scenario,
   type Template,
   type User,
   type Zone,
 } from './data'
 import { type FingerprintProfile } from './fingerprint'
+import { asStored, changedBeyondStamp, lastSaved, openForEditing, withSavedDraft } from './policy-draft'
 import { EMPTY_RISK_PROFILE, riskScale, type RiskProfile } from './risk-signals'
-import { type Hook } from './hooks'
-import { appsAt, fingerprintsAt, groupsAt, hooksAt, methodSetsAt, methodsAt, policiesAt, riskProfilesAt, usersAt, zonesAt } from './fixtures'
+import { normaliseHook, type Hook } from './hooks'
+import {
+  appsAt,
+  fingerprintsAt,
+  groupsAt,
+  hooksAt,
+  methodSetsAt,
+  methodsAt,
+  policiesAt,
+  riskProfilesAt,
+  scenariosAt,
+  settled,
+  tokensAt,
+  usersAt,
+  zonesAt,
+} from './fixtures'
+import type { ConfigField } from './method-config'
+import type { MfaValues } from './mfa-join'
+import { SEED_ENROLMENT, type UserEnrolment } from './user-methods'
+import {
+  assignTokens,
+  deleteTokens,
+  formatDay,
+  serialKey,
+  syncToken,
+  unassignTokens,
+  withTokenState,
+  type HardwareToken,
+} from './hardware-tokens'
 import type { AuthMethod } from './methods'
 import { TAB_SCREEN, personaById, type PersonaId } from './personas'
 import { featuresOf, type Edition, type Features } from './edition'
@@ -69,7 +101,7 @@ export type BrandScreen =
          the board was a one-way door: you came back to a different editor than
          the one you left, with the draft you had been holding gone. Defaults
          to the trail for callers that predate the board. */
-      from?: 'builder' | 'board'
+      from?: PolicyDetailsFrom
     }
   | { name: 'templates' }
   | { name: 'zones' }
@@ -79,7 +111,21 @@ export type BrandScreen =
      the same one as last time, and whether anything about it is suspicious. */
   | { name: 'risk-signals' }
   | { name: 'hooks' }
-  | { name: 'methods' }
+  | {
+      name: 'methods'
+      /* Set by the Display tokens page's back link, so focus lands on the
+         Hardware Token row that page was opened from rather than on <body>. */
+      from?: 'display-tokens'
+    }
+  /* Display Token's tokens, and who holds each one — the live console's
+     "Assign Hardware Token To Users" page. Reached from Authentication methods
+     (Display Token's Set up or Manage tokens, and Hardware Token's "Assign
+     hardware tokens" setting), and a page of its own rather than pages pushed
+     inside that slider, on the owner's word (15 Sep 2026).
+
+     `tab` is here rather than in the screen's state so switching tabs is a
+     change of place: it survives a remount, and a caller can land on either. */
+  | { name: 'display-tokens'; tab?: DisplayTokenTab }
   /* `create` has gone. Creating a policy was a screen — a gallery of templates
      that asked for the policy's name only after you had chosen one — and it is
      a form opened in place from the list now, so there is nothing to route to.
@@ -96,6 +142,72 @@ export type BrandScreen =
      end-user site has exactly two places — this and Setup 2FA — which is why
      it has a top bar and no rail to put one in. */
   | { name: 'apps' }
+
+/** The two halves of the Display tokens page. */
+export type DisplayTokenTab = 'assignments' | 'tokens'
+
+/** Where Policy details returns to. `policies` is the list: "Assign applications" from a turn-on it refused. */
+export type PolicyDetailsFrom = 'builder' | 'board' | 'policies'
+
+/* The one toast. `id` changes on every call, so the same message twice is two
+   toasts: each gets its full time on screen and is announced again. */
+export interface ToastMessage {
+  id: number
+  text: string
+}
+
+/* Who is signed in, for the account menu. The prototype has no auth, so these
+   are fixed: the admin who runs the console, and the person whose Setup 2FA and
+   launcher the User Dashboard shows. The end user is a directory person, so the
+   tokens assigned to them in the Display Token inventory are theirs. */
+export interface Account {
+  id: string
+  name: string
+  username: string
+  initials: string
+}
+
+export const ADMIN_ACCOUNT: Account = { id: 'jaspreet', name: 'Jaspreet Toor', username: 'jaspreet_t', initials: 'JT' }
+export const END_USER_ACCOUNT: Account = { id: 'priya', name: 'Priya Sharma', username: 'priya', initials: 'PS' }
+
+/* Account recovery, as the Recovery tab sets it. Everything off to begin with:
+   recovery is a decision in both directions, so the start grants nothing.
+   `choice` and `codeKind` are what each section shows once switched on. */
+export interface RecoverySettings {
+  forgot: boolean
+  choice: string
+  userPick: boolean
+  codes: boolean
+  codeKind: string
+}
+
+export const RECOVERY_DEFAULTS: RecoverySettings = {
+  forgot: false,
+  choice: 'kba',
+  userPick: false,
+  codes: false,
+  codeKind: 'static',
+}
+
+/* A screen's answer to "may I leave?" — functions, so the dialog reads the
+   screen's state at the moment someone tries to leave rather than when the
+   guard was registered. */
+export interface LeaveGuard {
+  /** True while there is something to lose. */
+  dirty: () => boolean
+  /** Commits the work. Returns false when it could not, and the dialog stays. */
+  save?: () => boolean
+  /** The save button's label: "Save as draft" in a builder, "Save" elsewhere. */
+  saveLabel?: () => string
+  /** Why saving is not possible right now, or null. */
+  blocked?: () => string | null
+}
+
+export interface PendingLeave {
+  saveLabel: string
+  canSave: boolean
+  blocked: string | null
+}
 
 export interface BrandStore {
   apps: App[]
@@ -136,34 +248,80 @@ export interface BrandStore {
      it, none of which a screen can decide for itself. */
   role: Role
   setRole: (r: Role) => void
+  /** Who the account menu names: the admin on the console, the end user on the User Dashboard. */
+  account: Account
+  /** The end user whose Setup 2FA this is. Their Display Tokens are `hardwareTokens` with this `userId`. */
+  viewerId: string
+  /** Loads another persona's tenant into every tab and remounts the screen. Picking the current persona does nothing. */
   setPersona: (p: PersonaId) => void
   methodSets: MethodSet[]
   /* The catalogue is the same eleven methods for every tenant; only how many
      people have enrolled in each moves with the persona. */
   methods: AuthMethod[]
   setMethods: Dispatch<SetStateAction<AuthMethod[]>>
+
+  /* The Display Token inventory: every fob the tenant has added, and who holds
+     each. Changing it also keeps the `display-token` method honest — see
+     `withTokenState` in hardware-tokens.ts. Every action below reads the
+     latest tokens, including ones changed earlier in the same event handler. */
+  hardwareTokens: HardwareToken[]
+  /** Adds validated tokens; any whose serial is already present is ignored. */
+  addHardwareTokens: (ts: HardwareToken[]) => void
+  /** Deletes unassigned tokens; assigned ones come back in `blocked`. */
+  deleteHardwareTokens: (serials: string[]) => { deleted: string[]; blocked: string[] }
+  /** Gives tokens to one person, skipping unknown, taken or already-held serials. */
+  assignHardwareTokens: (userId: string, serials: string[]) => { assigned: string[]; skipped: { serial: string; reason: string }[] }
+  /** Returns tokens to inventory. */
+  unassignHardwareTokens: (serials: string[]) => void
+  /** Records a resync on an event-based token; call after `syncErrors` passes. */
+  syncHardwareToken: (serial: string) => void
+
+  /* The Authentication methods screens' settings. On the store rather than in
+     the screen, because the screen unmounts on every tab change and every
+     navigation, and these are tenant settings that commit as they change. Each
+     pair is a drop-in for a `useState` pair. A persona switch resets them. */
+  /** The Recovery tab. */
+  recovery: RecoverySettings
+  setRecovery: Dispatch<SetStateAction<RecoverySettings>>
+  /** Method and family settings, keyed as the settings sheet keys them. */
+  mfaBehaviour: MfaValues
+  setMfaBehaviour: Dispatch<SetStateAction<MfaValues>>
+  /** The tenant default method. `undefined` until one is chosen: the screen shows its first defaultable method then. */
+  defaultMethodId: string | null | undefined
+  setDefaultMethodId: Dispatch<SetStateAction<string | null | undefined>>
+  /** What each integration's setup form was saved with, per method id. */
+  methodConfig: Record<string, ConfigField[]>
+  setMethodConfig: Dispatch<SetStateAction<Record<string, ConfigField[]>>>
+  /** What a setup card chose, per method id (Microsoft Push's NPS server). */
+  setupChoice: Record<string, string>
+  setSetupChoice: Dispatch<SetStateAction<Record<string, string>>>
+  /** The end user's own enrolment (`viewerId`). */
+  enrolment: UserEnrolment
+  setEnrolment: Dispatch<SetStateAction<UserEnrolment>>
+
   templates: Template[]
   policies: Policy[]
 
   screen: BrandScreen
+  /** Bumped whenever the open screen must start again even if its name is unchanged: a confirmed leave (Discard throws the draft away), a rail click on the screen already open, and a persona switch. */
+  visit: number
+  /** Navigates through the leave guard. Going to the library or list screen already open reopens it at its list. */
   go: (s: BrandScreen) => void
-  /* A screen holding unsaved work can ask to be consulted before it is left.
-
-     The board keeps its draft in local state, so navigating away unmounts the
-     component and the draft goes with it — silently, which is the part that
-     matters. The guard returns true when it is safe to leave. A screen that
-     registers one must clear it on unmount.
-
-     It hangs off `go` rather than off one button because there are many ways
-     out of a builder: the layout switch, "Edit details", the back arrow and
-     every item in the nav rail. Guarding the navigation guards all of them. */
-  registerLeaveGuard: (fn: (() => boolean) | null) => void
-  /** Where `go` was heading when a guard stopped it, or null. */
-  pendingNav: BrandScreen | null
-  /** Leave anyway — the guard is dropped and the navigation completes. */
-  confirmNav: () => void
-  /** Stay. The pending destination is forgotten. */
-  cancelNav: () => void
+  /* Every screen that edits a local draft registers one, through `useLeaveGuard`
+     in leave-guard.tsx, and every way out asks it: `go` for navigation, and
+     `requestLeave` for in-page backs that never touch `go` ("All profiles").
+     One dialog in the shell answers for all of them — Save (or Save as draft),
+     Discard, Keep editing — so no screen can lose work silently again. */
+  registerLeaveGuard: (g: LeaveGuard) => void
+  /** Drops `g` if it is still the registered guard; a newer screen's is left alone. */
+  releaseLeaveGuard: (g: LeaveGuard) => void
+  /** Runs `run` now when nothing would be lost; otherwise holds it for the leave dialog. */
+  requestLeave: (run: () => void, opts?: { canSave?: boolean }) => void
+  /** What the leave dialog shows, or null when no leave is waiting. */
+  pendingLeave: PendingLeave | null
+  leaveSave: () => void
+  leaveDiscard: () => void
+  leaveStay: () => void
 
   appById: (id: string) => App
   groupById: (id: string) => Group
@@ -177,10 +335,16 @@ export interface BrandStore {
   zoneById: (id: string) => Zone | undefined
   fingerprintById: (id: string) => FingerprintProfile | undefined
   hookById: (id: string) => Hook | undefined
-  addHook: (h: Hook) => void
+  /* Every `add*` below stores the item under an id nothing else has — its own
+     id when that is free, otherwise one from `newId` — and returns the id it
+     used. Open the item by the RETURNED id. The `*ById` lookups see an item
+     added earlier in the same event handler. */
+  /** Adds a hook, trimmed (see `normaliseHook`). Returns the stored id. */
+  addHook: (h: Hook) => string
   updateHook: (h: Hook) => void
   removeHook: (id: string) => void
-  addFingerprint: (p: FingerprintProfile) => void
+  /** Returns the stored id. */
+  addFingerprint: (p: FingerprintProfile) => string
   updateFingerprint: (p: FingerprintProfile) => void
   removeFingerprint: (id: string) => void
 
@@ -207,7 +371,8 @@ export interface BrandStore {
      is a deliberate act with a toast. */
   riskProfiles: RiskProfile[]
   activeRiskProfileId: string
-  addRiskProfile: (p: RiskProfile) => void
+  /** Returns the stored id. */
+  addRiskProfile: (p: RiskProfile) => string
   updateRiskProfile: (p: RiskProfile) => void
   removeRiskProfile: (id: string) => void
   useRiskProfile: (id: string) => void
@@ -229,7 +394,16 @@ export interface BrandStore {
   setGauntletOverride: (policyId: string, cardId: string, want: AccessDecision | null) => void
 
   savePolicy: (p: Policy) => void
-  addPolicy: (p: Policy) => void
+  /* Save as draft. On a policy still in draft the edits land in the policy
+     itself; on a published one they are kept in `pendingDraft` and the live
+     rules go on deciding sign-ins. Publishing clears it — callers pass
+     `pendingDraft: undefined` to `savePolicy`. */
+  saveDraft: (policyId: string, d: { rules: Rule[]; fallback?: Rule }) => void
+  /** Switches a published policy on or off. Leaves its rules and any saved draft alone. Ignored for the system policy, and for any status but draft on a policy with no applications. */
+  setPolicyStatus: (id: string, status: PolicyStatus) => void
+  discardDraft: (policyId: string) => void
+  /** Adds at the top of the list; a policy with no applications is stored as a draft. Returns the stored id. */
+  addPolicy: (p: Policy) => string
   /* Copy a rule into another policy as an independent rule.
 
      Copied, never linked, and the distinction is the whole design. Zones and
@@ -240,13 +414,24 @@ export interface BrandStore {
      make the second policy change without anybody touching it.
 
      So: fresh id, fresh identity, no back-reference. Whoever copies it owns
-     the copy. */
-  copyRuleInto: (targetPolicyId: string, rule: Rule) => void
-  addZone: (z: Zone) => void
+     the copy.
+
+     It lands where the builders would see it: in the policy while it is a
+     draft, and in its saved draft once it is published, so the live rules are
+     untouched until Review & save. Returns the rule's 1-based position and
+     whether it went into a saved draft, or null for an unknown policy. */
+  copyRuleInto: (targetPolicyId: string, rule: Rule) => { at: number; intoDraft: boolean } | null
+  /** Returns the stored id. */
+  addZone: (z: Zone) => string
   updateZone: (z: Zone) => void
   removeZone: (id: string) => void
   deletePolicy: (id: string) => void
-  duplicatePolicy: (id: string) => void
+  /** Copies a policy as a draft with fresh rule ids, named "X (copy)", "X (copy 2)"… within 50 characters. Returns the copy's id; `policyById` finds it at once. */
+  duplicatePolicy: (id: string) => string | null
+  /** Templates the board offers: the ones Xecurify ships and the ones this tenant saved. Reset per persona. */
+  scenarios: Scenario[]
+  /** Adds at the top. Returns the stored id. */
+  addScenario: (s: Scenario) => string
 
   showToast: (m: string) => void
 }
@@ -265,55 +450,166 @@ const Ctx = createContext<BrandStore | null>(null)
 
    `showToast` stays on the main store — it is a stable useCallback, so it costs
    its callers nothing. Only the string moved, and only one node reads it. */
-const ToastCtx = createContext<string | null>(null)
+const ToastCtx = createContext<ToastMessage | null>(null)
+
+/* A collection whose latest value can be read in the same event handler that
+   changed it.
+
+   `add*` has to hand back the id it stored, and a second add in the same
+   handler (or a lookup of the first) has to see the first one. State alone
+   cannot do that until the next render, so every write goes through `set`,
+   which updates the ref first. */
+function useCollection<T>(init: () => T[]) {
+  const [items, setItems] = useState<T[]>(init)
+  const ref = useRef(items)
+  const set = useCallback((next: T[] | ((all: T[]) => T[])) => {
+    const value = typeof next === 'function' ? next(ref.current) : next
+    ref.current = value
+    setItems(value)
+  }, [])
+  return [items, set, ref] as const
+}
+
+/* The id an added item is stored under: its own when nothing else has it,
+   otherwise a fresh one from its name. */
+function freeId<T extends { id: string }>(all: readonly T[], item: T, prefix: string, name: string): string {
+  const taken = all.map((x) => x.id)
+  return item.id && !taken.includes(item.id) ? item.id : newId(prefix, taken, name)
+}
+
+const MISSING_TINT = '#94a3b8'
 
 export function BrandProvider({ children }: { children: ReactNode }) {
-  const [policies, setPolicies] = useState<Policy[]>(() => policiesAt('medium'))
+  const [policies, setPolicies, policiesRef] = useCollection<Policy>(() => policiesAt('medium'))
   /* Zones are edited in place now that they carry two sections, so they need
      the same draft/commit treatment policies already had. */
-  const [zones, setZones] = useState<Zone[]>(() => zonesAt('medium'))
-  const [screen, setScreen] = useState<BrandScreen>({ name: 'policies' })
+  const [zones, setZones, zonesRef] = useCollection<Zone>(() => zonesAt('medium'))
+  const [scenarios, setScenarios, scenariosRef] = useCollection<Scenario>(() => scenariosAt('medium'))
+  const [screen, setScreenState] = useState<BrandScreen>({ name: 'policies' })
+  /* The screen as of the last navigation, for `go` to compare against without
+     waiting for a render. */
+  const screenRef = useRef(screen)
+  const setScreen = useCallback((s: BrandScreen) => {
+    screenRef.current = s
+    setScreenState(s)
+  }, [])
   /* A ref, not state: the guard is read during navigation and must not cause a
      render when a screen registers or clears one. */
-  const leaveGuard = useRef<(() => boolean) | null>(null)
-  const [pendingNav, setPendingNav] = useState<BrandScreen | null>(null)
+  const leaveGuard = useRef<LeaveGuard | null>(null)
+  /* The leave that is waiting on the dialog. A ref, because it is a closure and
+     rendering it would be meaningless; the dialog renders `pendingLeave`. */
+  const pendingRun = useRef<(() => void) | null>(null)
+  const [pendingLeave, setPendingLeave] = useState<PendingLeave | null>(null)
+  /* True while a confirmed leave runs, so a `go` inside that run is not stopped
+     by the same guard a second time. */
+  const leaving = useRef(false)
 
-  const go = useCallback((s: BrandScreen) => {
-    if (leaveGuard.current && !leaveGuard.current()) {
-      setPendingNav(s)
+  /* The save-blocked reason only when Save is offered. A persona switch offers
+     no Save, and a reason for a button that is not there is noise. */
+  const describeLeave = (g: LeaveGuard, canSave = true): PendingLeave => {
+    const offered = canSave && !!g.save
+    return {
+      saveLabel: g.saveLabel?.() ?? 'Save',
+      canSave: offered,
+      blocked: offered ? (g.blocked?.() ?? null) : null,
+    }
+  }
+
+  const requestLeave = useCallback((run: () => void, opts?: { canSave?: boolean }) => {
+    const g = leaveGuard.current
+    if (!leaving.current && g && g.dirty()) {
+      pendingRun.current = run
+      setPendingLeave(describeLeave(g, opts?.canSave ?? true))
       return
     }
-    setScreen(s)
+    run()
   }, [])
 
-  const registerLeaveGuard = useCallback((fn: (() => boolean) | null) => {
-    leaveGuard.current = fn
-  }, [])
-
-  const confirmNav = useCallback(() => {
-    setPendingNav((s) => {
-      if (s) {
-        /* Dropped before navigating, or the guard the unmounting screen
-           registered would answer for the next one. */
-        leaveGuard.current = null
+  const [visit, setVisit] = useState(0)
+  const go = useCallback(
+    (s: BrandScreen) =>
+      requestLeave(() => {
+        /* The rail item for the screen already open reopens it at its list.
+           Only for screens with no policy: a builder asked to open a sheet on
+           its own policy must keep its draft. Nor for a tab named on the same
+           screen — that is the page's own tab bar, and remounting under it
+           would throw away the search and drop focus off the tab. */
+        const again = screenRef.current.name === s.name && !('policyId' in s) && !('tab' in s)
         setScreen(s)
-      }
-      return null
-    })
+        if (leaving.current || again) setVisit((v) => v + 1)
+      }),
+    [requestLeave, setScreen],
+  )
+
+  const registerLeaveGuard = useCallback((g: LeaveGuard) => {
+    leaveGuard.current = g
+  }, [])
+  const releaseLeaveGuard = useCallback((g: LeaveGuard) => {
+    if (leaveGuard.current === g) leaveGuard.current = null
   }, [])
 
-  const cancelNav = useCallback(() => setPendingNav(null), [])
-  const [toast, setToast] = useState<string | null>(null)
+  const finishLeave = useCallback(() => {
+    const run = pendingRun.current
+    pendingRun.current = null
+    setPendingLeave(null)
+    if (!run) return
+    leaving.current = true
+    try {
+      run()
+    } finally {
+      leaving.current = false
+    }
+  }, [])
+
+  const leaveSave = useCallback(() => {
+    const g = leaveGuard.current
+    if (!g?.save || !g.save()) {
+      /* Could not save — say why, and stay. */
+      if (g) setPendingLeave(describeLeave(g))
+      return
+    }
+    finishLeave()
+  }, [finishLeave])
+  const leaveDiscard = finishLeave
+  const leaveStay = useCallback(() => {
+    pendingRun.current = null
+    setPendingLeave(null)
+  }, [])
+  const [toast, setToast] = useState<ToastMessage | null>(null)
+  const toastSeq = useRef(0)
   const [gauntletOverrides, setOverrides] = useState<Record<string, Record<string, AccessDecision>>>({})
   const [methodSets, setMethodSets] = useState<MethodSet[]>(() => methodSetsAt('medium'))
   /* Fingerprint profiles live here rather than on the screen: policy rules
      name them, so the linter and the simulator have to be able to resolve
      one without the Device Fingerprint page being mounted. */
-  const [fingerprints, setFingerprints] = useState<FingerprintProfile[]>(() => fingerprintsAt('medium'))
-  const [riskProfiles, setRiskProfiles] = useState<RiskProfile[]>(() => riskProfilesAt('medium'))
+  const [fingerprints, setFingerprints, fingerprintsRef] = useCollection<FingerprintProfile>(() => fingerprintsAt('medium'))
+  const [riskProfiles, setRiskProfiles, riskProfilesRef] = useCollection<RiskProfile>(() => riskProfilesAt('medium'))
   const [activeRiskProfileId, setActiveRiskProfileId] = useState('rp-shipped')
-  const [hooks, setHooks] = useState<Hook[]>(() => hooksAt('medium'))
-  const [methods, setMethods] = useState<AuthMethod[]>(() => methodsAt('medium'))
+  const [hooks, setHooks, hooksRef] = useCollection<Hook>(() => hooksAt('medium'))
+  const [hardwareTokens, setHardwareTokens] = useState<HardwareToken[]>(() => tokensAt('medium'))
+  /* The seeded catalogue ships Display Token unconfigured; the seeded drawer
+     has fobs issued. `withTokenState` reconciles the two from the first
+     render, so the method row never disagrees with the inventory. */
+  const [methods, setMethods] = useState<AuthMethod[]>(() => withTokenState(methodsAt('medium'), tokensAt('medium')))
+  /* The latest tokens, ahead of the next render. The actions return results
+     synchronously, so they compute from here rather than from `hardwareTokens`
+     — otherwise two calls in one handler (a CSV assigning to three people is
+     three calls) would each start from the same stale list and the last would
+     overwrite the others. */
+  const tokensRef = useRef(hardwareTokens)
+  const commitTokens = useCallback((next: HardwareToken[]) => {
+    tokensRef.current = next
+    setHardwareTokens(next)
+    /* miniOrange assigns tokens before the method is enabled, so the method is
+       configured only while a token is assigned, and switches off with the last. */
+    setMethods((ms) => withTokenState(ms, next))
+  }, [])
+  const [recovery, setRecovery] = useState<RecoverySettings>(RECOVERY_DEFAULTS)
+  const [mfaBehaviour, setMfaBehaviour] = useState<MfaValues>({})
+  const [defaultMethodId, setDefaultMethodId] = useState<string | null | undefined>(undefined)
+  const [methodConfig, setMethodConfig] = useState<Record<string, ConfigField[]>>({})
+  const [setupChoice, setSetupChoice] = useState<Record<string, string>>({})
+  const [enrolment, setEnrolment] = useState<UserEnrolment>(SEED_ENROLMENT)
   const [apps, setApps] = useState<App[]>(() => appsAt('medium'))
   const [groups, setGroups] = useState<Group[]>(() => groupsAt('medium'))
   const [directory, setDirectory] = useState(() => usersAt('medium'))
@@ -327,38 +623,78 @@ export function BrandProvider({ children }: { children: ReactNode }) {
      `Shell.tsx` and nothing else. */
   const [edition, setEdition] = useState<Edition>('lite')
   const [persona, setPersonaId] = useState<PersonaId>('manager')
+  const personaRef = useRef(persona)
   const [role, setRoleState] = useState<Role>('admin')
 
   /* Switching role lands you somewhere that exists for it. An end user has no
      policies screen to return to, and an admin arriving on the app launcher
-     would be looking at the one screen that is not theirs. */
-  const setRole = useCallback((r: Role) => {
-    setRoleState(r)
-    setScreen(r === 'user' ? { name: 'apps' } : { name: 'policies' })
-  }, [])
+     would be looking at the one screen that is not theirs. The two shells are
+     different components, so the screen remounts without a visit bump. */
+  const setRole = useCallback(
+    (r: Role) =>
+      requestLeave(() => {
+        setRoleState(r)
+        setScreen(r === 'user' ? { name: 'apps' } : { name: 'policies' })
+      }),
+    [requestLeave, setScreen],
+  )
 
   /* One swap, every tab. Held here rather than in the switcher so that a screen
      mounted at the time reads the new tenant on its next render instead of
      holding the old one until it is revisited. */
-  const setPersona = useCallback((id: PersonaId) => {
-    const { depth, landing } = personaById(id)
-    setPersonaId(id)
-    setPolicies(policiesAt(depth))
-    setZones(zonesAt(depth))
-    setMethodSets(methodSetsAt(depth))
-    setMethods(methodsAt(depth))
-    setFingerprints(fingerprintsAt(depth))
-    setHooks(hooksAt(depth))
-    setApps(appsAt(depth))
-    setGroups(groupsAt(depth))
-    setDirectory(usersAt(depth))
-    setOverrides({})
-    setScreen(TAB_SCREEN[landing])
-  }, [])
+  /* Through the leave guard like any other way out, but with no Save: the swap
+     replaces every policy, so a draft saved a moment before would go with it.
+
+     Everything tenant-shaped is reset, including the risk profile in use, the
+     saved templates and the Authentication methods settings, and `visit` is
+     bumped so the screen remounts even when the new persona lands on the same
+     one: an open zone, a search or a draft from the last tenant must not carry
+     into this one. Picking the persona already loaded does nothing, because
+     reloading it would silently undo every saved change. */
+  const setPersona = useCallback(
+    (id: PersonaId) => {
+      if (id === personaRef.current) return
+      requestLeave(
+        () => {
+          const { depth, landing } = personaById(id)
+          personaRef.current = id
+          setPersonaId(id)
+          setPolicies(policiesAt(depth))
+          setZones(zonesAt(depth))
+          setScenarios(scenariosAt(depth))
+          setMethodSets(methodSetsAt(depth))
+          const tokens = tokensAt(depth)
+          tokensRef.current = tokens
+          setHardwareTokens(tokens)
+          setMethods(withTokenState(methodsAt(depth), tokens))
+          setFingerprints(fingerprintsAt(depth))
+          setRiskProfiles(riskProfilesAt(depth))
+          setActiveRiskProfileId('rp-shipped')
+          setHooks(hooksAt(depth))
+          setApps(appsAt(depth))
+          setGroups(groupsAt(depth))
+          setDirectory(usersAt(depth))
+          setOverrides({})
+          setRecovery(RECOVERY_DEFAULTS)
+          setMfaBehaviour({})
+          setDefaultMethodId(undefined)
+          setMethodConfig({})
+          setSetupChoice({})
+          setEnrolment(SEED_ENROLMENT)
+          setScreen(TAB_SCREEN[landing])
+          setVisit((v) => v + 1)
+        },
+        { canSave: false },
+      )
+    },
+    [requestLeave, setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setScreen],
+  )
 
   const showToast = useCallback((m: string) => {
-    setToast(m)
-    window.setTimeout(() => setToast((t) => (t === m ? null : t)), 2800)
+    toastSeq.current += 1
+    const id = toastSeq.current
+    setToast({ id, text: m })
+    window.setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 2800)
   }, [])
 
   const value = useMemo<BrandStore>(
@@ -377,29 +713,96 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       setPersona,
       role,
       setRole,
+      account: role === 'user' ? END_USER_ACCOUNT : ADMIN_ACCOUNT,
+      viewerId: END_USER_ACCOUNT.id,
       methodSets,
       methods,
       setMethods,
+
+      hardwareTokens,
+      addHardwareTokens: (ts) => {
+        const current = tokensRef.current
+        const seen = new Set(current.map((t) => serialKey(t.serial)))
+        const fresh = ts.filter((t) => !seen.has(serialKey(t.serial)) && !!seen.add(serialKey(t.serial)))
+        if (fresh.length) commitTokens([...current, ...fresh])
+      },
+      deleteHardwareTokens: (serials) => {
+        const r = deleteTokens(tokensRef.current, serials)
+        if (r.deleted.length) commitTokens(r.tokens)
+        return { deleted: r.deleted, blocked: r.blocked }
+      },
+      assignHardwareTokens: (userId, serials) => {
+        const r = assignTokens(tokensRef.current, userId, serials, formatDay(new Date()))
+        if (r.assigned.length) commitTokens(r.tokens)
+        return { assigned: r.assigned, skipped: r.skipped }
+      },
+      unassignHardwareTokens: (serials) => {
+        const current = tokensRef.current
+        const next = unassignTokens(current, serials)
+        if (next.some((t, i) => t !== current[i])) commitTokens(next)
+      },
+      syncHardwareToken: (serial) => {
+        const r = syncToken(tokensRef.current, serial, formatDay(new Date()))
+        if (!r.error) commitTokens(r.tokens)
+      },
+
+      recovery,
+      setRecovery,
+      mfaBehaviour,
+      setMfaBehaviour,
+      defaultMethodId,
+      setDefaultMethodId,
+      methodConfig,
+      setMethodConfig,
+      setupChoice,
+      setSetupChoice,
+      enrolment,
+      setEnrolment,
+
       templates: seedTemplates,
+      scenarios,
+      addScenario: (s: Scenario) => {
+        const id = freeId(scenariosRef.current, s, 's', s.name)
+        setScenarios((all) => [{ ...s, id }, ...all])
+        return id
+      },
       policies,
 
       screen,
+      visit,
       go,
       registerLeaveGuard,
-      pendingNav,
-      confirmNav,
-      cancelNav,
+      releaseLeaveGuard,
+      requestLeave,
+      pendingLeave,
+      leaveSave,
+      leaveDiscard,
+      leaveStay,
 
-      appById: (id) => apps.find((a) => a.id === id) ?? apps[0],
-      groupById: (id) => groups.find((g) => g.id === id) ?? groups[0],
+      /* An unknown id falls back to the first app or group, and to a stand-in
+         named by the id when the tenant has none (a day-one tenant), so a
+         stale reference never throws. */
+      appById: (id) =>
+        apps.find((a) => a.id === id) ??
+        apps[0] ?? { id, name: id, protocol: 'SAML', glyph: '?', tint: MISSING_TINT, type: 'Desktop', lastUpdated: '' },
+      groupById: (id) => groups.find((g) => g.id === id) ?? groups[0] ?? { id, name: id, memberCount: 0 },
       userById: (id) => directory.people.find((u) => u.id === id),
       // Reads live state, not the seed — otherwise a deleted or renamed zone
-      // keeps resolving everywhere it is referenced.
-      zoneById: (id) => zones.find((z) => z.id === id),
-      fingerprintById: (id) => fingerprints.find((p) => p.id === id),
-      hookById: (id) => hooks.find((h) => h.id === id),
-      addHook: (h) => setHooks((all) => [...all, h]),
-      updateHook: (h) => setHooks((all) => all.map((x) => (x.id === h.id ? h : x))),
+      // keeps resolving everywhere it is referenced. The ref, so a zone added
+      // earlier in the same handler resolves too.
+      zoneById: (id) => zonesRef.current.find((z) => z.id === id),
+      fingerprintById: (id) => fingerprintsRef.current.find((p) => p.id === id),
+      hookById: (id) => hooksRef.current.find((h) => h.id === id),
+      addHook: (h) => {
+        const clean = normaliseHook(h)
+        const id = freeId(hooksRef.current, clean, 'hk', clean.name)
+        setHooks((all) => [...all, { ...clean, id }])
+        return id
+      },
+      updateHook: (h) => {
+        const clean = normaliseHook(h)
+        setHooks((all) => all.map((x) => (x.id === clean.id ? clean : x)))
+      },
       /* Same contract as zones and fingerprints: deleting does not unlink the
          rules naming it. The linter reports a condition pointing at nothing,
          which is a louder and more accurate signal than a rule that silently
@@ -407,31 +810,39 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       removeHook: (id) => setHooks((all) => all.filter((h) => h.id !== id)),
       riskProfiles,
       activeRiskProfileId,
-      addRiskProfile: (p) => setRiskProfiles((all) => [...all, p]),
+      addRiskProfile: (p) => {
+        const id = freeId(riskProfilesRef.current, p, 'rp', p.name)
+        setRiskProfiles((all) => [...all, { ...p, id }])
+        return id
+      },
       updateRiskProfile: (p) => setRiskProfiles((all) => all.map((x) => (x.id === p.id ? p : x))),
       /* Deleting the profile IN USE would leave the evaluator with no scale, so
          the active id falls back to the first survivor rather than dangling.
          The screen refuses the delete before it gets here; this is the guard
          that makes the refusal a policy rather than the only thing standing
          between a tenant and an undefined risk scale. */
-      removeRiskProfile: (id) =>
-        setRiskProfiles((all) => {
-          const left = all.filter((p) => p.id !== id)
-          if (id === activeRiskProfileId && left[0]) setActiveRiskProfileId(left[0].id)
-          return left
-        }),
+      removeRiskProfile: (id) => {
+        const left = riskProfilesRef.current.filter((p) => p.id !== id)
+        setRiskProfiles(left)
+        if (id === activeRiskProfileId && left[0]) setActiveRiskProfileId(left[0].id)
+      },
       useRiskProfile: setActiveRiskProfileId,
       /* The scale comes from the profile in use, and falls back to the shipped
          weighting rather than to `undefined` if the id ever points at nothing —
          a tenant with a broken pointer should grade as they did on day one, not
          crash the evaluator. */
       riskScale: riskScale(riskProfiles.find((p) => p.id === activeRiskProfileId) ?? EMPTY_RISK_PROFILE),
-      addFingerprint: (p) => setFingerprints((all) => [...all, p]),
+      addFingerprint: (p) => {
+        const id = freeId(fingerprintsRef.current, p, 'fp', p.name)
+        setFingerprints((all) => [...all, { ...p, id }])
+        return id
+      },
       updateFingerprint: (p) => setFingerprints((all) => all.map((x) => (x.id === p.id ? p : x))),
-      /* Deleting a profile does not unlink the rules naming it — the linter
-         reports a condition pointing at nothing, same as it does for zones. */
+      /* Deleting a profile does not unlink the rules naming it. ConfirmDelete
+         refuses while a live policy uses it, and the checks flag any rule left
+         naming it (PE135), same as zones (PE134) and hooks (PE130). */
       removeFingerprint: (id) => setFingerprints((all) => all.filter((p) => p.id !== id)),
-      policyById: (id) => policies.find((p) => p.id === id),
+      policyById: (id) => policiesRef.current.find((p) => p.id === id),
 
       gauntletOverrides,
       /* Passing null clears the override rather than storing the card's own
@@ -446,59 +857,102 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           return { ...all, [policyId]: forPolicy }
         }),
 
+      /* Stamped only when something changed. Saving an untouched policy used to
+         record an edit nobody made. A policy saved with no applications is
+         stored as a draft: unfinished means draft. */
       savePolicy: (p) =>
-        setPolicies((all) => all.map((x) => (x.id === p.id ? { ...p, lastModified: 'Just now', modifiedBy: 'You' } : x))),
+        setPolicies((all) =>
+          all.map((x) => {
+            if (x.id !== p.id) return x
+            const next = settled(asStored(p))
+            return changedBeyondStamp(x, next) ? { ...next, lastModified: 'Just now', modifiedBy: 'You' } : x
+          }),
+        ),
 
-      addPolicy: (p) => setPolicies((all) => [p, ...all]),
+      setPolicyStatus: (id, status) =>
+        setPolicies((all) =>
+          all.map((x) => {
+            if (x.id !== id || x.status === status || x.isSystem) return x
+            if (x.appIds.length === 0 && status !== 'draft') return x
+            return settled(asStored({ ...x, status, lastModified: 'Just now', modifiedBy: 'You' }))
+          }),
+        ),
+
+      saveDraft: (policyId, d) =>
+        setPolicies((all) => all.map((x) => (x.id === policyId ? withSavedDraft(x, d) : x))),
+
+      discardDraft: (policyId) =>
+        setPolicies((all) => all.map((x) => (x.id === policyId ? { ...x, pendingDraft: undefined } : x))),
+
+      addPolicy: (p) => {
+        const id = freeId(policiesRef.current, p, 'p', p.name)
+        setPolicies((all) => [settled({ ...p, id }), ...all])
+        return id
+      },
 
       /* Appended, not inserted. Under first-match-wins any other position is a
          guess about intent the copier has not expressed — dropping a rule into
          the middle of somebody else's ordered list silently changes what every
          rule below it decides. The end is the only position that changes
          nothing that already worked, and the dialog says so, and says whether
-         the rule can still fire from there. */
-      copyRuleInto: (targetPolicyId, r) =>
-        setPolicies((all) =>
-          all.map((p) =>
-            p.id === targetPolicyId
-              ? {
-                  ...p,
-                  /* Fresh ids all the way down, not just on the rule.
+         the rule can still fire from there.
 
-                     A shallow spread shares every Condition and ConditionCard
-                     object with the original, and both the linter and the
-                     composer address those by id — so editing the copy would
-                     edit the rule it was copied from. */
-                  rules: [...p.rules, reidRule(r)],
-                  lastModified: 'Just now',
-                  modifiedBy: 'You',
-                }
-              : p,
-          ),
-        ),
-      addZone: (z) => setZones((all) => [...all, z]),
+         Into what the builders open, not into the live rules. Writing the live
+         rules of a published policy enforced the copy at once, with no review,
+         and a saved draft on that policy then published over it and dropped it. */
+      copyRuleInto: (targetPolicyId, r) => {
+        const target = policiesRef.current.find((p) => p.id === targetPolicyId)
+        if (!target) return null
+        const base = lastSaved(target)
+        /* Fresh ids all the way down, not just on the rule.
+
+           A shallow spread shares every Condition and ConditionCard object
+           with the original, and both the linter and the composer address
+           those by id — so editing the copy would edit the rule it was copied
+           from. */
+        const next = withSavedDraft(target, { ...base, rules: [...base.rules, reidRule(r)] })
+        setPolicies((all) => all.map((p) => (p.id === targetPolicyId ? next : p)))
+        return { at: base.rules.length + 1, intoDraft: target.status !== 'draft' }
+      },
+      addZone: (z) => {
+        const id = freeId(zonesRef.current, z, 'z', z.name)
+        setZones((all) => [...all, { ...z, id }])
+        return id
+      },
       updateZone: (z) => setZones((all) => all.map((x) => (x.id === z.id ? z : x))),
-      /* A deleted zone is not unlinked from the rules that name it — the
-         dependency count in the editor is what warns you before you get here. */
+      /* A deleted zone is not unlinked from the rules that name it. ConfirmDelete
+         refuses while a live policy uses it, and the checks flag any rule left
+         naming it. */
       removeZone: (id) => setZones((all) => all.filter((z) => z.id !== id)),
 
       deletePolicy: (id) => setPolicies((all) => all.filter((p) => p.id !== id)),
 
-      duplicatePolicy: (id) =>
-        setPolicies((all) => {
-          const src = all.find((p) => p.id === id)
-          if (!src) return all
-          const copy: Policy = {
-            ...src,
-            id: `${src.id}-copy-${all.length}`,
-            name: `${src.name} (copy)`,
-            status: 'inactive',
-            isSystem: false,
-            lastModified: 'Just now',
-            modifiedBy: 'You',
-          }
-          return [copy, ...all]
-        }),
+      /* A draft, not a switched-off policy: nothing about a copy has been
+         reviewed. It copies what the builder would open (a saved draft if there
+         is one), and every rule gets new ids so editing one policy never edits
+         the other. The name is one no other policy has, within the 50-character
+         limit the details page enforces. */
+      duplicatePolicy: (id) => {
+        const all = policiesRef.current
+        const src = all.find((p) => p.id === id)
+        if (!src || src.isSystem) return null
+        const from = openForEditing(src)
+        const name = uniqueName(src.name, all.map((p) => p.name), 50)
+        const copy: Policy = {
+          ...from,
+          id: newId('p', all.map((p) => p.id), name),
+          name,
+          status: 'draft',
+          rules: from.rules.map(reidRule),
+          fallback: from.fallback && reidRule(from.fallback),
+          pendingDraft: undefined,
+          isSystem: false,
+          lastModified: 'Just now',
+          modifiedBy: 'You',
+        }
+        setPolicies([copy, ...all])
+        return copy.id
+      },
 
       showToast,
     }),
@@ -511,7 +965,14 @@ export function BrandProvider({ children }: { children: ReactNode }) {
        The three callbacks are `useCallback`-stable, so listing them costs
        nothing and stops the next reader wondering whether they were left out
        on purpose. */
-    [policies, zones, fingerprints, riskProfiles, activeRiskProfileId, hooks, apps, groups, directory, edition, persona, setPersona, role, setRole, methodSets, methods, screen, go, registerLeaveGuard, pendingNav, confirmNav, cancelNav, showToast, gauntletOverrides],
+    [
+      policies, scenarios, zones, fingerprints, riskProfiles, activeRiskProfileId, hooks, apps, groups, directory, edition,
+      persona, setPersona, role, setRole, methodSets, methods, hardwareTokens, commitTokens, screen, visit, go,
+      registerLeaveGuard, releaseLeaveGuard, requestLeave, pendingLeave, leaveSave, leaveDiscard, leaveStay, showToast,
+      gauntletOverrides, recovery, mfaBehaviour, defaultMethodId, methodConfig, setupChoice, enrolment,
+      setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks,
+      policiesRef, zonesRef, scenariosRef, fingerprintsRef, riskProfilesRef, hooksRef,
+    ],
   )
 
   return (
@@ -522,8 +983,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 }
 
 /** The current toast, or null. Separate from useBrand so a toast re-renders
-    the toast and nothing else. */
-export function useToast(): string | null {
+    the toast and nothing else. A new `id` is a new toast, even with the same text. */
+export function useToast(): ToastMessage | null {
   return useContext(ToastCtx)
 }
 

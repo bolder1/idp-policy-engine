@@ -1,5 +1,5 @@
 import { cond, emptyGroup, type Condition, type ConditionCard, type Predicate, type ZoneScope } from './data'
-import { cardJoin, ckey, drawsAsBracket, outerJoin, topJoin } from './predicate'
+import { cardJoin, ckey, drawsAsBracket, topJoin } from './predicate'
 import type { Joiner } from './data'
 
 /* -----------------------------------------------------------------------------
@@ -31,6 +31,9 @@ import type { Joiner } from './data'
 
 export type BranchId = string
 
+/** `group` and `user`: who a rule is for, which lives on `Rule.who` and not in a card. */
+const isLegacyWhoType = (typeId: string) => typeId === 'group' || typeId === 'user'
+
 /* The one place a predicate is rebuilt.
 
    `...w` rather than `{ cards }`, every time, so a field added to `Predicate`
@@ -57,6 +60,9 @@ export const branchOf = (w: Predicate, conditionId: string) =>
    opinion about is the end — and inside a branch every position means the same
    thing anyway, since a branch is one joiner applied to all of its members. */
 export function addCondition(w: Predicate, target: BranchId | 'new', c: Condition, at?: number): Predicate {
+  /* People and groups are `Rule.who`, never a condition. Refused here so a
+     stray caller cannot put them back into a card. */
+  if (isLegacyWhoType(c.typeId)) return w
   if (target === 'new') return withCards(w, [...w.cards, { ...emptyGroup(), grouped: false, conditions: [c] }])
   return mapBranch(w, target, (k) => {
     const next = [...k.conditions]
@@ -128,6 +134,7 @@ export function retypeCondition(w: Predicate, conditionId: string, typeId: strin
 
      The rebuild names only what every condition has, so a field the new type
      does not own cannot survive by being forgotten here. */
+  if (isLegacyWhoType(typeId)) return w
   return mapConditions(w, (c) => (c.id === conditionId ? { id: c.id, typeId, operator: firstOperator, values: [] } : c))
 }
 
@@ -255,8 +262,8 @@ export function moveBranch(w: Predicate, from: number, to: number): Predicate {
 /* Fold one branch's conditions into another, and drop the ones already there.
 
    De-duplicated on `ckey` rather than on id, because the same check written
-   twice in two branches is two ids and one condition — the seeded finance rule
-   holds `group in finance` in both of its branches — and merging them should
+   twice in two branches is two ids and one condition — `zone in office` held
+   by both branches, say — and merging them should
    leave one, not a branch that requires the same thing of somebody twice.
 
    The absorbing branch's joiner is the one that survives. Two runs being merged
@@ -375,9 +382,6 @@ export function setOuterJoin(w: Predicate, join: Joiner): Predicate {
   else next.join = 'and'
   return next
 }
-
-/** Flip the bracket's operator — the read of `outerJoin`, written to both levels. */
-export const flipOuterJoin = (w: Predicate): Predicate => setOuterJoin(w, outerJoin(w) === 'and' ? 'or' : 'and')
 
 /** A fresh, unset condition of a type — what every "add" route inserts. */
 export const freshCondition = (typeId: string, firstOperator: string) => cond(typeId, firstOperator, [])

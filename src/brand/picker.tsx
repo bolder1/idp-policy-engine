@@ -1,7 +1,11 @@
 import { motion } from 'motion/react'
 import { Fragment, useCallback, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, type LucideIcon } from 'lucide-react'
+import { Check, ChevronDown, ListX, type LucideIcon, SearchX } from 'lucide-react'
+
+import { appRoot } from './dialog-chrome'
+import { EmptyState } from './empty'
+import { Button } from './kit'
 
 /* The stylesheet is imported from main.tsx, in cascade order — see the note
    there. Importing it from this module put it before kit.css and let the
@@ -22,9 +26,12 @@ import { Check, ChevronDown, type LucideIcon } from 'lucide-react'
 
    So the row loses its `overflow` and this loses the `<select>`.
 
-   The popup is portalled to `document.body` and positioned `fixed`, which is
-   this codebase's own proven un-clippable pattern — `Tip` was rewritten to it
-   for exactly this reason. The placement logic is lifted from it: flip only
+   The popup is portalled to the app root (`.brand-root`) and positioned
+   `fixed`, which is this codebase's own proven un-clippable pattern — `Tip` was
+   rewritten to it for exactly this reason. The app root rather than
+   `document.body`, so the kit's resets, type and focus ring reach what is
+   inside it: the empty state's button rendered in the browser's own button
+   font out there. The placement logic is lifted from Tip: flip only
    when the preferred side genuinely lacks room AND the other has more, clamp
    horizontally to the viewport, follow scroll with `capture: true` so a nested
    scroller moves it too, and stay hidden until measured so nothing is ever seen
@@ -74,8 +81,11 @@ export function Picker({
   footer,
   onFooter,
   invalid = false,
+  disabled = false,
   autoOpen = false,
   summary: summaryText,
+  prefix,
+  noun = 'options',
 }: {
   value: string | string[] | null
   options: PickerOption[]
@@ -92,6 +102,11 @@ export function Picker({
   footer?: ReactNode
   onFooter?: () => void
   invalid?: boolean
+  /** The question still applies but the answer cannot change — one option is
+      possible, or something earlier in the form decided it. The value stays on
+      screen; only the choosing is off. Preferred to swapping the control for
+      plain text, which leaves a line of prose in a column of fields. */
+  disabled?: boolean
   /** Open on mount, for a row inserted with nothing chosen yet. */
   autoOpen?: boolean
   /* What the closed trigger says, when the caller can say it better.
@@ -101,6 +116,12 @@ export function Picker({
      instruction ("Choose…"). Same prop name and type as `ConditionPopover`'s,
      so moving between the two does not mean learning two words for one job. */
   summary?: string
+  /** A muted word before the value on the closed trigger — "Type", as in
+      "Type  Device health". What the dropdown filters, said once, so the value
+      does not have to carry it ("All types"). */
+  prefix?: string
+  /** Plural, lower case, for the empty states: 'applications', 'zones'. */
+  noun?: string
 }) {
   const [open, setOpen] = useState(autoOpen)
   const [q, setQ] = useState('')
@@ -119,8 +140,11 @@ export function Picker({
      look like a different thing from the choice that produced it. */
   const sole = picked.length === 1 ? options.find((o) => o.value === picked[0]) : undefined
 
-  const shown = q
-    ? options.filter((o) => `${o.label} ${o.meta ?? ''} ${o.value}`.toLowerCase().includes(q.toLowerCase()))
+  /* Trimmed, so a stray space neither hides every option nor reports that
+     nothing matches " ". */
+  const needle = q.trim().toLowerCase()
+  const shown = needle
+    ? options.filter((o) => `${o.label} ${o.meta ?? ''} ${o.value}`.toLowerCase().includes(needle))
     : options
   const usable = shown.filter((o) => !o.disabled)
 
@@ -144,8 +168,8 @@ export function Picker({
      The minimum was `Math.max(anchorWidth, measuredPopupWidth)`, and the
      measurement is a BORDER-box width being written back as a CONTENT-box
      minimum: the reset that would make those the same number is
-     `.brand-root *`, and this popup is portalled to `document.body`, outside
-     it. So each placement added the 2px of border, and placement runs on every
+     `.brand-root *`, and this popup was then portalled to `document.body`,
+     outside it. So each placement added the 2px of border, and placement runs on every
      scroll event — scrolling the option list widened the panel a couple of
      pixels a tick, without limit, for as long as somebody kept scrolling.
 
@@ -239,6 +263,32 @@ export function Picker({
       anchor.current?.focus()
       return
     }
+    const target = e.target as HTMLElement
+    const inPop = !!pop.current?.contains(target)
+    /* Tab moves between the controls inside the popup — its search, Clear
+       search, the footer — and closes it only when it would leave. It used to
+       close on any Tab, so the footer and the empty state's button could not be
+       reached from the keys, and focus fell out of a popup that sits at the end
+       of the page into nowhere. Leaving hands focus back to the trigger. */
+    if (e.key === 'Tab') {
+      if (inPop && pop.current) {
+        const inside = Array.from(
+          pop.current.querySelectorAll<HTMLElement>('input:not([disabled]), button:not([disabled])'),
+        )
+        const at = inside.indexOf(target)
+        const next = at + (e.shiftKey ? -1 : 1)
+        if (at !== -1 && next >= 0 && next < inside.length) return
+        e.preventDefault()
+        setOpen(false)
+        anchor.current?.focus()
+        return
+      }
+      setOpen(false)
+      return
+    }
+    /* A button inside the popup answers its own Enter and Space. Taken here,
+       Enter on the footer picked the highlighted option instead. */
+    if (inPop && target instanceof HTMLButtonElement) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       if (!open) {
@@ -272,7 +322,15 @@ export function Picker({
       if (usable[cursor]) commit(usable[cursor])
       return
     }
-    if (e.key === 'Tab') setOpen(false)
+  }
+
+  /* Clearing puts focus back in the search field, the control somebody who just
+     cleared a search types into next. Synchronous, before the button that was
+     pressed unmounts and takes focus with it. */
+  const clearSearch = () => {
+    setQ('')
+    setCursor(0)
+    pop.current?.querySelector<HTMLInputElement>('.bx-picker__search input')?.focus({ preventScroll: true })
   }
 
   /* Group headings are emitted when the group CHANGES rather than collected
@@ -292,6 +350,7 @@ export function Picker({
         aria-label={label}
         aria-invalid={invalid || undefined}
         aria-activedescendant={open && usable[cursor] ? `${id}-${cursor}` : undefined}
+        disabled={disabled}
         className={`bx-picker__trigger bx-picker__trigger--${size} ${open ? 'is-open' : ''} ${
           picked.length === 0 ? 'is-empty' : ''
         } ${invalid ? 'is-invalid' : ''}`}
@@ -303,6 +362,7 @@ export function Picker({
             {sole.art}
           </span>
         )}
+        {prefix && <span className="bx-picker__prefix">{prefix}</span>}
         <span className="bx-picker__value">{summary}</span>
         <ChevronDown size={size === 'sm' ? 12 : 13} strokeWidth={2.1} aria-hidden />
       </button>
@@ -346,15 +406,37 @@ export function Picker({
               </div>
             )}
 
+            {/* Nothing to list: the kit's empty state, compact, in place of the
+                list — not a stray line inside it. A search that matched nothing
+                offers the way back; an empty list says so, and the footer (when
+                there is one) is where to go and add something. */}
+            {shown.length === 0 && (
+              <div className="bx-picker__empty">
+                {needle ? (
+                  <EmptyState
+                    compact
+                    live
+                    icon={SearchX}
+                    title={`No ${noun} match “${q.trim()}”`}
+                    blurb="Check the spelling, or try another search."
+                    action={
+                      <Button variant="secondary" size="sm" onClick={clearSearch}>
+                        Clear search
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <EmptyState compact icon={ListX} title={`No ${noun} yet`} blurb="There is nothing to choose from." />
+                )}
+              </div>
+            )}
             <ul
               role="listbox"
               aria-label={label}
               aria-multiselectable={multiple || undefined}
               className="bx-picker__list"
+              hidden={shown.length === 0}
             >
-              {usable.length === 0 && (
-                <li className="bx-picker__none">{q ? `No match for “${q}”.` : 'Nothing to choose from yet.'}</li>
-              )}
               {shown.map((o) => {
                 const i = usable.indexOf(o)
                 const on = picked.includes(o.value)
@@ -412,7 +494,7 @@ export function Picker({
               </button>
             )}
           </motion.div>,
-          document.body,
+          appRoot(),
         )}
     </span>
   )

@@ -30,17 +30,12 @@
 
 /* --- Lettered sections ------------------------------------------------------ */
 
-.bv5__seclabel {
-  display: flex; align-items: center; gap: 8px;
-  margin-bottom: 8px;
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary);
-}
-.bv5__seclabel span {
-  display: grid; place-items: center;
-  width: 18px; height: 18px; border-radius: var(--radius-sm);
-  background: var(--accent-soft); border: 1px solid var(--accent-soft-border);
-  color: var(--accent-strong); letter-spacing: 0;
+/* A plain heading in sentence case. It was a lettered, uppercase micro-label. Two
+   classes, so it outranks `.bpage h2`. */
+.bv5 .bv5__seclabel {
+  margin: 0 0 8px;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold);
+  letter-spacing: 0; text-transform: none; color: var(--text-secondary);
 }
 .bv5__seccard {
   background: var(--surface-raised);
@@ -55,6 +50,7 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 .bv5__row:last-child { border-bottom: 0; }
+.bv5__row.is-disabled .bv5__rn { color: var(--text-tertiary); }
 .bv5__rn { display: block; font-size: var(--fs-base); font-weight: var(--fw-medium); color: var(--text-primary); }
 
 /* --- Radios ----------------------------------------------------------------- */

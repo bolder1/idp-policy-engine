@@ -1,22 +1,25 @@
-import { useState } from 'react'
-import { AlertTriangle, Info, Link2, Plus, RefreshCw, Trash2, Zap } from 'lucide-react'
+import { useId, useRef, useState, type ReactNode } from 'react'
+import { AlertTriangle, Info, Link2, Plus, RefreshCw, Webhook, Zap } from 'lucide-react'
 
 import { PageHead } from '../Shell'
-import { Badge, Button, Modal } from '../kit'
+import { Badge, Button, Callout, DeleteButton, Modal, TipDot } from '../kit'
 import { Picker } from '../picker'
 import { useBrand } from '../store'
-import { Webhook } from 'lucide-react'
 import { EmptyState } from '../empty'
-import { policiesUsing } from './usage'
+import { deleteImpact, policiesUsing } from './usage'
 import { UsedByList } from './used-by'
+import { ConfirmDelete } from './confirm-delete'
+import { useLeaveGuard } from '../leave-guard'
+import { firstInvalidField, hookDirty, hookEditImpact } from './hook-form'
+import { PageBar } from './page-bar'
 import {
-  FAILURE_BLURB,
   FAILURE_LABEL,
+  MAX_TIMEOUT_MS,
   SLOW_TIMEOUT_MS,
-  canSaveHook,
-  describeHook,
   validateHook,
   type Hook,
+  type HookField,
+  type HookIssue,
   type HookMode,
   type OnFailure,
 } from '../hooks'
@@ -24,36 +27,31 @@ import {
 /* -----------------------------------------------------------------------------
    External hooks — the library screen.
 
-   Problem 7, from Lenskart and the Oberoi Group: a condition the engine cannot
-   answer on its own, answered by a system that can.
+   A condition the engine cannot answer on its own, answered by a system that
+   can. Shaped like Zones: a named object, written once, referenced from rules
+   across many policies, so every card names the policies that use it.
 
-   The screen is shaped like Zones rather than like a settings page, because a
-   hook is the same kind of thing: a named object, written once, referenced from
-   rules across many policies, and dangerous to edit precisely because of that.
-   So it gets what zones get — a list with the fan-out on every row, and a
-   "used by" that names the policies rather than counting them.
-
-   --- What this screen refuses to let you skip -------------------------------
-
-   The failure behaviour. There is no default selected, and the form will not
-   save until it has been answered, because the alternative is what the product
-   had before this existed: a hook-gated rule whose behaviour on the day the
-   endpoint is down is whatever the implementation happened to do. Both answers
-   are defensible and they are opposite, which is exactly why the tenant has to
-   pick rather than inherit one.
+   The failure behaviour is always stated, on the card and in the form, because
+   it decides what sign-ins get on the day the endpoint is down.
    -------------------------------------------------------------------------- */
 
 const MODE: Record<HookMode, { label: string; blurb: string; icon: typeof Zap }> = {
   sync: {
     label: 'Synchronous',
-    blurb: 'Called during the sign-in. The answer decides the condition, and the wait is inside the login.',
+    blurb: 'Called during sign-in. The answer decides the condition.',
     icon: Zap,
   },
   'attribute-sync': {
     label: 'Attribute sync',
-    blurb: 'Pulls values into the user profile on a schedule. Rules then read them as ordinary attributes — nothing to wait for at sign-in.',
+    blurb: 'Pulls values into user profiles on a schedule. Rules read them as attributes.',
     icon: RefreshCw,
   },
+}
+
+/* What each answer does during an outage, in one plain line each. */
+const FAILURE_HINT: Record<OnFailure, string> = {
+  'fail-open': 'The condition counts as not matched. A rule that denies stops denying.',
+  'fail-closed': 'The sign-in is refused. An outage at the endpoint blocks sign-in.',
 }
 
 export function Hooks() {
@@ -62,52 +60,44 @@ export function Hooks() {
   const [confirmDelete, setConfirmDelete] = useState<Hook | null>(null)
 
   const save = (h: Hook) => {
-    if (store.hooks.some((x) => x.id === h.id)) store.updateHook(h)
+    if (h.id && store.hooks.some((x) => x.id === h.id)) store.updateHook(h)
     else store.addHook(h)
     setEditing(null)
-    store.showToast(`${h.name} saved`)
+    store.showToast(`${h.name.trim()} saved.`)
   }
 
-  /* Walked once. This read `policiesUsing(...).length > 0 ? policiesUsing(...).length`
-     — the same scan of every rule of every policy, run twice to ask a question
-     and then answer it. */
-  const deleteImpact = !confirmDelete
-    ? ''
-    : (() => {
-        const n = policiesUsing('webhook', confirmDelete.id, store.policies).length
-        return n > 0
-          ? `${n} policy rule set references this hook. Those conditions will point at nothing, and the checks will report each one as an error until they are fixed.`
-          : 'No rule references this hook, so nothing else changes.'
-      })()
+  const remove = (h: Hook) => {
+    store.removeHook(h.id)
+    setConfirmDelete(null)
+    store.showToast(`${h.name} deleted.`)
+  }
 
   return (
     <div className="bpage bhk">
-      <PageHead
-        title="External hooks"
-        caption="Conditions answered by a system outside the engine."
-        /* Withheld while the empty state is showing, which offers the same
-           action with the sentence that explains it. */
-        actions={
-          store.hooks.length > 0 ? (
+      <PageHead title="External hooks" caption="Rule conditions answered by an outside system." />
+
+      {/* New hook on the bar, where every library keeps its primary action —
+          see `PageBar`. Withheld while the empty state offers the same action. */}
+      {store.hooks.length > 0 && (
+        <PageBar
+          right={
             <Button variant="brand" onClick={() => setEditing(blank())}>
               <Plus size={15} strokeWidth={2.2} aria-hidden />
               New hook
             </Button>
-          ) : undefined
-        }
-      />
+          }
+        />
+      )}
 
       {store.hooks.length === 0 ? (
         <EmptyState
           icon={Webhook}
           title="No hooks yet"
-          /* Three real callees, named. See the note on the Device profiles
-             empty state for why the framing around them is gone. */
-          blurb="Call a fraud score, a CMDB or your own risk API, and let a rule decide on the answer."
+          blurb="Add a hook to let a rule check an outside system, like a fraud score."
           action={
             <Button variant="brand" onClick={() => setEditing(blank())}>
               <Plus size={15} strokeWidth={2.2} aria-hidden />
-              Create your first hook
+              New hook
             </Button>
           }
         />
@@ -115,7 +105,7 @@ export function Hooks() {
         <ul className="bhk__list">
           {store.hooks.map((h) => {
             const users = policiesUsing('webhook', h.id, store.policies)
-            const issues = validateHook(h)
+            const issues = validateHook(h, store.hooks)
             const Icon = MODE[h.mode].icon
             return (
               <li key={h.id} className="bhk__card">
@@ -125,49 +115,34 @@ export function Hooks() {
                   </span>
                   <div className="bhk__cardname">
                     <h3>{h.name}</h3>
-                    <p>{describeHook(h)}</p>
+                    {h.description && <TipDot text={h.description} label={`About ${h.name}`} />}
                   </div>
-                  {/* Neutral. A hook's mode is a fact about how it is wired,
-                      not information the reader is being alerted to, and the
-                      two modes were wearing the console's info and accent tones
-                      for no reason beyond being two of them. */}
                   <Badge tone="neutral">{MODE[h.mode].label}</Badge>
                   <Button variant="secondary" size="sm" onClick={() => setEditing(h)}>
                     Edit
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={() => setConfirmDelete(h)}>
-                    <Trash2 size={14} strokeWidth={1.9} aria-hidden />
-                    Delete
-                  </Button>
+                  <DeleteButton onClick={() => setConfirmDelete(h)} />
                 </div>
 
-                {h.description && <p className="bhk__why">{h.description}</p>}
-
                 <div className="bhk__facts">
-                  {/* The failure behaviour is a fact about the hook on the same
-                      level as its address, not a setting buried in its form.
-                      It is the one property that decides what happens on the
-                      worst day this object will have. */}
-                  <span className={`bhk__fact is-${h.onFailure}`}>
-                    <strong>If it does not answer</strong>
-                    {FAILURE_LABEL[h.onFailure]}
-                  </span>
+                  <Fact label="Endpoint" wide>
+                    {h.mode === 'sync' ? `${h.method} ${h.url}` : h.url}
+                  </Fact>
+                  {h.mode === 'sync' && <Fact label="Response field">{h.responsePath || 'None'}</Fact>}
                   {h.mode === 'sync' && (
-                    <span className={`bhk__fact ${h.timeoutMs > SLOW_TIMEOUT_MS ? 'is-slow' : ''}`}>
-                      <strong>Gives up after</strong>
-                      {h.timeoutMs}ms
-                    </span>
+                    <Fact label="Timeout" className={h.timeoutMs > SLOW_TIMEOUT_MS ? 'is-slow' : ''}>
+                      {h.timeoutMs} ms
+                    </Fact>
                   )}
                   {h.mode === 'attribute-sync' && (
-                    <span className="bhk__fact">
-                      <strong>Data trusted for</strong>
-                      {h.maxAgeHours ? `${h.maxAgeHours}h` : 'no limit set'}
-                    </span>
+                    <Fact label="Freshness limit">
+                      {h.maxAgeHours ? `${h.maxAgeHours} hour${h.maxAgeHours === 1 ? '' : 's'}` : 'No limit'}
+                    </Fact>
                   )}
-                  <span className="bhk__fact">
-                    <strong>Credential travels in</strong>
-                    {h.authHeader ?? 'no header set'}
-                  </span>
+                  <Fact label="When it does not answer" className={`is-${h.onFailure}`}>
+                    {FAILURE_LABEL[h.onFailure]}
+                  </Fact>
+                  <Fact label="Credential header">{h.authHeader?.trim() || 'None'}</Fact>
                 </div>
 
                 {issues.map((iss) => (
@@ -183,16 +158,14 @@ export function Hooks() {
                   </p>
                 ))}
 
-                {/* Used by, named. Same contract as zones and fingerprints: a
-                    count tells you a change is dangerous, a list tells you
-                    where to go and read before making it. */}
+                {/* Named, not counted: the list says where to go before a change. */}
                 <div className="bhk__uses">
                   <span className="bhk__useshead">
                     <Link2 size={13} strokeWidth={2} aria-hidden />
                     Used by
                   </span>
                   {users.length === 0 ? (
-                    <p className="bhk__usesnone">No rule references this hook.</p>
+                    <p className="bhk__usesnone">No policy uses this hook.</p>
                   ) : (
                     <UsedByList users={users} />
                   )}
@@ -205,49 +178,42 @@ export function Hooks() {
 
       <HookForm hook={editing} onClose={() => setEditing(null)} onSave={save} />
 
-      <Modal
+      {/* One dialog for every library delete. It refuses while a live policy
+          uses the hook, and names the drafts that will need another one. */}
+      <ConfirmDelete
         open={!!confirmDelete}
-        onClose={() => setConfirmDelete(null)}
-        title={`Delete ${confirmDelete?.name ?? 'hook'}?`}
-        width={480}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setConfirmDelete(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                if (confirmDelete) store.removeHook(confirmDelete.id)
-                setConfirmDelete(null)
-              }}
-            >
-              Delete
-            </Button>
-          </>
-        }
-      >
-        <p className="bhk__confirm">{deleteImpact}</p>
-      </Modal>
+        name={confirmDelete?.name ?? ''}
+        noun="hook"
+        impact={confirmDelete ? deleteImpact('webhook', confirmDelete.id, store.policies) : undefined}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => confirmDelete && remove(confirmDelete)}
+      />
     </div>
+  )
+}
+
+function Fact({ label, children, className = '', wide }: { label: string; children: ReactNode; className?: string; wide?: boolean }) {
+  return (
+    <span className={`bhk__fact ${wide ? 'is-wide' : ''} ${className}`}>
+      <strong>{label}</strong>
+      {children}
+    </span>
   )
 }
 
 /* --- The form ------------------------------------------------------------------ */
 
+/* No id: the store gives a new hook one nothing else has (`newId`). */
 function blank(): Hook {
   return {
-    id: `hk-${Date.now()}`,
+    id: '',
     name: '',
     mode: 'sync',
     url: '',
     method: 'POST',
     timeoutMs: 300,
     responsePath: '',
-    /* Deliberately seeded to the safer of the two rather than left undefined:
-       the type has no "unset", and a form that opens on fail-closed and is
-       never touched produces a hook that refuses sign-ins rather than one that
-       waves them through. The panel below still makes both explicit. */
+    /* Seeded to the safer of the two. The form still shows both. */
     onFailure: 'fail-closed',
   }
 }
@@ -261,64 +227,115 @@ function HookForm({
   onClose: () => void
   onSave: (h: Hook) => void
 }) {
+  const store = useBrand()
+  const uid = useId()
+  const form = useRef<HTMLDivElement | null>(null)
+  const [seed, setSeed] = useState<Hook | null>(hook)
   const [draft, setDraft] = useState<Hook>(hook ?? blank())
-  const [key, setKey] = useState('')
+  const [tried, setTried] = useState(false)
 
-  // Re-seed when a different hook is opened, without a useEffect: the key IS
-  // the identity, and comparing it here happens before the first paint.
-  if (hook && key !== hook.id) {
-    setKey(hook.id)
-    setDraft(hook)
+  /* Re-seeded every time the form opens, by the identity of what was opened.
+     It used to re-seed only when the id changed, so Cancel or Discard left the
+     edits in place and they came back when the same hook was reopened. Closing
+     sets `hook` to null, so any reopening is a new identity. The draft is kept
+     while closed, so the dialog's exit animation doesn't flash an empty form. */
+  if (hook !== seed) {
+    setSeed(hook)
+    if (hook) {
+      setDraft(hook)
+      setTried(false)
+    }
   }
 
   const set = (p: Partial<Hook>) => setDraft((d) => ({ ...d, ...p }))
-  const issues = validateHook(draft)
-  /* `errors` — the count that stood beside the Save button — has gone with it.
-     `canSaveHook` is what gates the button and always was; the list of issues
-     in the form body is what says why. */
+  const saved = draft.id ? store.hooks.find((x) => x.id === draft.id) : undefined
+  const issues = validateHook(draft, store.hooks)
+  const impact = hookEditImpact(saved, draft, store.policies)
+  const firstError = impact.modeError ?? issues.find((i) => i.level === 'error')?.detail ?? null
+  const dirty = !!hook && hookDirty(hook, draft)
+
+  /* Save stays enabled. Pressing it with errors shows each one under its field
+     and moves focus to the first. Before that, only warnings show: an error on
+     a field nobody has typed in yet is noise. */
+  const attemptSave = (): boolean => {
+    if (firstError) {
+      setTried(true)
+      const field = firstInvalidField(issues)
+      const selector = impact.modeError ? `[data-field="mode"] input:checked` : field ? `[data-field="${field}"]` : null
+      if (selector) window.setTimeout(() => form.current?.querySelector<HTMLElement>(selector)?.focus(), 0)
+      return false
+    }
+    onSave(draft)
+    return true
+  }
+
+  /* Esc, a click outside or the close button ask before typed changes are lost.
+     Cancel is an explicit discard. */
+  const confirmLeave = useLeaveGuard({
+    dirty,
+    save: () => {
+      if (firstError) return false
+      onSave(draft)
+      return true
+    },
+    saveLabel: 'Save hook',
+    blocked: firstError,
+  })
+
+  const shown = (field: HookField) => issues.filter((i) => i.field === field && (i.level === 'warning' || tried))
+  const invalid = (field: HookField) => tried && issues.some((i) => i.field === field && i.level === 'error')
+  const msgId = (field: string) => `${uid}-${field}`
+  const described = (field: HookField) => (shown(field).length > 0 ? msgId(field) : undefined)
 
   return (
     <Modal
       open={!!hook}
-      onClose={onClose}
-      title={hook && hook.name ? `Edit ${hook.name}` : 'New hook'}
+      onClose={() => confirmLeave(onClose)}
+      title={saved ? `Edit ${saved.name}` : 'New hook'}
       width={680}
       footer={
         <>
-          {/* The form already lists every issue in `.bhk__formissues`, so
-              this was a count of a list two centimetres above it. */}
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="brand" disabled={!canSaveHook(draft)} onClick={() => onSave(draft)}>
+          <Button variant="brand" onClick={attemptSave}>
             Save hook
           </Button>
         </>
       }
     >
-      <div className="bhk__form">
+      <div className="bhk__form" ref={form}>
         <label className="bhk__field">
           <span>Name</span>
-          <input value={draft.name} onChange={(e) => set({ name: e.target.value })} placeholder="Fraud score lookup" />
+          <input
+            data-field="name"
+            value={draft.name}
+            maxLength={80}
+            aria-invalid={invalid('name') || undefined}
+            aria-describedby={described('name')}
+            onChange={(e) => set({ name: e.target.value })}
+            placeholder="Fraud score lookup"
+          />
+          <FieldIssues id={msgId('name')} issues={shown('name')} />
         </label>
 
         <label className="bhk__field">
-          <span>Why this hook exists</span>
+          <span>Description</span>
           <textarea
             rows={2}
             value={draft.description ?? ''}
             onChange={(e) => set({ description: e.target.value })}
-            placeholder="Who owns the endpoint, and what it knows that this console does not."
+            placeholder="Owner and purpose"
           />
         </label>
 
-        <fieldset className="bhk__modes">
+        <fieldset className="bhk__modes" data-field="mode" aria-describedby={impact.modeError ? msgId('mode') : undefined}>
           <legend>How it is called</legend>
           {(Object.keys(MODE) as HookMode[]).map((m) => {
             const Icon = MODE[m].icon
             return (
               <label key={m} className={draft.mode === m ? 'is-on' : ''}>
-                <input type="radio" name="hook-mode" checked={draft.mode === m} onChange={() => set({ mode: m })} />
+                <input type="radio" name={`${uid}-mode`} checked={draft.mode === m} onChange={() => set({ mode: m })} />
                 <Icon size={15} strokeWidth={1.8} aria-hidden />
                 <span>
                   <strong>{MODE[m].label}</strong>
@@ -327,6 +344,9 @@ function HookForm({
               </label>
             )
           })}
+          {impact.modeError && (
+            <FieldIssues id={msgId('mode')} issues={[{ level: 'error', detail: impact.modeError }]} />
+          )}
         </fieldset>
 
         <div className="bhk__row">
@@ -345,14 +365,22 @@ function HookForm({
           </label>
           <label className="bhk__field">
             <span>Endpoint</span>
-            <input value={draft.url} onChange={(e) => set({ url: e.target.value })} placeholder="https://risk.internal/api/v2/score" />
+            <input
+              data-field="url"
+              value={draft.url}
+              aria-invalid={invalid('url') || undefined}
+              aria-describedby={described('url')}
+              onChange={(e) => set({ url: e.target.value })}
+              placeholder="https://risk.internal/api/v2/score"
+            />
+            <FieldIssues id={msgId('url')} issues={shown('url')} />
           </label>
         </div>
 
         <label className="bhk__field">
           <span>
             Credential header
-            <em>The header name only. The secret itself is stored separately and never travels in an exported policy.</em>
+            <em>Header name only.</em>
           </span>
           <input value={draft.authHeader ?? ''} onChange={(e) => set({ authHeader: e.target.value })} placeholder="X-Risk-Token" />
         </label>
@@ -362,64 +390,95 @@ function HookForm({
             <label className="bhk__field">
               <span>
                 Response field
-                <em>Dotted path into the JSON answer. The rule tests whatever this points at.</em>
+                <em>Dotted path in the JSON response.</em>
               </span>
-              <input value={draft.responsePath} onChange={(e) => set({ responsePath: e.target.value })} placeholder="result.highRisk" />
+              <input
+                data-field="responsePath"
+                value={draft.responsePath}
+                aria-invalid={invalid('responsePath') || undefined}
+                aria-describedby={described('responsePath')}
+                onChange={(e) => set({ responsePath: e.target.value })}
+                placeholder="result.highRisk"
+              />
+              <FieldIssues id={msgId('responsePath')} issues={shown('responsePath')} />
             </label>
             <label className="bhk__field bhk__field--num">
-              <span>Timeout</span>
+              <span>Timeout (ms)</span>
               <input
+                data-field="timeoutMs"
                 type="number"
-                min={0}
+                min={1}
+                max={MAX_TIMEOUT_MS}
                 step={50}
-                value={draft.timeoutMs}
-                onChange={(e) => set({ timeoutMs: Number(e.target.value) })}
+                value={Number.isFinite(draft.timeoutMs) ? draft.timeoutMs : ''}
+                aria-invalid={invalid('timeoutMs') || undefined}
+                aria-describedby={described('timeoutMs')}
+                onChange={(e) => set({ timeoutMs: e.target.value === '' ? Number.NaN : Number(e.target.value) })}
               />
             </label>
           </div>
         ) : (
           <label className="bhk__field bhk__field--num">
             <span>
-              Trust synced data for
-              <em>Past this, a rule reading the synced attributes is reading something nobody has confirmed.</em>
+              Freshness limit (hours)
+              <em>Leave empty for no limit.</em>
             </span>
             <input
+              data-field="maxAgeHours"
               type="number"
-              min={0}
-              value={draft.maxAgeHours ?? 0}
-              onChange={(e) => set({ maxAgeHours: Number(e.target.value) })}
+              min={1}
+              step={1}
+              value={draft.maxAgeHours ?? ''}
+              aria-invalid={invalid('maxAgeHours') || undefined}
+              aria-describedby={described('maxAgeHours')}
+              onChange={(e) => set({ maxAgeHours: e.target.value === '' ? undefined : Number(e.target.value) })}
             />
           </label>
         )}
+        {/* The timeout sits in a narrow column, so its messages go full width under the row. */}
+        {draft.mode === 'sync' ? (
+          <FieldIssues id={msgId('timeoutMs')} issues={shown('timeoutMs')} />
+        ) : (
+          <FieldIssues id={msgId('maxAgeHours')} issues={shown('maxAgeHours')} />
+        )}
 
-        {/* The decision this screen exists to force. Both options are stated in
-            full, in their consequences rather than their names, because
-            "fail-open" and "fail-closed" are jargon that reverse meaning
-            depending on whether you are thinking about the gate or the traffic. */}
+        {/* Both answers stated by their consequence, not as "fail-open" and
+            "fail-closed", which read opposite ways depending on the reader. */}
         <fieldset className="bhk__modes bhk__modes--fail">
           <legend>When it does not answer</legend>
           {(['fail-open', 'fail-closed'] as OnFailure[]).map((f) => (
             <label key={f} className={draft.onFailure === f ? 'is-on' : ''}>
-              <input type="radio" name="hook-fail" checked={draft.onFailure === f} onChange={() => set({ onFailure: f })} />
+              <input type="radio" name={`${uid}-fail`} checked={draft.onFailure === f} onChange={() => set({ onFailure: f })} />
               <span>
                 <strong>{FAILURE_LABEL[f]}</strong>
-                <em>{FAILURE_BLURB[f]}</em>
+                <em>{FAILURE_HINT[f]}</em>
               </span>
             </label>
           ))}
         </fieldset>
 
-        {issues.length > 0 && (
-          <ul className="bhk__formissues">
-            {issues.map((iss) => (
-              <li key={iss.title} className={`is-${iss.level}`}>
-                <strong>{iss.title}.</strong> {iss.detail}
-              </li>
-            ))}
-          </ul>
+        {impact.liveChanged.length > 0 && (
+          <Callout tone="notice" title="Live policies use this hook">
+            Saving changes sign-ins for {impact.liveChanged.join(', ')}.
+          </Callout>
         )}
       </div>
     </Modal>
   )
 }
 
+/* Under the field it belongs to. Hidden from the label's text, so the input's
+   name stays "Name"; the input points at it with aria-describedby instead. */
+function FieldIssues({ id, issues }: { id: string; issues: Pick<HookIssue, 'level' | 'detail'>[] }) {
+  if (issues.length === 0) return null
+  return (
+    <span id={id} className="bhk__fieldissues" aria-hidden>
+      {issues.map((iss) => (
+        <span key={iss.detail} className={`bhk__fieldissue is-${iss.level}`}>
+          {iss.level === 'error' ? <AlertTriangle size={13} strokeWidth={2} aria-hidden /> : <Info size={13} strokeWidth={2} aria-hidden />}
+          {iss.detail}
+        </span>
+      ))}
+    </span>
+  )
+}

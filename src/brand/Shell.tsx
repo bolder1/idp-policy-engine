@@ -1,27 +1,27 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import {
   Activity,
   AppWindow,
   BookOpen,
   ChevronRight,
+  ClipboardCheck,
   CreditCard,
-  Fingerprint,
   FileText,
+  IdCard,
   KeyRound,
   LayoutGrid,
-  Menu,
+  type LucideIcon,
   MonitorSmartphone,
   Moon,
   Palette,
-  Rocket,
+  PanelLeft,
   Settings,
   ShieldCheck,
   Sun,
-  User,
+  UserRound,
   Users,
   Zap,
-  type LucideIcon,
 } from 'lucide-react'
 
 // `EditionBar` is not imported while the bar is hidden — see the note at its
@@ -31,6 +31,7 @@ import { PersonaBar } from './PersonaBar'
 import { BrandSwitch } from './BrandSwitch'
 import { Tip } from './kit'
 import { useBrand, useToast, type BrandScreen } from './store'
+import { useTheme } from './theme-mode'
 
 /* -----------------------------------------------------------------------------
    AdminShell — the live console's chrome, measured off
@@ -58,7 +59,13 @@ interface NavItem {
   icon: LucideIcon
   screen?: BrandScreen
   badge?: string
-  children?: { label: string; screen?: BrandScreen; tag?: string }[]
+  children?: {
+    label: string
+    screen?: BrandScreen
+    tag?: string
+    /** False for a shortcut into a page that another item already lights. See `UNDER_ITEM`. */
+    lights?: boolean
+  }[]
 }
 
 /* The tree, its order and its sub-menus are the console's. Items without a
@@ -68,13 +75,13 @@ const NAV: { section?: string; items: NavItem[] }[] = [
   {
     items: [
       { label: 'Dashboard', icon: LayoutGrid },
-      { label: 'Getting Started', icon: Rocket },
+      { label: 'Getting Started', icon: ClipboardCheck },
     ],
   },
   {
     section: 'Configure',
     items: [
-      { label: 'Identity Providers', icon: Fingerprint },
+      { label: 'Identity Providers', icon: IdCard },
       { label: 'Apps', icon: AppWindow, screen: { name: 'applications' } },
       {
         label: 'Policies',
@@ -86,7 +93,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
              than letting somebody find out by opening them. A quiet tag, not
              the brand-filled badge "New" gets: one is an announcement and the
              other is a caveat, and they must not read alike. */
-          { label: 'Templates', screen: { name: 'templates' }, tag: 'WIP' },
+          { label: 'Templates', screen: { name: 'templates' }, tag: 'In progress' },
           { label: 'Zones', screen: { name: 'zones' } },
           /* The page calls itself "Device fingerprint"; so does the screen id
              and every sentence on it. The rail was the only place still saying
@@ -97,7 +104,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
              anything about it is suspicious. */
           { label: 'Risk signal profile', screen: { name: 'risk-signals' } },
           { label: 'Authentication methods', screen: { name: 'methods' } },
-          { label: 'External Hooks', screen: { name: 'hooks' }, tag: 'WIP' },
+          { label: 'External Hooks', screen: { name: 'hooks' }, tag: 'In progress' },
         ],
       },
       {
@@ -123,7 +130,10 @@ const NAV: { section?: string; items: NavItem[] }[] = [
           { label: 'Setup 2FA for Admin' },
           { label: 'Alternate 2FA Login Methods' },
           { label: '2FA Options For EndUsers' },
-          { label: 'Assign Hardware Token to Users' },
+          /* The live console's own way in to the Display tokens page, so it
+             opens it (15 Sep 2026). It does not light: the page says it is under
+             Policies > Authentication methods, and one place in the rail says so. */
+          { label: 'Assign Hardware Token to Users', screen: { name: 'display-tokens', tab: 'assignments' }, lights: false },
           { label: 'Static Code Generation' },
         ],
       },
@@ -140,7 +150,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
     items: [
       {
         label: 'Users',
-        icon: User,
+        icon: UserRound,
         children: [
           { label: 'User List' },
           { label: 'User Roles' },
@@ -170,7 +180,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
 /* What a row says in its Tip. These were native titles, which a keyboard never
    reached. */
 const NOT_BUILT = 'Not built in this prototype.'
-const WIP_TIP = 'Work in progress: the page opens, but it is not finished.'
+const WIP_TIP = 'The page opens, but it is not finished.'
 
 /* Every screen that lives under Policies.
 
@@ -190,6 +200,7 @@ const POLICY_SCREENS = [
   'risk-signals',
   'hooks',
   'methods',
+  'display-tokens',
 ]
 
 /* The two builders, which want the rail out of the way.
@@ -200,6 +211,15 @@ const POLICY_SCREENS = [
    work, not to navigate. */
 const BUILDER_SCREENS = ['builder', 'board']
 
+/* Screens that light a sub-item without being its screen: a page opened from
+   inside another lights the item it was opened from. Both builders and the
+   details page are a policy opened from All Policies; Display tokens is opened
+   only from Authentication methods, so that is where the rail says you are. */
+const UNDER_ITEM: Record<string, string[]> = {
+  policies: [...BUILDER_SCREENS, 'policy-details'],
+  methods: ['display-tokens'],
+}
+
 function isActive(current: BrandScreen, item: NavItem): boolean {
   if (item.label === 'Policies') return POLICY_SCREENS.includes(current.name)
   return item.screen ? current.name === item.screen.name : false
@@ -208,8 +228,13 @@ function isActive(current: BrandScreen, item: NavItem): boolean {
 export function Shell({ children }: { children: ReactNode }) {
   const { screen, go } = useBrand()
   const main = useRef<HTMLElement>(null)
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const nav = useRef<HTMLElement>(null)
+  const [theme, setTheme] = useTheme()
   const [collapsed, setCollapsed] = useState(false)
+  /* The rail row to put focus back on after the rail changes width. A row
+     gains or loses its Tip wrapper when the rail collapses or expands, which
+     remounts the button that had focus and drops focus to the page. */
+  const refocus = useRef<string | null>(null)
   // One at a time. Opening a menu closes whichever was open before it.
   const [open, setOpen] = useState<string | null>('Policies')
   /* True only while the rail is collapsed because the builder asked for the
@@ -219,8 +244,14 @@ export function Shell({ children }: { children: ReactNode }) {
   const autoCollapsed = useRef(false)
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
+    const label = refocus.current
+    refocus.current = null
+    if (!label) return
+    const row = [...(nav.current?.querySelectorAll<HTMLButtonElement>('[data-rail-item]') ?? [])].find(
+      (b) => b.dataset.railItem === label,
+    )
+    row?.focus()
+  }, [collapsed])
 
   useEffect(() => {
     main.current?.scrollTo({ top: 0 })
@@ -266,7 +297,13 @@ export function Shell({ children }: { children: ReactNode }) {
        icon in a collapsed rail is not a request to un-collapse it. */
     if (collapsed && item.children) {
       autoCollapsed.current = false
+      refocus.current = item.label
       setCollapsed(false)
+      /* Expanding shows this item's submenu. Toggling here closed a submenu
+         that was already marked open behind the collapsed rail, so the click
+         only widened the rail. */
+      setOpen(item.label)
+      return
     }
     if (item.children) {
       setOpen((cur) => (cur === item.label ? null : item.label))
@@ -288,7 +325,7 @@ export function Shell({ children }: { children: ReactNode }) {
             aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
             aria-expanded={!collapsed}
           >
-            <Menu size={21} strokeWidth={1.7} />
+            <PanelLeft size={21} strokeWidth={1.7} />
           </button>
         </Tip>
 
@@ -323,28 +360,28 @@ export function Shell({ children }: { children: ReactNode }) {
             <button
               type="button"
               className="bshell__icon"
-              onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
+              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
               aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
             >
               {theme === 'light' ? <Moon size={20} strokeWidth={1.7} /> : <Sun size={20} strokeWidth={1.7} />}
             </button>
           </Tip>
-          <Tip text="Documentation">
-            <button type="button" className="bshell__icon" aria-label="Documentation">
+          <Tip text={`Documentation. ${NOT_BUILT}`}>
+            <button type="button" className="bshell__icon is-inert" aria-label="Documentation" aria-disabled="true">
               <BookOpen size={20} strokeWidth={1.7} />
             </button>
           </Tip>
-          <Tip text="Settings">
-            <button type="button" className="bshell__icon" aria-label="Settings">
+          <Tip text={`Settings. ${NOT_BUILT}`}>
+            <button type="button" className="bshell__icon is-inert" aria-label="Settings" aria-disabled="true">
               <Settings size={20} strokeWidth={1.7} />
             </button>
           </Tip>
-          <ProfileMenu initials="JT" />
+          <ProfileMenu />
         </div>
       </header>
 
       <aside className="bshell__rail">
-        <nav className="bshell__nav" aria-label="Console">
+        <nav className="bshell__nav" aria-label="Console" ref={nav}>
           {NAV.map((group, gi) => (
             <div key={group.section ?? gi} className="bshell__group">
               {group.section && <p className="bshell__section">{group.section}</p>}
@@ -356,13 +393,15 @@ export function Shell({ children }: { children: ReactNode }) {
                 /* Collapsed, the label and the badge are hidden, so the row takes
                    its name from aria-label and shows it in a Tip. */
                 const name = item.badge ? `${item.label}, ${item.badge}` : item.label
-                const caveat = item.screen ? null : NOT_BUILT
+                /* A group with one built page in it is not "not built". */
+                const caveat = item.screen || item.children?.some((c) => c.screen) ? null : NOT_BUILT
                 const collapsedTip = caveat ? `${name}. ${caveat}` : name
                 const tip = collapsed ? collapsedTip : caveat
                 const row = (
                   <button
                     type="button"
-                    className={`bshell__item ${active ? 'is-active' : ''} ${item.screen ? '' : 'is-inert'}`}
+                    className={`bshell__item ${active ? 'is-active' : ''} ${caveat ? 'is-inert' : ''}`}
+                    data-rail-item={item.label}
                     onClick={() => toggle(item)}
                     aria-current={active ? 'page' : undefined}
                     aria-expanded={item.children ? expanded : undefined}
@@ -396,13 +435,11 @@ export function Shell({ children }: { children: ReactNode }) {
                         >
                           <div className="bshell__sub">
                             {item.children.map((c) => {
-                              /* Both builders and the details page are a policy
-                                 opened from All Policies, so all three light it. */
+                              /* Its own screen, or one opened from it — see `UNDER_ITEM`. */
                               const on =
                                 c.screen &&
-                                (screen.name === c.screen.name ||
-                                  (c.screen.name === 'policies' &&
-                                    [...BUILDER_SCREENS, 'policy-details'].includes(screen.name)))
+                                c.lights !== false &&
+                                (screen.name === c.screen.name || !!UNDER_ITEM[c.screen.name]?.includes(screen.name))
                               const tip = c.tag ? WIP_TIP : c.screen ? null : NOT_BUILT
                               const row = (
                                 <button
@@ -446,52 +483,66 @@ export function Shell({ children }: { children: ReactNode }) {
           over the content on every screen to save a scroll to the top. Out for
           now; the topbar keeps the icons. */}
 
-      <Toast />
+      {/* The toast and the one leave dialog are mounted beside the shell in
+          BrandApp's Chrome, so the end-user side has them too. */}
     </div>
   )
 }
 
 /* Its own component, so subscribing to the toast re-renders this node rather
-   than the whole shell around it. */
-function Toast() {
+   than the whole shell around it.
+
+   Two parts. The live region is always in the page and only its text changes,
+   because a region inserted together with its text is often not announced; the
+   text node is keyed by the toast id so the same message twice is read twice.
+   The pill is only visual, keyed the same way so a repeat animates in again. */
+export function Toast() {
   const toast = useToast()
   return (
-    <AnimatePresence>
-      {toast && (
-        <motion.div
-          className="bshell__toast"
-          initial={{ opacity: 0, y: 14, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.99 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 38 }}
-          role="status"
-        >
-          {toast}
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <>
+      <div className="u-sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {toast && <span key={toast.id}>{toast.text}</span>}
+      </div>
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            key={toast.id}
+            className="bshell__toast"
+            initial={{ opacity: 0, y: 14, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.99 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+            aria-hidden="true"
+          >
+            {toast.text}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }
 
-/** Page header used by every screen — title, caption, and one brand action. */
+/** Page header used by every screen: the title and its caption, and at most a
+    Documentation link. See `PageBar` for where a page's actions go. */
 export function PageHead({
   title,
   caption,
-  actions,
-  breadcrumb,
+  docs,
+  headRef,
 }: {
   title: string
   caption?: string
-  actions?: ReactNode
-  breadcrumb?: ReactNode
+  /** A Documentation link against the right edge — the one thing besides the
+      title the head may carry. */
+  docs?: boolean
+  /** For a page that puts focus back on its heading. */
+  headRef?: Ref<HTMLElement>
 }) {
   return (
-    <header className="bpage__head">
-      {breadcrumb && <div className="bpage__crumb">{breadcrumb}</div>}
-      {/* Title, then caption under it, matching the three screens that build
-          their own header — Zones, Device fingerprint and Authentication
-          methods. They have always stacked; this shared one did not, so the
-          console drew its page head two ways depending on the screen.
+    <header className="bpage__head" ref={headRef}>
+      {/* Title, then caption under it, in one container on one row (owner, 16
+          Sep 2026: "the heading and subheading in one container, in one row").
+          Beside it: at most Documentation.
 
           No `title` on the caption any more. It was there because the caption
           used to truncate, and a tooltip repeating a sentence that is now
@@ -501,7 +552,17 @@ export function PageHead({
           <h1>{title}</h1>
           {caption && <p>{caption}</p>}
         </div>
-        {actions && <div className="bpage__actions">{actions}</div>}
+        {/* Documentation is not built in this prototype, so the link is the top
+            bar's inert one — present, named, and saying so — rather than a
+            link to nowhere. */}
+        {docs && (
+          <Tip text={`Documentation. ${NOT_BUILT}`}>
+            <button type="button" className="bpage__docs" aria-disabled="true">
+              <BookOpen size={15} strokeWidth={1.8} aria-hidden />
+              Documentation
+            </button>
+          </Tip>
+        )}
       </div>
     </header>
   )

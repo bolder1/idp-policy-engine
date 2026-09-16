@@ -3,14 +3,25 @@ import { describe, expect, it } from 'vitest'
 import { RISK_SCORE, SIM_USERS, evalRule, type SimContext, type SimEnv } from './screens/simulate'
 import { blankRule, card, cond, when } from './data'
 import {
+  CATEGORY_TONE,
   EMPTY_RISK_PROFILE,
   PLATFORMS,
   RISK_SIGNALS,
+  SIGNAL_CATEGORIES,
+  blankRiskProfile,
   weightFor,
   shippedWeightFor,
   countOn,
   isOn,
+  riskChangeNames,
+  riskProfileNameProblem,
+  riskProfileProblem,
+  riskReviewRows,
   riskScale,
+  sameRiskProfile,
+  sameTuning,
+  setSignalOn,
+  setSignalTier,
   tierFor,
   tierKey,
   type RiskTuning,
@@ -156,5 +167,96 @@ describe('the profile decides what a rule catches', () => {
     expect(riskScale(quiet).High).toBeLessThan(60)
     const r = evalRule({ ...blankRule(), ...rule }, ctx, env(quiet))
     expect(r.match).toBe(false)
+  })
+})
+
+describe('category tones', () => {
+  it('gives every category its own tone, and none of them red', () => {
+    const tones = SIGNAL_CATEGORIES.map((c) => CATEGORY_TONE[c])
+    expect(tones.every(Boolean)).toBe(true)
+    expect(new Set(tones).size).toBe(SIGNAL_CATEGORIES.length)
+    expect(tones).not.toContain('negative')
+  })
+})
+
+describe('editing a profile draft', () => {
+  const saved = { ...blankRiskProfile('Remote workforce', 'rp-remote'), off: ['vpn', 'emulator'] }
+  const dual = RISK_SIGNALS.find((s) => s.on.length === 2)!
+
+  it('keeps switched-off signals in catalogue order', () => {
+    const t = setSignalOn(setSignalOn(EMPTY_RISK_PROFILE, 'vpn', false), 'emulator', false)
+    expect(t.off).toEqual(['emulator', 'vpn'])
+  })
+
+  it('treats a signal switched off and on again as no change', () => {
+    const draft = setSignalOn(setSignalOn(saved, 'emulator', true), 'emulator', false)
+    expect(sameRiskProfile(draft, saved)).toBe(true)
+    expect(riskChangeNames(saved, draft)).toEqual([])
+  })
+
+  it('drops a weight set back to its shipped value', () => {
+    const other = dual.tier === 'High' ? 'Low' : 'High'
+    const moved = setSignalTier(EMPTY_RISK_PROFILE, dual, 'android', other)
+    expect(moved.tiers).toEqual({ [tierKey(dual.id, 'android')]: other })
+    const back = setSignalTier(moved, dual, 'android', dual.tier)
+    expect(back.tiers).toEqual({})
+    expect(sameTuning(back, EMPTY_RISK_PROFILE)).toBe(true)
+  })
+
+  it('reads an override equal to the shipped weight as no override', () => {
+    expect(sameTuning({ off: [], tiers: { [tierKey(dual.id, 'ios')]: dual.tier } }, EMPTY_RISK_PROFILE)).toBe(true)
+  })
+
+  it('compares names trimmed, the way they are saved', () => {
+    expect(sameRiskProfile({ ...saved, name: '  Remote workforce ' }, saved)).toBe(true)
+  })
+})
+
+describe('what blocks a save', () => {
+  const base = blankRiskProfile('Test', 'rp-test')
+
+  it('needs a name', () => {
+    expect(riskProfileProblem({ ...base, name: '   ' }, [])).toBe('Enter a profile name.')
+    expect(riskProfileNameProblem('', [])).toBe('Enter a profile name.')
+  })
+
+  it('refuses a name another profile has, ignoring case and spaces', () => {
+    expect(riskProfileProblem({ ...base, name: ' shipped WEIGHTING ' }, ['Shipped weighting'])).toBe(
+      'A risk profile with this name already exists.',
+    )
+    expect(riskProfileNameProblem('Shipped weighting', ['Shipped weighting'])).not.toBeNull()
+    expect(riskProfileProblem(base, ['Shipped weighting'])).toBeNull()
+  })
+
+  it('refuses a profile that scores every band 0', () => {
+    const iosSignals = RISK_SIGNALS.filter((s) => s.on.includes('ios')).map((s) => s.id)
+    const p = { ...base, off: iosSignals }
+    expect(riskScale(p).High).toBe(0)
+    expect(riskProfileProblem(p, [])).toBe('Turn on at least one signal on each platform.')
+  })
+})
+
+describe('the review of a draft', () => {
+  const saved = blankRiskProfile('Test', 'rp-test')
+  const dual = RISK_SIGNALS.find((s) => s.on.length === 2)!
+
+  it('names each change with its saved and new value', () => {
+    let draft = { ...saved, name: 'Quiet network' }
+    draft = setSignalOn(draft, 'tor', false)
+    draft = setSignalTier(draft, dual, 'ios', dual.tier === 'Low' ? 'High' : 'Low')
+    const rows = riskReviewRows(saved, draft)
+    expect(rows[0]).toEqual({ label: 'Name', before: 'Test', after: 'Quiet network' })
+    expect(rows).toContainEqual({ label: 'Signal: Tor exit node', before: 'On', after: 'Off' })
+    expect(rows).toContainEqual({
+      label: `Weight: ${dual.name} on iOS`,
+      before: dual.tier,
+      after: dual.tier === 'Low' ? 'High' : 'Low',
+    })
+    expect(rows.some((r) => r.label === 'High risk score')).toBe(true)
+    expect(riskChangeNames(saved, draft)).toEqual(['Name', 'Signals', 'Weights'])
+  })
+
+  it('is empty when nothing changed', () => {
+    expect(riskReviewRows(saved, { ...saved })).toEqual([])
   })
 })

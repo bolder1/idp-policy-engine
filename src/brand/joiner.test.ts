@@ -33,10 +33,10 @@ describe('the defaults are the old semantics', () => {
   })
 
   it('signs a default predicate without any joiner marker', () => {
-    /* The signature is what `impactOf` compares to decide a rule's estimate has
-       gone stale, and what `proposeFix` compares to find an existing twin. If
-       adding joiners had changed the signature of an untouched rule, every
-       seeded rule would have read as edited on first load. */
+    /* The signature is what `proposeFix` compares to find an existing twin, and
+       what the change summaries compare to decide a rule was edited. If adding
+       joiners had changed the signature of an untouched rule, every seeded rule
+       would have read as edited on first load. */
     const plain = when(card(A, B), card(C))
     const spelled: Predicate = { join: 'or', cards: [{ ...card(A, B), join: 'and' }, { ...card(C), join: 'and' }] }
     expect(sig(spelled)).toBe(sig(plain))

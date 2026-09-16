@@ -1,10 +1,24 @@
 import { useState, type ReactNode } from 'react'
 import { motion } from 'motion/react'
-import { ChevronsLeftRight, ChevronsRightLeft, CornerDownRight, Plus, Split, Users, X, type LucideIcon } from 'lucide-react'
+import { useRef } from 'react'
+import {
+  AlertTriangle,
+  ChevronsLeftRight,
+  ChevronsRightLeft,
+  CornerDownRight,
+  type LucideIcon,
+  Plus,
+  Split,
+  Users,
+  X,
+  XCircle,
+} from 'lucide-react'
 
 import { Toggle } from '../../kit'
 import { fallbackRule, type Policy, type Rule } from '../../data'
-import { TONE, type Part, type Selection } from './model'
+import type { Diagnostic } from '../diagnostics'
+import { type Selection } from './model'
+import { settledName } from './parts'
 import { WhatEditor } from './WhatEditor'
 import { WhenEditor } from './WhenEditor'
 import { WhoEditor } from './WhoEditor'
@@ -32,9 +46,9 @@ import { WhoEditor } from './WhoEditor'
 export function Inspector({
   draft,
   selection,
+  diagnostics = [],
   onPatchRule,
   onPatchFallback,
-  onOpenPart,
   onClose,
   wide,
   onToggleWidth,
@@ -42,13 +56,10 @@ export function Inspector({
 }: {
   draft: Policy
   selection: Selection
+  /** Findings for the selected rule, shown above its sections. */
+  diagnostics?: Diagnostic[]
   onPatchRule: (i: number, p: Partial<Rule>) => void
   onPatchFallback: (p: Partial<Rule>) => void
-  /* The one part-changing control the PANEL owns, and it exists for exactly
-     one state: a Who pane that has stood down on an OR-shaped rule has to be
-     able to hand you to the pane that can do the job. It is not a switcher —
-     one button, one condition, one direction. */
-  onOpenPart: (part: Part) => void
   onClose: () => void
   /** Whether the panel is at its full width, and the way to change that. */
   wide: boolean
@@ -132,6 +143,7 @@ export function Inspector({
                 break the type checker cannot catch. */}
             <motion.div key={`head:${rule.id}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
               <RuleHead rule={rule} index={at} onPatch={patch} />
+              <RuleFindings diagnostics={diagnostics} />
             </motion.div>
             {/* ONE panel, three sections, all of them open.
 
@@ -155,7 +167,7 @@ export function Inspector({
                 two. */}
             <motion.div key={`pane:${rule.id}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
               <Section id="who" title="Who" icon={Users} tour="insp-who" focused={part === 'who'}>
-                <WhoEditor rule={rule} audience={draft.audience} onPatch={patch} onOpenPart={onOpenPart} />
+                <WhoEditor rule={rule} audience={draft.audience} onPatch={patch} />
               </Section>
 
               <ConditionSection rule={rule} onPatch={patch} focused={part === 'when'} />
@@ -314,15 +326,52 @@ function RuleHead({
   index: number
   onPatch: (p: Partial<Rule>) => void
 }) {
+  /* The name as it was when the field took focus. Left blank or spaces only, the
+     field goes back to it on blur rather than saving a rule with no name. */
+  const before = useRef(rule.name)
   return (
     <div className="bb__insphead">
-      <span className={`bb__idx is-${TONE[rule.decision]}`} aria-hidden>
-        {index + 1}
-      </span>
       <div className="bb__inspname">
-        <input className="bb__input bb__input--title" aria-label="Rule name" value={rule.name} placeholder="Name this rule" onChange={(e) => onPatch({ name: e.target.value })} />
+        <input
+          className="bb__input bb__input--title"
+          aria-label="Rule name"
+          value={rule.name}
+          placeholder="Name this rule"
+          onFocus={() => {
+            before.current = rule.name
+          }}
+          onChange={(e) => onPatch({ name: e.target.value })}
+          onBlur={() => {
+            const settled = settledName(rule.name, before.current, index)
+            if (settled !== rule.name) onPatch({ name: settled })
+          }}
+        />
       </div>
       <Toggle checked={rule.enabled} onChange={(enabled) => onPatch({ enabled })} label={rule.enabled ? 'On' : 'Off'} size="sm" />
+    </div>
+  )
+}
+
+/* What is wrong with this rule, where it is edited.
+
+   The card's pill says "Needs setup" or "Check"; this says why. Errors first.
+   A missing first or second factor method is said under its own picker in
+   Then, so it is not said twice. */
+const SHOWN_IN_THEN = new Set(['PE122', 'PE123'])
+function RuleFindings({ diagnostics }: { diagnostics: Diagnostic[] }) {
+  const shown = [...diagnostics].sort((a, b) => (a.severity === 'error' ? 0 : 1) - (b.severity === 'error' ? 0 : 1))
+  const list = shown.filter((d) => d.severity !== 'info' && !SHOWN_IN_THEN.has(d.code))
+  if (list.length === 0) return null
+  return (
+    <div className="bb__findings" role="status">
+      {list.map((d) => (
+        <p key={d.id} className={`bb__diag is-${d.severity}`}>
+          {d.severity === 'error' ? <XCircle size={13} strokeWidth={2} aria-hidden /> : <AlertTriangle size={13} strokeWidth={2} aria-hidden />}
+          <span>
+            <b>{d.title}.</b> {d.detail}
+          </span>
+        </p>
+      ))}
     </div>
   )
 }
@@ -338,10 +387,7 @@ function FallbackPane({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule
       <div className="bb__insphead">
         <div style={{ minWidth: 0, flex: 1 }}>
           <h2>Nothing else matched</h2>
-          <p>
-            The default at the bottom. Its name and place are fixed; what it does is yours. It has no Who and no
-            Condition — it is what happens when nothing else matched.
-          </p>
+          <p>Applies when no rule above matches. Its name and place are fixed.</p>
         </div>
       </div>
       <section className="bb__rule">

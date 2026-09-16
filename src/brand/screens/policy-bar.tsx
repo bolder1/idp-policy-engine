@@ -1,12 +1,48 @@
+import { useEffect, useSyncExternalStore } from 'react'
 import { AppWindow, ArrowLeft, Pencil, Users } from 'lucide-react'
 
-import { StatusPill } from '../kit'
 import { appsLabel, appsOf, audienceSummary, initials, type Policy } from '../data'
+import { ChangeState } from '../leave-guard'
 import { AppLogo } from '../logos/AppLogo'
 import { useBrand } from '../store'
 import { Peek } from './peek'
+import { StatusControl } from './status-control'
 
 import './policy-bar.css'
+
+/* The trail's unsaved flag, for the pill beside the status.
+
+   The bar and the builder are siblings in `BuilderPage` and the flag lives in
+   the builder's local draft, so the builder reports it through
+   `<ReportUnsaved/>` and the bar subscribes. Which policy is unsaved, not a
+   bare boolean, so a stale report cannot light another policy's bar. */
+let unsavedPolicyId: string | null = null
+const unsavedListeners = new Set<() => void>()
+
+const subscribeUnsaved = (l: () => void) => {
+  unsavedListeners.add(l)
+  return () => {
+    unsavedListeners.delete(l)
+  }
+}
+
+function setUnsaved(next: string | null) {
+  if (next === unsavedPolicyId) return
+  unsavedPolicyId = next
+  unsavedListeners.forEach((l) => l())
+}
+
+/** Renders nothing; tells the policy bar whether `policyId` has unsaved changes. */
+export function ReportUnsaved({ policyId, unsaved }: { policyId: string; unsaved: boolean }) {
+  useEffect(() => {
+    if (!unsaved) return
+    setUnsaved(policyId)
+    return () => {
+      if (unsavedPolicyId === policyId) setUnsaved(null)
+    }
+  }, [policyId, unsaved])
+  return null
+}
 
 /* -----------------------------------------------------------------------------
    The policy, above the builder.
@@ -31,6 +67,7 @@ import './policy-bar.css'
 
 export function PolicyBar({ policy }: { policy: Policy }) {
   const store = useBrand()
+  const unsaved = useSyncExternalStore(subscribeUnsaved, () => unsavedPolicyId === policy.id, () => false)
 
   const { everyone, groupIds, userIds } = policy.audience
   /* One phrase for the selection, one number for its size. Two groups and a
@@ -66,7 +103,8 @@ export function PolicyBar({ policy }: { policy: Policy }) {
           <ArrowLeft size={16} strokeWidth={1.9} aria-hidden />
         </button>
         <h1>{policy.name}</h1>
-        <StatusPill status={policy.status} />
+        <StatusControl policyId={policy.id} />
+        <ChangeState unsaved={unsaved} draft={!!policy.pendingDraft} />
         <span className="bpbar__type">{policy.type}</span>
       </div>
 
@@ -74,7 +112,7 @@ export function PolicyBar({ policy }: { policy: Policy }) {
         <div className={`bpbar__fact ${!app && !policy.isSystem ? 'is-empty' : ''}`}>
           <dt>
             <AppWindow size={12} strokeWidth={1.9} aria-hidden />
-            Application
+            Applications
           </dt>
           <dd>
             {policy.isSystem ? (
@@ -88,7 +126,7 @@ export function PolicyBar({ policy }: { policy: Policy }) {
                 {appsLabel(named)}
               </span>
             ) : (
-              <em>Not chosen — these rules never run</em>
+              <em>None</em>
             )}
           </dd>
         </div>

@@ -1,12 +1,12 @@
 import { Fragment, type MouseEvent, type ReactNode } from 'react'
 import { ArrowRight, Braces, Split, Users } from 'lucide-react'
 
-import { isWho, whoEditable, whoIds } from '../../audience-ops'
-import { AvatarStack } from './Avatar'
+import { hasWho as ruleHasWho, whoSummary } from '../../rule-who'
 import { conditionType, type Condition, type Rule } from '../../data'
 import { cardJoin, cardLetter, topJoin } from '../../predicate'
 import type { NameLookup } from '../predicate-prose'
 import { DECISION_NAME, TONE, journeyOf } from './model'
+import { isPristine } from './parts'
 import { conditionIcon, conditionTone } from './tones'
 
 /* -----------------------------------------------------------------------------
@@ -193,7 +193,15 @@ function valueChips(c: Condition, resolve: NameLookup): { text: string; unset: b
   if (vals.length === 0) return [{ text: 'no value', unset: true }]
   if (t.valueKind === 'time') return [{ text: `${c.values[0] ?? '09:00'} – ${c.values[1] ?? '17:00'}`, unset: false }]
   if (t.valueKind === 'zone' || t.valueKind === 'fingerprint' || t.valueKind === 'group' || t.valueKind === 'user')
-    return vals.map((v) => ({ text: resolve(t.valueKind as 'zone', v) ?? v, unset: false }))
+    return vals.map((v) => {
+      const name = resolve(t.valueKind as 'zone', v)
+      if (name != null) return { text: name, unset: false }
+      /* Group and user values only reach a card as a leftover condition, which
+         the linter reports (PE150). People and groups can sit outside the
+         listed directory, so only a zone or device profile missing from the
+         library is known to be deleted. */
+      return t.valueKind === 'zone' || t.valueKind === 'fingerprint' ? { text: 'Deleted', unset: true } : { text: v, unset: false }
+    })
   return vals.map((v) => ({ text: v, unset: false }))
 }
 
@@ -313,26 +321,10 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
 /* --- The read-only block, for the card ------------------------------------- */
 
 export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolve: NameLookup; token?: ReactNode; terminal?: boolean }) {
-  /* The who-conditions are drawn by the card's own `Who` button now, not here
-     among the circumstances.
-
-     This is the correctness fix the split owes. `WhenEditor` has hidden them
-     from the If list since groups became a step of their own, while this went
-     on drawing them as conditions — one rule described two ways, on two
-     surfaces that are on screen together, which is the exact thing the comment
-     below says a card must never do.
-
-     Same predicate, so the card, the Condition editor and the Who pane cannot
-     disagree about which rows belong to which question. On an OR predicate they
-     come back, because then this is the only place they can be seen — and a
-     card left with no conditions at all is dropped rather than drawn as an
-     empty bracket. `whoEditable` is only true for a single AND-run, so the
-     filtering can never renumber an alternative's letter. */
-  const cards = whoEditable(rule.when)
-    ? rule.when.cards
-        .map((k) => ({ ...k, conditions: k.conditions.filter((c) => !isWho(c)) }))
-        .filter((k) => k.conditions.length > 0)
-    : rule.when.cards
+  /* Every card, as stored. People and groups are the rule's `who`, not
+     conditions, so nothing here is filtered out and no alternative's letter
+     can move. */
+  const cards = rule.when.cards
   const top = topJoin(rule.when)
   if (terminal)
     return (
@@ -348,23 +340,22 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
       </div>
     )
 
-  /* The who, as the first row of the reading.
+  /* The who, as the first row of the reading, from `rule.who`.
 
-     The card printed `if … then … else` and never said who the rule was about,
-     because the who-conditions were being drawn among the circumstances — where
-     they read as one more thing to check rather than as the subject. Filtering
-     them out of the `if` list left the card silent about them, which is worse:
-     the fact did not move, it vanished.
+     A row of its own, in the same shape as `if` and `then` and above both,
+     whatever shape the cards below have — who applies to the whole rule, so it
+     is never drawn inside a group.
 
-     So it gets a row of its own, in the same shape as `if` and `then`, above
-     both. Only when the pane can own it — on an OR-shaped rule the who belongs
-     to each alternative and is drawn inside them, exactly as it was. */
-  const whoNames = whoEditable(rule.when)
-    ? [
-        ...whoIds(rule.when, 'group').map((id) => resolve('group', id) ?? id),
-        ...whoIds(rule.when, 'user').map((id) => resolve('user', id) ?? id),
-      ]
-    : []
+     Omitted for everyone. That is the rule's default, and this card draws
+     nothing until it has been answered (below). A who that is only exceptions
+     is an answer, so "Everyone except Contractors" does get the row.
+
+     Words, not faces: "Finance, Legal and 2 more" or "Finance except Priya
+     Sharma". An exception cannot be drawn as an avatar, and the full list is
+     on the title. */
+  const whoName = (kind: 'group' | 'user', id: string) => resolve(kind, id)
+  const whoText = whoSummary(rule.who, whoName)
+  const whoFull = whoSummary(rule.who, whoName, Infinity)
 
   /* Nothing is drawn until it has been ANSWERED.
 
@@ -379,17 +370,31 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
      They appear in the order a rule is written: who, then the circumstances,
      and the outcome LAST, once there is something for it to be the outcome of.
      A `then` above two blank rows answers a question nobody has asked yet. */
-  const hasWho = whoNames.length > 0
+  const hasWho = ruleHasWho(rule.who)
   const hasIf = cards.length > 0
   const configured = hasWho || hasIf
+  /* No who and no conditions is only "nothing set" while the rule is untouched.
+     Once an outcome is chosen, it catches every sign-in that reaches it — the
+     one thing about this rule most worth reading off the card. */
+  const blank = !configured && isPristine(rule)
+  const catchAll = !configured && !blank
 
   return (
     <div className="bb__if">
-      {!configured && (
+      {blank && (
         /* One quiet line rather than a skeleton of the rule. The two doors that
            fix it are on the panel, which this card opens. */
         <div className="bb__ifrow">
           <span className="bb__ifkw is-blank">Nothing set yet</span>
+        </div>
+      )}
+      {catchAll && (
+        <div className="bb__ifrow">
+          <span className="bb__ifbranch" aria-hidden>
+            <Split size={12} strokeWidth={2} />
+          </span>
+          <IfKw>if</IfKw>
+          <span className="bb__ifjourney">Every sign-in</span>
         </div>
       )}
       {hasWho && (
@@ -400,13 +405,10 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
             </span>
             <span className="bb__ifkw">who</span>
           </div>
-          {/* A stack, not a chip per name. It was one chip each, which is four
-              lines of them at eighteen people inside a rule somebody is trying
-              to read at a glance — and a real tenant has thousands. Five marks,
-              the first name in words and a count: the same width whatever it
-              holds. */}
           <IfSub className="bb__ifwho">
-            <AvatarStack names={whoNames} />
+            <span className="bb__ifwho__text" title={whoFull}>
+              {whoText}
+            </span>
           </IfSub>
         </>
       )}
@@ -532,7 +534,7 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
       )}
       {/* The outcome, last, and only once there is something above it to be
           the outcome OF. */}
-      {configured && <ActionRow rule={rule} token={token} />}
+      {!blank && <ActionRow rule={rule} token={token} />}
     </div>
   )
 }

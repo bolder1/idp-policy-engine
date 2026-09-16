@@ -1,0 +1,22 @@
+/* The status pill as a menu button. The pill inside is the kit's own; this only
+   adds the hit area, the chevron and the focus ring. */
+.bxsc {
+  flex: none;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 24px; padding: 0 var(--space-2) 0 var(--space-3);
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  background: none; font-family: inherit; cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bxsc:hover,
+.bxsc.is-open { background: var(--state-hover-bg, var(--surface-sunken)); border-color: var(--border-subtle); }
+.bxsc:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bxsc > .bx-status { pointer-events: none; }
+.bxsc__chev { flex: none; color: var(--text-tertiary); }
+
+/* Portalled to the app root and placed from the trigger, so no bar or sticky
+   cell can clip it. */
+.bx-menu__pop.bxsc__pop { position: fixed; right: auto; min-width: 168px; }
+.bxsc__pop .bx-menu__item { align-items: center; }
+.bxsc__pop .bx-menu__item:hover,
+.bxsc__pop .bx-menu__item:focus-visible { outline: none; background: var(--state-hover-bg, var(--surface-sunken)); }

@@ -1,8 +1,12 @@
 import { motion } from 'motion/react'
 import { useMemo, useState } from 'react'
+import { AppWindow, Plus, Users } from 'lucide-react'
 
+import { Button, DecisionChip } from '../kit'
+import { EmptyState } from '../empty'
 import { AppLogo } from '../logos/AppLogo'
-import { coversEveryApp, enforces, type AccessDecision, type App, type Group, type Policy, type Rule } from '../data'
+import { coversEveryApp, enforces, type AccessDecision, type App, type Group, type Policy, type Rule, type User } from '../data'
+import { whoPasses } from '../rule-who'
 import { useBrand } from '../store'
 
 /* -----------------------------------------------------------------------------
@@ -20,8 +24,8 @@ import { useBrand } from '../store'
 
    The outcome in each cell is resolved the way the engine resolves it — the
    policies attached to that app, their rules walked top to bottom, first match
-   wins. Inactive policies are not counted as cover, because they do not
-   evaluate.
+   wins. Draft and inactive policies are not counted as cover, because they do
+   not evaluate.
    -------------------------------------------------------------------------- */
 
 interface Cell {
@@ -47,10 +51,22 @@ interface Cell {
    though nobody's access widened. */
 const STRICTNESS: Record<AccessDecision, number> = { '1fa': 0, '2fa': 1, deny: 2 }
 
-function match(p: Policy, app: App, group: Group): Cell | null {
-  /* `enforces`, not `!== 'inactive'`. A monitor policy evaluates and records
-     and stops there — counting it as cover would report a tenant as protected
-     by a policy that has never refused anything. */
+/* Can this rule apply to anyone in the group?
+
+   Its Who decides, not its conditions. Yes when the group is covered — by
+   everyone, by the group itself, or by "everyone except" another group — or
+   when a person it names is a member. A rule for Finance does not paint the
+   Legal row. */
+function reachesGroup(r: Rule, group: Group, directory: User[]): boolean {
+  if (whoPasses(r.who, { id: '', groupId: group.id })) return true
+  return (r.who?.userIds ?? []).some((id) => {
+    const u = directory.find((x) => x.id === id)
+    return !!u && u.groupId === group.id && whoPasses(r.who, u)
+  })
+}
+
+function match(p: Policy, app: App, group: Group, directory: User[]): Cell | null {
+  /* `enforces`, not `!== 'inactive'`: a draft decides nothing either. */
   if (!enforces(p)) return null
   /* `includes`, so one policy legitimately fills several columns of this grid.
      That used to be the argument AGAINST a list — a policy drawn three times
@@ -65,9 +81,10 @@ function match(p: Policy, app: App, group: Group): Cell | null {
   /* The audience test moved up: it is the POLICY that governs a group now, so
      a policy either covers this column or it does not, and every one of its
      rules covers it equally. Named individuals do not appear on this matrix at
-     all — see the footnote the table renders under it. */
+     all — see the footnote the table renders under it. Within the policy, a
+     rule's own Who narrows it again. */
   if (!p.audience.everyone && !p.audience.groupIds.includes(group.id)) return null
-  const applicable = p.rules.filter((r) => r.enabled)
+  const applicable = p.rules.filter((r) => r.enabled && reachesGroup(r, group, directory))
   if (applicable.length === 0) return null
 
   const worst = applicable.reduce((a, b) => (STRICTNESS[b.decision] > STRICTNESS[a.decision] ? b : a))
@@ -80,28 +97,27 @@ function match(p: Policy, app: App, group: Group): Cell | null {
   }
 }
 
-function resolve(policies: Policy[], app: App, group: Group): Cell | null {
+function resolve(policies: Policy[], app: App, group: Group, directory: User[]): Cell | null {
   for (const p of policies) {
     if (p.isSystem) continue
-    const hit = match(p, app, group)
+    const hit = match(p, app, group, directory)
     if (hit) return hit
   }
   for (const p of policies) {
     if (!p.isSystem) continue
-    const hit = match(p, app, group)
+    const hit = match(p, app, group, directory)
     if (hit) return hit
   }
   return null
 }
 
-/* `flag`, not `warn` — `.bcov__stat.is-warn` in this same file already means
-   "this number is worth looking at". See the note on `TONE` in board/model. */
-const TONE: Record<AccessDecision, string> = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' }
-
-/** The strictest outcome this pair can get, and how many rules can produce it. */
-function cellLabel(c: Cell) {
-  const word = c.decision === 'deny' ? 'Deny' : c.decision === '2fa' ? 'MFA' : 'Allow'
-  return c.rules > 1 ? `${word} · ${c.rules}` : word
+/* The tooltip on a cell. The rule count lives here rather than in the cell,
+   which carries the outcome only. */
+function cellTitle(c: Cell | null) {
+  if (!c) return 'No policy covers this pair. Click to create one.'
+  if (c.fallback) return `Only the ${c.policy.name} covers this pair.`
+  const rules = `${c.rules} rule${c.rules === 1 ? '' : 's'}`
+  return `${c.policy.name}: ${rules} can apply. Strictest: ${c.rule.name}.`
 }
 
 export function Coverage({ onNew }: {
@@ -120,7 +136,7 @@ export function Coverage({ onNew }: {
   const grid = useMemo(() => {
     const rows = store.groups.map((g) => ({
       group: g,
-      cells: store.apps.map((a) => resolve(store.policies, a, g)),
+      cells: store.apps.map((a) => resolve(store.policies, a, g, store.users)),
     }))
     const all = rows.flatMap((r) => r.cells)
     const real = all.filter((c) => c && !c.fallback)
@@ -131,7 +147,7 @@ export function Coverage({ onNew }: {
       mfa: real.filter((c) => c?.decision === '2fa').length,
       deny: real.filter((c) => c?.decision === 'deny').length,
     }
-  }, [store.policies, store.apps, store.groups])
+  }, [store.policies, store.apps, store.groups, store.users])
 
   const gaps = grid.total - grid.governed
 
@@ -147,11 +163,31 @@ export function Coverage({ onNew }: {
     else onNew()
   }
 
+  /* A grid needs both axes. With no applications or no groups there is no pair
+     to show, and an empty table would read as a glitch. */
+  if (store.apps.length === 0 || store.groups.length === 0) {
+    const noApps = store.apps.length === 0
+    return (
+      <EmptyState
+        icon={noApps ? AppWindow : Users}
+        title={noApps ? 'No applications yet' : 'No groups yet'}
+        blurb={noApps ? 'Coverage shows each application against each group.' : 'Coverage shows each group against each application.'}
+        action={
+          noApps ? (
+            <Button variant="secondary" onClick={() => store.go({ name: 'applications' })}>
+              Go to applications
+            </Button>
+          ) : undefined
+        }
+      />
+    )
+  }
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18 }}>
       <div className="bcov__stats">
         <Stat label="Pairs governed" value={grid.governed} of={grid.total} />
-        <Stat label="Step-up required" value={grid.mfa} tone="mfa" />
+        <Stat label="MFA required" value={grid.mfa} tone="mfa" />
         <Stat label="Denied" value={grid.deny} tone="deny" />
         <Stat label="Uncovered pairs" value={gaps} warn={gaps > 0} />
       </div>
@@ -187,29 +223,19 @@ export function Coverage({ onNew }: {
                     <td key={c}>
                       <button
                         type="button"
-                        className={`bcov__cell ${
-                          !cell ? 'is-empty' : cell.fallback ? 'is-fallback' : `is-${TONE[cell.decision]}`
-                        }`}
+                        className={`bcov__cell ${!cell ? 'is-empty' : cell.fallback ? 'is-fallback' : ''}`}
                         onMouseEnter={() => setHover({ a: c, g: r })}
                         onMouseLeave={() => setHover(null)}
                         onClick={() => open(cell)}
-                        title={
-                          !cell
-                            ? 'No policy governs this pair — click to create one'
-                            : cell.fallback
-                              ? `Only ${cell.policy.name} reaches this pair — no policy of your own does`
-                              : `${cell.policy.name} — ${cell.rules} rule${cell.rules === 1 ? '' : 's'} can apply, strictest is "${cell.rule.name}"`
-                        }
+                        title={cellTitle(cell)}
+                        aria-label={cellTitle(cell)}
                       >
-                        {cell ? (
-                          <>
-                            <i aria-hidden />
-                            {cell.fallback ? 'Default' : cellLabel(cell)}
-                          </>
+                        {!cell ? (
+                          <Plus size={14} strokeWidth={2} aria-hidden />
+                        ) : cell.fallback ? (
+                          <span className="bcov__tag">Default</span>
                         ) : (
-                          <span className="bcov__plus" aria-hidden>
-                            +
-                          </span>
+                          <DecisionChip decision={cell.decision} size="sm" />
                         )}
                       </button>
                     </td>
@@ -223,33 +249,23 @@ export function Coverage({ onNew }: {
 
       <div className="bcov__foot">
         <div className="bcov__legend">
-          <span className="is-allow">
-            <i aria-hidden />
-            Allow
+          <span>
+            <DecisionChip decision="1fa" size="sm" />
+            <DecisionChip decision="2fa" size="sm" />
+            <DecisionChip decision="deny" size="sm" />
           </span>
-          <span className="is-mfa">
-            <i aria-hidden />
-            Step-up
+          <span>
+            <span className="bcov__tag">Default</span>
+            Default policy only
           </span>
-          <span className="is-deny">
-            <i aria-hidden />
-            Deny
-          </span>
-          <span className="is-fallback">
-            <i aria-hidden />
-            Global default only
-          </span>
-          <span className="is-empty">
-            <i aria-hidden />
+          <span>
+            <Plus size={14} strokeWidth={2} aria-hidden />
             No policy
           </span>
         </div>
         <p className="bcov__note">
-          A cell shows the strictest outcome the pair can get and how many rules can apply — which
-          one actually wins depends on the conditions at sign-in. Inactive policies and the
-          always-on global default are not
-          counted as cover — the default reaches everything, so counting it would report full
-          coverage for a tenant that has written no policy at all.
+          Each cell shows the strictest outcome a rule can give that pair. Draft and inactive
+          policies and the default policy don't count as cover.
         </p>
       </div>
 

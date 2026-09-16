@@ -441,8 +441,6 @@ export function searchPlaces(query: string, limit = 12): Place[] {
   return scored.slice(0, limit).map((s) => s.p)
 }
 
-export const placeById = (id: string) => PLACES.find((p) => p.id === id)
-
 /* Adding Pune to a zone that already contains India does not narrow it and does
    not widen it — the sections within a location are ORed, so the country
    already covers the city. Worth saying, because it looks like it did

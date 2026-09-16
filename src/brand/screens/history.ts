@@ -38,6 +38,17 @@ export function commit(h: History, next: Policy): History {
   return { past: [...h.past, h.present].slice(-HISTORY_LIMIT), present: next, future: [] }
 }
 
+/* Discarding unsaved edits, as a step that can be undone.
+
+   Discard used to reset the history to the saved policy, which emptied the undo
+   stack along with the edits: one mis-click next to Save draft lost the whole
+   session. This records the saved policy as the next state instead, so Ctrl+Z
+   brings the discarded edits back. Use `historyOf` only when a saved draft is
+   thrown away after the admin confirmed it. */
+export function revertTo(h: History, saved: Policy): History {
+  return commit(h, saved)
+}
+
 export function undo(h: History): History {
   if (h.past.length === 0) return h
   return { past: h.past.slice(0, -1), present: h.past[h.past.length - 1], future: [h.present, ...h.future] }

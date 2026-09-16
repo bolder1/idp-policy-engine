@@ -42,10 +42,10 @@
 .bus__navitem:hover { color: var(--text-primary); }
 /* The underline is the live site's, and it is the only active treatment on the
    bar — a pill or a filled row would be the admin console's language. */
-.bus__navitem.is-on { color: var(--text-primary); }
+.bus__navitem.is-on { color: var(--brand-text); }
 .bus__navitem.is-on::after {
   content: ''; position: absolute; left: 12px; right: 12px; bottom: 0;
-  height: 2px; border-radius: 2px 2px 0 0; background: var(--accent);
+  height: 2px; border-radius: 2px 2px 0 0; background: var(--brand);
 }
 /* Focus is the global ring. The halo alone this used to draw is about 1.3:1 on
    white. */
@@ -86,12 +86,6 @@
 }
 .buapps .buapps__search input:focus-visible { outline: none; }
 .buapps__search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
-
-.buapps__hidden {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
-}
-.buapps .buapps__hidden input { width: auto; height: auto; accent-color: var(--accent); }
 
 .buapps__grid {
   list-style: none; margin: 0; padding: 0;

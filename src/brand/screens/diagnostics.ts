@@ -1,15 +1,27 @@
 import {
+  FALLBACK_NAME,
   conditionType,
-  reach,
   users as seedUsers,
   type AccessDecision,
   type Group,
   type Policy,
   type Rule,
   type User,
+  type Zone,
 } from '../data'
-import { cardJoin, ckey, isSingleAndRun, leaves, matchesEverything, sig, topJoin } from '../predicate'
+import { cardJoin, ckey, isSingleAndRun, leaves, matchesEverything, topJoin } from '../predicate'
+import { outsideAudienceOf } from '../audience-ops'
+import {
+  hasWho,
+  legacyWhoConditions,
+  normaliseWho,
+  ruleMatchesEveryone,
+  ruleSig,
+  whoContains,
+  whoCoversNobody,
+} from '../rule-who'
 import { SLOW_TIMEOUT_MS, seedHooks, type Hook } from '../hooks'
+import type { FingerprintProfile } from '../fingerprint'
 
 /* -----------------------------------------------------------------------------
    Rule diagnostics.
@@ -54,6 +66,10 @@ export interface Diagnostic {
   /** The other rule involved, when the problem is a relationship. */
   relatedIndex?: number
 }
+
+/** "Finance", "Finance and Legal", "Finance, Legal and Contractors". */
+const listOf = (names: string[]) =>
+  names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 
 const clockMinutes = (s: string) => {
   const [h, m] = s.split(':').map(Number)
@@ -102,13 +118,19 @@ const NEGATIONS: Record<string, string> = {
    depended on it (subsumption, unreachable, the shadow count, `shadowedBy`)
    strictly stronger: they now compare predicates alone.
 
-   That will look like a regression. More rules get reported unreachable than
-   before, because a rule that used to be excused by "well, it targets a
-   different group" no longer has that excuse — the group narrowing is a
-   condition now, and the checks read conditions. */
+   Narrowing inside a policy is `Rule.who` now, a field beside the WHEN rather
+   than a condition in it. So every check that asks "does that rule match
+   everything this one matches" asks it of both halves: the WHEN through the
+   predicate, and the people through `whoContains`. A rule's identity is
+   `ruleSig`, which carries both. */
 
-/** A rule that matches every sign-in reaching it. */
-const isCatchAll = (r: Rule) => r.enabled && matchesEverything(r.when)
+/** A rule that matches every sign-in reaching it: no who and no conditions. */
+const isCatchAll = (r: Rule) => r.enabled && ruleMatchesEveryone(r)
+
+/* An earlier rule that always matches first for everyone `r` applies to:
+   switched on, no conditions, and a who covering all of `r`'s people. A rule
+   with no who covers everyone, so this is the catch-all case and more. */
+const blocks = (e: Rule, r: Rule) => e.enabled && matchesEverything(e.when) && whoContains(e.who, r.who)
 
 /* One card is one unbroken run of ANDs, by construction. That is the whole
    reason the model is a disjunction of cards rather than an arbitrary tree:
@@ -122,8 +144,8 @@ const allOr = (r: Rule) =>
   (topJoin(r.when) === 'or' && r.when.cards.length > 1 && r.when.cards.every((k) => k.conditions.length === 1)) ||
   (r.when.cards.length === 1 && cardJoin(r.when.cards[0]) === 'or' && r.when.cards[0].conditions.length > 1)
 
-/** The predicate, normalised. Audience is no longer part of it — it is the policy's. */
-const signature = (r: Rule) => sig(r.when)
+/** Who and the predicate, normalised. The policy audience is not part of it — it is the policy's. */
+const signature = (r: Rule) => ruleSig(r)
 
 /* Which rules below `index` that rule puts out of reach.
 
@@ -133,10 +155,10 @@ const signature = (r: Rule) => sig(r.when)
    broad rule high up silently kills specific rules beneath it. */
 export function shadowedBy(policy: Policy, index: number): number[] {
   const rule = policy.rules[index]
-  if (!rule || !isCatchAll(rule)) return []
+  if (!rule || !rule.enabled || !matchesEverything(rule.when)) return []
   const out: number[] = []
   policy.rules.forEach((r, j) => {
-    if (j > index && r.enabled) out.push(j)
+    if (j > index && r.enabled && blocks(rule, r)) out.push(j)
   })
   return out
 }
@@ -145,14 +167,26 @@ export function shadowedBy(policy: Policy, index: number): number[] {
    resolver in builder-dialogs does. Callers with a store pass the live list so
    a hook deleted five seconds ago is reported; callers without one (the tests,
    the interview composer) still get sound answers about the seeded catalogue. */
+export interface DiagnoseLibrary {
+  zones?: Zone[]
+  fingerprints?: FingerprintProfile[]
+}
+
 export function diagnose(
   policy: Policy,
   groups: Group[],
   hooks: Hook[] = seedHooks,
   directory: User[] = seedUsers,
+  /* The tenant's zones and device profiles. Omitted, rules naming them are not
+     checked against what exists; passed, a rule naming a deleted one is an error. */
+  library: DiagnoseLibrary = {},
 ): Diagnostic[] {
   const out: Diagnostic[] = []
   const rules = policy.rules
+  /* The ids that still exist. Undefined when the caller passed no list, which
+     skips the check rather than calling every zone or profile deleted. */
+  const zoneIds = library.zones ? new Set(library.zones.map((z) => z.id)) : undefined
+  const profileIds = library.fingerprints ? new Set(library.fingerprints.map((p) => p.id)) : undefined
   // The global default is a deliberate catch-all; warning about it is noise.
   if (policy.isSystem) return out
 
@@ -237,7 +271,12 @@ export function diagnose(
        rule also appears in this one, then A∧B∧C ⟹ A, so anything matching here
        already matched there and stopped. The pure-OR mirror holds too. Webhook
        conditions are excluded — their result is opaque, so nothing can be
-       proved about them. */
+       proved about them.
+
+       And the people: the earlier rule's who has to cover everyone this rule
+       applies to. "Finance, in the office" above "Contractors, in the office
+       from a managed device" subsumes nothing. An earlier rule with no
+       conditions at all is PE103's case, not this one. */
     if (r.enabled && allAnd(r) && r.when.cards.length > 0) {
       const mine = new Set(r.when.cards[0].conditions.map(ckey))
       const opaque = (x: Rule) => leaves(x.when).some((c) => c.typeId === 'webhook')
@@ -248,6 +287,7 @@ export function diagnose(
           e.when.cards.length > 0 &&
           !opaque(e) &&
           !opaque(r) &&
+          whoContains(e.who, r.who) &&
           (allAnd(e)
             ? e.when.cards[0].conditions.every((c) => mine.has(ckey(c)))
             : allOr(e) && e.when.cards.some((k) => mine.has(ckey(k.conditions[0])))),
@@ -292,6 +332,79 @@ export function diagnose(
       })
     }
 
+    /* --- People or groups written as a condition ----------------------------
+       Who a rule is for is `Rule.who`. A `group` or `user` condition in a card
+       is the old way of saying it, and it is an error rather than a quiet
+       second path: the If pickers cannot write one, the Who section cannot see
+       one, and a rule holding one reads differently on every surface. */
+    const legacy = legacyWhoConditions(r.when)
+    if (legacy.length > 0) {
+      out.push({
+        id: `legacywho-${r.id}`,
+        code: 'PE150',
+        severity: 'error',
+        scope: 'rule',
+        ruleIndex: i,
+        title: 'People or groups in a condition',
+        detail: 'Move people and groups to Who.',
+      })
+    }
+
+    /* --- Who ----------------------------------------------------------------
+       Three things the who itself can be wrong about. Not gated on `enabled`,
+       like the deleted-zone checks: a switched-off rule is still broken. */
+    const who = normaliseWho(r.who)
+    if (who) {
+      /* Every chosen group and person is also an exception. */
+      if (whoCoversNobody(who, directory)) {
+        out.push({
+          id: `whonobody-${r.id}`,
+          code: 'PE153',
+          severity: 'error',
+          scope: 'rule',
+          ruleIndex: i,
+          title: 'This rule applies to nobody',
+          detail: 'Every group and person in Who is also an exception. Remove the exception or the choice.',
+        })
+      }
+
+      /* Named, but the policy does not govern them. The audience is checked
+         before any rule, so the rule can never apply to them. */
+      const outside = outsideAudienceOf(a, who, directory)
+      const outsideNames = [
+        ...outside.groups.map((g) => groups.find((x) => x.id === g)?.name ?? g),
+        ...outside.users.map((u) => directory.find((x) => x.id === u)?.name ?? u),
+      ]
+      if (outsideNames.length > 0) {
+        out.push({
+          id: `whooutside-${r.id}`,
+          code: 'PE151',
+          severity: 'warning',
+          scope: 'rule',
+          ruleIndex: i,
+          title: 'Who is outside this policy',
+          detail: `This policy does not govern ${listOf(outsideNames)}, so this rule never applies to them. Add them to the policy, or remove them from Who.`,
+        })
+      }
+
+      /* Gone from the directory since the rule named them. */
+      const allIds = (ids?: string[]) => ids ?? []
+      const goneGroups = [...who.groupIds, ...allIds(who.exceptGroupIds)].filter((g) => !groups.some((x) => x.id === g))
+      const goneUsers = [...who.userIds, ...allIds(who.exceptUserIds)].filter((u) => !directory.some((x) => x.id === u))
+      const gone = goneGroups.length + goneUsers.length
+      if (gone > 0) {
+        out.push({
+          id: `whogone-${r.id}`,
+          code: 'PE152',
+          severity: 'warning',
+          scope: 'rule',
+          ruleIndex: i,
+          title: `${gone} in Who ${gone === 1 ? 'no longer exists' : 'no longer exist'}`,
+          detail: 'A group or person this rule names has been removed from the directory. Remove it from Who.',
+        })
+      }
+    }
+
     /* --- A condition with nothing to match on -------------------------------- */
     const blank = leaves(r.when).filter((c) => c.values.length === 0 || c.values.every((v) => !v.trim()))
     if (blank.length > 0) {
@@ -306,41 +419,24 @@ export function diagnose(
       })
     }
 
-    /* --- Configuration that contradicts the outcome -------------------------- */
-    if (r.decision === 'deny' && (r.secondFactor === 'specific' || r.rememberMfa || r.allowDisable2fa)) {
+    /* --- A rule with no name --------------------------------------------------
+       Every finding, trace and menu names a rule by its name, so a blank one
+       is a row nobody can refer to. Not gated on `enabled`. */
+    if (!r.name.trim()) {
       out.push({
-        id: `denyfactors-${r.id}`,
-        code: 'PE120',
-        scope: 'rule',
-        severity: 'warning',
-        ruleIndex: i,
-        title: 'Authentication settings on a Deny rule',
-        detail: 'This rule blocks access, so nobody ever reaches a factor prompt. These settings have no effect.',
-      })
-    }
-
-    if (r.decision === '2fa' && r.allowDisable2fa) {
-      out.push({
-        id: `optout-${r.id}`,
-        code: 'PE121',
-        scope: 'rule',
-        severity: 'warning',
-        ruleIndex: i,
-        title: 'Users can opt out of this requirement',
-        detail: 'The rule requires a second factor, but end users are allowed to switch theirs off. Anyone who does is no longer covered by it.',
-      })
-    }
-
-    if (r.decision === '2fa' && r.secondFactor === 'specific' && (r.secondFactorMethods?.length ?? 0) === 0) {
-      out.push({
-        id: `nomethods-${r.id}`,
-        code: 'PE122',
+        id: `noname-${r.id}`,
+        code: 'PE105',
         scope: 'rule',
         severity: 'error',
         ruleIndex: i,
-        title: 'No second factor chosen',
-        detail: 'The rule asks for specific methods but none are selected, so there is nothing for a user to verify with.',
+        title: 'Rule name is empty',
+        detail: 'Give this rule a name.',
       })
+    }
+
+    /* --- Configuration that contradicts the outcome -------------------------- */
+    for (const f of outcomeFindings(r)) {
+      out.push({ id: `${f.key}-${r.id}`, code: f.code, scope: 'rule', severity: f.severity, ruleIndex: i, title: f.title, detail: f.detail })
     }
 
     /* --- External hooks ------------------------------------------------------
@@ -368,6 +464,22 @@ export function diagnose(
           ruleIndex: i,
           title: 'This rule calls a hook that no longer exists',
           detail: `The condition names a hook that has been deleted, so it has nothing to ask. The rule cannot be evaluated as written.`,
+        })
+        continue
+      }
+
+      /* An attribute-sync hook pulls data in the background and answers no
+         question during a sign-in, so a condition calling it has nothing to
+         wait for. The hook form can switch a hook's mode after rules use it. */
+      if (hook.mode !== 'sync') {
+        out.push({
+          id: `hookmode-${r.id}-${c.id}`,
+          code: 'PE136',
+          scope: 'rule',
+          severity: 'error',
+          ruleIndex: i,
+          title: 'This rule calls a hook that cannot answer it',
+          detail: `${hook.name} syncs attributes and is not called during sign-in. Choose a hook that answers a sign-in.`,
         })
         continue
       }
@@ -409,13 +521,37 @@ export function diagnose(
       }
     }
 
+    /* --- Deleted zones and device profiles -----------------------------------
+
+       Same contract as PE130. Deleting a zone or a profile leaves the rules that
+       name it in place, and this is what says so. Not gated on `enabled`, like
+       PE130: a switched-off rule is still broken, and the renderers decide
+       whether that blocks publishing. Every value is checked, not just the
+       first — a condition can name several. */
+    for (const c of leaves(r.when)) {
+      const known = c.typeId === 'zone' ? zoneIds : c.typeId === 'fingerprint' ? profileIds : undefined
+      if (!known) continue
+      if (!c.values.some((v) => v.trim() !== '' && !known.has(v))) continue
+      const zone = c.typeId === 'zone'
+      out.push({
+        id: `${zone ? 'zonegone' : 'profilegone'}-${r.id}-${c.id}`,
+        code: zone ? 'PE134' : 'PE135',
+        scope: 'rule',
+        severity: 'error',
+        ruleIndex: i,
+        title: zone ? 'This rule uses a zone that no longer exists' : 'This rule uses a device profile that no longer exists',
+        detail: zone ? 'Pick another zone or remove the condition.' : 'Pick another device profile or remove the condition.',
+      })
+    }
+
     /* --- Unreachable ---------------------------------------------------------
        Only claimed when it is certain: an earlier enabled rule with no
-       conditions and an audience covering this one will always match first.
-       An earlier rule *with* conditions might not fire, so it is left alone —
-       guessing there would produce warnings on correct policies. */
-    const blocker = rules.findIndex((e, j) => j < i && isCatchAll(e))
+       conditions, whose who covers everyone this rule applies to, will always
+       match first. An earlier rule *with* conditions might not fire, so it is
+       left alone — guessing there would produce warnings on correct policies. */
+    const blocker = rules.findIndex((e, j) => j < i && blocks(e, r))
     if (blocker !== -1) {
+      const scoped = hasWho(rules[blocker].who)
       out.push({
         id: `unreachable-${r.id}`,
         code: 'PE103',
@@ -424,7 +560,9 @@ export function diagnose(
         ruleIndex: i,
         relatedIndex: blocker,
         title: 'This rule can never run',
-        detail: `Rule ${blocker + 1} · ${rules[blocker].name} has no conditions and covers the same people, so it always matches first. Evaluation stops there and never reaches this rule.`,
+        detail: scoped
+          ? `Rule ${blocker + 1} · ${rules[blocker].name} has no conditions and applies to everyone this rule applies to, so it always matches first. Evaluation stops there and never reaches this rule.`
+          : `Rule ${blocker + 1} · ${rules[blocker].name} has no conditions and covers the same people, so it always matches first. Evaluation stops there and never reaches this rule.`,
       })
     }
 
@@ -544,8 +682,13 @@ export function diagnose(
     /* --- A catch-all above other rules --------------------------------------
        Reported on the cause rather than each victim: fixing the one rule fixes
        all of them, so one actionable warning beats five identical ones. */
-    if (isCatchAll(r) && i < rules.length - 1) {
-      const shadowed = rules.filter((_, j) => j > i).length
+    /* With a who and no conditions, the rule is a catch-all for its own
+       people only, so it shadows just the rules below whose who it covers. */
+    const scopedCatchAll = r.enabled && hasWho(r.who) && matchesEverything(r.when)
+    if ((isCatchAll(r) || scopedCatchAll) && i < rules.length - 1) {
+      const shadowed = isCatchAll(r)
+        ? rules.filter((_, j) => j > i).length
+        : rules.filter((x, j) => j > i && whoContains(r.who, x.who)).length
       if (shadowed > 0) {
         out.push({
           id: `catchall-${r.id}`,
@@ -554,7 +697,9 @@ export function diagnose(
           severity: 'warning',
           ruleIndex: i,
           title: `Shadows ${shadowed} rule${shadowed === 1 ? '' : 's'} below it`,
-          detail: `This rule has no conditions, so everyone who reaches it matches. ${shadowed === 1 ? 'The rule' : 'The rules'} below it covering the same people can never run. Add a condition, or move this rule down.`,
+          detail: isCatchAll(r)
+            ? `This rule has no conditions, so everyone who reaches it matches. ${shadowed === 1 ? 'The rule' : 'The rules'} below it covering the same people can never run. Add a condition, or move this rule down.`
+            : `This rule has no conditions, so everyone it applies to matches. ${shadowed === 1 ? 'The rule' : 'The rules'} below it for the same people can never run. Add a condition, or move this rule down.`,
         })
       }
     }
@@ -587,92 +732,74 @@ export function diagnose(
 
   })
 
+  /* --- The terminal rule ------------------------------------------------------
+     It has no conditions to check, but it decides every sign-in the rules
+     above it miss, so its outcome settings are checked like any rule's. Its
+     findings belong to no rule row: ruleIndex -1, scope 'policy'. */
+  if (policy.fallback) {
+    for (const f of outcomeFindings(policy.fallback)) {
+      out.push({
+        id: `${f.key}-fallback`,
+        code: f.code,
+        scope: 'policy',
+        severity: f.severity,
+        ruleIndex: -1,
+        title: `${FALLBACK_NAME}: ${f.title.charAt(0).toLowerCase()}${f.title.slice(1)}`,
+        detail: f.detail,
+      })
+    }
+  }
+
   return out
 }
 
-/* -----------------------------------------------------------------------------
-   Impact.
-
-   Only two of these numbers are exact — the audience size and where traffic
-   falls through to — and the UI labels the rest as estimates. matchEstimate is
-   seeded, not computed, so anything derived from it inherits that and must not
-   be presented as a count.
-   -------------------------------------------------------------------------- */
-
-export interface Impact {
-  /** Exact: how many people the POLICY governs. Every rule's ceiling. */
-  audience: number
-  /** Estimate: how many of them this rule is expected to match. */
-  matches: number
-  /** Estimate, 0–100. */
-  share: number
-  /** Exact: the rule that would take over if this one stopped matching. */
-  fallsTo: { index: number; name: string; decision: AccessDecision } | null
-  /* How much to trust `matches`.
-     - `exact`   — the rule has no conditions, so it matches its whole audience
-                   and the number is a fact rather than a guess.
-     - `estimate`— seeded, and still describes the rule as written.
-     - `stale`   — the conditions have been edited since the estimate was made,
-                   so it no longer describes this rule at all.
-     matchEstimate is seed data that never recomputes; without this flag the
-     panel would keep reporting the old number after every condition was
-     deleted, which is worse than reporting nothing. */
-  basis: 'exact' | 'estimate' | 'stale'
+/* What a rule's outcome settings get wrong on their own, whatever it matches
+   on. Shared by every rule and by the terminal rule. `key` prefixes the id. */
+export interface OutcomeFinding {
+  key: string
+  code: string
+  severity: Severity
+  title: string
+  detail: string
 }
 
-export function impactOf(
-  policy: Policy,
-  index: number,
-  groups: Group[],
-  saved?: Policy,
-  directory: User[] = seedUsers,
-): Impact {
-  const rule = policy.rules[index]
-  /* The ceiling is the POLICY's audience now, not the rule's. Every rule
-     inherits it and no rule can be broader, so a per-rule number would be
-     answering a question the model no longer asks. */
-  const audience = reach(policy.audience, groups, directory)
-
-  /* Structural, not statistical: the next enabled rule is exactly who inherits
-     these sign-ins. There is no audience test left to make here — every rule in
-     a policy covers the same people, which is precisely what hoisting the
-     audience bought. */
-  const nextIdx = policy.rules.findIndex((r, j) => j > index && r.enabled)
-  const next = nextIdx === -1 ? null : policy.rules[nextIdx]
-
-  /* No conditions means every one of them matches — that is arithmetic, not an
-     estimate, so it is reported as a fact. */
-  const exact = matchesEverything(rule.when)
-  const before = saved?.rules.find((r) => r.id === rule.id)
-  /* `sig` rather than a positional list, and the difference is load-bearing:
-     the old compare was order-sensitive on a flat array, so it could not see a
-     pure REGROUPING — the same conditions moved between alternatives, which is
-     a different rule catching different people. That is the exact failure the
-     `stale` basis exists to catch. */
-  const edited = !!before && sig(before.when) !== sig(rule.when)
-
-  const matches = exact ? audience : rule.matchEstimate
-
-  return {
-    audience,
-    matches,
-    share: audience > 0 ? Math.min(100, Math.round((matches / audience) * 100)) : 0,
-    fallsTo: next ? { index: nextIdx, name: next.name, decision: next.decision } : null,
-    basis: exact ? 'exact' : edited ? 'stale' : 'estimate',
+export function outcomeFindings(r: Rule): OutcomeFinding[] {
+  const out: OutcomeFinding[] = []
+  if (r.decision === 'deny' && (r.secondFactor === 'specific' || r.rememberMfa || r.allowDisable2fa)) {
+    out.push({
+      key: 'denyfactors',
+      code: 'PE120',
+      severity: 'warning',
+      title: 'Authentication settings on a Deny rule',
+      detail: 'This rule blocks access, so nobody ever reaches a factor prompt. These settings have no effect.',
+    })
   }
-}
-
-/** Estimated split of the policy's matched population across outcomes. */
-export function outcomeSplit(policy: Policy) {
-  const live = policy.rules.filter((r) => r.enabled)
-  const total = live.reduce((n, r) => n + r.matchEstimate, 0)
-  const by = (d: AccessDecision) =>
-    live.filter((r) => r.decision === d).reduce((n, r) => n + r.matchEstimate, 0)
-  return {
-    total,
-    deny: by('deny'),
-    mfa: by('2fa'),
-    allow: by('1fa'),
-    pct: (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0),
+  if (r.decision === '2fa' && r.allowDisable2fa) {
+    out.push({
+      key: 'optout',
+      code: 'PE121',
+      severity: 'warning',
+      title: 'Users can opt out of this requirement',
+      detail: 'The rule requires a second factor, but end users are allowed to switch theirs off. Anyone who does is no longer covered by it.',
+    })
   }
+  if (r.decision === '2fa' && r.secondFactor === 'specific' && (r.secondFactorMethods?.length ?? 0) === 0) {
+    out.push({
+      key: 'nomethods',
+      code: 'PE122',
+      severity: 'error',
+      title: 'No second factor chosen',
+      detail: 'The rule asks for specific methods but none are selected, so there is nothing for a user to verify with.',
+    })
+  }
+  if (r.decision !== 'deny' && r.firstFactor === 'Specific' && !r.firstFactorMethod) {
+    out.push({
+      key: 'nofirstmethod',
+      code: 'PE123',
+      severity: 'error',
+      title: 'No first factor method chosen',
+      detail: 'Choose a method or pick Password.',
+    })
+  }
+  return out
 }

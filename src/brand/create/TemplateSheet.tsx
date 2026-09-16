@@ -1,10 +1,16 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
-import { Store, X } from 'lucide-react'
+import { useRef } from 'react'
+import { BookmarkPlus, LayoutTemplate, Store, X } from 'lucide-react'
 
 import { Button, SearchBox } from '../kit'
+import { useDialogChrome } from '../dialog-chrome'
+import { EmptyState, NoMatches } from '../empty'
 import { Picker } from '../picker'
-import { scenarios, type Scenario } from '../data'
+import type { AccessDecision, Scenario } from '../data'
+import { useBrand } from '../store'
+import type { TemplateLibrary } from '../screens/board/apply-template'
+import type { WhoDirectory } from '../rule-who'
 import { TemplateCard, TemplatePreview, scenarioCard } from './TemplateCard'
 
 /* -----------------------------------------------------------------------------
@@ -27,25 +33,21 @@ import { TemplateCard, TemplatePreview, scenarioCard } from './TemplateCard'
 
    Note the consequence, because it is real and it is not a bug: both templates
    this tenant wrote are Compliance ones, so filtering the Xecurify shelf to
-   Compliance shows one of the three the catalogue holds. The dropdown counts
-   are drawn from the shelf you are ON for that reason — advertising three and
-   delivering one is worse than saying one — and the empty state points at the
-   other shelf when that is where the rest are.
+   Compliance shows one of the three the catalogue holds. The dropdown shows no
+   counts, and the page and its empty state point at the other shelf when that
+   is where the rest are.
    -------------------------------------------------------------------------- */
-
-const MINE = scenarios.filter((s) => !s.provided)
-const PROVIDED = scenarios.filter((s) => s.provided)
 
 /** Who wrote it. The rail's whole job. */
 type Shelf = 'mine' | 'xecurify'
 
-/** What it is for. The dropdown's whole job. */
-const CATS = ['Quick Protection', 'Device-based', 'Risk-based', 'Compliance'] as const
+/** What it is for. The dropdown's whole job. `Uncategorized` is listed only when the shelf holds one. */
+const CATS = ['Quick Protection', 'Device-based', 'Risk-based', 'Compliance', 'Uncategorized'] as const
 type Cat = (typeof CATS)[number]
 
 function hit(s: Scenario, q: string) {
-  if (!q) return true
-  const t = q.toLowerCase()
+  const t = q.trim().toLowerCase()
+  if (!t) return true
   return s.name.toLowerCase().includes(t) || s.description.toLowerCase().includes(t)
 }
 
@@ -62,52 +64,57 @@ export function TemplateSheet({
   open,
   onClose,
   onChoose,
+  fallback = '1fa',
 }: {
   open: boolean
   onClose: () => void
   /** Hands back the chosen template. What is done with its rules is the host's. */
   onChoose: (s: Scenario) => void
+  /** What the host policy's default decides, drawn as the last row of every template. */
+  fallback?: AccessDecision
 }) {
   const [shelf, setShelf] = useState<Shelf>('xecurify')
   const [cat, setCat] = useState<Cat | 'All'>('All')
   const [q, setQ] = useState('')
   const [preview, setPreview] = useState<Scenario | null>(null)
+  const sheet = useRef<HTMLDivElement>(null)
+
+  /* From the store, so a template saved from a policy is on the tenant's shelf
+     the next time this opens. The directory and library are the ones applying
+     uses, so a card never lists a rule that applying leaves out. */
+  const { scenarios, users, zones, fingerprints } = useBrand()
+  const library = useMemo<TemplateLibrary>(() => ({ zones, fingerprints }), [zones, fingerprints])
+  const tenantOwn = useMemo(() => scenarios.filter((s) => !s.provided), [scenarios])
+  const shipped = useMemo(() => scenarios.filter((s) => s.provided), [scenarios])
+
+  /* Focus in, Tab kept inside, Escape peels one layer, focus back on close. */
+  useDialogChrome(open, onClose, sheet)
 
   /* One flat list, filtered by three independent things. The old derivation
      split the result into `mine` and `theirs` and drew two headed sections; the
      shelf is a choice now, so there is one section and it needs no heading. */
-  const shelved = shelf === 'mine' ? MINE : PROVIDED
+  const shelved = shelf === 'mine' ? tenantOwn : shipped
+  /* Uncategorized is what a tenant files a template under by default. It is an
+     option only where there is something in it, so it never adds "0 templates". */
+  const cats = CATS.filter((c) => c !== 'Uncategorized' || shelved.some((s) => s.category === c))
   const list = useMemo(
     () => shelved.filter((s) => (cat === 'All' || s.category === cat) && hit(s, q)),
     [shelved, cat, q],
   )
 
-  /* Counts from the shelf you are on, never from all fourteen. Compliance holds
-     three templates and exactly one of them is Xecurify's. */
-  const counts = useMemo(() => {
-    const n: Record<string, number> = { All: shelved.length }
-    for (const c of CATS) n[c] = shelved.filter((s) => s.category === c).length
-    return n
-  }, [shelved])
-
-  /** How many of this category are sitting on the OTHER shelf. */
-  const elsewhere = cat === 'All' ? 0 : (shelf === 'mine' ? PROVIDED : MINE).filter((s) => s.category === cat).length
-
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      /* One layer at a time. This is a bare window listener rather than a
-         member of the kit's dialog stack, so without the guard a single Escape
-         would close the preview Modal on top of the sheet AND the sheet under
-         it — and, from the board, hand the keystroke to a canvas whose own
-         handler treats Escape as "clear the rehearsal, then the selection". */
-      if (e.key !== 'Escape' || document.querySelector('.bx-scrim')) return
-      onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  /** The same search and category on the OTHER shelf — where the rest are. */
+  const otherShelf: Shelf = shelf === 'mine' ? 'xecurify' : 'mine'
+  const otherName = otherShelf === 'mine' ? 'Your templates' : 'Xecurify templates'
+  const elsewhere = useMemo(
+    () => (shelf === 'mine' ? shipped : tenantOwn).filter((s) => (cat === 'All' || s.category === cat) && hit(s, q)).length,
+    [shelf, shipped, tenantOwn, cat, q],
+  )
+  const searching = q.trim() !== '' || cat !== 'All'
+  /* Changing shelf keeps the search, so the matches over there are what you see. */
+  const showOther = () => {
+    setShelf(otherShelf)
+    setCat('All')
+  }
 
   /* Cleared when it OPENS. The sheet's state lives above its own mount, so a
      search typed on one visit would still be filtering the grid on the next. */
@@ -148,9 +155,14 @@ export function TemplateSheet({
              would still be acting on the rule underneath while somebody reads a
              template. */
           role="dialog"
+          aria-modal="true"
           aria-label="Start from a template"
         >
           <motion.div
+            ref={sheet}
+            tabIndex={-1}
+            /* Focused as a whole on open, so no ring round the whole sheet. */
+            style={{ outline: 'none' }}
             className="bmarket__sheet"
             initial={{ y: 24, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -210,7 +222,6 @@ export function TemplateSheet({
                     onClick={() => pickShelf('mine')}
                   >
                     <span>Your templates</span>
-                    <em>{MINE.length}</em>
                   </button>
                   <button
                     type="button"
@@ -220,73 +231,100 @@ export function TemplateSheet({
                     onClick={() => pickShelf('xecurify')}
                   >
                     <span>Xecurify templates</span>
-                    <em>{PROVIDED.length}</em>
                   </button>
                 </div>
               </aside>
 
               <div className="bmarket__body">
                 <div className="bmarket__shelf">
+                  {/* No count beside the heading: the cards under it are the count. */}
                   <h3 className="bgal__section">
-                    {shelf === 'mine' ? 'Your templates' : 'Xecurify templates'} <em>{list.length}</em>
-                    <span>{shelf === 'mine' ? 'Built by your team' : 'by miniOrange'}</span>
+                    {shelf === 'mine' ? 'Your templates' : 'Xecurify templates'}
+                    <span>{shelf === 'mine' ? 'Built by your team' : 'By miniOrange'}</span>
                   </h3>
 
                   {/* The filter, over the thing it filters, and only where it
                       has work to do: two tenant templates do not need a
-                      taxonomy between them. Counts come from THIS shelf. */}
+                      taxonomy between them. No counts in the options: the
+                      cards are the count. */}
                   {shelf === 'xecurify' && (
                     <Picker
                       label="Filter by category"
                       value={cat}
                       size="md"
-                      summary={cat === 'All' ? `All categories · ${counts.All}` : `${cat} · ${counts[cat]}`}
-                      options={[
-                        { value: 'All', label: 'All categories', meta: `${counts.All} templates` },
-                        ...CATS.map((c) => ({
-                          value: c,
-                          label: c,
-                          meta: counts[c] === 1 ? '1 template' : `${counts[c]} templates`,
-                        })),
-                      ]}
+                      summary={cat === 'All' ? 'All categories' : cat}
+                      options={[{ value: 'All', label: 'All categories' }, ...cats.map((c) => ({ value: c, label: c }))]}
                       onChange={(v) => setCat(v as Cat | 'All')}
                     />
                   )}
                 </div>
 
-                <div className="bgal__grid">
-                  {list.map((s) => (
-                    <Card key={s.id} s={s} onUse={() => take(s)} onPreview={() => setPreview(s)} />
-                  ))}
-                </div>
+                {list.length > 0 && (
+                  <div className="bgal__grid">
+                    {list.map((s) => (
+                      <Card
+                        key={s.id}
+                        s={s}
+                        directory={users}
+                        library={library}
+                        fallback={fallback}
+                        onUse={() => take(s)}
+                        onPreview={() => setPreview(s)}
+                      />
+                    ))}
+                  </div>
+                )}
 
-                {/* Where the rest of them are. Both templates this tenant wrote
-                    are Compliance ones, so filtering Xecurify to Compliance
-                    shows one of three — and the two that are missing are one
-                    click away rather than gone. */}
-                {elsewhere > 0 && (
+                {/* Where the rest of them are, for the same search and category.
+                    Both templates this tenant wrote are Compliance ones, so
+                    filtering Xecurify to Compliance shows one of three — and the
+                    two that are missing are one click away rather than gone. */}
+                {list.length > 0 && searching && elsewhere > 0 && (
                   <p className="bmarket__elsewhere">
-                    {elsewhere} more {cat} template{elsewhere === 1 ? ' is' : 's are'}{' '}
-                    {shelf === 'mine' ? "in Xecurify's" : "your team's"}.{' '}
-                    <button type="button" onClick={() => { pickShelf(shelf === 'mine' ? 'xecurify' : 'mine') }}>
-                      {shelf === 'mine' ? 'Show Xecurify templates' : 'Show your templates'}
+                    {elsewhere} more in {otherName}.{' '}
+                    <button type="button" onClick={showOther}>
+                      Show {otherName.toLowerCase()}
                     </button>
                   </p>
                 )}
 
-                {list.length === 0 && (
-                  <div className="bgal__none">
-                    <p>{q ? `Nothing here matches “${q}”.` : 'Nothing on this shelf yet.'}</p>
-                    <Button
-                      onClick={() => {
+                {list.length === 0 &&
+                  (searching ? (
+                    <NoMatches
+                      compact
+                      noun="templates"
+                      query={q}
+                      filtered={cat !== 'All'}
+                      blurb={elsewhere > 0 ? `${elsewhere} in ${otherName}.` : undefined}
+                      secondary={
+                        elsewhere > 0 ? (
+                          <Button variant="ghost" onClick={showOther}>
+                            Show {otherName.toLowerCase()}
+                          </Button>
+                        ) : undefined
+                      }
+                      onClear={() => {
                         setQ('')
                         setCat('All')
                       }}
-                    >
-                      Clear filters
-                    </Button>
-                  </div>
-                )}
+                    />
+                  ) : shelf === 'mine' ? (
+                    <EmptyState
+                      compact
+                      icon={BookmarkPlus}
+                      title="No templates yet"
+                      blurb="Save a policy as a template from its menu."
+                      action={<Button onClick={showOther}>Show Xecurify templates</Button>}
+                    />
+                  ) : (
+                    <EmptyState
+                      compact
+                      icon={LayoutTemplate}
+                      title="No Xecurify templates"
+                      blurb="Templates from miniOrange show here."
+                      action={<Button onClick={showOther}>Show your templates</Button>}
+                    />
+                  ))}
               </div>
             </div>
           </motion.div>
@@ -294,7 +332,8 @@ export function TemplateSheet({
           {/* The live preview draws the rules a template will create before it
               is chosen. Ungated: see the note on the card's face. */}
           <TemplatePreview
-            m={preview ? scenarioCard(preview) : null}
+            m={preview ? scenarioCard(preview, users, library) : null}
+            fallback={fallback}
             onClose={() => setPreview(null)}
             onUse={() => preview && take(preview)}
           />
@@ -304,7 +343,21 @@ export function TemplateSheet({
   )
 }
 
-function Card({ s, onUse, onPreview }: { s: Scenario; onUse: () => void; onPreview: () => void }) {
-  const m = useMemo(() => scenarioCard(s), [s])
-  return <TemplateCard m={m} onUse={onUse} onPreview={onPreview} useLabel="Use" />
+function Card({
+  s,
+  directory,
+  library,
+  fallback,
+  onUse,
+  onPreview,
+}: {
+  s: Scenario
+  directory: WhoDirectory
+  library: TemplateLibrary
+  fallback: AccessDecision
+  onUse: () => void
+  onPreview: () => void
+}) {
+  const m = useMemo(() => scenarioCard(s, directory, library), [s, directory, library])
+  return <TemplateCard m={m} fallback={fallback} onUse={onUse} onPreview={onPreview} useLabel="Use" />
 }

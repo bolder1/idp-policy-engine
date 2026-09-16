@@ -1,19 +1,44 @@
-import { AnimatePresence, motion } from 'motion/react'
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
-import { BookmarkPlus, Check, Copy, Pencil, Plus, Trash2, Waypoints } from 'lucide-react'
+import { AnimatePresence } from 'motion/react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  AppWindow,
+  Check,
+  Copy,
+  Grid3x3,
+  LayoutTemplate,
+  Pencil,
+  Plus,
+  Power,
+  PowerOff,
+  Table2,
+  ShieldCheck,
+  ShieldPlus,
+  Trash2,
+  Waypoints,
+} from 'lucide-react'
 
 import { PageHead } from '../Shell'
 import { Coverage } from './Coverage'
 import { AppsPeek } from './apps-peek'
 import { AppLogo } from '../logos/AppLogo'
-import { Badge, Button, Modal, SearchBox, StatusPill } from '../kit'
-import { Picker } from '../picker'
-import { appsLabel, appsOf, blankPolicy, enforces, type Policy, type PolicyType } from '../data'
+import { Badge, Button, Modal, RowMenu, SearchBox, StatusPill, TipMark, type MenuItem } from '../kit'
+import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
+import type { LibView, ViewOption } from './library-view-state'
+import { FilterTabs, PageBar } from './page-bar'
+import { appsOf, blankPolicy, enforces, type Policy } from '../data'
 import { NewPolicyDialog } from '../create/NewPolicyDialog'
-import { useBrand } from '../store'
-import { NoResults } from '../empty'
+import { useBrand, useNameLookup } from '../store'
+import { ChangeState } from '../leave-guard'
+import { EmptyState, NoMatches } from '../empty'
+import { openForEditing } from '../policy-draft'
+import { scenarioFromPolicy } from '../template-from-policy'
+import { SaveTemplateDialog } from './builder-dialogs'
+import { ConfirmDelete } from './confirm-delete'
+import { decidesFor, deleteDetail, protectionOf } from './app-policies'
 import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
+import { statusOptions, type StatusTarget } from './status-options'
+import { useStatusChange } from './use-status-change'
 
 /* Mounted only while it is open — the list is the landing screen and does not
    need the interview's questions, composer and figures in its chunk. */
@@ -22,30 +47,23 @@ const Interview = lazy(() => import('../create/Interview').then((m) => ({ defaul
 /* -----------------------------------------------------------------------------
    Policies — the list.
 
-   Same columns, same filters, same row actions as the console ships today. The
-   changes are all craft: brand surfaces, sortable headers, a visible row count,
-   and — the one real fix — the bare red dot now says what the configuration
-   problem actually is instead of just asserting there is one.
+   Name, applications, status and the row menu; Exposure too in the full
+   edition. One status filter and a search. Every dialog a row opens lives on
+   the page, not in the row, so a row that is deleted or filtered out does not
+   take its dialog — and the keyboard focus — with it.
    -------------------------------------------------------------------------- */
 
-type SortKey = 'name' | 'type' | 'rules' | 'modified' | 'exposure'
+type SortKey = 'name' | 'modified' | 'exposure'
+type StatusFilter = 'all' | 'draft' | 'active' | 'inactive'
+type RowAction = 'edit' | 'trail' | 'template' | 'duplicate' | 'delete' | 'assign' | StatusTarget
+type RowDialog = { kind: 'delete' | 'assign' | 'template'; policy: Policy }
 
 /* -----------------------------------------------------------------------------
-   Exposure.
+   Exposure (full edition only).
 
-   The gauntlet answers "what gets through this policy", and until now it
-   answered it one policy at a time, inside a dialog inside a builder. That is
-   the wrong altitude for the question an administrator actually has, which is
-   "which of my nine policies has a hole in it".
-
-   So the deck runs against every row. The column shows the finding rather than
-   the letter — "5 got through" is actionable where "F" is a thing to feel bad
-   about — and clicking it lands you in the gauntlet for that policy rather than
-   merely near it.
-
-   Cheap enough to do on every render: nine policies × thirteen cards × a
-   handful of rules is a few hundred condition evaluations, and it is memoised
-   on the policy list anyway.
+   The gauntlet runs against every row. The column shows the finding rather than
+   the letter — "5 got through" is actionable where "F" is not — and clicking it
+   opens the gauntlet for that policy.
    -------------------------------------------------------------------------- */
 function exposureOf(r: GauntletResult) {
   if (r.breaches > 0) return { tone: 'bad' as const, label: `${r.breaches} got through`, rank: 3 }
@@ -54,116 +72,103 @@ function exposureOf(r: GauntletResult) {
   return { tone: 'ok' as const, label: 'Nothing got through', rank: 0 }
 }
 
-/* -----------------------------------------------------------------------------
-   The rules cell.
+/* Out as segments, in the order they are used: what decides sign-ins first. */
+const STATUS_TABS: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'inactive', label: 'Inactive' },
+]
 
-   It used to print the count and then one chip per distinct outcome — "5 rules ·
-   Deny · MFA · Allow". Three chips on every row, and between them they said only
-   that the policy contains a mix, not which rule does what or in what order.
-   With order being the whole semantics of this engine, a set of outcomes is the
-   one summary that cannot be read back into anything useful.
+/* The ONE policies view is the TABLE (owner, 16 Sep 2026). The same day it
+   went table/list/card, then list only — "the list view" having meant the
+   table, which this page called List before it had three — and then back to
+   the table. The list and card renderings below are still in the source behind
+   this one word. Typed wide on purpose, so those branches still compile. */
+const POLICY_VIEW: LibView = 'table'
 
-   So the cell is the count, and pointing at it opens the actual stack.
-
-   Rendered through a portal because .btable__scroll is an overflow-x container:
-   anything absolutely positioned inside it gets clipped at the cell, and worse,
-   widens the horizontal scroll. Fixed coordinates measured off the trigger are
-   the only placement that survives that.
-   -------------------------------------------------------------------------- */
-
-
-/* `RulePeek` stood here — the rules count with the stack behind it on hover.
-
-   The column it filled is gone: Type, Rules and Last modified came off this
-   table, which leaves the name, the application it protects, whether it is on
-   and what it is exposed to. `Peek` itself stays in peek.tsx, where zones and
-   device profiles use it for their own Used-by columns. */
-
-
-const TYPE_FILTERS: (PolicyType | 'All')[] = ['All', 'App Access', 'Session', 'Account Management']
+/* Coverage is not one of the three library views; it is the matrix, and only
+   where the product has it. Where it does, the switch is the two options the
+   page had before today: the table, and Coverage. */
+type PolicyView = 'table' | 'coverage'
+const POLICY_VIEWS: ViewOption<PolicyView>[] = [
+  { id: 'table', label: 'Table view', icon: Table2 },
+  { id: 'coverage', label: 'Coverage view', icon: Grid3x3 },
+]
 
 export function Policies() {
   const store = useBrand()
-  const [view, setView] = useState<'list' | 'coverage'>('list')
-  const [type, setType] = useState<PolicyType | 'All'>('All')
-  const [status, setStatus] = useState<'all' | 'draft' | 'active' | 'monitor' | 'inactive'>('all')
+  const resolveName = useNameLookup()
+  const libView = POLICY_VIEW
+  const [coverageOn, setCoverageOn] = useState(false)
+  const [status, setStatus] = useState<StatusFilter>('all')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'modified', dir: 1 })
-  const [menuFor, setMenuFor] = useState<string | null>(null)
-  /* Creating a policy is a form, and the form opens here.
-
-     It was a whole SCREEN: `New policy` navigated to a gallery of templates,
-     you chose one, and only then were you asked the two questions that
-     actually make a policy — what it is called and what it protects. That put
-     the catalogue in front of the decision. Somebody who already knows they
-     are writing a rule for Workday had to browse twelve strangers' policies
-     before they could say so, and somebody who wanted a template was choosing
-     one for a policy that did not exist yet.
-
-     So the button opens the form, the form lands you in the builder, and the
-     catalogue is offered from the empty board — where "how would you like to
-     start?" is a question you are in a position to answer, and where taking a
-     template is an edit to a real policy that undo can put back. */
+  /* Creating a policy is a form, opened here; it lands in the builder, where
+     templates are offered from the empty board. */
   const [naming, setNaming] = useState(false)
   const [interview, setInterview] = useState(false)
   /** The application the form had already collected, carried into the guided build. */
   const [guidedApps, setGuidedApps] = useState<string[]>([])
 
-  /* Keyed on the three collections it reads, not on the store object.
+  /* The row dialogs. `dialog` keeps the policy while the dialog animates out,
+     including after a delete has removed it from the store. */
+  const [dialog, setDialog] = useState<RowDialog | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const openDialog = (kind: RowDialog['kind'], policy: Policy) => {
+    setDialog({ kind, policy })
+    setDialogOpen(true)
+  }
+  const closeDialog = () => setDialogOpen(false)
 
-     `store` changes identity whenever anything in it changes, so this memo was
-     rebuilt by edits that had nothing to do with it — and because the gauntlet
-     memo below lists `env` as a dependency, every policy was re-scored each
-     time. Naming the real inputs means the deck recomputes when a zone,
-     fingerprint or group actually changes, and not otherwise. */
+  /* The rows' container in whichever view is showing, for the focus pass. */
+  const bodyRef = useRef<HTMLElement | null>(null)
+  const setBody = useCallback((el: HTMLElement | null) => {
+    bodyRef.current = el
+  }, [])
+  const searchRef = useRef<HTMLInputElement | null>(null)
+  /* The row a confirmed change may remove from the list: a delete, a status
+     change under a status filter, an assignment that makes it a draft. */
+  const leaving = useRef<{ id: string; index: number } | null>(null)
+
+  const showExposure = store.features.exposure
+
+  /* Keyed on the collections it reads, not on the store object, so the deck
+     recomputes only when a zone, fingerprint or group actually changes. */
   const { zones, fingerprints, groups, riskScale } = store
   const env = useMemo<SimEnv>(
     () => ({
       zoneName: (id) => zones.find((z) => z.id === id)?.name ?? id,
       fingerprintName: (id) => fingerprints.find((p) => p.id === id)?.name ?? id,
-      groupName: (id) => (groups.find((g) => g.id === id) ?? groups[0]).name,
+      hasZone: (id) => zones.some((z) => z.id === id),
+      hasFingerprint: (id) => fingerprints.some((p) => p.id === id),
+      groupName: (id) => (groups.find((g) => g.id === id) ?? groups[0])?.name ?? id,
       riskScale,
     }),
     [zones, fingerprints, groups, riskScale],
   )
 
-  /* Two exclusions, both to stop the column asserting things it cannot know.
-
-     The system default is a documented catch-all that lets everyone in on one
-     factor. The deck would report it as nothing but holes and it would head
-     every sort, which tells nobody anything about a rule whose entire job is to
-     be the fall-through.
-
-     Session and Account Management policies are excluded because the deck asks
-     app-access questions. "Was this Tor sign-in blocked" is not a session
-     policy's job — it governs how long a session lasts once access has already
-     been decided — so scoring one against these cards produces eleven failures
-     that are all category errors. A column that cries wolf on two thirds of the
-     table is a column administrators learn to skip. */
+  /* Not run at all in Lite, where the Exposure column is withheld. The system
+     default is skipped: it is the fall-through, so the deck would report it as
+     nothing but holes. The deck asks app-access questions only. */
   const grades = useMemo(() => {
     const m = new Map<string, GauntletResult>()
+    if (!showExposure) return m
     for (const p of store.policies) {
       if (p.isSystem || p.type !== 'App Access') continue
       m.set(p.id, runGauntlet(p, env, store.gauntletOverrides[p.id] ?? {}))
     }
     return m
-  }, [store.policies, store.gauntletOverrides, env])
+  }, [showExposure, store.policies, store.gauntletOverrides, env])
+
+  const q = query.trim().toLowerCase()
 
   const rows = useMemo(() => {
     let list = store.policies.filter((p) => {
-      if (type !== 'All' && p.type !== type) return false
-      /* "Active" filters to what actually decides sign-ins, so a monitor
-         policy is excluded from it — the filter has to mean the same thing the
-         pill does or the two teach different models of one state. */
+      /* "Active" means what decides sign-ins, so the always-on default is in it. */
       if (status === 'active' && !enforces(p)) return false
-      /* Draft was an <option> with no branch behind it: choosing it matched
-         every policy, so the one status that means "not finished" was the one
-         the filter could not find. It is the whole of what used to be called a
-         configuration issue, so it has to be findable. */
-      if (status === 'draft' && p.status !== 'draft') return false
-      if (status === 'monitor' && p.status !== 'monitor') return false
-      if (status === 'inactive' && p.status !== 'inactive') return false
-      if (query && !p.name.toLowerCase().includes(query.toLowerCase())) return false
+      if ((status === 'draft' || status === 'inactive') && p.status !== status) return false
+      if (q && !p.name.toLowerCase().includes(q)) return false
       return true
     })
     list = [...list].sort((a, b) => {
@@ -171,10 +176,6 @@ export function Policies() {
       switch (sort.key) {
         case 'name':
           return a.name.localeCompare(b.name) * d
-        case 'type':
-          return a.type.localeCompare(b.type) * d
-        case 'rules':
-          return (a.rules.length - b.rules.length) * d
         case 'exposure': {
           const ra = grades.get(a.id)
           const rb = grades.get(b.id)
@@ -189,24 +190,69 @@ export function Policies() {
     })
     // System policy is pinned regardless of sort — it always evaluates.
     return [...list.filter((p) => p.isSystem), ...list.filter((p) => !p.isSystem)]
-  }, [store.policies, type, status, query, sort, grades])
+  }, [store.policies, status, q, sort, grades])
 
-  const counts = useMemo(() => {
-    const active = store.policies.filter(enforces).length
-    const monitoring = store.policies.filter((p) => p.status === 'monitor').length
-    return { total: store.policies.length, active, monitoring }
-  }, [store.policies])
+  const deciding = useMemo(() => store.policies.filter(enforces).length, [store.policies])
 
-  /* Counted across everything graded, not just the filtered rows — a filter
-     that hides four failing policies should not also hide the fact that they
-     are failing. */
+  /* Counted across everything graded, not just the filtered rows. */
   const leaking = [...grades.values()].filter((r) => r.breaches > 0).length
 
-  /* `scope` and `aria-sort` are the two things a sortable header owes a screen
-     reader, and neither was here: the column had no association with its cells,
-     and the direction lived only in an arrow glyph marked `aria-hidden`. So the
-     table announced "button, Policy name" and never said it was sorted, or
-     which way. */
+  const filtered = status !== 'all'
+  const systemPolicy = store.policies.find((p) => p.isSystem)
+  /* A tenant with nothing but the system policy: the list is empty in every
+     sense that matters, though the pinned row is there. */
+  const noPolicies = !q && !filtered && store.policies.every((p) => p.isSystem)
+
+  const markLeaving = (id: string) => {
+    leaving.current = { id, index: rows.findIndex((r) => r.id === id) }
+  }
+
+  /* After a change that removed a row, focus the row now in its place (or the
+     one above, at the end), or the search box when the list is empty. Runs
+     after the closing dialog has tried to restore focus to the gone row. */
+  useEffect(() => {
+    const l = leaving.current
+    if (!l) return
+    leaving.current = null
+    if (rows.some((r) => r.id === l.id)) return
+    const links = bodyRef.current?.querySelectorAll<HTMLButtonElement>('.btable__link, .blist__open')
+    const next = links && links.length > 0 ? links[Math.min(Math.max(l.index, 0), links.length - 1)] : null
+    ;(next ?? searchRef.current)?.focus({ preventScroll: true })
+  }, [rows])
+
+  const statusChange = useStatusChange({
+    onAssignApps: (p) => openDialog('assign', p),
+    onChange: (p) => markLeaving(p.id),
+  })
+
+  const act = (policy: Policy, action: RowAction) => {
+    switch (action) {
+      case 'edit':
+        store.go({ name: 'board', policyId: policy.id })
+        break
+      case 'trail':
+        store.go({ name: 'builder', policyId: policy.id })
+        break
+      case 'active':
+      case 'inactive':
+        statusChange.request(policy, action)
+        break
+      case 'duplicate': {
+        const id = store.duplicatePolicy(policy.id)
+        if (!id) return
+        store.showToast(`${store.policyById(id)?.name ?? 'Copy'} created as a draft`)
+        store.go({ name: 'board', policyId: id })
+        break
+      }
+      case 'delete':
+      case 'assign':
+      case 'template':
+        openDialog(action, policy)
+        break
+    }
+  }
+
+  /* `scope` and `aria-sort` are what a sortable header owes a screen reader. */
   function head(key: SortKey, label: string, extra?: string) {
     const on = sort.key === key
     return (
@@ -223,73 +269,115 @@ export function Policies() {
     )
   }
 
+  const isCoverage = store.features.coverage && coverageOn
+
+  /* No matches, or no policies at all — the same two states in every view. */
+  const empty = (
+    <>
+      {rows.length === 0 && (
+        <NoMatches
+          noun="policies"
+          query={query}
+          filtered={filtered}
+          compact
+          onClear={() => {
+            setStatus('all')
+            setQuery('')
+          }}
+        />
+      )}
+      {noPolicies && (
+        <EmptyState
+          compact
+          icon={ShieldPlus}
+          title="No policies yet"
+          blurb={`Sign-ins use the ${systemPolicy?.name ?? 'default policy'} until you add a policy.`}
+          action={
+            <Button variant="secondary" icon={Plus} onClick={() => setNaming(true)}>
+              New policy
+            </Button>
+          }
+        />
+      )}
+    </>
+  )
+
+  /* The line under the list: how many decide sign-ins, and how many leak. */
+  const summary = (
+    <span>
+      {deciding} {deciding === 1 ? 'policy' : 'policies'} deciding sign-ins
+      {showExposure && leaking > 0 && (
+        <>
+          {', '}
+          <button type="button" className="btable__leaking" onClick={() => setSort({ key: 'exposure', dir: 1 })}>
+            {leaking} let test sign-ins through
+          </button>
+        </>
+      )}
+    </span>
+  )
+
+  /* The dialog's policy as it is now, or as it was when it was deleted. */
+  const current = dialog ? (store.policies.find((p) => p.id === dialog.policy.id) ?? dialog.policy) : null
+
   return (
-    <div className="bpage" onClick={() => setMenuFor(null)}>
+    <div className="bpage">
       <PageHead
         title="Policies"
         caption="Every sign-in is checked against the policies on the app being opened."
-        actions={
+        docs
+      />
+
+      {/* The row every list page has — see `PageBar`: the search box, then the
+          filter; the view and New on the right. Status is switched often, so it
+          is out as segments. Coverage has no rows to search or filter. */}
+      <PageBar
+        left={
+          !isCoverage && (
+            <>
+              <SearchBox
+                value={query}
+                onChange={setQuery}
+                inputRef={searchRef}
+                placeholder="Search policies…"
+                label="Search policies"
+              />
+              <FilterTabs label="Filter by status" value={status} options={STATUS_TABS} onChange={setStatus} />
+            </>
+          )
+        }
+        right={
           <>
-            {/* Two tabs or none, and the gate is on the LIST rather than on
-                the second tab.
-
-                That sentence was already written here, one line above the
-                second tab, and the code did not do it: hiding Coverage left the
-                switch behind with "List" alone in it — a tablist with one tab,
-                which is a label with a border round it and a `role="tablist"`
-                announcing a choice that does not exist. Now the whole control
-                comes and goes with the thing it would switch to. */}
+            {/* No table/list/card switch — the table is the only view. The switch
+                is drawn only where there is a second thing to switch to. */}
             {store.features.coverage && (
-              <div className="bviewswitch" role="tablist" aria-label="Policy view">
-                <button
-                  role="tab"
-                  aria-selected={view === 'list'}
-                  className={view === 'list' ? 'is-on' : ''}
-                  onClick={() => setView('list')}
-                >
-                  List
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={view === 'coverage'}
-                  className={view === 'coverage' ? 'is-on' : ''}
-                  onClick={() => setView('coverage')}
-                >
-                  Coverage
-                </button>
-              </div>
+              <ViewSwitch<PolicyView>
+                value={isCoverage ? 'coverage' : 'table'}
+                views={POLICY_VIEWS}
+                label="Policy view"
+                onChange={(v) => setCoverageOn(v === 'coverage')}
+              />
             )}
-            {/* "Manage templates" stood here, beside "New policy".
-
-                It is a second destination in the one place on this page that
-                should carry a single action — and it is a destination the left
-                rail already lists, one item below "All Policies". A header
-                action that duplicates a nav item spends the page's most
-                valuable position on a shortcut to somewhere you can already
-                see. */}
-            <Button variant="brand" onClick={() => setNaming(true)}>
+            <Button variant="brand" icon={Plus} onClick={() => setNaming(true)}>
               New policy
             </Button>
           </>
         }
       />
 
-      {store.features.coverage && view === 'coverage' && <Coverage onNew={() => setNaming(true)} />}
+      {isCoverage && <Coverage onNew={() => setNaming(true)} />}
 
-      {/* Two questions, then the builder.
-
-          `NewPolicyDialog` hands back a finished, rules-empty policy and does
-          not navigate — the Applications screen calls it the same way and
-          deliberately stays put. What happens next is the caller's, and from
-          here the errand was "I want to write a policy", so it ends in the one
-          place that can. */}
+      {/* `NewPolicyDialog` hands back a rules-empty policy; from here the errand
+          ends in the builder. The store may give it a different id, so the
+          builder opens the id `addPolicy` returns. */}
       <NewPolicyDialog
         open={naming}
         onClose={() => setNaming(false)}
         onCreate={(policy) => {
-          store.addPolicy(policy)
+          const id = store.addPolicy(policy)
+          setNaming(false)
           store.showToast(`${policy.name} created`)
-          store.go({ name: 'board', policyId: policy.id })
+          store.go({ name: 'board', policyId: id })
         }}
         onGuided={store.features.guidedSetup ? (ids) => { setGuidedApps(ids); setNaming(false); setInterview(true) } : undefined}
       />
@@ -301,344 +389,240 @@ export function Policies() {
               open={interview}
               onClose={() => setInterview(false)}
               onCreate={(rules, builtName, audience) => {
-                /* The application the form had already collected. Without it
-                   the guided path silently produced a policy protecting nothing
-                   — the one field the form marks required with a red asterisk. */
                 const policy = blankPolicy(builtName, guidedApps)
                 policy.rules = rules
                 policy.audience = audience
-                store.addPolicy(policy)
+                const id = store.addPolicy(policy)
                 store.showToast(`${policy.name} created with ${rules.length} rule${rules.length === 1 ? '' : 's'}`)
-                store.go({ name: 'board', policyId: policy.id })
+                store.go({ name: 'board', policyId: id })
               }}
             />
           </Suspense>
         )}
       </AnimatePresence>
 
-      {(view === 'list' || !store.features.coverage) && (
+      {!isCoverage && libView === 'table' && (
+        <div className="btable-wrap">
+          {rows.length > 0 && (
+            <div className="btable__scroll">
+              <table className="btable">
+                <thead>
+                  <tr>
+                    {head('name', 'Policy name')}
+                    <th scope="col">Applications</th>
+                    {showExposure && head('exposure', 'Exposure')}
+                    <th scope="col" className="btable__col-status">
+                      Status
+                    </th>
+                    <th scope="col" className="btable__actions btable__col-actions">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody ref={setBody}>
+                  {rows.map((p) => (
+                    <PolicyRow
+                      key={p.id}
+                      policy={p}
+                      gauntlet={grades.get(p.id)}
+                      showExposure={showExposure}
+                      onAction={(a) => act(p, a)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {empty}
+          <footer className="btable__foot">{summary}</footer>
+        </div>
+      )}
+
+      {/* List and card: the libraries' own two shapes, drawn by the component
+          Zones, Device profiles and Risk signal profiles use. The table stays
+          the policies' own — it sorts, and it grades. */}
+      {!isCoverage && libView !== 'table' && (
         <>
-      {/* An attention banner stood here — "N policies need attention. They are
-          switched on but cannot take effect as configured."
-
-          It counted a state this product does not have. An unfinished policy is
-          not saved and switched on; it is a DRAFT, which the status column
-          already says in a word and the status filter already finds. The banner
-          was reporting a fault class invented by the prototype, and the red dot
-          it told you to hover was the same invention on the row. */}
-      <div className="btoolbar">
-        {/* Search left, filters right — the order zones already used, and now
-            the order every list screen uses. You type a name far more often
-            than you narrow a kind, so the control reached first sits where
-            reading starts; the controls that narrow sit with the count of what
-            survived, which is the thing they change. */}
-        <div className="btoolbar__left">
-          <SearchBox value={query} onChange={setQuery} placeholder="Search policies…" label="Search policies" />
-        </div>
-        <div className="btoolbar__right">
-          {/* Both filters are dropdowns, and they sit together.
-
-              Type used to be a row of four chips while status was already a
-              select, so two controls doing the same job looked like two different
-              kinds of thing — and the chip row grew a line every time a policy
-              type was added. A select costs one row at any number of types. */}
-          <div className="btoolbar__filters">
-            {/* `Picker`, not `<select>`.
-
-                Both were `<select>`, which closed looked like the console and
-                OPEN was whatever the operating system draws — no ticks, no
-                marks, no search, a different font on every machine. The console
-                has its own list control and its own header calls it "the
-                replacement for the native `<select>`"; it had simply never been
-                finished. Two implementations of one control is the only reason
-                a filter here and a filter in the rule editor behave
-                differently. */}
-            <span className={`btoolbar__filter ${type !== 'All' ? 'is-set' : ''}`}>
-              <Picker
-                label="Filter by policy type"
-                value={type}
-                width="fill"
-                size="md"
-                options={TYPE_FILTERS.map((t) => ({ value: t, label: t === 'All' ? 'All types' : t }))}
-                onChange={(v) => setType(v as PolicyType | 'All')}
-              />
-            </span>
-            <span className={`btoolbar__filter ${status !== 'all' ? 'is-set' : ''}`}>
-              <Picker
-                label="Filter by status"
-                value={status}
-                width="fill"
-                size="md"
-                options={[
-                  { value: 'all', label: 'All statuses' },
-                  { value: 'draft', label: 'Draft' },
-                  { value: 'active', label: 'Active' },
-                  { value: 'monitor', label: 'Monitor' },
-                  { value: 'inactive', label: 'Inactive' },
-                ]}
-                onChange={(v) => setStatus(v as typeof status)}
-              />
-            </span>
-            {/* Only appears once something is filtered — a permanent Clear that
-                clears nothing is just another thing to read. */}
-            {(type !== 'All' || status !== 'all') && (
-              <button
-                type="button"
-                className="btoolbar__clear"
-                onClick={() => {
-                  setType('All')
-                  setStatus('all')
-                }}
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-          <span className="btoolbar__count">
-            {rows.length === counts.total
-              ? `${counts.total} policies`
-              : `${rows.length} of ${counts.total}`}
-          </span>
-        </div>
-      </div>
-
-      <div className="btable-wrap">
-        <div className="btable__scroll">
-        <table className="btable">
-          <thead>
-            <tr>
-              {head('name', 'Policy name')}
-
-              <th scope="col">Application</th>
-
-              {store.features.exposure && head('exposure', 'Exposure')}
-              <th scope="col" className="btable__col-status">Status</th>
-
-              <th scope="col" className="btable__actions btable__col-actions">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((p) => (
-              <PolicyRow
-                key={p.id}
-                policy={p}
-                gauntlet={grades.get(p.id)}
-                menuOpen={menuFor === p.id}
-                onMenu={(e) => {
-                  e.stopPropagation()
-                  setMenuFor((m) => (m === p.id ? null : p.id))
-                }}
-              />
-            ))}
-          </tbody>
-        </table>
-        </div>
-
-        {rows.length === 0 && (
-          <div className="btable__empty">
-            <NoResults>No policies match those filters.</NoResults>
-            <Button
-              onClick={() => {
-                setType('All')
-                setStatus('all')
-                setQuery('')
-              }}
-            >
-              Clear filters
-            </Button>
-          </div>
-        )}
-
-        <footer className="btable__foot">
-          <span>
-            Showing {rows.length} of {counts.total} policies · {counts.active} enforcing
-            {counts.monitoring > 0 && ` · ${counts.monitoring} in monitor`}
-            {leaking > 0 && (
-              <>
-                {' · '}
-                <button type="button" className="btable__leaking" onClick={() => setSort({ key: 'exposure', dir: 1 })}>
-                  {leaking} with holes
-                </button>
-              </>
-            )}
-          </span>
-        </footer>
-      </div>
+          {rows.length > 0 && (
+            <LibraryRows
+              view={libView}
+              listRef={setBody}
+              columns={[]}
+              rows={rows.map(
+                (p): LibRow => ({
+                  id: p.id,
+                  name: p.name,
+                  tile: <ShieldCheck size={18} strokeWidth={1.8} />,
+                  tileClass: 'bpol__tile',
+                  badge: <PolicyMarks policy={p} />,
+                  onOpen: () => act(p, 'edit'),
+                  facts: [
+                    { label: 'Apps', value: <PolicyApps policy={p} onAssign={() => act(p, 'assign')} /> },
+                    { label: 'Status', value: <StatusPill status={p.status} /> },
+                    ...(showExposure
+                      ? [{ label: 'Exposure', value: <PolicyExposure policy={p} gauntlet={grades.get(p.id)} /> }]
+                      : []),
+                  ],
+                  menu: (
+                    <RowMenu label={`Actions for ${p.name}`} items={policyMenu(p)} onSelect={(id) => act(p, id as RowAction)} />
+                  ),
+                }),
+              )}
+            />
+          )}
+          {empty}
+          <p className="bpol__foot">{summary}</p>
         </>
       )}
+
+      {/* The row dialogs, on the page so they outlive the row. */}
+      {dialog && current && dialog.kind === 'delete' && (
+        <ConfirmDelete
+          open={dialogOpen}
+          name={current.name}
+          noun="policy"
+          detail={deleteDetail(current, store.policies, store.apps) ?? undefined}
+          onCancel={closeDialog}
+          onConfirm={() => {
+            markLeaving(current.id)
+            closeDialog()
+            store.deletePolicy(current.id)
+            store.showToast(`${current.name} deleted`)
+          }}
+        />
+      )}
+      {dialog && current && dialog.kind === 'assign' && (
+        <AssignAppsDialog
+          open={dialogOpen}
+          policy={current}
+          onClose={closeDialog}
+          onCommit={() => markLeaving(current.id)}
+        />
+      )}
+      {dialog && current && dialog.kind === 'template' && (
+        <SaveTemplateDialog
+          open={dialogOpen}
+          policy={openForEditing(current)}
+          onClose={closeDialog}
+          onSave={(t) => {
+            store.addScenario(scenarioFromPolicy(current, t, Date.now(), resolveName))
+            closeDialog()
+            store.showToast(`${t.name.trim()} saved as a template`)
+          }}
+        />
+      )}
+      {statusChange.dialog}
     </div>
+  )
+}
+
+/* A policy's row menu, the same in every view. */
+function policyMenu(policy: Policy): MenuItem[] {
+  return [
+    { id: 'edit', label: 'Edit policy', icon: Pencil },
+    ...statusOptions(policy).map((s) => ({ id: s.target, label: s.label, icon: s.target === 'active' ? Power : PowerOff })),
+    { id: 'trail', label: 'Open in trail', icon: Waypoints },
+    /* A template of a policy with no rules would apply nothing. */
+    ...(openForEditing(policy).rules.length > 0 ? [{ id: 'template', label: 'Save as template', icon: LayoutTemplate }] : []),
+    ...(policy.isSystem
+      ? []
+      : [
+          { id: 'duplicate', label: 'Duplicate', icon: Copy },
+          { id: 'delete', label: 'Delete policy', icon: Trash2, danger: true, divide: true },
+        ]),
+  ]
+}
+
+/* The applications, as marks with the full list on hover; with none, the
+   control that assigns them. The table's cell and the list's and card's fact. */
+function PolicyApps({ policy, onAssign }: { policy: Policy; onAssign: () => void }) {
+  const store = useBrand()
+  const named = appsOf(policy, store.apps)
+  if (policy.isSystem) return <span className="btable__allapps">Every application</span>
+  if (named.length > 0) return <AppsPeek apps={named} policyName={policy.name} onEdit={onAssign} />
+  return (
+    <button type="button" className="btable__assign" onClick={onAssign}>
+      <Plus size={13} strokeWidth={2.2} aria-hidden />
+      Assign apps
+    </button>
+  )
+}
+
+/* How exposed a policy is, as a grade that opens the test deck. */
+function PolicyExposure({ policy, gauntlet }: { policy: Policy; gauntlet?: GauntletResult }) {
+  const store = useBrand()
+  if (!gauntlet) {
+    return (
+      <span
+        className="u-muted"
+        title={policy.isSystem ? 'The default policy catches every sign-in, so it is not scored.' : 'Only app access policies are scored.'}
+      >
+        —
+      </span>
+    )
+  }
+  const e = exposureOf(gauntlet)
+  return (
+    <button
+      type="button"
+      className={`btable__exposure is-${e.tone}`}
+      title={gauntlet.gradeReason}
+      onClick={() => store.go({ name: 'board', policyId: policy.id, open: 'gauntlet' })}
+    >
+      {e.label}
+      <b>{gauntlet.grade}</b>
+    </button>
+  )
+}
+
+/* The marks beside a policy's name: System, and a live policy's unpublished edits. */
+function PolicyMarks({ policy }: { policy: Policy }) {
+  if (!policy.isSystem && !policy.pendingDraft) return null
+  return (
+    <span className="btable__marks">
+      {policy.isSystem && <Badge tone="system">System</Badge>}
+      {policy.pendingDraft && <ChangeState unsaved={false} draft />}
+    </span>
   )
 }
 
 function PolicyRow({
   policy,
   gauntlet,
-  menuOpen,
-  onMenu,
+  showExposure,
+  onAction,
 }: {
   policy: Policy
   gauntlet?: GauntletResult
-  menuOpen: boolean
-  onMenu: (e: React.MouseEvent) => void
+  showExposure: boolean
+  onAction: (action: RowAction) => void
 }) {
-  const store = useBrand()
-  const named = appsOf(policy, store.apps)
-  const [assigning, setAssigning] = useState(false)
-
   return (
     <tr className={policy.isSystem ? 'is-system' : ''}>
       <td className="btable__primary">
-        <button type="button" className="btable__link" onClick={() => store.go({ name: 'board', policyId: policy.id })}>
+        {/* The mark the list and card views give a policy, so a row reads as the
+            same object in all three. */}
+        <span className="blist__tile bpol__tile" aria-hidden>
+          <ShieldCheck size={18} strokeWidth={1.8} />
+        </span>
+        <button type="button" className="btable__link" onClick={() => onAction('edit')}>
           {policy.name}
         </button>
-        <span className="btable__marks">
-          {policy.isSystem && <Badge tone="system">System</Badge>}
-        </span>
+        <PolicyMarks policy={policy} />
       </td>
-      {/* The applications, as marks. When there are none, the cell is a
-          control.
-
-          "Not assigned" was a grey label and a dead end. The one row that told
-          you something needed doing was the one row you could not act on, and
-          the fix was three screens away in Policy details. It is a button now,
-          which is the shortest path between noticing and fixing.
-
-          Several applications print as a stack of up to four marks and a count.
-          This cell used to print the first name and "+N", on the reasoning that
-          a stack is several things to identify before you can read anything.
-          That held while the only way to learn the other names was to open the
-          edit dialog. Policies now carry dozens of applications, and the cell
-          opens a list of every one of them on hover, so the stack no longer has
-          to name anything. It only has to show that the policy is shared, and
-          roughly with what. A lone application keeps its name. See apps-peek.tsx.
-
-          The cell no longer goes straight into editing. Looking and changing
-          were one gesture, so reading the list meant hovering over the control
-          that starts an edit. Edit lives inside the panel now, and opens the
-          same dialog as before. */}
       <td>
-        {policy.isSystem ? (
-          <span className="btable__allapps">Every application</span>
-        ) : named.length > 0 ? (
-          <AppsPeek apps={named} policyName={policy.name} onEdit={() => setAssigning(true)} />
-        ) : (
-          <button type="button" className="btable__assign" onClick={() => setAssigning(true)}>
-            <Plus size={13} strokeWidth={2.2} aria-hidden />
-            Assign apps
-          </button>
-        )}
-        <AssignAppsDialog
-          open={assigning}
-          policy={policy}
-          onClose={() => setAssigning(false)}
-        />
+        <PolicyApps policy={policy} onAssign={() => onAction('assign')} />
       </td>
-      {/* The Exposure column is the grade in the list. Withheld in lite, so
-          the cell goes with the header rather than leaving an empty column. */}
-      {store.features.exposure && (
-      <td>
-        {gauntlet ? (
-          (() => {
-            const e = exposureOf(gauntlet)
-            return (
-              <button
-                type="button"
-                className={`btable__exposure is-${e.tone}`}
-                title={gauntlet.gradeReason}
-                onClick={() => store.go({ name: 'board', policyId: policy.id, open: 'gauntlet' })}
-              >
-                {e.label}
-                <b>{gauntlet.grade}</b>
-              </button>
-            )
-          })()
-        ) : (
-          <span
-            className="u-muted"
-            title={
-              policy.isSystem
-                ? 'The engine fall-through. It is meant to catch everything, so a hole is its definition rather than a defect.'
-                : `The deck asks app-access questions. A ${policy.type} policy decides something else, so scoring it against these cards would only report category errors.`
-            }
-          >
-            —
-          </span>
-        )}
-      </td>
+      {showExposure && (
+        <td>
+          <PolicyExposure policy={policy} gauntlet={gauntlet} />
+        </td>
       )}
       <td>
         <StatusPill status={policy.status} />
       </td>
       <td className="btable__actions">
-        <div className="btable__menuwrap">
-          <button type="button" className="btable__kebab" onClick={onMenu} aria-label={`Actions for ${policy.name}`} aria-expanded={menuOpen}>
-            ⋯
-          </button>
-          <AnimatePresence>
-            {menuOpen && (
-              <motion.div
-                className="bmenu"
-                initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                transition={{ duration: 0.13 }}
-                onClick={(e) => e.stopPropagation()}
-                role="menu"
-              >
-                {/* An icon per item.
-
-                    Four bare strings in a column are read word by word; with a
-                    mark in front, the one you came for is found by shape before
-                    it is read — which is the whole reason a menu you open a
-                    hundred times has icons. Every row-action menu worth copying
-                    does it: Zoom, Amplitude, Lightfield. */}
-                <button role="menuitem" onClick={() => store.go({ name: 'board', policyId: policy.id })}>
-                  <Pencil size={14} strokeWidth={1.9} aria-hidden />
-                  Edit policy
-                </button>
-                {/* The OTHER builder over the same policy — the trail, a
-                    scrolling column of forms. Both edit the same draft; this
-                    is a different shape for the same work, and it is the one
-                    you now have to ask for. */}
-                <button role="menuitem" onClick={() => store.go({ name: 'builder', policyId: policy.id })}>
-                  <Waypoints size={14} strokeWidth={1.9} aria-hidden />
-                  Open in trail
-                </button>
-                <button role="menuitem" onClick={() => store.showToast(`${policy.name} saved as a template`)}>
-                  <BookmarkPlus size={14} strokeWidth={1.9} aria-hidden />
-                  Save as template
-                </button>
-                <button role="menuitem" onClick={() => store.duplicatePolicy(policy.id)}>
-                  <Copy size={14} strokeWidth={1.9} aria-hidden />
-                  Duplicate
-                </button>
-                {!policy.isSystem && (
-                  <>
-                    <span className="bmenu__rule" />
-                    {/* This was deliberately neutral, on the reasoning that the
-                        red belongs in the confirmation where the decision is
-                        actually made. Reversed, because the two are not
-                        alternatives: a menu is scanned and clicked fast, and
-                        "Delete policy" sitting in identical grey among three
-                        harmless items is easy to hit by accident. The dialog
-                        still catches it — this reduces how often it has to.
-
-                        Every reference that has a destructive item colours it:
-                        Lightfield, Retool. The confirmation keeps its red too. */}
-                    <button
-                      role="menuitem"
-                      className="is-danger"
-                      onClick={() => store.showToast('Deleting a policy opens a confirmation with its blast radius')}
-                    >
-                      <Trash2 size={14} strokeWidth={1.9} aria-hidden />
-                      Delete policy
-                    </button>
-                  </>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        <RowMenu label={`Actions for ${policy.name}`} items={policyMenu(policy)} onSelect={(id) => onAction(id as RowAction)} />
       </td>
     </tr>
   )
@@ -646,44 +630,28 @@ function PolicyRow({
 
 /* --- Assigning applications from the list ---------------------------------------
 
-   The shortest path between noticing that a policy protects nothing and fixing
-   it. It opens from the Application cell — the cell that states the problem —
-   rather than sending anybody to Policy details, which is where this used to be
-   answered and is two navigations away from the row that raised it.
-
-   A checklist, not a picker. `ApplicationField` is the right control inside a
-   form, where it sits in a column of other fields and has to stay one line
-   tall; here the dialog IS the question, so the list can be the body of it and
-   every application is visible without opening a second layer. The two agree on
-   what they write — an `appIds` array in catalogue order — which is the part
-   that has to match.
-
-   It edits a local set and saves on Save. The rest of this table writes through
-   immediately, and this does not, because assigning applications is the one
-   edit here that changes what gets enforced: a half-finished multi-select
-   landing on the store a click at a time would enforce each intermediate state
-   for as long as it took to make the next click. */
+   Opens from the Applications cell. A checklist, not a picker: the dialog is the
+   question, so every application is visible without a second layer. It edits a
+   local set and saves on Save, because assigning applications changes what is
+   enforced and each intermediate click should not be. */
 function AssignAppsDialog({
   open,
   policy,
   onClose,
+  onCommit,
 }: {
   open: boolean
   policy: Policy
   onClose: () => void
+  /** Called just before the assignment is written. */
+  onCommit: () => void
 }) {
   const store = useBrand()
   const [picked, setPicked] = useState<string[]>(policy.appIds)
   const [q, setQ] = useState('')
 
-  /* The seed as a STRING, and that is what makes the effect below honest.
-
-     `policy.appIds` is a fresh array on every store change, so depending on it
-     directly would re-seed — and discard the ticks somebody had just made —
-     every time anything in the tenant moved. Depending on `[open]` alone fixes
-     that by lying to the linter about what the effect reads. Joining gives a
-     value that changes only when the assignment actually changes, so the effect
-     can name everything it uses and still re-run only when it should. */
+  /* The seed as a string, so the effect re-seeds only when the assignment
+     actually changes, not on every store change. */
   const seed = policy.appIds.join()
 
   useEffect(() => {
@@ -691,6 +659,16 @@ function AssignAppsDialog({
     setPicked(seed === '' ? [] : seed.split(','))
     setQ('')
   }, [open, seed])
+
+  /* Other deciding policies on each application, for the tooltip beside its name. */
+  const alsoOn = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const a of store.apps) {
+      const others = protectionOf(a.id, store.policies).decides.filter((p) => p.id !== policy.id)
+      if (others.length > 0) m.set(a.id, others.map((p) => p.name))
+    }
+    return m
+  }, [store.apps, store.policies, policy.id])
 
   const shown = store.apps.filter((a) => a.name.toLowerCase().includes(q.trim().toLowerCase()))
   const toggle = (id: string) =>
@@ -701,6 +679,31 @@ function AssignAppsDialog({
     )
 
   const changed = picked.join() !== policy.appIds.join()
+  const noApps = store.apps.length === 0
+
+  const save = () => {
+    /* Unfinished means draft: a policy left with no application becomes one.
+       Assigning does not publish in return. */
+    const next = { ...policy, appIds: picked }
+    onCommit()
+    store.savePolicy(picked.length === 0 ? { ...next, status: 'draft' as const } : next)
+    const n = picked.length
+    const count = `${n} application${n === 1 ? '' : 's'}`
+    /* "Protects" only for a policy that decides sign-ins. An active policy with
+       no rule turned on decides nothing either, and is not inactive. */
+    const why =
+      policy.status === 'draft' ? 'It is still a draft.' : policy.status === 'inactive' ? 'It is inactive.' : 'No rule is turned on.'
+    store.showToast(
+      n === 0
+        ? policy.status === 'draft'
+          ? `${policy.name} has no applications`
+          : `${policy.name} is now a draft`
+        : decidesFor(policy)
+          ? `${policy.name} now protects ${count}`
+          : `${policy.name} is assigned to ${count}. ${why}`,
+    )
+    onClose()
+  }
 
   return (
     <Modal
@@ -713,80 +716,83 @@ function AssignAppsDialog({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            variant="brand"
-            disabled={!changed}
-            onClick={() => {
-              /* The same demotion rule the rest of the product follows: a policy
-                 left with no application is not finished, and unfinished is a
-                 draft. Assigning one does NOT promote in return — publishing is
-                 a decision somebody makes on the policy, not a side effect of
-                 filling in a field. */
-              const next = { ...policy, appIds: picked }
-              store.savePolicy(picked.length === 0 ? { ...next, status: 'draft' as const } : next)
-              store.showToast(
-                picked.length === 0
-                  ? `${policy.name} has no application — back to draft`
-                  : `${policy.name} now protects ${picked.length} application${picked.length === 1 ? '' : 's'}`,
-              )
-              onClose()
-            }}
-          >
+          <Button variant="brand" disabled={!changed} onClick={save}>
             Save
           </Button>
         </>
       }
     >
       <div className="bassign">
-        <p className="bassign__lede">Every sign-in to one of these is checked against this policy.</p>
-
-        {/* Only once the list is long enough to need it. Twenty-six rows is
-            past that; a tenant with six would spend a control on nothing. */}
-        {store.apps.length > 8 && (
-          <SearchBox
-            block
-            placeholder="Search applications…"
-            label="Search applications"
-            value={q}
-            onChange={setQ}
-          />
-        )}
-
-        <div className="bassign__list">
-          {shown.map((a) => {
-            const on = picked.includes(a.id)
-            return (
-              /* A button with the console's own tick, not a native
-                 `<input type="checkbox">` — which is whatever the operating
-                 system draws, and was the only OS control left in a dialog
-                 otherwise entirely of this console's making. */
-              <button
-                key={a.id}
-                type="button"
-                role="checkbox"
-                aria-checked={on}
-                className={`bassign__row ${on ? 'is-on' : ''}`}
-                onClick={() => toggle(a.id)}
+        {noApps ? (
+          <EmptyState
+            compact
+            icon={AppWindow}
+            title="No applications yet"
+            blurb="Add an application, then assign it to this policy."
+            action={
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  onClose()
+                  store.go({ name: 'applications' })
+                }}
               >
-                <span className="bx-tick" aria-hidden>
-                  <Check size={11} strokeWidth={3.2} />
-                </span>
-                <AppLogo appId={a.id} name={a.name} size={22} />
-                <span className="bassign__name">{a.name}</span>
-                <span className="bassign__meta">{a.protocol}</span>
-              </button>
-            )
-          })}
-          {shown.length === 0 && <p className="bassign__none">No application matches “{q}”.</p>}
-        </div>
+                Go to applications
+              </Button>
+            }
+          />
+        ) : (
+          <>
+            <p className="bassign__lede">Every sign-in to one of these is checked against this policy.</p>
 
-        {/* Says what the save will do, in the terms the row will read back.
-            A count that only appears once something is ticked, because "0
-            selected" under an empty list is a restatement of the list. */}
-        {picked.length > 0 && (
-          <p className="bassign__foot">
-            {picked.length} selected — {appsLabel(store.apps.filter((a) => picked.includes(a.id)))}
-          </p>
+            {/* Only once the list is long enough to need it. */}
+            {store.apps.length > 8 && (
+              <SearchBox block placeholder="Search applications…" label="Search applications" value={q} onChange={setQ} />
+            )}
+
+            {shown.length > 0 ? (
+              <div className="bassign__list">
+                {shown.map((a) => {
+                  const on = picked.includes(a.id)
+                  const others = alsoOn.get(a.id)
+                  const also = others ? `Also decided by ${others.join(', ')}.` : null
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={on}
+                      className={`bassign__row ${on ? 'is-on' : ''}`}
+                      onClick={() => toggle(a.id)}
+                    >
+                      <span className="bx-tick" aria-hidden>
+                        <Check size={11} strokeWidth={3.2} />
+                      </span>
+                      <AppLogo appId={a.id} name={a.name} size={22} />
+                      <span className="bassign__name">
+                        {a.name}
+                        {also && (
+                          <>
+                            {' '}
+                            <TipMark text={also} />
+                            <span className="u-sr-only">{also}</span>
+                          </>
+                        )}
+                      </span>
+                      <span className="bassign__meta">{a.protocol}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <NoMatches noun="applications" query={q} compact onClear={() => setQ('')} />
+            )}
+
+            {picked.length > 0 && <p className="bassign__foot">{picked.length} selected</p>}
+            {picked.length === 0 && policy.status !== 'draft' && (
+              <p className="bassign__foot">With no applications, this policy becomes a draft.</p>
+            )}
+          </>
         )}
       </div>
     </Modal>

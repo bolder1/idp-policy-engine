@@ -9,10 +9,11 @@
    preview, the marketplace sheet those cards sit in, and the field styling the
    naming form shares with Policy details.
 
-   `.bcp*`, `.bname2*`, `.bbar*` and `.bempty` are NOT create-page classes any
-   more, whatever their names suggest: PolicyDetails.tsx imports this file and
-   wears them, and `.bempty` restyles every empty state in the console. None of
-   them can be deleted as gallery cleanup.
+   `.bcp*` and `.bname2*` are NOT create-page classes any more, whatever their
+   names suggest: PolicyDetails.tsx imports this file and wears them, so they
+   cannot be deleted as gallery cleanup. `.bbar*` went when Policy details moved
+   to the kit save bar, and the old `.bempty` override went because it put a
+   dashed edge back on every empty state in the console — empty.css owns those.
 
    Console-native: white page, #f8f9fa tiles, 6px radii, orange primary.
    --------------------------------------------------------------------------- */
@@ -60,7 +61,6 @@
   display: grid; grid-template-columns: repeat(auto-fill, minmax(296px, 1fr));
   gap: 18px; align-items: stretch; grid-auto-rows: 1fr;
 }
-.bgal__none { padding: 48px; text-align: center; display: grid; gap: 14px; justify-items: center; color: var(--text-tertiary); }
 
 /* --- Template card ---------------------------------------------------------
    A thumbnail of the rule stack, then the heading, then the description, then a
@@ -166,7 +166,7 @@
   border-radius: 5px;
   background: var(--surface-inset);
   border: 1px solid var(--border-subtle);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
   color: var(--text-tertiary);
 }
@@ -177,9 +177,8 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .bgcard__mdec {
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
-  letter-spacing: 0.02em;
   padding: 2px 6px;
   border-radius: var(--radius-pill);
   white-space: nowrap;
@@ -188,10 +187,11 @@
 .bgcard__mdec.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
 .bgcard__mdec.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
 
-/* Not part of the template: what the engine does when nothing above matched. */
+/* Not part of the template: what the engine does when nothing above matched.
+   Set apart by an unfilled row and muted text; the edge stays solid, because
+   dashed outlines are out of the design system. */
 .bgcard__mrow--default {
   background: transparent;
-  border-style: dashed;
   box-shadow: none;
 }
 .bgcard__mrow--default .bgcard__mname { color: var(--text-tertiary); font-weight: var(--fw-regular); }
@@ -199,7 +199,6 @@
 
 .bgcard__mrow--rest {
   background: transparent;
-  border-style: dashed;
   box-shadow: none;
 }
 .bgcard__mrow--rest .bgcard__mname { color: var(--text-secondary); }
@@ -284,13 +283,6 @@
   background: var(--surface-raised);
   border-top: 1px solid var(--border-subtle);
 }
-.bgcard__meta {
-  min-width: 0;
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bgcard__meta i { font-style: normal; margin: 0 5px; color: var(--border-strong); }
 
 .bgcard__cta {
   flex: none;
@@ -323,8 +315,7 @@
   border-radius: var(--radius-md);
 }
 .bprev__facts dt {
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-tertiary);
 }
 .bprev__facts dd { margin: 3px 0 0; font-size: var(--fs-md); color: var(--text-primary); }
 .bprev__facts > div:last-child { min-width: 0; }
@@ -359,7 +350,7 @@
   box-shadow: 0 1px 1px rgba(33, 37, 41, 0.03);
 }
 .bprev__node--default {
-  background: transparent; border-style: dashed; box-shadow: none;
+  background: transparent; box-shadow: none;
 }
 .bprev__node--default .bprev__body strong { color: var(--text-secondary); font-weight: var(--fw-medium); }
 
@@ -367,21 +358,23 @@
   flex: none; width: 20px; height: 20px; border-radius: 6px;
   display: grid; place-items: center;
   background: var(--surface-inset); border: 1px solid var(--border-subtle);
-  font-size: 10px; font-weight: var(--fw-semibold); color: var(--text-tertiary);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary);
 }
 .bprev__body { flex: 1; min-width: 0; }
 .bprev__body strong { display: block; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* Wrapped, never cut. The preview is the template with nothing left out, and a
+   rule's who and conditions run long; the card thumbnail is what truncates. */
 .bprev__body > span {
   display: block; margin-top: 2px;
   font-size: var(--fs-sm); color: var(--text-tertiary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  white-space: normal; overflow-wrap: anywhere;
 }
 .bprev__body i {
-  font-style: normal; font-family: var(--font-mono);
-  font-size: 10px; letter-spacing: 0.04em; color: var(--text-muted);
+  font-style: normal; font-weight: var(--fw-semibold);
+  font-size: var(--fs-xs); color: var(--text-secondary);
 }
 .bprev__right { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
-.bprev__right em { font-style: normal; font-size: 10px; color: var(--text-tertiary); }
+.bprev__right em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
 
 .bprev__foot {
   margin-top: 12px;
@@ -390,7 +383,7 @@
 
 /* --- Step 2 ---------------------------------------------------------------- */
 
-.bcard { background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px 20px; }
+.bname2__card { background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px 20px; }
 /* The whole form is one card of two fields. It was two cards because each one
    carried a heading and a paragraph and needed the separation; with the prose
    gone they are just fields, and fields belong in the same box. */
@@ -398,10 +391,10 @@
 .bname2__field { display: flex; flex-direction: column; gap: 6px; }
 .bname2__label {
   display: block;
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary);
 }
-.bname2__label i { font-style: normal; color: var(--fb-negative-dot); }
+/* Neutral, not red: red is kept for destructive actions. */
+.bname2__label i { font-style: normal; color: var(--text-tertiary); }
 /* The label and the counter share a row.
 
    The counter used to sit under the input with `align-self: flex-end`, so it
@@ -416,7 +409,6 @@
 .bname2__form { max-width: 720px; }
 .bname2__field .bx-picker { width: 100%; }
 .bname2__field input[type='text'] { max-width: 420px; }
-
 
 /* --- Name your policy, as a dialog -----------------------------------------
 
@@ -461,26 +453,8 @@
 
 /* `.bnp__note` is gone with the footer sentence it styled — see NewPolicyDialog. */
 
-/* --- Bottom bar ------------------------------------------------------------ */
-
-.bbar {
-  grid-column: 1 / -1;
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-top: 4px;
-  padding: 13px 18px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  box-shadow: 0 -2px 12px rgba(33, 37, 41, 0.06);
-  z-index: 20;
-}
-.bbar__note { font-size: var(--fs-sm); color: var(--text-tertiary); min-width: 0; }
-.bbar__acts { display: flex; align-items: center; gap: 8px; flex: none; }
+/* `.bbar`, the bottom action bar Policy details wore, stood here. That page
+   commits through the kit save bar now. */
 
 /* --- Guided setup ------------------------------------------------------------
    The only animated control in the product. A slow sheen crosses it every few
@@ -528,24 +502,9 @@ html[data-theme='dark'] .bguided__sheen {
   .bguided:hover svg { transform: none; }
 }
 
-/* --- Empty state ----------------------------------------------------------- */
-
-.bempty {
-  margin-top: 8px;
-  padding: 0 0 14px;
-  border: 1px dashed var(--border-default);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  text-align: center;
-}
-.bempty .glscene { border-bottom: none; border-radius: var(--radius-md) var(--radius-md) 0 0; }
-.bempty strong { display: block; margin-top: 10px; font-size: var(--fs-md); font-weight: 600; }
-.bempty span { display: block; margin: 4px 14px 0; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.55; }
-
-@media (max-width: 1120px) {
-  /* The rail's width lives in one variable, so this needs no override — a
-     hard-coded 200px here broke the moment the rail could collapse. */
-}
+/* `.bempty` stood here, from the drawn empty states. This sheet loads after
+   empty.css, so it won the tie and put a dashed edge, no top padding and a
+   stray margin on the icon back onto every EmptyState. empty.css owns them. */
 
 /* --- The summary panel is a plain block ------------------------------------
    It used to be a sticky flex column handing its height down to appsum and on
@@ -554,8 +513,6 @@ html[data-theme='dark'] .bguided__sheen {
    the rule list now just grow; the commit bar is fixed, so nothing they push
    down ends up out of reach. */
 
-
-
 /* --- Mobile ---------------------------------------------------------------
    The console rail collapses below this, so the gallery gets the full width and
    the summary stops being a sidebar. */
@@ -563,12 +520,6 @@ html[data-theme='dark'] .bguided__sheen {
   .bcp { padding-bottom: 92px; }
   .bcp__headrow { flex-direction: column; gap: 14px; }
   .bgal__grid { grid-template-columns: minmax(0, 1fr); }
-
-
-  .bbar { left: 0; padding: 11px 16px; flex-wrap: wrap; gap: 10px; }
-  .bbar__note { flex: 1 1 100%; order: 2; }
-  .bbar__acts { flex: 1 1 100%; }
-  .bbar__acts .bx-btn { flex: 1; }
 }
 
 /* --- Template gallery (marketplace) ----------------------------------------
@@ -661,20 +612,11 @@ html[data-theme='dark'] .bguided__sheen {
   font-size: var(--fs-xl); font-weight: var(--fw-semibold); letter-spacing: -0.01em;
   color: var(--text-primary);
 }
-.bmarket__lede { margin-top: 5px; font-size: var(--fs-md); color: var(--text-tertiary); }
 
 /* The search, at the width a template name actually needs. The pill-shaped
    42px field this used to draw is gone — a fifth shape for the same object —
    and the wrapper now only says how wide the box is on this page. */
 .bmarket__searchbox { width: min(440px, 100%); margin-top: 12px; }
-/* The consequence, quiet and last. It is the one thing a shelf cannot show.
-
-   `--text-tertiary`, not `--text-muted`: muted is #93a2b0, which is 2.31:1 on
-   the page surface and fails AA — a live failure on this line before any of the
-   colour work, and the search placeholder shared it. Tertiary clears 4.5 on
-   both themes and on every one of the six band states, because the scrim pins
-   this y-position to the untinted surface. */
-.bmarket__note { margin-top: 14px; max-width: 62ch; font-size: var(--fs-sm); color: var(--text-tertiary); }
 
 /* The close, over the band rather than in a row of its own. */
 .bmarket__x {
@@ -713,7 +655,7 @@ html[data-theme='dark'] .bguided__sheen {
 }
 .bmarket__railhead {
   margin: 4px 8px 8px;
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: 0.06em; text-transform: uppercase;
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold);
   color: var(--text-tertiary);
 }
 .bmarket__cats { display: flex; flex-direction: column; gap: 2px; }
@@ -724,13 +666,9 @@ html[data-theme='dark'] .bguided__sheen {
   font-size: var(--fs-md); color: var(--text-secondary);
 }
 .bmarket__cat:hover { background: var(--surface-sunken); color: var(--text-primary); }
-.bmarket__cat em {
-  font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums;
-}
 /* The selected shelf. A tint and a weight, not a fill — this is where you are,
    not something to press. */
 .bmarket__cat.is-on { background: var(--surface-inset); color: var(--text-primary); font-weight: var(--fw-medium); }
-.bmarket__cat.is-on em { color: var(--text-secondary); }
 .bmarket__cat:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 .bmarket__body { grid-column: 2; min-width: 0; }
@@ -778,11 +716,6 @@ html[data-theme='dark'] .bguided__sheen {
   .bmarket__body { grid-column: 1; }
 }
 
-/* The review line. Deliberately quiet — it is provenance, not a boast, and it
-   must not out-shout the action beside it. */
-.bgcard__reviewed { display: inline-flex; align-items: center; gap: 5px; color: var(--text-tertiary); }
-.bgcard__reviewed svg { color: var(--fb-positive-fg); flex: none; }
-
 /* --- Step 2 · a page that fits ----------------------------------------------
    The step is now sized to the viewport instead of flowing past it. The page
    itself never scrolls; the one thing whose length is unbounded — the rule
@@ -823,18 +756,6 @@ html[data-theme='dark'] .bguided__sheen {
 }
 .bname2__form { min-height: 0; }
 
-/* Last row of the column, not a fixed overlay. */
-.bcp--fit .bbar {
-  position: static;
-  flex: none;
-  left: auto; right: auto; bottom: auto;
-  margin-top: 16px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
-  box-shadow: none;
-  padding: 11px 16px;
-}
-
 @media (max-width: 1120px) {
   /* Below this a fixed-height column has too little of it to be worth the
      scrolling it forces, so the page goes back to being a normal one. */
@@ -846,9 +767,6 @@ html[data-theme='dark'] .bguided__sheen {
   margin-left: 6px; letter-spacing: 0; text-transform: none;
   color: var(--text-muted);
 }
-
-
-
 
 /* The scroller. The list takes whatever height the column has left, so the
    page itself never grows. */
@@ -933,7 +851,6 @@ html[data-theme='dark'] .bguided__sheen {
    — `min-height: 224px`, sized for the 212px thumbnail — is still live above
    and is correct again now that every card has one. */
 
-
 /* --- The category pill --------------------------------------------------------
 
    Top-left of the thumbnail, mirroring the preview control top-right — the
@@ -976,7 +893,7 @@ html[data-theme='dark'] .bguided__sheen {
 .bgcard__sig {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 2px 8px 2px 6px; border-radius: var(--radius-pill);
-  font-size: 11px; line-height: 1.5; white-space: nowrap;
+  font-size: var(--fs-xs); line-height: 1.5; white-space: nowrap;
 }
 .bgcard__sig em { font-style: normal; }
 .bgcard__sig.is-info { background: var(--fb-info-bg); color: var(--fb-info-fg); }
@@ -1009,13 +926,10 @@ html[data-theme='dark'] .bguided__sheen {
 .bgcard__body { flex: 1; min-height: 0; }
 .bgcard__foot { margin-top: auto; }
 
-
 /* --- The audience picker, inline -------------------------------------------
 
    The same control as the application list beside it, because it answers the
    same shape of question. Its own frame, its own search, one scroller. */
-
-
 
 /* Two tabs rather than two headings in one scroller. Five groups above
    twenty-four people meant the groups — what almost every policy is actually
@@ -1023,11 +937,6 @@ html[data-theme='dark'] .bguided__sheen {
    rest of the session. */
 /* The count of what you have chosen, not of what exists — so a tab you are not
    looking at can still tell you it holds a selection. */
-
-
-
-
-
 
 /* Both template-card metadata rows are hidden for now, on request.
 

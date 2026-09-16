@@ -60,13 +60,6 @@ export const FAILURE_LABEL: Record<OnFailure, string> = {
   'fail-closed': 'Deny the sign-in',
 }
 
-export const FAILURE_BLURB: Record<OnFailure, string> = {
-  'fail-open':
-    'Evaluation carries on as though the condition did not match. Nobody is locked out by an outage — and a rule that exists to deny stops denying.',
-  'fail-closed':
-    'The sign-in is refused. Nothing gets through on a guess — and an outage at the endpoint is an outage of your login.',
-}
-
 export interface Hook {
   id: string
   name: string
@@ -96,75 +89,91 @@ export interface Hook {
    default, and refusing to save would just teach them to write 499. */
 export const SLOW_TIMEOUT_MS = 500
 
+/** The longest a synchronous hook may wait. Past this a sign-in has stalled, not slowed. */
+export const MAX_TIMEOUT_MS = 30000
+
+/** The form field an issue belongs under, so a form can show it there. */
+export type HookField = 'name' | 'url' | 'responsePath' | 'timeoutMs' | 'maxAgeHours'
+
 export interface HookIssue {
   level: 'error' | 'warning'
+  /** Unique within one hook's issues; forms may key on it. */
   title: string
   detail: string
+  field: HookField
 }
 
-/** Sound-only, same contract as the policy linter: never reports a working hook. */
-export function validateHook(h: Hook): HookIssue[] {
+/* A full https URL with a host, or the reason it is not one. `new URL` rather
+   than a prefix test, so "https://" alone and "risk.internal/score" are both
+   caught. */
+function endpointIssue(raw: string): HookIssue | null {
+  const url = raw.trim()
+  if (!url) return { level: 'error', field: 'url', title: 'No endpoint', detail: 'Enter the URL to call.' }
+  let parsed: URL | null = null
+  try {
+    parsed = new URL(url)
+  } catch {
+    parsed = null
+  }
+  if (!parsed || !parsed.hostname)
+    return { level: 'error', field: 'url', title: 'Not a full URL', detail: 'Enter a full URL, like https://risk.internal/score.' }
+  if (parsed.protocol !== 'https:')
+    return { level: 'error', field: 'url', title: 'Not HTTPS', detail: 'Use an https:// URL. The request carries the identity and the answer decides access.' }
+  return null
+}
+
+/** Sound-only, same contract as the policy linter: never reports a working hook.
+    Pass `others` (the rest of the library) to check the name is not taken. */
+export function validateHook(h: Hook, others: readonly Hook[] = []): HookIssue[] {
   const out: HookIssue[] = []
 
-  if (!h.name.trim())
-    out.push({ level: 'error', title: 'No name', detail: 'Rules reference a hook by name. An unnamed one cannot be chosen from the condition list.' })
+  const name = h.name.trim().toLowerCase()
+  if (!name) out.push({ level: 'error', field: 'name', title: 'No name', detail: 'Enter a name.' })
+  else if (others.some((o) => o.id !== h.id && o.name.trim().toLowerCase() === name))
+    out.push({ level: 'error', field: 'name', title: 'Name taken', detail: 'A hook with this name already exists.' })
 
-  if (!h.url.trim()) {
-    out.push({ level: 'error', title: 'No endpoint', detail: 'There is nothing to call.' })
-  } else if (!/^https:\/\//i.test(h.url.trim())) {
-    /* Not pedantry. The request carries a username and the answer decides
-       whether that person gets in; over plain HTTP both are readable and, worse,
-       writable by anything on the path. */
-    out.push({
-      level: h.url.trim().startsWith('http://') ? 'error' : 'warning',
-      title: 'Not an HTTPS endpoint',
-      detail:
-        'The request carries the identity being evaluated and the response decides access. Over plain HTTP both can be read and altered in transit.',
-    })
-  }
+  const endpoint = endpointIssue(h.url)
+  if (endpoint) out.push(endpoint)
 
   if (h.mode === 'sync') {
     if (!h.responsePath.trim())
-      out.push({
-        level: 'error',
-        title: 'No response path',
-        detail: 'The engine needs to know which field of the answer to read. Without one there is nothing to test.',
-      })
+      out.push({ level: 'error', field: 'responsePath', title: 'No response field', detail: 'Enter the field of the answer to read.' })
 
-    if (h.timeoutMs > SLOW_TIMEOUT_MS)
+    if (!Number.isFinite(h.timeoutMs) || h.timeoutMs <= 0)
+      out.push({ level: 'error', field: 'timeoutMs', title: 'No timeout', detail: 'Enter a timeout above 0 ms.' })
+    else if (h.timeoutMs > MAX_TIMEOUT_MS)
+      out.push({ level: 'error', field: 'timeoutMs', title: 'Timeout too long', detail: `Enter ${MAX_TIMEOUT_MS} ms or less.` })
+    else if (h.timeoutMs > SLOW_TIMEOUT_MS)
       out.push({
         level: 'warning',
-        title: 'Slow enough to be felt',
-        detail: `${h.timeoutMs}ms is charged to every sign-in that reaches a rule naming this hook, on top of the engine's own work. Worth confirming against the endpoint's measured p99 rather than its hopeful one.`,
+        field: 'timeoutMs',
+        title: 'Slow timeout',
+        detail: `Every sign-in that reaches a rule using this hook can wait this long. Check it against the endpoint's p99.`,
       })
-
-    if (h.timeoutMs <= 0)
-      out.push({ level: 'error', title: 'No timeout', detail: 'A call with no time limit is a login with no time limit.' })
   }
 
-  if (h.mode === 'attribute-sync' && !h.maxAgeHours)
-    out.push({
-      level: 'warning',
-      title: 'No freshness limit',
-      detail:
-        'A sync that has been failing quietly leaves the last-known values in place, and a rule reading them cannot tell current from stale. Setting a limit makes the difference visible.',
-    })
+  if (h.mode === 'attribute-sync') {
+    const age = h.maxAgeHours
+    if (age !== undefined && (!Number.isInteger(age) || age < 1))
+      out.push({ level: 'error', field: 'maxAgeHours', title: 'Freshness limit not valid', detail: 'Enter 1 hour or more, or leave it empty for no limit.' })
+    else if (age === undefined)
+      out.push({ level: 'warning', field: 'maxAgeHours', title: 'No freshness limit', detail: 'Rules cannot tell current data from stale.' })
+  }
 
   return out
 }
 
-export const canSaveHook = (h: Hook) => !validateHook(h).some((i) => i.level === 'error')
+export const canSaveHook = (h: Hook, others: readonly Hook[] = []) => !validateHook(h, others).some((i) => i.level === 'error')
 
-/** One sentence describing what the hook does, for the list and the condition row. */
-export function describeHook(h: Hook): string {
-  if (h.mode === 'attribute-sync')
-    return `Pulls attributes from ${host(h.url)}${h.maxAgeHours ? `, trusted for ${h.maxAgeHours}h` : ''}.`
-  return `${h.method} ${host(h.url)}, reads ${h.responsePath || '—'}, gives up after ${h.timeoutMs}ms.`
-}
-
-function host(url: string): string {
-  const m = url.match(/^https?:\/\/([^/]+)/i)
-  return m ? m[1] : url || '—'
+/* What is stored: text trimmed, an empty optional field left out, and a cleared
+   freshness limit stored as no limit rather than 0. */
+export function normaliseHook(h: Hook): Hook {
+  const { description, authHeader, maxAgeHours, ...rest } = h
+  const out: Hook = { ...rest, name: h.name.trim(), url: h.url.trim(), responsePath: h.responsePath.trim() }
+  if (description?.trim()) out.description = description.trim()
+  if (authHeader?.trim()) out.authHeader = authHeader.trim()
+  if (maxAgeHours !== undefined && Number.isFinite(maxAgeHours) && maxAgeHours !== 0) out.maxAgeHours = maxAgeHours
+  return out
 }
 
 export const seedHooks: Hook[] = [
@@ -206,7 +215,6 @@ export const seedHooks: Hook[] = [
     onFailure: 'fail-open',
     maxAgeHours: 36,
   },
-
 
   /* A hook for HR status. NOTE THE DISTORTION: the engine can only ask a hook
      "returns true" / "returns false" — there is no field/value comparison — so

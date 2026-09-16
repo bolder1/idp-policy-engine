@@ -1,20 +1,3 @@
-/* -----------------------------------------------------------------------------
-   The method configuration form.
-
-   Rescued from method-sets.css when that screen was deleted: the stylesheet
-   went with it, but `ConfigFields` did not — it is the form behind every "Set
-   up" button on the categories screen, and it had been rendering unstyled since
-   the purge. Kept in its own file this time so its lifetime is tied to the
-   component rather than to whichever screen happened to mount it first.
-   -------------------------------------------------------------------------- */
-
-/* --- Configuration form -------------------------------------------------------- */
-
-.bmc__blurb {
-  margin: 0 0 var(--space-6); padding: var(--space-5);
-  background: var(--fb-info-bg); border-radius: var(--radius-md);
-  font-size: var(--fs-md); color: var(--fb-info-fg); line-height: 1.55;
-}
 /* --- Configuration fields ------------------------------------------------------
 
    Stacked: label and help above, control at full width below.
@@ -28,12 +11,10 @@
    Toggles keep the row form, because a switch is small enough to sit beside its
    label and stacking one wastes a line saying nothing. */
 
-.bmc__fields { display: flex; flex-direction: column; }
-.bmc__field {
-  display: flex; flex-direction: column; gap: var(--space-3);
-  padding: var(--space-5) 0; border-top: 1px solid var(--border-subtle);
-}
-.bmc__field:first-child { border-top: 0; padding-top: 0; }
+/* No rule between fields: one straight form, spaced by the gap alone. The
+   hairlines made every field its own strip, which read as a stack of boxes. */
+.bmc__fields { display: flex; flex-direction: column; gap: var(--space-7); }
+.bmc__field { display: flex; flex-direction: column; gap: var(--space-4); }
 /* A switch beside its label, not under it. */
 .bmc__field.is-toggle {
   flex-direction: row; align-items: center; justify-content: space-between; gap: var(--space-6);
@@ -44,6 +25,8 @@
    under it. Twenty-six fields each lost a line of prose, which is most of the
    scroll this form used to be. */
 .bmc__label { display: flex; align-items: center; gap: 6px; }
+/* A value that cannot work, under its field. */
+.bmc__error { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--fb-negative-fg); }
 .bmc__label label { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-body); }
 .bmc__label label b { margin-left: 2px; color: var(--fb-negative-fg); }
 
@@ -101,18 +84,19 @@
 .bmc__radios strong { font-size: var(--fs-md); color: var(--text-primary); }
 .bmc__radios em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
 
-.bmc__list { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; }
-.bmc__list ul { margin: 0; padding: 0; list-style: none; }
+/* A list field without a frame: its items, then the row that adds one. */
+.bmc__list { display: flex; flex-direction: column; gap: var(--space-3); }
+.bmc__list ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
 .bmc__list li {
   display: flex; align-items: center; gap: var(--space-4);
-  padding: var(--space-3) var(--space-5);
-  border-bottom: 1px solid var(--border-subtle); font-size: var(--fs-md); color: var(--text-body);
+  padding: var(--space-2) 0;
+  font-size: var(--fs-md); color: var(--text-body);
 }
 .bmc__list li.is-empty { color: var(--text-muted); font-size: var(--fs-sm); }
 .bmc__list li span { flex: 1; min-width: 0; }
 .bmc__list li button { display: grid; place-items: center; width: 22px; height: 22px; border-radius: var(--radius-sm); color: var(--text-muted); }
 .bmc__list li button:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bmc__listadd { display: flex; gap: var(--space-3); padding: var(--space-3); background: var(--surface-sunken); }
+.bmc__listadd { display: flex; gap: var(--space-3); }
 .bmc__listadd input { flex: 1; height: var(--ctl-height-sm); padding: 0 var(--space-4); background: var(--ctl-bg); border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius); font-size: var(--fs-md); font-family: inherit; color: var(--text-primary); }
 .bmc__listadd button {
   display: inline-flex; align-items: center; gap: 4px;
@@ -121,5 +105,3 @@
   background: var(--surface-raised); font-size: var(--fs-sm); color: var(--text-secondary); cursor: pointer;
 }
 .bmc__listadd button:disabled { opacity: var(--disabled-opacity); cursor: default; }
-
-.bmc__foot { flex: 1; display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); }

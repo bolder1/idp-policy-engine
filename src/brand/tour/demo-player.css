@@ -15,7 +15,7 @@
    --------------------------------------------------------------------------- */
 
 .dpl {
-  position: fixed; inset: 0; z-index: calc(var(--z-modal) + 10);
+  position: fixed; inset: 0; z-index: calc(var(--z-modal) + 70);
   display: grid; place-items: center;
   /* Named, because the ambient wash below has to know it. The room between the
      frame and the edge of the screen IS this padding, and a glow sized in

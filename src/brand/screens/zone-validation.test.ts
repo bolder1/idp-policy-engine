@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import { emptyLocation, zones, type Zone, type ZoneLocation } from '../data'
-import { canSaveZone, classifyIp, describeZone, isValidAsn, validateZone } from './zone-validation'
+import {
+  canSaveZone,
+  classifyIp,
+  describeZone,
+  explainBadEntry,
+  isValidAsn,
+  validateZone,
+} from './zone-validation'
 
 /* -----------------------------------------------------------------------------
    The five worked examples in the spec are the acceptance criteria, so they are
@@ -44,8 +51,21 @@ describe('address classification', () => {
     ['not-an-address'],
     [''],
     ['203.0.113.10 – nonsense'],
+    ['10.0.0.0/8/9'],
+    ['1.1.1.1-2.2.2.2-junk'],
+    ['10.0.0.9-10.0.0.1'],
   ])('rejects %s', (v) => {
     expect(classifyIp(v)).toBe('invalid')
+  })
+
+  it('accepts a range of one address', () => {
+    expect(classifyIp('10.0.0.1-10.0.0.1')).toBe('ipv4-range')
+  })
+
+  it('says why a reversed range was refused', () => {
+    expect(explainBadEntry('10.0.0.9-10.0.0.1')).toBe('Start is after end.')
+    expect(explainBadEntry('10.0.0.9 – 10.0.0.1')).toBe('Start is after end.')
+    expect(explainBadEntry('rubbish')).toBe('Not an address, CIDR block, range or ASN.')
   })
 
   it('accepts the ASNs the spec lists and rejects bare numbers', () => {
@@ -147,6 +167,14 @@ describe('save gating', () => {
 
   it('blocks a malformed ASN', () => {
     expect(canSaveZone(zone({ asn: ['AS55836', '55836'] }))).toBe(false)
+  })
+
+  it('blocks a name another zone already has, whatever its case or spacing', () => {
+    const z = zone({ name: ' office network ', ip: ['203.0.113.0/24'] })
+    expect(idsOf(z)).not.toContain('dupname')
+    expect(validateZone(z, ['Office Network']).map((i) => i.id)).toContain('dupname')
+    expect(canSaveZone(z, ['Office Network'])).toBe(false)
+    expect(canSaveZone(z, ['Office'])).toBe(true)
   })
 
   it('a warning alone never blocks — only errors do', () => {

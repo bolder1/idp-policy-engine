@@ -1,3 +1,4 @@
+import { nameTaken } from './data'
 import { TIER_WEIGHT, type Priority } from './fingerprint'
 
 /* -----------------------------------------------------------------------------
@@ -47,13 +48,29 @@ export const SIGNAL_CATEGORIES: SignalCategory[] = [
   'Behaviour',
 ]
 
+/* One tint per category, used wherever the category shows on the page: the
+   pill on a signal row and the mark in the category filter (owner, 14 Sep
+   2026). Never negative: red is for danger in this kit, and green reads as
+   "safe" on a list of attack signals. Four categorical ramps and notice make
+   five. The rebrand folds info, accent, lime and magenta into one blue, so
+   risk-signals.css gives each tone its own value there. */
+export type CategoryTone = 'info' | 'accent' | 'lime' | 'magenta' | 'notice'
+
+export const CATEGORY_TONE: Record<SignalCategory, CategoryTone> = {
+  'Device integrity': 'info',
+  Instrumentation: 'accent',
+  'Network origin': 'lime',
+  'Address reputation': 'magenta',
+  Behaviour: 'notice',
+}
+
 export interface RiskSignal {
   id: string
   name: string
   category: SignalCategory
   /** The platforms that can actually collect it. Never both by default. */
   on: Platform[]
-  /** One sentence: what it means when this fires. Sits under the name. */
+  /** One sentence: what it means when this fires. In the tip beside the name. */
   purpose: string
   /** What it is worth out of the box, per platform that collects it. */
   tier: Priority
@@ -342,3 +359,119 @@ export function riskScale(profile: RiskTuning): Record<string, number> {
 /** How many signals are switched on, for the category headings and the summary. */
 export const countOn = (profile: RiskTuning, within?: SignalCategory) =>
   RISK_SIGNALS.filter((s) => (within ? s.category === within : true) && isOn(profile, s.id)).length
+
+/* --- Editing a profile -------------------------------------------------------
+
+   Pure helpers for the profile page's draft, so an edit that is undone leaves
+   nothing behind: a signal switched off and on again, or a weight moved away
+   and back, compares equal to what is saved. */
+
+/** Longest profile name the name fields accept. */
+export const RISK_PROFILE_NAME_MAX = 80
+
+/** Switch one signal on or off. `off` stays in catalogue order, so the order of clicks never shows as a change. */
+export function setSignalOn<T extends RiskTuning>(t: T, signalId: string, on: boolean): T {
+  const off = new Set(t.off)
+  if (on) off.delete(signalId)
+  else off.add(signalId)
+  const known = RISK_SIGNALS.filter((s) => off.has(s.id)).map((s) => s.id)
+  /* Ids the catalogue no longer carries are kept, after the known ones. */
+  const unknown = [...new Set(t.off)].filter((id) => off.has(id) && !signalById(id))
+  return { ...t, off: [...known, ...unknown] }
+}
+
+/** Set one signal's weight on one platform. Setting it back to the shipped weight removes the override. */
+export function setSignalTier<T extends RiskTuning>(t: T, s: RiskSignal, p: Platform, tier: Priority): T {
+  const key = tierKey(s.id, p)
+  const tiers = { ...t.tiers }
+  if (tier === s.tier) delete tiers[key]
+  else tiers[key] = tier
+  return { ...t, tiers }
+}
+
+/** The weight an override key resolves to, falling back to the catalogue. */
+const effectiveTier = (t: RiskTuning, key: string): Priority | undefined => {
+  const s = signalById(key.split(':')[0])
+  return t.tiers[key] ?? s?.tier
+}
+
+/** Same signals off and same effective weights, whatever order they were stored in. */
+export function sameTuning(a: RiskTuning, b: RiskTuning): boolean {
+  const offA = new Set(a.off)
+  const offB = new Set(b.off)
+  if (offA.size !== offB.size) return false
+  for (const id of offA) if (!offB.has(id)) return false
+  const keys = new Set([...Object.keys(a.tiers), ...Object.keys(b.tiers)])
+  for (const k of keys) if (effectiveTier(a, k) !== effectiveTier(b, k)) return false
+  return true
+}
+
+/** No unsaved change between two versions of a profile. Names compare trimmed, the way they are saved. */
+export function sameRiskProfile(a: RiskProfile, b: RiskProfile): boolean {
+  return a.name.trim() === b.name.trim() && sameTuning(a, b)
+}
+
+/** Why a profile cannot be saved, or null. `otherNames` are the names of every other profile. */
+export function riskProfileProblem(p: Pick<RiskProfile, 'name'> & RiskTuning, otherNames: Iterable<string>): string | null {
+  if (!p.name.trim()) return 'Enter a profile name.'
+  if (nameTaken(p.name, otherNames)) return 'A risk profile with this name already exists.'
+  /* With nothing on for a platform every band is 0: "Risk score above N" would
+     never fire and "below N" would always match. */
+  if (PLATFORMS.some((pl) => weightFor(p, pl.id) === 0)) return 'Turn on at least one signal on each platform.'
+  return null
+}
+
+/** Why a new profile name cannot be used, or null. */
+export function riskProfileNameProblem(name: string, otherNames: Iterable<string>): string | null {
+  if (!name.trim()) return 'Enter a profile name.'
+  if (nameTaken(name, otherNames)) return 'A risk profile with this name already exists.'
+  return null
+}
+
+const BANDS = ['Low', 'Medium', 'High'] as const
+
+/** One line of the review: what changed, as saved and as it will be saved. */
+export interface RiskReviewLine {
+  label: string
+  before: string
+  after: string
+}
+
+/** Every change between the saved profile and the draft, in the order the page reads. */
+export function riskReviewRows(saved: RiskProfile, draft: RiskProfile): RiskReviewLine[] {
+  const rows: RiskReviewLine[] = []
+  if (saved.name.trim() !== draft.name.trim()) rows.push({ label: 'Name', before: saved.name.trim(), after: draft.name.trim() })
+
+  const fromScale = riskScale(saved)
+  const toScale = riskScale(draft)
+  for (const b of BANDS) {
+    if (fromScale[b] !== toScale[b]) {
+      rows.push({ label: `${b} risk score`, before: String(fromScale[b]), after: String(toScale[b]) })
+    }
+  }
+
+  for (const s of RISK_SIGNALS) {
+    const was = isOn(saved, s.id)
+    const now = isOn(draft, s.id)
+    if (was !== now) rows.push({ label: `Signal: ${s.name}`, before: was ? 'On' : 'Off', after: now ? 'On' : 'Off' })
+  }
+
+  for (const s of RISK_SIGNALS) {
+    for (const p of PLATFORMS) {
+      if (!s.on.includes(p.id)) continue
+      const was = tierFor(saved, s, p.id)
+      const now = tierFor(draft, s, p.id)
+      if (was !== now) rows.push({ label: `Weight: ${s.name} on ${p.label}`, before: was, after: now })
+    }
+  }
+  return rows
+}
+
+/** Short names for what changed, for the save bar. */
+export function riskChangeNames(saved: RiskProfile, draft: RiskProfile): string[] {
+  const names: string[] = []
+  if (saved.name.trim() !== draft.name.trim()) names.push('Name')
+  if (RISK_SIGNALS.some((s) => isOn(saved, s.id) !== isOn(draft, s.id))) names.push('Signals')
+  if (RISK_SIGNALS.some((s) => s.on.some((p) => tierFor(saved, s, p) !== tierFor(draft, s, p)))) names.push('Weights')
+  return names
+}

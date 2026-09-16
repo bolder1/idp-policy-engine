@@ -7,3 +7,10 @@
    rebrand.css, so at equal weight a rule here wins over one there. The rules
    it follows are in docs/rebrand-guideline.md.
    ========================================================================== */
+
+/* Pick-one tiles are cards: tile fill and no edge at rest, the console's selected
+   card when chosen — blue soft fill and a blue edge (guideline §2 rule 3, §4). */
+[data-brand='rebrand'] .bfp2__answer { background: var(--surface-sunken); border-color: transparent; }
+[data-brand='rebrand'] .bfp2__answer:hover { background: var(--surface-inset); border-color: transparent; }
+[data-brand='rebrand'] .bfp2__answer.is-on { background: var(--blue-soft); border-color: var(--blue); }
+[data-brand='rebrand'] .bfp2__answer.is-pending { background: var(--fb-notice-bg); border-color: transparent; }

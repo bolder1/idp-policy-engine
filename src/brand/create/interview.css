@@ -31,8 +31,8 @@
 }
 .biv__brandmark {
   display: inline-flex; align-items: center; gap: var(--space-3);
-  font-size: var(--fs-xs); font-weight: var(--fw-medium); letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--text-muted);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  color: var(--text-tertiary);
 }
 .biv__step { flex: 1; text-align: center; font-size: var(--fs-sm); color: var(--text-secondary); }
 .biv__x {
@@ -78,8 +78,8 @@
 
 .biv__eyebrow {
   display: inline-flex; align-items: center; gap: var(--space-3);
-  font-size: var(--fs-xs); font-weight: var(--fw-medium); letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--text-muted);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  color: var(--text-tertiary);
 }
 .biv__panel h1 {
   display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap;
@@ -175,11 +175,10 @@
 .biv__asidehead {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
   margin: 0 0 var(--space-4);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--text-muted);
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold);
+  color: var(--text-secondary);
 }
 .biv__asidehead + * + .biv__asidehead { margin-top: var(--space-6); }
-.biv__asidehead b { font-weight: var(--fw-medium); letter-spacing: 0; text-transform: none; color: var(--text-tertiary); }
 
 .biv__coming { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
 .biv__coming li {
@@ -191,7 +190,7 @@
 .biv__comingn {
   flex: none; display: grid; place-items: center; width: 18px; height: 18px;
   border-radius: var(--radius-full); background: var(--surface-inset);
-  font-size: 10px; font-weight: var(--fw-semibold); color: var(--text-muted);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-tertiary);
 }
 
 .biv__mini { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
@@ -212,7 +211,7 @@
 .biv__minin {
   flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin-top: 1px;
   border-radius: var(--radius-sm); background: var(--surface-inset);
-  font-size: 10px; font-weight: var(--fw-semibold); color: var(--text-secondary);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-secondary);
 }
 
 .biv__record { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
@@ -223,7 +222,7 @@
 }
 .biv__record button:hover { background: var(--surface-sunken); }
 .biv__record button > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.biv__record em { font-style: normal; font-size: var(--fs-xs); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+.biv__record em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
 /* --fw-regular, not --fw-normal. The latter is not a token, so this declaration
    was invalid at computed-value time and the weight fell back to inherited —
    which is bold, from the <strong>, i.e. the exact opposite of what it asks
@@ -281,7 +280,8 @@
   content: ''; position: absolute; left: 32px; top: calc(var(--space-4) * -1); height: var(--space-4); width: 1px;
   background: var(--border-default);
 }
-.biv__spine li.is-ghost { background: var(--surface-sunken); border-style: dashed; box-shadow: none; }
+/* A rule still to come: sunken and flat, with a solid edge (no dashed outlines). */
+.biv__spine li.is-ghost { background: var(--surface-sunken); box-shadow: none; }
 .biv__spine li.is-ghost .biv__n { background: transparent; box-shadow: inset 0 0 0 1px var(--border-default); color: var(--text-muted); }
 .biv__skel { display: block; height: 9px; border-radius: var(--radius-full); background: var(--surface-inset); }
 .biv__skel + .biv__skel { margin-top: 7px; }

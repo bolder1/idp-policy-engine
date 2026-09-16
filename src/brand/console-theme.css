@@ -89,6 +89,9 @@
      reading as the same orange from across a page. It is for filled brand
      surfaces with words on them, and nothing else. */
   --brand-on-fill: #c2431c;
+  /* Orange as TEXT: the chosen line tab's label and icon. #eb5424 is 3.4:1 on
+     white, under the 4.5:1 a 14px label needs; this shade clears it. */
+  --brand-text: #c2431c;
   --brand-subtle-bg: #fdeee9;
   --brand-subtle-border: #f9cabb;
 
@@ -280,9 +283,9 @@
   /* Geometry -------------------------------------------------------------- */
   --nav-sidebar-w: 235px;
   --nav-topbar-h: 52px;
-  --ctl-height-sm: 31px;
-  --ctl-height-md: 35px;
-  --ctl-height-lg: 42px;
+  --ctl-height-sm: 34px;
+  --ctl-height-md: 40px;
+  --ctl-height-lg: 46px;
   --table-row-h: 46px;
   --table-header-h: 40px;
 
@@ -357,7 +360,7 @@
   .bpage { padding: 24px 20px 48px; }
 }
 .bpage__headrow p { font-size: var(--fs-md); }
-.btable-wrap, .bx-card, .bedit, .bmaster__list {
+.btable-wrap, .bx-card {
   border-color: var(--border-subtle);
   box-shadow: none;
 }
@@ -469,8 +472,6 @@
 .bx-btn--brand { background: var(--brand-on-fill); border-color: var(--brand-on-fill); font-weight: 400; padding: 0 16px; }
 .bx-btn--brand:not(:disabled):hover { background: var(--brand-active); border-color: var(--brand-active); }
 .bx-btn--brand:not(:disabled):active { background: #92330f; border-color: #92330f; }
-.bx-btn--setup { background: var(--int-setup-bg); color: #fff; border-color: var(--int-setup-bg); }
-.bx-btn--setup:not(:disabled):hover { background: var(--int-setup-bg-hover); border-color: var(--int-setup-bg-hover); }
 
 /* --- One heading scale, every page -------------------------------------------
    The console's page title is an H5 at 20px/700, not a 24px display size — and
@@ -484,10 +485,12 @@
    and stepped down so a section heading cannot equal its own page title —
    Authentication methods had h1 and h2 both at 20px, which is two levels drawn
    as one. */
-.bpage h1, .bwiz__title h1 { font-size: 20px; font-weight: 700; letter-spacing: 0; }
-.bpage h2 { font-size: 16px; font-weight: 600; letter-spacing: 0; }
-.bpage h3 { font-size: 14px; font-weight: 600; letter-spacing: 0; }
-.bpage__headrow p, .bwiz__title p { font-size: var(--fs-md); color: var(--text-secondary); }
+.bpage h1 { font-size: 20px; font-weight: 700; letter-spacing: 0; }
+/* `.bx-modal` too: dialogs portal to the app root, outside `.bpage`, and their
+   section headings kept the page's scale while they rendered inside it. */
+.bpage h2, .bx-modal h2 { font-size: 16px; font-weight: 600; letter-spacing: 0; }
+.bpage h3, .bx-modal h3 { font-size: 14px; font-weight: 600; letter-spacing: 0; }
+.bpage__headrow p { font-size: var(--fs-md); color: var(--text-secondary); }
 
 /* The body cell keeps the console's reading size; the head is stated in
    screens.css from the variables above. This rule used to restate the head too,
@@ -520,30 +523,22 @@
    block, the banner, the toolbar and the table were four things at one
    interval, so nothing on the page said which of them belonged together.
 
-   Three intervals now, ordered by relation rather than by convenience:
+   Intervals ordered by relation rather than by convenience, on the page grid's
+   16px row gap (measured 16 Sep 2026, the same on every list page):
 
-     24px  after the title block — it names the page, and what follows is a
-           different level of the document.
-     16px  between page-level things that are merely adjacent, e.g. an
-           attention banner and the toolbar under it.
-     10px  between the toolbar and the table it filters — they are ONE object,
-           and a toolbar that floats equidistant between the title above it and
-           the data below it reads as belonging to neither.
+     40px  after the title block (its 24px margin + the gap) — it names the
+           page, and what follows is a different level of the document.
+     28px  between the bar and the list it filters (the bar's 12px + the gap).
 
-   The three bespoke page heads join the shared one here rather than each being
-   corrected in its own sheet: Zones, Device profiles and Authentication methods
-   build their own header element, and the reason they kept drifting is that
-   there was nowhere that said what a page head IS. */
+   The bespoke page heads — the device and risk profile pages' `.bfp2__head`
+   and Authentication methods' `.bm8__head` — join the shared one here rather
+   than each being corrected in its own sheet. */
 .bpage__head,
-.bz7__head,
 .bfp2__head,
 .bm8__head { margin-bottom: var(--space-8); }
-.bz7__head,
 .bfp2__head,
 .bm8__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-7); }
 .bpage__title p,
-.bz7__head p,
-.bfp2__head p,
 .bm8__head p {
   margin: 4px 0 0;
   max-width: 68ch;
@@ -551,35 +546,30 @@
   color: var(--text-secondary);
   line-height: 1.55;
 }
-/* The toolbar's own margin, and why it is zero on the library pages.
-
-   `.bz7`, `.bfp2` and `.bm8` are flex COLUMNS, and a flex child's margin adds
-   to the column's gap instead of replacing it. So this 12px was landing on top
-   of each page's gap — and each page had picked its own gap, 16px on zones and
-   18px on the other two. Between the search row and the table that came out as
-   16px on zones and 30px on device profiles: two pages one nav click apart,
-   drawing the same two objects at nearly twice the distance.
-
-   One gap for the three, and the toolbar contributes nothing on top of it. The
-   margin stays for the pages that are still block-flow. */
+/* The bar's own margin: 12px under it, on top of the page grid's row gap, on
+   every page (see below). */
 .btoolbar { margin-bottom: var(--space-5); }
 /* `.bpage.bz7, .bpage.bfp2, .bpage.bm8 { gap }` stood here — the three library
    screens' own section spacing. `.bpage` is a grid with one row-gap now, so the
-   three no longer need a rule saying they are different. */
-.bz7 > .btoolbar, .bfp2 > .btoolbar, .bm8 > .btoolbar { margin-bottom: 0; }
+   three no longer need a rule saying they are different.
+
+   `.bz7 > .btoolbar, .bfp2 > .btoolbar, .bm8 > .btoolbar { margin-bottom: 0 }`
+   stood here too, and it was the last difference (owner, 16 Sep 2026: "make
+   all the spacing equal like we have in Policies"). Measured: Policies drew 40px
+   from its head to the toolbar and 28px from the toolbar to the table; the
+   library pages drew the same 40 and then 16, because this rule took the
+   toolbar's 12px away. Every page is the same grid now, so every page gets the
+   same 16 + 12. */
 /* Top, not centre. The caption makes the left column two lines tall on the
    longer ones, and an action centred against that sits below the title it
    belongs to. */
 .bpage__headrow { align-items: flex-start; }
-.bpage__title { min-width: 0; }
-.bpage__title p {
-  margin: 4px 0 0;
-  max-width: 68ch;
-  font-size: var(--fs-md);
-  color: var(--text-secondary);
-  line-height: 1.55;
+.bpage__title {
+  min-width: 0;
+  /* Takes the row, so a Documentation link beside it sits at the far right.
+     (A page's controls are never on this row — see `page-bar.tsx`.) */
+  flex: 1 1 240px;
 }
-
 /* --- Side spacing on the library screens ---------------------------------------
 
    `padding-inline: clamp(20px, 9%, 148px)` stood here, on `.bz7`, `.bfp2` and
@@ -606,6 +596,7 @@
    its surroundings, because value is still the only channel doing the work and
    the direction of "more" flips with the ground. */
 :root[data-theme='dark'] {
+  --brand-text: #ef7650;
   --accent: #93a0ae;
   --accent-hover: #b6c0cb;
   --accent-strong: #e8edf2;

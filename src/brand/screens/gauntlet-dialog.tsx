@@ -1,22 +1,22 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ArrowRight,
   Check,
-  ChevronRight,
   Clock,
   Flame,
+  MapPin,
   Minus,
   MonitorSmartphone,
   RotateCcw,
   Swords,
-  Target,
   UserRound,
   Wrench,
   X,
 } from 'lucide-react'
 
 import { Button, Counter, DecisionChip, Modal, TipDot } from '../kit'
-import { predicateSentence } from './predicate-prose'
+import { ruleIfLine } from './predicate-prose'
 import { useNameLookup } from '../store'
 import type { Policy } from '../data'
 import { useBrand } from '../store'
@@ -67,6 +67,9 @@ const OUTCOME_BLURB: Record<Outcome, string> = {
   held: 'Exactly the treatment the card expects.',
 }
 
+/** A sentence opening, lowercased to follow a dash — "for everyone except Contractors", not "for Everyone …". */
+const lowerFirst = (s: string) => (s.charAt(0).toLowerCase() + s.slice(1)).replace(/^for Everyone\b/, 'for everyone')
+
 const GRADE_TONE: Record<string, string> = { A: 'good', B: 'good', C: 'warn', D: 'bad', F: 'bad' }
 
 /* --- The dial ----------------------------------------------------------------
@@ -99,9 +102,7 @@ function Dial({ result, running }: { result: GauntletResult | null; running: boo
         {result ? (
           <>
             <strong>{result.grade}</strong>
-            <em>
-              {held}/{total} held
-            </em>
+            <em>{total} dealt</em>
           </>
         ) : (
           <>
@@ -128,7 +129,7 @@ function CardFace({ c, size = 'md' }: { c: Challenge; size?: 'sm' | 'md' }) {
           {userOf(c.userId).name}
         </li>
         <li>
-          <Target size={12} strokeWidth={2} aria-hidden />
+          <MapPin size={12} strokeWidth={2} aria-hidden />
           {c.place}
         </li>
         <li>
@@ -194,7 +195,7 @@ function BoardTile({
         <span className="bgt__want">wants {EXPECT_LABEL[want]}</span>
         {settled ? (
           <>
-            <ChevronRight size={11} strokeWidth={2} aria-hidden />
+            <ArrowRight size={11} strokeWidth={2} aria-hidden />
             <DecisionChip decision={round.decision} size="sm" />
           </>
         ) : (
@@ -288,8 +289,9 @@ function TileDetail({
             <strong>Close this with a rule</strong>
           </div>
           <p className="bgt__fixrule">
-            <b>{fix.rule.name}</b> — when{' '}
-            {predicateSentence(fix.rule.when, resolve)}{' '}
+            {/* Who and if as one line — "for Contractors, any sign-in". The line
+                always opens with For, If or Any, so lowercasing it is safe. */}
+            <b>{fix.rule.name}</b> — {lowerFirst(ruleIfLine(fix.rule, resolve))}{' '}
             → <em>{EXPECT_LABEL[round.want]}</em>
           </p>
           <p className="bgt__fixwhy">{fix.why}</p>
@@ -365,6 +367,8 @@ export function GauntletDialog({
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
       fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
+      hasZone: (id) => !!store.zoneById(id),
+      hasFingerprint: (id) => !!store.fingerprintById(id),
       groupName: (id) => store.groupById(id).name,
       riskScale: store.riskScale,
     }),
@@ -458,7 +462,7 @@ export function GauntletDialog({
           <span className="bgt__foot">
             {overrideCount > 0
               ? `${overrideCount} expectation${overrideCount === 1 ? '' : 's'} overruled by you.`
-              : `${DECK.length} attempts — seven hostile, six ordinary.`}
+              : 'Seven hostile, six ordinary.'}
           </span>
           <Button variant="ghost" onClick={onClose}>
             Close
@@ -509,7 +513,7 @@ export function GauntletDialog({
                     text="Heuristic, not the engine: each card's context maps to condition values through the same fixed table the Test dialog uses. Real: the order, the first-match stop, and the decision. A card's expected treatment is an opinion — yours to overrule, and the grade follows."
                   />
                 </h3>
-                <p>Thirteen sign-in attempts, dealt at these rules. Nothing accumulates — the grade is a function of the rules as they stand.</p>
+                <p>Each attempt is dealt at these rules. Nothing accumulates — the grade is a function of the rules as they stand.</p>
               </>
             )}
 
@@ -647,6 +651,8 @@ export function GauntletPip({ policy, onOpen }: { policy: Policy; onOpen: () => 
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
       fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
+      hasZone: (id) => !!store.zoneById(id),
+      hasFingerprint: (id) => !!store.fingerprintById(id),
       groupName: (id) => store.groupById(id).name,
       riskScale: store.riskScale,
     }),

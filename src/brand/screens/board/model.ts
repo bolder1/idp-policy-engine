@@ -1,4 +1,5 @@
 import type { AccessDecision, Rule } from '../../data'
+import { normaliseWho } from '../../rule-who'
 import type { SimContext, TraceResult } from '../simulate'
 
 /* -----------------------------------------------------------------------------
@@ -48,12 +49,11 @@ import type { SimContext, TraceResult } from '../simulate'
 
    And on the `rule` member ONLY. The default at the bottom has no Who and no
    If: the evaluator reads `p.fallback?.decision` and nothing else, yet
-   `fallbackRule()` goes through `rule()` and carries a real `Predicate` that
-   `whoEditable` would accept. A Who form mounted against it would cheerfully
-   write `group in […]` into a predicate no evaluator, linter, gauntlet or
-   sweep will ever read — precisely the invisible gate `Rule.appliesTo` was
-   deleted to prevent. Making the fallback partless is not a hidden button; it
-   is a value that cannot be spelt. */
+   `fallbackRule()` goes through `rule()` and is a real `Rule`. A Who form
+   mounted against it would cheerfully write a `fallback.who` that no
+   evaluator, linter, gauntlet or sweep will ever read — an invisible gate on
+   the one rule that has to catch everybody. Making the fallback partless is
+   not a hidden button; it is a value that cannot be spelt. */
 export type Selection = { kind: 'none' } | { kind: 'rule'; id: string; part: Part } | { kind: 'fallback' }
 
 /* The three questions a rule answers, in the order it is written.
@@ -173,9 +173,13 @@ export interface JourneyStep {
 export function journeyOf(rule: Rule): JourneyStep[] {
   if (rule.decision === 'deny') return [{ id: 'stop', label: 'Refused', sub: 'No prompt, no way round', kind: 'stop' }]
 
+  /* A specific first factor with no method is a rule nobody can complete, and
+     the step says so rather than claiming a method was chosen. */
+  const noFirstMethod = rule.firstFactor === 'Specific' && !rule.firstFactorMethod
   const first: JourneyStep = {
     id: 'first',
-    label: rule.firstFactor === 'Specific' ? (rule.firstFactorMethod ?? 'A chosen method') : rule.firstFactor === 'Any' ? 'Any first factor' : 'Password',
+    label: rule.firstFactor === 'Specific' ? (rule.firstFactorMethod ?? 'No method chosen') : rule.firstFactor === 'Any' ? 'Any first factor' : 'Password',
+    ...(noFirstMethod ? { sub: 'cannot be completed' } : null),
     kind: 'first',
   }
   const out: JourneyStep[] = [first]
@@ -217,6 +221,39 @@ export const CLOCKS = [
   { label: '09:30', minutes: 570, caption: 'Working hours' },
   { label: '21:00', minutes: 1260, caption: 'Evening' },
 ] as const
+
+/* Lower the first letter only, and only if the word is not a name.
+
+   The trace reasons are written as sentences — "Closest was card A: Network
+   Zone not in zone Office Network" — and they get spliced mid-sentence after a
+   dash. `toLowerCase()` on the whole string flattened every proper noun in
+   them, and a reason can name a group or a person. */
+export const uncapitalise = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s)
+
+/* Which part of a rule a finding is about, for the links that open one.
+
+   The who findings open Who; everything else opens the If and Then, which is
+   where the rest of the linter's findings are fixed. PE150 (people inside a
+   condition) opens the If: that is where the leftover condition sits and gets
+   deleted. */
+const WHO_FINDINGS = new Set(['PE151', 'PE152', 'PE153'])
+export const partForFinding = (code: string): Part => (WHO_FINDINGS.has(code) ? 'who' : 'when')
+
+/* One patch, applied to one rule. What every edit in the panel goes through.
+
+   A patch that carries `who` writes the who and nothing else: the WHEN is
+   carried over by reference, whatever shape it has.
+
+   The who is normalised, and "everyone" is stored as `who: undefined` rather
+   than by deleting the key. `JSON.stringify` drops an undefined field, so the
+   rule still serialises exactly like one that never had a who. Keeping the key
+   is what keeps its PLACE: a seeded rule has `who` before
+   `secondFactorMethods`, and a delete followed by a re-add would move it to the
+   end — the same rule, a different string, and the save bar lit on a no-op. */
+export function patchRule(r: Rule, p: Partial<Rule>): Rule {
+  if (!('who' in p)) return { ...r, ...p }
+  return { ...r, ...p, who: normaliseWho(p.who) }
+}
 
 /** A stable, human short label for a situation axis value. */
 export const shortPlace = (p: string) =>

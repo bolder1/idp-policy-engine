@@ -10,19 +10,11 @@
 
 export type PolicyType = 'App Access' | 'Session' | 'Account Management'
 
-/* `monitor` is the framework doc's report-only, and it is the reason the two
-   predicates below exist.
+/* Four statuses and no more: Draft, Active, Inactive, and Always on for the
+   system policy.
 
-   Entra ships it as a first-class policy state and the doc lists it as an open
-   question with its own answer already attached — "would meaningfully de-risk
-   rollout and should be cheap if we design the PDP to log decisions
-   regardless." It is also §6.4's migration mechanism: run the new engine
-   alongside the old one, log both, flip when they agree.
-
-   A monitor policy **evaluates and does not enforce.** That is one sentence and
-   two different questions, which every surface in this console was previously
-   answering with `status !== 'inactive'` — a test that silently counts a
-   monitor policy as protection the moment the state exists. Hence: */
+   Monitor (report-only) was a fifth and it is gone, by the owner's call on
+   14 Sep 2026: the product has no such state. Seeds that sat in it are Active. */
 /* `draft` is not `inactive`, and the difference is the whole reason it exists.
 
    Inactive is a DECISION: this policy was published and somebody has since
@@ -32,18 +24,75 @@ export type PolicyType = 'App Access' | 'Session' | 'Account Management'
    nine policies could not tell the two they had deliberately parked from the
    four somebody had started and abandoned.
 
-   It enforces nothing and evaluates nothing, and it gets that for free from
-   `enforces` below rather than from a rule of its own — the two predicates
-   name the statuses that DO act, so a status that does not act needs no
-   entry. */
-export type PolicyStatus = 'draft' | 'active' | 'inactive' | 'monitor' | 'always-on'
+   It enforces nothing, and it gets that for free from `enforces` below rather
+   than from a rule of its own — the predicate names the statuses that DO act,
+   so a status that does not act needs no entry. */
+export type PolicyStatus = 'draft' | 'active' | 'inactive' | 'always-on'
+
+/** Every status, in the order the console lists them. */
+export const POLICY_STATUSES: readonly PolicyStatus[] = ['draft', 'active', 'inactive', 'always-on']
 
 /** Decides real sign-ins. The question Coverage, conflicts and cover-counts ask. */
 export const enforces = (p: { status: PolicyStatus }) =>
   p.status === 'active' || p.status === 'always-on'
 
-/** Runs and records what it would have done. Enforcing implies evaluating. */
-export const evaluates = (p: { status: PolicyStatus }) => enforces(p) || p.status === 'monitor'
+/** Runs against real sign-ins. With Monitor gone this is exactly `enforces`;
+    kept as a name so callers that ask "does it run" still read that way. */
+export const evaluates = enforces
+
+/* --- Ids and names -----------------------------------------------------------
+
+   One way to mint an id and one way to name a copy, for every library object.
+
+   Ids used to end in the collection's length (`z-dup-19`). A delete lowers the
+   length, so the next create repeated an id that was still in the list, and one
+   save or delete then hit both rows. `newId` checks what is taken instead. */
+
+/** Lower-case, hyphenated, no leading or trailing hyphen. Empty when nothing is left. */
+export function slugOf(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/, '')
+}
+
+/** An id that is not in `taken`: `prefix-slug`, then `prefix-slug-2`, `-3`… */
+export function newId(prefix: string, taken: Iterable<string>, name = ''): string {
+  const used = new Set(taken)
+  const stem = [prefix, slugOf(name)].filter(Boolean).join('-') || 'item'
+  if (!used.has(stem)) return stem
+  for (let n = 2; ; n += 1) {
+    const candidate = `${stem}-${n}`
+    if (!used.has(candidate)) return candidate
+  }
+}
+
+/** Case-insensitive, trimmed. `name` counts as taken when any of `others` has it. */
+export function nameTaken(name: string, others: Iterable<string>): boolean {
+  const key = name.trim().toLowerCase()
+  if (!key) return false
+  for (const o of others) if (o.trim().toLowerCase() === key) return true
+  return false
+}
+
+/* A name for a copy that no other item has: "X (copy)", "X (copy 2)", …
+
+   The base is trimmed so the whole name fits `max`, and an existing copy suffix
+   is dropped first, so copying "X (copy)" gives "X (copy 2)" rather than
+   "X (copy) (copy)". */
+export function uniqueName(base: string, taken: Iterable<string>, max = 50): string {
+  const others = [...taken]
+  const root = base.trim().replace(/\s*\(copy(?: \d+)?\)$/i, '') || base.trim()
+  for (let n = 1; ; n += 1) {
+    const suffix = n === 1 ? ' (copy)' : ` (copy ${n})`
+    const room = Math.max(1, max - suffix.length)
+    const candidate = `${root.slice(0, room).trimEnd()}${suffix}`
+    if (!nameTaken(candidate, others)) return candidate
+  }
+}
 
 /* What the console calls "App Type", and it is NOT the protocol.
 
@@ -72,10 +121,22 @@ export interface App {
 
      FABRICATED, and named as fabricated the way the `users` note is — there is
      no audit trail behind these timestamps. The FORMAT is real, taken from the
-     live page ("Aug 14, 2026, 14:25:51"); the values are not. Anything that
-     sorts on this must sort on the order the fixture states, not on a parse of
-     the string. */
+     live page ("Aug 14, 2026, 14:25:51"); the values are not. Sort on
+     `lastUpdatedAt` below, never on array order or `Date.parse`. */
   lastUpdated: string
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/* Milliseconds for an app's "Last updated", read from the one format the
+   console prints ("Aug 14, 2026, 14:25:51"). A strict read rather than
+   `Date.parse`, whose handling of that shape differs between engines. Anything
+   that does not match sorts first, as 0. */
+export function lastUpdatedAt(a: Pick<App, 'lastUpdated'>): number {
+  const m = a.lastUpdated.match(/^([A-Z][a-z]{2}) (\d{1,2}), (\d{4}), (\d{2}):(\d{2}):(\d{2})$/)
+  const month = m ? MONTHS.indexOf(m[1]) : -1
+  if (!m || month < 0) return 0
+  return Date.UTC(Number(m[3]), month, Number(m[2]), Number(m[4]), Number(m[5]), Number(m[6]))
 }
 
 export interface Group {
@@ -107,16 +168,11 @@ export interface ConditionType {
   keys?: readonly string[]
   /* In the catalogue, and NOT in the When list.
 
-     `group` and `user` are the WHO step's vocabulary. `audience-ops.ts` is a
-     view over exactly these two conditions — read them out of the predicate,
-     write them back — so they have to exist here or `conditionType('group')`
-     falls through to `CONDITION_CATALOGUE[0]` and every surface that draws an
-     audience labels it "Network zone". A wrong label, silently, on the one
-     part of a rule that says who it is about.
-
-     They are still not offered beside the circumstances, because who a rule is
-     for is asked once, on its own step, and offering it twice is how a policy
-     grows a second place to say the same thing. */
+     `group` and `user` are not conditions any more. Who a rule applies to is
+     `Rule.who`, a field of its own beside the WHEN (see `rule-who.ts`), and no
+     picker offers these two. The rows stay only so a legacy condition that
+     still names one reads with its real label, and the linter's PE150 can say
+     "move people and groups to Who" instead of "unknown attribute". */
   who?: true
   /* Listed, described, and not addable.
 
@@ -278,7 +334,7 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      real it is a flag flip, not a re-implementation — and a coming-soon row
      that would return "undecided" the day it shipped is worse than no row. */
   { id: 'ml-risk', label: 'ML risk score', group: 'Risk', hint: 'An AI-derived verdict across every signal. Not available yet.', operators: ['is', 'is not'], valueKind: 'list', options: ['Low', 'Medium', 'High'], soon: true },
-  /* The two the Who step is a view over. See `who` above. */
+  /* Legacy only: never offered, never written. See `who` above and `Rule.who`. */
   { id: 'group', label: 'Group Membership', group: 'Group', hint: "Match by the user's group", operators: ['in', 'not in'], valueKind: 'group', who: true },
   { id: 'user', label: 'Specific people', group: 'User', hint: 'Match named individuals from the directory', operators: ['is', 'is not'], valueKind: 'user', who: true },
 ]
@@ -472,12 +528,6 @@ export const DECISION_LABEL: Record<AccessDecision, string> = {
   '2fa': '2 factors',
 }
 
-export const DECISION_CAPTION: Record<AccessDecision, string> = {
-  deny: 'Block access',
-  '1fa': 'One step',
-  '2fa': 'Two steps',
-}
-
 export interface Rule {
   id: string
   name: string
@@ -500,9 +550,17 @@ export interface Rule {
      holding it per rule let a policy build "rule 1 covers Finance, rule 2
      covers everyone", which reads as a scoped policy and is not one.
 
-     Narrowing INSIDE a policy is still expressible, and now says so: it is a
-     `group` or `user-type` condition in the rule's WHEN, evaluated like every
-     other condition instead of being a second, invisible gate. */
+     Narrowing INSIDE a policy is `who` below: the groups and people this rule
+     applies to, inside the policy's audience. It is not a condition and never
+     sits in a card, so the If cards only describe the sign-in. */
+  /* Who this rule applies to. ABSENT means everyone the policy governs.
+
+     ANDed with the whole WHEN: a sign-in matches when the person is covered
+     AND the predicate holds. Groups and people are a union; the exceptions
+     subtract. Always stored normalised (`normaliseWho` in `rule-who.ts`), with
+     the field omitted rather than empty, because every dirty check in the app
+     compares JSON. */
+  who?: RuleWho
   when: Predicate
   decision: AccessDecision
   firstFactor: 'Password' | 'Any' | 'Specific'
@@ -523,6 +581,23 @@ export interface Rule {
   allowDisable2fa: boolean
   /** Rough population the rule matches — shown live while editing. */
   matchEstimate: number
+}
+
+/* Who one rule applies to.
+
+   A person is covered when both include lists are empty (everyone), or their
+   group is in `groupIds`, or their id is in `userIds` — and their group is not
+   in `exceptGroupIds`, and they are not in `exceptUserIds`. The policy's own
+   audience is checked before any rule, so this can only narrow it.
+
+   `groupIds` and `userIds` are always present on a stored value; the two
+   exception lists are omitted when empty, and so is the whole field when
+   every list is empty. `normaliseWho` is the one place that shape is made. */
+export interface RuleWho {
+  groupIds: string[]
+  userIds: string[]
+  exceptGroupIds?: string[]
+  exceptUserIds?: string[]
 }
 
 /* Who a policy governs.
@@ -649,6 +724,21 @@ export interface Policy {
   modifiedBy: string
   rules: Rule[]
   isSystem?: boolean
+  /* Edits saved as a draft on a policy that is already published.
+
+     The live `rules` and `fallback` keep deciding sign-ins; this is what the
+     builders reopen on, until Review & save publishes it or Discard drops it.
+     A policy whose status is `draft` never carries one — it has nothing live to
+     protect, so saving a draft writes straight into it. */
+  pendingDraft?: PolicyDraft
+}
+
+/** Unpublished edits to a published policy — see `Policy.pendingDraft`. */
+export interface PolicyDraft {
+  rules: Rule[]
+  fallback?: Rule
+  savedAt: string
+  savedBy: string
 }
 
 // --- Library objects ---------------------------------------------------------
@@ -836,12 +926,12 @@ export const groups: Group[] = [
 
   /* --- Two groups that are never a target ------------------------------------
 
-     `On-Call` and `Matter-Acme-Litigation` exist to be read by a `group`
-     CONDITION inside a rule, which is the distinction the document draws in
-     finding #15: a fast-rotating operational group belongs in a condition,
+     `On-Call` and `Matter-Acme-Litigation` exist to be read by a RULE's who,
+     not by a policy's audience, which is the distinction the document draws in
+     finding #15: a fast-rotating operational group belongs on the rule,
      because targeting it would mean re-assigning a policy on every rotation,
-     and a matter group belongs in a condition because membership of it is what
-     the rule is asking about rather than which rule applies.
+     and a matter group belongs on the rule because membership of it is what
+     the rule is asking about rather than which policy applies.
 
      Nothing in this fixture marks them as condition-only. That is the gap, not
      an omission: the model has no way to say "this group is not an assignment
@@ -1146,7 +1236,6 @@ export const zones: Zone[] = [
     usedIn: 4,
   },
 
-
   {
     id: 'corp-network',
     kind: 'allowed',
@@ -1345,9 +1434,15 @@ export const methodSets: MethodSet[] = [
 let ruleSeq = 0
 function rule(over: Partial<Rule> & Pick<Rule, 'name'>): Rule {
   ruleSeq += 1
+  /* A who sits immediately before `when`, the one place `withWho` in
+     rule-who.ts also puts it, so a seeded rule whose people are cleared and
+     chosen again stringifies exactly as it was seeded. Spread-if-set: a rule
+     with no who gains no key. */
+  const { who, ...rest } = over
   return {
     id: `r${ruleSeq}`,
     enabled: true,
+    ...(who ? { who } : null),
     when: anySignIn(),
     decision: '2fa',
     firstFactor: 'Password',
@@ -1355,7 +1450,7 @@ function rule(over: Partial<Rule> & Pick<Rule, 'name'>): Rule {
     rememberMfa: false,
     allowDisable2fa: false,
     matchEstimate: 120,
-    ...over,
+    ...rest,
   }
 }
 
@@ -1433,9 +1528,6 @@ export function when(...cards: ConditionCard[]): Predicate {
 /** The catch-all: no conditions, so it decides every sign-in that reaches it. */
 export const anySignIn = (): Predicate => ({ cards: [] })
 
-/** A blank card with one unset condition of the given type — what "+ Add condition" inserts. */
-export const blankCard = (typeId: string, operator: string): ConditionCard => card(cond(typeId, operator, []))
-
 /* Deep clone with fresh ids, mandatory wherever a rule is reused.
 
    `store.copyRuleInto` and the three synthetic-tenant builders in fixtures.ts
@@ -1463,6 +1555,18 @@ export function reidRule(r: Rule): Rule {
        into many policies, so a single shared array would reach all of them. */
     secondFactorMethods: r.secondFactorMethods ? [...r.secondFactorMethods] : undefined,
     methodChain: r.methodChain ? [...r.methodChain] : undefined,
+    /* Who, copied list by list for the same reason. Spread-if-set, so a rule
+       with no who stays byte-identical under `JSON.stringify`. */
+    ...(r.who
+      ? {
+          who: {
+            groupIds: [...r.who.groupIds],
+            userIds: [...r.who.userIds],
+            ...(r.who.exceptGroupIds ? { exceptGroupIds: [...r.who.exceptGroupIds] } : null),
+            ...(r.who.exceptUserIds ? { exceptUserIds: [...r.who.exceptUserIds] } : null),
+          },
+        }
+      : null),
     when: {
       join: r.when.join,
       cards: r.when.cards.map((k) => ({
@@ -1800,14 +1904,8 @@ export const policies: Policy[] = [
     name: 'Outdated browser enforcement',
     type: 'App Access',
     appIds: ['wiki'],
-    /* Monitoring, not enforcing, and that is the honest status for this one.
-
-       A browser floor is the requirement most likely to catch somebody the
-       tenant did not expect — a contractor on a locked-down build, a kiosk that
-       has not updated. Monitor evaluates every rule and records every verdict
-       and refuses nothing, so the estate can be measured before the deny below
-       is switched on. */
-    status: 'monitor',
+    /* Active. It sat in Monitor, which is gone (owner, 14 Sep 2026). */
+    status: 'active',
     lastModified: '2 days ago',
     modifiedBy: 'Jaspreet T.',
     audience: EVERYONE,
@@ -1951,11 +2049,7 @@ export const policies: Policy[] = [
     id: 'sc9-contractor-onboarding',
     name: 'Contractor devices — compliance gate before access',
     type: 'App Access',
-    /* Not `dms`, and the reason is a fixture rather than a preference: Document
-       Management is the estate's only app whose single policy is in monitor,
-       which is the state `summarise` reports as 'off' and the only place that
-       branch is demonstrated. Attaching an active policy there would have taken
-       the tenant's one example of it away. */
+    /* Not `dms`: that app already has its own policy (M&A Integration). */
     appIds: ['jira'],
     status: 'active',
     lastModified: '8 hours ago',
@@ -2130,13 +2224,8 @@ export const policies: Policy[] = [
            first-match-wins (`simulate.ts:421`) preserves that faithfully, so this
            one thing survives the mapping intact. */
         name: 'After hours, on-call rotation only',
-        when: when(
-          namedCard(
-            'On the rotation, on a managed device',
-            cond('group', 'in', ['on-call']),
-            cond('fingerprint', 'matches', ['fp-managed']),
-          ),
-        ),
+        who: { groupIds: ['on-call'], userIds: [] },
+        when: when(namedCard('On a managed device', cond('fingerprint', 'matches', ['fp-managed']))),
         decision: '2fa',
         firstFactor: 'Password',
         secondFactor: 'specific',
@@ -2228,19 +2317,14 @@ export const policies: Policy[] = [
     rules: [
       rule({
         name: 'Paralegal, cleared, on matter, from the office',
-        when: when(
-          namedCard(
-            'Paralegal on the matter, on the office network',
-            /* `user-role` and `user-attr` are both gone from the catalogue, and
-               with them the clearance ladder this policy was built on. What is
-               left is the matter and the office. The rule above this one —
-               'Role, matter and clearance all agree' — is deleted rather than
-               emptied: without clearance it was `group in matter-acme`, which
-               is strictly broader than this rule and sat in front of it. */
-            cond('group', 'in', ['matter-acme']),
-            cond('zone', 'in zone', ['office-cidr'], 'ip'),
-          ),
-        ),
+        /* `user-role` and `user-attr` are both gone from the catalogue, and
+           with them the clearance ladder this policy was built on. What is
+           left is the matter and the office. The rule above this one —
+           'Role, matter and clearance all agree' — is deleted rather than
+           emptied: without clearance it was the matter group on its own, which
+           is strictly broader than this rule and sat in front of it. */
+        who: { groupIds: ['matter-acme'], userIds: [] },
+        when: when(namedCard('On the office network', cond('zone', 'in zone', ['office-cidr'], 'ip'))),
         decision: '2fa',
         firstFactor: 'Password',
         secondFactor: 'specific',
@@ -2291,7 +2375,6 @@ export const policies: Policy[] = [
     }),
   },
 
-
   /* Policy B — DevOps */
   {
     id: 's5-devops',
@@ -2324,7 +2407,6 @@ export const policies: Policy[] = [
     fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 0 }),
   },
 
-
   /* Policy C — End-Users */
   {
     id: 's5-endusers',
@@ -2349,7 +2431,6 @@ export const policies: Policy[] = [
     ],
     fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 0 }),
   },
-
 
   /* Application Baseline Policy */
   {
@@ -2520,8 +2601,10 @@ export const policies: Policy[] = [
       rule({
         name: 'CFO anywhere, hardened',
         /* `user-attr is cfo@acme.com` would be the literal reading, but user-attr
-           has no evaluator case and would never match. `user` is modelled. */
-        when: when(card(cond('user', 'is', ['mehak']))),
+           has no evaluator case and would never match. A named person in the
+           rule's who is modelled, and it is the whole rule: no conditions. */
+        who: { groupIds: [], userIds: ['mehak'] },
+        when: anySignIn(),
         decision: '2fa',
         firstFactor: 'Password',
         secondFactor: 'specific',
@@ -2545,7 +2628,6 @@ export const policies: Policy[] = [
     ],
     fallback: rule({ name: 'Default rule', when: anySignIn(), decision: 'deny', matchEstimate: 12 }),
   },
-
 
   /* Application Baseline Policy */
   {
@@ -2672,7 +2754,6 @@ export const policies: Policy[] = [
       matchEstimate: 0,
     }),
   },
-
 
   /* Scenario 18 — Traveling Executive. */
   {
@@ -2847,7 +2928,6 @@ export const policies: Policy[] = [
     }),
   },
 
-
   /* Scenario 20 — Red-Flag Deny Guard. */
   {
     id: 'privileged-gateway',
@@ -2927,7 +3007,6 @@ export const policies: Policy[] = [
     }),
   },
 
-
   {
     id: 's10-aws-posture',
     name: 'Production Cloud Console — Device Posture',
@@ -2982,7 +3061,6 @@ export const policies: Policy[] = [
     }),
   },
 
-
   {
     id: 's11-wiki-contractor',
     name: 'Internal Wiki — Contractor Control',
@@ -3031,7 +3109,6 @@ export const policies: Policy[] = [
       matchEstimate: 12,
     }),
   },
-
 
   {
     id: 's12-crm-risk',
@@ -3096,7 +3173,6 @@ export const policies: Policy[] = [
     }),
   },
 
-
   {
     id: 's13-trading-compliance',
     name: 'Trading Platform — Compliance Gate',
@@ -3155,7 +3231,6 @@ export const policies: Policy[] = [
       matchEstimate: 12,
     }),
   },
-
 
   {
     id: 's14-erp-regional',
@@ -3248,13 +3323,12 @@ export const policies: Policy[] = [
     }),
   },
 
-
   {
     id: 's15-ma-onboarding',
     name: 'M&A Integration — Document Management',
     type: 'App Access',
     appIds: ['dms'],
-    status: 'monitor',
+    status: 'active',
     lastModified: '4 days ago',
     modifiedBy: 'Ravi Menon',
     // Doc target is `Acquired-Co-Employees`. No such group; `contractors` is the
@@ -3416,10 +3490,7 @@ export const policies: Policy[] = [
 
   /* Scenario 4 — Registered Devices Only (Device gate).
      Doc app: "Code Repository (GitLab)" — GitLab does NOT exist in `apps`.
-     Nearest real id: 'github' (GitHub Enterprise). Already claimed by the seeded
-     `eng-vpn` policy, but at status 'monitor', which does not decide sign-ins
-     (`app-policies.decidesFor` requires `enforces`), so there is no live
-     precedence collision — only an indistinguishable pair of "assignments".
+     Nearest real id: 'github' (GitHub Enterprise).
      Doc target: Group `Engineering` → 'engineering' EXISTS (310). */
   {
     id: 'uc4-registered-devices',
@@ -3506,7 +3577,7 @@ export interface Scenario {
   id: string
   name: string
   description: string
-  category: 'Quick Protection' | 'Device-based' | 'Risk-based' | 'Compliance'
+  category: 'Quick Protection' | 'Device-based' | 'Risk-based' | 'Compliance' | 'Uncategorized'
   tag?: string
   badge?: string
   /** Shipped by Xecurify. Absent means this tenant authored it. */
@@ -3566,8 +3637,8 @@ export const scenarios: Scenario[] = [
     description: 'Executives with miniOrange App can sign in with a push notification.',
     audience: audienceOf(['executives']),
     rules: [{
-      name: 'Executive passwordless', ifText: 'Group is Executives', decision: '1fa',
-      build: () => rule({ name: 'Executive passwordless',when: when(card(cond('group', 'in', ['Executives']))), decision: '1fa', firstFactor: 'Any', matchEstimate: 12 }),
+      name: 'Executive passwordless', ifText: 'For Executives, any sign-in', decision: '1fa',
+      build: () => rule({ name: 'Executive passwordless', who: { groupIds: ['executives'], userIds: [] }, when: anySignIn(), decision: '1fa', firstFactor: 'Any', matchEstimate: 12 }),
     }],
   },
   {
@@ -3706,6 +3777,8 @@ export const FALLBACK_NAME = 'Nothing else matched'
    could write in a card, and drawing an empty WHEN section on it would invite
    somebody to try. */
 export function fallbackRule(decision: AccessDecision = '1fa'): Rule {
+  /* Never a who, for the same reason it never has conditions: it decides for
+     everyone the rules above missed. `rule()` sets none, and nothing reads one. */
   return rule({ name: FALLBACK_NAME, decision, matchEstimate: 0 })
 }
 
@@ -3728,71 +3801,3 @@ export function blankPolicy(name: string, appIds: string[] = []): Policy {
     rules: [],
   }
 }
-
-// --- Decision log ------------------------------------------------------------
-
-export interface LogEntry {
-  time: string
-  user: string
-  app: string
-  matchedRule: string
-  decision: 'Allow' | 'Deny' | 'Challenge'
-  conditions: { label: string; matched: boolean }[]
-  ip: string
-  device: string
-  place: string
-  factor: string
-  latency: string
-  risk: string
-  chain: { rule: string; outcome: string }[]
-}
-
-/* Every row's app is the app its matched rule's policy protects.
-
-   That was free when a policy could cover five applications; under one app per
-   policy it is a constraint, and the seed broke it in three places — two
-   Salesforce sign-ins and a GitHub one all matching rules that belong to
-   "Finance Team – High Security", which protects Workday. A log that shows a
-   rule firing on an application its policy does not cover is a log that teaches
-   the reader the wrong model of the engine.
-
-   Only "Default Rule" is free to appear anywhere: it is the system policy's,
-   and that is the one policy with no application. */
-export const decisionLog: LogEntry[] = [
-  {
-    time: '11:48:02', user: 'priya@mo.com', app: 'Workday', matchedRule: 'Off-network finance access', decision: 'Challenge',
-    conditions: [{ label: 'Group is Finance', matched: true }, { label: 'Outside Office Network', matched: true }],
-    ip: '115.160.205.254', device: 'MO-LT-0510', place: 'Pune, IN', factor: 'Push', latency: '142ms', risk: 'Low · ML Engine: No escalation',
-    chain: [{ rule: 'Rule 1 · Block compromised devices', outcome: 'skipped (no match)' }, { rule: 'Rule 2 · Off-network finance access', outcome: 'matched — evaluation stopped' }],
-  },
-  {
-    time: '11:47:51', user: 'arun@mo.com', app: 'Zoom', matchedRule: 'Default Rule', decision: 'Allow',
-    conditions: [{ label: 'No rule matched', matched: false }],
-    ip: '10.4.2.19', device: 'MO-LT-0233', place: 'Pune, IN', factor: 'Password', latency: '88ms', risk: 'Low',
-    chain: [{ rule: 'Rules 1–4', outcome: 'skipped (no match)' }, { rule: 'Default Rule', outcome: 'applied' }],
-  },
-  {
-    time: '11:47:30', user: 'contractor@ext.com', app: 'Workday', matchedRule: 'Block compromised devices', decision: 'Deny',
-    conditions: [{ label: 'Not recognised by Corporate managed', matched: true }],
-    ip: '185.220.101.12', device: 'unknown', place: 'Unknown (Tor exit)', factor: '—', latency: '61ms', risk: 'High · ML Engine: escalated',
-    chain: [{ rule: 'Rule 1 · Block compromised devices', outcome: 'matched — evaluation stopped' }],
-  },
-  {
-    time: '11:46:12', user: 'mehak@mo.com', app: 'Workday', matchedRule: 'Off-network finance access', decision: 'Challenge',
-    conditions: [{ label: 'Group is Finance', matched: true }, { label: 'Outside Office Network', matched: true }],
-    ip: '49.36.12.8', device: 'MO-LT-0119', place: 'Bengaluru, IN', factor: 'OTP', latency: '210ms', risk: 'Medium',
-    chain: [{ rule: 'Rule 1', outcome: 'skipped (no match)' }, { rule: 'Rule 2', outcome: 'matched — evaluation stopped' }],
-  },
-  {
-    time: '11:45:03', user: 'jwttest@wttest.com', app: 'Salesforce', matchedRule: 'Default Rule', decision: 'Allow',
-    conditions: [{ label: 'No rule matched', matched: false }],
-    ip: '10.4.9.71', device: 'MO-DT-0044', place: 'Pune, IN', factor: 'Password', latency: '73ms', risk: 'Low',
-    chain: [{ rule: 'Rules 1–4', outcome: 'skipped (no match)' }, { rule: 'Default Rule', outcome: 'applied' }],
-  },
-  {
-    time: '11:44:20', user: 'ops@mo.com', app: 'Workday', matchedRule: 'Off-network finance access', decision: 'Challenge',
-    conditions: [{ label: 'Group is Finance', matched: true }, { label: 'Outside Office Network', matched: true }],
-    ip: '86.14.22.9', device: 'MO-MB-0091', place: 'London, UK', factor: 'Push', latency: '164ms', risk: 'Medium',
-    chain: [{ rule: 'Rule 1', outcome: 'skipped (no match)' }, { rule: 'Rule 2', outcome: 'matched — evaluation stopped' }],
-  },
-]

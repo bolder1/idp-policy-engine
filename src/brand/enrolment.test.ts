@@ -50,6 +50,10 @@ describe('the person can only be enrolled in what they can reach', () => {
 const FACTORS = AUTH_METHODS.filter((m) => m.use === 'second')
 
 describe('every method knows what to ask a person for', () => {
+  it('asks nobody to type a display token serial: an admin assigns it', () => {
+    expect(enrolShapeFor('display-token')).toEqual({ kind: 'assigned', note: 'Your admin assigns this token.' })
+  })
+
   it('gives each method in the catalogue an enrolment shape', () => {
     /* Falling through to 'none' is a legitimate answer for CAC and the grid,
        and a bug for anything that genuinely needs a form — so the assertion is
@@ -65,7 +69,7 @@ describe('every method knows what to ask a person for', () => {
       if (s.kind === 'phone' || s.kind === 'email' || s.kind === 'alt-email' || s.kind === 'token') {
         expect(s.label, `${m.name} (${s.kind}) has no field label`).toBeTruthy()
       }
-      if (s.kind === 'none') {
+      if (s.kind === 'none' || s.kind === 'assigned') {
         expect(s.note, `${m.name} has nothing to set up and does not say so`).toBeTruthy()
       }
     }

@@ -229,7 +229,7 @@ function WhoFig({ reduce }: Fig) {
         <rect x="94" y="12" width="132" height="24" rx="12" fill="var(--surface-raised)" stroke={INK} strokeOpacity="0.75" />
         <circle cx="110" cy="24" r="3.4" fill={INK} opacity="0.5" />
         <text x="121" y="27.5" fontSize="10" fill={INK} opacity="0.85" fontWeight="600">
-          group in Finance
+          Finance
         </text>
       </motion.g>
 

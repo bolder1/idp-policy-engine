@@ -7,7 +7,9 @@
    the product.
    --------------------------------------------------------------------------- */
 
-.btr { position: fixed; inset: 0; z-index: var(--z-modal); pointer-events: none; }
+/* Above centred dialogs (--z-modal + 50), below popovers: a step opens the
+   review dialog, and the card has to stay clickable on top of it. */
+.btr { position: fixed; inset: 0; z-index: calc(var(--z-modal) + 60); pointer-events: none; }
 
 /* A bare positioning context for the card, so the keyed swap has a stable
    parent and the card keeps its absolute placement. */
@@ -80,8 +82,7 @@
 
 .btr__body { padding: var(--space-6) var(--space-6) var(--space-5); }
 .btr__count {
-  font-size: var(--fs-xs); font-weight: var(--fw-medium);
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted);
+  font-size: 12px; font-weight: var(--fw-medium); color: var(--text-muted);
 }
 .btr__body h2 {
   margin: var(--space-3) 0 var(--space-3);
@@ -97,14 +98,9 @@
   padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--border-subtle); background: var(--surface-sunken);
 }
-.btr__dots { flex: 1; display: flex; gap: 5px; }
-.btr__dots i {
-  width: 6px; height: 6px; border-radius: var(--radius-full);
-  background: var(--border-strong);
-  transition: background var(--dur-fast) var(--ease-standard), width var(--dur-fast) var(--ease-standard);
-}
-.btr__dots i.is-done { background: var(--accent); }
-.btr__dots i.is-on { width: 16px; border-radius: var(--radius-pill); background: var(--accent); }
+/* A spacer that pushes Skip, Back and Next to the end. It held progress dots,
+   which repeated the step count and are out of the console. */
+.btr__dots { flex: 1; }
 
 .btr__skip { font-size: var(--fs-xs); color: var(--text-muted); padding: 0 var(--space-3); }
 .btr__skip:hover { color: var(--text-primary); text-decoration: underline; }

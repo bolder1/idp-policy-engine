@@ -93,12 +93,22 @@ html[data-theme='dark'] {
   border-radius: var(--radius-sm);
 }
 
+/* Sentence case, 12px or more. The uppercase, letter-spaced micro-label is gone
+   from the console (owner, 14 Sep 2026). */
 .brand-root .u-label {
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--text-tertiary);
+}
+
+/* A heading that takes focus only so focus has somewhere to land (after a save
+   bar leaves, say). It is not a control, so it draws no control ring. */
+.brand-root :where(h1, h2, h3)[tabindex='-1']:focus,
+.brand-root :where(h1, h2, h3)[tabindex='-1']:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .brand-root .u-mono {
@@ -178,8 +188,19 @@ html[data-theme='dark'] {
 .bx-btn--ghost:not(:disabled):hover { background: var(--int-ghost-bg-hover); }
 .bx-btn--ghost:not(:disabled):active { background: var(--int-ghost-bg-active); }
 
-.bx-btn--danger { background: var(--int-danger-bg); color: var(--int-danger-text); border-color: var(--int-danger-bg); }
-.bx-btn--danger:not(:disabled):hover { background: var(--int-danger-bg-hover); border-color: var(--int-danger-bg-hover); }
+/* Text only, in the link colour: no fill and no edge, so it sits in a row of
+   switches without reading as a second primary. The padding stays so the press
+   target is a button's, and the hover is the underline a link gives. */
+.bx-btn--link { background: transparent; color: var(--text-link); border-color: transparent; padding-inline: var(--space-3); }
+.bx-btn--link:not(:disabled):hover { text-decoration: underline; text-underline-offset: 3px; }
+.bx-btn--link.bx-btn--sm { font-size: var(--fs-sm); }
+
+/* Destructive actions are an outline, not a fill: the red edge and red words say
+   what the button does without it becoming the loudest thing in the footer. The
+   owner asked for this for every delete and discard (14 Sep 2026). */
+.bx-btn--danger { background: transparent; color: var(--fb-negative-fg); border-color: var(--int-danger-bg); }
+.bx-btn--danger:not(:disabled):hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); border-color: var(--int-danger-bg-hover); }
+.bx-btn--danger:not(:disabled):active { background: var(--fb-negative-bg); border-color: var(--int-danger-bg-hover); }
 .bx-btn--danger:focus-visible { outline-color: var(--focus-ring-danger); }
 
 /* --- Icon button -----------------------------------------------------------
@@ -243,12 +264,39 @@ html[data-theme='dark'] {
   flex: none; margin-top: 1px; padding: 1px 5px;
   border: 1px solid var(--border-subtle); border-radius: var(--radius-xs);
   background: var(--surface-sunken);
-  font-family: inherit; font-size: 10px; color: var(--text-muted);
+  font-family: inherit; font-size: var(--fs-xs); color: var(--text-muted);
 }
-.bx-menu__item.is-cursor:not(:disabled) { background: var(--surface-sunken); }
-.bx-menu__item.is-danger.is-cursor strong,
+/* Focus is the highlight. Hover moves focus in MenuButton and RowMenu, so the
+   pointer and the arrow keys light the same row and never two. */
+.bx-menu__item:focus,
+.bx-menu__item:focus-visible { outline: none; box-shadow: none; }
+.bx-menu__item:focus:not(:disabled),
+.bx-menu__item:hover:not(:disabled) { background: var(--surface-sunken); }
+.bx-menu__item.is-danger:focus strong,
 .bx-menu__item.is-danger:hover strong { color: var(--fb-negative-fg); }
 .bx-menu__item:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
+
+/* --- Row menu ------------------------------------------------------------------
+   The kebab at the end of a row (RowMenu), and its menu, portalled to the app
+   root at fixed coordinates so no table scroller can clip it. */
+.bx-rowmenu {
+  display: inline-grid; place-items: center; flex: none;
+  width: var(--ctl-height-sm); height: var(--ctl-height-sm);
+  border: var(--bw-thin) solid transparent; border-radius: var(--radius-md);
+  background: none; color: var(--text-tertiary); cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bx-rowmenu--md { width: var(--ctl-height-md); height: var(--ctl-height-md); }
+.bx-rowmenu:not(:disabled):hover,
+.bx-rowmenu.is-open { background: var(--surface-inset); color: var(--text-primary); }
+.bx-rowmenu:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
+.bx-menu__pop.bx-rowmenu__pop {
+  position: fixed; right: auto;
+  z-index: var(--z-popover);
+  min-width: 200px; max-width: min(320px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px); overflow-y: auto;
+  text-align: left;
+}
 
 /* --- Tip -------------------------------------------------------------------
    Where a demoted sentence goes. Hover, focus and touch all open it; Escape
@@ -278,9 +326,9 @@ html[data-theme='dark'] {
 
 .bx-tipdot {
   display: grid; place-items: center; flex: none;
-  width: 15px; height: 15px; border-radius: var(--radius-full);
+  width: 16px; height: 16px; border-radius: var(--radius-full);
   border: 1px solid var(--border-default); background: var(--surface-raised);
-  font-size: 9px; font-weight: var(--fw-semibold); line-height: 1;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); line-height: 1;
   color: var(--text-muted); cursor: help;
 }
 .bx-tipdot:hover { border-color: var(--border-strong); color: var(--text-secondary); }
@@ -374,18 +422,9 @@ html[data-theme='dark'] {
 
 /* --- Decision chip / status ----------------------------------------------
 
-   COMPONENTS.md says status is a dot AND a label, always. That rule was written
-   against dot-ONLY status — a coloured circle with nothing beside it, which is
-   unreadable to anyone who cannot separate the hues and unreadable to everyone
-   else without a legend. It is still right about that.
-
-   It is not an argument for a dot on a pill that is ALREADY tinted, bordered
-   and labelled. There the dot is a third copy of one fact, and three copies of
-   one fact is how a screen fills up with marks nobody can spend attention on.
-   So the dot survives in exactly one place: `--active` / `--inactive`, which
-   are plain text in a table column with no fill of their own. There the dot is
-   the only thing you can scan a column by, which is the job the rule was
-   protecting. Everywhere the pill carries a tint, the tint is the dot.
+   No dots, anywhere (owner, 14 Sep 2026). A status is a tinted pill with its
+   word in it: the tint is what a column is scanned by, and the word is what
+   makes it readable to anyone who cannot separate the hues.
 
    Both families take the shared pill geometry, so a decision chip and a badge
    on the same row are the same object at the same size. */
@@ -399,12 +438,6 @@ html[data-theme='dark'] {
   line-height: var(--pill-line);
   white-space: nowrap;
 }
-.bx-status i {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-full);
-  flex: none;
-}
 .bx-decision {
   padding: var(--pill-py) var(--pill-px);
   border-radius: var(--pill-radius);
@@ -414,19 +447,31 @@ html[data-theme='dark'] {
 .bx-decision--positive { background: var(--fb-positive-bg); color: var(--fb-positive-fg); border-color: var(--fb-positive-border); }
 .bx-decision--negative { background: var(--fb-negative-bg); color: var(--fb-negative-fg); border-color: var(--fb-negative-border); }
 .bx-decision--notice { background: var(--fb-notice-bg); color: var(--fb-notice-fg); border-color: var(--fb-notice-border); }
-.bx-decision--info { background: var(--fb-info-bg); color: var(--fb-info-fg); border-color: var(--fb-info-border); }
 
-.bx-status--active { color: var(--text-body); }
-.bx-status--active i { background: var(--fb-positive-dot); }
-/* Inactive is a lifecycle state, not a failure — neutral, never red. */
+/* Draft, Active, Inactive, and Always on for the system policy — nothing else.
+   Active and Always on take the positive tint; Inactive the neutral fill; Draft
+   a solid outline. */
+.bx-status--active {
+  padding: var(--pill-py) var(--pill-px);
+  border-radius: var(--pill-radius);
+  background: var(--fb-positive-bg);
+  color: var(--fb-positive-fg);
+  border: var(--bw-thin) solid var(--fb-positive-border);
+}
 .bx-status--draft {
   padding: var(--pill-py) var(--pill-px);
   border-radius: var(--pill-radius);
-  border: var(--bw-thin) dashed var(--border-default);
+  border: var(--bw-thin) solid var(--border-default);
   color: var(--text-tertiary); background: none;
 }
-.bx-status--inactive { color: var(--text-tertiary); }
-.bx-status--inactive i { background: var(--fb-neutral-dot); }
+/* Inactive is a lifecycle state, not a failure — neutral, never red. */
+.bx-status--inactive {
+  padding: var(--pill-py) var(--pill-px);
+  border-radius: var(--pill-radius);
+  background: var(--surface-inset);
+  color: var(--text-tertiary);
+  border: var(--bw-thin) solid var(--border-subtle);
+}
 .bx-status--always {
   padding: var(--pill-py) var(--pill-px);
   border-radius: var(--pill-radius);
@@ -462,7 +507,7 @@ html[data-theme='dark'] {
 /* On is GREEN, not brand.
 
    A switch says "this is running", which is a state, and the console already
-   has a colour for that state: the positive dot on every Active pill. Brand is
+   has a colour for that state: the positive tint on every Active pill. Brand is
    for the thing you press to commit, and a page of brand-orange switches spent
    that meaning on rows nobody is about to act on — nine rules, nine orange
    bars, none of them the primary action. */
@@ -549,11 +594,6 @@ html[data-theme='dark'] {
   box-shadow: var(--el-low);
 }
 .bx-tabs__label { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: var(--space-3); }
-.bx-tabs__label em {
-  font-style: normal;
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
-}
 
 /* The underline flavour.
 
@@ -575,7 +615,7 @@ html[data-theme='dark'] {
   border-radius: 0;
 }
 .bx-tabs--line .bx-tabs__tab {
-  height: 34px;
+  height: 40px;
   padding: 0 var(--space-3);
   border-radius: 0;
   /* Over the container's own rule, not above it — the active bar and the
@@ -584,6 +624,8 @@ html[data-theme='dark'] {
   font-size: var(--fs-md);
 }
 .bx-tabs--line .bx-tabs__tab:hover { color: var(--text-primary); }
+/* The chosen line tab is orange end to end: the bar, the label and its icon. */
+.bx-tabs--line .bx-tabs__tab.is-on { color: var(--brand-text); }
 .bx-tabs--line .bx-tabs__bg {
   inset: auto 0 0;
   height: 2px;
@@ -599,10 +641,11 @@ html[data-theme='dark'] {
 
 /* --- Fields --------------------------------------------------------------- */
 
-.bx-field { display: flex; flex-direction: column; gap: var(--space-3); }
+/* 8px label to control, matching every other form on the product. */
+.bx-field { display: flex; flex-direction: column; gap: var(--space-4); }
 .bx-field.is-inline { flex-direction: row; align-items: center; gap: var(--space-5); }
 .bx-field.is-inline .bx-field__label { min-width: 128px; }
-.bx-field__control { display: flex; flex-direction: column; gap: var(--space-3); }
+.bx-field__control { display: flex; flex-direction: column; gap: var(--space-4); }
 .bx-field__hint { font-size: var(--fs-sm); color: var(--text-tertiary); }
 
 /* :where() throughout — at (0,2,1) these defaults beat every component that
@@ -644,6 +687,24 @@ html[data-theme='dark'] {
   box-shadow: 0 0 0 4px var(--focus-halo);
 }
 .brand-root :where(input, textarea)::placeholder { color: var(--text-placeholder); }
+
+/* A control in a STACKED FORM FIELD takes the form size, whatever size the
+   caller asked for (16 Sep 2026).
+
+   `Picker` defaults to `sm` because most of its callers are row controls — a
+   condition's operator, a weight, a filter. In a field with a label above it
+   that default drew a 34px dropdown directly over a 40px number field and under
+   a 40px text input, which is the drift the scale change was meant to end.
+
+   Scoped to the three wrappers that mean "label above a control" rather than
+   applied by width: `width="fill"` is not the same signal (the weight picker
+   and the board's editors fill their cells too, and are meant to stay small).
+   A fifth form wrapper is one selector. */
+.bx-field .bx-picker__trigger,
+.bfp2__enrolctl .bx-picker__trigger,
+.bmc__field .bx-picker__trigger {
+  height: var(--ctl-height-md);
+}
 
 /* --- Callout -------------------------------------------------------------- */
 
@@ -705,6 +766,13 @@ html[data-theme='dark'] {
   grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: var(--space-8);
+  /* Above slide-overs, below popovers. A centred dialog is opened FROM a drawer
+     or a slider far more often than the other way round, and it sat at the
+     overlay layer (300) under the drawer (400): its right half, with Delete,
+     Save and Discard on it, was under the panel and could not be clicked.
+     Popovers portalled from inside a dialog (pickers, row menus) stay above it
+     at --z-popover. */
+  z-index: calc(var(--z-modal) + 50);
 }
 
 .bx-drawer {
@@ -763,6 +831,10 @@ html[data-theme='dark'] {
 }
 .bx-drawer__head h2,
 .bx-modal__head h2 { font-size: var(--fs-lg); }
+/* A name with no spaces in it ("Delete corporate-network-apac-singapore-…?")
+   breaks where it must instead of pushing the close button out of the dialog. */
+.bx-drawer__head > div,
+.bx-modal__head h2 { min-width: 0; overflow-wrap: anywhere; }
 .bx-drawer__head p { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); }
 /* A control, not a character.
 
@@ -816,50 +888,82 @@ html[data-theme='dark'] {
 
 /* --- Save bar ------------------------------------------------------------- */
 
-/* Fixed at the bottom centre of the VIEWPORT, and it stays there.
+/* A footer across the page column, not a card floating over it.
 
-   Sticky was the other option and it is the wrong one for this: it keeps the
-   bar inside the page column, so it is as wide as the content, moves with the
-   document until it pins, and on a short form sits wherever the fields happen
-   to end. Fixed puts it in one place, so "where do I commit this" never depends
-   on how far down the page you are. */
+   Portalled into `.bshell__main` as its last child. That column is a flex
+   column that scrolls, so `margin-top: auto` puts the footer at the bottom of
+   the window on a short page, and `sticky` keeps it pinned there while a long
+   page scrolls under it. In the flow, it never covers the last control — the
+   floating card needed every page to reserve 84px of padding for that.
+
+   Motion animates opacity only, so nothing here competes for `transform`. */
 .bx-savebar {
-  position: fixed;
-  /* Centred WITHOUT a transform, and this is load-bearing rather than a style
-     preference. `motion` writes this element's `transform` inline on every
-     frame of the slide-in, so a `translateX(-50%)` in the stylesheet is
-     overwritten and the bar jumps to the left edge the moment the spring
-     settles. This is what that rule looked like before it had a caller to
-     expose it. `left: 0; right: 0` over a `fit-content` width centres the same
-     way and leaves `transform` entirely to the animation. */
-  left: 0;
-  right: 0;
-  bottom: var(--space-8);
-  margin-inline: auto;
-  width: fit-content;
-  max-width: calc(100vw - var(--space-8) * 2);
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  flex: none;
   display: flex;
   align-items: center;
-  gap: var(--space-5);
-  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-7);
-  /* A raised card, not the inverse surface this used to be. The toast is a dark
-     pill at the bottom centre of the same screen, and saving makes this bar
-     leave and a toast arrive — two dark pills in one place, one replacing the
-     other, is two things nobody can tell apart at the moment they swap. */
+  justify-content: space-between;
+  gap: var(--space-6);
+  /* The page's own side inset, so the words line up with the page's edge. */
+  padding: var(--space-6) 32px;
   background: var(--surface-raised);
-  border: var(--bw-thin) solid var(--border-default);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--el-overlay);
-  /* Under the toast for the same reason: for the moment both exist, the
-     confirmation is the newer fact. */
-  z-index: var(--z-overlay);
+  border-top: var(--bw-thin) solid var(--border-subtle);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+  /* Over the page it pins above, under popovers, dialogs and the toast. */
+  z-index: 20;
 }
-.bx-savebar__text { display: flex; flex-direction: column; min-width: 0; }
-.bx-savebar__text strong { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bx-savebar__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bx-savebar__text strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bx-savebar__text span {
-  font-size: var(--fs-xs); color: var(--text-tertiary);
+  font-size: var(--fs-sm); color: var(--text-tertiary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Why Save is off. Notice, not red: nothing is being destroyed. It wraps rather
+   than ellipsises — the reason is the one line here that must be read whole. */
+.bx-savebar__text span.is-blocked { color: var(--fb-notice-fg); font-weight: var(--fw-medium); white-space: normal; }
+.bx-savebar > .bx-btn { flex: none; min-width: 148px; }
+@media (max-width: 720px) {
+  .bx-savebar { padding: var(--space-5) 20px; }
+}
+/* A page sized to the column (`.bcp--fit`) gives the footer its line rather
+   than pushing the column into a scroll the height of the footer. */
+.bshell__main:has(> .bx-savebar) > .bcp--fit { height: auto; flex: 1 1 0; }
+
+/* --- Renaming in place (kit NameField) --------------------------------------
+
+   A heading-sized input, the count under its left edge, and a small raised
+   pair — ✕ and ✓ — under its right edge. Sized to the heading it replaces. */
+.bx-namefield { display: flex; flex-direction: column; gap: var(--space-2); width: min(460px, 100%); min-width: 0; }
+.bx-namefield__input {
+  width: 100%; height: var(--ctl-height-lg); padding: 0 var(--space-5);
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md);
+  font-family: inherit; font-size: 20px; font-weight: 700; letter-spacing: 0; color: var(--text-primary);
+}
+.bx-namefield__input:focus-visible,
+.bx-namefield__input:focus { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
+.bx-namefield__input[aria-invalid='true'] { border-color: var(--fb-negative-border); }
+.bx-namefield__foot { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.bx-namefield__count { padding-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.bx-namefield__acts {
+  display: inline-flex; align-items: stretch;
+  background: var(--surface-raised);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  box-shadow: var(--el-low);
+  overflow: hidden;
+}
+.bx-namefield__btn {
+  width: 36px; height: 30px;
+  display: grid; place-items: center;
+  background: none; cursor: pointer;
+}
+.bx-namefield__btn + .bx-namefield__btn { border-left: var(--bw-thin) solid var(--border-subtle); }
+.bx-namefield__btn.is-cancel { color: var(--fb-negative-fg); }
+.bx-namefield__btn.is-apply { color: var(--fb-positive-fg); }
+.bx-namefield__btn:hover { background: var(--surface-inset); }
+.bx-namefield__btn:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
 
 /* --- App logos ------------------------------------------------------------ */
 
@@ -886,27 +990,11 @@ html[data-theme='dark'] {
   color: var(--text-muted);
 }
 
-.applogo__none { font-size: var(--fs-sm); color: var(--text-muted); }
-
 /* Two more pill families, for labels that are categories rather than states —
    severity bands, environments, owners. They exist so a categorical tag never
    has to borrow a semantic colour and imply an outcome it does not have. */
 .bx-badge--lime { background: var(--fb-lime-bg); color: var(--fb-lime-fg); border-color: var(--fb-lime-border); }
 .bx-badge--magenta { background: var(--fb-magenta-bg); color: var(--fb-magenta-fg); border-color: var(--fb-magenta-border); }
-
-/* Monitor — the report-only state.
-
-   Notice, never positive. A pill that reads as "live" on a policy which has
-   never refused anything is how a tenant spends a fortnight believing they are
-   protected, and the whole value of the state is that it is visibly not
-   enforcing. */
-.bx-status--monitor {
-  padding: var(--pill-py) var(--pill-px);
-  border-radius: var(--pill-radius);
-  background: var(--fb-notice-bg);
-  border: var(--bw-thin) solid var(--fb-notice-border);
-  color: var(--fb-notice-fg);
-}
 
 /* --- Number stepper ---------------------------------------------------------------
    One bordered control holding the whole question: step down, the value, its
@@ -966,6 +1054,36 @@ html[data-theme='dark'] {
 .bx-step__hint[data-on='true'] { opacity: 1; }
 .bx-step.is-corrected + .bx-step__hint { color: var(--fb-negative-fg); }
 
+/* --- The same number, as a FIELD -------------------------------------------------
+
+   The console's own shape (Allowed Device Registrations): a box that takes the
+   width it is given, the value against the left edge like any text input, and
+   the two steps stacked as chevrons inside the right edge. Chosen where the
+   number sits in a column of dropdowns and switches — a 96px minus/value/plus
+   pill among full-width fields reads as a different kind of question, which is
+   the one thing it is not (owner, 16 Sep 2026).
+
+   Placed by grid rather than reordered by flex: the two buttons have to occupy
+   one 26px column in two rows, which a row of flex children cannot do. The DOM
+   keeps decrease before increase — the reading order a screen reader gets is
+   the same either way, and `role="spinbutton"` on the input is what actually
+   carries the control. */
+.bx-stepwrap--field { display: flex; width: 100%; min-width: 0; }
+.bx-step--field {
+  display: grid; width: 100%; min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 1fr 1fr;
+  height: var(--ctl-height-md); padding: 0 0 0 var(--space-5); gap: 0;
+}
+.bx-step--field > .bx-step__val { grid-column: 1; grid-row: 1 / -1; align-items: center; padding: 0; min-width: 0; }
+.bx-step--field > .bx-step__val input { width: 100%; text-align: left; }
+/* Increase is the top chevron, and it is the LAST child — the up arrow has to
+   be the one that adds, whatever order the buttons are written in. */
+.bx-step--field > .bx-step__btn { width: 26px; height: auto; border-radius: 0; }
+.bx-step--field > .bx-step__btn:first-of-type { grid-column: 2; grid-row: 2; }
+.bx-step--field > .bx-step__btn:last-of-type { grid-column: 2; grid-row: 1; }
+.bx-stepwrap--field > .bx-step__hint { text-align: left; padding-top: 3px; }
+
 @media (prefers-reduced-motion: reduce) {
   .bx-step, .bx-step__hint { transition: none; }}
 
@@ -1004,7 +1122,9 @@ html[data-theme='dark'] {
 .bx-tierpick { display: inline-flex; min-width: 0; }
 .bx-tierpick .bx-picker { width: 100%; }
 .bx-tierpick .bx-picker__trigger {
-  height: 28px; min-height: 28px;
+  /* The scale, not a number of its own. At a fixed 28 it was the one control
+     on the signals list that did not move when the scale did. */
+  height: var(--ctl-height-sm); min-height: var(--ctl-height-sm);
   font-weight: var(--fw-medium);
 }
 /* No hue ramp. It was red / amber / green on the trigger, hot to cool, and the
@@ -1031,10 +1151,6 @@ html[data-theme='dark'] {
    still there for a pointer and a screen reader — see the note at the call
    site in RiskSignals.tsx. */
 .bx-tiers--none { font-size: var(--fs-md); color: var(--text-muted); white-space: nowrap; }
-
-@media (max-width: 720px) {
-  .bx-tier { padding: 0 8px; }
-}
 
 /* --- The tick ------------------------------------------------------------- */
 
@@ -1070,3 +1186,62 @@ html[data-theme='dark'] {
   background: var(--accent-strong);
   color: var(--surface-raised);
 }
+
+/* The leave dialog body — one line, secondary. See LeaveDialog in leave-guard.tsx. */
+.bx-leave__body { margin: 0; font-size: var(--fs-md); line-height: 1.5; color: var(--text-secondary); }
+
+/* The change-state pill is a short sentence, never a long name, so it gets
+   room for all of it and never gives way to a title beside it. */
+.bx-badge.bx-change {
+  --badge-max: 24ch;
+  flex: none;
+}
+
+/* The one delete confirmation (screens/confirm-delete.tsx). */
+.bx-confirm { display: flex; flex-direction: column; gap: var(--space-4); }
+.bx-confirm p { margin: 0; font-size: var(--fs-md); line-height: 1.5; color: var(--text-secondary); }
+.bx-confirm__uses {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-subtle);
+}
+.bx-confirm__uses li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-block: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bx-confirm__policy {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  color: var(--text-link);
+  cursor: pointer;
+}
+.bx-confirm__policy:hover { text-decoration: underline; }
+.bx-confirm__policy:focus-visible { outline: 2px solid var(--focus-ring, var(--text-link)); outline-offset: 2px; }
+.bx-confirm__policy, .bx-confirm__rules { overflow-wrap: anywhere; }
+.bx-confirm__rules { font-size: var(--fs-sm); color: var(--text-muted); }
+.bx-confirm__uses li > .bx-badge { align-self: flex-start; }
+
+/* Review changes (kit ReviewChanges): saved against draft, one change a row.
+   The wrap scrolls sideways on a phone rather than squeezing three columns. */
+.bx-review__wrap { overflow-x: auto; }
+.bx-review { width: 100%; min-width: 420px; border-collapse: collapse; font-size: var(--fs-md); }
+.bx-review th, .bx-review td { text-align: left; vertical-align: top; padding: var(--space-4) var(--space-5); border-bottom: var(--bw-thin) solid var(--border-subtle); overflow-wrap: anywhere; }
+.bx-review thead th { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary); }
+.bx-review tbody th { font-weight: var(--fw-medium); color: var(--text-primary); width: 28%; }
+.bx-review__before { color: var(--text-tertiary); width: 36%; }
+.bx-review__after { color: var(--text-primary); width: 36%; }
+.bx-review__nil { color: var(--text-muted); }
+.bx-review__none, .bx-review__blocked { margin: 0 0 var(--space-5); font-size: var(--fs-md); color: var(--text-secondary); }
+.bx-review__blocked { color: var(--fb-notice-fg); font-weight: var(--fw-medium); }
+

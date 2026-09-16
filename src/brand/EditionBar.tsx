@@ -147,7 +147,7 @@ function GapRow({ gap, onSee }: { gap: Gap; onSee: () => void }) {
       <div className="bed__gaphead">
         <span className="bed__surface">{gap.surface}</span>
         <strong>{gap.title}</strong>
-        <span className={`bed__weight is-${gap.weight}`}>{gap.weight} risk</span>
+        <span className={`bed__weight is-${gap.weight}`}>{gap.weight.charAt(0).toUpperCase() + gap.weight.slice(1)} risk</span>
       </div>
 
       {/* The question first. It is the only line somebody skimming will read,

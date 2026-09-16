@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
-import type { LucideIcon } from 'lucide-react'
+import { useId } from 'react'
+import { type LucideIcon, SearchX } from 'lucide-react'
+
+import { Button } from './kit'
 
 /* -----------------------------------------------------------------------------
    Empty states.
@@ -27,19 +30,25 @@ export function EmptyState({
   blurb,
   action,
   compact,
+  live,
+  id,
 }: {
   icon: LucideIcon
   title: string
   /** One line. If it needs two, the second one belongs somewhere else. */
   blurb: string
+  /** A Button, or a fragment of a primary Button and one secondary control. */
   action?: ReactNode
   /* For an empty SECTION rather than an empty page — the panel it sits in
      already has a heading and a border, so the state inside it needs less air
      and a smaller mark or it out-weighs the thing it belongs to. */
   compact?: boolean
+  /** Announce it when it appears — for a state that replaces a list as somebody types. */
+  live?: boolean
+  id?: string
 }) {
   return (
-    <div className={`bempty ${compact ? 'is-compact' : ''}`}>
+    <div id={id} className={`bempty ${compact ? 'is-compact' : ''}`} role={live ? 'status' : undefined}>
       <span className="bempty__icon" aria-hidden>
         <Icon size={26} strokeWidth={1.5} />
       </span>
@@ -50,19 +59,76 @@ export function EmptyState({
   )
 }
 
-/* The inline kind: a filter or a search that matched nothing. No drawing — the
-   surrounding page is still full of context, and an illustration here would be
-   a picture of a thing that does exist, drawn because it is hidden. */
-export function NoResults({ children }: { children: ReactNode }) {
-  return <p className="bempty__none">{children}</p>
+/* A search or a filter that matched nothing, drawn as fully as an empty page.
+
+   The owner asked for every empty state to be treated equally (14 Sep 2026):
+   the one-line "Nothing matches" read as a loading glitch. It is the same block
+   now, with its own mark, a title that names what was searched for, one plain
+   line, and the action that brings the list back.
+
+   Clearing brings the list back and removes this block, button and all, which
+   used to leave keyboard focus on <body>. Focus goes to the page's search box
+   instead, the control somebody clearing a search reaches for next. */
+export function NoMatches({
+  noun,
+  query,
+  filtered = false,
+  onClear,
+  compact,
+  blurb: blurbOverride,
+  secondary,
+}: {
+  /** Plural, lower case: 'zones', 'device profiles'. */
+  noun: string
+  query?: string
+  /** A filter other than the search is narrowing the list. */
+  filtered?: boolean
+  onClear: () => void
+  compact?: boolean
+  /** Replaces the default line, for a fact worth more than the default ("3 in Xecurify templates."). */
+  blurb?: string
+  /** One more control beside Clear, such as a switch to where the matches are. */
+  secondary?: ReactNode
+}) {
+  const id = useId()
+  const q = query?.trim()
+  const title = q ? `No ${noun} match “${q}”` : `No ${noun} match these filters`
+  const blurb =
+    blurbOverride ??
+    (q && filtered
+      ? 'Try another search, or change the filters.'
+      : q
+        ? 'Check the spelling, or try another search.'
+        : 'Change or clear the filters to see more.')
+  const clear = q && filtered ? 'Clear search and filters' : q ? 'Clear search' : 'Clear filters'
+
+  const clearAndRefocus = () => {
+    const scope = document.getElementById(id)?.closest('[role="dialog"], .bpage, .bshell__main') ?? document.body
+    onClear()
+    window.setTimeout(() => {
+      const active = document.activeElement
+      if (active && active !== document.body && active.isConnected) return
+      scope.querySelector<HTMLInputElement>('.bx-search input, input[type="search"]')?.focus({ preventScroll: true })
+    }, 0)
+  }
+
+  return (
+    <EmptyState
+      id={id}
+      icon={SearchX}
+      title={title}
+      blurb={blurb}
+      compact={compact}
+      live
+      action={
+        <>
+          <Button variant="secondary" onClick={clearAndRefocus}>
+            {clear}
+          </Button>
+          {secondary}
+        </>
+      }
+    />
+  )
 }
 
-/* --- The drawings ---------------------------------------------------------------
-   All on a 132×92 field, 1.5 stroke, round joins, sharing `S` — so the three
-   read as one set rather than three illustrations that happen to be nearby.
-
-   One per surface that can genuinely be empty, and no more. Policies and
-   Authentication methods are never empty (the system catch-all and the
-   twenty-one-method catalogue always exist), and Templates is a static
-   catalogue — those get `NoResults` for a search that matched nothing, which is
-   a different thing and correctly undrawn. */

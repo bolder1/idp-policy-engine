@@ -1,3 +1,9 @@
+import { Undo2 } from 'lucide-react'
+
+import { Button } from '../../kit'
+import type { AccessDecision } from '../../data'
+import { DECISION_NAME } from './model'
+
 /* -----------------------------------------------------------------------------
    The empty policy — a screen, not a canvas.
 
@@ -16,11 +22,49 @@
    the whole region when it does.
    -------------------------------------------------------------------------- */
 
-export function BoardEmpty({ onUseTemplate, onScratch }: { onUseTemplate?: () => void; onScratch: () => void }) {
+export function BoardEmpty({
+  fresh = true,
+  fallback,
+  onEditDefault,
+  onUndo,
+  undoLabel = 'Undo',
+  onUseTemplate,
+  onScratch,
+}: {
+  /** A new draft nobody has written in yet. Otherwise the policy lost its rules, or never had any while live. */
+  fresh?: boolean
+  /** What the policy's default decides. Every sign-in gets it while there are no rules. */
+  fallback?: AccessDecision
+  onEditDefault?: () => void
+  /** Present when the last edit can be undone — deleting the last rule, say. */
+  onUndo?: () => void
+  undoLabel?: string
+  onUseTemplate?: () => void
+  onScratch: () => void
+}) {
   return (
     <div className="bb__empty">
       <div className="bb__empty__inner">
-        <h2>How would you like to start?</h2>
+        <h2>{fresh ? 'Add the first rule' : 'No rules'}</h2>
+
+        {/* What the policy does right now. The default card and the undo
+            control live on the canvas, which is not drawn without rules, so
+            this line carries both. */}
+        {fallback && (
+          <div className="bb__empty__now">
+            <p>Every sign-in gets the default: {DECISION_NAME[fallback]}.</p>
+            {onEditDefault && (
+              <Button variant="ghost" size="sm" onClick={onEditDefault}>
+                Edit default
+              </Button>
+            )}
+            {onUndo && (
+              <Button variant="ghost" size="sm" icon={Undo2} onClick={onUndo}>
+                {undoLabel}
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Two ways in, side by side, sized the same.
 
@@ -70,19 +114,12 @@ export function BoardEmpty({ onUseTemplate, onScratch }: { onUseTemplate?: () =>
    the card behind: enough to answer the pointer, not enough to watch.
    -------------------------------------------------------------------------- */
 
-/** The panel both cards draw: a rounded frame, a title bar, three dots. */
+/** The panel both cards draw: a rounded frame and a title bar. No window dots. */
 function ArtPanel({ x, y, plain }: { x: number; y: number; plain?: boolean }) {
   return (
     <g transform={`translate(${x} ${y})`}>
       <rect className="bb__ill__panel" x="0.5" y="0.5" width="99" height="61" rx="6" />
-      {!plain && (
-        <>
-          <path className="bb__ill__bar" d="M0.5 15.5 H99.5" />
-          <circle className="bb__ill__dot" cx="9" cy="8" r="1.8" />
-          <circle className="bb__ill__dot" cx="15" cy="8" r="1.8" />
-          <circle className="bb__ill__dot" cx="21" cy="8" r="1.8" />
-        </>
-      )}
+      {!plain && <path className="bb__ill__bar" d="M0.5 15.5 H99.5" />}
     </g>
   )
 }
@@ -118,9 +155,8 @@ function ScratchArt() {
     <svg className="bb__start2__art" viewBox="0 0 150 100" role="img" aria-label="An empty policy, with a place for the first rule">
       <g className="bb__ill__front">
         <ArtPanel x={26} y={22} />
-        {/* Where the first rule goes. Dashed, because it is a slot rather than
-            a thing — and the one part of either picture that takes the brand on
-            its own. */}
+        {/* Where the first rule goes — the one part of either picture that
+            takes the brand on its own. */}
         <g transform="translate(26 22)">
           <rect className="bb__ill__slot" x="34" y="26" width="32" height="24" rx="5" />
           <path className="bb__ill__plus" d="M50 32 V44 M44 38 H56" />

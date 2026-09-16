@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { anySignIn, EVERYONE, type Policy, type Rule } from '../data'
-import { canRedo, canUndo, commit, historyOf, HISTORY_LIMIT, redo, undo } from './history'
+import { canRedo, canUndo, commit, historyOf, HISTORY_LIMIT, redo, revertTo, undo } from './history'
 
 /* -----------------------------------------------------------------------------
    Undo is the one control an administrator reaches for when they have already
@@ -105,5 +105,22 @@ describe('history', () => {
     expect(h.past).toHaveLength(HISTORY_LIMIT)
     // The oldest states fell off the back; the newest is still present.
     expect(h.present.rules[0].name).toBe(`r${HISTORY_LIMIT + 19}`)
+  })
+})
+
+describe('discarding unsaved edits', () => {
+  it('can be undone, bringing the edits back', () => {
+    const saved = policy([rule('one')])
+    const edited = policy([rule('one'), rule('two')])
+    const h = revertTo(commit(historyOf(saved), edited), saved)
+    expect(h.present).toBe(saved)
+    expect(canUndo(h)).toBe(true)
+    expect(undo(h).present).toBe(edited)
+  })
+
+  it('records nothing when there was nothing to discard', () => {
+    const saved = policy([rule('one')])
+    const h = revertTo(historyOf(saved), JSON.parse(JSON.stringify(saved)) as Policy)
+    expect(canUndo(h)).toBe(false)
   })
 })

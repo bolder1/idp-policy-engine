@@ -3,23 +3,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
-  Building2,
   Check,
   ChevronDown,
   Clock,
-  Gavel,
+  CornerDownRight,
   Loader2,
+  type LucideIcon,
+  Network,
   Pencil,
   ShieldAlert,
   Sparkles,
   Users,
   Wand2,
   X,
-  type LucideIcon,
 } from 'lucide-react'
 
 import { Button, DecisionChip, TipDot } from '../kit'
 import { EVERYONE, type Audience, type Rule } from '../data'
+import { freeName } from '../policy-name'
 import { useBrand } from '../store'
 import { runGauntlet } from '../screens/gauntlet'
 import type { SimEnv } from '../screens/simulate'
@@ -67,8 +68,8 @@ const EXAMPLES = [
 const Q_ICON: Record<QuestionId, LucideIcon> = {
   audience: Users,
   threat: ShieldAlert,
-  response: Gavel,
-  relief: Building2,
+  response: CornerDownRight,
+  relief: Network,
   remember: Clock,
 }
 
@@ -123,6 +124,8 @@ export function Interview({
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
       fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
+      hasZone: (id) => !!store.zoneById(id),
+      hasFingerprint: (id) => !!store.fingerprintById(id),
       groupName: (id) => store.groupById(id).name,
       riskScale: store.riskScale,
     }),
@@ -255,7 +258,9 @@ export function Interview({
     setStage('ask')
   }
 
-  const name = nameFor(text, answers)
+  /* Numbered when a policy already has the name, so the policy this creates
+     is never a second row nobody can tell apart from the first. */
+  const name = freeName(nameFor(text, answers), store.policies.map((p) => p.name))
 
   /* One number for the whole run. The questions own most of it; the build owns
      the last stretch, because a bar that sits at 100% while a loader is still
@@ -322,10 +327,8 @@ export function Interview({
             </button>
 
             <div className="biv__asidebody">
-              <h2 className="biv__asidehead">
-                {stage === 'prompt' ? 'What we will ask' : 'Policy so far'}
-                {stage !== 'prompt' && <b>{rules.length} rules</b>}
-              </h2>
+              {/* No count beside the heading: the list under it is numbered. */}
+              <h2 className="biv__asidehead">{stage === 'prompt' ? 'What we will ask' : 'Policy so far'}</h2>
 
               {stage === 'prompt' ? (
                 <ol className="biv__coming">
@@ -405,7 +408,7 @@ export function Interview({
               >
                 <h1>What should this policy do?</h1>
                 <p className="biv__sub">
-                  One sentence, then five questions. We write the rules and grade them before you touch the builder.
+                  Describe it in one sentence, then answer five questions. The rules are written and tested before the builder opens.
                 </p>
 
                 <textarea
@@ -456,7 +459,7 @@ export function Interview({
                 {seeded[q.id] && (
                   <p className="biv__caught">
                     <Sparkles size={12} strokeWidth={2} aria-hidden />
-                    Read from your sentence — change it if that is wrong
+                    Taken from your sentence. Change it if needed.
                   </p>
                 )}
 
@@ -580,8 +583,7 @@ export function Interview({
                 <Spine rules={rules} lines={lines} landed={rules.length} reduce={!!reduce} />
 
                 <p className="biv__order">
-                  The guard rule is first on purpose. Under first-match-wins the rule below it never sees anything the
-                  one above already caught — which is why relief goes underneath, never on top.
+                  Rules are checked in order. The first rule that matches decides.
                 </p>
               </motion.div>
             )}
@@ -723,8 +725,8 @@ function Grade({ grade, reduce }: { grade: ReturnType<typeof runGauntlet>; reduc
         </b>
         <em>
           {grade.breaches === 0
-            ? 'Nothing in the deck got through. You can tighten it further in the builder.'
-            : `${grade.breaches} got through. Open the gauntlet in the builder to see which, and why.`}
+            ? 'No test sign-in got through.'
+            : `${grade.breaches === 1 ? '1 test sign-in' : `${grade.breaches} test sign-ins`} got through. The gauntlet in the builder lists them.`}
         </em>
       </div>
     </div>

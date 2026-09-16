@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react'
+import { useEffect } from 'react'
 import {
   AlertTriangle,
   BellRing,
@@ -6,12 +7,13 @@ import {
   Fingerprint,
   HelpCircle,
   KeyRound,
-  Plus,
   Layers,
   ListChecks,
   Lock,
+  type LucideIcon,
   Mail,
   MessageSquare,
+  Plus,
   ShieldAlert,
   Timer,
   Usb,
@@ -19,14 +21,13 @@ import {
   UserRound,
   X,
   XCircle,
-  type LucideIcon,
 } from 'lucide-react'
 
 import { Toggle } from '../../kit'
 import { Picker } from '../../picker'
-import { restConditions, whoIds } from '../../audience-ops'
 import type { AccessDecision, Rule } from '../../data'
 import { METHODS } from '../rule-form'
+import { isPristine } from './parts'
 import { Prop } from './Section'
 
 /* -----------------------------------------------------------------------------
@@ -286,10 +287,41 @@ export function WhatEditor({
   const lastAllow = useRef<AccessDecision>(rule.decision === '2fa' ? '2fa' : '1fa')
   if (rule.decision === '1fa' || rule.decision === '2fa') lastAllow.current = rule.decision
 
+  /* The factor settings as they were before Deny, so Allow brings them back.
+
+     Deny still clears them from the rule — a Deny rule holds no hidden factor
+     state — but pressing Deny and then Allow used to return a second factor on
+     "Any enabled method" in place of the specific list somebody had chosen,
+     which is a looser rule than the one they left. Held here, for this visit. */
+  const beforeDeny = useRef<Partial<Rule> | null>(null)
+
   const pick = (id: AccessDecision) => {
-    if (id === 'deny') return onPatch({ decision: 'deny', ...noSecondStep })
-    /* Allow returns whichever Allow this rule last was. */
-    onPatch({ decision: lastAllow.current })
+    if (id === 'deny') {
+      /* Nothing chosen yet, so nothing to come back to: Allow afterwards is Allow. */
+      if (!answered) {
+        lastAllow.current = '1fa'
+        beforeDeny.current = null
+      } else if (rule.decision !== 'deny') {
+        beforeDeny.current = {
+          secondFactor: rule.secondFactor,
+          secondFactorMethods: rule.secondFactorMethods,
+          methodChain: rule.methodChain,
+          preferredFallback: rule.preferredFallback,
+          rememberMfa: rule.rememberMfa,
+          rememberDays: rule.rememberDays,
+          forceMfaEachLogin: rule.forceMfaEachLogin,
+          allowDisable2fa: rule.allowDisable2fa,
+        }
+      }
+      return onPatch({ decision: 'deny', ...noSecondStep })
+    }
+    /* A new rule holds `2fa` without anybody having chosen it; Allow on it
+       means Allow, and a second factor is added below. */
+    if (!answered) return onPatch({ decision: '1fa' })
+    /* Allow returns whichever Allow this rule last was, with its settings. */
+    const restore = rule.decision === 'deny' ? beforeDeny.current : null
+    beforeDeny.current = null
+    onPatch({ decision: lastAllow.current, ...(restore ?? {}) })
   }
 
   const unsatisfiable = twoStep && rule.secondFactor === 'specific' && methods.length === 0
@@ -322,9 +354,8 @@ export function WhatEditor({
      else is set, so the window where the two disagree is narrow — but it is
      real, and the honest fix is an optional `decision`, which is a change to
      what a rule IS. */
-  const [answered, setAnswered] = useState(
-    () => rule.decision !== '2fa' || whoIds(rule.when, 'group').length > 0 || whoIds(rule.when, 'user').length > 0 || restConditions(rule.when).length > 0,
-  )
+  /* The default at the foot of the chain always has an outcome; it is never "new". */
+  const [answered, setAnswered] = useState(() => !!terminal || !isPristine(rule))
 
   /* The chosen outcome's mark, for the rung beside the dropdown. */
   const chosen = answered ? TILES.find((t) => t.id === active) : undefined
@@ -377,8 +408,8 @@ export function WhatEditor({
             value={answered ? active : ''}
             options={TILES.map((t) => ({ value: t.id, label: t.label, hint: t.hint, icon: t.icon, tone: t.tone }))}
             onChange={(v) => {
-              setAnswered(true)
               pick(v as AccessDecision)
+              setAnswered(true)
             }}
           />
         </div>
@@ -441,14 +472,24 @@ export function WhatEditor({
               }
               detail={(v) =>
                 v === 'Specific' ? (
-                  <Picker
-                    label="Which method"
-                    width="fill"
-                    value={rule.firstFactorMethod ?? ''}
-                    placeholder="Choose a method"
-                    options={METHODS.map(methodOption)}
-                    onChange={(firstFactorMethod) => onPatch({ firstFactorMethod })}
-                  />
+                  <>
+                    <Picker
+                      label="Which method"
+                      width="fill"
+                      value={rule.firstFactorMethod ?? ''}
+                      placeholder="Choose a method"
+                      options={METHODS.map(methodOption)}
+                      onChange={(firstFactorMethod) => onPatch({ firstFactorMethod })}
+                    />
+                    {!rule.firstFactorMethod && (
+                      <p className="bb__diag is-error" role="alert">
+                        <XCircle size={13} strokeWidth={2} aria-hidden />
+                        <span>
+                          <b>No method chosen.</b> Choose a method or pick Password.
+                        </span>
+                      </p>
+                    )}
+                  </>
                 ) : null
               }
             />
@@ -596,7 +637,7 @@ export function WhatEditor({
           draws, arrow by arrow, six inches to the left; restating it in prose
           under every outcome was the same fact told twice, in the half of the
           panel that has the least room for it. */}
-      {terminal && <p className="bb__secnote">Whatever reaches this far.</p>}
+      {/* The default's pane says when it applies, above this; no second line here. */}
     </div>
   )
 }
@@ -614,8 +655,20 @@ export function WhatEditor({
    Three property rows — a toggle, a number, a second toggle — for a setting
    most rules leave off. Two of the three were only ever reachable through the
    first, so they are inside it now. */
+const MAX_REMEMBER_DAYS = 365
+const validDays = (n: number) => Number.isInteger(n) && n >= 1 && n <= MAX_REMEMBER_DAYS
+
 function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
-  const [days, setDays] = useState(rule.rememberDays ?? 30)
+  /* What is typed, as text, so the field can be empty for a keystroke. The rule
+     only ever holds a whole number of days from 1 to 365. */
+  const stored = rule.rememberDays ?? 30
+  const [days, setDays] = useState(String(stored))
+  /* Undo and redo change the rule under this field without remounting it. */
+  useEffect(() => {
+    setDays(String(stored))
+  }, [stored])
+  const typed = Number(days)
+  const invalid = days.trim() === '' || !validDays(typed)
   return (
     <div className="bb__after">
       <Prop label="Remember this device">
@@ -631,20 +684,33 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
                 min={1}
                 max={365}
                 aria-label="Days to remember"
+                step={1}
+                aria-invalid={invalid}
                 value={days}
                 onChange={(e) => {
-                  const n = Number(e.target.value)
-                  setDays(n)
+                  const text = e.target.value
+                  setDays(text)
                   /* Only a usable number reaches the rule. Typing over the field
                      empties it for a keystroke, and `Number('') || 30` snapped
                      it back to 30 mid-edit — so clearing it to type 90 wrote 30
                      and moved the cursor. */
-                  if (Number.isFinite(n) && n >= 1) onPatch({ rememberDays: n })
+                  const n = Number(text)
+                  if (text.trim() !== '' && validDays(n)) onPatch({ rememberDays: n })
+                }}
+                /* Left invalid, the field shows what the rule still holds. */
+                onBlur={() => {
+                  if (invalid) setDays(String(stored))
                 }}
               />
               <span className="bb__unit">days</span>
             </span>
           </Prop>
+          {invalid && (
+            <p className="bb__diag is-error" role="alert">
+              <XCircle size={13} strokeWidth={2} aria-hidden />
+              <span>Enter 1 to 365 days.</span>
+            </p>
+          )}
           <Prop label="Force at every sign-in" indent>
             <Toggle checked={rule.forceMfaEachLogin ?? false} onChange={(forceMfaEachLogin) => onPatch({ forceMfaEachLogin })} label="Force at every sign-in" size="sm" />
           </Prop>

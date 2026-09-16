@@ -10,6 +10,7 @@ import {
   type Rule,
 } from '../data'
 import { leaves } from '../predicate'
+import { ruleMatchesEveryone } from '../rule-who'
 
 /* -----------------------------------------------------------------------------
    The interview — a policy built from answers.
@@ -266,7 +267,10 @@ export function narrate(rules: Rule[]): string[] {
         : r.decision === '1fa'
           ? 'signs in on one factor'
             : 'is asked for a second factor'
-    const trigger = r.when.cards.length === 0 ? 'anyone still unmatched' : describe(r)
+    /* "Anyone still unmatched" only when it is true of the whole rule: a rule
+       with a who and no conditions is for its people, not for anyone. The
+       interview puts the audience on the policy and composes no who today. */
+    const trigger = ruleMatchesEveryone(r) ? 'anyone still unmatched' : r.when.cards.length === 0 ? 'anyone this rule names' : describe(r)
     return `${i + 1}. ${trigger} ${what}.`
   })
 }

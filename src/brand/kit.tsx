@@ -1,3 +1,4 @@
+import type { KeyboardEvent as ReactKeyboardEvent, Ref } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   useCallback,
@@ -7,24 +8,28 @@ import {
   useState,
   type CSSProperties,
   type ReactNode,
-  type RefObject,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { useLayoutEffect } from 'react'
 import {
   AlertOctagon,
   AlertTriangle,
+  Check,
   CheckCircle2,
   ChevronDown,
+  ChevronUp,
   Info,
+  type LucideIcon,
   Minus,
   MoreHorizontal,
   Plus,
   Search,
+  Trash2,
   X,
-  type LucideIcon,
 } from 'lucide-react'
 
 import type { AccessDecision, PolicyStatus } from './data'
+import { appRoot, useDialogChrome } from './dialog-chrome'
 
 /* -----------------------------------------------------------------------------
    Brand kit — the primitives from IDP · 2 Core.
@@ -40,7 +45,7 @@ import type { AccessDecision, PolicyStatus } from './data'
    per view.
    -------------------------------------------------------------------------- */
 
-export type ButtonVariant = 'primary' | 'secondary' | 'brand' | 'neutral' | 'ghost' | 'danger'
+export type ButtonVariant = 'primary' | 'secondary' | 'brand' | 'neutral' | 'ghost' | 'danger' | 'link'
 
 const ROLE: Record<ButtonVariant, string> = {
   primary: 'brand',
@@ -49,6 +54,10 @@ const ROLE: Record<ButtonVariant, string> = {
   neutral: 'neutral',
   ghost: 'ghost',
   danger: 'danger',
+  /* A text button in the link colour — an action that takes you somewhere to do
+     something, on a row where a boxed button would outweigh the switches beside
+     it. */
+  link: 'link',
 }
 
 export function Button({
@@ -87,6 +96,29 @@ export function Button({
       {children}
       {IconRight && <IconRight size={px} strokeWidth={2} aria-hidden />}
     </button>
+  )
+}
+
+/* The one delete button. The page-header trigger and the confirmation's own
+   button are the same control — red outline, trash icon, the word Delete — so
+   deleting looks the same wherever it starts and wherever it is confirmed. */
+export function DeleteButton({
+  onClick,
+  size = 'sm',
+  disabled,
+  title,
+  children = 'Delete',
+}: {
+  onClick?: () => void
+  size?: 'sm' | 'md'
+  disabled?: boolean
+  title?: string
+  children?: ReactNode
+}) {
+  return (
+    <Button variant="danger" size={size} icon={Trash2} disabled={disabled} title={title} onClick={onClick}>
+      {children}
+    </Button>
   )
 }
 
@@ -177,20 +209,31 @@ export function MenuButton({
      that DO pass it chose. */
   const Glyph = icon ?? (iconOnly ? MoreHorizontal : undefined)
   const [open, setOpen] = useState(false)
-  const [cursor, setCursor] = useState(0)
   const wrap = useRef<HTMLSpanElement | null>(null)
+  const trigger = useRef<HTMLButtonElement | null>(null)
+  const pop = useRef<HTMLDivElement | null>(null)
+  /* Which item takes focus when the menu opens: ArrowUp on the trigger starts
+     at the bottom, everything else at the top. */
+  const startAt = useRef<'first' | 'last'>('first')
   const id = useId()
+
+  const close = useCallback((refocus: boolean) => {
+    setOpen(false)
+    if (refocus) trigger.current?.focus()
+  }, [])
 
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
       if (!wrap.current?.contains(e.target as Node)) setOpen(false)
     }
+    /* Escape with focus outside the menu (the menu's own handler takes it when
+       focus is inside). Stopped, so a dialog underneath stays open. */
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        setOpen(false)
-      }
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      e.preventDefault()
+      e.stopPropagation()
+      close(true)
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -198,23 +241,25 @@ export function MenuButton({
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
     }
-  }, [open])
+  }, [open, close])
 
-  const usable = items.filter((i) => !i.disabled)
-  const step = (d: number) => {
-    if (usable.length === 0) return
-    setCursor((c) => (c + d + usable.length) % usable.length)
-  }
+  /* Focus goes INTO the menu, so the arrow keys, Enter and Escape reach it.
+     It used to stay on the trigger with a painted cursor, and the menu's own
+     key handler never heard a key. */
+  useEffect(() => {
+    if (open) focusMenuItem(pop.current, startAt.current)
+  }, [open])
 
   const pick = (item: MenuItem) => {
     if (item.disabled) return
-    setOpen(false)
+    close(true)
     onSelect(item.id)
   }
 
   return (
     <span className="bx-menu" ref={wrap}>
       <button
+        ref={trigger}
         type="button"
         className={`bx-btn bx-btn--${ROLE[variant]} bx-btn--${size} bx-menu__trigger ${iconOnly ? 'bx-menu__trigger--icon' : ''} ${open ? 'is-open' : ''}`}
         aria-label={iconOnly ? label : undefined}
@@ -222,13 +267,15 @@ export function MenuButton({
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         onClick={() => {
-          setCursor(0)
+          startAt.current = 'first'
           setOpen((v) => !v)
         }}
         onKeyDown={(e) => {
-          if (e.key === 'ArrowDown') {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault()
-            setOpen(true)
+            startAt.current = e.key === 'ArrowUp' ? 'last' : 'first'
+            if (open) focusMenuItem(pop.current, startAt.current)
+            else setOpen(true)
           }
         }}
       >
@@ -240,51 +287,18 @@ export function MenuButton({
       <AnimatePresence>
         {open && (
           <motion.div
+            ref={pop}
             id={id}
             role="menu"
+            aria-label={label}
             className={`bx-menu__pop is-${align}`}
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.13, ease: [0.2, 0, 0, 1] }}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowDown') {
-                e.preventDefault()
-                step(1)
-              }
-              if (e.key === 'ArrowUp') {
-                e.preventDefault()
-                step(-1)
-              }
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                if (usable[cursor]) pick(usable[cursor])
-              }
-            }}
+            onKeyDown={(e) => menuKeys(e, pop.current, close)}
           >
-            {items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                role="menuitem"
-                disabled={item.disabled}
-                className={`bx-menu__item ${item.danger ? 'is-danger' : ''} ${item.divide ? 'is-divided' : ''} ${
-                  usable[cursor]?.id === item.id ? 'is-cursor' : ''
-                }`}
-                onMouseEnter={() => {
-                  const n = usable.findIndex((u) => u.id === item.id)
-                  if (n >= 0) setCursor(n)
-                }}
-                onClick={() => pick(item)}
-              >
-                {item.icon && <item.icon size={14} strokeWidth={1.9} aria-hidden />}
-                <span>
-                  <strong>{item.label}</strong>
-                  {item.hint && <em>{item.hint}</em>}
-                </span>
-                {item.kbd && <kbd>{item.kbd}</kbd>}
-              </button>
-            ))}
+            <MenuItems items={items} onPick={pick} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -294,6 +308,294 @@ export function MenuButton({
 
 function MenuIcon({ icon: Icon, size }: { icon: LucideIcon; size: 'sm' | 'md' }) {
   return <Icon size={size === 'sm' ? 13 : 14} strokeWidth={2} aria-hidden />
+}
+
+/* --- Shared by MenuButton and RowMenu ------------------------------------------ */
+
+const menuItemsIn = (pop: HTMLElement | null) =>
+  Array.from(pop?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [])
+
+function focusMenuItem(pop: HTMLElement | null, at: 'first' | 'last') {
+  const list = menuItemsIn(pop)
+  ;(at === 'last' ? list[list.length - 1] : list[0])?.focus({ preventScroll: true })
+}
+
+/* Arrow keys, Home and End move real focus among the enabled items; Escape and
+   Tab close and hand focus back to the trigger. Escape is stopped here so the
+   dialog underneath a menu does not close with it. */
+function menuKeys(e: ReactKeyboardEvent, pop: HTMLElement | null, close: (refocus: boolean) => void) {
+  const list = menuItemsIn(pop)
+  const at = list.indexOf(document.activeElement as HTMLButtonElement)
+  const move = (i: number) => list[(i + list.length) % list.length]?.focus({ preventScroll: true })
+  switch (e.key) {
+    case 'ArrowDown':
+      e.preventDefault()
+      move(at + 1)
+      break
+    case 'ArrowUp':
+      e.preventDefault()
+      move(at < 0 ? -1 : at - 1)
+      break
+    case 'Home':
+      e.preventDefault()
+      move(0)
+      break
+    case 'End':
+      e.preventDefault()
+      move(-1)
+      break
+    case 'Escape':
+      e.preventDefault()
+      e.stopPropagation()
+      close(true)
+      break
+    case 'Tab':
+      e.preventDefault()
+      close(true)
+      break
+  }
+}
+
+function MenuItems({ items, onPick }: { items: MenuItem[]; onPick: (item: MenuItem) => void }) {
+  return (
+    <>
+      {items.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          role="menuitem"
+          tabIndex={-1}
+          disabled={item.disabled}
+          className={`bx-menu__item ${item.danger ? 'is-danger' : ''} ${item.divide ? 'is-divided' : ''}`}
+          /* Hover moves focus, so the pointer and the keys share one highlight
+             rather than painting two. */
+          onMouseEnter={(e) => {
+            if (!item.disabled) e.currentTarget.focus({ preventScroll: true })
+          }}
+          onClick={(e) => {
+            e.stopPropagation()
+            onPick(item)
+          }}
+        >
+          {item.icon && <item.icon size={14} strokeWidth={1.9} aria-hidden />}
+          <span>
+            <strong>{item.label}</strong>
+            {item.hint && <em>{item.hint}</em>}
+          </span>
+          {item.kbd && <kbd>{item.kbd}</kbd>}
+        </button>
+      ))}
+    </>
+  )
+}
+
+/* --- Row menu ---------------------------------------------------------------------
+
+   The kebab at the end of a list or table row, and the one menu it opens.
+
+   Policies, Applications, Zones, Device profiles and Risk profiles each drew
+   their own: an absolutely placed box inside the row. Inside a table scroller
+   that box was clipped — with one to three rows, or on the last rows, the items
+   were cut off or unreachable — and each copy handled Escape, outside clicks and
+   focus differently or not at all.
+
+   This one portals to the app root at fixed coordinates measured from the
+   trigger, so no ancestor can clip it. It opens below the kebab and flips above
+   when the viewport has no room below; it closes on an outside press, Escape,
+   Tab, a scroll or a resize; the arrow keys, Home and End move through the
+   items; and focus returns to the kebab when it closes. A pick focuses the
+   kebab before running the action, so a dialog the action opens restores focus
+   to it. */
+
+const ROWMENU_GAP = 4
+const ROWMENU_MARGIN = 8
+
+export function RowMenu({
+  label,
+  items,
+  onSelect,
+  onOpenChange,
+  icon: Icon = MoreHorizontal,
+  size = 'sm',
+  align = 'end',
+  disabled,
+}: {
+  /** The accessible name, naming the row: "Actions for Corporate network". */
+  label: string
+  items: MenuItem[]
+  onSelect: (id: string) => void
+  /** Told when the menu opens or closes, for a row that stays highlighted while it is open. */
+  onOpenChange?: (open: boolean) => void
+  icon?: LucideIcon
+  size?: 'sm' | 'md'
+  /** Which edge of the kebab the menu lines up with. */
+  align?: 'start' | 'end'
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number; side: 'top' | 'bottom' } | null>(null)
+  const trigger = useRef<HTMLButtonElement | null>(null)
+  const pop = useRef<HTMLDivElement | null>(null)
+  const startAt = useRef<'first' | 'last'>('first')
+  const id = useId()
+
+  const onOpenChangeRef = useRef(onOpenChange)
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange
+  })
+
+  /* Reported after the fact, from an effect, so a caller's state update never
+     runs inside this component's render. */
+  const reported = useRef(false)
+  useEffect(() => {
+    if (reported.current === open) return
+    reported.current = open
+    onOpenChangeRef.current?.(open)
+  }, [open])
+
+  const close = useCallback((refocus: boolean) => {
+    setOpen(false)
+    if (refocus) trigger.current?.focus({ preventScroll: true })
+  }, [])
+
+  /* Measured once the menu is in the DOM (rendered hidden at 0,0 first), so its
+     real height decides whether it fits below. */
+  const place = useCallback(() => {
+    const a = trigger.current?.getBoundingClientRect()
+    const p = pop.current?.getBoundingClientRect()
+    if (!a || !p) return
+    const below = window.innerHeight - a.bottom
+    const above = a.top
+    const side: 'top' | 'bottom' =
+      below < p.height + ROWMENU_GAP + ROWMENU_MARGIN && above > below ? 'top' : 'bottom'
+    const top =
+      side === 'bottom'
+        ? Math.min(a.bottom + ROWMENU_GAP, window.innerHeight - p.height - ROWMENU_MARGIN)
+        : Math.max(ROWMENU_MARGIN, a.top - p.height - ROWMENU_GAP)
+    const want = align === 'end' ? a.right - p.width : a.left
+    const left = Math.max(ROWMENU_MARGIN, Math.min(want, window.innerWidth - p.width - ROWMENU_MARGIN))
+    setPos((was) => (was && was.top === top && was.left === left && was.side === side ? was : { top, left, side }))
+  }, [align])
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null)
+      return
+    }
+    place()
+  }, [open, place])
+
+  useEffect(() => {
+    if (open && pos) focusMenuItem(pop.current, startAt.current)
+    // Only when it first lands, not on every re-placement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pos !== null])
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (trigger.current?.contains(t) || pop.current?.contains(t)) return
+      close(false)
+    }
+    /* A scroll anywhere but inside the menu closes it: a menu left floating
+       while its row scrolls away points at the wrong row. */
+    const onScroll = (e: Event) => {
+      if (e.target instanceof Node && pop.current?.contains(e.target)) return
+      close(false)
+    }
+    const onResize = () => close(false)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      e.preventDefault()
+      e.stopPropagation()
+      close(true)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onResize)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onResize)
+    }
+  }, [open, close])
+
+  /* A row that unmounts with its menu open (deleted, filtered out) must not
+     leave the page believing a menu is still open. */
+  useEffect(
+    () => () => {
+      if (reported.current) onOpenChangeRef.current?.(false)
+    },
+    [],
+  )
+
+  const pick = (item: MenuItem) => {
+    if (item.disabled) return
+    close(true)
+    onSelect(item.id)
+  }
+
+  return (
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        className={`bx-rowmenu bx-rowmenu--${size} ${open ? 'is-open' : ''}`}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        disabled={disabled}
+        onClick={(e) => {
+          /* Rows are often one big link or button; the kebab is not part of it. */
+          e.stopPropagation()
+          startAt.current = 'first'
+          setOpen(!open)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault()
+            e.stopPropagation()
+            startAt.current = e.key === 'ArrowUp' ? 'last' : 'first'
+            if (open) focusMenuItem(pop.current, startAt.current)
+            else setOpen(true)
+          }
+        }}
+      >
+        <Icon size={size === 'sm' ? 15 : 16} strokeWidth={2} aria-hidden />
+      </button>
+
+      {open &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <motion.div
+            ref={pop}
+            id={id}
+            role="menu"
+            aria-label={label}
+            className={`bx-menu__pop bx-rowmenu__pop is-${pos?.side ?? 'bottom'}`}
+            style={{
+              top: pos?.top ?? 0,
+              left: pos?.left ?? 0,
+              visibility: pos ? 'visible' : 'hidden',
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.12, ease: [0.2, 0, 0, 1] }}
+            onKeyDown={(e) => menuKeys(e, pop.current, close)}
+            /* The menu lives in a portal but still bubbles through the row in
+               React; a click inside it is not a click on the row. */
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MenuItems items={items} onPick={pick} />
+          </motion.div>,
+          appRoot(),
+        )}
+    </>
+  )
 }
 
 /* --- Clipped, and a tooltip only where one is earned ---------------------------
@@ -344,8 +646,10 @@ function useClipped(label: ReactNode) {
 export function Badge({
   children,
   tone = 'neutral',
+  className,
 }: {
   children: ReactNode
+  className?: string
   tone?: 'neutral' | 'brand' | 'positive' | 'negative' | 'notice' | 'info' | 'accent' | 'lime' | 'magenta' | 'system'
 }) {
   /* The label is its own element rather than a bare text node because
@@ -354,7 +658,7 @@ export function Badge({
      that can be clipped. */
   const [ref, full] = useClipped(children)
   return (
-    <span className={`bx-badge bx-badge--${tone}`}>
+    <span className={`bx-badge bx-badge--${tone}${className ? ` ${className}` : ''}`}>
       <span className="bx-badge__label" ref={ref} title={full ?? undefined}>
         {children}
       </span>
@@ -378,30 +682,19 @@ export function DecisionChip({
 }
 
 export function StatusPill({ status }: { status: PolicyStatus }) {
+  /* Four statuses, no more: Draft, Active, Inactive, and Always on for the
+     system policy. Each is a pill with no dot (owner, 14 Sep 2026) — Active and
+     Always on the positive tint, Inactive the neutral fill, Draft a solid
+     outline, because a draft is a state the policy has not reached yet. */
   if (status === 'always-on') return <span className="bx-status bx-status--always">Always on</span>
-  /* Draft reads as unfinished rather than as off. An outline pill, because
-     every other status here is a state the policy IS and this one is a state
-     it has not reached — and no dot, since the dot is what the live statuses
-     use to say they are running. */
   if (status === 'draft')
     return (
-      <span className="bx-status bx-status--draft" title="Not published yet. It has never decided a sign-in.">
+      <span className="bx-status bx-status--draft" title="Not published yet.">
         Draft
       </span>
     )
-  /* Monitor gets its own pill rather than a variant of Active, because the two
-     differ in the only way that matters — one refuses sign-ins and one does
-     not. Notice tone, never positive: a monitor policy looking like a live one
-     is how a tenant believes they are protected for a fortnight. */
-  if (status === 'monitor')
-    return (
-      <span className="bx-status bx-status--monitor" title="Evaluates every sign-in and records what it would have done. Enforces nothing.">
-        Monitor
-      </span>
-    )
   return (
-    <span className={`bx-status bx-status--${status}`}>
-      <i />
+    <span className={`bx-status bx-status--${status === 'active' ? 'active' : 'inactive'}`}>
       {status === 'active' ? 'Active' : 'Inactive'}
     </span>
   )
@@ -461,14 +754,14 @@ export function Chip({
   children,
   active,
   onClick,
-  count,
   removable,
   onRemove,
 }: {
   children: ReactNode
   active?: boolean
   onClick?: () => void
-  count?: number | string
+  /* No count: a filter chip names the filter, and the number belongs in the
+     list it filters (owner: no toolbar counts). */
   removable?: boolean
   onRemove?: () => void
 }) {
@@ -476,7 +769,6 @@ export function Chip({
     <span className={`bx-chip ${active ? 'is-on' : ''} ${onClick ? 'is-clickable' : ''}`}>
       <button type="button" onClick={onClick} disabled={!onClick} className="bx-chip__main">
         {children}
-        {count !== undefined && <em>{count}</em>}
       </button>
       {removable && (
         <button type="button" className="bx-chip__x" onClick={onRemove} aria-label="Remove">
@@ -509,7 +801,8 @@ export function Tabs<T extends string>({
   className,
 }: {
   value: T
-  options: { value: T; label: string; count?: number; sub?: ReactNode; icon?: LucideIcon }[]
+  /* No `count`. A tab names a view; the number belongs in the view it opens. */
+  options: { value: T; label: string; sub?: ReactNode; icon?: LucideIcon }[]
   onChange: (v: T) => void
   name: string
   /** The `id` of the element this tablist controls, if there is one. */
@@ -570,7 +863,6 @@ export function Tabs<T extends string>({
             <span className="bx-tabs__label">
               {Ico && <Ico size={13} strokeWidth={1.9} aria-hidden />}
               {o.label}
-              {o.count !== undefined && <em>{o.count}</em>}
             </span>
             {o.sub && <span className="bx-tabs__sub">{o.sub}</span>}
           </button>
@@ -757,6 +1049,7 @@ export function NumberStepper({
   unit,
   label,
   invalid,
+  width = 'auto',
   onChange,
 }: {
   id?: string
@@ -767,6 +1060,11 @@ export function NumberStepper({
   unit?: string
   label?: string
   invalid?: boolean
+  /** `fill` is the console's own number field: the box takes the width it is
+      given, the value sits left, and the two steps stack as chevrons inside the
+      right edge. `auto` is the dense form shape — minus, value, plus — sized to
+      its digits. Same control, same keys, same hold-to-repeat. */
+  width?: 'auto' | 'fill'
   onChange: (n: number) => void
 }) {
   const [draft, setDraft] = useState<string | null>(null)
@@ -830,13 +1128,14 @@ export function NumberStepper({
   const atMin = value <= min
   const atMax = value >= max
   const shown = draft ?? String(value)
+  const fill = width === 'fill'
 
   return (
-    <span className="bx-stepwrap">
+    <span className={`bx-stepwrap ${fill ? 'bx-stepwrap--field' : ''}`}>
       <span
-        className={`bx-step ${focused ? 'is-focus' : ''} ${invalid ? 'is-invalid' : ''} ${
-          corrected ? 'is-corrected' : ''
-        }`}
+        className={`bx-step ${fill ? 'bx-step--field' : ''} ${focused ? 'is-focus' : ''} ${
+          invalid ? 'is-invalid' : ''
+        } ${corrected ? 'is-corrected' : ''}`}
       >
         <button
           type="button"
@@ -855,7 +1154,11 @@ export function NumberStepper({
              a detail of 0 is how a synthetic click says it came from a key. */
           onClick={(e) => e.detail === 0 && nudge(-step)}
         >
-          <Minus size={14} strokeWidth={2.3} aria-hidden />
+          {fill ? (
+            <ChevronDown size={14} strokeWidth={2.3} aria-hidden />
+          ) : (
+            <Minus size={14} strokeWidth={2.3} aria-hidden />
+          )}
         </button>
 
         <span className="bx-step__val">
@@ -923,7 +1226,11 @@ export function NumberStepper({
           onPointerCancel={endHold}
           onClick={(e) => e.detail === 0 && nudge(step)}
         >
-          <Plus size={14} strokeWidth={2.3} aria-hidden />
+          {fill ? (
+            <ChevronUp size={14} strokeWidth={2.3} aria-hidden />
+          ) : (
+            <Plus size={14} strokeWidth={2.3} aria-hidden />
+          )}
         </button>
       </span>
 
@@ -1094,7 +1401,11 @@ export function TipDot({ text, label = 'Why this matters' }: { text: ReactNode; 
 export function TipMark({ text }: { text: ReactNode }) {
   return (
     <Tip text={text}>
-      <span className="bx-tipdot" aria-hidden>
+      {/* The press stops here. The mark lives inside a row-sized button, and on
+          a touch screen the tap that opens the tip is also a click — which
+          bubbled to the row and ticked or unticked it while you were only asking
+          what it was. */}
+      <span className="bx-tipdot" aria-hidden onClick={(e) => e.stopPropagation()}>
         ?
       </span>
     </Tip>
@@ -1128,12 +1439,15 @@ export function SearchBox({
   placeholder,
   label,
   block,
+  inputRef,
 }: {
   value: string
   onChange: (next: string) => void
   placeholder: string
   /** The accessible name — "Search zones", not "Search". */
   label: string
+  /** The input itself, for a caller that puts focus back here (after Clear filters, say). */
+  inputRef?: Ref<HTMLInputElement>
   /* Full width of whatever holds it. A toolbar gives the box a fixed width so
      the row does not reflow as the page does; a dialog or a drawer has already
      decided how wide the column is, and a 300px box inside a 520px panel is a
@@ -1144,6 +1458,7 @@ export function SearchBox({
     <label className={`bx-search ${block ? 'is-block' : ''}`}>
       <Search size={14} strokeWidth={2} aria-hidden />
       <input
+        ref={inputRef}
         type="search"
         value={value}
         placeholder={placeholder}
@@ -1334,134 +1649,9 @@ const clampWidth = (want: number, min: number, max: number) =>
    Call sites pass the number; this is the list of numbers that exist. */
 const DIALOG_W = { confirm: 480, form: 560, wide: 680, work: 780, full: 980 } as const
 
-/* Every dialog currently open, innermost last.
-
-   Module-level rather than a context because it is answering a window-level
-   question — "who owns Escape right now" — and the dialogs that stack are not
-   always in one another's React tree: a picker portalled to the body sits
-   inside a dialog visually and beside it in the DOM. */
-const openDialogs: symbol[] = []
-
-/* Escape ownership, a focus trap and focus restoration — the three things any
-   surface with a scrim over it owes a keyboard, and the three things `Drawer`
-   did not have.
-
-   This lived inside `Modal`. `Drawer` had a bare unconditional Escape listener
-   and nothing else, which meant three separate faults across the six panels
-   that use it:
-
-     - Tab walked straight out of an open drawer and into the page behind the
-       scrim, so for a keyboard user the panel was a picture rather than a mode.
-     - Closing one dropped focus to <body>, so the next Tab restarted from the
-       top of the console instead of from the control that opened the panel.
-     - Its Escape did not join the stack, so a dialog opened from inside a
-       drawer — naming a policy from the app-protection panel is the live case —
-       was dismissed together with the drawer underneath it, taking the
-       half-typed name with it. `Applications.tsx` worked around that by
-       refusing to close while a dialog was up, and said in a comment that the
-       repair belonged here. This is that repair; the workaround can go.
-
-   Shared rather than copied, because the failure above is precisely what
-   happens when two surfaces that owe the same debts are written twice. */
-function useDialogChrome(open: boolean, onClose: () => void, panel: RefObject<HTMLElement | null>) {
-  const returnTo = useRef<HTMLElement | null>(null)
-
-  /* `onClose` is an inline arrow in every caller, so it has a new identity on
-     every render of the host. Putting it in the effect's dependencies made the
-     effect tear down and re-run continuously — which meant the "restore focus"
-     cleanup fired on every keystroke in the builder behind the dialog, throwing
-     focus at whatever had been active when that render started. Held in a ref
-     instead, so the effect below depends only on `open`. */
-  const onCloseRef = useRef(onClose)
-  useEffect(() => {
-    onCloseRef.current = onClose
-  })
-
-  useEffect(() => {
-    if (!open) return
-    returnTo.current = document.activeElement as HTMLElement | null
-    const panelNode = panel.current
-    /* Where the trigger sat, a few levels up. A dialog can replace the control
-       that opened it — Set up becomes a switch once setup is saved — and focus
-       should come back to that spot rather than fall to <body>. Kept short: a
-       trigger that navigated took its whole screen with it, and an ancestor that
-       far up is not "where it was". */
-    const trail: HTMLElement[] = []
-    for (let el = returnTo.current?.parentElement ?? null; el && trail.length < 4; el = el.parentElement) {
-      trail.push(el)
-    }
-
-    /* This surface's place in the stack. Answering Escape only when innermost
-       makes it peel one layer, which is what it means everywhere else. */
-    const me = Symbol('dialog')
-    openDialogs.push(me)
-
-    /* Focus the panel itself rather than its first control: these open with a
-       heading, and starting on a button skips the sentence that says what the
-       surface is for.
-
-       A frame AND a timer, which is the same guard `Counter` carries and for
-       the same reason: `requestAnimationFrame` does not run in a background
-       tab or an embedded webview, and moving focus into a dialog is not
-       decoration — without it Tab starts from the top of the console with a
-       modal open over it. Whichever lands first does the job; the other finds
-       focus already where it belongs. */
-    const focusPanel = () => panel.current?.focus()
-    const id = window.requestAnimationFrame(focusPanel)
-    const fallback = window.setTimeout(focusPanel, 60)
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (openDialogs[openDialogs.length - 1] !== me) return
-        return onCloseRef.current()
-      }
-      if (e.key !== 'Tab' || !panel.current) return
-      const focusable = panel.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      )
-      if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      const on = document.activeElement
-      if (e.shiftKey && (on === first || on === panel.current)) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && on === last) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.cancelAnimationFrame(id)
-      window.clearTimeout(fallback)
-      window.removeEventListener('keydown', onKey)
-      const at = openDialogs.indexOf(me)
-      if (at !== -1) openDialogs.splice(at, 1)
-      /* Only restore to a control that still exists. Some of these are opened
-         by a trigger that navigates — the policy list's exposure cell opens the
-         gauntlet and unmounts the whole table doing it — and calling focus() on
-         a detached node silently drops focus to <body> instead of leaving it
-         where the new screen put it. */
-      const back = returnTo.current
-      if (back?.isConnected) {
-        back.focus()
-      } else {
-        /* Only when nothing else has taken focus. A new screen may have put it
-           somewhere on purpose, and that beats a guess at where the trigger was. */
-        const active = document.activeElement
-        const lost = !active || active === document.body || Boolean(panelNode?.contains(active))
-        const home = lost ? trail.find((el) => el.isConnected) : undefined
-        home
-          ?.querySelector<HTMLElement>(
-            'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-          )
-          ?.focus()
-      }
-    }
-  }, [open, panel])
-}
+/* The dialog stack, Escape ownership, the focus trap and focus restoration live
+   in dialog-chrome.ts — shared by Modal, Drawer and any sheet a screen draws
+   itself, and importable without costing this file fast refresh. */
 
 /** The close control every dialog surface carries. */
 function DialogClose({ onClose }: { onClose: () => void }) {
@@ -1492,7 +1682,13 @@ export function Modal({
   const panel = useRef<HTMLDivElement | null>(null)
   useDialogChrome(open, onClose, panel)
 
-  return (
+  /* Portalled to the app root. Rendered in place, a dialog opened from inside a
+     slide-over, a sticky table cell or anything with a transform was positioned
+     and stacked by that ancestor: it opened under the slider, and Delete, Save
+     and Discard could not be clicked. At the root it always covers the window.
+     React events still bubble through the tree it was opened from. */
+  if (typeof document === 'undefined') return null
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div className="bx-scrim bx-scrim--center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
@@ -1519,14 +1715,15 @@ export function Modal({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    appRoot(),
   )
 }
 
-/* --- The unsaved bar -------------------------------------------------------
+/* --- The unsaved footer ----------------------------------------------------
 
-   One floating strip, bottom centre, present only while a draft differs from
-   what is stored.
+   One strip at the bottom of the page column, present only while a draft
+   differs from what is stored. (It floated, bottom centre, until 15 Sep 2026.)
 
    This existed with no callers, built for a policy builder that ended up doing
    its committing elsewhere — the button said "Review & enforce". Three screens
@@ -1540,53 +1737,428 @@ export function Modal({
    is true of every form ever built; "name · 3 added" is the thing somebody is
    being asked to confirm — and on a tabbed or scrolling page it is what names
    edits made where they cannot currently see them. */
-export function SaveBar({
+/** One line of a draft's review: what changed, as it was and as it will be saved. */
+export interface ReviewRow {
+  label: string
+  before: ReactNode
+  after: ReactNode
+}
+
+/* Review changes: the draft against what is saved, before committing it.
+
+   Opened from the save footer's one button. Every row is one change — added,
+   removed or edited — with the saved value on the left and the draft's on the
+   right, so a reader compares rather than remembers. Keep editing goes back to
+   the page with the draft intact.
+
+   No Discard. Leaving the page already asks Save, Discard or Keep editing, so a
+   red button here was a second way to throw the work away, one click from Save. */
+export function ReviewChanges({
   open,
-  changes,
-  onDiscard,
+  rows,
+  onClose,
   onSave,
   saveLabel = 'Save changes',
-  /** Blocks the save without hiding the bar — for a draft that is not valid yet. */
   blocked = false,
+  blockedReason,
 }: {
   open: boolean
-  changes: string[]
-  onDiscard: () => void
+  rows: ReviewRow[]
+  onClose: () => void
   onSave: () => void
   saveLabel?: string
   blocked?: boolean
+  blockedReason?: string
 }) {
   return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Review changes"
+      width={DIALOG_W.wide}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Keep editing
+          </Button>
+          <Button
+            variant="brand"
+            disabled={blocked}
+            title={blocked ? blockedReason : undefined}
+            onClick={() => {
+              onSave()
+              onClose()
+            }}
+          >
+            {saveLabel}
+          </Button>
+        </>
+      }
+    >
+      {blocked && blockedReason && <p className="bx-review__blocked">{blockedReason}</p>}
+      {rows.length === 0 ? (
+        <p className="bx-review__none">Nothing has changed.</p>
+      ) : (
+        <div className="bx-review__wrap">
+          <table className="bx-review">
+            <thead>
+              <tr>
+                <th scope="col">Change</th>
+                <th scope="col">Saved</th>
+                <th scope="col">After saving</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={`${r.label}-${i}`}>
+                  <th scope="row">{r.label}</th>
+                  <td className="bx-review__before">{reviewValue(r.before)}</td>
+                  <td className="bx-review__after">{reviewValue(r.after)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+/* An added item has nothing saved and a removed one has nothing after: say so
+   rather than leave a blank cell that reads as a rendering fault. */
+const reviewValue = (v: ReactNode) =>
+  v === '' || v === null || v === undefined || v === false ? <span className="bx-review__nil">None</span> : v
+
+/* Where focus goes when the bar leaves with focus inside it — after Save or
+   Discard. Back to what was focused before the bar was reached, or else the
+   page's heading, never <body>. */
+function focusPageHeading(from: Element | null) {
+  const scope =
+    from?.closest('[role="dialog"]') ??
+    document.querySelector('.bshell__main') ??
+    document.querySelector('.bus__main') ??
+    document.body
+  const h = scope.querySelector<HTMLElement>('h1') ?? scope.querySelector<HTMLElement>('h2')
+  if (!h) return
+  if (!h.hasAttribute('tabindex')) h.setAttribute('tabindex', '-1')
+  h.focus({ preventScroll: true })
+}
+
+/* The page column a save footer pins to: the console's scrolling main, or the
+   end-user shell's. Looked up after mount, because the footer is portalled into
+   it rather than rendered where the screen happens to call it. */
+function footerHost(): HTMLElement | null {
+  if (typeof document === 'undefined') return null
+  return document.querySelector<HTMLElement>('.bshell__main') ?? document.querySelector<HTMLElement>('.bus__main')
+}
+
+/* The save footer.
+
+   A full-width strip pinned to the bottom of the page column, present only
+   while a draft differs from what is stored — so an untouched page opens clean,
+   and the footer arrives with the first edit.
+
+   It was a floating card, bottom centre, with Discard, Review changes and Save.
+   Three buttons for one decision, and a card that sat over the last row of the
+   page. Now:
+
+   - A footer, not a float. It is the last child of the scrolling column and
+     `sticky` to its bottom, so on a short page it sits at the bottom of the
+     window and on a long one it stays pinned while the page scrolls under it —
+     and, being in the flow, it never covers the last control.
+   - One button. Given review rows it says "Review & save" and opens Review
+     changes, whose primary commits; without rows it saves directly.
+   - No Discard. Every way off the page asks first (the leave dialog offers
+     Discard), so a red button beside Save was a second, easier way to lose work. */
+export function SaveBar({
+  open,
+  changes,
+  onSave,
+  saveLabel = 'Save changes',
+  /** Blocks the save without hiding the footer — for a draft that is not valid yet. */
+  blocked = false,
+  blockedReason,
+  review,
+}: {
+  open: boolean
+  /** Short names for what changed: "Name", "IP networks". The first two are shown. */
+  changes: string[]
+  onSave: () => void
+  /** The commit's label: on the button when there is nothing to review, in Review changes otherwise. */
+  saveLabel?: string
+  blocked?: boolean
+  /** Why Save is blocked. Shown in the footer in place of the change list, and on the button. */
+  blockedReason?: string
+  /** The draft against what is saved. Given and not empty, the one button reviews before saving. */
+  review?: ReviewRow[]
+}) {
+  const [reviewing, setReviewing] = useState(false)
+  const bar = useRef<HTMLDivElement | null>(null)
+  const cameFrom = useRef<HTMLElement | null>(null)
+  const [host, setHost] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setHost(footerHost())
+  }, [])
+
+  /* A bar that closes also closes its review, so the dialog never reopens by
+     itself the next time the page becomes dirty. */
+  useEffect(() => {
+    if (!open) setReviewing(false)
+  }, [open])
+
+  /* Save and Discard remove the bar with focus on one of its buttons, which
+     dropped keyboard users to <body>. Runs after the review dialog has put focus
+     back on the bar, so it covers both paths. */
+  useEffect(() => {
+    if (open) return
+    const el = bar.current
+    const active = document.activeElement
+    if (!el || !active || !el.contains(active)) return
+    const back = cameFrom.current
+    if (back?.isConnected && !el.contains(back)) back.focus({ preventScroll: true })
+    else focusPageHeading(el)
+  }, [open])
+
+  const parts = changes.filter(Boolean)
+  const shown = parts.slice(0, 2).join(' · ') + (parts.length > 2 ? ` · +${parts.length - 2} more` : '')
+  const reason = blocked && blockedReason ? blockedReason : null
+  const reviews = !!review && review.length > 0
+
+  /* Nothing to review can leave a review open: it closes with the rows. */
+  useEffect(() => {
+    if (!reviews) setReviewing(false)
+  }, [reviews])
+
+  const footer = (
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={bar}
           className="bx-savebar"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 10 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 38 }}
-          /* `status`, not `alert`. It reports a state the reader caused; an
-             alert would interrupt a screen reader mid-word on every keystroke
-             that made a form dirty. */
-          role="status"
+          /* Opacity only. The footer takes its line in the column as it
+             arrives, so a slide would move the page twice. */
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.14, ease: [0.2, 0, 0, 1] }}
+          onFocus={(e) => {
+            const from = e.relatedTarget as HTMLElement | null
+            /* Not from inside the footer, and not from a dialog that is closing. */
+            if (from && !e.currentTarget.contains(from) && !from.closest('.bx-scrim--center')) cameFrom.current = from
+          }}
         >
-          <span className="bx-savebar__text">
-            <strong>
-              {changes.length} unsaved change{changes.length === 1 ? '' : 's'}
-            </strong>
-            <span>
-              {changes.slice(0, 2).join(' · ')}
-              {changes.length > 2 ? ` · +${changes.length - 2} more` : ''}
-            </span>
+          {/* `status`, not `alert`, and on the words only. It reports a state
+              the reader caused; an alert would interrupt a screen reader on
+              every keystroke that made a form dirty, and a status region
+              around the button would read its label out with it. */}
+          <span className="bx-savebar__text" role="status">
+            <strong>Unsaved changes</strong>
+            {reason ? <span className="is-blocked">{reason}</span> : shown && <span>{shown}</span>}
           </span>
-          <Button variant="ghost" size="sm" onClick={onDiscard}>
-            Discard
-          </Button>
-          <Button variant="brand" size="sm" disabled={blocked} onClick={onSave}>
-            {saveLabel}
+          {/* Blocked, the one button is off and the reason is the footer's
+              words: a review that ends on a disabled Save is a dead end. */}
+          <Button
+            variant="brand"
+            icon={Check}
+            disabled={blocked}
+            title={reason ?? undefined}
+            onClick={reviews ? () => setReviewing(true) : onSave}
+          >
+            {reviews ? 'Review & save' : saveLabel}
           </Button>
         </motion.div>
       )}
     </AnimatePresence>
+  )
+
+  return (
+    <>
+      {review && (
+        <ReviewChanges
+          open={reviewing && open && reviews}
+          rows={review}
+          onClose={() => setReviewing(false)}
+          onSave={onSave}
+          saveLabel={saveLabel}
+          blocked={blocked}
+          blockedReason={blockedReason}
+        />
+      )}
+      {host ? createPortal(footer, host) : footer}
+    </>
+  )
+}
+
+/* --- Renaming in place ----------------------------------------------------------
+
+   The chrome around a page heading turned into an input: the field, how many
+   characters are left, and a Cancel ✕ and an Apply ✓ under its right edge. The
+   console's own inline rename looks like this, and without the two buttons the
+   only ways out were keys nobody is told about and a click somewhere else.
+
+   Chrome only, plus when the edit is over. Each page keeps its own commit rules
+   — a zone refuses a name in use, a profile falls back to the old name when
+   emptied — so the page passes the handlers, and Enter and Escape in the input
+   are still the page's to decide.
+
+   A press anywhere in the field except the input keeps focus where it is. The
+   pages commit when focus leaves, and a ✕ that blurred the field first would
+   have applied the name it was pressed to throw away — and so did a press on
+   the count or the gap beside ✕, which are not focusable and blurred the input
+   as a click anywhere else would.
+
+   When focus leaves is decided here, once, because three pages each worked it
+   out and each got a different part of it right:
+   - Leaving is focus going out of the whole field, not the input's blur. ✕ and
+     ✓ are in the tab order; Tab from the input to them is still the edit, and
+     closing on that blur would unmount the button focus was going to, keep the
+     name the user was tabbing over to cancel, and drop focus on the body.
+   - Keeping and closing are two calls, `onLeave` then `onClose`. The field is
+     taller than the heading it stands in for. Closed on the mousedown that took
+     focus away, the header shrinks under the pointer, the mouseup lands on
+     something else, and the control pressed never gets its click. So the name
+     is kept at once — a Save pressed in that same click must see it — and the
+     close waits for pointerup and a task after it, which is where the click
+     has already run. A leave by keyboard has no click to wait for and closes
+     straight away.
+   - Escape on ✕ or ✓ is Cancel. Focus is still in the edit, and the key that
+     cancels in the input should not stop working a Tab later.
+   Listeners are native and come off in a layout effect's cleanup, which React
+   runs before it removes the field: a focusout from the field being taken away
+   after Enter or Escape is never heard as a leave, so no page needs a flag to
+   stop Escape's revert being undone by a second keep. */
+export function NameField({
+  value,
+  max,
+  label,
+  placeholder,
+  inputRef,
+  className = '',
+  errorId,
+  invalid = false,
+  onChange,
+  onKeyDown,
+  onLeave,
+  onClose,
+  onApply,
+  onCancel,
+}: {
+  value: string
+  max: number
+  /** The field's accessible name: "Zone name". */
+  label: string
+  placeholder?: string
+  inputRef?: Ref<HTMLInputElement>
+  className?: string
+  /** The id of the page's error line, while it shows one. */
+  errorId?: string
+  invalid?: boolean
+  onChange: (v: string) => void
+  onKeyDown?: (e: ReactKeyboardEvent<HTMLInputElement>) => void
+  /** Focus went out of the field. Runs at once: keep the name, don't unmount. */
+  onLeave?: () => void
+  /** After `onLeave`, end the edit. Runs at once for a key, after the click for a press. */
+  onClose?: () => void
+  onApply: () => void
+  onCancel: () => void
+}) {
+  const field = useRef<HTMLDivElement>(null)
+  /* The listeners are attached once; a deferred close must reach the handlers
+     of the render it runs in, not the ones the edit opened with. */
+  const latest = useRef({ onLeave, onClose })
+  useLayoutEffect(() => {
+    latest.current = { onLeave, onClose }
+  })
+
+  useLayoutEffect(() => {
+    const el = field.current
+    if (!el) return
+    let pressing = false
+    let closing = false
+    let timer = 0
+    const onDown = () => {
+      pressing = true
+    }
+    const onUp = () => {
+      pressing = false
+      if (!closing) return
+      closing = false
+      timer = window.setTimeout(() => latest.current.onClose?.())
+    }
+    const onOut = (e: FocusEvent) => {
+      if (e.relatedTarget instanceof Node && el.contains(e.relatedTarget)) return
+      latest.current.onLeave?.()
+      if (pressing) closing = true
+      else latest.current.onClose?.()
+    }
+    document.addEventListener('pointerdown', onDown, true)
+    document.addEventListener('pointerup', onUp, true)
+    document.addEventListener('pointercancel', onUp, true)
+    el.addEventListener('focusout', onOut)
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true)
+      document.removeEventListener('pointerup', onUp, true)
+      document.removeEventListener('pointercancel', onUp, true)
+      el.removeEventListener('focusout', onOut)
+      window.clearTimeout(timer)
+    }
+  }, [])
+
+  const cancelOnEscape = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== 'Escape') return
+    e.preventDefault()
+    onCancel()
+  }
+
+  return (
+    <div
+      ref={field}
+      className={`bx-namefield ${className}`}
+      onMouseDown={(e) => {
+        if (!(e.target instanceof HTMLInputElement)) e.preventDefault()
+      }}
+    >
+      <input
+        ref={inputRef}
+        type="text"
+        className="bx-namefield__input"
+        value={value}
+        maxLength={max}
+        placeholder={placeholder}
+        aria-label={label}
+        aria-invalid={invalid || undefined}
+        aria-describedby={errorId}
+        autoFocus
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+      />
+      <div className="bx-namefield__foot">
+        <span className="bx-namefield__count" aria-hidden>
+          {value.length}/{max}
+        </span>
+        <span className="bx-namefield__acts">
+          <button
+            type="button"
+            className="bx-namefield__btn is-cancel"
+            aria-label="Cancel"
+            title="Cancel"
+            onKeyDown={cancelOnEscape}
+            onClick={onCancel}
+          >
+            <X size={16} strokeWidth={2.2} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="bx-namefield__btn is-apply"
+            aria-label="Apply name"
+            title="Apply"
+            onKeyDown={cancelOnEscape}
+            onClick={onApply}
+          >
+            <Check size={16} strokeWidth={2.4} aria-hidden />
+          </button>
+        </span>
+      </div>
+    </div>
   )
 }

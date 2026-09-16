@@ -1,10 +1,18 @@
-import { useId, useState } from 'react'
-import { Check, Pencil, QrCode, ShieldCheck, Smartphone, X } from 'lucide-react'
+import { useId } from 'react'
+import { Pencil, QrCode, ShieldCheck, Smartphone, X } from 'lucide-react'
 
-import { Button, Toggle } from '../kit'
+import { Badge, Button, TipDot, Toggle } from '../kit'
 import { Picker } from '../picker'
 import type { AuthMethod } from '../methods'
-import { SECURITY_QUESTIONS, enrolShapeFor, type EnrolShape } from '../user-methods'
+import {
+  SECURITY_QUESTIONS,
+  enrolIssue,
+  enrolShapeFor,
+  isEmail,
+  isPhone,
+  questionPlan,
+  type EnrolShape,
+} from '../user-methods'
 import { MethodIcon } from './recovery'
 
 /* -----------------------------------------------------------------------------
@@ -28,35 +36,49 @@ import { MethodIcon } from './recovery'
      place rather than opening a dialog, and it is the better answer here for
      the reason it usually is — the form is three fields, and a dialog for three
      fields costs you the list you were reading.
+
+   The form's working copy is held by the page, not by the form: opening another
+   card, closing the panel or leaving the page all go through the one leave
+   guard, which has to be able to see what was typed and save it.
    -------------------------------------------------------------------------- */
 
 export function UserMethodCard({
   m,
   enrolled,
+  ready,
   isActive,
-  values,
   open,
   onOpen,
+  onCancel,
   onActivate,
+  draft,
+  onDraft,
   onSave,
+  questions,
 }: {
   m: AuthMethod
   enrolled: boolean
+  /** Can be switched on: enrolled, nothing to set up, or a token the admin assigned. See `readyFor`. */
+  ready: boolean
   isActive: boolean
-  values: Record<string, string>
   open: boolean
+  /** Edit or Set up pressed: open the form, or close it (asking first when something was typed). */
   onOpen: (open: boolean) => void
+  /** The form's Cancel: close it and drop what was typed. */
+  onCancel: () => void
   onActivate: (on: boolean) => void
-  onSave: (values: Record<string, string>) => void
+  /** The open form's working copy. */
+  draft: Record<string, string>
+  onDraft: (key: string, value: string) => void
+  onSave: () => void
+  /** Security Questions: how many questions the admin asks each person to set. */
+  questions: number
 }) {
   const shape = enrolShapeFor(m.id)
   const nothingToSetUp = shape.kind === 'none'
-  /* Can this be switched on yet? Enrolling is what earns the switch — except
-     for the methods that ask nothing of you, which are ready the moment they
-     are offered. The live page gives the CAC row a toggle and no setup step for
-     exactly that reason: the certificate is on the card, so there is nothing to
-     wait for. */
-  const ready = enrolled || nothingToSetUp
+  /* A token an admin hands out. There is no setup for the person to do, and no
+     switch until they hold one — so, before that, the card says who does it. */
+  const adminIssued = shape.kind === 'assigned'
 
   return (
     <div className={`bm8__card bm8__card--method bmu__card ${open ? 'is-open' : ''}`}>
@@ -68,55 +90,35 @@ export function UserMethodCard({
         <div className="bm8__info">
           <span className="bm8__name">
             {m.name}
-            {enrolled && (
-              <i className="bm8__badge bmu__badge--set">
-                <Check size={11} strokeWidth={2.6} aria-hidden />
-                Configured
-              </i>
-            )}
+            {enrolled && <Badge tone="positive">Configured</Badge>}
             {m.tier === 'Phishing-resistant' && (
               <i className="bm8__badge">
                 <ShieldCheck size={11} strokeWidth={2.2} aria-hidden />
                 Phishing-resistant
               </i>
             )}
+            {/* The description is a tip beside the name, not a line under it. */}
+            <TipDot text={m.description} label={`About ${m.name}`} />
           </span>
-          <span className="bm8__desc">{m.description}</span>
         </div>
 
-        {/* One control per state, which is the same rule the admin card already
-            follows and this card was breaking.
-
-            It shipped with Set up AND a switch side by side on a method nobody
-            had enrolled in yet — and because you cannot be challenged by
-            something you have not set up, the switch could not activate
-            anything either. It opened the form. Two controls, one outcome, in
-            the same corner: whichever you pressed, you got the form, so the
-            second one taught you nothing and cost a decision.
-
-            Before enrolment there is nothing to turn on, so there is no switch —
-            not a disabled one, no switch. After enrolment there are two real and
-            different choices, so there are two controls: change what you gave
-            us, and use this one or not. */}
+        {/* One control per state. Before enrolment there is nothing to turn on,
+            so there is no switch — not a disabled one, no switch. After
+            enrolment there are two real and different choices: change what you
+            gave us, and use this one or not. */}
         <div className="bm8__right">
           {ready ? (
             <div className="bm8__ctlrow">
-              {/* No Edit where there is nothing to edit. The CAC row on the
-                  live page has a toggle and no Edit at all, and inventing one
-                  would be inventing a form. */}
-              {!nothingToSetUp && (
+              {!nothingToSetUp && !adminIssued && (
                 <Button variant="secondary" size="sm" onClick={() => onOpen(!open)}>
                   <Pencil size={13} strokeWidth={2} aria-hidden />
                   Edit
                 </Button>
               )}
-              {/* No word under the switch. It read "Active"/"Inactive", which is
-                  the switch position spelled out — the switch is already the
-                  clearer statement of it, the admin card has never captioned
-                  its own, and the one fact the position does NOT carry is
-                  whether you are enrolled, which the badge on the name says. */}
               <Toggle checked={isActive} onChange={onActivate} label={`Use ${m.name}`} />
             </div>
+          ) : adminIssued ? (
+            <span className="bmu__hint">{shape.note}</span>
           ) : (
             <Button variant="secondary" size="sm" onClick={() => onOpen(!open)}>
               <Pencil size={13} strokeWidth={2} aria-hidden />
@@ -126,16 +128,15 @@ export function UserMethodCard({
         </div>
       </div>
 
-      {open && (
+      {open && !adminIssued && (
         <div className="bmu__form">
           <EnrolForm
             shape={shape}
-            values={values}
-            onCancel={() => onOpen(false)}
-            onSave={(v) => {
-              onSave(v)
-              onOpen(false)
-            }}
+            draft={draft}
+            onDraft={onDraft}
+            questions={questions}
+            onCancel={onCancel}
+            onSave={onSave}
           />
         </div>
       )}
@@ -148,24 +149,34 @@ export function UserMethodCard({
    variations on a form — a phone number, a QR ceremony and three questions are
    three different kinds of asking, and the thing they share is a footer. */
 
+const EMAIL_ERROR = 'Enter a valid email address.'
+const PHONE_ERROR = 'Enter a phone number with country code.'
+
 function EnrolForm({
   shape,
-  values,
+  draft,
+  onDraft,
+  questions,
   onCancel,
   onSave,
 }: {
   shape: EnrolShape
-  values: Record<string, string>
+  draft: Record<string, string>
+  onDraft: (key: string, value: string) => void
+  questions: number
   onCancel: () => void
-  onSave: (v: Record<string, string>) => void
+  onSave: () => void
 }) {
-  const [draft, setDraft] = useState<Record<string, string>>(values)
-  const set = (k: string, v: string) => setDraft((d) => ({ ...d, [k]: v }))
   const uid = useId()
+  const issue = enrolIssue(shape.kind, draft, questions)
+  const value = (k: string) => (draft[k] ?? '').trim()
+  /* Said only once something is typed: a blank field is not wrong, it is not done yet. */
+  const emailError = value('email') && !isEmail(value('email')) ? EMAIL_ERROR : null
+  const phoneError = value('phone') && !isPhone(value('phone')) ? PHONE_ERROR : null
 
-  const footer = (saveLabel = 'Save', can = true) => (
+  const footer = (saveLabel = 'Save') => (
     <div className="bmu__foot">
-      <Button variant="brand" size="sm" disabled={!can} onClick={() => onSave(draft)}>
+      <Button variant="brand" size="sm" disabled={issue !== null} onClick={onSave}>
         {saveLabel}
       </Button>
       <Button variant="ghost" size="sm" onClick={onCancel}>
@@ -174,17 +185,21 @@ function EnrolForm({
     </div>
   )
 
+  const errorLine = (id: string, text: string | null) =>
+    text ? (
+      <p id={id} className="bmu__error">
+        {text}
+      </p>
+    ) : null
+
   switch (shape.kind) {
     case 'phone':
     case 'email':
     case 'alt-email': {
       const key = shape.kind === 'phone' ? 'phone' : 'email'
+      const error = key === 'phone' ? phoneError : emailError
       return (
         <>
-          {/* The live page states the value and offers a link to change it,
-              rather than presenting an editable field straight away. It is the
-              right default for something you set once a year: the common visit
-              is to check what is on file, not to change it. */}
           {shape.changeLink && <p className="bmu__changelink">{shape.changeLink}</p>}
           <label className="bmu__field">
             <span>{shape.label}</span>
@@ -192,10 +207,13 @@ function EnrolForm({
               type={shape.kind === 'phone' ? 'tel' : 'email'}
               value={draft[key] ?? ''}
               placeholder={shape.placeholder}
-              onChange={(e) => set(key, e.target.value)}
+              aria-invalid={!!error}
+              aria-describedby={error ? `${uid}-err` : undefined}
+              onChange={(e) => onDraft(key, e.target.value)}
             />
           </label>
-          {footer('Save', Boolean((draft[key] ?? '').trim()))}
+          {errorLine(`${uid}-err`, error)}
+          {footer()}
         </>
       )
     }
@@ -207,7 +225,15 @@ function EnrolForm({
           <div className="bmu__pair">
             <label className="bmu__field">
               <span>Phone</span>
-              <input type="tel" value={draft.phone ?? ''} placeholder="+1" onChange={(e) => set('phone', e.target.value)} />
+              <input
+                type="tel"
+                value={draft.phone ?? ''}
+                placeholder="+1"
+                aria-invalid={!!phoneError}
+                aria-describedby={phoneError ? `${uid}-perr` : undefined}
+                onChange={(e) => onDraft('phone', e.target.value)}
+              />
+              {errorLine(`${uid}-perr`, phoneError)}
             </label>
             <label className="bmu__field">
               <span>Email</span>
@@ -215,56 +241,74 @@ function EnrolForm({
                 type="email"
                 value={draft.email ?? ''}
                 placeholder="you@company.com"
-                onChange={(e) => set('email', e.target.value)}
+                aria-invalid={!!emailError}
+                aria-describedby={emailError ? `${uid}-eerr` : undefined}
+                onChange={(e) => onDraft('email', e.target.value)}
               />
+              {errorLine(`${uid}-eerr`, emailError)}
             </label>
           </div>
-          {footer('Save', Boolean((draft.phone ?? '').trim() && (draft.email ?? '').trim()))}
+          {footer()}
         </>
       )
 
-    case 'questions':
+    case 'questions': {
+      /* As many as the admin's "Questions to configure" asks for: most from the
+         list, the rest written by the person. */
+      const { presets, custom } = questionPlan(questions)
+      const picked = Array.from({ length: presets }, (_, i) => draft[`q${i}`] ?? '')
       return (
         <>
           <p className="bmu__hint">
-            Two from the list and one of your own. Answers are not case sensitive.
+            Pick {presets} from the list and write {custom} of your own. Answers are not case sensitive.
           </p>
-          {[0, 1].map((i) => (
-            <div className="bmu__pair" key={i}>
+          {Array.from({ length: presets }, (_, i) => (
+            <div className="bmu__pair" key={`p${i}`}>
               <label className="bmu__field">
                 <span className="u-sr-only">Question {i + 1}</span>
                 <Picker
                   label={`Security question ${i + 1}`}
                   width="fill"
-                  value={draft[`q${i}`] ?? ''}
+                  value={draft[`q${i}`] || null}
                   placeholder="Select question"
-                  options={SECURITY_QUESTIONS.map((q) => ({ value: q, label: q }))}
-                  onChange={(v) => set(`q${i}`, v)}
+                  /* A question already picked in another row is not offered again. */
+                  options={SECURITY_QUESTIONS.filter((q) => q === picked[i] || !picked.includes(q)).map((q) => ({
+                    value: q,
+                    label: q,
+                  }))}
+                  onChange={(v) => onDraft(`q${i}`, v)}
                 />
               </label>
               <label className="bmu__field">
                 <span className="u-sr-only">Answer {i + 1}</span>
-                <input value={draft[`a${i}`] ?? ''} placeholder="Answer" onChange={(e) => set(`a${i}`, e.target.value)} />
+                <input value={draft[`a${i}`] ?? ''} placeholder="Answer" onChange={(e) => onDraft(`a${i}`, e.target.value)} />
               </label>
             </div>
           ))}
-          <div className="bmu__pair">
-            <label className="bmu__field">
-              <span className="u-sr-only">Your own question</span>
-              <input value={draft.q2 ?? ''} placeholder="Enter your own question" onChange={(e) => set('q2', e.target.value)} />
-            </label>
-            <label className="bmu__field">
-              <span className="u-sr-only">Answer 3</span>
-              <input value={draft.a2 ?? ''} placeholder="Answer" onChange={(e) => set('a2', e.target.value)} />
-            </label>
-          </div>
-          {footer(
-            'Save',
-            [0, 1].every((i) => draft[`q${i}`] && (draft[`a${i}`] ?? '').trim()) &&
-              Boolean((draft.q2 ?? '').trim() && (draft.a2 ?? '').trim()),
-          )}
+          {Array.from({ length: custom }, (_, j) => {
+            const i = presets + j
+            return (
+              <div className="bmu__pair" key={`c${i}`}>
+                <label className="bmu__field">
+                  <span className="u-sr-only">Your own question {j + 1}</span>
+                  <input
+                    value={draft[`q${i}`] ?? ''}
+                    placeholder="Your own question"
+                    onChange={(e) => onDraft(`q${i}`, e.target.value)}
+                  />
+                </label>
+                <label className="bmu__field">
+                  <span className="u-sr-only">Answer {i + 1}</span>
+                  <input value={draft[`a${i}`] ?? ''} placeholder="Answer" onChange={(e) => onDraft(`a${i}`, e.target.value)} />
+                </label>
+              </div>
+            )
+          })}
+          {errorLine(`${uid}-qerr`, issue?.message || null)}
+          {footer()}
         </>
       )
+    }
 
     case 'authenticator':
       return (
@@ -276,9 +320,7 @@ function EnrolForm({
               <QrCode size={92} strokeWidth={1.1} />
             </span>
             <div>
-              <p className="bmu__hint">
-                Scan this in the app, then type the six digits it shows to prove it worked.
-              </p>
+              <p className="bmu__hint">Scan this in the app, then enter the 6-digit code it shows.</p>
               <label className="bmu__field bmu__field--code">
                 <span id={`${uid}-code`}>Code from the app</span>
                 <input
@@ -287,12 +329,12 @@ function EnrolForm({
                   value={draft.code ?? ''}
                   placeholder="000000"
                   aria-labelledby={`${uid}-code`}
-                  onChange={(e) => set('code', e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) => onDraft('code', e.target.value.replace(/\D/g, ''))}
                 />
               </label>
             </div>
           </div>
-          {footer('Verify and save', (draft.code ?? '').length === 6)}
+          {footer('Verify and save')}
         </>
       )
 
@@ -317,13 +359,9 @@ function EnrolForm({
         <>
           <label className="bmu__field">
             <span>{shape.label}</span>
-            <input
-              value={draft.serial ?? ''}
-              placeholder={shape.placeholder}
-              onChange={(e) => set('serial', e.target.value)}
-            />
+            <input value={draft.serial ?? ''} placeholder={shape.placeholder} onChange={(e) => onDraft('serial', e.target.value)} />
           </label>
-          {footer('Save', Boolean((draft.serial ?? '').trim()))}
+          {footer()}
         </>
       )
 
@@ -331,8 +369,7 @@ function EnrolForm({
       return (
         <>
           <p className="bmu__hint">
-            Your browser will ask for Face ID, a fingerprint, or your security key. Nothing is
-            stored here — the credential stays on the device.
+            Your browser asks for Face ID, a fingerprint or your security key. The credential stays on the device.
           </p>
           {footer('Create a passkey')}
         </>
@@ -352,4 +389,3 @@ function EnrolForm({
       )
   }
 }
-

@@ -30,23 +30,10 @@
 .bhk__tile.is-sync { background: var(--fb-info-bg); color: var(--fb-info-fg); }
 .bhk__tile.is-attribute-sync { background: var(--fb-accent-bg); color: var(--fb-accent-fg); }
 
-.bhk__cardname { flex: 1; min-width: 0; }
-.bhk__cardname h3 { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-medium); }
-.bhk__cardname p {
-  margin: 1px 0 0;
-  font-size: var(--fs-sm);
-  color: var(--text-tertiary);
-  font-variant-numeric: tabular-nums;
-}
-
-.bhk__why {
-  margin: var(--space-5) 0 0;
-  padding-left: var(--space-5);
-  border-left: 2px solid var(--border-default);
-  font-size: var(--fs-sm);
-  color: var(--text-tertiary);
-  line-height: 1.55;
-}
+/* The name and, when there is one, the tip holding the description. A long
+   name with no spaces wraps rather than pushing the buttons off the card. */
+.bhk__cardname { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-3); }
+.bhk__cardname h3 { margin: 0; min-width: 0; font-size: var(--fs-lg); font-weight: var(--fw-medium); overflow-wrap: anywhere; }
 
 /* --- The facts row --------------------------------------------------------- */
 
@@ -63,7 +50,10 @@
   border-radius: var(--radius-sm);
   font-size: var(--fs-sm);
   color: var(--text-body);
+  max-width: 100%;
 }
+/* The endpoint is a URL, which can be longer than the card is wide. */
+.bhk__fact.is-wide { overflow-wrap: anywhere; }
 /* Sentence case. These are questions - "If it does not answer", "Gives up
    after" - and a question set in letterspaced caps stops looking like one. */
 .bhk__fact strong {
@@ -119,8 +109,6 @@
    they went on matching the shared list that replaced them and re-flattened its
    cards back into two-column rows. */
 .bhk__uses .buse { margin-top: var(--space-3); }
-
-.bhk__confirm { margin: 0; font-size: var(--fs-md); line-height: 1.55; color: var(--text-body); }
 
 /* --- The form -------------------------------------------------------------- */
 
@@ -207,12 +195,18 @@
   line-height: 1.5;
 }
 
-.bhk__formissues { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
-.bhk__formissues li {
-  padding: var(--space-4) var(--space-5);
-  border-radius: var(--radius-sm);
+/* Each issue under the field it belongs to. Errors appear once Save has been
+   pressed; warnings as soon as they apply. */
+.bhk__fieldissues { display: flex; flex-direction: column; gap: var(--space-2); }
+.bhk__fieldissue {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
   font-size: var(--fs-sm);
-  line-height: 1.5;
+  font-weight: var(--fw-regular);
+  line-height: 1.45;
 }
-.bhk__formissues li.is-error { background: var(--fb-negative-bg); border: 1px solid var(--fb-negative-border); color: var(--fb-negative-fg); }
-.bhk__formissues li.is-warning { background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border); color: var(--fb-notice-fg); }
+.bhk__fieldissue svg { flex: none; margin-top: 2px; }
+.bhk__fieldissue.is-error { color: var(--fb-negative-fg); }
+.bhk__fieldissue.is-warning { color: var(--fb-notice-fg); }
+.bhk__field input[aria-invalid='true'] { border-color: var(--fb-negative-border); }

@@ -1,56 +1,48 @@
 import { useEffect, useState } from 'react'
-import { Shield } from 'lucide-react'
+import { useId, useRef } from 'react'
+import { ArrowLeft, ShieldPlus } from 'lucide-react'
 
-import { Badge, Button, Callout, Drawer, Modal, StatusPill } from '../kit'
+import { Badge, Button, Callout, Drawer, Modal, StatusPill, TipDot } from '../kit'
 import { EmptyState } from '../empty'
 import { Picker, type PickerOption } from '../picker'
 import { AppLogo } from '../logos/AppLogo'
 import { useBrand } from '../store'
-import { appsLabel, appsOf, type Policy } from '../data'
-import {
-  attachKind,
-  attachTo,
-  attachableTo,
-  decidesFor,
-  detachFrom,
-  orderOf,
-  protectionOf,
-  whyNotDeciding,
-} from './app-policies'
+import { appsLabel, appsOf, blankPolicy, nameTaken, type Policy } from '../data'
+import { ApplicationFixed } from './scope-fields'
+import { attachKind, attachTo, attachableTo, decidesFor, detachFrom, orderOf, protectionOf, whyNotDeciding } from './app-policies'
+import { attachNote, existingHint, remainingApps, removeCopy, removeToast } from './applications-model'
 
 /* -----------------------------------------------------------------------------
    What protects one application, and the form for adding to it.
 
    The brief this was built to: "Do not add an option to attach a policy.
    Instead, provide a form where the user can attach a new policy or an existing
-   one." The distinction is the whole design. An option is a menu item that
-   performs an attachment as the consequence of being found; a form is a surface
-   where both routes are visible, neither is chosen for you, and what the choice
-   costs is stated before it is made.
+   one." So the form is always open at the foot of this panel, and nothing is
+   preselected.
 
-   So the form is permanently open at the foot of this panel — not behind a
-   button, not in a tab, not in a disclosure — and NOTHING IS PRESELECTED, not
-   even on an application with no policies at all, which is the commonest state
-   on this page and exactly the moment the choice is worth making deliberately.
+   The panel stays open after every write, so you watch the list you are
+   changing.
 
-   The panel stays open after every write. That is the argument for a drawer
-   rather than a screen: you watch the list you are changing.
+   Naming a new policy is a page pushed inside this panel, with Back, not a
+   centred dialog over it.
    -------------------------------------------------------------------------- */
 
 export function AppProtection({
   appId,
   justAdded,
   onClose,
-  onNew,
+  onCreate,
 }: {
   appId: string | null
   /* A policy the CALLER just created, so it lands with the same tint as one
-     attached from inside this panel. Two ways in, one arrival. */
+     attached from inside this panel. */
   justAdded?: string | null
   onClose: () => void
-  onNew: () => void
+  /** Hands out the named policy. The caller stores it. */
+  onCreate: (p: Policy) => void
 }) {
   const store = useBrand()
+  const uid = useId()
 
   const [choice, setChoice] = useState<'new' | 'existing' | null>(null)
   const [pickId, setPickId] = useState<string | null>(null)
@@ -58,6 +50,12 @@ export function AppProtection({
   const [gone, setGone] = useState(false)
   const [removing, setRemoving] = useState<Policy | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
+  /** The pushed "Name your policy" page is showing. */
+  const [naming, setNaming] = useState(false)
+  const [newName, setNewName] = useState('')
+  const newRadio = useRef<HTMLInputElement | null>(null)
+  const nameField = useRef<HTMLInputElement | null>(null)
+  const body = useRef<HTMLDivElement | null>(null)
 
   /* Reset when the subject changes. One drawer serves every row, so a form
      that remembered the last application's answer would offer to attach a
@@ -68,37 +66,57 @@ export function AppProtection({
     setTried(false)
     setGone(false)
     setFlash(null)
+    setNaming(false)
+    setNewName('')
   }, [appId])
 
-  /* `apps.find`, never `store.appById` — that resolves an unknown id to
-     `apps[0]` with no undefined branch, so a stale id would render this whole
-     panel as Salesforce rather than as nothing. */
+  /* And after the caller created a policy from this form: the choice has been
+     acted on, so "Name and create" must not stay on offer for a second one.
+     Focus goes to the new row, which replaced the page that had it. */
+  useEffect(() => {
+    if (!justAdded) return
+    setChoice(null)
+    setPickId(null)
+    setTried(false)
+    const id = requestAnimationFrame(() =>
+      body.current?.querySelector<HTMLElement>(`[data-policy-id="${CSS.escape(justAdded)}"]`)?.focus(),
+    )
+    return () => cancelAnimationFrame(id)
+  }, [justAdded])
+
+  /* The name field takes focus when its page is pushed. After the drawer's own
+     focus, which lands on the panel when it opens. */
+  useEffect(() => {
+    if (!naming) return
+    const id = requestAnimationFrame(() => nameField.current?.focus())
+    return () => cancelAnimationFrame(id)
+  }, [naming])
+
+  /* `apps.find`, never `store.appById` — that resolves an unknown id to a
+     placeholder, so a stale id would render this panel for the wrong app. */
   const app = appId ? store.apps.find((a) => a.id === appId) : undefined
 
   const { own, decides, fallback } = protectionOf(app?.id ?? '', store.policies)
   const numbers = orderOf(own)
   const options = app ? attachableTo(app.id, store.policies) : []
   const none = options.length === 0
+  const otherPolicies = store.policies.filter((p) => !p.isSystem).length
   const picked = pickId ? (store.policyById(pickId) ?? null) : null
-  /* Whether the chosen policy already protects something else. It used to gate
-     a warning, because attaching here would have TAKEN it from there. It gates
-     nothing now — a policy holds a list, so this application is added to it —
-     and what is left is a wording change: `also` rather than `Attach`. */
   const alsoOn = picked && app ? attachKind(picked, app.id) === 'also' : false
 
   function submit() {
     if (!app) return
     setTried(true)
     if (choice === 'new') {
-      onNew()
+      setNewName('')
+      setNaming(true)
       return
     }
     if (!pickId) return
 
     /* Re-read at click time rather than trusting the object the options were
        built from. `savePolicy` replaces the whole record by id, so writing a
-       spread of a stale render would silently revert every field edited
-       elsewhere since this panel opened. */
+       spread of a stale render would revert fields edited elsewhere. */
     const live = store.policyById(pickId)
     if (!live) {
       setGone(true)
@@ -106,15 +124,8 @@ export function AppProtection({
       return
     }
 
-    /* How many it protected BEFORE, so the toast can say "now protects three"
-       rather than implying this was the only one. */
-    const had = live.appIds.length
     store.savePolicy(attachTo(live, app.id, store.apps))
-    store.showToast(
-      had > 0
-        ? `${live.name} now protects ${app.name} as well — ${had + 1} applications`
-        : `${live.name} now protects ${app.name}`,
-    )
+    store.showToast(`${live.name} added to ${app.name}.`)
     setChoice(null)
     setPickId(null)
     setTried(false)
@@ -124,31 +135,39 @@ export function AppProtection({
   function remove(p: Policy) {
     const live = store.policyById(p.id)
     if (live && app) {
-      const next = detachFrom(live, app.id)
-      store.savePolicy(next)
-      store.showToast(
-        next.appIds.length === 0
-          ? `${live.name} no longer protects ${app.name} — back to draft`
-          : `${live.name} no longer protects ${app.name} — still on ${next.appIds.length}`,
-      )
+      store.savePolicy(detachFrom(live, app.id))
+      store.showToast(removeToast(live.name, app.name, remainingApps(live, app.id), live.status === 'draft'))
     }
     setRemoving(null)
   }
 
   if (!app) return null
 
+  const taken = nameTaken(newName, store.policies.map((p) => p.name))
+  const nameReady = newName.trim().length > 0 && !taken
+
+  /* Back to the list, with focus on the choice that pushed the page. */
+  const back = () => {
+    setNaming(false)
+    requestAnimationFrame(() => newRadio.current?.focus())
+  }
+
+  const create = () => {
+    if (!nameReady) return
+    onCreate(blankPolicy(newName.trim(), [app.id]))
+    setNaming(false)
+  }
+
   const note =
     choice === null
       ? 'Choose new or existing to continue.'
       : choice === 'new'
-        ? 'You will name it next. Created switched off — nothing changes for users until you turn it on.'
+        ? 'Nothing changes for users until it is published.'
         : !picked
           ? 'Pick a policy to attach.'
           : gone
             ? ''
-            : decidesFor(picked)
-              ? `This takes effect on the next sign-in to ${app.name}.`
-              : `${picked.name} protects nothing today, and it is switched off — nothing changes for users yet.`
+            : attachNote(picked, app.name)
 
   const primary =
     choice === 'new'
@@ -163,211 +182,241 @@ export function AppProtection({
     <>
       <Drawer
         open={!!appId}
-        /* Plainly `onClose` again. This used to decline to close while the name
-           dialog was up, because `Drawer`'s Escape handler was unconditional
-           and one press closed both — taking the half-typed name with it. The
-           repair landed in the kit: `Drawer` joins the same innermost-wins
-           stack `Modal` uses, so Escape peels the dialog and leaves the panel
-           standing, and the panel no longer has to know the dialog exists. */
         onClose={onClose}
-        title={`Protection for ${app.name}`}
+        title={naming ? 'Name your policy' : `Protection for ${app.name}`}
         width={560}
         resizable
         head={
-          <div className="bapr__head">
-            <AppLogo appId={app.id} name={app.name} size={28} />
-            <div>
-              <h2>{app.name}</h2>
-              {/* Attachment, which is a fact. Whether it is GOVERNED is a
-                  judgement, and it goes in the verdict below where there is
-                  room to qualify it. */}
-              <p>
-                {app.type} · {own.length === 0 ? 'No policy of its own' : `${own.length} polic${own.length === 1 ? 'y' : 'ies'} attached`}
-              </p>
+          naming ? (
+            <div className="bapr__pushed">
+              {/* Named for where it goes. */}
+              <button type="button" className="bapr__back" onClick={back}>
+                <ArrowLeft size={14} strokeWidth={2} aria-hidden />
+                {app.name}
+              </button>
+              <h2>Name your policy</h2>
             </div>
-          </div>
+          ) : (
+            <div className="bapr__head">
+              <AppLogo appId={app.id} name={app.name} size={28} />
+              <div>
+                <h2>{app.name}</h2>
+                <p>{app.type}</p>
+              </div>
+            </div>
+          )
         }
         actions={
-          <>
-            <p className="bapr__note">{note}</p>
-            <Button variant="ghost" onClick={onClose}>
-              Close
-            </Button>
-            <Button variant="brand" disabled={choice === null || (choice === 'existing' && !pickId)} onClick={submit}>
-              {primary}
-            </Button>
-          </>
+          naming ? (
+            <>
+              {/* Cancel goes where Back goes: closing the panel from here would
+                  throw away the list along with the name. */}
+              <Button variant="ghost" onClick={back}>
+                Cancel
+              </Button>
+              <Button variant="brand" disabled={!nameReady} onClick={create}>
+                Create policy
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="bapr__note">{note}</p>
+              <Button variant="ghost" onClick={onClose}>
+                Close
+              </Button>
+              <Button variant="brand" disabled={choice === null || (choice === 'existing' && !pickId)} onClick={submit}>
+                {primary}
+              </Button>
+            </>
+          )
         }
       >
-        <Verdict app={app.name} own={own.length} decides={decides.length} />
-
-        <section className="bapr__list">
-          <header className="bapr__listhead">
-            <h3>Policies on this application</h3>
-            {/* The same dialect the policies table's rule peek uses. One
-                ordering semantics, one sentence for it. */}
-            <p>Checked top to bottom · first match wins</p>
-          </header>
-
-          {own.length === 0 ? (
-            <EmptyState
-              compact
-              /* Shield, not ShieldOff. The application is not unprotected —
-                 the tenant default catches it — and the icon must not
-                 contradict the sentence under it. */
-              icon={Shield}
-              title="Nothing of its own yet"
-              /* NOT the fall-through sentence again. The verdict above already
-                 says where sign-ins go, and an empty state that repeats the
-                 callout six inches under it reads as two components arguing
-                 for the same space. This says the thing neither of them does:
-                 which row on this panel is currently doing the deciding. */
-              blurb="The row below is what decides a sign-in here today."
-            />
-          ) : (
-            <ol className="bapr__stack">
-              {own.map((p, i) => (
-                <PolicyRow
-                  key={p.id}
-                  policy={p}
-                  n={numbers[i]}
-                  fresh={flash === p.id || justAdded === p.id}
-                  onOpen={() => store.go({ name: 'board', policyId: p.id })}
-                  onRemove={() => setRemoving(p)}
+        <div ref={body}>
+          {naming ? (
+            <div className="bnp bapr__naming">
+              <div className="bname2__field">
+                <span className="bname2__labelrow">
+                  <label htmlFor={`${uid}-name`} className="bname2__label">
+                    Policy name <i>*</i>
+                  </label>
+                  {newName.length > 39 && <span className="bname2__count">{50 - newName.length} left</span>}
+                </span>
+                <input
+                  id={`${uid}-name`}
+                  ref={nameField}
+                  type="text"
+                  value={newName}
+                  maxLength={50}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return
+                    e.preventDefault()
+                    create()
+                  }}
+                  aria-invalid={taken || undefined}
+                  aria-describedby={taken ? `${uid}-name-error` : undefined}
+                  placeholder="Finance Team – High Security"
                 />
-              ))}
-            </ol>
-          )}
-
-          {/* Always rendered, including on an empty application, because it is
-              what actually decides the sign-in when nothing above does.
-              Excluding the tenant default from the PICKER is right; hiding it
-              from the reading of what protects this app would answer the
-              question except for the part that usually answers it. */}
-          {fallback && (
-            <div className="bapr__fall">
-              <span className="bapr__n bapr__n--fall" aria-hidden>
-                ⌄
-              </span>
-              <div className="bapr__body">
-                <strong>{fallback.name}</strong>
-                <span>Nothing above matched</span>
+                {taken && (
+                  <p id={`${uid}-name-error`} className="bapr__nameerror" role="alert">
+                    A policy with this name already exists.
+                  </p>
+                )}
               </div>
-              <Badge tone="system">System</Badge>
-              <StatusPill status={fallback.status} />
+              <div className="bname2__field">
+                <span className="bname2__label">Application</span>
+                <ApplicationFixed appId={app.id} />
+              </div>
             </div>
-          )}
-        </section>
-
-        <fieldset className="bapr__form">
-          <legend className="u-label">Add protection</legend>
-
-          <label className={`bapr__choice ${choice === 'new' ? 'is-on' : ''}`}>
-            <input
-              type="radio"
-              name={`bapr-${app.id}`}
-              value="new"
-              checked={choice === 'new'}
-              onChange={() => setChoice('new')}
-            />
-            <span className="bapr__choicename">Write a new policy</span>
-            <span className="bapr__choicehint">Created for {app.name} and switched off. You name it next.</span>
-          </label>
-
-          <label className={`bapr__choice ${choice === 'existing' ? 'is-on' : ''} ${none ? 'is-disabled' : ''}`}>
-            <input
-              type="radio"
-              name={`bapr-${app.id}`}
-              value="existing"
-              disabled={none}
-              checked={choice === 'existing'}
-              onChange={() => setChoice('existing')}
-            />
-            <span className="bapr__choicename">Use an existing policy</span>
-            {/* Disabled WITH a reason. A choice that disappears becomes
-                folklore about a broken screen; a disabled one that says why
-                does not. Reachable: at the day-one persona depth the tenant
-                has ten applications and only the system policy. */}
-            <span className="bapr__choicehint">
-              {none
-                ? 'Every other policy already protects this application.'
-                : 'A policy protects one application at a time, so this moves it here.'}
-            </span>
-          </label>
-
-          {choice === 'existing' && (
-            <div className="bapr__pick">
-              {gone && (
-                <Callout tone="negative" title="That policy no longer exists.">
-                  It may have been deleted since this panel was opened.
+          ) : (
+            <>
+              {/* Only the case the list can't show on its own: policies are attached
+                  and none of them decides. */}
+              {own.length > 0 && decides.length === 0 && (
+                /* Notice, not red: red is kept for destructive actions. */
+                <Callout
+                  tone="notice"
+                  title={own.length === 1 ? `The policy on ${app.name} decides nothing.` : `None of the policies on ${app.name} decides anything.`}
+                >
+                  {fallback ? `Sign-ins fall through to ${fallback.name}.` : 'Sign-ins fall through to the tenant default.'}
                 </Callout>
               )}
 
-              <Picker
-                label="Policy to attach"
-                width="fill"
-                size="md"
-                searchable
-                placeholder="Choose a policy"
-                /* Only after a submit was attempted. A red border on a control
-                   nobody has touched is an accusation. */
-                invalid={tried && !pickId}
-                value={pickId}
-                options={options.map((p) => toOption(p, store))}
-                onChange={(v) => {
-                  setPickId(v)
-                  setGone(false)
-                }}
-              />
+              <section className="bapr__list">
+                <header className="bapr__listhead">
+                  <h3>Policies on this application</h3>
+                  <p>Checked top to bottom. The first match decides.</p>
+                </header>
 
-              <p className="bapr__nodefault">
-                The tenant default is not listed — it already applies wherever nothing else does.
-              </p>
+                {own.length === 0 ? (
+                  <EmptyState
+                    compact
+                    icon={ShieldPlus}
+                    title="No policies on this application"
+                    blurb="Sign-ins fall through to the tenant default below."
+                    action={
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          /* Straight to the name page: the choice is already made. */
+                          setChoice('new')
+                          setNewName('')
+                          setNaming(true)
+                        }}
+                      >
+                        Write a new policy
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <ol className="bapr__stack">
+                    {own.map((p, i) => (
+                      <PolicyRow
+                        key={p.id}
+                        policy={p}
+                        n={numbers[i]}
+                        fresh={flash === p.id || justAdded === p.id}
+                        onOpen={() => store.go({ name: 'board', policyId: p.id })}
+                        onRemove={() => setRemoving(p)}
+                      />
+                    ))}
+                  </ol>
+                )}
 
-              {picked && alsoOn && <AlsoNote picked={picked} />}
-            </div>
+                {/* Always shown, because it is what decides the sign-in when nothing
+                    above does. */}
+                {fallback && (
+                  <div className="bapr__fall">
+                    <span className="bapr__n bapr__n--fall" aria-hidden>
+                      ⌄
+                    </span>
+                    <div className="bapr__body">
+                      <span className="bapr__namerow">
+                        <strong>{fallback.name}</strong>
+                        <TipDot text="Decides when no policy above matches." label={`About ${fallback.name}`} />
+                      </span>
+                    </div>
+                    <Badge tone="system">System</Badge>
+                    <StatusPill status={fallback.status} />
+                  </div>
+                )}
+              </section>
+
+              <fieldset className="bapr__form">
+                <legend className="u-label">Add protection</legend>
+
+                <label className={`bapr__choice ${choice === 'new' ? 'is-on' : ''}`}>
+                  <input
+                    ref={newRadio}
+                    type="radio"
+                    name={`bapr-${app.id}`}
+                    value="new"
+                    checked={choice === 'new'}
+                    onChange={() => setChoice('new')}
+                  />
+                  <span className="bapr__choicename">Write a new policy</span>
+                  <span className="bapr__choicehint">Created as a draft on {app.name}. You name it next.</span>
+                </label>
+
+                <label className={`bapr__choice ${choice === 'existing' ? 'is-on' : ''} ${none ? 'is-disabled' : ''}`}>
+                  <input
+                    type="radio"
+                    name={`bapr-${app.id}`}
+                    value="existing"
+                    disabled={none}
+                    checked={choice === 'existing'}
+                    onChange={() => setChoice('existing')}
+                  />
+                  <span className="bapr__choicename">Use an existing policy</span>
+                  {/* Disabled with a reason, and the reason matches the tenant: a
+                      day-one tenant has no other policies at all. */}
+                  <span className="bapr__choicehint">{existingHint(options.length, otherPolicies)}</span>
+                </label>
+
+                {choice === 'existing' && (
+                  <div className="bapr__pick">
+                    {gone && (
+                      <Callout tone="negative" title="That policy no longer exists.">
+                        It may have been deleted since this panel was opened.
+                      </Callout>
+                    )}
+
+                    <Picker
+                      label="Policy to attach"
+                      width="fill"
+                      size="md"
+                      searchable
+                      noun="policies"
+                      placeholder="Choose a policy"
+                      /* Only after a submit was attempted. */
+                      invalid={tried && !pickId}
+                      value={pickId}
+                      options={options.map((p) => toOption(p, store))}
+                      onChange={(v) => {
+                        setPickId(v)
+                        setGone(false)
+                      }}
+                    />
+
+                    <p className="bapr__nodefault">The tenant default isn't listed. It already applies to every application.</p>
+
+                    {picked && alsoOn && <AlsoNote picked={picked} />}
+                  </div>
+                )}
+              </fieldset>
+            </>
           )}
-        </fieldset>
+        </div>
       </Drawer>
 
-      {/* A sibling of the drawer, for the same reason the name dialog is:
-          `Modal` does not portal, and the drawer's transform makes it the
-          containing block for anything fixed inside it. */}
       <RemoveDialog
         policy={removing}
-        appName={app.name}
-        next={nextDecider(removing, own)}
+        app={app}
+        own={own}
         onCancel={() => setRemoving(null)}
         onConfirm={() => removing && remove(removing)}
       />
     </>
-  )
-}
-
-/* What is true of this application right now, in one sentence.
-
-   The third case is the loudest thing in the panel deliberately: a list of
-   attached-but-dormant policies looks exactly like protection on every other
-   surface in the product, and this is the only place that says otherwise. */
-function Verdict({ app, own, decides }: { app: string; own: number; decides: number }) {
-  if (decides > 0) {
-    return (
-      <Callout tone="positive">
-        Sign-ins are checked against the policies below, top to bottom. The first match decides.
-      </Callout>
-    )
-  }
-  if (own === 0) {
-    return (
-      <Callout tone="notice" title="No policy of its own.">
-        Sign-ins to {app} fall through to the tenant default, which asks for a password and nothing else.
-      </Callout>
-    )
-  }
-  return (
-    <Callout tone="negative" title={`${own} polic${own === 1 ? 'y' : 'ies'} name${own === 1 ? 's' : ''} ${app} and none of them decides anything.`}>
-      Sign-ins fall through to the tenant default, which asks for a password and nothing else.
-    </Callout>
   )
 }
 
@@ -385,48 +434,32 @@ function PolicyRow({
   onOpen: () => void
   onRemove: () => void
 }) {
-  const why = whyNotDeciding(policy)
   const empty = policy.rules.length === 0
+  /* Why it has no number, in a tip beside the name. The status pill already
+     says Draft or Inactive; the tip says what that means here. */
+  const why = empty ? 'No rules yet. Open it to add rules.' : decidesFor(policy) ? null : whyNotDeciding(policy)
 
   return (
     <li className={`bapr__row ${n === null ? 'is-off' : ''} ${fresh ? 'is-new' : ''}`}>
-      {/* Earned, not positional. Numbering a switched-off policy 3 asserts a
-          place in a race it never enters, and puts this panel in direct
-          contradiction with the coverage grid, which draws no cell for it. */}
+      {/* Earned, not positional: a policy that decides nothing takes no number. */}
       <span className="bapr__n" aria-hidden>
         {n ?? '—'}
       </span>
       <div className="bapr__body">
         <span className="bapr__namerow">
-          <button type="button" className="bapr__name" onClick={onOpen}>
+          <button type="button" className="bapr__name" data-policy-id={policy.id} onClick={onOpen}>
             {policy.name}
           </button>
+          {why && <TipDot text={why} label={`Why ${policy.name} decides nothing`} />}
         </span>
         <span className="bapr__meta">
           <Badge tone="info">{policy.type}</Badge>
-          {!empty && (
-            <span className="u-muted">
-              {policy.rules.length} rule{policy.rules.length === 1 ? '' : 's'}
-            </span>
-          )}
+          <span className="u-muted">{empty ? 'No rules' : `${policy.rules.length} rule${policy.rules.length === 1 ? '' : 's'}`}</span>
           <StatusPill status={policy.status} />
         </span>
-        {/* The state a policy created from this panel lands in. It must not be
-            silent about what that means. */}
-        {empty ? (
-          <span className="bapr__why">
-            No rules yet — everyone gets in with a password.
-            <Button size="sm" variant="brand" onClick={onOpen}>
-              Add rules →
-            </Button>
-          </span>
-        ) : (
-          why && <span className="bapr__why">{why}</span>
-        )}
       </div>
-      {/* No "Turn on" here. Flipping a policy live begins refusing real
-          sign-ins, and doing that from a side panel with the rules off screen
-          is an enforcement change made blind. The builder's own bar owns it. */}
+      {/* No "Turn on" here. Publishing belongs to the builder, with the rules
+          in view. */}
       <Button size="sm" variant="ghost" onClick={onRemove}>
         Remove
       </Button>
@@ -434,50 +467,40 @@ function PolicyRow({
   )
 }
 
-/* `MoveWarning` stood here, and its removal is the point of the whole change.
-
-   It said: "Moving, not copying. X protects Salesforce today. A policy protects
-   one application, so attaching it here takes it off Salesforce" — and then
-   counted what Salesforce would be left with, because the answer could be
-   nothing and a sign-in falling through to the tenant default is worth a
-   warning.
-
-   None of that is true any more. Attaching adds; Salesforce keeps what it had.
-   A warning about a consequence that no longer happens is worse than no
-   warning, so what replaces it states the fact plainly and in the `info` ramp:
-   nothing is at stake, there is something to know. */
+/* Attaching adds; the policy keeps its other applications. Info, not a
+   warning: nothing is at stake, there is something to know. */
 function AlsoNote({ picked }: { picked: Policy }) {
   const store = useBrand()
   const on = appsOf(picked, store.apps)
   if (on.length === 0) return null
 
   return (
-    <Callout tone="info" title="Adding, not moving.">
-      <em>{picked.name}</em> already protects <strong>{on.map((a) => a.name).join(', ')}</strong>, and keeps
-      {on.length === 1 ? ' it' : ' them'}. One policy can protect several applications, so the same rules
-      apply here too — and editing it later changes every one of them at once.
+    <Callout tone="info" title="Also on other applications">
+      <em>{picked.name}</em> stays on <strong>{on.map((a) => a.name).join(', ')}</strong>. Edits to it apply to every
+      application it is on.
     </Callout>
   )
 }
 
 function RemoveDialog({
   policy,
-  appName,
-  next,
+  app,
+  own,
   onCancel,
   onConfirm,
 }: {
   policy: Policy | null
-  appName: string
-  next: Policy | null
+  app: { id: string; name: string }
+  own: Policy[]
   onCancel: () => void
   onConfirm: () => void
 }) {
+  const copy = policy ? removeCopy(policy, app, own) : null
   return (
     <Modal
       open={!!policy}
       onClose={onCancel}
-      title={`Remove this policy from ${appName}?`}
+      title={`Remove this policy from ${app.name}?`}
       width={480}
       footer={
         <>
@@ -490,42 +513,21 @@ function RemoveDialog({
         </>
       }
     >
-      {policy && (
+      {copy && (
         <div className="bapr__confirm">
-          <p>
-            <em>{policy.name}</em> goes back to a draft. Its rules stay exactly as they are, but a policy with no
-            application is not finished, so it stops deciding sign-ins until you attach it somewhere and publish it
-            again.
-          </p>
-          {/* The consequence a generic confirmation cannot state: what catches
-              the sign-ins this policy was deciding. */}
-          <p>
-            {next
-              ? `Sign-ins it was deciding will fall to ${next.name}.`
-              : `${appName} will be left with the tenant default only.`}
-          </p>
+          <p>{copy.policy}</p>
+          <p>{copy.signIns}</p>
         </div>
       )}
     </Modal>
   )
 }
 
-/** The next policy below this one that actually decides, for the remove confirmation. */
-function nextDecider(policy: Policy | null, own: Policy[]): Policy | null {
-  if (!policy) return null
-  const at = own.findIndex((p) => p.id === policy.id)
-  if (at < 0) return null
-  return own.slice(at + 1).find(decidesFor) ?? null
-}
-
-/* The words the pills use, not the enum. A picker row reading "active" in
-   lower case beside a table of "Active" pills is the same fact in two
-   dialects, and the raw value is the one nobody outside the model says. */
+/* The words the pills use, not the enum. */
 const STATUS_WORD: Record<Policy['status'], string> = {
   draft: 'Draft',
   active: 'Active',
   inactive: 'Inactive',
-  monitor: 'Monitor',
   'always-on': 'Always on',
 }
 
@@ -537,14 +539,8 @@ function toOption(p: Policy, store: ReturnType<typeof useBrand>): PickerOption {
   return {
     value: p.id,
     label: p.name,
-    /* The application's NAME, resolved. A neighbouring surface prints the raw
-       id here while its own comment says it means the name; that bug is not
-       worth propagating into a second place. */
-    meta: on ? `Protects ${appsLabel(named)} · ${rules} · ${status}` : `${p.type} · ${rules} · ${status}`,
-    /* The first application's mark, so a row says what this policy is already
-       doing before anybody clicks. Nothing on the unassigned group — there is
-       nothing to show. */
+    meta: on ? `${appsLabel(named)}, ${rules}, ${status}` : `${p.type}, ${rules}, ${status}`,
     art: on ? <AppLogo appId={on.id} name={on.name} size={16} /> : undefined,
-    group: on ? 'Already protecting something else' : 'Protecting nothing yet',
+    group: on ? 'On other applications' : 'No applications yet',
   }
 }

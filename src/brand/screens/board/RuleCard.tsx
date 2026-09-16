@@ -1,15 +1,31 @@
-import type { PointerEvent as ReactPointerEvent } from 'react'
 import { motion } from 'motion/react'
-import { ArrowDown, ArrowRight, ArrowUp, ChevronsDownUp, ChevronsUpDown, Copy, GripVertical, Home, Lock, Power, PowerOff, Split, Trash2, Users } from 'lucide-react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
+import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
+  Asterisk,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Copy,
+  GripVertical,
+  Lock,
+  Power,
+  PowerOff,
+  Split,
+  Trash2,
+  Users,
+} from 'lucide-react'
 
-import { restConditions, whoEditable, whoIds } from '../../audience-ops'
-import { AvatarStack } from './Avatar'
 import { type Rule } from '../../data'
+import { leafCount } from '../../predicate'
+import { hasWho, whoSummary } from '../../rule-who'
 import type { NameLookup } from '../predicate-prose'
 import type { StepKind } from '../simulate'
 import type { RuleState } from '../rule-form'
 import { DECISION_NAME, TONE, type Part } from './model'
 import { IfBlock, IfChip, IfKw } from './IfBlock'
+import { isPristine, stateLabel } from './parts'
 
 /* -----------------------------------------------------------------------------
    A card on the chain — one rule, read whole, or read short.
@@ -37,7 +53,6 @@ import { IfBlock, IfChip, IfKw } from './IfBlock'
    siblings below simply reflow — no projection, no snapshot, nothing for the
    chain's own `layout` animation to fight. See the note on `.bb__fold`. */
 
-const STATE_LABEL: Record<RuleState, string> = { ready: 'Ready', setup: 'Needs setup', warn: 'Check' }
 
 /* The card in one line, for when the body is folded away.
 
@@ -85,20 +100,11 @@ function CardSummary({ rule, resolve, terminal }: { rule: Rule; resolve?: NameLo
       </div>
     )
 
-  /* `restConditions`, not every leaf. The who is reported separately at the
-     head of this line now, and counting a group twice inflates the number the
-     line exists to give. */
-  const n = restConditions(rule.when).length
-  /* `whoEditable` gates it: on an OR-shaped rule the who belongs to each
-     alternative and is drawn inside them, so naming it once at the head of the
-     line would flatten a distinction the body is careful about. */
-  const who =
-    resolve && whoEditable(rule.when)
-      ? [
-          ...whoIds(rule.when, 'group').map((id) => resolve('group', id) ?? id),
-          ...whoIds(rule.when, 'user').map((id) => resolve('user', id) ?? id),
-        ]
-      : []
+  /* Every condition in the WHEN. People and groups are the rule's `who`, not
+     conditions, so they are never in this count. */
+  const n = leafCount(rule.when)
+  /* From `rule.who`, whatever shape the cards have, and nothing for everyone. */
+  const who = hasWho(rule.who) ? whoSummary(rule.who, (kind, id) => resolve?.(kind, id), 2) : ''
   /* The same rule the expanded body follows: nothing is reported until it has
      been answered.
 
@@ -106,12 +112,27 @@ function CardSummary({ rule, resolve, terminal }: { rule: Rule; resolve?: NameLo
      somebody had just added — three defaults read back as decisions, and the
      folded card contradicting its own body, which said "Nothing set yet" two
      pixels below. Whichever of the two you believed, the card was wrong. */
-  const configured = who.length > 0 || n > 0
+  const configured = who !== '' || n > 0
 
-  if (!configured) {
+  /* Untouched: nothing to report. Answered with no who and no conditions — an
+     outcome chosen on a new rule, say — it catches every sign-in that reaches
+     it, and the line says that rather than "Nothing set yet". */
+  if (!configured && isPristine(rule)) {
     return (
       <div className="bb__cardsum">
         <span className="bb__ifkw is-blank">Nothing set yet</span>
+      </div>
+    )
+  }
+  if (!configured) {
+    return (
+      <div className="bb__cardsum">
+        <span className="bb__ifbranch" aria-hidden>
+          <Split size={11} strokeWidth={2} />
+        </span>
+        <span className="bb__cardsum__n">Every sign-in</span>
+        <ArrowRight size={11} strokeWidth={2} aria-hidden />
+        <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>
       </div>
     )
   }
@@ -122,13 +143,10 @@ function CardSummary({ rule, resolve, terminal }: { rule: Rule; resolve?: NameLo
           A folded card said how much test there was and what it decided, and
           never who it was about, which is the one of the three you cannot
           infer from the others. */}
-      {who.length > 0 && (
+      {who !== '' && (
         <>
           <Users size={11} strokeWidth={2} aria-hidden />
-          <AvatarStack names={who} />
-          <span className="bb__cardsum__dot" aria-hidden>
-            ·
-          </span>
+          <span className="bb__cardsum__n">{who}</span>
         </>
       )}
       {n > 0 && (
@@ -150,6 +168,8 @@ export function RuleCard({
   index,
   openPart,
   state,
+  stateNote,
+  unreachable = false,
   traceKind,
   traceReason,
   landed,
@@ -177,6 +197,10 @@ export function RuleCard({
      is selected while naming no part. */
   openPart: Part | null
   state: RuleState
+  /** Why the pill says what it does — the first finding's title. Shown on hover. */
+  stateNote?: string
+  /** Another rule always matches first, so this one never runs. */
+  unreachable?: boolean
   traceKind: StepKind | null
   traceReason: string | null
   /** The sign-in token has landed here. */
@@ -353,7 +377,7 @@ export function RuleCard({
                 onOpen('who')
               }}
             >
-              <strong>{rule.name || 'Untitled rule'}</strong>
+              <strong>{rule.name.trim() || 'Untitled rule'}</strong>
             </button>
             {/* The state belongs to the rule, so it sits with the rule's name.
 
@@ -362,7 +386,9 @@ export function RuleCard({
                 between the title and the buttons, reading as the first of them.
                 People pressed it. Beside the name it is what it is: a fact
                 about this rule, next to the thing it is a fact about. */}
-            <span className={`bb__state ${rule.enabled ? `is-${state}` : 'is-off'}`}>{rule.enabled ? STATE_LABEL[state] : 'Off'}</span>
+            <span className={`bb__state ${rule.enabled ? `is-${state}` : 'is-off'}`} title={rule.enabled ? stateNote : undefined}>
+              {stateLabel(state, rule.enabled, unreachable)}
+            </span>
           </span>
         </div>
 
@@ -512,7 +538,7 @@ export function TerminalCard({
       <div className="bb__cardhead">
         <span className="bb__idx is-home" aria-hidden>
           <span>
-            <Home size={13} strokeWidth={2} />
+            <Asterisk size={13} strokeWidth={2} />
           </span>
         </span>
 

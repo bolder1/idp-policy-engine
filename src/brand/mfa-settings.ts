@@ -33,13 +33,6 @@
 /** Where an option lives today, so the migration is legible on the screen. */
 export type SettingSource = 'prod' | 'advanced' | '2fa' | 'new'
 
-export const SOURCE_LABEL: Record<SettingSource, string> = {
-  prod: 'Moved from Product Settings',
-  advanced: 'Moved from Advanced Options',
-  '2fa': 'Moved from the 2FA section',
-  new: 'New',
-}
-
 export type MfaField =
   | {
       kind: 'number'
@@ -75,11 +68,11 @@ export type MfaField =
      twelfth character is not a styling problem. `rule` is the sentence shown
      when the value breaks `pattern` — written as what to do, not what went
      wrong. */
-  /* Not a value at all: a way through to a surface this panel does not contain.
-     Hardware tokens are assigned to people, which is a table of users and
-     serials, and inlining that into a settings row would turn the row into a
-     screen. The row says the thing exists and where it lives; `cta` is the
-     button's words. */
+  /* Not a value at all: a way through to a page this row does not contain.
+     Hardware tokens are added and assigned to people on the Display tokens
+     page, and inlining that into a settings row would turn the row into a
+     screen. The row opens that page (`LINK_SCREENS` in auth-panel.ts); `cta` is
+     the button's words. */
   | { kind: 'link'; cta: string }
   | {
       kind: 'text'
@@ -271,16 +264,18 @@ export const FAMILIES: MfaFamily[] = [
     id: 'hardware',
     name: 'Hardware token',
     blurb: 'A physical device the user carries. Nothing to phish and nothing to intercept.',
-    /* The sheet's Suggestions column is explicit: keep assignment where it is.
-       Following it rather than absorbing the section. */
-    note: 'Token assignment stays its own section under 2FA, which is what the sheet recommends.',
+    /* Assignment used to be its own section under 2FA, as the sheet suggested.
+       It is part of Display Token's setup now: tokens are added and assigned on
+       one page, Display tokens, because assigning is choosing from the tokens
+       that were added. This row is the way there from the family. */
+    note: 'Tokens are added and assigned on the Display tokens page.',
     settings: [
       {
         id: 'token-assign',
         label: 'Assign hardware tokens',
-        help: 'Bind each hardware token to the user who carries it.',
+        help: 'Add each Display Token and assign it to the person who carries it.',
         source: '2fa',
-        field: { kind: 'link', cta: 'Open assignment' },
+        field: { kind: 'link', cta: 'Manage tokens' },
       },
     ],
     methods: [

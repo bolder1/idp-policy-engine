@@ -15,50 +15,16 @@
 
 /* --- The list ------------------------------------------------------------- */
 
-/* The live page puts search on the left and the primary action on the right,
-   which is the reverse of the policies table. Kept, because this page is being
-   reproduced rather than redesigned — and the search is wider than the shared
-   260px because "Search Application" is a longer prompt than "Search policies". */
 /* `.bapl__search` widened the toolbar's search box to 340px here and nowhere
    else, which is a third width for the same control. Gone with the shared
    `SearchBox`. */
 
-.bapl__viewswitch button:disabled {
-  opacity: var(--disabled-opacity);
-  cursor: not-allowed;
-}
+/* `.bapl__foot` stood here — the table footer that held the pager. The pager is
+   the page's last row now, as on every paged page (16 Sep 2026). */
 
-.bapl__foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-5);
-}
-
-.bapl__pager { display: inline-flex; gap: var(--space-2); }
-.bapl__pager button {
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  border: var(--bw-thin) solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-  color: var(--text-secondary);
-  font-size: var(--fs-base);
-  line-height: 1;
-  cursor: pointer;
-}
-.bapl__pager button:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text-primary); }
-/* Disabled at both ends rather than hidden. Ten applications fit on one page,
-   so this is the resting state — and a pager that vanishes when it cannot page
-   makes the footer jump the moment a search narrows the list. */
-.bapl__pager button:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
-
-/* The Protection cell. A dot, a count, and the shortfall when there is one —
-   the dot carries whether anything is outstanding, because a cell that reads
-   "3 policies" while two of them decide nothing is the list overstating its
-   own coverage. */
+/* The Protection cell: a count, and the shortfall as a tinted pill when there
+   is one. A cell that reads "3 policies" while two of them decide nothing
+   would overstate the app's coverage. */
 .bapl__prot {
   display: inline-flex;
   align-items: center;
@@ -114,8 +80,35 @@
 /* --- The protection panel ------------------------------------------------- */
 
 .bapr__head { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+
 .bapr__head h2 { font-size: var(--fs-lg); }
 .bapr__head p { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* The pushed "Name your policy" page: Back above the title it leaves. */
+.bapr__pushed { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.bapr__back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+  height: var(--ctl-height-sm);
+  margin: -2px 0 0 -8px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-tertiary);
+  overflow-wrap: anywhere;
+}
+.bapr__back:hover { background: var(--state-hover-bg); color: var(--text-primary); }
+.bapr__back:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bapr__back svg { flex: none; }
+.bapr__nameerror { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--fb-negative-fg); }
 
 .bapr__list { margin-top: var(--space-6); }
 .bapr__listhead { margin-bottom: var(--space-4); }
@@ -179,14 +172,6 @@
 .bapr__name:hover { color: var(--text-link); text-decoration: underline; }
 
 .bapr__meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); font-size: var(--fs-xs); }
-.bapr__why {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
-  line-height: 1.5;
-}
 
 /* Where the sign-in actually goes when nothing above catches it. Same glyph
    and same two-line body as the default row the template preview draws, on
@@ -197,7 +182,7 @@
   gap: var(--space-4);
   margin-top: var(--space-3);
   padding: var(--space-4);
-  border: var(--bw-thin) dashed var(--border-default);
+  border: var(--bw-thin) solid var(--border-subtle);
   border-radius: var(--radius-md);
 }
 .bapr__fall .bapr__body strong { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary); }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { PLACES, coveredBy, placeById, placeContext, searchPlaces } from './places'
+import { PLACES, coveredBy, placeContext, searchPlaces } from './places'
 
 describe('the catalogue is well formed', () => {
   it('has a unique id for every place', () => {
@@ -22,10 +22,6 @@ describe('the catalogue is well formed', () => {
       expect(Math.abs(p.lat), `${p.name} latitude`).toBeLessThanOrEqual(90)
       expect(Math.abs(p.lon), `${p.name} longitude`).toBeLessThanOrEqual(180)
     }
-  })
-
-  it('is resolvable by id', () => {
-    for (const p of PLACES) expect(placeById(p.id)).toBe(p)
   })
 
   it('covers all three kinds at a useful size', () => {

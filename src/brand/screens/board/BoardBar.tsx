@@ -1,11 +1,14 @@
-import { Activity, ChevronLeft, ChevronRight, GraduationCap, ListChecks, Pencil } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
+import { Activity, ChevronRight, GraduationCap, ListChecks, Pencil } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { DemoButton } from '../../tour/DemoButton'
-import { Button, StatusPill } from '../../kit'
+import { Button } from '../../kit'
 import { appsOf, type Policy } from '../../data'
+import { ChangeState } from '../../leave-guard'
 import { AppLogo } from '../../logos/AppLogo'
 import { useBrand } from '../../store'
+import { StatusControl } from '../status-control'
 
 /* -----------------------------------------------------------------------------
    The board's top row.
@@ -49,11 +52,17 @@ import { useBrand } from '../../store'
 
 export function BoardBar({
   policy,
+  unsaved = false,
+  draftSaved = false,
   actions,
   onLearn,
   onWatchDemo,
 }: {
   policy: Policy
+  /* The change-state pill beside the status: edits since the last save, or a
+     saved draft that is not live yet. */
+  unsaved?: boolean
+  draftSaved?: boolean
   /* The publishing verbs, which belong to the builder's draft rather than to
      the policy. Passed in rather than reached for: this component knows what a
      policy IS, and the host knows what is unsaved about it. */
@@ -81,7 +90,7 @@ export function BoardBar({
     <header className="bbtop">
       <nav className="bbtop__crumbs" aria-label="Where this policy sits">
         <button type="button" className="bbtop__back" aria-label="Back to policies" onClick={() => store.go({ name: 'policies' })}>
-          <ChevronLeft size={16} strokeWidth={2} aria-hidden />
+          <ArrowLeft size={16} strokeWidth={2} aria-hidden />
         </button>
         <button type="button" className="bbtop__crumb" onClick={() => store.go({ name: 'policies' })}>
           Policies
@@ -117,7 +126,7 @@ export function BoardBar({
         <button
           type="button"
           className="bbtop__name"
-          title={app ? `${app.name} — edit the policy's name, application and audience` : "Edit the policy's name, application and audience"}
+          title="Edit the policy's name and applications"
           onClick={() => store.go({ name: 'policy-details', policyId: policy.id, from: 'board' })}
         >
           {app && <AppLogo appId={app.id} name={app.name} size={16} />}
@@ -134,9 +143,12 @@ export function BoardBar({
             case and needs saying for the same reason: it is the only one here
             that is not about a single application. */}
         {policy.isSystem && <span className="bbtop__crumb is-static">Every application</span>}
-        {!policy.isSystem && !app && <span className="bbtop__crumb is-warn">No application — these rules never run</span>}
+        {!policy.isSystem && !app && <span className="bbtop__crumb is-warn">No applications</span>}
 
-        <StatusPill status={policy.status} />
+        {/* Read from the store, not this bar's copy: the status is switched
+            here, and it is not part of the draft. */}
+        <StatusControl policyId={policy.id} />
+        <ChangeState unsaved={unsaved} draft={draftSaved} />
       </nav>
 
       {/* Who it governs stood here — a glyph, a phrase, a count and a hover
@@ -178,18 +190,27 @@ export function BoardBarActions({
   test,
   movement,
   sheet,
-  dirty,
+  toPublish,
+  unsaved,
+  canDiscard,
   blockers,
   onSheet,
+  onSaveDraft,
   onDiscard,
   onReview,
 }: {
   test: { grade: string; gradeReason: string; breaches: number } | null
   movement: { changed: number; stricter: number; looser: number } | null
   sheet: 'check' | 'impact' | null
-  dirty: boolean
+  /** Something differs from live, or the policy has never been published. */
+  toPublish: boolean
+  /** Edits since the last save or draft. */
+  unsaved: boolean
+  /** Unsaved edits or a saved draft to throw away. */
+  canDiscard: boolean
   blockers: number
   onSheet: (t: 'check' | 'impact') => void
+  onSaveDraft: () => void
   onDiscard: () => void
   onReview: () => void
 }) {
@@ -214,14 +235,16 @@ export function BoardBarActions({
         >
           <ListChecks size={13} strokeWidth={2} aria-hidden />
           Check
-          {test ? (
-            <>
-              <span className={`bb__grade is-${test.grade}`}>{test.grade}</span>
-              {test.breaches > 0 && <span className="bb__n">{test.breaches} through</span>}
-            </>
-          ) : (
-            <span className="bb__n">—</span>
-          )}
+          {/* With the sheet open on Check, the sheet carries the reading. */}
+          {sheet !== 'check' &&
+            (test ? (
+              <>
+                <span className={`bb__grade is-${test.grade}`}>{test.grade}</span>
+                {test.breaches > 0 && <span className="bb__n">{test.breaches} through</span>}
+              </>
+            ) : (
+              <span className="bb__n">—</span>
+            ))}
         </button>
       )}
       {features.blastRadius && (
@@ -233,17 +256,21 @@ export function BoardBarActions({
         >
           <Activity size={13} strokeWidth={2} aria-hidden />
           What changes
-          <span className="bb__n">{movement ? movement.changed.toLocaleString() : '—'}</span>
+          {sheet !== 'impact' && <span className="bb__n">{movement ? movement.changed.toLocaleString() : '—'}</span>}
         </button>
       )}
       </span>
       {(features.gauntlet || features.blastRadius) && <span className="bbtop__sep" />}
 
-      {dirty && (
-        <Button variant="ghost" size="sm" onClick={onDiscard}>
-          Discard
-        </Button>
-      )}
+      {/* Always present, as in the trail; enabled only with something to throw away. */}
+      {/* A disabled button says why. Discard is destructive, so it is the
+          kit's danger outline. */}
+      <Button variant="danger" size="sm" disabled={!canDiscard} title={canDiscard ? undefined : 'Nothing to discard'} onClick={onDiscard}>
+        Discard
+      </Button>
+      <Button variant="secondary" size="sm" disabled={!unsaved} title={unsaved ? undefined : 'No changes to save'} onClick={onSaveDraft}>
+        Save draft
+      </Button>
       {/* The same two labels the trail uses, chosen the same way. Lite has no
           publish gate, so the button says what it actually does there rather
           than promising a review step that does not exist.
@@ -258,11 +285,11 @@ export function BoardBarActions({
         <Button
           variant="brand"
           size="sm"
-          disabled={!dirty}
-          title={blockers > 0 ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first` : undefined}
+          disabled={!toPublish}
+          title={!toPublish ? 'No changes to review' : blockers > 0 ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first` : undefined}
           onClick={onReview}
         >
-          {features.publish ? 'Review & publish' : 'Review & Save'}
+          {features.publish ? 'Review & publish' : 'Review & save'}
         </Button>
       </span>
     </>

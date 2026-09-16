@@ -28,9 +28,12 @@ import { MethodIcon } from './recovery'
 export function ActiveMethod({
   methods,
   enrolment,
+  anySetUp,
 }: {
   methods: AuthMethod[]
   enrolment: UserEnrolment
+  /** Whether the person has set up any method they can still use. */
+  anySetUp: boolean
 }) {
   const m = methods.find((x) => x.id === enrolment.active) ?? null
 
@@ -47,10 +50,11 @@ export function ActiveMethod({
         </span>
       ) : (
         /* Nothing active is the opposite of this, not a quieter version, so it
-           is not the same colour. */
+           is not the same colour. "Set up yet" only while nothing is: a person
+           whose admin switched off their active method still has the others. */
         <span className="bmact__pill is-none">
           <ShieldAlert size={14} strokeWidth={2} aria-hidden />
-          No method set up yet
+          {anySetUp ? 'No active method' : 'No method set up yet'}
         </span>
       )}
     </div>

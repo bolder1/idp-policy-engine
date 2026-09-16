@@ -9,15 +9,16 @@ import {
   Fingerprint,
   Globe,
   Layers,
+  ListX,
+  type LucideIcon,
   MapPin,
+  MonitorSmartphone,
   Network,
   Search,
-  Trash2,
   UserRound,
   Users,
   Webhook,
   X,
-  type LucideIcon,
 } from 'lucide-react'
 
 /* What an operator IS, as a glyph.
@@ -32,11 +33,12 @@ import {
 const operatorIcon = (o: string): LucideIcon =>
   o.includes('not') ? Ban : o === 'between' ? ArrowLeftRight : CircleCheck
 
-import { EmptyState } from '../empty'
+import { Button } from '../kit'
+import { EmptyState, NoMatches } from '../empty'
 import { modeLabel } from '../fingerprint'
 import { conditionIcon, conditionTone } from './board/tones'
 import { Picker } from '../picker'
-import type { BrandStore } from '../store'
+import { useBrand, type BrandStore } from '../store'
 import type { NameLookup } from './predicate-prose'
 import {
   TIMEZONES,
@@ -286,7 +288,6 @@ export function ConditionPopover({
   onFooter,
   autoOpen,
   stacked,
-  hideAttribute,
 }: {
   c: Condition
   /** The chosen values, summarised for the pill's third segment. */
@@ -328,15 +329,6 @@ export function ConditionPopover({
      every keyboard path are shared — what differs is how the three triggers are
      arranged, which is the only thing that should differ. */
   stacked?: boolean
-  /* Drop the attribute segment.
-
-     For the WHO step, where the attribute IS the step: that row is about
-     groups, and letting somebody retype it into Day of week would edit the
-     question out from under the heading it sits below. Everything else about
-     the pill stays, which is the point — choosing a group there and choosing
-     one in a condition are the same gesture over the same list, because they
-     write the same condition. */
-  hideAttribute?: boolean
 }) {
   const t = conditionType(c.typeId)
   /* `'op'`, not `'what'`.
@@ -498,26 +490,17 @@ export function ConditionPopover({
           attribute and the value are names and take the room, the operator is a
           closed set of two or three words and takes what it needs. */}
       <div className="cp__stackrow">
-        {!hideAttribute ? (
-          <Field
-            ref={whatRef}
-            kind="what"
-            icon={conditionIcon(t.id, t.group)}
-            tone={conditionTone(t.id, t.group)}
-            open={open === 'what'}
-            label={`Change what is checked. Currently ${t.label}.`}
-            onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
-          >
-            {t.label}
-          </Field>
-        ) : (
-          /* The Who pane owns the attribute, so the row opens on its operator
-             and the head is just the label. */
-          <span className="cp__stacklabel">
-            <GroupIcon icon={conditionIcon(t.id, t.group)} />
-            {t.label}
-          </span>
-        )}
+        <Field
+          ref={whatRef}
+          kind="what"
+          icon={conditionIcon(t.id, t.group)}
+          tone={conditionTone(t.id, t.group)}
+          open={open === 'what'}
+          label={`Change what is checked. Currently ${t.label}.`}
+          onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
+        >
+          {t.label}
+        </Field>
 
         <Field
           ref={opRef}
@@ -545,7 +528,7 @@ export function ConditionPopover({
         )}
 
         <button type="button" className="cp__del" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
-          <Trash2 size={14} strokeWidth={1.9} />
+          <X size={14} strokeWidth={1.9} />
         </button>
       </div>
 
@@ -557,17 +540,15 @@ export function ConditionPopover({
     </div>
   ) : (
     <span className="cp__pill">
-      {!hideAttribute && (
-        <Seg
-          ref={whatRef}
-          kind="what"
-          open={open === 'what'}
-          label={`Change what is checked. Currently ${t.label}.`}
-          onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
-        >
-          {t.label}
-        </Seg>
-      )}
+      <Seg
+        ref={whatRef}
+        kind="what"
+        open={open === 'what'}
+        label={`Change what is checked. Currently ${t.label}.`}
+        onOpen={() => setOpen((o) => (o === 'what' ? null : 'what'))}
+      >
+        {t.label}
+      </Seg>
 
       <Seg
         ref={opRef}
@@ -642,10 +623,10 @@ export function ConditionPopover({
                  rows can only ever hide three of them, and a lead order over
                  four is an order nobody can perceive.
 
-                 `WHEN_CONDITIONS` and not the catalogue: `group` and `user` are
-                 in the catalogue for the Who step to resolve its labels
-                 through, and retyping a circumstance into an audience here
-                 would put the audience in two places. */
+                 `WHEN_CONDITIONS` and not the catalogue: `group` and `user`
+                 stay in the catalogue only to label leftover conditions. People
+                 are the rule's `who`, chosen in the Who section, so they are
+                 never offered as a condition. */
               items={WHEN_CONDITIONS
                 /* The family's own glyph, the same one the card and the editor
                    draw. Four rows do not need finding, but the mark is what
@@ -910,23 +891,29 @@ function OptionList({
   onPick: (v: string) => void
 }) {
   const [q, setQ] = useState('')
+  const search = useRef<HTMLInputElement | null>(null)
   const shown = useMemo(() => {
     const n = q.trim().toLowerCase()
     if (!n) return items
     return items.filter((o) => `${o.label} ${o.meta ?? ''} ${o.note ?? ''}`.toLowerCase().includes(n))
   }, [items, q])
 
+  /* No "3 of 24" under the list: the rows are the count. */
   return (
     <>
-      {searchLabel && <SearchField value={q} onChange={setQ} label={searchLabel} />}
-      <List items={shown} picked={picked} single={single} onPick={onPick} q={q} />
-      {searchLabel && (
-        <div className="cp__foot">
-          <span className="cp__count">
-            {shown.length} of {items.length}
-          </span>
-        </div>
-      )}
+      {searchLabel && <SearchField value={q} onChange={setQ} label={searchLabel} inputRef={search} />}
+      <List
+        items={shown}
+        picked={picked}
+        single={single}
+        onPick={onPick}
+        q={q}
+        noun="options"
+        onClear={() => {
+          setQ('')
+          search.current?.focus()
+        }}
+      />
     </>
   )
 }
@@ -936,13 +923,25 @@ function OptionList({
    flips, so the ref callback is the one moment the node is certainly in the
    document. `armed` stops it grabbing focus back on every later re-render,
    which mid-typing is worse than never having taken it. */
-function SearchField({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+function SearchField({
+  value,
+  onChange,
+  label,
+  inputRef,
+}: {
+  value: string
+  onChange: (v: string) => void
+  label: string
+  /** The input, so clearing a search that matched nothing can put focus back in it. */
+  inputRef?: { current: HTMLInputElement | null }
+}) {
   const armed = useRef(false)
   return (
     <div className="cp__search">
       <Search size={14} strokeWidth={2} aria-hidden />
       <input
         ref={(el) => {
+          if (inputRef) inputRef.current = el
           if (!el || armed.current) return
           armed.current = true
           el.focus()
@@ -1020,17 +1019,23 @@ function List({
   single,
   onPick,
   q,
+  noun,
+  onClear,
 }: {
   items: ValueOption[]
   picked: string[]
   single?: boolean
   onPick: (v: string) => void
   q: string
+  /** Plural, lower case, for the no-match state: 'zones', 'groups'. */
+  noun: string
+  onClear: () => void
 }) {
   return (
     <div className="cp__list" role={single ? 'listbox' : 'group'}>
       {items.length === 0 ? (
-        <p className="cp__none">Nothing matches “{q}”.</p>
+        /* The full no-match state, with the way back, rather than a bare line. */
+        <NoMatches compact noun={noun} query={q} onClear={onClear} />
       ) : (
         items.map((o) => {
           const on = picked.includes(o.value)
@@ -1118,7 +1123,11 @@ function ValueBody({
   close: () => void
 }) {
   const t = conditionType(c.typeId)
+  /* Every hook, not only the ones offered: a library of attribute-sync hooks is
+     not an empty library, and "No hooks yet" would be wrong about it. */
+  const hookCount = useBrand().hooks.length
   const [q, setQ] = useState('')
+  const search = useRef<HTMLInputElement | null>(null)
   const armed = useRef(false)
   const take = (el: HTMLInputElement | null) => {
     if (!el || armed.current) return
@@ -1166,26 +1175,19 @@ function ValueBody({
      already exists and already navigates — it just never rendered in the one
      case where it is the only useful control on the panel. */
   if (options.length === 0) {
-      const lib =
-      t.valueKind === 'zone' ? 'zone' : t.valueKind === 'fingerprint' ? 'device profile' : t.valueKind === 'hook' ? 'hook' : null
+    const empty = emptyLibrary(t.valueKind, hookCount)
     return (
       <div className="cp__body">
         <EmptyState
           compact
-          icon={t.valueKind === 'fingerprint' ? Fingerprint : Globe}
-          title={lib ? `No ${lib}s yet` : 'Nothing to choose'}
-          blurb={
-            lib === 'zone'
-              ? 'A zone is the only way a rule can name a network or a place. Create one, then come back to this condition.'
-              : lib === 'device profile'
-                ? 'A device profile is the only way a rule can name a device. Create one, then come back to this condition.'
-                : 'This attribute has no values to offer.'
-          }
+          icon={empty.icon}
+          title={empty.title}
+          blurb={empty.blurb}
           action={
             onFooter ? (
-              <button type="button" className="cp__manage" onClick={onFooter}>
-                {footer} →
-              </button>
+              <Button variant="secondary" onClick={onFooter}>
+                {footer}
+              </Button>
             ) : undefined
           }
         />
@@ -1232,12 +1234,17 @@ function ValueBody({
         </div>
       )}
 
-      <SearchField value={q} onChange={setQ} label={`Search ${t.label}`} />
+      <SearchField value={q} onChange={setQ} label={`Search ${t.label}`} inputRef={search} />
       <List
         items={shown}
         picked={values}
         single={single}
         q={q}
+        noun={NOUN[t.valueKind] ?? 'values'}
+        onClear={() => {
+          setQ('')
+          search.current?.focus()
+        }}
         onPick={(v) => {
           toggle(v)
           /* A single-value kind is finished the moment it is chosen; a
@@ -1247,22 +1254,42 @@ function ValueBody({
         }}
       />
 
-      <div className="cp__foot">
-        <span className="cp__count">
-          {shown.length} of {options.length}
-        </span>
-        {footer &&
-          (onFooter ? (
-            <button type="button" className="cp__manage" onClick={onFooter}>
-              {footer} →
-            </button>
-          ) : (
-            <span className="cp__hint">{footer}</span>
-          ))}
-      </div>
+      {/* The footer only. No "3 of 24" beside it: the rows are the count. */}
+      {footer && (
+        <div className="cp__foot">
+          {footer &&
+            (onFooter ? (
+              <button type="button" className="cp__manage" onClick={onFooter}>
+                {footer} →
+              </button>
+            ) : (
+              <span className="cp__hint">{footer}</span>
+            ))}
+        </div>
+      )}
     </>
   )
 }
+/* What a value list is called in its no-match state. */
+const NOUN: Partial<Record<ConditionType['valueKind'], string>> = {
+  zone: 'zones',
+  fingerprint: 'device profiles',
+  hook: 'hooks',
+  group: 'groups',
+  user: 'people',
+}
+
+/* The empty library, said once, in one line. */
+function emptyLibrary(kind: ConditionType['valueKind'], hookCount: number): { icon: LucideIcon; title: string; blurb: string } {
+  if (kind === 'zone') return { icon: Globe, title: 'No zones yet', blurb: 'Create a zone, then choose it here.' }
+  if (kind === 'fingerprint') return { icon: Fingerprint, title: 'No device profiles yet', blurb: 'Create a device profile, then choose it here.' }
+  if (kind === 'hook')
+    return hookCount > 0
+      ? { icon: Webhook, title: 'No synchronous hooks', blurb: 'Rules can only call synchronous hooks.' }
+      : { icon: Webhook, title: 'No hooks yet', blurb: 'Create a synchronous hook, then choose it here.' }
+  return { icon: ListX, title: 'Nothing to choose', blurb: 'This attribute has no values.' }
+}
+
 export function condSummary(t: ConditionType, c: Condition, names: string[]): string {
   const values = c.values.filter(Boolean)
   if (t.valueKind === 'time') return `${c.values[0] ?? '09:00'} – ${c.values[1] ?? '17:00'}`
@@ -1302,7 +1329,7 @@ export function valueSource(
             icon: Globe,
           }))
         : kind === 'fingerprint'
-          ? store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p), icon: Fingerprint }))
+          ? store.fingerprints.map((p) => ({ value: p.id, label: p.name, meta: modeLabel(p), icon: MonitorSmartphone }))
           : /* Sync hooks only. An attribute-sync hook writes values onto the
                user out of band; it has no answer to give a rule that is waiting
                on it, and offering one here would be offering a condition that
@@ -1312,7 +1339,7 @@ export function valueSource(
               .map((h) => ({ value: h.id, label: h.name, meta: `Answers within ${h.timeoutMs}ms`, icon: Webhook }))
     return {
       options,
-      names: values.map((id) => resolve(kind, id) ?? `deleted · ${id}`),
+      names: values.map((id) => resolve(kind, id) ?? 'Deleted'),
       /* A hook holds one. `diagnostics` reads `values[0]` to check the endpoint
          still exists, and a rule consulting two services would have to say what
          happens when they disagree. */

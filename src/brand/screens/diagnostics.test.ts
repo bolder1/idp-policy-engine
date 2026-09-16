@@ -9,11 +9,16 @@ import {
   groups,
   policies,
   when,
+  zones,
   type Audience,
   type Policy,
   type Rule,
+  type RuleWho,
 } from '../data'
-import { diagnose, impactOf, outcomeSplit, shadowedBy } from './diagnostics'
+import { seedProfiles } from '../fingerprint'
+import { DEPTHS, fingerprintsAt, policiesAt, zonesAt, type Depth } from '../fixtures'
+import { seedHooks } from '../hooks'
+import { diagnose, shadowedBy } from './diagnostics'
 
 /* -----------------------------------------------------------------------------
    The value of a diagnostics panel is entirely in its precision. A false
@@ -26,9 +31,8 @@ import { diagnose, impactOf, outcomeSplit, shadowedBy } from './diagnostics'
 
    - a rule's WHEN is a disjunction of cards, so "joined by AND" is "in the same
      card" and "joined by OR" is "in two cards";
-   - audience is the POLICY's, so a rule can no longer be excused from a check
-     by pointing at a different group. Narrowing inside a policy is a `group`
-     condition, which the checks read like any other.
+   - audience is the POLICY's, and narrowing inside a policy is the rule's
+     `who` — a field beside the WHEN, which the checks read alongside it.
    -------------------------------------------------------------------------- */
 
 let seq = 0
@@ -48,6 +52,9 @@ function rule(over: Partial<Rule> = {}): Rule {
     ...over,
   }
 }
+
+const fin: RuleWho = { groupIds: ['finance'], userIds: [] }
+const con: RuleWho = { groupIds: ['contractors'], userIds: [] }
 
 function policy(rules: Rule[], audience: Audience = EVERYONE): Policy {
   return {
@@ -84,25 +91,35 @@ describe('unreachable rules', () => {
     expect(ids(p)).not.toContain('unreachable')
   })
 
-  it('stays quiet when the earlier rule narrows to a group — a narrowed rule is a conditional rule', () => {
-    /* Was "stays quiet when the earlier catch-all targets a narrower audience".
-       A rule cannot carry an audience any more; narrowing inside a policy is a
-       `group` condition, so the rule above is simply not a catch-all and blocks
-       nothing. Same silence, sounder reason. */
+  it('stays quiet when the earlier rule has a who and no conditions — it is not for everyone', () => {
+    /* The seeded "CFO anywhere, hardened" shape: a named person, no
+       conditions, above a rule for everyone. It blocks nobody the rule below
+       applies to, and it is not a catch-all. */
     const p = policy([
-      rule({ when: when(card(cond('group', 'in', ['finance']))) }),
+      rule({ who: fin, when: anySignIn() }),
       rule({ when: when(card(cond('day', 'is', ['Monday']))) }),
     ])
     expect(ids(p)).not.toContain('unreachable')
+    expect(ids(p)).not.toContain('catchall')
   })
 
-  it('flags a rule narrowed to a group under a catch-all — narrowing is no longer an excuse', () => {
-    /* Was "flags when the earlier catch-all is broader (all covers finance)".
-       With `audienceCovers` deleted this is stricter, not weaker: the catch-all
-       above matches everyone the policy governs, and a Finance condition below
-       is still out of reach. */
-    const p = policy([rule({ when: anySignIn() }), rule({ when: when(card(cond('group', 'in', ['finance']))) })])
+  it('flags a rule with a who under a catch-all — narrowing is no excuse', () => {
+    const p = policy([rule({ when: anySignIn() }), rule({ who: fin, when: when(card(cond('day', 'is', ['Monday']))) })])
     expect(ids(p)).toContain('unreachable')
+  })
+
+  it('flags a rule for the same people under a rule for them with no conditions', () => {
+    const p = policy([rule({ who: fin, when: anySignIn() }), rule({ who: fin, when: when(card(cond('day', 'is', ['Monday']))) })])
+    const d = diagnose(p, groups).find((x) => x.id.startsWith('unreachable'))
+    expect(d?.relatedIndex).toBe(0)
+    expect(d?.detail).toContain('applies to everyone this rule applies to')
+    expect(diagnose(p, groups).find((x) => x.id.startsWith('catchall'))?.title).toBe('Shadows 1 rule below it')
+  })
+
+  it('stays quiet when the rule below is for other people', () => {
+    const p = policy([rule({ who: fin, when: anySignIn() }), rule({ who: con, when: when(card(cond('day', 'is', ['Monday']))) })])
+    expect(ids(p)).not.toContain('unreachable')
+    expect(ids(p)).not.toContain('catchall')
   })
 
   it('ignores a disabled catch-all — a switched-off rule blocks nothing', () => {
@@ -310,76 +327,6 @@ describe('quiet on healthy policies', () => {
      surviving. */
 })
 
-describe('impact', () => {
-  it('sums the audience exactly from group membership', () => {
-    // The audience is the policy's now — every rule in it inherits this number.
-    const p = policy([rule({})], audienceOf(['finance', 'executives']))
-    // Finance 86 + Executives 12
-    expect(impactOf(p, 0, groups).audience).toBe(98)
-  })
-
-  it('names the rule that inherits the traffic when this one stops matching', () => {
-    const p = policy([rule({}), rule({ decision: 'deny' })])
-    const i = impactOf(p, 0, groups)
-    expect(i.fallsTo?.index).toBe(1)
-    expect(i.fallsTo?.decision).toBe('deny')
-  })
-
-  it('skips disabled rules when working out the fall-through', () => {
-    const p = policy([rule({}), rule({ enabled: false }), rule({ decision: 'deny' })])
-    expect(impactOf(p, 0, groups).fallsTo?.index).toBe(2)
-  })
-
-  it('falls through to the next enabled rule whatever it narrows to', () => {
-    /* Was "skips rules whose audience does not overlap", and that answer is
-       gone with per-rule audiences: every rule in a policy governs the same
-       people, so the rule that inherits the traffic is structurally the next
-       enabled one. A `group` condition on it is a condition, not a second
-       audience gate, and the fall-through cannot claim to know whether it
-       matches. */
-    const p = policy(
-      [
-        rule({ when: when(card(cond('group', 'in', ['finance']))) }),
-        rule({ when: when(card(cond('group', 'in', ['engineering']))) }),
-        rule({ when: when(card(cond('group', 'in', ['finance']))), decision: 'deny' }),
-      ],
-      audienceOf(['finance', 'engineering']),
-    )
-    expect(impactOf(p, 0, groups).fallsTo?.index).toBe(1)
-  })
-
-  it('returns null when nothing downstream can take over', () => {
-    const p = policy([rule({})], audienceOf(['finance']))
-    expect(impactOf(p, 0, groups).fallsTo).toBeNull()
-  })
-
-  it('never reports a share above 100%, however the estimate was seeded', () => {
-    const p = policy(
-      [rule({ when: when(card(cond('day', 'is', ['Monday']))), matchEstimate: 9999 })],
-      audienceOf(['executives']),
-    )
-    expect(impactOf(p, 0, groups).share).toBe(100)
-  })
-})
-
-describe('outcome split', () => {
-  it('totals only enabled rules', () => {
-    const p = policy([
-      rule({ decision: 'deny', matchEstimate: 10 }),
-      rule({ decision: '2fa', matchEstimate: 20, enabled: false }),
-      rule({ decision: '1fa', matchEstimate: 30 }),
-    ])
-    const s = outcomeSplit(p)
-    expect(s.total).toBe(40)
-    expect(s.mfa).toBe(0)
-    expect(s.pct(s.deny)).toBe(25)
-  })
-
-  it('does not divide by zero on an empty policy', () => {
-    expect(outcomeSplit(policy([])).pct(0)).toBe(0)
-  })
-})
-
 describe('subsumption and duplication', () => {
   it('flags a rule made more specific than one above it', () => {
     const p = policy([
@@ -412,15 +359,38 @@ describe('subsumption and duplication', () => {
   })
 
   it('flags an exact duplicate as unreachable', () => {
-    const c = () => when(card(cond('group', 'in', ['contractors'])))
-    const p = policy([rule({ when: c() }), rule({ when: c() })], audienceOf(['contractors']))
+    const c = () => when(card(cond('zone', 'in zone', ['office'])))
+    const p = policy([rule({ who: con, when: c() }), rule({ who: { groupIds: ['contractors'], userIds: [] }, when: c() })], audienceOf(['contractors']))
     expect(ids(p)).toContain('dupe')
   })
 
+  it('does not call two rules duplicates when only their people differ', () => {
+    const c = () => when(card(cond('zone', 'in zone', ['office'])))
+    const p = policy([rule({ who: fin, when: c(), decision: '1fa' }), rule({ who: con, when: c(), decision: 'deny' })])
+    expect(ids(p)).not.toContain('dupe')
+    expect(ids(p)).not.toContain('subsumed')
+  })
+
+  it('ignores the order people were chosen in when comparing rules', () => {
+    const c = () => when(card(cond('zone', 'in zone', ['office'])))
+    const p = policy([
+      rule({ who: { groupIds: ['finance', 'legal'], userIds: [] }, when: c() }),
+      rule({ who: { groupIds: ['legal', 'finance'], userIds: [] }, when: c() }),
+    ])
+    expect(ids(p)).toContain('dupe')
+  })
+
+  it('flags a narrower rule under a broader one only when the broader one covers its people', () => {
+    const broad = rule({ who: { groupIds: ['finance', 'contractors'], userIds: [] }, when: when(card(cond('zone', 'in zone', ['office']))) })
+    const narrow = (who: RuleWho) => rule({ who, when: when(card(cond('zone', 'in zone', ['office']), cond('day', 'is', ['Monday']))) })
+    expect(ids(policy([broad, narrow(con)]))).toContain('subsumed')
+    expect(ids(policy([broad, narrow({ groupIds: ['legal'], userIds: [] })]))).not.toContain('subsumed')
+  })
+
   it('calls out a same-predicate rule with a DIFFERENT outcome as a contradiction', () => {
-    const c = () => when(card(cond('group', 'in', ['contractors'])))
+    const c = () => when(card(cond('zone', 'in zone', ['office'])))
     const p = policy(
-      [rule({ when: c(), decision: '1fa' }), rule({ when: c(), decision: '2fa' })],
+      [rule({ who: con, when: c(), decision: '1fa' }), rule({ who: con, when: c(), decision: '2fa' })],
       audienceOf(['contractors']),
     )
     const d = diagnose(p, groups).find((x) => x.id.startsWith('dupe'))
@@ -498,74 +468,107 @@ describe('the policy audience is checked too', () => {
   })
 })
 
+describe('zones and device profiles that no longer exist', () => {
+  const library = { zones, fingerprints: seedProfiles }
+  const withoutZone = (id: string) => ({ ...library, zones: zones.filter((z) => z.id !== id) })
+  const withoutProfile = (id: string) => ({ ...library, fingerprints: seedProfiles.filter((p) => p.id !== id) })
+  const found = (p: Policy, lib: Parameters<typeof diagnose>[4]) =>
+    diagnose(p, groups, seedHooks, undefined, lib).filter((d) => d.code === 'PE134' || d.code === 'PE135')
+
+  it('flags a rule naming a deleted zone as PE134, an error on that rule', () => {
+    const p = policy([rule({ when: anySignIn() }), rule({ when: when(card(cond('zone', 'not in zone', ['office']))) })])
+    const d = found(p, withoutZone('office'))
+    expect(d).toHaveLength(1)
+    expect(d[0]).toMatchObject({ code: 'PE134', severity: 'error', scope: 'rule', ruleIndex: 1 })
+    expect(d[0].title).toBe('This rule uses a zone that no longer exists')
+  })
+
+  it('flags a rule naming a deleted device profile as PE135', () => {
+    const p = policy([rule({ when: when(card(cond('fingerprint', 'matches', ['fp-corp']))) })])
+    const d = found(p, withoutProfile('fp-corp'))
+    expect(d).toHaveLength(1)
+    expect(d[0]).toMatchObject({ code: 'PE135', severity: 'error', scope: 'rule', ruleIndex: 0 })
+    expect(d[0].title).toBe('This rule uses a device profile that no longer exists')
+  })
+
+  it('checks every value, not only the first', () => {
+    const p = policy([rule({ when: when(card(cond('zone', 'in zone', ['office', 'eu']))) })])
+    expect(found(p, withoutZone('eu')).map((d) => d.code)).toEqual(['PE134'])
+  })
+
+  it('flags a switched-off rule too, the way PE130 does', () => {
+    const p = policy([rule({ enabled: false, when: when(card(cond('zone', 'in zone', ['office']))) })])
+    expect(found(p, withoutZone('office'))).toHaveLength(1)
+  })
+
+  it('stays quiet while the zone and the profile exist', () => {
+    const p = policy([
+      rule({ when: when(card(cond('zone', 'in zone', ['office']), cond('fingerprint', 'matches', ['fp-corp']))) }),
+    ])
+    expect(found(p, library)).toEqual([])
+  })
+
+  it('skips the check when no library is passed', () => {
+    const p = policy([
+      rule({ when: when(card(cond('zone', 'in zone', ['no-such-zone']), cond('fingerprint', 'matches', ['no-such-profile']))) }),
+    ])
+    expect(found(p, undefined)).toEqual([])
+    expect(found(p, {})).toEqual([])
+  })
+
+  it('checks each list on its own — zones passed, profiles omitted', () => {
+    const p = policy([
+      rule({ when: when(card(cond('zone', 'in zone', ['no-such-zone']), cond('fingerprint', 'matches', ['no-such-profile']))) }),
+    ])
+    expect(found(p, { zones }).map((d) => d.code)).toEqual(['PE134'])
+  })
+
+  it('finds no dangling zone or profile in any tenant fixture', () => {
+    for (const depth of Object.keys(DEPTHS) as Depth[]) {
+      const lib = { zones: zonesAt(depth), fingerprints: fingerprintsAt(depth) }
+      for (const p of policiesAt(depth)) {
+        const d = found(p, lib)
+        expect(d, `${depth} · ${p.name}: ${JSON.stringify(d.map((x) => x.id))}`).toEqual([])
+      }
+    }
+  })
+})
+
+describe('who', () => {
+  it('is an error to write people or groups as a condition', () => {
+    const p = policy([rule({ when: when(card(cond('group', 'in', ['finance']), cond('day', 'is', ['Monday']))) })])
+    const d = diagnose(p, groups).find((x) => x.code === 'PE150')
+    expect(d).toMatchObject({ severity: 'error', scope: 'rule', ruleIndex: 0, detail: 'Move people and groups to Who.' })
+  })
+
+  it('warns when the who names groups or people the policy does not govern', () => {
+    const p = policy([rule({ who: { groupIds: ['contractors'], userIds: ['priya', 'mehak'] }, when: anySignIn() })], audienceOf(['finance']))
+    const d = diagnose(p, groups).find((x) => x.code === 'PE151')
+    expect(d?.severity).toBe('warning')
+    expect(d?.detail).toContain('Contractors and Mehak Garg')
+    expect(d?.detail).not.toContain('Priya')
+  })
+
+  it('says nothing about a who inside the audience, or a policy for everyone', () => {
+    expect(diagnose(policy([rule({ who: fin, when: anySignIn() })], audienceOf(['finance'])), groups).map((d) => d.code)).not.toContain('PE151')
+    expect(diagnose(policy([rule({ who: con, when: anySignIn() })]), groups).map((d) => d.code)).not.toContain('PE151')
+  })
+
+  it('warns about a group or person no longer in the directory', () => {
+    const p = policy([rule({ who: { groupIds: ['gone-group'], userIds: [], exceptUserIds: ['gone-person'] }, when: anySignIn() })])
+    expect(diagnose(p, groups).find((x) => x.code === 'PE152')?.title).toBe('2 in Who no longer exist')
+  })
+
+  it('is an error when every choice is also an exception', () => {
+    const p = policy([rule({ who: { groupIds: ['finance'], userIds: [], exceptGroupIds: ['finance'] }, when: anySignIn() })])
+    expect(diagnose(p, groups).find((x) => x.code === 'PE153')?.severity).toBe('error')
+  })
+})
+
 describe('the system policy is left alone', () => {
   it('never warns about the global default, which is a deliberate catch-all', () => {
     const sys = policies.find((p) => p.isSystem)!
     expect(diagnose(sys, groups)).toHaveLength(0)
-  })
-})
-
-describe('impact honesty', () => {
-  it('reports an exact count for a conditionless rule — it matches its whole audience', () => {
-    const p = policy([rule({ when: anySignIn(), matchEstimate: 3 })], audienceOf(['finance']))
-    const i = impactOf(p, 0, groups)
-    expect(i.basis).toBe('exact')
-    expect(i.matches).toBe(86)
-  })
-
-  it('marks the estimate stale once the conditions have been edited', () => {
-    const before = policy([
-      rule({ when: when(card(cond('day', 'is', ['Monday']))), matchEstimate: 108 }),
-    ])
-    const after: Policy = {
-      ...before,
-      rules: [{ ...before.rules[0], when: anySignIn(), matchEstimate: 108 }],
-    }
-    // conditions removed entirely -> exact wins, since it now matches everyone
-    expect(impactOf(after, 0, groups, before).basis).toBe('exact')
-
-    const narrowed: Policy = {
-      ...before,
-      rules: [{ ...before.rules[0], when: when(card(cond('day', 'is', ['Tuesday']))) }],
-    }
-    expect(impactOf(narrowed, 0, groups, before).basis).toBe('stale')
-  })
-
-  it('marks the estimate stale on a pure regrouping, which catches different people', () => {
-    /* New, and only expressible in this model: the same three conditions moved
-       between alternatives. `a AND b AND c` and `(a AND b) OR c` share every
-       leaf, so a flat comparison would call this untouched and go on reporting
-       an estimate calculated for a different rule. */
-    const before = policy([
-      rule({
-        when: when(
-          card(
-            cond('zone', 'in zone', ['office']),
-            cond('ml-risk', 'is', ['High']),
-            cond('day', 'is', ['Monday']),
-          ),
-        ),
-        matchEstimate: 108,
-      }),
-    ])
-    const regrouped: Policy = {
-      ...before,
-      rules: [
-        {
-          ...before.rules[0],
-          when: when(
-            card(cond('zone', 'in zone', ['office']), cond('ml-risk', 'is', ['High'])),
-            card(cond('day', 'is', ['Monday'])),
-          ),
-        },
-      ],
-    }
-    expect(impactOf(regrouped, 0, groups, before).basis).toBe('stale')
-  })
-
-  it('is a plain estimate when nothing has been touched', () => {
-    const p = policy([rule({ when: when(card(cond('day', 'is', ['Monday']))) })])
-    expect(impactOf(p, 0, groups, p).basis).toBe('estimate')
   })
 })
 
@@ -583,15 +586,27 @@ describe('shadowedBy — the canvas beam', () => {
   it('dims every enabled rule below a catch-all, whatever they narrow to', () => {
     /* Was "only dims rules whose audience the shadowing rule actually covers".
        `audienceCovers` is deleted and the exemption with it: the rules below
-       narrow with a `group` condition, and a catch-all above still matches
-       first for every one of the people they were narrowing out of. Both are
-       dimmed, and that is the honest answer. */
+       narrow with a who, and a catch-all above still matches first for every
+       one of the people they were narrowing to. Both are dimmed, and that is
+       the honest answer. */
     const p = policy([
       rule({ when: anySignIn() }),
-      rule({ when: when(card(cond('group', 'in', ['engineering']))) }),
-      rule({ when: when(card(cond('group', 'in', ['finance']))) }),
+      rule({ who: { groupIds: ['engineering'], userIds: [] }, when: anySignIn() }),
+      rule({ who: fin, when: when(card(cond('day', 'is', ['Monday']))) }),
     ])
     expect(shadowedBy(p, 0)).toEqual([1, 2])
+  })
+
+  it('dims only the rules for the same people below a who with no conditions', () => {
+    const p = policy([
+      rule({ who: fin, when: anySignIn() }),
+      rule({ who: con, when: anySignIn() }),
+      rule({ who: fin, when: when(card(cond('day', 'is', ['Monday']))) }),
+      rule({}),
+    ])
+    expect(shadowedBy(p, 0)).toEqual([2])
+    const flagged = diagnose(p, groups).filter((d) => d.id.startsWith('unreachable')).map((d) => d.ruleIndex)
+    expect(flagged).toEqual([2])
   })
 
   it('never dims a disabled rule, which was already not running', () => {
@@ -605,5 +620,55 @@ describe('shadowedBy — the canvas beam', () => {
       .filter((d) => d.id.startsWith('unreachable'))
       .map((d) => d.ruleIndex)
     expect(shadowedBy(p, 0)).toEqual(flagged)
+  })
+})
+
+describe('rule names and outcome settings', () => {
+  const codes = (p: Policy) => diagnose(p, groups, seedHooks).map((d) => d.code)
+
+  it('flags a blank or whitespace-only rule name as PE105, an error', () => {
+    const p = policy([rule({ name: '   ', when: when(card(cond('country', 'is', ['IN']))) })])
+    const d = diagnose(p, groups).find((x) => x.code === 'PE105')
+    expect(d).toMatchObject({ severity: 'error', scope: 'rule', ruleIndex: 0, title: 'Rule name is empty' })
+    expect(codes(policy([rule({ name: 'Named', when: when(card(cond('country', 'is', ['IN']))) })]))).not.toContain('PE105')
+  })
+
+  it('flags a specific first factor with no method as PE123, and stays quiet once one is chosen', () => {
+    const none = rule({ decision: '1fa', firstFactor: 'Specific', firstFactorMethod: undefined })
+    expect(diagnose(policy([none]), groups).find((d) => d.code === 'PE123')).toMatchObject({
+      severity: 'error',
+      title: 'No first factor method chosen',
+    })
+    expect(codes(policy([{ ...none, firstFactorMethod: 'Email OTP' }]))).not.toContain('PE123')
+    expect(codes(policy([{ ...none, decision: 'deny' }]))).not.toContain('PE123')
+  })
+
+  it('checks the terminal rule’s outcome too, as a policy-wide finding', () => {
+    const p: Policy = {
+      ...policy([rule({ when: when(card(cond('country', 'is', ['IN']))) })]),
+      fallback: rule({ name: 'Nothing else matched', decision: '2fa', secondFactor: 'specific', secondFactorMethods: [] }),
+    }
+    const d = diagnose(p, groups).find((x) => x.code === 'PE122')
+    expect(d).toMatchObject({ severity: 'error', scope: 'policy', ruleIndex: -1 })
+    expect(d?.title).toBe('Nothing else matched: no second factor chosen')
+  })
+
+  it('says nothing about a terminal rule whose outcome is sound', () => {
+    const p: Policy = { ...policy([rule({ when: when(card(cond('country', 'is', ['IN']))) })]), fallback: rule({ decision: 'deny' }) }
+    expect(diagnose(p, groups).filter((d) => d.ruleIndex === -1)).toHaveLength(0)
+  })
+})
+
+describe('hooks that cannot answer a sign-in', () => {
+  it('flags a condition calling an attribute-sync hook as PE136', () => {
+    const p = policy([rule({ when: when(card(cond('webhook', 'returns true', ['hk-hrms']))) })])
+    const d = diagnose(p, groups, seedHooks).filter((x) => x.code === 'PE136')
+    expect(d).toHaveLength(1)
+    expect(d[0]).toMatchObject({ severity: 'error', ruleIndex: 0 })
+  })
+
+  it('stays quiet for a sync hook', () => {
+    const p = policy([rule({ when: when(card(cond('webhook', 'returns true', ['hk-fraud']))) })])
+    expect(diagnose(p, groups, seedHooks).map((d) => d.code)).not.toContain('PE136')
   })
 })

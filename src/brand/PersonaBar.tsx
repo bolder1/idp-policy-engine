@@ -1,5 +1,6 @@
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Users } from 'lucide-react'
+import { ChevronDown, UserRound } from 'lucide-react'
 
 import { DEPTHS } from './fixtures'
 import { Tip } from './kit'
@@ -30,13 +31,27 @@ export function PersonaBar() {
   const store = useBrand()
   const [open, setOpen] = useState(false)
   const wrap = useRef<HTMLDivElement | null>(null)
+  const trigger = useRef<HTMLButtonElement | null>(null)
+  const list = useRef<HTMLDivElement | null>(null)
+
+  /* Closing from inside the list puts focus back on the trigger; otherwise the
+     focused option unmounts with the panel and focus falls to the page. */
+  const close = (restore: boolean) => {
+    setOpen(false)
+    if (restore) trigger.current?.focus()
+  }
 
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
       if (!wrap.current?.contains(e.target as Node)) setOpen(false)
     }
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const inside = wrap.current?.contains(document.activeElement)
+      setOpen(false)
+      if (inside) trigger.current?.focus()
+    }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -44,6 +59,29 @@ export function PersonaBar() {
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
+
+  const options = () => [...(list.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? [])]
+
+  /* On open, focus the persona already loaded. */
+  useEffect(() => {
+    if (!open) return
+    const all = options()
+    ;(all.find((o) => o.getAttribute('aria-selected') === 'true') ?? all[0])?.focus()
+  }, [open])
+
+  const onListKey = (e: ReactKeyboardEvent) => {
+    const all = options()
+    const at = all.indexOf(document.activeElement as HTMLButtonElement)
+    const move = (i: number) => {
+      e.preventDefault()
+      all[Math.max(0, Math.min(all.length - 1, i))]?.focus()
+    }
+    if (e.key === 'ArrowDown') move(at + 1)
+    else if (e.key === 'ArrowUp') move(at - 1)
+    else if (e.key === 'Home') move(0)
+    else if (e.key === 'End') move(all.length - 1)
+    else if (e.key === 'Tab') setOpen(false)
+  }
 
   const current = personaById(store.persona)
 
@@ -53,25 +91,23 @@ export function PersonaBar() {
           title, which a keyboard never reached. */}
       <Tip text="Prototype only: loads another persona’s tenant into every tab.">
         <button
+          ref={trigger}
           type="button"
           className="bpb__trigger"
           aria-haspopup="listbox"
           aria-expanded={open}
+          aria-label={`Persona: ${current.label}`}
           onClick={() => setOpen((o) => !o)}
         >
-          <Users size={14} strokeWidth={1.9} aria-hidden />
-          <span className="bpb__label">Persona</span>
+          <UserRound size={14} strokeWidth={1.9} aria-hidden />
           <strong>{current.label}</strong>
           <ChevronDown size={14} strokeWidth={2} aria-hidden />
         </button>
       </Tip>
 
       {open && (
-        <div className="bpb__panel" role="listbox" aria-label="Persona">
-          <p className="bpb__intro">
-            {PERSONAS.length} personas, one tenant each. Picking one loads that tenant into every tab and opens where
-            they start.
-          </p>
+        <div className="bpb__panel" role="listbox" aria-label="Persona" ref={list} onKeyDown={onListKey}>
+          <p className="bpb__intro">Each persona has its own tenant. Picking one loads it into every tab.</p>
           <ul>
             {PERSONAS.map((p) => {
               const on = p.id === store.persona
@@ -84,8 +120,10 @@ export function PersonaBar() {
                     aria-selected={on}
                     className={on ? 'is-on' : ''}
                     onClick={() => {
-                      store.setPersona(p.id)
-                      setOpen(false)
+                      /* The persona already loaded only closes the list:
+                         loading it again would undo every saved change. */
+                      close(true)
+                      if (!on) store.setPersona(p.id)
                     }}
                   >
                     <span className="bpb__name">
@@ -102,10 +140,10 @@ export function PersonaBar() {
                           make the switcher a sales tool rather than a check. */}
                       {unmet > 0 && <i className="is-gap">{unmet} unmet</i>}
                     </span>
+                    {/* One line, comma-separated: the tabs used to be separate
+                        items joined by dots. */}
                     <span className="bpb__tabs">
-                      {tabsFor(p).map((t) => (
-                        <em key={t}>{TAB_LABEL[t]}</em>
-                      ))}
+                      <em>{tabsFor(p).map((t) => TAB_LABEL[t]).join(', ')}</em>
                     </span>
                   </button>
                 </li>
@@ -117,4 +155,3 @@ export function PersonaBar() {
     </div>
   )
 }
-

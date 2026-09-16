@@ -13,7 +13,7 @@ import {
 } from '../../data'
 import { MenuButton } from '../../kit'
 import * as ops from '../../when-ops'
-import { isWho, whoEditable } from '../../audience-ops'
+import { hasWho } from '../../rule-who'
 import { useBrand, useNameLookup } from '../../store'
 import { ConditionList, ConditionPopover, summarise, valueSource } from '../ConditionPopover'
 
@@ -204,9 +204,9 @@ export function WhenEditor({
      drawing, because it is not a fact about the rule — `A ∧ B ∧ (group) ∧ C`
      stores C in a second card only because a group sits between them.
 
-     The who-conditions are filtered out wherever the Who pane owns them, so a
-     card can contribute no members at all and simply not appear. */
-  const shownIn = (k: ConditionCard) => (whoEditable(rule.when) ? k.conditions.filter((c) => !isWho(c)) : k.conditions)
+     Every condition in a card is drawn. People and groups are not conditions:
+     they are the rule's `who`, edited in the Who section above, and never
+     appear in this list. */
 
   type Member =
     | { kind: 'cond'; key: string; c: Condition; card: ConditionCard }
@@ -215,7 +215,7 @@ export function WhenEditor({
   const members: Member[] = []
   cards.forEach((k, i) => {
     if (drawsAsBracket(rule.when, k)) members.push({ kind: 'group', key: k.id, card: k, index: i })
-    else shownIn(k).forEach((c) => members.push({ kind: 'cond', key: c.id, c, card: k }))
+    else k.conditions.forEach((c) => members.push({ kind: 'cond', key: c.id, c, card: k }))
   })
 
   /* Counted in members, not conditions. A group somebody just made holds
@@ -242,7 +242,13 @@ export function WhenEditor({
               <Split size={18} strokeWidth={1.8} />
             </span>
             <h4>No conditions yet</h4>
-            <p>Every sign-in that reaches this rule matches it. Add a condition to narrow that.</p>
+            {/* Who is ANDed with the If, so with a who set it is not every
+                sign-in that matches — only those people's. */}
+            <p>
+              {hasWho(rule.who)
+                ? 'Any sign-in by the people in Who matches. Add a condition to narrow that.'
+                : 'Every sign-in that reaches this rule matches it. Add a condition to narrow that.'}
+            </p>
             {/* The same list the foot opens, at the pane's full width.
 
                 A native select stood here for one commit and was the wrong
@@ -325,7 +331,7 @@ export function WhenEditor({
                 <GroupMember
                   k={m.card}
                   letter={cardLetter(m.index)}
-                  rows={shownIn(m.card)}
+                  rows={m.card.conditions}
                   fresh={fresh}
                   dupes={dupes}
                   store={store}
@@ -707,8 +713,8 @@ function JoinRow({
         }
         onChange={(e) => onSet(e.target.value as Joiner)}
       >
-        <option value="and">AND</option>
-        <option value="or">OR</option>
+        <option value="and">and</option>
+        <option value="or">or</option>
       </select>
     </div>
   )

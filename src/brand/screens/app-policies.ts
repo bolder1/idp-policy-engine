@@ -20,8 +20,8 @@ import { coversEveryApp, enforces, type App, type Policy } from '../data'
    `enforces` AND at least one enabled rule, which is exactly the pair of tests
    `Coverage.match` applies before it will draw a cell. Stated once, here, so
    the panel's precedence numbers and the coverage grid cannot disagree about
-   which policies are in the race: a policy that is switched off, or that is
-   only watching, or that has no enabled rule to run, reaches no sign-in — and
+   which policies are in the race: a policy that is a draft, or switched off,
+   or that has no enabled rule to run, reaches no sign-in — and
    numbering it 2 of 3 on this screen while the grid leaves its column blank
    would make one of the two a liar. */
 export function decidesFor(p: Policy): boolean {
@@ -83,11 +83,50 @@ export function whyNotDeciding(p: Policy): string | null {
      off" says somebody turned it off; a draft has never been on, and telling
      an administrator they switched off something they never published is the
      kind of small lie that costs a screen its credibility. */
-  if (p.status === 'draft') return 'Still a draft — it has never decided a sign-in.'
-  if (p.status === 'inactive') return 'Switched off — skipped.'
-  if (p.status === 'monitor') return 'Records what it would have done. Decides nothing.'
-  if (!p.rules.some((r) => r.enabled)) return 'No rules enabled — every sign-in falls straight through.'
+  if (p.status === 'draft') return 'Draft. It decides no sign-ins.'
+  if (p.status === 'inactive') return 'Inactive. It decides no sign-ins.'
+  if (!p.rules.some((r) => r.enabled)) return 'No rule is turned on. Every sign-in falls through.'
   return null
+}
+
+/* Names in a sentence: "Box", "Box and Slack", "Box and 3 other applications".
+   Empty for none. `plural` names the rest, which is always two or more. */
+export function listPhrase(names: string[], plural = 'applications'): string {
+  if (names.length === 0) return ''
+  if (names.length === 1) return names[0]
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names[0]} and ${names.length - 1} other ${plural}`
+}
+
+/* The applications only this policy decides, in the policy's own order.
+
+   Take this policy away (delete it, or turn it off) and these fall through to
+   the tenant default. An app another deciding policy also covers is not on the
+   list: that policy still decides it. */
+export function decidedOnlyBy(policy: Policy, policies: Policy[]): string[] {
+  if (policy.isSystem || !decidesFor(policy)) return []
+  return policy.appIds.filter((appId) => {
+    const d = protectionOf(appId, policies).decides
+    return d.length === 1 && d[0].id === policy.id
+  })
+}
+
+/* The one line the delete confirmation says about a policy.
+
+   "Protects" only for a policy that decides sign-ins. A draft or an inactive
+   policy is assigned to its apps and protects nothing. Null when there is
+   nothing worth saying (a draft with no applications). */
+export function deleteDetail(policy: Policy, policies: Policy[], apps: App[]): string | null {
+  const named = apps.filter((a) => policy.appIds.includes(a.id))
+  if (named.length === 0) return null
+  const names = listPhrase(named.map((a) => a.name))
+  if (!decidesFor(policy)) return `Assigned to ${names}. It decides no sign-ins.`
+  const alone = decidedOnlyBy(policy, policies)
+  const fallback = policies.find(coversEveryApp)
+  if (alone.length === 0 || !fallback) return `Protects ${names}.`
+  if (alone.length === named.length) return `Protects ${names}. Sign-ins there will use the ${fallback.name}.`
+  const aloneNames = listPhrase(named.filter((a) => alone.includes(a.id)).map((a) => a.name))
+  return `Protects ${names}. Sign-ins to ${aloneNames} will use the ${fallback.name}.`
 }
 
 export type AttachKind = 'fresh' | 'already-here' | 'also' | 'system'
@@ -187,9 +226,9 @@ export function detachFrom(p: Policy, appId: string): Policy {
 export interface AppSummary {
   own: number
   decides: number
-  /** What the cell says: "3 policies", "Not protected". */
+  /** What the cell says: "3 policies", "Default only". */
   label: string
-  /** The qualification, when there is one: "1 not deciding", "Off". */
+  /** The qualification, when there is one: "1 not deciding", "Draft", "Inactive". */
   tag: string | null
   tone: 'on' | 'part' | 'off'
   title?: string
@@ -212,10 +251,11 @@ export function summarise(appId: string, policies: Policy[]): AppSummary {
     return {
       own: 0,
       decides: 0,
-      label: 'Not protected',
+      /* Not "Not protected": the tenant default still decides these sign-ins. */
+      label: 'Default only',
       tag: null,
       tone: 'off',
-      title: 'No policy names this application. Sign-ins fall through to the tenant default.',
+      title: 'No policy of its own. Sign-ins use the default policy.',
     }
   }
 
@@ -223,13 +263,17 @@ export function summarise(appId: string, policies: Policy[]): AppSummary {
   const behind = own.length - decides.length
 
   if (decides.length === 0) {
+    /* One policy: its own status word, the one the policies list shows. "Off"
+       is not a status, and a draft was never on. */
+    const only = own[0]
+    const word = only.status === 'draft' ? 'Draft' : only.status === 'inactive' ? 'Inactive' : 'No rule on'
     return {
       own: own.length,
       decides: 0,
       label,
-      tag: own.length === 1 ? 'Off' : 'None deciding',
+      tag: own.length === 1 ? word : 'None deciding',
       tone: 'off',
-      title: 'Attached, but nothing here decides a sign-in yet.',
+      title: own.length === 1 ? whyNotDeciding(only) ?? undefined : 'None of these policies decides sign-ins.',
     }
   }
 

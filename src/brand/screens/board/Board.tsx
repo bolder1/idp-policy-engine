@@ -9,6 +9,7 @@ import type { Diagnostic } from '../diagnostics'
 import type { NameLookup } from '../predicate-prose'
 import { ruleState } from '../rule-form'
 import type { Selection, Trace } from './model'
+import { UNREACHABLE_CODES } from './parts'
 import { RuleCard, TerminalCard } from './RuleCard'
 
 /* -----------------------------------------------------------------------------
@@ -386,7 +387,7 @@ export function Board({
               )}
               {destination === null ? (
                 <span>
-                  <b className="bb__start__at">No application</b> <em>— no sign-in ever reaches these rules</em>
+                  <b className="bb__start__at">No applications</b>
                 </span>
               ) : (
                 <span>
@@ -438,6 +439,15 @@ export function Board({
                          part. */
                       openPart={selection.kind === 'rule' && selection.id === r.id ? selection.part : null}
                       state={ruleState(diagsFor(ri))}
+                      /* The pill says what; its tooltip says why, which is the
+                         only place Lite says it on the canvas. */
+                      stateNote={(
+                        /* "Unreachable" is explained by the finding that makes it so. */
+                        diagsFor(ri).find((d) => UNREACHABLE_CODES.includes(d.code)) ??
+                        diagsFor(ri).find((d) => d.severity === 'error') ??
+                        diagsFor(ri).find((d) => d.severity === 'warning')
+                      )?.title}
+                      unreachable={diagsFor(ri).some((d) => UNREACHABLE_CODES.includes(d.code))}
                       traceKind={stepKind(ri)}
                       traceReason={trace?.result.steps[ri]?.reason ?? null}
                       landed={landedOn === ri}

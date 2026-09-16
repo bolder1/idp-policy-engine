@@ -1,8 +1,10 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useMemo, useState } from 'react'
-import { Search, Users, X } from 'lucide-react'
+import { useRef } from 'react'
+import { Search, UserRound, Users, X } from 'lucide-react'
 
 import { EVERYONE, initials, reach, type Audience, type Group, type User } from '../data'
+import { EmptyState, NoMatches } from '../empty'
 import { Badge, Button, Counter, Toggle } from '../kit'
 
 import './audience-drawer.css'
@@ -43,6 +45,11 @@ export function AudienceDrawer({
   const [draft, setDraft] = useState<Audience>(audience)
   const [tab, setTab] = useState<'groups' | 'people'>('groups')
   const [q, setQ] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
+  const clearSearch = () => {
+    setQ('')
+    searchRef.current?.focus()
+  }
 
   // Reset whenever it reopens, so a cancelled edit never leaks into the next one.
   const [seen, setSeen] = useState(open)
@@ -138,6 +145,7 @@ export function AudienceDrawer({
               <div className="baud__search">
                 <Search size={14} strokeWidth={2} aria-hidden />
                 <input
+                  ref={searchRef}
                   aria-label="Search groups and people"
                   placeholder="Search groups and people…"
                   value={q}
@@ -154,7 +162,8 @@ export function AudienceDrawer({
                   className={tab === 'groups' ? 'is-on' : ''}
                   onClick={() => setTab('groups')}
                 >
-                  Groups {draft.groupIds.length > 0 && <em>{draft.groupIds.length}</em>}
+                  <Users size={14} strokeWidth={1.9} aria-hidden />
+                  Groups
                 </button>
                 <button
                   type="button"
@@ -163,11 +172,24 @@ export function AudienceDrawer({
                   className={tab === 'people' ? 'is-on' : ''}
                   onClick={() => setTab('people')}
                 >
-                  People {draft.userIds.length > 0 && <em>{draft.userIds.length}</em>}
+                  <UserRound size={14} strokeWidth={1.9} aria-hidden />
+                  People
                 </button>
               </div>
 
-              {tab === 'groups' ? (
+              {tab === 'groups' && shownGroups.length === 0 ? (
+                q.trim() ? (
+                  <NoMatches noun="groups" query={q} compact onClear={clearSearch} />
+                ) : (
+                  <EmptyState icon={Users} title="No groups yet" blurb="Groups come from the directory." compact />
+                )
+              ) : tab === 'people' && shownUsers.length === 0 ? (
+                q.trim() ? (
+                  <NoMatches noun="people" query={q} compact onClear={clearSearch} />
+                ) : (
+                  <EmptyState icon={UserRound} title="No people yet" blurb="People come from the directory." compact />
+                )
+              ) : tab === 'groups' ? (
                 <ul className="baud__list">
                   {shownGroups.map((g) => (
                     <li key={g.id}>
@@ -193,7 +215,6 @@ export function AudienceDrawer({
                       </button>
                     </li>
                   ))}
-                  {shownGroups.length === 0 && <li className="baud__none">No group matches “{q}”.</li>}
                 </ul>
               ) : (
                 <ul className="baud__list">
@@ -228,7 +249,6 @@ export function AudienceDrawer({
                       </li>
                     )
                   })}
-                  {shownUsers.length === 0 && <li className="baud__none">Nobody matches “{q}”.</li>}
                   {unlisted > 0 && (
                     <li className="baud__more">
                       Showing {users.length} of {(users.length + unlisted).toLocaleString()}. Search to find someone.
@@ -315,11 +335,10 @@ export function AudienceBar({
 /* `AudiencePicker` stood here — a tabbed, searchable roster of groups and
    people, rendered inline by the create form and by Policy details.
 
-   Both screens have stopped asking who a policy governs. That question is
-   answered per RULE now, by the Who step, which reads and writes the `group`
-   and `user` conditions the rule already held — so a policy-level audience
-   asked on two screens was two more chances for three places to disagree about
-   one fact.
+   Both screens have stopped asking who a policy governs. Who each RULE is
+   for is `rule.who`, a field of its own on the rule — never a `group` or
+   `user` condition — and a policy-level audience asked on two more screens was
+   two more chances to disagree about one fact.
 
    `AudienceDrawer` and `AudienceBar` above are untouched: the builder's top bar
    still shows what a policy governs and still lets you change it, which is the

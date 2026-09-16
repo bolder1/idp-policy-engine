@@ -13,10 +13,9 @@
   gap: 0;
   padding: 64px 24px 68px;
   text-align: center;
-  /* A dashed edge, not a solid card. The region is a placeholder for content
-     that will live here — a solid border would draw it as a panel that belongs
-     on the page, which is exactly what it is not. */
-  border: 1px dashed var(--border-default);
+  /* A solid, quiet edge. It was dashed; the owner took dotted and dashed
+     outlines out of the design system (14 Sep 2026). */
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   background: var(--surface-raised);
 }
@@ -117,25 +116,20 @@
   line-height: 1.6;
 }
 
-.bempty__action { margin-top: 22px; }
+/* A row, so a primary action and one secondary control sit side by side and
+   wrap together on a narrow panel. */
+.bempty__action {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: var(--space-4);
+  margin-top: 22px;
+}
+.bempty .bempty__title { overflow-wrap: anywhere; }
 
 /* `.bempty__note` — a second, boxed paragraph below the action — stood here.
    Exactly one empty state used it, which made it the exception rather than the
    pattern, and it spent four lines under a button explaining a rule the screen
    it leads to explains in context. One line under the title is the whole
    subheading now. */
-
-/* --- No results ------------------------------------------------------------
-   A filter or a search that matched nothing. Deliberately undrawn: the page
-   around it is still full, and an illustration here would be a picture of
-   something that DOES exist and is merely hidden. */
-.bempty__none {
-  margin: 0;
-  padding: 28px 16px;
-  text-align: center;
-  font-size: var(--fs-md);
-  color: var(--text-tertiary);
-}
 
 /* --- Compact: an empty SECTION -----------------------------------------------
    Inside a panel that already carries a heading and a border, so it drops its
@@ -148,6 +142,7 @@
 }
 /* 44px: the same 26px mark in 8px of padding and the same 1px ring. */
 .bempty.is-compact .bempty__icon { padding: 8px; margin-bottom: 10px; }
+.bempty.is-compact .bempty__action { margin-top: 14px; }
 .bempty.is-compact .bempty__title { font-size: var(--fs-base); }
 /* 11px was small enough to read as a caption on something rather than as the
    sentence explaining it. */

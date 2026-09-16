@@ -1,5 +1,6 @@
-import { conditionType, type AccessDecision, type Condition, type Policy, type Rule } from '../data'
+import { conditionType, users as seedUsers, type AccessDecision, type Condition, type Policy, type Rule } from '../data'
 import { blame, cardJoin, cardName, credit, leaves, predicatePasses, topJoin } from '../predicate'
+import { hasWho, normaliseWho, whoPasses } from '../rule-who'
 
 /* -----------------------------------------------------------------------------
    The simulation core.
@@ -168,6 +169,9 @@ export interface SimEnv {
   zoneName: (id: string) => string
   fingerprintName: (id: string) => string
   groupName: (id: string) => string
+  /* A person's name, for the trace line of a rule whose who did not match.
+     Optional, and absent falls back to the seeded directory, then the id. */
+  userName?: (id: string) => string
   /* What the three risk verdicts are worth in this tenant, from the risk-signal
      profile. Optional, and absent means the shipped scale.
 
@@ -179,6 +183,14 @@ export interface SimEnv {
      env is already threaded to every one of them, because it is where the
      lookups a rule needs but a situation does not already live. */
   riskScale?: Record<string, number>
+  /* Whether the tenant still has this zone / device profile. Optional, and
+     absent means every id exists, which is how the evaluator behaved before.
+
+     Passed, a condition naming a deleted one comes back `unknown` — never a
+     pass, under `in` or `not in` alike. The linter reports it as PE134 / PE135;
+     the rehearsal must not grade it as though the object were still there. */
+  hasZone?: (id: string) => boolean
+  hasFingerprint?: (id: string) => boolean
 }
 
 // --- Evaluation --------------------------------------------------------------
@@ -221,9 +233,9 @@ export function condPhrase(c: Condition, env: SimEnv): string {
   const vals = c.values.filter((v) => v.trim() !== '')
   const shown =
     t.valueKind === 'zone'
-      ? vals.map(env.zoneName).join(', ')
+      ? vals.map((v) => (env.hasZone && !env.hasZone(v) ? '(deleted)' : env.zoneName(v))).join(', ')
       : t.valueKind === 'fingerprint'
-        ? vals.map(env.fingerprintName).join(', ')
+        ? vals.map((v) => (env.hasFingerprint && !env.hasFingerprint(v) ? 'a deleted device profile' : env.fingerprintName(v))).join(', ')
         : t.valueKind === 'time'
           ? `${vals[0] ?? '—'}–${vals[1] ?? '—'}`
           : vals.join(', ')
@@ -257,6 +269,7 @@ export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: 
      which is the one thing the trace has to be able to do. */
   switch (c.typeId) {
     case 'zone': {
+      if (env?.hasZone && vals.some((v) => !env.hasZone!(v))) return unknown('this rule names a zone that no longer exists')
       if (!place.zonesIn) return unknown('“Any location” does not fix an origin, so zone membership is undecided')
       /* The half the condition asked about, and nothing wider. A rule scoped to
          the network half must not be satisfied by a geographic match it did not
@@ -299,6 +312,8 @@ export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: 
         : decide(vals.includes(place.city), `the connection geolocates to ${place.city}`)
 
     case 'fingerprint':
+      if (env?.hasFingerprint && vals.some((v) => !env.hasFingerprint!(v)))
+        return unknown('this rule names a device profile that no longer exists')
       return decide(
         device.recognised,
         `the device fingerprint ${device.recognised ? 'matches the profile' : 'does not match the profile'}`,
@@ -332,18 +347,13 @@ export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: 
       return decide(vals.includes(ctx.user.userType), `${ctx.user.name} is a ${ctx.user.userType.toLowerCase()}`)
     case 'user-role':
       return decide(vals.includes(ctx.user.role), `${ctx.user.name} has the ${ctx.user.role} role`)
-    /* Keyed by group ID, not display name.
-
-       It used to compare against `groupName`, which meant renaming a group in
-       the directory silently stopped every rule that named it from matching.
-       The catalogue entry now carries no hardcoded options at all — the picker
-       reads live groups — so ids are the only stable key. */
+    /* Legacy only. People and groups are `Rule.who` now and `evalRule` reads
+       that before any card; no picker writes these two and the linter reports
+       one as PE150. They still evaluate honestly, keyed by id, so a rule that
+       has not been migrated is rehearsed as it would run rather than going
+       quiet. */
     case 'group':
       return decide(vals.includes(ctx.user.groupId), `${ctx.user.name} is in ${ctx.user.groupName}`)
-    /* New, and load-bearing: with the audience hoisted to the policy, naming a
-       person or a group inside a rule is the ONLY way to narrow within a
-       policy. It has to actually evaluate, or the first thing an admin reaches
-       for after the hoist returns "unknown". */
     case 'user':
       return decide(vals.includes(ctx.user.id), `this sign-in is ${ctx.user.name}`)
 
@@ -449,12 +459,26 @@ export interface RuleVerdict {
    met.
 
    `unknown` is not a pass, here as in `evalCond`. A card the simulator cannot
-   fully decide does not carry the match. */
+   fully decide does not carry the match.
+
+   Who comes first. It is ANDed with the whole WHEN, so a person the rule is
+   not for misses before a single condition is read, and the trace says who
+   the rule was for rather than blaming a card. */
 export function evalRule(rule: Rule, ctx: SimContext, env: SimEnv): RuleVerdict {
   const p = rule.when
 
+  if (!whoPasses(rule.who, ctx.user)) {
+    return { match: false, reason: whoMissReason(rule, ctx, env), card: null }
+  }
+
   if (p.cards.length === 0) {
-    return { match: true, reason: 'No conditions — this step catches everything that reaches it', card: null }
+    return {
+      match: true,
+      reason: hasWho(rule.who)
+        ? 'No conditions — this step catches everyone it applies to'
+        : 'No conditions — this step catches everything that reaches it',
+      card: null,
+    }
   }
 
   const results = new Map<string, { state: CondState; detail: string }>()
@@ -494,6 +518,27 @@ export function evalRule(rule: Rule, ctx: SimContext, env: SimEnv): RuleVerdict 
   const detail = results.get(near.condition.id)?.detail ?? ''
   const prefix = p.cards.length > 1 ? `Closest was ${cardName(near.card, near.index)}: ` : ''
   return { match: false, reason: `${prefix}${condPhrase(near.condition, env)} — ${detail}`, card: near.index }
+}
+
+/* Why a rule's who did not cover this person, in one line.
+
+   "Not Finance or Mehak Rao" when they are outside the chosen groups and
+   people; "Contractors is an exception" or "Devon Rao is an exception" when
+   they were included and then taken out. Names come from the env, so a renamed
+   group reads as renamed. */
+export function whoMissReason(rule: Pick<Rule, 'who'>, ctx: SimContext, env: SimEnv): string {
+  const w = normaliseWho(rule.who)
+  if (!w) return ''
+  const person = (id: string) => env.userName?.(id) ?? seedUsers.find((u) => u.id === id)?.name ?? id
+  /* In the order `whoPasses` decides: not included at all is the reason before
+     any exception is, so "Finance except Priya" reads "Not Finance" to Devon
+     in Contractors even when Devon is also listed as an exception. */
+  const included = w.groupIds.length + w.userIds.length === 0 || w.groupIds.includes(ctx.user.groupId) || w.userIds.includes(ctx.user.id)
+  if (included && w.exceptUserIds?.includes(ctx.user.id)) return `${ctx.user.name} is an exception`
+  if (included && w.exceptGroupIds?.includes(ctx.user.groupId)) return `${env.groupName(ctx.user.groupId)} is an exception`
+  const names = [...w.groupIds.map((id) => env.groupName(id)), ...w.userIds.map(person)]
+  const list = names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`
+  return `Not ${list}`
 }
 
 /** Does this policy govern the person signing in? Asked once, above the rules. */

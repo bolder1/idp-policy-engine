@@ -12,22 +12,23 @@
    column.
    -------------------------------------------------------------------------- */
 
+/* No rule between rows: the list gap separates them (see .bm8__setlist). */
 .bsf {
   display: flex; flex-direction: column; gap: 10px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 10px 0;
 }
-.bsf:last-child { border-bottom: none; }
 /* A range row is two lines tall by nature, so it gets a little more air than a
    toggle row rather than the same and looking cramped. */
-.bsf.is-range { padding-bottom: 16px; }
+.bsf.is-range { padding-bottom: 14px; }
 
 .bsf__head { display: flex; align-items: center; gap: 11px; }
 
+/* The setting's subject, drawn plain: no tile behind it, so the row is a line
+   of text with a glyph rather than a box beside a label. */
 .bsf__ico {
   flex: none; display: grid; place-items: center;
-  width: 28px; height: 28px; border-radius: var(--radius-sm);
-  background: var(--surface-inset); color: var(--text-tertiary);
+  width: 24px; height: 24px;
+  color: var(--text-tertiary);
 }
 
 .bsf__label {
@@ -36,10 +37,8 @@
   font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
 }
 
-/* The label and its one line about the setting, stacked. The line is a single
-   sentence by rule — see `help` in mfa-settings.ts — so it never needs clipping. */
+/* The label, with what the setting does on its tip. */
 .bsf__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.bsf__about { font-size: var(--fs-sm); line-height: 1.45; color: var(--text-tertiary); }
 
 .bsf__ctl { flex: none; display: flex; align-items: center; gap: 8px; }
 
@@ -142,27 +141,24 @@
    The field reserves room for it so the text never runs underneath. */
 .bsf__count {
   position: absolute; right: 9px;
-  font-style: normal; font-size: 10px; color: var(--text-muted);
+  font-style: normal; font-size: var(--fs-xs); color: var(--text-muted);
   font-variant-numeric: tabular-nums; pointer-events: none;
 }
 .bsf__textwrap:has(.bsf__count) .bsf__text { padding-right: 42px; }
 .bsf__textwrap.is-bad .bsf__count { color: var(--fb-negative-fg); font-weight: var(--fw-medium); }
 
 /* --- Revealed settings --------------------------------------------------------------
-   What a choice brought with it. Indented under the row that caused them and
-   held by a rule down the left, because their existence is conditional on that
-   row: flush with everything else they read as peers, and then vanish when the
-   choice changes, which is a list rearranging itself for no visible reason. */
+   What a choice brought with it. Indented under the label of the row that
+   caused them, because their existence is conditional on that row: flush with
+   everything else they read as peers. The indent alone says it — the rule that
+   ran down the left went with the other dividers (15 Sep 2026). */
 .bsf__reveal {
-  margin: 2px 0 0 39px;                 /* aligns with the label, past the icon */
-  padding-left: 14px;
-  border-left: 2px solid var(--border-default);
+  margin: 2px 0 0 35px;                 /* aligns with the label, past the 24px icon and its gap */
 }
-.bsf__reveal .bsf { padding: 10px 0; border-bottom: none; }
-.bsf__reveal .bsf + .bsf { border-top: 1px solid var(--border-subtle); }
+.bsf__reveal .bsf { padding: 8px 0; }
 /* One step down in the hierarchy, so a revealed row does not compete with the
    row that produced it. */
-.bsf__reveal .bsf__ico { width: 24px; height: 24px; }
+.bsf__reveal .bsf__ico { width: 20px; height: 20px; }
 .bsf__reveal .bsf__label { font-weight: var(--fw-regular); color: var(--text-secondary); }
 
 @media (max-width: 620px) {

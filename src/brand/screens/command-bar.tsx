@@ -1,8 +1,26 @@
 import { motion } from 'motion/react'
 import { useId, useState } from 'react'
-import { ChevronDown, Check, Command, Copy, LayoutGrid, ListFilter, ListOrdered, Plus, Redo2, Search, Swords, Undo2, X, XCircle, type LucideIcon } from 'lucide-react'
+import { useRef } from 'react'
+import {
+  AppWindow,
+  Check,
+  ChevronDown,
+  Command,
+  LayoutTemplate,
+  ListOrdered,
+  type LucideIcon,
+  Plus,
+  Redo2,
+  ScrollText,
+  Search,
+  Swords,
+  Target,
+  Undo2,
+  X,
+} from 'lucide-react'
 
 import type { Rule } from '../data'
+import { NoMatches } from '../empty'
 
 /* -----------------------------------------------------------------------------
    The command bar.
@@ -38,11 +56,11 @@ export function baseCommands(rules: Rule[], opts: { canUndo: boolean; canRedo: b
   const out: Cmd[] = [...(opts.extra ?? [])]
   out.push({ id: 'add', label: 'Add a rule', icon: Plus })
   out.push({ id: 'gauntlet', label: 'Run the gauntlet', hint: 'Deal 13 sign-in attempts at this policy', icon: Swords })
-  out.push({ id: 'impact', label: 'Open the blast radius', hint: 'What this change does to the modelled world', icon: LayoutGrid })
+  out.push({ id: 'impact', label: 'Open the blast radius', hint: 'What this change does to the modelled world', icon: Target })
   out.push({ id: 'test', label: 'Test one person', icon: Search })
-  out.push({ id: 'log', label: 'Decision log', icon: ListFilter })
-  out.push({ id: 'apps', label: 'Assign applications', icon: LayoutGrid })
-  out.push({ id: 'template', label: 'Save as template', icon: Copy })
+  out.push({ id: 'log', label: 'Decision log', icon: ScrollText })
+  out.push({ id: 'apps', label: 'Assign applications', icon: AppWindow })
+  out.push({ id: 'template', label: 'Save as template', icon: LayoutTemplate })
   out.push({ id: 'publish', label: 'Review and publish', icon: Check })
   if (opts.canUndo) out.push({ id: 'undo', label: 'Undo', icon: Undo2 })
   if (opts.canRedo) out.push({ id: 'redo', label: 'Redo', icon: Redo2 })
@@ -59,6 +77,7 @@ export function CommandBar({
   onRun: (id: string) => void
   onClose: () => void
 }) {
+  const inputRef = useRef<HTMLInputElement>(null)
   const [q, setQ] = useState('')
   const [cursor, setCursor] = useState(0)
   const listId = useId()
@@ -95,6 +114,7 @@ export function CommandBar({
         <div className="bm__cmdbar">
           <Command size={14} strokeWidth={2} aria-hidden />
           <input
+            ref={inputRef}
             autoFocus
             role="combobox"
             aria-label="Search actions"
@@ -150,12 +170,21 @@ export function CommandBar({
               </li>
             )
           })}
-          {shown.length === 0 && (
-            <li className="bm__cmdempty">
-              <XCircle size={14} strokeWidth={1.9} aria-hidden /> Nothing matches “{q}”.
-            </li>
-          )}
         </ul>
+        {shown.length === 0 && (
+          <div className="bm__cmdempty">
+            <NoMatches
+              noun="actions"
+              query={q}
+              compact
+              onClear={() => {
+                setQ('')
+                setCursor(0)
+                inputRef.current?.focus()
+              }}
+            />
+          </div>
+        )}
       </motion.div>
     </motion.div>
   )

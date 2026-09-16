@@ -1,39 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
-import { card, cond, when, type AccessDecision, type Predicate, type Rule } from '../../data'
-import type { NameLookup } from '../predicate-prose'
-import { PARTS, nextPart, ruleAt, type Part } from './model'
-import { PART_LABEL, partSummary } from './parts'
+import { blankRule, card, cond, policies, when, type Predicate, type Rule } from '../../data'
+import { PARTS, nextPart, patchRule, ruleAt, type Part } from './model'
+import { PART_LABEL } from './parts'
 
 /* -----------------------------------------------------------------------------
-   The part rides on the selection, and the card's three buttons report the
-   rule honestly.
+   The part rides on the selection.
 
-   Two properties worth pinning. The first is that `Condition` is a LABEL and
+   The property worth pinning is that `Condition` is a LABEL and
    `when` is an ID: the model field, its writer and its editor are all called
    `when`, and a fourth name for that one thing is the drift this board's
    comments spend their life undoing — but the screen has to say the word the
    person asking for it used.
-
-   The second is that the card's condition count no longer includes the
-   who-conditions. It used to count every leaf, which was right while the card
-   had one number for the whole predicate; a card that reports its groups under
-   `Who` and counts them again under `Condition` states the same fact twice and
-   inflates the second telling.
    -------------------------------------------------------------------------- */
-
-const NAMES: Record<string, string> = {
-  'group:finance': 'Finance',
-  'group:eng': 'Engineering',
-  'user:priya': 'Priya Sharma',
-}
-const resolve: NameLookup = (kind, id) => NAMES[`${kind}:${id}`]
-
-/* `partSummary` reads exactly two fields, so the fixture is two fields. A full
-   `rule()` factory is not exported from `data.ts` and inventing one here would
-   be a second definition of what a rule is. */
-const asRule = (when: Predicate, decision: AccessDecision = '1fa') => ({ when, decision }) as Rule
-const ruleWith = (p: Predicate): Rule => asRule(p)
 
 describe('the parts themselves', () => {
   it('are two, in the order a rule is written', () => {
@@ -75,63 +54,51 @@ describe('nextPart', () => {
   })
 })
 
-describe('partSummary', () => {
-  it('carries the outcome with the count, because they share a pane', () => {
-    /* `then` stopped being a part of its own: the outcome is the second half of
-       the sentence the condition starts, and one phrase says both. */
-    const s = partSummary(asRule(when(), 'deny'), 'when', resolve)
-    expect(s).toEqual({ text: 'Any sign-in → Deny', dim: true })
+describe('patchRule', () => {
+  const day = () => cond('day', 'is', ['Monday'])
+  const shapes: [string, Predicate][] = [
+    ['no conditions', when()],
+    ['one card', when(card(day(), cond('time', 'between', ['09:00', '17:00'])))],
+    ['two ways in', when(card(day()), card(cond('time', 'between', ['09:00', '17:00'])))],
+    ['a group joined by or', { join: 'or', cards: [{ ...card(day()), grouped: true }, card(cond('device-risk', 'above', ['70']))] }],
+  ]
+
+  it('writes the who and leaves the conditions alone, whatever shape they have', () => {
+    for (const [name, w] of shapes) {
+      const r: Rule = { ...blankRule(name), when: w }
+      const next = patchRule(r, { who: { groupIds: ['finance', 'finance'], userIds: ['priya'] } })
+      expect(next.when, name).toBe(r.when)
+      expect(next.who, name).toEqual({ groupIds: ['finance'], userIds: ['priya'] })
+      const cleared = patchRule(next, { who: undefined })
+      expect(cleared.when, name).toBe(r.when)
+    }
   })
 
-  it('counts conditions, and does not count the who among them', () => {
-    /* The assertion the split owes. Three leaves, one of which is the group —
-       the card must say two, because the group is reported by the Who button
-       directly beside it. */
-    const r = ruleWith(
-      when(card(cond('group', 'in', ['finance']), cond('day', 'is', ['Monday']), cond('time', 'between', ['09:00', '17:00']))),
-    )
-    expect(partSummary(r, 'when', resolve).text).toBe('2 conditions → Allow')
+  it('takes a rule back to everyone as the same JSON as a rule that never had a who', () => {
+    const r = blankRule('R')
+    const round = patchRule(patchRule(r, { who: { groupIds: ['finance'], userIds: [] } }), { who: undefined })
+    expect(JSON.stringify(round)).toBe(JSON.stringify(r))
+    // Empty lists are everyone too.
+    expect(JSON.stringify(patchRule(r, { who: { groupIds: [], userIds: [] } }))).toBe(JSON.stringify(r))
   })
 
-  it('says any sign-in when the only condition is a who', () => {
-    // A rule that names a group and nothing else tests no circumstances at all.
-    const r = ruleWith(when(card(cond('group', 'in', ['finance']))))
-    expect(partSummary(r, 'when', resolve)).toEqual({ text: 'Any sign-in → Allow', dim: true })
+  it('removing every choice and adding it back is not a change', () => {
+    /* The seeded rules carry `who` before other fields. Deleting the key and
+       re-adding it would move it to the end: the same rule, a different
+       string, and the save bar lit on a no-op. */
+    const seeded = policies.flatMap((p) => p.rules).filter((r) => r.who)
+    expect(seeded.length).toBeGreaterThan(0)
+    for (const r of seeded) {
+      const back = patchRule(patchRule(r, { who: undefined }), { who: r.who })
+      expect(JSON.stringify(back), r.name).toBe(JSON.stringify(r))
+    }
   })
 
-  it('singularises one condition', () => {
-    expect(partSummary(ruleWith(when(card(cond('day', 'is', ['Monday'])))), 'when', resolve).text).toBe(
-      '1 condition → Allow',
-    )
-  })
-
-  it('says Everyone, dimmed, when the rule names nobody', () => {
-    expect(partSummary(ruleWith(when()), 'who', resolve)).toEqual({ text: 'Everyone', dim: true })
-  })
-
-  it('names the groups and people it does have', () => {
-    const r = ruleWith(when(card(cond('group', 'in', ['finance']), cond('user', 'is', ['priya']))))
-    const s = partSummary(r, 'who', resolve)
-    expect(s.dim).toBe(false)
-    expect(s.text).toContain('Finance')
-  })
-
-  it('marks an unresolvable id as deleted rather than printing a slug', () => {
-    const r = ruleWith(when(card(cond('group', 'in', ['gone']))))
-    expect(partSummary(r, 'who', resolve).text).toContain('deleted')
-  })
-
-  it('declines to summarise the who of an OR-shaped rule', () => {
-    /* Two ways in means the who belongs to each alternative rather than to the
-       rule, so no single phrase is true of it. The button stays and says so —
-       a control that vanishes when a rule grows an OR is a card changing shape
-       for a reason nobody can see. */
-    const r = ruleWith(when(card(cond('group', 'in', ['finance'])), card(cond('day', 'is', ['Monday']))))
-    expect(partSummary(r, 'who', resolve)).toEqual({ text: 'Per alternative', dim: true })
-  })
-
-  it('still counts the conditions of an OR-shaped rule across every alternative', () => {
-    const r = ruleWith(when(card(cond('group', 'in', ['finance'])), card(cond('day', 'is', ['Monday']))))
-    expect(partSummary(r, 'when', resolve).text).toBe('1 condition → Allow')
+  it('passes any other patch straight through', () => {
+    const r: Rule = { ...blankRule('R'), who: { groupIds: ['finance'], userIds: [] } }
+    const next = patchRule(r, { name: 'Renamed' })
+    expect(next.name).toBe('Renamed')
+    expect(next.who).toBe(r.who)
+    expect(next.when).toBe(r.when)
   })
 })

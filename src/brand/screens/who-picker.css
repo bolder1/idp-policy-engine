@@ -1,0 +1,83 @@
+/* -----------------------------------------------------------------------------
+   Who picker — `who-picker.tsx`.
+
+   One field that reads "Everyone" until something is chosen, the chosen
+   groups and people as kit badges inside it, and a list under it. Exceptions
+   are the same field again under a plain "Except" label.
+   -------------------------------------------------------------------------- */
+
+.wp { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+.wp__wrap { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+/* The field and its list, so the list opens against the field whatever height
+   the chosen badges have wrapped it to. */
+.wp__anchor { position: relative; min-width: 0; }
+
+.wp__field {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  min-height: 32px; padding: 3px var(--space-3);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  cursor: text;
+}
+.wp__field:focus-within { border-color: var(--border-strong); box-shadow: 0 0 0 4px var(--focus-halo); }
+
+.wp__all { padding: 0 2px; font-size: var(--fs-md); color: var(--text-primary); }
+
+.wp__input {
+  flex: 1 1 120px; min-width: 80px; height: 24px; padding: 0 2px;
+  border: none; outline: none; background: none;
+  font-family: inherit; font-size: var(--fs-md); color: var(--text-body);
+}
+.wp__input::placeholder { color: var(--text-muted); }
+
+.wp__chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; min-width: 0; --badge-max: 24ch; }
+.wp__chipx {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; padding: 0;
+  border: none; border-radius: var(--radius-sm); background: none;
+  color: var(--text-tertiary); cursor: pointer;
+}
+.wp__chipx:hover { color: var(--text-primary); background: var(--surface-sunken); }
+.wp__chipx:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+
+.wp__list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 40;
+  margin: 0; padding: 4px 0; list-style: none;
+  max-height: 280px; overflow-y: auto;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised); box-shadow: var(--el-high);
+}
+
+.wp__opt {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 6px var(--space-4); min-width: 0;
+  cursor: pointer;
+  --badge-max: 20ch;
+}
+.wp__opt.is-active { background: var(--surface-sunken); }
+.wp__opt > svg { flex: none; color: var(--text-tertiary); }
+.wp__opt b {
+  min-width: 0; flex: none; max-width: 60%;
+  font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-body);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wp__opt.is-on b { font-weight: var(--fw-medium); color: var(--text-primary); }
+.wp__opt em {
+  min-width: 0; flex: 1 1 auto;
+  font-style: normal; font-size: max(12px, var(--fs-xs)); color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wp__opt .bx-badge { flex: none; margin-left: auto; }
+
+.wp__note { padding: 6px var(--space-4); font-size: max(12px, var(--fs-xs)); color: var(--text-tertiary); }
+/* The empty state inside the list: nobody in the directory, or no match. */
+.wp__empty { padding: var(--space-2) var(--space-3); cursor: default; }
+
+.wp__hint { margin: 0; font-size: max(12px, var(--fs-xs)); line-height: 1.5; color: var(--text-tertiary); }
+
+.wp__except { display: flex; flex-direction: column; gap: var(--space-2); }
+.wp__exceptlabel { font-size: var(--fs-sm); color: var(--text-secondary); }
+
+.wp.is-compact .wp__opt { padding: 4px var(--space-3); }
+.wp.is-compact .wp__field { min-height: 28px; padding: 2px var(--space-2); }

@@ -141,16 +141,22 @@ describe('the board walkthrough', () => {
   })
 
   it('can satisfy its own condition step on a rule that already has a Who', () => {
-    /* The real order. `conditionPatch` appends into the run `setWho` started,
-       and appending into a branch is a different path from starting one — so a
-       demo taken in order exercises a path a demo taken from a blank rule never
-       reaches. */
+    /* The real order. Who is its own field, so picking Finance adds no card and
+       the condition step still starts the first one. */
     const rule = blankRule()
     const withWho: Rule = { ...rule, ...whoPatch(rule) }
+    expect(withWho.when).toEqual(rule.when)
     const after: Rule = { ...withWho, ...conditionPatch(withWho) }
     expect(byId.when.task.done(ctx({ rule: after }))).toBe(true)
-    // And the Who survived it, rather than being replaced by the condition.
+    expect(after.when.cards).toHaveLength(1)
+    // And the Who survived it, untouched by the condition.
+    expect(after.who).toEqual(withWho.who)
     expect(byId.who.task.done(ctx({ rule: after }))).toBe(true)
+  })
+
+  it('writes Finance into the who, not into a condition', () => {
+    const rule = blankRule()
+    expect(whoPatch(rule)).toEqual({ who: { groupIds: ['finance'], userIds: [] } })
   })
 
   it('can satisfy its own Then step, from every starting outcome', () => {

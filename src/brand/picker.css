@@ -1,8 +1,8 @@
 /* -----------------------------------------------------------------------------
    Picker — trigger and portalled popup.
 
-   The popup is `position: fixed` on `document.body`, so nothing in the page can
-   clip it. That is the entire reason this control exists; see picker.tsx.
+   The popup is `position: fixed`, portalled to the app root (`.brand-root`), so
+   nothing in the page can clip it. That is the entire reason this control exists; see picker.tsx.
    -------------------------------------------------------------------------- */
 
 .bx-picker {
@@ -37,6 +37,15 @@
 .bx-picker.is-fill .bx-picker__trigger { width: 100%; }
 
 .bx-picker__trigger:hover { border-color: var(--ctl-border-hover); background: var(--ctl-bg-hover); }
+/* Disabled shows the ANSWER, greyed, with the chevron still there to say what
+   kind of control it is. The alternative — swapping it for plain text — put a
+   line of prose where every other row in the form had a field, which is what
+   the agentless enrolment question looked like (16 Sep 2026). */
+.bx-picker__trigger:disabled,
+.bx-picker__trigger:disabled:hover {
+  opacity: var(--disabled-opacity); cursor: not-allowed;
+  background: var(--surface-sunken); border-color: var(--ctl-border);
+}
 .bx-picker__trigger.is-open,
 .bx-picker__trigger:focus-visible {
   outline: none;
@@ -48,6 +57,10 @@
    writing is a lifecycle state, not an alarm — it escalates to negative only
    when the linter promotes it to a publish blocker. */
 .bx-picker__trigger.is-empty .bx-picker__value { color: var(--text-muted); }
+/* "Type  Device health": the prefix quiet, the value in ink — Claude's
+   "Sort by  Next run". */
+.bx-picker__prefix { flex: none; margin-right: var(--space-2); color: var(--text-tertiary); }
+.bx-picker__trigger:has(.bx-picker__prefix) .bx-picker__value { font-weight: var(--fw-medium); }
 .bx-picker__trigger.is-invalid { border-color: var(--fb-negative-border); }
 
 .bx-picker__value {
@@ -63,11 +76,11 @@
 
 .bx-picker__pop {
   position: fixed;
-  /* Above `--z-modal`, not below it: this is portalled to the body, and a menu
+  /* Above `--z-modal`, not below it: this is portalled out of the page, and a menu
      opened from inside a dialog that renders behind that dialog is a menu you
      cannot use. Below `--z-tooltip`, so a `Tip` can still explain an option. */
-  /* Portalled to `document.body`, so the `.brand-root *` border-box reset does
-     not reach it. Without this the 1px border sits OUTSIDE any width the
+  /* Kept border-box for the `document.body` fallback of `appRoot()`, which the
+     `.brand-root *` reset does not reach. Without this the 1px border sits OUTSIDE any width the
      placement code sets — which is how the panel used to gain 2px per scroll
      tick, since that code fed its own measurement back in. `.brpk` carries the
      same line for the same reason. */
@@ -117,6 +130,12 @@
   list-style: none;
   overflow-y: auto;
 }
+
+/* The empty state (picker.tsx): the kit block, compact, in place of the option
+   list. It scrolls rather than clips when the popup is squeezed near a window
+   edge. */
+.bx-picker__empty { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.bx-picker__empty .bempty.is-compact { padding: var(--space-6) var(--space-5); }
 
 .bx-picker__head {
   padding: var(--space-3) var(--space-4) var(--space-2);
@@ -180,12 +199,6 @@
 .bx-picker__opttext em {
   font-style: normal;
   font-size: var(--fs-xs);
-  color: var(--text-muted);
-}
-
-.bx-picker__none {
-  padding: var(--space-5) var(--space-4);
-  font-size: var(--fs-md);
   color: var(--text-muted);
 }
 

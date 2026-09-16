@@ -35,6 +35,8 @@
    software and configuration 5.
    -------------------------------------------------------------------------- */
 
+import { nameTaken } from './data'
+
 /* Back, and only for the device catalogue. See DEVICE_ATTRIBUTES below: the two
    kinds ask different questions and were never well served by one list. */
 /* Seven, and two of them belong to the requirements catalogue rather than the
@@ -473,7 +475,12 @@ export const OS_ATTRIBUTES: Attribute[] = [
        option is the one above it plus one more class of device. Three
        independent switches would let somebody build "tampered is fine but
        rooted is not", which is not a posture anybody holds — tampering is the
-       broader fact and rooting is one way to achieve it. */
+       broader fact and rooting is one way to achieve it.
+
+       The last rung was "Not rooted, tampered, or running in an emulator":
+       308px, the one answer the device profile list's 260px control column
+       could not hold, and the only one with a serial comma (15 Sep 2026). Same
+       three facts in the ladder's own words. */
     config: {
       kind: 'choice',
       label: 'Require',
@@ -481,7 +488,7 @@ export const OS_ATTRIBUTES: Attribute[] = [
       options: [
         'Not rooted or jailbroken',
         'Not rooted, jailbroken or tampered',
-        'Not rooted, tampered, or running in an emulator',
+        'Not rooted, tampered or emulated',
       ],
     },
   },
@@ -882,24 +889,38 @@ export type ProfileMode = 'os' | 'device'
 export interface ModeMeta {
   id: ProfileMode
   label: string
+  /** One line under the name, where the choice is made. The blurb is the `?`. */
+  summary: string
   blurb: string
   /** The feedback ramp this kind wears, named for the ramp and not for itself. */
   tint: 'info' | 'accent'
 }
 
+/* Named for the question each kind answers, 13 Sep 2026.
+
+   "OS and version" named five of the thirteen checks in its own catalogue and
+   left out integrity, screen lock and the miniOrange clients. "Device
+   attributes" named the inputs of the other kind rather than its purpose, which
+   is recognising a machine it has seen before. Device health is the manager's
+   word and the IdP market's (Duo, JumpCloud); a trusted device is miniOrange's
+   own term for a device it recognises.
+
+   The blurbs are read on a `?` now, not printed under the choice. */
 export const MODES: ModeMeta[] = [
   {
     id: 'os',
-    label: 'OS and version',
+    label: 'Device health',
+    summary: 'OS, browser, integrity, screen lock and app version',
     blurb:
-      'State what a device must be running — a form factor, and a version floor per platform. Everything it reads arrives with the request, so there is nothing to install.',
+      'Checks a device must pass to sign in — OS and browser version, integrity, screen lock and miniOrange app version. Integrity and screen lock are reported by the miniOrange app; a device without it fails those checks.',
     tint: 'info',
   },
   {
     id: 'device',
-    label: 'Device attributes',
+    label: 'Trusted device',
+    summary: 'Recognises machines it has seen, by weighted signals',
     blurb:
-      'Recognise the machine itself. Each attribute carries a weight, what changed since last time adds up to a score, and the score picks the outcome.',
+      'Recognises a machine it has seen before. Each signal carries a weight, what changed since last time adds up to a score, and the score picks the outcome.',
     tint: 'accent',
   },
 ]
@@ -908,13 +929,14 @@ export const MODE_META: Record<ProfileMode, ModeMeta> = Object.fromEntries(
   MODES.map((m) => [m.id, m]),
 ) as Record<ProfileMode, ModeMeta>
 
-/* The noun for a thing this kind holds. An OS profile's rows are CONDITIONS a
-   device has to satisfy; a device profile's rows are SIGNALS it watches. Both
-   were called "attributes", which is true of the catalogue and wrong about what
-   the profile does with them. */
+/* The noun for a thing this kind holds. A health profile's rows are CHECKS a
+   device has to pass; a trusted-device profile's rows are SIGNALS it watches.
+   Both were once called "attributes", which is true of the catalogue and wrong
+   about what the profile does with them — and "check" is the word every IdP
+   peer uses for the first (Okta, Duo, Cloudflare). */
 export const ITEM_NOUN: Record<ProfileMode, { one: string; many: string; verb: string }> = {
-  os: { one: 'requirement', many: 'requirements', verb: 'requires' },
-  device: { one: 'attribute', many: 'attributes', verb: 'watches' },
+  os: { one: 'check', many: 'checks', verb: 'checks' },
+  device: { one: 'signal', many: 'signals', verb: 'watches' },
 }
 
 export const countLabel = (mode: ProfileMode, n: number) =>
@@ -942,10 +964,15 @@ export type ProfileReach = 'agentless' | 'agent'
 export interface ReachMeta {
   id: ProfileReach
   label: string
+  /** One line under the name, where the choice is made. The blurb is the `?`. */
+  summary: string
   blurb: string
   /* The console puts "Windows only" in a callout that appears AFTER agent-based
      has been chosen, which is one screen too late to be a decision input. A
-     platform limit is a property of the choice, so it travels on the card. */
+     platform limit is a property of the choice, so it travels on the row — as a
+     pill short enough to read before choosing, with the full consequence in
+     `note` behind the row's `?`. */
+  tag?: string
   note?: string
 }
 
@@ -953,15 +980,18 @@ export const REACHES: ReachMeta[] = [
   {
     id: 'agentless',
     label: 'Agentless',
+    summary: 'Browser, network and location — nothing to install',
     blurb:
-      'Browser, network and geolocation attributes establish device identity. Nothing to install.',
+      'Browser, network and geolocation signals establish device identity. Nothing to install.',
   },
   {
     id: 'agent',
     label: 'Agent-based',
+    summary: 'Adds hardware identifiers: TPM, motherboard, disk',
     blurb:
       'An installed agent adds hardware identifiers — TPM, motherboard, disk — for high-assurance access.',
-    note: 'Windows only. Users without the agent cannot sign in.',
+    tag: 'Windows only',
+    note: 'Users without the agent cannot sign in.',
   },
 ]
 
@@ -1013,25 +1043,12 @@ export const REGISTRATION_LABEL: Record<Registration, string> = {
   'pre-approved': 'Pre-approved devices only',
 }
 
-/* The same two answers in the two words a stated column has room for.
-
-   The sentences above are what a dropdown needs — an option has to say what
-   choosing it does. A fact in a 260px rail is a different job: "Users register
-   their own devices" wraps to three ragged right-aligned lines there, which is
-   a paragraph pretending to be a value. The sentence is not lost; it is on the
-   tip beside the label, where this page already puts the thing you want once. */
-export const REGISTRATION_SHORT: Record<Registration, string> = {
-  self: 'Self-service',
-  'pre-approved': 'Roster only',
-}
-
 /** An uploaded roster of approved devices. Keyed on MAC, so it needs an agent. */
 export interface Roster {
   fileName: string
   rows: number
   uploadedAt: string
 }
-
 
 /** How many devices a new profile allows. The console ships 1, which denies
     anybody with a laptop and a desktop on the day it goes live. */
@@ -1174,21 +1191,176 @@ export const platformsNamed = (p: FingerprintProfile): string[] =>
 export const rosterNeedsMac = (p: Pick<FingerprintProfile, 'registration' | 'enabled'>): boolean =>
   p.registration === 'pre-approved' && !p.enabled.includes('mac')
 
-/* The page's one-line description of a whole profile.
+/* --- What stops a profile from saving -------------------------------------------
+   One answer for the create wizard, the profile page's save bar and the leave
+   dialog, so the three never disagree about what a finished profile is. The
+   first problem only, in the order the page reads. */
 
-   Joined with ` · ` and never with "and": a list of facets is not a conjunction,
-   and the moment it reads as one somebody starts asking whether they all have to
-   be true.
+/** Longest profile name the inputs accept. */
+export const PROFILE_NAME_MAX = 80
 
-   The enrolment facet appears only once somebody has answered it, which is the
-   same claim `restrictionSet` exists to refuse — printed as one clause here
-   instead of as three rows. */
-export function describeProfile(p: FingerprintProfile): string {
-  const parts = [modeLabel(p)]
-  if (asksReach(p.mode)) parts.push(reachLabel(p.reach))
-  parts.push(countLabel(p.mode, p.enabled.length))
-  if (p.restrictionSet) parts.push(REGISTRATION_LABEL[p.registration])
-  return parts.join(' · ')
+/** What a profile holds: always-on first, then what was ticked, at this reach. */
+export const chosenAttributes = (p: Pick<FingerprintProfile, 'mode' | 'reach' | 'enabled'>): Attribute[] => {
+  const on = offeredAttributes(p.mode, p.reach).filter((a) => a.always || p.enabled.includes(a.id))
+  return [...on.filter((a) => a.always), ...on.filter((a) => !a.always)]
+}
+
+/** Blank or already used by another profile. */
+export function nameIssue(name: string, otherNames: Iterable<string>): string | null {
+  if (!name.trim()) return 'Enter a profile name.'
+  if (nameTaken(name, otherNames)) return 'A profile with this name already exists.'
+  return null
+}
+
+const VERSION_TEXT = /^\d+(\.\d+)*$/
+
+/** Whether a typed version reads as one: "131", "6.4.1". */
+export const isVersionText = (value: string) => VERSION_TEXT.test(value.trim())
+
+/** The first version check whose value is blank or not a version. */
+export function invalidVersion(p: Pick<FingerprintProfile, 'mode' | 'reach' | 'enabled' | 'config'>): Attribute | undefined {
+  return chosenAttributes(p).find((a) => {
+    if (a.config?.kind !== 'version') return false
+    const v = p.config[a.id]
+    return !isVersionText((isRuleValue(v) ? v : a.config.value).value)
+  })
+}
+
+export function profileIssue(p: FingerprintProfile, otherNames: Iterable<string>): string | null {
+  const named = nameIssue(p.name, otherNames)
+  if (named) return named
+  if (chosenAttributes(p).length === 0) return p.mode === 'os' ? 'Add at least one check.' : 'Add at least one signal.'
+  const bad = invalidVersion(p)
+  if (bad?.config?.kind === 'version') return `Enter a version for ${bad.config.platform}.`
+  if (p.registration === 'pre-approved') {
+    if (!p.roster) return 'Upload a device roster.'
+    if (rosterNeedsMac(p)) return 'Add MAC address to match the roster.'
+  }
+  return null
+}
+
+/* A new profile before anybody has answered anything but its name and type.
+
+   The id is left blank for the caller, which knows what ids are taken and which
+   ones a policy rule still names. `enabled` holds the always-on signals from the
+   start: stored without them, the profile page drew those rows on while the
+   change summary, scoring and pruning all read them as off. Agentless and
+   self-service are the defaults the page shows, and `restrictionSet` is false
+   because nobody has chosen them yet (15 Sep 2026). */
+export function blankProfile(name: string, mode: ProfileMode): FingerprintProfile {
+  return {
+    id: '',
+    name,
+    mode,
+    enabled: withAlwaysOn(mode, []),
+    config: {},
+    weights: {},
+    reach: 'agentless',
+    registration: 'self',
+    maxDevices: DEFAULT_MAX_DEVICES,
+    roster: null,
+    autoRegister: false,
+    restrictionSet: false,
+    usedIn: 0,
+  }
+}
+
+/* --- A roster from an uploaded file ------------------------------------------- */
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** "15 Sep 2026", the format the seeded rosters use. */
+export const dayLabel = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
+
+const MAC = /([0-9a-f]{2}[:-]){5}[0-9a-f]{2}/i
+
+/** One device per non-empty line. A first line naming columns rather than a device is skipped. */
+export function rosterFromCsv(fileName: string, text: string, now: Date): Roster {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  const header = lines.length > 0 && !MAC.test(lines[0]) && /mac|name|email/i.test(lines[0])
+  return { fileName, rows: lines.length - (header ? 1 : 0), uploadedAt: dayLabel(now) }
+}
+
+/* --- What changed, for the save bar and Review changes ------------------------- */
+
+export interface ProfileChange {
+  label: string
+  before: string
+  after: string
+}
+
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+/* What one check is set to, in the words a review cell has room for. */
+function itemValue(p: FingerprintProfile, a: Attribute): string {
+  if (p.mode === 'device') return `${tierOf(p.weights[a.id] ?? a.weight)} weight`
+  return a.config ? valueLabel(a, p.config[a.id]) : 'On'
+}
+
+/** Every change from the saved profile to the draft, one row each. */
+export function profileReview(before: FingerprintProfile, after: FingerprintProfile): ProfileChange[] {
+  const rows: ProfileChange[] = []
+  const push = (label: string, b: string, a: string) => {
+    if (b !== a) rows.push({ label, before: b, after: a })
+  }
+  push('Name', before.name, after.name)
+  /* Setting up basic details is a change of its own (15 Sep 2026). A press on the
+     Basic details tab can confirm every default as it stands — the one way a profile nobody
+     answered becomes one somebody did — and with no row for it the page would
+     count that draft as clean, show no footer, and never save the answer. Only
+     where the questions are asked: a health profile has none. */
+  if (asksReach(after.mode)) {
+    const setUp = (p: FingerprintProfile) => (p.restrictionSet ? 'Set up' : 'Not set up')
+    push('Basic details', setUp(before), setUp(after))
+    push('What it can read', reachLabel(before.reach), reachLabel(after.reach))
+  }
+  push('How a device gets registered', REGISTRATION_LABEL[before.registration], REGISTRATION_LABEL[after.registration])
+  push('Register silently on first sign-in', before.autoRegister ? 'On' : 'Off', after.autoRegister ? 'On' : 'Off')
+  push('Devices per person', before.maxDevices === null ? '' : String(before.maxDevices), after.maxDevices === null ? '' : String(after.maxDevices))
+  const rosterText = (r: Roster | null) => (r ? `${r.fileName}, ${r.rows} devices` : '')
+  push('Approved device roster', rosterText(before.roster), rosterText(after.roster))
+
+  const noun = capital(ITEM_NOUN[after.mode].many)
+  const was = chosenAttributes(before)
+  const now = chosenAttributes(after)
+  for (const a of now) {
+    if (!was.some((x) => x.id === a.id)) rows.push({ label: `${noun}: added ${a.name}`, before: '', after: itemValue(after, a) })
+  }
+  for (const a of was) {
+    if (!now.some((x) => x.id === a.id)) rows.push({ label: `${noun}: removed ${a.name}`, before: itemValue(before, a), after: '' })
+  }
+  for (const a of now) {
+    if (!was.some((x) => x.id === a.id)) continue
+    push(after.mode === 'device' ? `${a.name} weight` : a.name, itemValue(before, a), itemValue(after, a))
+  }
+  return rows
+}
+
+/** The save bar's short list: what kinds of thing changed. */
+export function profileChangeParts(before: FingerprintProfile, after: FingerprintProfile): string[] {
+  const parts: string[] = []
+  if (before.name !== after.name) parts.push('Name')
+  if (before.reach !== after.reach) parts.push('What it can read')
+  const enrol = ['registration', 'autoRegister', 'maxDevices', 'roster'] as const
+  if (enrol.some((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]))) parts.push('How devices enrol')
+  /* Named only when nothing it covers is already named: "What it can read"
+     beside "Basic details" says one change twice in a two-item footer. */
+  const basicNamed = parts.includes('What it can read') || parts.includes('How devices enrol')
+  if (asksReach(after.mode) && before.restrictionSet !== after.restrictionSet && !basicNamed) parts.push('Basic details')
+  const was = chosenAttributes(before).map((a) => a.id)
+  const now = chosenAttributes(after)
+  const added = now.filter((a) => !was.includes(a.id)).length
+  const removed = was.filter((id) => !now.some((a) => a.id === id)).length
+  if (added > 0) parts.push(`${countLabel(after.mode, added)} added`)
+  if (removed > 0) parts.push(`${countLabel(after.mode, removed)} removed`)
+  const tuned = now.some(
+    (a) => was.includes(a.id) && itemValue(before, a) !== itemValue(after, a),
+  )
+  if (tuned) parts.push(after.mode === 'device' ? 'Weights changed' : 'Values changed')
+  return parts
 }
 
 /* The steps a profile takes to create, and what each is called.
@@ -1213,10 +1385,13 @@ export function describeProfile(p: FingerprintProfile): string {
    roster needs MAC, MAC needs an agent — and an OS profile answers it from the
    detail page's one Edit instead. `restrictionSet` records the difference
    honestly: false on a new OS profile, because nobody asked. */
-export const stepsFor = (mode: ProfileMode): string[] =>
-  asksReach(mode)
-    ? ['Profile', 'Devices', 'Attributes']
-    : ['Profile', ITEM_NOUN[mode].many.replace(/^./, (c) => c.toUpperCase())]
+export const stepsFor = (mode: ProfileMode): string[] => {
+  /* The last step is named by the kind's own noun on BOTH shapes. The device
+     shape spelled "Attributes" out by hand, which was right only until the noun
+     changed. */
+  const items = ITEM_NOUN[mode].many.replace(/^./, (c) => c.toUpperCase())
+  return asksReach(mode) ? ['Profile', 'Devices', items] : ['Profile', items]
+}
 
 /* --- The three weights a risk profile can give an attribute ---------------------
    The master carries four (5, 10, 20, 30) because the sheet does. A profile

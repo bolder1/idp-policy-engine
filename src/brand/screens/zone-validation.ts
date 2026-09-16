@@ -1,4 +1,4 @@
-import { ipSectionEmpty, locationEmpty, type Zone } from '../data'
+import { ipSectionEmpty, locationEmpty, nameTaken, type Zone } from '../data'
 
 /* -----------------------------------------------------------------------------
    Network zone validation.
@@ -31,7 +31,10 @@ export function classifyIp(raw: string): IpKind {
   if (!v) return 'invalid'
 
   if (v.includes('/')) {
-    const [addr, prefix] = v.split('/')
+    /* Exactly one slash: `10.0.0.0/8/9` is not a block. */
+    const parts = v.split('/')
+    if (parts.length !== 2) return 'invalid'
+    const [addr, prefix] = parts
     if (!/^\d{1,3}$/.test(prefix)) return 'invalid'
     const p = Number(prefix)
     if (IPV4.test(addr)) return p <= 32 ? 'ipv4-cidr' : 'invalid'
@@ -40,13 +43,28 @@ export function classifyIp(raw: string): IpKind {
   }
 
   if (v.includes('-')) {
-    const [a, b] = v.split('-').map((x) => x.trim())
-    return IPV4.test(a) && IPV4.test(b) ? 'ipv4-range' : 'invalid'
+    /* Exactly two ends, both IPv4, and the start no later than the end. */
+    const parts = v.split('-').map((x) => x.trim())
+    if (parts.length !== 2) return 'invalid'
+    const [a, b] = parts
+    if (!IPV4.test(a) || !IPV4.test(b)) return 'invalid'
+    return ipv4Number(a) <= ipv4Number(b) ? 'ipv4-range' : 'invalid'
   }
 
   if (IPV4.test(v)) return 'ipv4'
   if (IPV6.test(v)) return 'ipv6'
   return 'invalid'
+}
+
+const ipv4Number = (v: string) => v.split('.').reduce((n, o) => n * 256 + Number(o), 0)
+
+/** Why an entry was refused, in the words shown under the field. */
+export function explainBadEntry(raw: string): string {
+  const v = raw.trim().replace(/\s*[–—]\s*/g, '-')
+  const parts = v.split('-').map((x) => x.trim())
+  if (parts.length === 2 && IPV4.test(parts[0]) && IPV4.test(parts[1]) && ipv4Number(parts[0]) > ipv4Number(parts[1]))
+    return 'Start is after end.'
+  return 'Not an address, CIDR block, range or ASN.'
 }
 
 /** A single host — the case that already fixes its own geography. */
@@ -70,7 +88,7 @@ export interface ZoneIssue {
   values?: string[]
 }
 
-export function validateZone(z: Zone): ZoneIssue[] {
+export function validateZone(z: Zone, otherNames: Iterable<string> = []): ZoneIssue[] {
   const out: ZoneIssue[] = []
   const noIp = ipSectionEmpty(z)
   const noLoc = locationEmpty(z.location)
@@ -79,8 +97,17 @@ export function validateZone(z: Zone): ZoneIssue[] {
     out.push({
       id: 'name',
       level: 'error',
-      title: 'The zone needs a name',
-      detail: 'Rules reference zones by name, so an unnamed zone cannot be used in a condition.',
+      title: 'No name',
+      detail: 'Rules show zones by name. Enter a zone name.',
+    })
+  } else if (nameTaken(z.name, otherNames)) {
+    /* Rule pickers and Used by list zones by name only, so two zones with one
+       name cannot be told apart. */
+    out.push({
+      id: 'dupname',
+      level: 'error',
+      title: 'Name already used',
+      detail: 'Another zone has this name. Rules show zones by name.',
     })
   }
 
@@ -90,9 +117,8 @@ export function validateZone(z: Zone): ZoneIssue[] {
     out.push({
       id: 'empty',
       level: 'error',
-      title: 'This zone would match everything',
-      detail:
-        'Both sections are empty, and an empty section means “any”. A zone with no addresses and no location draws no boundary at all — fill in at least one section.',
+      title: 'Matches everything',
+      detail: 'An empty section matches any value. Add an IP network or a location.',
     })
   }
 
@@ -102,8 +128,8 @@ export function validateZone(z: Zone): ZoneIssue[] {
       id: 'badip',
       level: 'error',
       section: 'ip',
-      title: `${badIp.length} entr${badIp.length === 1 ? 'y is' : 'ies are'} not a valid address`,
-      detail: 'Accepted: a single IPv4 or IPv6 address, a CIDR block, or an IPv4 range like 203.0.113.10 – 203.0.113.60.',
+      title: `${badIp.length} entr${badIp.length === 1 ? 'y is' : 'ies are'} not valid`,
+      detail: 'Use an IPv4 or IPv6 address, a CIDR block, or an IPv4 range such as 203.0.113.10-203.0.113.60.',
       values: badIp,
     })
   }
@@ -114,8 +140,8 @@ export function validateZone(z: Zone): ZoneIssue[] {
       id: 'badasn',
       level: 'error',
       section: 'asn',
-      title: `${badAsn.length} ASN${badAsn.length === 1 ? ' is' : 's are'} malformed`,
-      detail: 'An ASN is “AS” followed by digits — for example AS15169.',
+      title: `${badAsn.length} ASN${badAsn.length === 1 ? ' is' : 's are'} not valid`,
+      detail: 'An ASN is AS followed by digits, such as AS15169.',
       values: badAsn,
     })
   }
@@ -130,8 +156,8 @@ export function validateZone(z: Zone): ZoneIssue[] {
       id: 'exact-vs-location',
       level: 'warning',
       section: 'location',
-      title: 'An exact address combined with a location',
-      detail: `${exact.join(', ')} already geolocates to one place. Because the two sections are ANDed, adding a location either changes nothing — if it agrees — or makes the zone match nothing at all. Use a CIDR block or an ASN if you meant to narrow a network by geography.`,
+      title: 'Exact address with a location',
+      detail: `${exact.length > 3 ? `${exact.slice(0, 3).join(', ')} and ${exact.length - 3} more` : exact.join(', ')} already ${exact.length === 1 ? 'has' : 'have'} a fixed location, so the location changes nothing or matches nothing. Use a CIDR block or an ASN.`,
       values: exact,
     })
   }
@@ -144,7 +170,7 @@ export function validateZone(z: Zone): ZoneIssue[] {
       level: 'info',
       section: 'ip',
       title: 'Any network',
-      detail: 'No addresses or ASNs, so this zone matches the location from any network.',
+      detail: 'No IP networks, so any network in these locations matches.',
     })
   }
   if (!noIp && noLoc) {
@@ -153,7 +179,7 @@ export function validateZone(z: Zone): ZoneIssue[] {
       level: 'info',
       section: 'location',
       title: 'Any location',
-      detail: 'No location, so this zone matches those networks wherever they geolocate.',
+      detail: 'No locations, so these networks match from any location.',
     })
   }
 
@@ -161,7 +187,8 @@ export function validateZone(z: Zone): ZoneIssue[] {
 }
 
 /** Saving is blocked only by errors; warnings are the admin's call. */
-export const canSaveZone = (z: Zone) => !validateZone(z).some((i) => i.level === 'error')
+export const canSaveZone = (z: Zone, otherNames: Iterable<string> = []) =>
+  !validateZone(z, otherNames).some((i) => i.level === 'error')
 
 /** One line describing what the zone actually covers. */
 export function describeZone(z: Zone): string {
@@ -179,7 +206,7 @@ export function describeZone(z: Zone): string {
   if (l.countries.length) geo.push(l.countries.join(', '))
   if (l.states.length) geo.push(l.states.join(', '))
   if (l.cities.length) geo.push(l.cities.join(', '))
-  if (l.radius) geo.push(`${l.radius.km}km of ${l.radius.label ?? `${l.radius.lat}, ${l.radius.lon}`}`)
+  if (l.radius) geo.push(`${l.radius.km} km of ${l.radius.label ?? `${l.radius.lat}, ${l.radius.lon}`}`)
   parts.push(geo.length ? geo.join(' · ') : 'Any location')
 
   /* Joined as a list, not a conjunction.

@@ -1,0 +1,363 @@
+/* -----------------------------------------------------------------------------
+   New device profile, as a page · `DeviceProfileWizard`.
+
+   Versions 1 and 3 of "Create new profile" (owner, 15 Sep 2026). Most of what
+   the page draws is borrowed on purpose: the profile page's head, back link,
+   section headings, two columns and side panel, the picker's bar and rows, the
+   check list's aligned columns, and the kit's save footer. What is here is only
+   what a wizard adds — the ladder, the lock on a value until its check is
+   ticked, the review, and the footer's second button.
+
+   Loaded eagerly from main.tsx straight after device-fingerprint-v2.css, so
+   the rules below win the ties they are written to win and console-theme.css
+   still has the last word.
+   -------------------------------------------------------------------------- */
+
+/* The title and the ladder are one head. The shared page-head margin is for a
+   title over a page; here the ladder under it is part of the head, and the
+   grid's own gap is enough between them. */
+.bfp2 .bdpw__head { margin-bottom: 0; }
+
+/* --- The ladder ---------------------------------------------------------------
+
+   The drawer's numbered steps at a page's size, spread across the full width:
+   the connectors take the free space (below). The accent appears once, on the
+   step you are on; done is grey. */
+.bdpw__steps {
+  min-width: 0; margin-bottom: var(--space-8);
+  container: bdpw-steps / inline-size;
+  /* The disc grey, held here so the ladder's two grey states cannot drift
+     apart. A literal and not `--border-strong`: that token is #adb5bd in the
+     console and #ced4da under the rebrand, and the rebrand's is too pale to
+     carry a white numeral — the disc read as empty. The numeral is decorative
+     (`aria-hidden`; the label names the step), so this is a graphic against
+     white and not body text. Owner's value, matched to the live console's own
+     stepper (16 Sep 2026). */
+  --bdpw-disc: #9e9e9e;
+}
+/* Full width, so the ladder spans the form it heads rather than sitting in the
+   left third of it — the shape the product's own stepper has. */
+.bdpw__steps ol {
+  display: flex; align-items: center;
+  list-style: none; margin: 0; padding: 0; min-width: 0; width: 100%;
+}
+/* The STEP grows, not just the connector inside it.
+
+   The connector is this element's `::after`, so a step that sizes to its own
+   content gives it nothing to grow into — `flex: 1` on the line did nothing
+   while the li was `flex: 0 1 auto`, and the ladder stayed bunched at the left
+   of a full-width nav. The step takes the free space and hands it to the line.
+
+   The last step does not grow: it has no connector, so growing would only push
+   its own label away from the step before it. */
+.bdpw__step {
+  display: flex; align-items: center; flex: 1 1 auto; min-width: 0;
+  font-size: var(--fs-md); color: var(--text-muted);
+}
+/* The last step neither grows NOR shrinks, and the grow half is the fix.
+
+   It only said `flex-shrink: 0`, so it still took `flex-grow: 1` from the rule
+   above and was handed an equal share of the free space — 197px for a disc and
+   one word, with the 128px left over trailing off its right edge. Review looked
+   marooned, because it was: the space was inside its own step rather than in a
+   connector.
+
+   Growing exactly the steps that HAVE a connector puts the free space in the
+   lines, which is the only place it reads as spacing. The ladder then starts on
+   the left edge and ends on the right one, and whatever is in between divides
+   what is left — the same at three steps, four or five. */
+.bdpw__step:last-child { flex: 0 0 auto; }
+/* The connector GROWS now, where it used to shrink from a fixed 48px. That is
+   what spreads four steps across the whole width instead of bunching them at
+   the left, and it keeps the spacing even at any number of steps — three for a
+   health profile, four for a trusted-device one, five when values are split. */
+.bdpw__step:not(:last-child)::after {
+  content: ''; flex: 1 1 auto; min-width: 16px; height: 1px;
+  margin: 0 var(--space-6);
+  background: var(--border-default);
+}
+/* Whole words first: the connectors give up their length before a label gives
+   up a letter, down to the width where the words are hidden below. */
+.bdpw__stepbtn {
+  display: inline-flex; align-items: center; gap: var(--space-4); min-width: 0; flex-shrink: 0;
+  padding: var(--space-2) 0; border: 0; border-radius: var(--radius-sm);
+  background: none; font: inherit; color: inherit; white-space: nowrap;
+}
+button.bdpw__stepbtn { cursor: pointer; }
+button.bdpw__stepbtn:hover .bdpw__steplabel { text-decoration: underline; text-underline-offset: 3px; }
+button.bdpw__stepbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bdpw__steplabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A FILLED disc, not an outlined one — the product's stepper, which reads at a
+   glance as a numbered sequence rather than as four empty controls.
+
+   The glyph is `--surface-raised` and not `white`, for the reason `.bx-tick`
+   records: the accent ramp has a light half in one theme, and a white numeral
+   on it is an empty circle.
+
+   Upcoming steps are filled in the neutral edge grey; the one you are on takes
+   `--accent`. That token is the product's blue under the rebrand and the
+   console's slate outside it, so this matches the reference where the reference
+   applies and keeps 60/30/10 where it does not. */
+.bdpw__stepn {
+  flex: none; display: grid; place-items: center;
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 0;
+  background: var(--bdpw-disc);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); font-variant-numeric: tabular-nums;
+  color: var(--surface-raised);
+}
+/* Done is GREY, and only the step you are on is coloured.
+
+   It shared `--accent` with the current step, distinguished by the check alone —
+   so a four-step ladder on step four was four coloured discs and no sense of
+   where you were. Grey for everything behind you, colour for exactly one disc:
+   the ladder then says "here" at a glance, which is the only thing it is for.
+   The check still separates done from not-yet-reached, both being grey. */
+.bdpw__step.is-done { color: var(--text-secondary); }
+/* The label is BLACK on the step you are on, not the accent.
+
+   It took `--accent-strong` to match the disc beside it, and that put the blue
+   on twice for one state — the filled disc is what says "here", and a blue word
+   beside a blue disc reads as a link. Black is the emphasis; the disc keeps the
+   colour. */
+.bdpw__step.is-on { color: var(--text-primary); font-weight: var(--fw-medium); }
+.bdpw__step.is-on .bdpw__stepn { background: var(--accent); color: var(--surface-raised); }
+
+/* Five labels do not fit a narrow column. The step you are on keeps its word;
+   the others keep their numbers, and their words stay in the accessible name.
+
+   Measured on the ladder's own width, not the window's. A viewport query at
+   720px let an 800px window, whose page column is 545px, cut every label to a
+   letter or two — "P…  De…  Choose …" (15 Sep 2026).
+
+   Re-measured at the 8px gap and 16px connector margins (16 Sep 2026). With
+   connectors at their shortest a ladder needs:
+
+     5 steps  Profile · Devices · Choose signals · Set values · Review   619px
+     4 steps  Profile · Devices · Signals · Review                       429px
+     3 steps  Profile · Checks · Review                                  309px
+
+   so the five-step ladder gets a threshold of its own. One threshold for all
+   three would have to be the widest, and that takes the words off a four-step
+   ladder at 600px, where they fit with 170px to spare. The one word left may
+   shorten on a phone. */
+@container bdpw-steps (max-width: 639px) {
+  ol:has(> :nth-child(5)) .bdpw__stepbtn { flex-shrink: 1; }
+  ol:has(> :nth-child(5)) .bdpw__step:not(.is-on) .bdpw__steplabel {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  ol:has(> :nth-child(5)) .bdpw__step:not(:last-child)::after { flex-basis: 24px; width: 24px; }
+}
+@container bdpw-steps (max-width: 439px) {
+  .bdpw__stepbtn { flex-shrink: 1; }
+  .bdpw__step:not(.is-on) .bdpw__steplabel {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  .bdpw__step:not(:last-child)::after { flex-basis: 24px; width: 24px; }
+}
+
+/* --- Step one --------------------------------------------------------------------
+
+   The name field FILLS the column (owner, 16 Sep 2026). It was capped at 480px
+   on the argument that a name does not need 900px — true of a page-width column
+   and false of this one: the 50/50 split already holds the work at ~586px, and
+   inside that a 480px field stopped 100px short of the type tiles under it. One
+   right edge down the column beats a field measured to its content. */
+.bdpw__form { display: flex; flex-direction: column; gap: var(--space-7); min-width: 0; }
+
+/* --- The bar, on a page ------------------------------------------------------------
+
+   The picker's bar was sized for a 560px drawer, where a search box that fills
+   the line is a normal width. Across a page column it was a 600px field, so it
+   stops at a search's width and the count keeps the end of the line. Both
+   shapes of step, the inline list and the picker. */
+.bdpw__work .bfp2__pickbar { background: var(--surface-page); }
+.bdpw__work .bfp2__pickbar > .bx-search { max-width: 360px; }
+
+/* --- Checks, chosen and set on one line --------------------------------------------
+
+   The profile page's check list (`.bfp2__checklist`): one grid, each row a
+   subgrid, so every value starts on one x. The picker's row does the ticking,
+   across the list's first two columns — the tick, the mark and the name.
+
+   Bled left by the row's own padding, as the picker's list is, so the tick
+   sits on the search box's edge and the focus ring has room. */
+.bdpw__list .bdpw__tick {
+  grid-column: 1 / 3; align-self: stretch;
+  width: auto; min-width: 0;
+  margin-left: calc(var(--space-5) * -1);
+}
+/* No always-on checks, no lock column: a health profile's values end on the
+   list's right edge, where the count above them ends. */
+.bdpw__list.no-lock { grid-template-columns: 20px minmax(0, 1fr) var(--bfp2-ctl); }
+
+/* A `fieldset`, for the native disable; stripped of everything a fieldset
+   draws. `min-inline-size` is the one that matters — a fieldset defaults to
+   its content's width, and the control column could not shrink. Dimmed while
+   locked, the way a disabled button is. */
+.bdpw__list .bdpw__ctl { margin: 0; padding: 0; border: 0; min-inline-size: 0; }
+.bdpw__list .bdpw__ctl:disabled { opacity: var(--disabled-opacity); }
+.bdpw__list .bdpw__ctl:disabled * { cursor: not-allowed; }
+
+/* A column too narrow for a name beside a 200px value puts the value under its
+   name. A weight is small enough to stay on the line.
+
+   Only at a phone's width. It was below 480px, which is the two-column page at
+   1100 wide, and every health row went to two lines there while the profile
+   page's own list, the same width, kept a 200px picker on the line — so the
+   version the owner asked to be one line was the one that was not (15 Sep
+   2026). Between 400 and 519 the check list's own rule narrows the picker to
+   200px instead. */
+@container bfp2-checks (max-width: 399px) {
+  .bdpw__list:not(.is-weights),
+  .bdpw__list.no-lock:not(.is-weights) { grid-template-columns: 20px minmax(0, 1fr) 32px; }
+  /* Under the name's first letter: the tick (16px) and the mark (20px, the
+     same as the mark column) with a 6px gap after each, less the column the
+     mark already fills and the grid gap after it. */
+  .bdpw__list:not(.is-weights) .bdpw__ctl {
+    grid-column: 2 / -1; grid-row: 2;
+    margin-left: calc(16px + var(--space-3) * 2 - var(--space-5));
+    justify-content: flex-start; padding-bottom: var(--space-4);
+  }
+  .bdpw__list:not(.is-weights) .bfp2__checkdel { grid-column: 3; grid-row: 1; }
+}
+
+/* --- Review ------------------------------------------------------------------------
+
+   One card per section; in it, label and value in two columns. */
+/* One centred column on the steps that have no panel beside them — Review.
+
+   `.bz7__cols` is two equal halves, which is right where the left half is a
+   form and the right one explains it. A summary explains itself, so the right
+   half was empty and the facts sat in the left 450px of a 900px page. Centred
+   and capped at a reading measure, the review reads as the page's own content
+   rather than as a form missing its other half. */
+.bdpw__cols--solo { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+.bdpw__cols--solo > .bdpw__work { width: 100%; max-width: 720px; }
+
+.bdpw__review { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+
+/* --- A folded section ---------------------------------------------------------------
+
+   A card, because a review is a set of things you open and shut and a hairline
+   between open sections cannot show where one ends and the next begins once
+   they can be closed. One border, one radius, no card inside it: the rows have
+   no fills and no rules of their own.
+
+   The toggle takes the header's free space and Edit keeps its own width, and
+   the summary pill's `margin-right: auto` puts the chevron on one x whatever
+   the title's length — three headers whose controls wander are the thing that
+   makes a stack of folds look broken. */
+.bdpw__fold {
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+.bdpw__foldhead {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding-right: var(--space-5);
+}
+/* The whole header line is the press target except Edit — a title you can only
+   open by hitting a 16px chevron is the usual fault of this pattern. */
+/* The heading is only structure: it takes the free space and draws nothing. */
+.bdpw__foldtitle { flex: 1 1 auto; min-width: 0; margin: 0; font: inherit; }
+.bdpw__foldbtn {
+  width: 100%; min-width: 0;
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-5); border: 0; background: none;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.bdpw__foldbtn:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.bdpw__foldbtn:hover { background: var(--surface-sunken); }
+.bdpw__foldico {
+  flex: none; display: grid; place-items: center;
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  background: var(--surface-inset); color: var(--text-secondary);
+}
+.bdpw__foldname {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+/* The summary pill takes the space between the title and the chevron, so the
+   chevron lands on the same x in every fold. */
+.bdpw__foldbtn > .bx-badge { margin-right: auto; }
+.bdpw__foldchev {
+  flex: none; color: var(--text-tertiary);
+  transition: transform 0.16s ease;
+}
+.bdpw__fold.is-open .bdpw__foldchev { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .bdpw__foldchev { transition: none; } }
+
+/* What happens next, at the foot of what it follows. Muted and unboxed: it is
+   the quietest thing on the step and must not compete with the facts. */
+.bdpw__next {
+  margin: 0; max-width: 60ch;
+  font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.55;
+}
+.bdpw__facts {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-6);
+  margin: 0; padding: 0 var(--space-5) var(--space-5);
+}
+/* The label takes the room and the value ends on the card's right edge. It was
+   a fixed 260px label column with the value beside it, which on a 720px card
+   left every value stranded in the middle with 300px of white after it. */
+.bdpw__fact {
+  grid-column: 1 / -1;
+  display: grid; grid-template-columns: subgrid; align-items: center;
+  min-height: 36px;
+}
+.bdpw__fact dt {
+  display: flex; align-items: center; gap: var(--space-3); min-width: 0;
+  font-size: var(--fs-md); color: var(--text-secondary);
+}
+.bdpw__fact dt > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bdpw__fact dd {
+  margin: 0; min-width: 0; justify-self: end; text-align: right;
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+/* A value pill is wider than a badge in a table — these are whole phrases
+   ("Users register their own devices"), not statuses. */
+.bdpw__fact dd > .bx-badge { --badge-max: 34ch; }
+@media (max-width: 560px) {
+  .bdpw__facts { grid-template-columns: minmax(0, 1fr); }
+  .bdpw__fact { padding-block: var(--space-2); }
+  .bdpw__fact dd { justify-self: start; text-align: left; }
+}
+
+/* --- The footer ----------------------------------------------------------------------
+
+   `.bx-savebar` from the kit, with two buttons instead of one. They sit in a
+   group, so the kit's 148px floor for its one button lands on the primary
+   only. On a phone the words take the line and the buttons the next. */
+.bdpw__foot { flex-wrap: wrap; row-gap: var(--space-4); }
+.bdpw__acts { flex: none; display: flex; align-items: center; gap: var(--space-4); margin-left: auto; }
+.bdpw__acts > .bx-btn--brand { min-width: 148px; }
+
+/* --- The slide-over variant ------------------------------------------------------
+
+   `Current` on the create-flow switch: the same wizard, drawn over the list
+   instead of replacing it. See the note in `DeviceProfileWizard`.
+
+   What differs from the page is only what the page's region gave it for free.
+   The ladder and the body stack in one column here — there is no room beside a
+   720px panel for the aside the page puts at its right, and the aside is the
+   first thing a narrow panel should lose, being the explanation rather than the
+   question. The Drawer owns the padding, the scroll and the footer. */
+.bdpw--drawer { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+.bdpw--drawer .bdpw__work { min-width: 0; }
+/* The page keeps its aside in the column beside the work; in the panel it is
+   not rendered at all, so nothing here has to hide it. */
+
+/* The reason a disabled Next cannot be pressed. On the page this sits in the
+   sticky footer; a Drawer's footer belongs to the Drawer, so it goes under the
+   ladder — above the step it is about, where it is read before the control it
+   is explaining rather than after. */
+.bdpw__reason {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+}

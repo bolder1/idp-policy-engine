@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { scenarios } from '../data'
+import { audienceOf, blankRule, card, cond, EVERYONE, groups, scenarios, when, type Audience, type Rule, type Scenario } from '../data'
+import { legacyWhoConditions, whoPasses } from '../rule-who'
+import { sig } from '../predicate'
+import { buildTemplate, buildTemplateRules, narrowToAudience } from '../screens/board/apply-template'
 
 /* -----------------------------------------------------------------------------
    Card stress tests.
@@ -152,5 +155,149 @@ describe('ownership segregation', () => {
 
   it('provided templates carry no author, so nothing claims a name it lacks', () => {
     for (const s of provided) expect(s.author, `${s.id}`).toBeUndefined()
+  })
+})
+
+/* -----------------------------------------------------------------------------
+   A template keeps its audience on the board.
+
+   New policies govern everyone, and the board used to commit a template's rules
+   without its audience — so "Stricter auth for contractors" stepped up every
+   sign-in and "Regulated data access" denied everyone's unmanaged device.
+   `buildTemplateRules` writes the audience into each rule's `who`, and never
+   touches the WHEN cards.
+
+   The reach checks are worst case: every condition is assumed to pass, so the
+   who alone decides. A rule that reaches someone outside the audience under
+   that assumption is wider than its template.
+   -------------------------------------------------------------------------- */
+
+const person = (groupId: string, id = `someone-in-${groupId}`) => ({ id, groupId })
+const reaches = (r: Rule, groupId: string, userId?: string) => whoPasses(r.who, person(groupId, userId))
+const inside = (a: Audience, groupId: string) => a.everyone || a.groupIds.includes(groupId)
+
+describe('applying a template keeps its audience', () => {
+  const narrowed = scenarios.filter((s) => !s.audience.everyone)
+
+  it('covers the templates that narrow only through their audience, deny rules included', () => {
+    const ids = narrowed.map((s) => s.id)
+    for (const id of ['s-contractor', 's-session', 's-regulated', 's-contractor-life']) expect(ids).toContain(id)
+    expect(narrowed.some((s) => s.rules.some((r) => r.decision === 'deny'))).toBe(true)
+  })
+
+  it('every rule of a narrowed template names the audience in its who', () => {
+    for (const s of narrowed) {
+      const built = buildTemplateRules(s)
+      expect(built.length, s.id).toBe(s.rules.length)
+      for (const r of built) {
+        if (s.audience.groupIds.length > 0) {
+          expect(r.who?.groupIds.length, `${s.id} / ${r.name}`).toBeGreaterThan(0)
+          for (const g of r.who!.groupIds) expect(s.audience.groupIds, `${s.id} / ${r.name}`).toContain(g)
+        }
+        for (const u of s.audience.userIds) expect(r.who?.userIds, `${s.id} / ${r.name}`).toContain(u)
+      }
+    }
+  })
+
+  it('never writes people or groups into a card', () => {
+    for (const s of scenarios) {
+      for (const r of buildTemplateRules(s)) expect(legacyWhoConditions(r.when), `${s.id} / ${r.name}`).toEqual([])
+    }
+  })
+
+  it('leaves the WHEN exactly as built', () => {
+    for (const s of scenarios) {
+      const plain = s.rules.map((r) => r.build())
+      const built = buildTemplateRules(s)
+      expect(built.map((r) => sig(r.when)), s.id).toEqual(plain.map((r) => sig(r.when)))
+    }
+  })
+
+  it('no rule reaches a group outside its template audience, and every rule still reaches inside it', () => {
+    for (const s of narrowed) {
+      for (const r of buildTemplateRules(s)) {
+        for (const g of groups) {
+          expect(reaches(r, g.id), `${s.id} / ${r.name} / ${g.id}`).toBe(inside(s.audience, g.id))
+        }
+      }
+    }
+  })
+
+  it('leaves templates for everyone exactly as built', () => {
+    for (const s of scenarios.filter((x) => x.audience.everyone)) {
+      for (const r of s.rules.map((x) => x.build())) expect(narrowToAudience(r, EVERYONE)).toBe(r)
+    }
+  })
+
+  it('s-passwordless names the executives group, once, and has no conditions', () => {
+    const s = scenarios.find((x) => x.id === 's-passwordless')!
+    expect(s.audience.groupIds).toEqual(['executives'])
+    expect(groups.some((g) => g.id === 'executives')).toBe(true)
+    const [r] = buildTemplateRules(s)
+    expect(r.who).toEqual({ groupIds: ['executives'], userIds: [] })
+    expect(r.when.cards).toEqual([])
+  })
+})
+
+describe('narrowing a rule that already says who', () => {
+  const ruleWith = (who?: Rule['who'], w: Rule['when'] = { cards: [] }): Rule => ({ ...blankRule('Test'), ...(who ? { who } : null), when: w })
+
+  it('intersects a group list the rule already names', () => {
+    const r = narrowToAudience(ruleWith({ groupIds: ['executives', 'contractors'], userIds: [] }), audienceOf(['contractors']))
+    expect(r?.who).toEqual({ groupIds: ['contractors'], userIds: [] })
+  })
+
+  it('drops the rule rather than widening it when the rule names a different group', () => {
+    expect(narrowToAudience(ruleWith({ groupIds: ['executives'], userIds: [] }), audienceOf(['contractors']))).toBeNull()
+  })
+
+  it('reports a dropped rule by name from the template build', () => {
+    const t: Scenario = {
+      id: 't-drop',
+      name: 'Drop test',
+      description: 'x',
+      category: 'Compliance',
+      audience: audienceOf(['contractors']),
+      rules: [
+        { name: 'Executives only', ifText: 'x', decision: 'deny', build: () => ruleWith({ groupIds: ['executives'], userIds: [] }) },
+        { name: 'Everyone', ifText: 'x', decision: '2fa', build: () => ruleWith() },
+      ],
+    }
+    const built = buildTemplate(t)
+    expect(built.dropped).toEqual(['Executives only'])
+    expect(built.rules.map((r) => r.who)).toEqual([{ groupIds: ['contractors'], userIds: [] }])
+    expect(buildTemplateRules(t)).toHaveLength(1)
+  })
+
+  it('keeps an exception, and never covers the excepted group', () => {
+    const r = narrowToAudience(ruleWith({ groupIds: [], userIds: [], exceptGroupIds: ['contractors'] }), audienceOf(['contractors', 'finance']))!
+    expect(reaches(r, 'finance')).toBe(true)
+    expect(reaches(r, 'contractors')).toBe(false)
+    expect(r.who?.groupIds).toEqual(['finance'])
+  })
+
+  it('names people when the audience is people', () => {
+    const r = narrowToAudience(ruleWith(), audienceOf([], ['priya']))!
+    expect(r.who?.userIds).toEqual(['priya'])
+    expect(reaches(r, 'engineering', 'priya')).toBe(true)
+    expect(reaches(r, 'engineering', 'someone-else')).toBe(false)
+  })
+
+  it('keeps groups and people a union, whatever the WHEN looks like', () => {
+    const a = audienceOf(['finance'], ['u-x'])
+    const orCard = { ...card(cond('zone', 'in zone', ['office']), cond('day', 'is', ['Monday'])), join: 'or' as const }
+    const shapes: Rule['when'][] = [
+      { cards: [] },
+      when(card(cond('zone', 'in zone', ['office']))),
+      when(card(cond('zone', 'in zone', ['office'])), card(cond('day', 'is', ['Monday']))),
+      when(orCard),
+    ]
+    for (const w of shapes) {
+      const r = narrowToAudience(ruleWith(undefined, w), a)!
+      expect(reaches(r, 'finance')).toBe(true)
+      expect(reaches(r, 'engineering', 'u-x')).toBe(true)
+      expect(reaches(r, 'engineering')).toBe(false)
+      expect(r.when).toBe(w)
+    }
   })
 })

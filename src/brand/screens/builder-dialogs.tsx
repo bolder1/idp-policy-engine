@@ -1,10 +1,13 @@
-import { AlertTriangle, Info, XCircle } from 'lucide-react'
+import { AlertTriangle, CopyPlus, Info, ListX, XCircle } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useId, useMemo, useState } from 'react'
 
-import type { Policy, Rule } from '../data'
-import { Badge, Button, DecisionChip, Field, Modal, StatusPill } from '../kit'
+import { FALLBACK_NAME, evaluates, fallbackRule, nameTaken, type Policy, type Rule } from '../data'
+import { EmptyState } from '../empty'
+import { Badge, Button, DecisionChip, Field, Modal, StatusPill, TipDot, TipMark } from '../kit'
+import { lastSaved, type CommitIntent } from '../policy-draft'
 import { useBrand, useNameLookup } from '../store'
+import { narrowToAudience } from './board/apply-template'
 import { diagnose, type Diagnostic } from './diagnostics'
 
 import './builder-dialogs.css'
@@ -30,7 +33,7 @@ import './builder-dialogs.css'
    this module keep working. */
 
 export { ruleSentence, type NameLookup, type RuleProse } from './predicate-prose'
-import { ruleSentence } from './predicate-prose'
+import { ruleLabel, ruleSentence } from './predicate-prose'
 
 /* `AssignAppsDialog` is gone.
 
@@ -42,7 +45,8 @@ import { ruleSentence } from './predicate-prose'
 
 const SEVERITY_ICON = { error: XCircle, warning: AlertTriangle, info: Info }
 
-function DiagnosticRow({ d }: { d: Diagnostic }) {
+/** One linter finding, as the review dialog prints it. Exported for the board's inspector. */
+export function DiagnosticRow({ d }: { d: Diagnostic }) {
   const Icon = SEVERITY_ICON[d.severity]
   return (
     <div className={`bdlg-diag bdlg-diag--${d.severity}`}>
@@ -59,18 +63,27 @@ export function ReviewDialog({
   open,
   policy,
   onClose,
-  onConfirm,
+  onCommit,
+  from = 'builder',
 }: {
   open: boolean
+  /** The builder's draft being reviewed. Its status is not read: the saved policy's is. */
   policy: Policy
   onClose: () => void
-  onConfirm: () => void
+  /** Both builders store `committed(saved, draft, intent)`. */
+  onCommit: (intent: CommitIntent) => void
+  /** Which builder Edit details returns to. */
+  from?: 'builder' | 'board'
 }) {
   const store = useBrand()
   const resolve = useNameLookup()
   const reduce = useReducedMotion()
+  /* The status comes from the store, not the draft: it can be switched from the
+     bar while an edit is open, and the footer below is chosen by it. */
+  const saved = store.policyById(policy.id) ?? policy
+  const isDraft = saved.status === 'draft'
 
-  const diagnostics = diagnose(policy, store.groups, store.hooks)
+  const diagnostics = diagnose(policy, store.groups, store.hooks, store.users, { zones: store.zones, fingerprints: store.fingerprints })
   /* Only errors on rules that actually run can block the save. diagnose()
      leaves `blank`, `nomethods` and `unreachable` unguarded by rule.enabled
      (unlike the duplicate/subsumed checks), so without this filter a rule you
@@ -80,7 +93,40 @@ export function ReviewDialog({
   const errors = diagnostics.filter(
     (d) => d.severity === 'error' && policy.rules[d.ruleIndex]?.enabled !== false,
   )
-  const unassigned = policy.appIds.length === 0 && !policy.isSystem
+  const noApps = policy.appIds.length === 0 && !policy.isSystem
+  const blocked = errors.length > 0
+  /* The policy's own last rule, read the way the engine and the board read it.
+     This row used to be hard-coded to one factor, so a deny-by-default policy
+     was described as the opposite at the moment of saving. */
+  const fallback = policy.fallback ?? fallbackRule()
+
+  /* One commit rule (policy-draft.ts `committed`), so the buttons name what it
+     will do. Without applications the result is a draft, and an unfinished
+     policy is allowed to be one, so errors do not block that case. */
+  const commit = isDraft ? (
+    noApps ? (
+      <Button variant="brand" onClick={() => onCommit('keep-off')}>
+        Save draft
+      </Button>
+    ) : (
+      <>
+        <Button variant="secondary" onClick={() => onCommit('keep-off')} disabled={blocked}>
+          Save, keep off
+        </Button>
+        <Button variant="brand" onClick={() => onCommit('turn-on')} disabled={blocked}>
+          Save and turn on
+        </Button>
+      </>
+    )
+  ) : noApps ? (
+    <Button variant="brand" onClick={() => onCommit('keep-off')}>
+      Save and move to draft
+    </Button>
+  ) : (
+    <Button variant="brand" onClick={() => onCommit('keep-off')} disabled={blocked}>
+      Save changes
+    </Button>
+  )
 
   return (
     <Modal
@@ -96,9 +142,7 @@ export function ReviewDialog({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="brand" onClick={onConfirm} disabled={errors.length > 0}>
-            Confirm &amp; Save
-          </Button>
+          {commit}
         </>
       }
     >
@@ -106,11 +150,11 @@ export function ReviewDialog({
         <header className="bdlg-rev__head">
           <h3>{policy.name}</h3>
           <Badge tone="neutral">{policy.type}</Badge>
-          <StatusPill status={policy.status} />
+          <StatusPill status={saved.status} />
         </header>
 
         <AnimatePresence initial={false}>
-          {unassigned && (
+          {noApps && (
             <motion.div
               className="bdlg-warn"
               initial={{ opacity: 0, height: reduce ? 'auto' : 0 }}
@@ -120,28 +164,46 @@ export function ReviewDialog({
             >
               <AlertTriangle size={15} aria-hidden />
               <span>
-                No application chosen, so nothing reaches these rules.{' '}
+                {isDraft
+                  ? 'No applications. Assign one to turn this policy on.'
+                  : evaluates(saved)
+                    ? 'No applications, so this policy becomes a draft and stops deciding sign-ins.'
+                    : 'No applications, so this policy becomes a draft.'}{' '}
                 {/* Straight to the page that owns it. This used to open a
                     dialog behind this dialog, or — with no handler — just
-                    close, which is a "go and do that" link that does not. */}
+                    close, which is a "go and do that" link that does not.
+                    `go` is leave-guarded, so an unsaved draft gets asked
+                    about rather than dropped. */}
                 <button
                   type="button"
                   className="bdlg-warn__go"
                   onClick={() => {
                     onClose()
-                    store.go({ name: 'policy-details', policyId: policy.id })
+                    store.go({ name: 'policy-details', policyId: policy.id, from })
                   }}
                 >
-                  Choose one in Edit details →
+                  Assign applications
                 </button>
               </span>
             </motion.div>
           )}
         </AnimatePresence>
 
+        {/* Findings about the policy as a whole (who it applies to) belong to
+            no rule row, and one of them can disable the buttons below. */}
+        {diagnostics.some((d) => d.ruleIndex === -1) && (
+          <div className="bdlg-rev__policydiag">
+            {diagnostics
+              .filter((d) => d.ruleIndex === -1)
+              .map((d) => (
+                <DiagnosticRow key={d.id} d={d} />
+              ))}
+          </div>
+        )}
+
         <ol className="bdlg-rev__rules">
           {policy.rules.map((rule, i) => {
-            const { iff, then } = ruleSentence(rule, resolve)
+            const { who, iff, then } = ruleSentence(rule, resolve)
             const mine = diagnostics.filter((d) => d.ruleIndex === i)
             return (
               <motion.li
@@ -157,17 +219,23 @@ export function ReviewDialog({
               >
                 <p className="bdlg-rev__line">
                   <span className="bdlg-rev__n">{i + 1}</span>
-                  <strong>{rule.name}</strong>
+                  <strong>{ruleLabel(rule)}</strong>
                   <span className="bdlg-rev__arrow" aria-hidden>
                     →
                   </span>
                   <DecisionChip decision={rule.decision} size="sm" />
                 </p>
+                {/* Who on its own line, never inside If. Absent for everyone. */}
+                {who && (
+                  <p className="bdlg-rev__prose">
+                    <span className="bdlg-rev__key">Who:</span> {who}
+                  </p>
+                )}
                 <p className="bdlg-rev__prose">
-                  <span className="bdlg-rev__key">IF:</span> {iff}
+                  <span className="bdlg-rev__key">If:</span> {iff}
                 </p>
                 <p className="bdlg-rev__prose">
-                  <span className="bdlg-rev__key">THEN:</span>{' '}
+                  <span className="bdlg-rev__key">Then:</span>{' '}
                   <span className="bdlg-rev__arrow" aria-hidden>
                     →
                   </span>{' '}
@@ -185,18 +253,23 @@ export function ReviewDialog({
           <li className="is-default">
             <p className="bdlg-rev__line">
               <span className="bdlg-rev__n">—</span>
-              <strong>Default Rule — Everyone</strong>
+              <strong>{FALLBACK_NAME}</strong>
               <span className="bdlg-rev__arrow" aria-hidden>
                 →
               </span>
-              <DecisionChip decision="1fa" size="sm" />
+              <DecisionChip decision={fallback.decision} size="sm" />
+            </p>
+            {/* Not the fallback's predicate: nothing evaluates it. What reaches
+                this row is whatever the rules above did not catch. */}
+            <p className="bdlg-rev__prose">
+              <span className="bdlg-rev__key">If:</span> no rule above matched
             </p>
             <p className="bdlg-rev__prose">
-              <span className="bdlg-rev__key">THEN:</span>{' '}
+              <span className="bdlg-rev__key">Then:</span>{' '}
               <span className="bdlg-rev__arrow" aria-hidden>
                 →
               </span>{' '}
-              Anyone who reaches this point signs in with one factor.
+              {ruleSentence(fallback, resolve).then}
             </p>
           </li>
         </ol>
@@ -227,6 +300,7 @@ export function SaveTemplateDialog({
   onSave: (t: { name: string; description: string; category: string }) => void
 }) {
   const uid = useId()
+  const store = useBrand()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   /* Defaults to Uncategorized rather than the first option. A template filed
@@ -242,7 +316,32 @@ export function SaveTemplateDialog({
     setCategory('Uncategorized')
   }, [open])
 
-  const ready = name.trim().length > 0
+  /* Which rules applying the template will actually write. Applying narrows
+     every rule to the template's audience (the policy's), and a rule whose Who
+     shares nobody with it is left out — so this list says so before saving
+     rather than the board saying so after. */
+  const kept = useMemo(
+    () => policy.rules.map((r) => narrowToAudience(r, policy.audience, store.users) !== null),
+    [policy.rules, policy.audience, store.users],
+  )
+  const keptCount = kept.filter(Boolean).length
+
+  const trimmed = name.trim()
+  const taken = nameTaken(trimmed, store.scenarios.map((s) => s.name))
+  const reason =
+    policy.rules.length === 0
+      ? 'Add a rule before saving this policy as a template.'
+      : keptCount === 0
+        ? 'None of these rules apply to anyone in this policy.'
+        : taken
+          ? 'A template with this name already exists.'
+          : !trimmed
+            ? 'Enter a template name.'
+            : null
+  const ready = reason === null
+  const save = () => {
+    if (ready) onSave({ name: trimmed, description: description.trim(), category })
+  }
 
   return (
     <Modal
@@ -255,13 +354,11 @@ export function SaveTemplateDialog({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            variant="brand"
-            disabled={!ready}
-            onClick={() => onSave({ name: name.trim(), description: description.trim(), category })}
-          >
-            Save template
-          </Button>
+          <span title={reason ?? undefined}>
+            <Button variant="brand" disabled={!ready} onClick={save}>
+              Save template
+            </Button>
+          </span>
         </>
       }
     >
@@ -272,9 +369,23 @@ export function SaveTemplateDialog({
             className="bdlg-input"
             type="text"
             value={name}
+            maxLength={50}
+            required
             placeholder={`e.g. ${policy.name}`}
+            aria-invalid={taken || undefined}
+            aria-describedby={taken ? `${uid}-taken` : undefined}
             onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              save()
+            }}
           />
+          {taken && (
+            <p id={`${uid}-taken`} className="bdlg-error" role="alert">
+              A template with this name already exists.
+            </p>
+          )}
         </Field>
 
         <Field
@@ -307,24 +418,33 @@ export function SaveTemplateDialog({
           ))}
         </fieldset>
 
-        <section className="bdlg-tpl__includes">
-          <p className="u-label">This template includes:</p>
-          {policy.rules.length === 0 ? (
-            <p className="bdlg-empty">
-              This policy has no rules yet, so the template would carry nothing but its name.
-            </p>
-          ) : (
+        {policy.rules.length === 0 ? (
+          <EmptyState compact icon={ListX} title="No rules" blurb="Add a rule before saving this policy as a template." />
+        ) : (
+          <section className="bdlg-tpl__includes">
+            <p className="u-label">Rules</p>
             <ul>
               {policy.rules.map((r, i) => (
-                <li key={r.id}>
+                <li key={r.id} className={kept[i] ? '' : 'is-dropped'}>
                   <span className="bdlg-tpl__n">{i + 1}</span>
-                  <span className="bdlg-tpl__rule">{r.name}</span>
+                  <span className="bdlg-tpl__rule">{ruleLabel(r)}</span>
+                  {!kept[i] && (
+                    <>
+                      <Badge tone="neutral">Not included</Badge>
+                      <TipDot text="Its Who shares nobody with this policy." label={`Why ${ruleLabel(r)} is not included`} />
+                    </>
+                  )}
                   <DecisionChip decision={r.decision} size="sm" />
                 </li>
               ))}
             </ul>
-          )}
-        </section>
+            {keptCount === 0 && (
+              <p className="bdlg-error" role="alert">
+                None of these rules apply to anyone in this policy.
+              </p>
+            )}
+          </section>
+        )}
       </div>
     </Modal>
   )
@@ -393,35 +513,44 @@ export function CopyRuleDialog({
        rule and is already visible in the builder behind the dialog. The only
        findings worth a row here are the ones the move creates. */
     const intrinsic = new Set(
-      diagnose({ ...from, isSystem: false, rules: [probe] }, store.groups, store.hooks).map((d) => d.title),
+      diagnose({ ...from, isSystem: false, rules: [probe] }, store.groups, store.hooks, store.users, { zones: store.zones, fingerprints: store.fingerprints }).map((d) => d.title),
     )
 
     return store.policies
       .filter((p) => p.id !== from.id && p.type === from.type && !p.isSystem)
       .map((p) => {
-        const at = p.rules.length
-        const would: Policy = { ...p, rules: [...p.rules, probe] }
-        const found = diagnose(would, store.groups, store.hooks)
+        /* Against what the target's builder opens on — its saved draft when it
+           has one — because that is where the copy is written. */
+        const base = lastSaved(p)
+        const at = base.rules.length
+        const would: Policy = { ...p, rules: [...base.rules, probe], fallback: base.fallback }
+        const found = diagnose(would, store.groups, store.hooks, store.users, { zones: store.zones, fingerprints: store.fingerprints })
           .filter((d) => d.ruleIndex === at)
-          .filter((d) => !intrinsic.has(d.title))
+          /* Who outside the policy is never intrinsic: each target governs its
+             own people, so it is judged against the target every time. */
+          .filter((d) => d.code === 'PE151' || !intrinsic.has(d.title))
+        const notes = found.filter((d) => d.severity !== 'error')
         return {
           policy: p,
           at,
           blocking: found.find((d) => d.severity === 'error'),
-          notes: found.filter((d) => d.severity !== 'error'),
+          /* A copy that applies to nobody there is the first thing to say. */
+          notes: [...notes.filter((d) => d.code === 'PE151'), ...notes.filter((d) => d.code !== 'PE151')],
         }
       })
-  }, [store.policies, store.groups, from, rule])
+  }, [store.policies, store.groups, store.hooks, store.users, store.zones, store.fingerprints, from, rule])
 
   const chosen = targets.find((t) => t.policy.id === picked)
 
   const copy = () => {
     if (!rule || !chosen) return
-    store.copyRuleInto(chosen.policy.id, rule)
+    /* Into the target's draft when it is published, so the copy goes through
+       its Review & save rather than deciding sign-ins at once. */
+    const done = store.copyRuleInto(chosen.policy.id, rule)
+    if (!done) return
+    const where = done.intoDraft ? `the ${chosen.policy.name} draft` : chosen.policy.name
     store.showToast(
-      `“${rule.name}” copied into ${chosen.policy.name} as rule ${chosen.at + 1}${
-        chosen.blocking ? ' — where it cannot fire. Reorder it there.' : ''
-      }`,
+      `“${ruleLabel(rule)}” added to ${where} as rule ${done.at}.${chosen.blocking ? ' It cannot run there.' : ''}`,
     )
     onClose()
   }
@@ -430,7 +559,7 @@ export function CopyRuleDialog({
     <Modal
       open={open && !!rule}
       onClose={onClose}
-      title={rule ? `Copy “${rule.name}” to…` : 'Copy rule'}
+      title={rule ? `Copy “${ruleLabel(rule)}” to…` : 'Copy rule'}
       width={680}
       footer={
         <>
@@ -445,10 +574,12 @@ export function CopyRuleDialog({
     >
       <div className="bdlg bdlg-copy">
         {targets.length === 0 ? (
-          <p className="bdlg-copy__none">
-            There is no other <strong>{from.type}</strong> policy to copy into. A rule can only be copied to a
-            policy of the same type — the conditions and the outcome mean different things in the others.
-          </p>
+          <EmptyState
+            compact
+            icon={CopyPlus}
+            title="No policy to copy into"
+            blurb={`A rule can only be copied to another ${from.type} policy.`}
+          />
         ) : (
           <ul className="bdlg-copy__list">
             {targets.map((t) => (
@@ -464,11 +595,8 @@ export function CopyRuleDialog({
                     <span className="bdlg-copy__name">
                       {t.policy.name}
                       <StatusPill status={t.policy.status} />
-                    </span>
-                    <span className="bdlg-copy__meta">
-                      {t.policy.rules.length === 0
-                        ? 'No rules yet — the copy becomes rule 1'
-                        : `${t.policy.rules.length} rule${t.policy.rules.length === 1 ? '' : 's'} — the copy lands last, as rule ${t.at + 1}`}
+                      <span className="u-sr-only">Added as rule {t.at + 1}.</span>
+                      <TipMark text={`Added last, as rule ${t.at + 1}.`} />
                     </span>
                     {t.blocking && (
                       <span className="bdlg-copy__warn">

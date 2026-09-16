@@ -1,4 +1,17 @@
-import { CalendarDays, Clock, Fingerprint, Gauge, Globe, ListFilter, MonitorSmartphone, Sparkles, Tag, UserRound, Users, Webhook, type LucideIcon } from 'lucide-react'
+import {
+  CalendarDays,
+  Clock,
+  Gauge,
+  Globe,
+  ListFilter,
+  type LucideIcon,
+  MonitorSmartphone,
+  Sparkles,
+  Tag,
+  UserRound,
+  Users,
+  Webhook,
+} from 'lucide-react'
 
 /* One mark and one tone per condition, shared by the card, the editor and the
    catalogue so a Network zone looks the same in all three.
@@ -22,7 +35,7 @@ const GROUP_ICON: Record<string, LucideIcon> = {
   Attributes: ListFilter,
   Risk: Gauge,
   Group: Users,
-  User: Fingerprint,
+  User: UserRound,
 }
 
 export const GROUP_TONE: Record<string, string> = {

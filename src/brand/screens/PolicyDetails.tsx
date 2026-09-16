@@ -1,10 +1,15 @@
 import { useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { useEffect } from 'react'
+import { ArrowLeft, FileX } from 'lucide-react'
 
-import { Button } from '../kit'
-import { EVERYONE, reach, type Audience } from '../data'
-import { useBrand } from '../store'
+import { Button, SaveBar, TipDot } from '../kit'
+import { EmptyState } from '../empty'
+import { EVERYONE, evaluates, type Audience } from '../data'
+import { ChangeState, useLeaveGuard } from '../leave-guard'
+import { POLICY_NAME_MAX, policyNameIssue } from '../policy-name'
+import { useBrand, type PolicyDetailsFrom } from '../store'
 import { ApplicationField } from './scope-fields'
+import { detailsChanges } from './policy-details-review'
 
 import '../create/create.css'
 import './policy-details.css'
@@ -22,35 +27,84 @@ import './policy-details.css'
    that already exists. Somebody who created a policy last week and comes back to
    widen it should meet the screen they filled in, not a different arrangement of
    the same three fields.
+
+   It commits through the kit save bar, as the library pages do: the bar names
+   what changed, Review changes lays the saved values beside the new ones, and
+   Save stores them and goes back to where you came from.
    -------------------------------------------------------------------------- */
 
-export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string; from?: 'builder' | 'board' }) {
+export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string; from?: PolicyDetailsFrom }) {
   const store = useBrand()
   const saved = store.policyById(policyId)
 
   const [name, setName] = useState(saved?.name ?? '')
   const [appIds, setAppIds] = useState<string[]>(saved?.appIds ?? [])
-  /* Carried, not edited. The form no longer asks who the policy governs — the
-     Who step on each rule does — so this holds whatever the policy already had
+  /* Carried, not edited. The form no longer asks who the policy governs — each
+     rule's own Who field narrows it — so this holds whatever the policy already had
      and writes it back unchanged, rather than a save silently narrowing or
      widening a policy through a field that is not on screen. */
   const [audience] = useState<Audience>(saved?.audience ?? EVERYONE)
+  /* Set by Save. The page leaves once the store holds the saved values, so the
+     leave guard sees nothing unsaved and does not ask. */
+  const [closing, setClosing] = useState(false)
+
+  /* Compared as the save stores it — name trimmed, applications as a set — so a
+     trailing space is not an unsaved change. Applications are optional here, as
+     on the create form: a published policy saved with none goes back to draft,
+     because a policy that names nothing cannot decide a sign-in. */
+  const diff = saved ? detailsChanges(saved, { name, appIds }, (id) => store.appById(id).name) : null
+  const dirty = !!diff && diff.changes.length > 0
+  const becomesDraft = !!diff && diff.becomesDraft
+  const blocked = saved ? policyNameIssue(name, store.policies, saved.id) : null
+
+  /* Commits the details. Spreads the store's policy, so a saved draft of the
+     rules (`pendingDraft`) survives a rename. The system policy covers every
+     application, so its list is written back as it was. */
+  const save = () => {
+    if (!saved || blocked) return false
+    const trimmed = name.trim()
+    const ids = saved.isSystem ? saved.appIds : appIds
+    store.savePolicy({ ...saved, name: trimmed, appIds: ids, audience, status: becomesDraft ? 'draft' : saved.status })
+    /* From the list's "Assign applications", the turn-on that was refused is
+       still the errand, and the list is where it is done. */
+    const turnOn = from === 'policies' && saved.status === 'inactive' && ids.length > 0
+    store.showToast(
+      becomesDraft ? `${trimmed} saved as a draft` : turnOn ? `${trimmed} updated. Turn it on from the list.` : `${trimmed} updated`,
+    )
+    setName(trimmed)
+    return true
+  }
+
+  useLeaveGuard({ dirty, save, saveLabel: 'Save', blocked })
+
+  const go = store.go
+  useEffect(() => {
+    if (!closing || dirty) return
+    if (from === 'policies') go({ name: 'policies' })
+    else go({ name: from, policyId })
+  }, [closing, dirty, go, from, policyId])
 
   if (!saved) {
     return (
       <div className="bpage">
-        <p style={{ padding: 24 }}>That policy no longer exists.</p>
+        <EmptyState
+          icon={FileX}
+          title="Policy not found"
+          blurb="It may have been deleted."
+          action={
+            <Button variant="brand" onClick={() => store.go({ name: 'policies' })}>
+              Back to policies
+            </Button>
+          }
+        />
       </div>
     )
   }
 
-  const noApp = appIds.length === 0
-  const dirty =
-    name !== saved.name ||
-    appIds.join() !== saved.appIds.join() ||
-    JSON.stringify(audience) !== JSON.stringify(saved.audience)
-
-  const back = () => store.go({ name: from, policyId })
+  const back = () => (from === 'policies' ? store.go({ name: 'policies' }) : store.go({ name: from, policyId }))
+  /* The name in the crumb opens the policy: the builder you came from, or the
+     board when you came from the list. */
+  const openPolicy = () => store.go({ name: from === 'policies' ? 'board' : from, policyId })
 
   return (
     <div className="bpage bcp bcp--fit bpd">
@@ -58,17 +112,23 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
         <nav className="bcp__crumb">
           <button onClick={() => store.go({ name: 'policies' })}>Policies</button>
           <span aria-hidden>/</span>
-          <button onClick={back}>{saved.name}</button>
+          <button onClick={openPolicy}>{saved.name}</button>
           <span aria-hidden>/</span>
           <span>Details</span>
         </nav>
         <div className="bcp__headrow">
-          <h1>Policy details</h1>
+          <div className="bpd__title">
+            <h1>Policy details</h1>
+            <ChangeState unsaved={dirty} />
+          </div>
+          <Button variant="ghost" icon={ArrowLeft} onClick={back}>
+            {from === 'policies' ? 'Back to policies' : 'Back to the rules'}
+          </Button>
         </div>
       </header>
 
       <section className="bname2">
-        <div className="bname2__form bcard">
+        <div className="bname2__form bname2__card">
           <div className="bname2__field">
             <label htmlFor="pd-name" className="bname2__label">
               Policy name <i>*</i>
@@ -77,61 +137,67 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
               id="pd-name"
               type="text"
               value={name}
-              maxLength={50}
+              maxLength={POLICY_NAME_MAX}
+              aria-invalid={!!blocked}
+              aria-describedby={blocked ? 'pd-name-error' : undefined}
               onChange={(e) => setName(e.target.value)}
               placeholder="Finance Team – High Security"
             />
+            {blocked && (
+              <p id="pd-name-error" className="bpd__error">
+                {blocked}
+              </p>
+            )}
           </div>
 
           {/* Two questions, matching the create form exactly.
 
               Both were resident scrolling lists — ten applications and a
               tabbed roster of groups and people, 475px each. "Applies to" is
-              gone: it is answered per RULE now by the Who step, which writes
-              the `group` and `user` conditions the rule already held, and a
-              policy-level audience asked in two places was two chances for the
-              two to disagree. The application is required, because a policy
-              that names nothing is a set of rules no sign-in can reach. */}
+              gone: each rule says who it is for in its own Who field
+              (`rule.who`, not a condition), and a policy-level audience asked
+              in two places was two chances for the two to disagree. */}
           <div className="bname2__field">
-            <span className="bname2__label">
-              Application <i>*</i>
-            </span>
-            <ApplicationField appIds={appIds} onChange={setAppIds} />
+            <span className="bname2__label">Applications</span>
+            {saved.isSystem ? (
+              /* Stated, not asked. The system policy decides the sign-ins no
+                 other policy matches, on every application; choosing one here
+                 drew that app's logo beside "Every application" in the board. */
+              <div className="bname2__fixed">
+                <strong>Every application</strong>
+                <TipDot label="About the system policy" text="The system policy covers every application. It decides sign-ins no other policy matches." />
+              </div>
+            ) : (
+              <ApplicationField appIds={appIds} onChange={setAppIds} />
+            )}
+            {/* "Stops deciding sign-ins" only where it was deciding them, as in
+                Review & save: an inactive policy decides nothing already. */}
+            {becomesDraft && dirty && (
+              <p className="bpd__note">
+                {evaluates(saved)
+                  ? 'With no applications this policy becomes a draft and stops deciding sign-ins.'
+                  : 'With no applications this policy becomes a draft.'}
+                {diff?.takesSavedDraft && ' Its saved draft replaces the published rules.'}
+              </p>
+            )}
           </div>
         </div>
       </section>
 
-      <div className="bbar">
-        <p className="bbar__note">
-          {!name.trim()
-            ? 'A policy needs a name.'
-            : noApp
-              ? 'Choose the application this policy protects.'
-              : dirty
-                ? `About ${reach(audience, store.groups, store.users).toLocaleString()} people will be governed by this policy.`
-                : 'Nothing changed.'}
-        </p>
-        <div className="bbar__acts">
-          <Button variant="ghost" icon={ArrowLeft} onClick={back}>
-            Back to the rules
-          </Button>
-          <Button
-            variant="brand"
-            disabled={!name.trim() || noApp || !dirty}
-            onClick={() => {
-              /* Saved straight through rather than staged into the builder's
-                 undo stack. These are policy facts, not rule edits, and mixing
-                 them into the same history would make ⌘Z on the rules screen
-                 quietly rename the policy. */
-              store.savePolicy({ ...saved, name: name.trim(), appIds, audience })
-              store.showToast(`${name.trim()} updated`)
-              store.go({ name: from, policyId })
-            }}
-          >
-            Save details
-          </Button>
-        </div>
-      </div>
+      {/* Saved straight through rather than staged into the builder's undo
+          stack. These are policy facts, not rule edits, and mixing them into
+          the same history would make ⌘Z on the rules screen quietly rename the
+          policy. */}
+      <SaveBar
+        open={dirty}
+        changes={diff?.changes ?? []}
+        onSave={() => {
+          if (save()) setClosing(true)
+        }}
+        blocked={!!blocked}
+        blockedReason={blocked ?? undefined}
+        review={diff?.rows}
+      />
     </div>
   )
 }

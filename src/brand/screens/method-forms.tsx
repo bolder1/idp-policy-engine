@@ -3,7 +3,7 @@ import { Eye, EyeOff, Plus, X } from 'lucide-react'
 
 import { NumberStepper, TipDot } from '../kit'
 import { Picker } from '../picker'
-import type { ConfigField } from '../method-config'
+import { fieldIssue, type ConfigField } from '../method-config'
 
 /* -----------------------------------------------------------------------------
    The configuration form.
@@ -45,7 +45,10 @@ export function ConfigFields({
 function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, value: unknown) => void }) {
   const uid = useId()
   const [reveal, setReveal] = useState(false)
-  const missing = (f.kind === 'text' || f.kind === 'secret') && !!f.required && f.value.trim() === ''
+  const missing = (f.kind === 'text' || f.kind === 'secret') && !!f.required && !(f.kind === 'secret' && f.stored) && f.value.trim() === ''
+  /* A filled-in value that cannot work, said under the field as it is typed. */
+  const issue = fieldIssue(f)
+  const describedBy = [f.help ? `${uid}-help` : '', issue ? `${uid}-err` : ''].filter(Boolean).join(' ') || undefined
 
   return (
     <div className={`bmc__field is-${f.kind} ${missing ? 'is-missing' : ''}`}>
@@ -91,8 +94,8 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
             type="text"
             value={f.value}
             placeholder={f.placeholder}
-            aria-invalid={missing}
-            aria-describedby={f.help ? `${uid}-help` : undefined}
+            aria-invalid={missing || !!issue}
+            aria-describedby={describedBy}
             onChange={(e) => onChange(f.id, e.target.value)}
           />
         )}
@@ -126,7 +129,8 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
           <Picker
             label={f.label}
             width="fill"
-            value={f.value}
+            value={f.value || null}
+            placeholder={f.placeholder}
             options={f.options.map((o) => ({ value: o, label: o }))}
             onChange={(v) => onChange(f.id, v)}
           />
@@ -195,6 +199,11 @@ function FieldRow({ f, onChange }: { f: ConfigField; onChange: (id: string, valu
 
         {f.kind === 'list' && <ListField f={f} onChange={onChange} />}
       </div>
+      {issue && (
+        <p id={`${uid}-err`} className="bmc__error">
+          {issue}
+        </p>
+      )}
     </div>
   )
 }

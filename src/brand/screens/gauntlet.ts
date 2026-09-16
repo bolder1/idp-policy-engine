@@ -1,5 +1,19 @@
-import { blankRule, card, cond, when, type AccessDecision, type Condition, type Policy, type Rule, type ZoneScope } from '../data'
-import { ckey, isSingleAndRun, sig } from '../predicate'
+import {
+  anySignIn,
+  blankRule,
+  card,
+  cond,
+  when,
+  type AccessDecision,
+  type Condition,
+  type Policy,
+  type Predicate,
+  type Rule,
+  type RuleWho,
+  type ZoneScope,
+} from '../data'
+import { ckey, isSingleAndRun } from '../predicate'
+import { hasWho, normaliseWho, ruleSig, whoContains, whoPasses, withWho } from '../rule-who'
 import { SIM_USERS, decide, inAudience, walk, type SimEnv, type SimUser, type TraceResult } from './simulate'
 
 /* -----------------------------------------------------------------------------
@@ -90,6 +104,9 @@ export interface Challenge {
      makes the card hostile, which is the thing worth writing a rule about. */
   fix?: {
     name: string
+    /* Who the fixing rule is for, when the card's argument is about the person
+       rather than the sign-in. Absent means everyone the policy governs. */
+    who?: RuleWho
     conditions: SpecCondition[]
     why: string
   }
@@ -175,11 +192,11 @@ export const DECK: Challenge[] = [
     why: 'Odd hours alone are weak evidence — plenty of people work late. Verify, do not accuse.',
     fix: {
       name: 'Verify contractors',
-      /* `user-type` is gone; `group` is the only survivor that says who somebody
-         is. It is a WHO rather than a WHEN, and it is offered here anyway
-         because the card's argument is precisely that the rule should be about
-         who they are rather than the hour. */
-      conditions: [{ typeId: 'group', operator: 'in', values: ['contractors'] }],
+      /* A who, not a condition: the card's argument is precisely that the rule
+         should be about who they are rather than the hour. So it has no
+         conditions at all. */
+      who: { groupIds: ['contractors'], userIds: [] },
+      conditions: [],
       why: 'Written against who they are rather than the hour, because the hour is weak evidence and group membership is not.',
     },
   },
@@ -459,7 +476,13 @@ export interface ProposedFix {
 const specConds = (conditions: SpecCondition[]): Condition[] =>
   conditions.map((c) => cond(c.typeId, c.operator, [...c.values], c.scope))
 
-const specKey = (conditions: SpecCondition[]) => sig(when(card(...specConds(conditions))))
+/* One card, or no card at all. `card()` refuses an empty list, and a spec with
+   only a who has no conditions — so its WHEN is the always-true predicate, and
+   the who is what narrows it. */
+const specWhen = (conditions: SpecCondition[]): Predicate =>
+  conditions.length === 0 ? anySignIn() : when(card(...specConds(conditions)))
+
+const specKey = (spec: NonNullable<Challenge['fix']>) => ruleSig({ who: spec.who, when: specWhen(spec.conditions) })
 
 export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
   const spec = round.challenge.fix
@@ -483,32 +506,38 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
      So a rule counts as a twin when it shares the predicate and its audience
      covers the person on the card. Re-aiming it is then the minimal edit that
      closes the card, and the placement text says whose treatment changed. */
-  /* The audience half of the twin test is gone: every rule in a policy covers
-     the same people now, so "and its audience covers the person on the card" is
-     a question about the POLICY, asked once by the deck filter before any card
-     is scored.
+  /* The twin is found by who AND predicate, preferring an exact match.
 
-     What replaced it is SUPERSET matching, and that is not a convenience — it
-     is required for correctness. A rule that used to be `appliesTo: ['finance']`
-     plus one condition is now ONE card holding a group condition AND that
-     condition, so an exact predicate match no longer finds it. Falling through
-     to `insert` then puts the fix's broader predicate directly above the
-     narrower rule and makes it permanently unreachable, which the linter
-     correctly refuses to publish — a one-click fix that breaks the policy it
-     was offered on.
+     Rules in a policy do not all cover the same people — a rule has a `who`
+     — so an exact match is the same who and the same WHEN (`ruleSig`).
 
-     So: the twin is the earliest single-card rule whose conditions CONTAIN the
-     spec's, preferring an exact match. Only single-card rules qualify, because
-     a rule with alternatives is not made unreachable by a broader rule above it
-     in the same way and re-aiming it would change more than the card asks. */
+     Past that, SUPERSET matching, and that is not a convenience — it is
+     required for correctness. A narrower rule saying the same thing (the
+     spec's conditions and more, for the spec's people or fewer) would be made
+     permanently unreachable by inserting the fix's broader rule above it,
+     which the linter correctly refuses to publish — a one-click fix that
+     breaks the policy it was offered on.
+
+     So: the twin is the earliest rule whose who the spec's who contains, which
+     still covers the person on the card, and whose single AND-run CONTAINS the
+     spec's conditions. Only single-card rules qualify, because a rule with
+     alternatives is not made unreachable by a broader rule above it in the
+     same way and re-aiming it would change more than the card asks.
+
+     A spec with no conditions is the trap: "contains every one of nothing" is
+     true of any rule, and the first unrelated rule in the policy would be
+     re-aimed. Its twin must have no conditions either. */
   const want = new Set(specConds(spec.conditions).map(ckey))
-  /* And an AND-run specifically: a single card whose conditions are joined by
-     OR covers none of them jointly, so re-aiming it would not do what the fix
-     spec asks. */
-  const covers = (r: Rule) =>
-    isSingleAndRun(r.when) &&
-    [...want].every((k) => r.when.cards[0].conditions.some((c) => ckey(c) === k))
-  const exact = policy.rules.findIndex((r) => sig(r.when) === specKey(spec.conditions))
+  const covers = (r: Rule) => {
+    if (!whoContains(spec.who, r.who) || !whoPasses(r.who, round.user)) return false
+    if (want.size === 0) return hasWho(spec.who) && r.when.cards.length === 0
+    /* And an AND-run specifically: a single card whose conditions are joined
+       by OR covers none of them jointly, so re-aiming it would not do what the
+       fix spec asks. */
+    return isSingleAndRun(r.when) && [...want].every((k) => r.when.cards[0].conditions.some((c) => ckey(c) === k))
+  }
+  const key = specKey(spec)
+  const exact = policy.rules.findIndex((r) => ruleSig(r) === key)
   const twinIndex = exact !== -1 ? exact : policy.rules.findIndex(covers)
 
   if (twinIndex !== -1) {
@@ -535,14 +564,17 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
     }
   }
 
-  const rule: Rule = {
-    ...blankRule(spec.name),
-    /* One card: a fix spec is a set of conditions that must all hold. The
-       hardcoded `appliesTo: ['all']` that used to sit here is gone — a rule
-       cannot be broader than its policy, so there is nothing to widen it to. */
-    when: when(card(...specConds(spec.conditions))),
-    decision: round.want,
-  }
+  const rule: Rule = withWho(
+    {
+      ...blankRule(spec.name),
+      /* One card: a fix spec is a set of conditions that must all hold — or no
+         card, when the spec is only about who. A rule cannot be broader than its
+         policy, so there is nothing to widen it to. */
+      when: specWhen(spec.conditions),
+      decision: round.want,
+    },
+    normaliseWho(spec.who),
+  )
 
   return {
     kind: 'insert',

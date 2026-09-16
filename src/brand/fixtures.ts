@@ -3,6 +3,7 @@ import {
   apps as seedApps,
   groups as seedGroups,
   reidRule,
+  scenarios as seedScenarios,
   users as seedUsers,
   methodSets as seedMethodSets,
   policies as seedPolicies,
@@ -11,14 +12,18 @@ import {
   type Group,
   type MethodSet,
   type Policy,
+  type Rule,
+  type Scenario,
   type User,
   type Zone,
 } from './data'
 import { seedProfiles, type FingerprintProfile } from './fingerprint'
+import { type HardwareToken } from './hardware-tokens'
 import { seedHooks, type Hook } from './hooks'
 import { AUTH_METHODS, type AuthMethod } from './methods'
 import { type RiskProfile } from './risk-signals'
 import { leaves } from './predicate'
+import { withWho } from './rule-who'
 
 /* -----------------------------------------------------------------------------
    How much is in the tenant — derived from who is looking.
@@ -85,6 +90,8 @@ const HEADCOUNT: Record<Depth, number> = { none: 0, small: 1, medium: 1, large: 
 
 export function groupsAt(depth: Depth): Group[] {
   const f = HEADCOUNT[depth]
+  // A tenant on its first morning has no directory yet, so no groups.
+  if (depth === 'none') return []
   if (depth === 'small') {
     // A 50–500 tenant does not have six segments. It has everyone, plus the two
     // distinctions it actually makes decisions about.
@@ -113,6 +120,8 @@ export function usersAt(depth: Depth): { people: User[]; unlisted: number } {
 }
 
 export function appsAt(depth: Depth): App[] {
+  // A tenant on its first morning has connected nothing.
+  if (depth === 'none') return []
   // Small tenants connect a handful of apps; the catalogue is not the tenant.
   if (depth === 'small') return seedApps.slice(0, 4)
   return seedApps
@@ -137,10 +146,8 @@ function clonePolicy(src: Policy, i: number, dept: string, scale: number): Polic
     ...src,
     id: `syn-${i}-${src.id}`,
     name: `${dept} — ${short}`,
-    /* A realistic mix, monitor included: at this size something is always
-       mid-rollout, and an estate where everything is either on or off does not
-       look like anywhere real. */
-    status: roll > 0.82 ? 'inactive' : roll > 0.72 ? 'monitor' : 'active',
+    /* A realistic mix: at this size something is always switched off. */
+    status: roll > 0.82 ? 'inactive' : 'active',
     isSystem: false,
     lastModified: `${1 + Math.floor(r() * 40)} days ago`,
     modifiedBy: ['Mehak Garg', 'Jaspreet T.', 'Rohit K.', 'System'][Math.floor(r() * 4)],
@@ -154,7 +161,47 @@ function clonePolicy(src: Policy, i: number, dept: string, scale: number): Polic
   }
 }
 
+/* Unfinished means draft: a policy with no applications cannot be live.
+
+   Applied to every depth, so no fixture can hand the list an Active policy that
+   protects nothing. A saved draft on such a policy becomes its rules, the same
+   way `asStored` in policy-draft.ts folds one. */
+export function settled(p: Policy): Policy {
+  if (p.isSystem || p.appIds.length > 0 || (p.status === 'draft' && !p.pendingDraft)) return p
+  const { pendingDraft, ...rest } = p
+  return pendingDraft
+    ? { ...rest, status: 'draft', rules: pendingDraft.rules, fallback: pendingDraft.fallback }
+    : { ...rest, status: 'draft' }
+}
+
+/* The small tenant's stand-ins for apps it does not have. Payroll runs on
+   Workday there, so the Payroll policy stays live instead of losing its app. */
+const SMALL_APP_SWAP: Record<string, string> = { payroll: 'workday' }
+
+/* A rule's who, cut down to the people and groups this tenant lists.
+
+   A rule that named only people the tenant lacks is dropped rather than kept
+   with an empty who, because an empty who means everyone: "CFO anywhere,
+   hardened" must not widen to the whole company. */
+function whoWithin(r: Rule, people: Set<string>, groups: Set<string>): Rule | null {
+  if (!r.who) return r
+  const keep = (ids: string[] | undefined, known: Set<string>) => (ids ?? []).filter((id) => known.has(id))
+  const next = {
+    groupIds: keep(r.who.groupIds, groups),
+    userIds: keep(r.who.userIds, people),
+    exceptGroupIds: keep(r.who.exceptGroupIds, groups),
+    exceptUserIds: keep(r.who.exceptUserIds, people),
+  }
+  const named = r.who.groupIds.length + r.who.userIds.length > 0
+  if (named && next.groupIds.length + next.userIds.length === 0) return null
+  return withWho(r, next)
+}
+
 export function policiesAt(depth: Depth): Policy[] {
+  return rawPoliciesAt(depth).map(settled)
+}
+
+function rawPoliciesAt(depth: Depth): Policy[] {
   const system = seedPolicies.filter((p) => p.isSystem)
 
   /* Day one keeps the system catch-all, because a real tenant always has one and
@@ -175,6 +222,9 @@ export function policiesAt(depth: Depth): Policy[] {
        than invented, so a Delegator's tenant is a subset of the estate the rest
        of the console is reasoned about with. */
     const keep = ['uc3-country-allowlist', 's9-finance', 's5-baseline']
+    const owned = new Set(appsAt('small').map((a) => a.id))
+    const people = new Set(usersAt('small').people.map((u) => u.id))
+    const segments = new Set(groupsAt('small').map((g) => g.id))
     return [
       ...system,
       ...seedPolicies
@@ -182,15 +232,16 @@ export function policiesAt(depth: Depth): Policy[] {
         .map((p) => ({
           ...p,
           /* Narrowed to the apps this tenant actually has, rather than dropped
-             wholesale. A policy naming four applications in the full estate
-             keeps whichever of them a small tenant owns, and ends up unassigned
-             only if it owns none of them — which is the same answer the single
-             `appId` gave, arrived at per application instead of all-or-nothing. */
-          appIds: p.appIds.filter((id) => appsAt('small').some((a) => a.id === id)),
+             wholesale. A policy that owns none of them ends up with no apps,
+             and `settled` then makes it a draft: S5's baseline is exactly the
+             policy a small tenant started and never finished. */
+          appIds: [...new Set(p.appIds.map((id) => SMALL_APP_SWAP[id] ?? id))].filter((id) => owned.has(id)),
           rules: p.rules
             // A Delegator does not write four-rule policies. They take the
             // first two the template gave them and leave.
             .slice(0, 2)
+            .map((r) => whoWithin(r, people, segments))
+            .filter((r): r is Rule => r !== null)
             .map((r) => ({ ...reidRule(r), matchEstimate: Math.round(r.matchEstimate * 0.24) })),
         })),
     ]
@@ -274,7 +325,20 @@ export function hooksAt(depth: Depth): Hook[] {
   // A small tenant has no systems to call out to, and would not know to want
   // one. The Integrator's whole estate is the reason hooks exist.
   if (depth === 'none' || depth === 'small') return []
-  if (depth === 'medium') return seedHooks.slice(0, 1)
+  /* Derived, like `zonesAt('small')`: every hook the medium tenant's policies
+     call, plus the fraud lookup. A sliced list left live policies calling hooks
+     the library did not have. */
+  if (depth === 'medium') {
+    const named = new Set(
+      policiesAt('medium').flatMap((p) =>
+        [...p.rules, p.fallback].flatMap((r) =>
+          r ? leaves(r.when).filter((c) => c.typeId === 'webhook').flatMap((c) => c.values) : [],
+        ),
+      ),
+    )
+    named.add('hk-fraud')
+    return seedHooks.filter((h) => named.has(h.id))
+  }
   return seedHooks
 }
 
@@ -346,6 +410,15 @@ export function riskProfilesAt(depth: Depth): RiskProfile[] {
   return seedRiskProfiles
 }
 
+/* Templates the gallery offers.
+
+   A day-one tenant has only what Xecurify ships: nobody there has saved one
+   yet. Every other tenant also has the ones its own team wrote. */
+export function scenariosAt(depth: Depth): Scenario[] {
+  if (depth === 'none') return seedScenarios.filter((s) => s.provided)
+  return seedScenarios
+}
+
 export function methodSetsAt(depth: Depth): MethodSet[] {
   if (depth === 'none' || depth === 'small') return []
   return seedMethodSets
@@ -367,4 +440,48 @@ export function methodsAt(depth: Depth): AuthMethod[] {
   return AUTH_METHODS.map((m) =>
     m.enrolled === undefined ? m : { ...m, enrolled: Math.round(m.enrolled * f) },
   )
+}
+
+/* --- Display tokens ----------------------------------------------------------
+
+   The fobs in the tenant's drawer, and who holds them. Every type appears, so
+   the inventory shows what each one looks like: a C100 that has been synced
+   (the only kind that ever is), a person holding two tokens, and fobs still
+   unassigned. Half assigned, because a drawer that is empty or fully issued
+   hides one of the two jobs the page exists for.
+
+   Hardware is not headcount. A 20,000-person estate does not issue fobs to
+   20,000 people — they go to the few who cannot use a phone — so `large` holds
+   the same drawer as `medium` rather than a multiplied one. */
+const seedTokens: HardwareToken[] = [
+  { serial: 'MO-DT-1001', type: 'miniorange', userId: 'priya', addedAt: '12 Aug 2026', assignedAt: '12 Aug 2026' },
+  { serial: 'MO-DT-1002', type: 'miniorange', userId: null, addedAt: '12 Aug 2026' },
+  { serial: 'MO-DT-1003', type: 'miniorange', userId: null, addedAt: '12 Aug 2026' },
+  {
+    serial: 'FT-C100-004512',
+    type: 'feitian-c100',
+    counter: 37,
+    userId: 'u-it-1',
+    addedAt: '18 Aug 2026',
+    assignedAt: '18 Aug 2026',
+    syncedAt: '2 Sep 2026',
+  },
+  { serial: 'FT-C100-004513', type: 'feitian-c100', counter: 0, userId: null, addedAt: '18 Aug 2026' },
+  { serial: 'FT-C200-118203', type: 'feitian-c200', userId: 'u-fin-2', addedAt: '25 Aug 2026', assignedAt: '26 Aug 2026' },
+  { serial: 'FT-C200-118204', type: 'feitian-c200', userId: null, addedAt: '25 Aug 2026' },
+  { serial: 'TOTP-2608-0091', type: 'totp', userId: 'priya', addedAt: '29 Aug 2026', assignedAt: '1 Sep 2026' },
+]
+
+export function tokensAt(depth: Depth): HardwareToken[] {
+  if (depth === 'none') return []
+  if (depth === 'small') {
+    /* Three fobs, one issued. Assignments are kept only for people the small
+       directory lists, so the fixture cannot name a holder the tenant lacks —
+       the same dangling-reference trap `zonesAt('small')` is derived to avoid. */
+    const listed = new Set(usersAt('small').people.map((u) => u.id))
+    return seedTokens
+      .filter((t) => ['MO-DT-1001', 'MO-DT-1003', 'FT-C200-118204'].includes(t.serial))
+      .map((t) => (t.userId && !listed.has(t.userId) ? { ...t, userId: null, assignedAt: undefined } : t))
+  }
+  return seedTokens
 }

@@ -15,12 +15,10 @@ import {
 /* -----------------------------------------------------------------------------
    The Impact arena — the "what does this change" function, made visible.
 
-   `impactOf()` in diagnostics.ts answers per-rule impact from `matchEstimate`,
-   which is seed data and honestly labelled as an estimate. That is the right
-   answer for a number sitting next to a rule while you edit it. It is the wrong
-   answer for the question this screen asks — *what does publishing this change
-   do* — because you cannot subtract two estimates and present the difference as
-   a consequence.
+   A rule's `matchEstimate` is seed data, honestly labelled as an estimate. That
+   is the wrong answer for the question this screen asks — *what does publishing
+   this change do* — because you cannot subtract two estimates and present the
+   difference as a consequence.
 
    So this module does not estimate anything. It enumerates the situation space
    the simulator can actually model — every combination of person, origin,
@@ -283,7 +281,7 @@ export function badges(
     label: 'Actually in force',
     claim: 'An application is attached, so the rules are evaluated at all.',
     earned: policy.appIds.length > 0 || policy.isSystem === true,
-    detail: 'No application chosen — these rules are saved but never evaluated.',
+    detail: 'No applications, so these rules never run.',
   })
 
   if (movement) {

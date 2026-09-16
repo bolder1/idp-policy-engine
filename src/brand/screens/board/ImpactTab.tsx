@@ -7,7 +7,7 @@ import type { AccessDecision, Policy } from '../../data'
 import type { Diagnostic } from '../diagnostics'
 import { LANES, SITUATIONS, badges, compare, sweep, type Lane, type Situation } from '../impact-arena'
 import { SIM_USERS, PLACES, walk, type SimContext, type SimEnv } from '../simulate'
-import { CLOCKS, DECISION_SHORT, TONE, ruleAt, shortAuth, shortDevice, shortPlace, type Selection } from './model'
+import { CLOCKS, DECISION_SHORT, TONE, ruleAt, shortAuth, shortDevice, shortPlace, uncapitalise, type Selection } from './model'
 import { Section, Seg } from './Section'
 
 /* -----------------------------------------------------------------------------
@@ -291,7 +291,7 @@ export function ImpactTab({
                 <p style={{ margin: 0 }}>No rule matched — the default at the bottom decided.</p>
               ) : (
                 <p style={{ margin: 0 }}>
-                  Rule {pickedWalk.hitIndex + 1}, <b>{draft.rules[pickedWalk.hitIndex].name}</b> — {pickedWalk.steps[pickedWalk.hitIndex].reason.toLowerCase()}.
+                  Rule {pickedWalk.hitIndex + 1}, <b>{draft.rules[pickedWalk.hitIndex].name}</b> — {uncapitalise(pickedWalk.steps[pickedWalk.hitIndex].reason)}.
                 </p>
               )}
               {before && before.winners[picked!] !== after.winners[picked!] && (

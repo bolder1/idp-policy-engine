@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { AlertTriangle, Check, LogIn } from 'lucide-react'
+import { Asterisk, ListX, LogIn } from 'lucide-react'
 
-import { Button, DecisionChip, Modal } from '../kit'
-import { type Policy } from '../data'
+import { Badge, Button, DecisionChip, Modal } from '../kit'
+import { FALLBACK_NAME, fallbackRule, type AccessDecision, type Policy, type Rule } from '../data'
+import { EmptyState } from '../empty'
 import { shadowedBy, type Diagnostic } from './diagnostics'
-import { predicateSentence, type NameLookup } from './predicate-prose'
+import { predicateSentence, ruleLabel, whoSentence, type NameLookup } from './predicate-prose'
 
 /* -----------------------------------------------------------------------------
    Reading the policy.
@@ -29,11 +30,28 @@ import { predicateSentence, type NameLookup } from './predicate-prose'
 /* One renderer, shared with every other surface that prints a rule. This used
    to be a fifth private implementation of "condition, joiner, condition" — and
    like the others it flattened the joiners, so it printed the wrong predicate
-   for any rule that mixed them. */
-function predicate(policy: Policy, index: number, resolve: NameLookup): string {
-  const p = policy.rules[index].when
-  return p.cards.length === 0 ? 'everyone who reaches it' : predicateSentence(p, resolve)
+   for any rule that mixed them.
+
+   Who comes first and on its own, never inside the predicate, in the words
+   `ruleIfLine` and the review's WHO / IF lines use: "For Finance, if in zone
+   Office" · "For Finance, any sign-in" · "If in zone Office". */
+function RuleLine({ rule, resolve }: { rule: Rule; resolve: NameLookup }) {
+  const named = whoSentence(rule.who, resolve)
+  /* Mid-sentence: "For everyone except Contractors", not "For Everyone …". */
+  const who = named?.startsWith('Everyone') ? `everyone${named.slice('Everyone'.length)}` : named
+  const p = rule.when
+  const iff = p.cards.length === 0 ? null : predicateSentence(p, resolve)
+  if (!who) {
+    return <p>{iff ? <>If <em>{iff}</em></> : <em>Any sign-in that reaches this rule</em>}</p>
+  }
+  return (
+    <p>
+      For <em>{who}</em>, {iff ? <>if <em>{iff}</em></> : 'any sign-in'}
+    </p>
+  )
 }
+
+const tone = (d: AccessDecision) => (d === 'deny' ? 'deny' : d === '2fa' ? 'mfa' : 'allow')
 
 export function PolicyOverview({
   open,
@@ -51,6 +69,7 @@ export function PolicyOverview({
   onJump: (index: number) => void
 }) {
   const [hover, setHover] = useState<number | null>(null)
+  const fallback = policy.fallback ?? fallbackRule()
   const shadowed = hover === null ? [] : shadowedBy(policy, hover)
 
   /* Every rule that is out of reach from ANY rule above it, not just the one
@@ -89,15 +108,14 @@ export function PolicyOverview({
         </article>
 
         {policy.rules.length === 0 && (
-          <p className="bov__empty">
-            No rules. Every sign-in falls straight through to the engine default.
-          </p>
+          <EmptyState compact icon={ListX} title="No rules yet" blurb="Every sign-in gets the default outcome." />
         )}
 
+        {policy.rules.length > 0 && (
         <ol className="bov__list">
           {policy.rules.map((r, i) => {
             const mine = diagnostics.filter((d) => d.ruleIndex === i)
-            const errors = mine.filter((d) => d.severity === 'error')
+            const hasErrors = mine.some((d) => d.severity === 'error')
             return (
               <li key={r.id}>
                 <button
@@ -109,25 +127,21 @@ export function PolicyOverview({
                   onBlur={() => setHover(null)}
                   onClick={() => onJump(i)}
                 >
-                  <span className={`bov__n is-${r.decision === 'deny' ? 'deny' : r.decision === '2fa' ? 'mfa' : 'allow'}`}>
+                  <span className={`bov__n is-${tone(r.decision)}`}>
                     {i + 1}
                   </span>
                   <div>
                     <span className="bov__eyebrow">
-                      Rule {i + 1}
-                      {!r.enabled && <b className="bov__tag">off</b>}
-                      {dead.has(i) && <b className="bov__tag is-dead">never runs</b>}
-                      {errors.length > 0 && (
-                        <b className="bov__tag is-error">
-                          <AlertTriangle size={10} strokeWidth={2.4} aria-hidden />
-                          {errors.length}
-                        </b>
+                      Rule
+                      {!r.enabled && <Badge tone="neutral">Off</Badge>}
+                      {dead.has(i) ? (
+                        <Badge tone="negative">Never runs</Badge>
+                      ) : (
+                        hasErrors && <Badge tone="negative">Needs fixing</Badge>
                       )}
                     </span>
-                    <h3>{r.name}</h3>
-                    <p>
-                      When <em>{predicate(policy, i, resolve)}</em>
-                    </p>
+                    <h3>{ruleLabel(r)}</h3>
+                    <RuleLine rule={r} resolve={resolve} />
                   </div>
                   <DecisionChip decision={r.decision} size="sm" />
                 </button>
@@ -135,16 +149,22 @@ export function PolicyOverview({
             )
           })}
         </ol>
+        )}
 
+        {/* The policy's own last rule, drawn like the rows above. It used to
+            say one factor whatever the fallback did. */}
         <article className="bov__step is-fallback">
-          <span className="bov__n is-allow" aria-hidden>
-            <Check size={14} strokeWidth={2.2} />
+          <span className={`bov__n is-${tone(fallback.decision)}`} aria-hidden>
+            <Asterisk size={14} strokeWidth={2} />
           </span>
           <div>
             <span className="bov__eyebrow">Otherwise</span>
-            <h3>Everyone else signs in on one factor</h3>
-            <p>The engine default. It cannot be removed or reordered.</p>
+            <h3>{FALLBACK_NAME}</h3>
+            <p>
+              If <em>no rule above matched</em>
+            </p>
           </div>
+          <DecisionChip decision={fallback.decision} size="sm" />
         </article>
       </div>
     </Modal>

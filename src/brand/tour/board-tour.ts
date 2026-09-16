@@ -1,5 +1,6 @@
 import { cond, type Policy, type Rule } from '../data'
-import { restConditions, setWho, whoIds } from '../audience-ops'
+import { leafCount } from '../predicate'
+import { hasWho, setWhoIds } from '../rule-who'
 import { addCondition } from '../when-ops'
 
 /* -----------------------------------------------------------------------------
@@ -91,10 +92,10 @@ export interface BoardStop {
 
 /* The group the demo narrows to, and the condition it writes.
 
-   Real ids from the fixture, not invented ones: `setWho` writes
-   `group in ['finance']` and the evaluator, the linter, the gauntlet and the
-   sweep all read it, so the rule this tour builds is a rule the rest of the
-   product can reason about. A demo that writes data only the demo understands
+   Real ids from the fixture, not invented ones: `setWhoIds` writes
+   `who: { groupIds: ['finance'] }` and the evaluator, the linter, the gauntlet
+   and the sweep all read it, so the rule this tour builds is a rule the rest of
+   the product can reason about. A demo that writes data only the demo understands
    is a demo about a different product. */
 export const DEMO_GROUP = 'finance'
 export const DEMO_CONDITION = { typeId: 'device-risk', operator: 'above', value: '70' }
@@ -125,7 +126,7 @@ export const BOARD_STOPS: BoardStop[] = [
     task: {
       ask: 'Pick a group in the Who section.',
       didIt: 'Narrowed — everyone outside that group now skips this rule entirely.',
-      done: ({ rule }) => !!rule && (whoIds(rule.when, 'group').length > 0 || whoIds(rule.when, 'user').length > 0),
+      done: ({ rule }) => !!rule && hasWho(rule.who),
       doLabel: 'Pick Finance for me',
     },
   },
@@ -137,7 +138,7 @@ export const BOARD_STOPS: BoardStop[] = [
     task: {
       ask: 'Add a condition.',
       didIt: 'Added — the rule now fires only when that is true of the attempt.',
-      done: ({ rule }) => !!rule && restConditions(rule.when).length > 0,
+      done: ({ rule }) => !!rule && leafCount(rule.when) > 0,
       doLabel: 'Add risk above 70',
     },
   },
@@ -200,14 +201,15 @@ export const BOARD_STOPS: BoardStop[] = [
    component owns those because they are board state rather than rule state.
    -------------------------------------------------------------------------- */
 
+/* The rule's who, and nothing else. The If cards are not touched. */
 export function whoPatch(rule: Rule): Partial<Rule> {
-  return { when: setWho(rule.when, 'group', [DEMO_GROUP]) }
+  return { who: setWhoIds(rule, 'groupIds', [DEMO_GROUP]).who }
 }
 
 export function conditionPatch(rule: Rule): Partial<Rule> {
-  /* Into the run that is already there, or the first one — the same choice
-     `setWho` makes, for the same reason: a second branch would turn the rule
-     into an OR of alternatives and quietly widen it. */
+  /* Into the run that is already there, or a new one when there is none: a
+     second branch would turn the rule into an OR of alternatives and quietly
+     widen it. */
   const target = rule.when.cards[0]?.id
   return {
     when: addCondition(

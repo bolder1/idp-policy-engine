@@ -75,9 +75,10 @@
 .cp__seg.is-val { flex: 1; min-width: 0; }
 .cp__seg.is-val .cp__seg__text { font-weight: var(--fw-medium); color: var(--accent); }
 /* A condition with no value never matches, which the linter also reports — this
-   is the same fact said where the value would be. */
+   is the same fact said where the value would be. A solid tinted edge: no
+   dashed placeholder borders anywhere. */
 .cp__seg.is-val.is-unset .cp__seg__text { color: var(--fb-negative-fg); font-style: italic; }
-.cp__pill:has(.is-unset) { border-style: dashed; border-color: var(--fb-negative-border); }
+.cp__pill:has(.is-unset) { border-color: var(--fb-negative-border); }
 
 /* Which half of a zone, when it is narrower than the zone as written. */
 /* The shared pill geometry - see the --pill-* block in console-theme.css. */
@@ -169,7 +170,7 @@
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: var(--fw-medium);
   color: var(--text-secondary);
   white-space: nowrap;
@@ -290,10 +291,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cp__text em { font-style: normal; font-size: 11px; color: var(--text-tertiary); }
-.cp__text small { font-size: 10px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp__text em { font-style: normal; font-size: 12px; color: var(--text-tertiary); }
+.cp__text small { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.cp__none { margin: 0; padding: var(--space-4); text-align: center; font-size: var(--fs-xs); color: var(--text-tertiary); }
+/* `.cp__none` stood here: a bare "Nothing matches" line. A search with no match
+   is the kit's NoMatches block now. */
+.cp__list > .bempty { padding: var(--space-4) var(--space-3); }
 
 /* The three values that are one control already. */
 .cp__body--inline { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); }
@@ -325,20 +328,23 @@
   padding: 6px var(--space-3);
   border-top: 1px solid var(--border-subtle);
 }
-.cp__count { margin-right: auto; font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+/* `.cp__count` — "3 of 24" under a searched list — is gone: the rows are the
+   count. The footer link and hint push themselves right. */
+.cp__manage,
+.cp__hint { margin-left: auto; }
 .cp__manage {
   border: 0;
   background: none;
   padding: 0;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: var(--fw-medium);
   color: var(--accent);
   cursor: pointer;
 }
 .cp__manage:hover { text-decoration: underline; }
 .cp__manage:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: 2px; }
-.cp__hint { font-size: 11px; color: var(--text-tertiary); }
+.cp__hint { font-size: 12px; color: var(--text-tertiary); }
 
 /* --- The catalogue, inline ------------------------------------------------------
 
@@ -392,7 +398,7 @@
   font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
 }
 .cp__catsoon {
-  flex: none; font-style: normal; font-size: 10px; font-weight: var(--fw-medium);
+  flex: none; font-style: normal; font-size: 12px; font-weight: var(--fw-medium);
   line-height: 1; padding: 3px 6px; border-radius: var(--radius-full);
   background: var(--fb-neutral-bg); color: var(--fb-neutral-fg);
 }
@@ -505,7 +511,6 @@
 .cp__stackrow > .cp__fld.is-op .cp__fldtext { overflow: visible; }
 .cp__stackrow > .cp__fld.is-val { flex: 1 1 44%; min-width: 0; }
 .cp__stackrow > .cp__inline { flex: 1 1 44%; min-width: 0; padding: 0 var(--space-5); }
-.cp__stackrow > .cp__stacklabel { flex: 1 1 34%; min-width: 0; padding: 0 var(--space-5); }
 
 /* A segment, not a field. No border, no radius, no ground of its own — the
    frame supplies all three. The hairline between segments is the only mark
@@ -555,11 +560,6 @@
 .cp__stack:hover .cp__del,
 .cp__stack:focus-within .cp__del { opacity: 1; }
 .cp__del:focus-visible { opacity: 1; }
-.cp__stacklabel {
-  flex: 1; min-width: 0;
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
-}
 .cp__del {
   display: grid; place-items: center; width: 28px; height: 28px; flex: none;
   border: 0; border-radius: var(--radius-sm); background: none;
@@ -608,7 +608,7 @@
 .cp__fld.is-what .cp__fldtext { font-weight: var(--fw-medium); }
 .cp__fld.is-op { color: var(--text-secondary); background: var(--surface-sunken); }
 .cp__fld.is-val .cp__fldtext { font-weight: var(--fw-medium); color: var(--accent); }
-.cp__fld.is-val.is-unset { border-color: var(--fb-negative-border); border-style: dashed; }
+.cp__fld.is-val.is-unset { border-color: var(--fb-negative-border); }
 .cp__fld.is-val.is-unset .cp__fldtext { color: var(--fb-negative-fg); font-style: italic; font-weight: var(--fw-regular); }
 
 /* --- The value, as chips ------------------------------------------------------
@@ -654,8 +654,8 @@
 /* `text-overflow` does not reach an anonymous flex item, so the name needs a box
    of its own to be clipped in — the same trap the kit's badge documents. */
 .cp__vchip > span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* The counter is not a value, and dashed already means "not a value" here. */
-.cp__vchip.is-more { background: none; border-style: dashed; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+/* The counter is not a value: no fill, quieter text, the same solid edge. */
+.cp__vchip.is-more { background: none; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 
 /* A typed value — a window, a threshold — in the row where a chosen one would
    have been. */
@@ -710,21 +710,16 @@
 .bb__insp .cp__fld.is-open { border-color: var(--border-strong); box-shadow: 0 0 0 3px var(--surface-inset, var(--surface-sunken)); }
 .bb__insp .cp__fld:focus-visible { border-color: var(--border-strong); box-shadow: 0 0 0 2px var(--focus-ring); }
 .bb__insp .cp__fldinput:focus-visible { border-color: var(--border-strong); box-shadow: 0 0 0 2px var(--focus-ring); }
-/* Nothing chosen, said with a dash and a weight rather than with red.
-
-   The dash is the strongest non-hue mark available here — one dashed edge in a
-   column of solid ones is unmissable, and it survives greyscale and a colour
-   deficiency, which a 1px #f5c6ce does not. The text goes QUIETER rather than
-   louder, which is also the more truthful reading: an unanswered field is an
-   absence, and this stylesheet already says exactly that about the select whose
-   value is the tenant default. The linter states the consequence in words. */
+/* Nothing chosen, said with a stronger edge and a quieter, italic value rather
+   than with red or a dashed border. An unanswered field is an absence, and this
+   stylesheet already says exactly that about the select whose value is the
+   tenant default. The linter states the consequence in words. */
 .bb__insp .cp__fld.is-val.is-unset { border-color: var(--border-strong); }
 .bb__insp .cp__fld.is-val.is-unset .cp__fldtext { color: var(--text-tertiary); }
 .bb__insp .cp__del:hover { background: var(--surface-inset, var(--surface-sunken)); color: var(--text-primary); }
 /* The zone-half capsule already says `network` or `map` in words, and it only
    exists when the condition is narrowed — its presence is the signal. */
 .bb__insp .cp__scopetag { background: var(--surface-inset, var(--surface-sunken)); color: var(--text-secondary); }
-
 
 /* The value's two halves: a name that may elide, and a count that may not.
 

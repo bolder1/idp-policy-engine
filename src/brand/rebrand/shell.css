@@ -57,7 +57,7 @@
 /* --- End-user top nav: line tabs, the chosen one in blue -------------------- */
 [data-brand='rebrand'] .bus__navitem { color: var(--text-tertiary); }
 [data-brand='rebrand'] .bus__navitem:hover { color: var(--text-primary); }
-[data-brand='rebrand'] .bus__navitem.is-on { color: var(--blue-strong); }
+[data-brand='rebrand'] .bus__navitem.is-on { color: var(--brand-text); }
 
 /* --- The launcher: a page one-liner, a field, grey tiles --------------------- */
 [data-brand='rebrand'] .buapps__head p {

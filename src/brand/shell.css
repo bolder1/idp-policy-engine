@@ -55,7 +55,7 @@
   background: var(--shell-raised);
   color: #fff;
   display: grid; place-items: center;
-  font-size: 11px; font-weight: var(--fw-semibold);
+  font-size: 12px; font-weight: var(--fw-semibold);
 }
 
 /* --- Rail ----------------------------------------------------------------- */
@@ -119,11 +119,9 @@
   border-radius: var(--radius-pill);
   background: var(--brand-on-fill);
   color: #fff;
-  font-size: var(--fs-xs);
+  font-size: 12px;
   font-weight: var(--fw-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  line-height: 15px;
+  line-height: 16px;
 }
 .bshell__chev {
   flex: none;
@@ -172,7 +170,7 @@
   flex: none; margin-left: auto;
   padding: 0 5px;
   border: 1px solid rgba(255, 255, 255, 0.22); border-radius: var(--radius-pill);
-  font-size: 9px; font-weight: var(--fw-semibold); letter-spacing: 0.04em;
+  font-size: 12px; font-weight: var(--fw-semibold); line-height: 16px; white-space: nowrap;
   color: rgba(255, 255, 255, 0.55);
 }
 
@@ -224,14 +222,8 @@
    on arrival — which showed as a block of dark, empty rows under one icon. */
 .bshell.is-collapsed .bshell__sub { display: none; }
 
-/* An icon with no label needs its own dot. Without it, the one row carrying a
-   badge — "Devices · New" — loses the only thing that made it worth noticing. */
-.bshell.is-collapsed .bshell__item:has(.bshell__badge)::after {
-  content: '';
-  position: absolute; top: 8px; right: 10px;
-  width: 6px; height: 6px; border-radius: var(--radius-full);
-  background: var(--brand);
-}
+/* No marker dot on the collapsed rail: dots are out of the console. The "New"
+   badge shows again when the rail opens, and the row's name says it. */
 
 /* A column, so a page can be told to take the height that is left rather
    than all of it. Screens that carry a version switcher put it in here
@@ -276,24 +268,16 @@
 /* The page's padding, the head's margin and the caption's type are stated once,
    in console-theme.css, which loads last. The copies here never applied. */
 .bpage { max-width: 1560px; }
-.bpage__crumb {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-5);
-  font-size: var(--fs-sm);
-  color: var(--text-tertiary);
-}
-.bpage__crumb button { color: var(--text-tertiary); }
-.bpage__crumb button:hover { color: var(--text-primary); }
 .bpage__headrow {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-8);
+  /* Wraps, so the Documentation link drops under the title before it squeezes
+     the caption. */
+  flex-wrap: wrap;
+  gap: var(--space-5) var(--space-8);
 }
 .bpage__headrow h1 { font-size: var(--fs-3xl); letter-spacing: -0.02em; }
-.bpage__actions { display: flex; align-items: center; gap: var(--space-4); flex: none; }
 
 /* --- Narrow --------------------------------------------------------------- */
 

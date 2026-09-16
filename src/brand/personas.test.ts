@@ -1,8 +1,23 @@
 import { describe, expect, it } from 'vitest'
 
 import { PERSONAS, TAB_LABEL, TAB_SCREEN, personaById, tabsFor, unmetNeeds, type TabId } from './personas'
-import { DEPTHS, appsAt, fingerprintsAt, groupsAt, hooksAt, methodSetsAt, policiesAt, zonesAt, type Depth } from './fixtures'
-import { enforces } from './data'
+import {
+  DEPTHS,
+  appsAt,
+  fingerprintsAt,
+  groupsAt,
+  hooksAt,
+  methodSetsAt,
+  policiesAt,
+  riskProfilesAt,
+  scenariosAt,
+  settled,
+  usersAt,
+  zonesAt,
+  type Depth,
+} from './fixtures'
+import { POLICY_STATUSES, enforces, policies as seedPolicies, type Policy } from './data'
+import { leaves } from './predicate'
 
 const DEPTH_ORDER: Depth[] = ['none', 'small', 'medium', 'large']
 
@@ -88,6 +103,11 @@ describe('persona coverage of the Policy tab', () => {
   it('records exactly the needs still unbuilt', () => {
     const open = unmetNeeds().map(({ persona, need }) => `${persona.id}: ${need.what}`)
     expect(open).toEqual([
+      'first-run: Be walked through the first policy',
+      'generalist: Find what is protected by nothing',
+      'generalist: Try a policy without risking a lockout',
+      'manager: Know what a policy lets through before shipping it',
+      'architect: Read the estate as a matrix',
       'architect: Export policies for version control and review',
       'architect: Be told when two live policies disagree about the same app and group',
       'architect: Order policies against each other, not just rules within one',
@@ -136,6 +156,10 @@ describe('the tenant loaded for each depth', () => {
        tenant authored" finally means nothing at all. `every` on an empty array
        is vacuously true, so this asserts the length instead. */
     expect(t.zones).toHaveLength(0)
+    // No apps connected and no directory yet.
+    expect(t.apps).toHaveLength(0)
+    expect(t.groups).toHaveLength(0)
+    expect(usersAt('none').people).toHaveLength(0)
   })
 
   /* The system catch-all survives at every depth. Removing it would misstate
@@ -211,5 +235,104 @@ describe('each persona lands in a tenant that shows their problem', () => {
 
   it('gives the new admin nothing at all to read', () => {
     expect(tenantAt(personaById('first-run').depth).policies.filter((p) => !p.isSystem)).toHaveLength(0)
+  })
+})
+
+/* -----------------------------------------------------------------------------
+   The loaded tenant has to be one the product could have produced.
+
+   Two owner rules make that checkable: Monitor is gone, so the only statuses are
+   Draft, Active, Inactive and Always on; and unfinished means draft, so a
+   policy with no applications is never live. And nothing a policy names may be
+   missing from that tenant's own libraries: a dangling reference renders as a
+   broken rule in a demo nobody broke.
+   -------------------------------------------------------------------------- */
+
+const ruleSets = (p: Policy) => [p, ...(p.pendingDraft ? [p.pendingDraft] : [])]
+const rulesOf = (p: Policy) => ruleSets(p).flatMap((s) => [...s.rules, ...(s.fallback ? [s.fallback] : [])])
+const named = (p: Policy, typeId: string) =>
+  rulesOf(p).flatMap((r) => leaves(r.when).filter((c) => c.typeId === typeId).flatMap((c) => c.values))
+
+describe('every tenant is one the product could have produced', () => {
+  it('uses only Draft, Active, Inactive and Always on, at every depth', () => {
+    for (const d of DEPTH_ORDER) {
+      for (const p of policiesAt(d)) expect(POLICY_STATUSES, `${d}: ${p.id} is ${p.status}`).toContain(p.status)
+    }
+    for (const p of seedPolicies) expect(POLICY_STATUSES, `seed ${p.id}`).toContain(p.status)
+    expect(JSON.stringify(DEPTH_ORDER.map(policiesAt))).not.toMatch(/"status":"monitor"/)
+  })
+
+  it('never has a live policy with no applications, at any depth', () => {
+    for (const d of DEPTH_ORDER) {
+      for (const p of policiesAt(d)) {
+        if (p.isSystem) continue
+        if (p.appIds.length === 0) expect(p.status, `${d}: ${p.name}`).toBe('draft')
+        if (p.status === 'draft') expect(p.pendingDraft, `${d}: ${p.name}`).toBeUndefined()
+      }
+    }
+  })
+
+  it('keeps the small tenant Payroll policy live on an app the tenant has', () => {
+    const payroll = policiesAt('small').find((p) => p.id === 's9-finance')!
+    expect(payroll.appIds.length).toBeGreaterThan(0)
+    expect(payroll.status).toBe('active')
+  })
+
+  it('names only apps, zones, device profiles and hooks the tenant has', () => {
+    for (const d of DEPTH_ORDER) {
+      const apps = new Set(appsAt(d).map((a) => a.id))
+      const zones = new Set(zonesAt(d).map((z) => z.id))
+      const profiles = new Set(fingerprintsAt(d).map((f) => f.id))
+      const hooks = new Set(hooksAt(d).map((h) => h.id))
+      for (const p of policiesAt(d)) {
+        for (const id of p.appIds) expect(apps.has(id), `${d}: ${p.name} app ${id}`).toBe(true)
+        for (const id of named(p, 'zone')) expect(zones.has(id), `${d}: ${p.name} zone ${id}`).toBe(true)
+        for (const id of named(p, 'fingerprint')) expect(profiles.has(id), `${d}: ${p.name} profile ${id}`).toBe(true)
+        for (const id of named(p, 'webhook')) expect(hooks.has(id), `${d}: ${p.name} hook ${id}`).toBe(true)
+      }
+    }
+  })
+
+  it('names only people and groups the tenant lists in a rule who and an audience', () => {
+    for (const d of DEPTH_ORDER) {
+      const groups = new Set(groupsAt(d).map((g) => g.id))
+      const people = new Set(usersAt(d).people.map((u) => u.id))
+      for (const p of policiesAt(d)) {
+        for (const id of p.audience.groupIds) expect(groups.has(id), `${d}: ${p.name} audience group ${id}`).toBe(true)
+        for (const id of p.audience.userIds) expect(people.has(id), `${d}: ${p.name} audience user ${id}`).toBe(true)
+        for (const r of rulesOf(p)) {
+          const who = r.who
+          if (!who) continue
+          for (const id of [...who.groupIds, ...(who.exceptGroupIds ?? [])]) expect(groups.has(id), `${d}: ${r.name} group ${id}`).toBe(true)
+          for (const id of [...who.userIds, ...(who.exceptUserIds ?? [])]) expect(people.has(id), `${d}: ${r.name} user ${id}`).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('offers a day-one tenant only the templates Xecurify ships', () => {
+    expect(scenariosAt('none').length).toBeGreaterThan(0)
+    expect(scenariosAt('none').every((s) => s.provided)).toBe(true)
+    expect(scenariosAt('medium').some((s) => !s.provided)).toBe(true)
+  })
+
+  it('gives every tenant a risk profile to grade with', () => {
+    for (const d of DEPTH_ORDER) expect(riskProfilesAt(d).some((p) => p.id === 'rp-shipped'), d).toBe(true)
+  })
+
+  it('makes a policy with no applications a draft, folding a saved draft into its rules', () => {
+    const live = seedPolicies.find((p) => !p.isSystem && p.status === 'active' && p.rules.length > 0)!
+    const orphan: Policy = {
+      ...live,
+      appIds: [],
+      pendingDraft: { rules: [], savedAt: 'Just now', savedBy: 'You' },
+    }
+    const out = settled(orphan)
+    expect(out.status).toBe('draft')
+    expect(out.rules).toEqual([])
+    expect(out.pendingDraft).toBeUndefined()
+    expect(settled(live)).toBe(live)
+    const system = seedPolicies.find((p) => p.isSystem)!
+    expect(settled(system)).toBe(system)
   })
 })

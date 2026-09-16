@@ -3,17 +3,15 @@ import {
   groups as seedGroups,
   users as seedUsers,
   zones as seedZones,
-  type Audience,
   type Condition,
-  type Group,
   type ConditionCard,
   type Predicate,
   type Rule,
-  type User,
 } from '../data'
 import { seedProfiles } from '../fingerprint'
 import { seedHooks } from '../hooks'
-import { cardLetter } from '../predicate'
+import { cardLetter, leafCount } from '../predicate'
+import { hasWho, whoSummary } from '../rule-who'
 
 /* -----------------------------------------------------------------------------
    The rule, read back as English. One implementation.
@@ -48,6 +46,31 @@ export function seedName(kind: RefKind, id: string): string | undefined {
 
 const REF_KINDS = new Set<string>(['zone', 'fingerprint', 'hook', 'group', 'user'])
 
+/* What a zone, device profile or hook the tenant has deleted reads as.
+
+   Only when a resolver is supplied: a resolver IS the live library, so an id it
+   cannot name is gone, and falling back to the seed would print the name of a
+   thing that no longer exists — "in zone Office Network" for a rule the linter
+   is reporting as broken (PE134, PE135, PE130). With no resolver there is no
+   live library to ask, and the seed stays the answer. */
+const DELETED: Partial<Record<RefKind, string>> = {
+  /* The type label already names the kind for zones and hooks ("in zone …"),
+     so the value only says it is gone. Device profiles drop their label. */
+  zone: '(deleted)',
+  fingerprint: 'a deleted device profile',
+  hook: '(deleted)',
+}
+
+function refName(kind: RefKind, id: string, resolve?: NameLookup): string {
+  if (resolve) {
+    const live = resolve(kind, id)
+    if (live != null) return live
+    const gone = DELETED[kind]
+    if (gone) return gone
+  }
+  return seedName(kind, id) ?? id
+}
+
 /* One condition as English.
 
    The type label is dropped wherever the object's own name already says which
@@ -75,7 +98,7 @@ export function conditionSentence(c: Condition, resolve?: NameLookup): string {
   let value: string
   if (REF_KINDS.has(t.valueKind)) {
     const kind = t.valueKind as RefKind
-    value = raw.map((v) => resolve?.(kind, v) ?? seedName(kind, v) ?? v).join(' or ')
+    value = raw.map((v) => refName(kind, v, resolve)).join(' or ')
   } else if (t.valueKind === 'time' || t.valueKind === 'range') {
     value = raw.join('–')
   } else {
@@ -159,19 +182,6 @@ export function predicateParts(p: Predicate, resolve?: NameLookup): ProseCard[] 
   }))
 }
 
-/** Who a policy governs, as one phrase. */
-export function audienceSentence(a: Audience, groups: Group[] = seedGroups, directory: User[] = seedUsers): string {
-  if (a.everyone) return 'everyone in the directory'
-  const names = [
-    ...a.groupIds.map((id) => groups.find((g) => g.id === id)?.name ?? id),
-    ...a.userIds.map((id) => directory.find((u) => u.id === id)?.name ?? id),
-  ]
-  if (names.length === 0) return 'nobody'
-  if (names.length === 1) return names[0]
-  if (names.length === 2) return `${names[0]} and ${names[1]}`
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
-}
-
 /** What the rule does when it matches, in one sentence. */
 export function decisionSentence(rule: Rule): string {
   if (rule.decision === 'deny') return 'Access is blocked. No alternative path.'
@@ -196,24 +206,74 @@ export function decisionSentence(rule: Rule): string {
 
   if (rule.firstFactor === 'Any') return 'Access is granted after any single enabled factor. Nothing further is asked.'
   if (rule.firstFactor === 'Specific') {
-    return `Access is granted after ${rule.firstFactorMethod ?? 'the chosen factor'} alone. Nothing further is asked.`
+    return rule.firstFactorMethod
+      ? `Access is granted after ${rule.firstFactorMethod} alone. Nothing further is asked.`
+      : 'Access is granted after a specific first factor, but no method is chosen yet.'
   }
   return 'Access is granted after the password alone. No second factor is requested.'
 }
 
+/* Who a rule applies to, as a phrase — or `null` for everyone.
+
+   Every name printed, because a sentence has room a list row does not. Groups
+   and people resolve through the same lookup as conditions, and an id the
+   directory cannot name prints as the id. */
+export function whoSentence(who: Rule['who'], resolve?: NameLookup): string | null {
+  if (!hasWho(who)) return null
+  return whoSummary(who, (kind, id) => refName(kind, id, resolve), Infinity)
+}
+
+/** What a rule is called on screen. A blank or whitespace-only name still needs a label. */
+export function ruleLabel(rule: Pick<Rule, 'name'>): string {
+  return rule.name.trim() || 'Untitled rule'
+}
+
+/** The lowest "Rule N" no rule in the list is already called. */
+export function nextRuleName(rules: Pick<Rule, 'name'>[]): string {
+  const taken = new Set(rules.map((r) => r.name.trim().toLowerCase()))
+  for (let n = 1; ; n += 1) if (!taken.has(`rule ${n}`)) return `Rule ${n}`
+}
+
 export interface RuleProse {
-  /** Everything after "IF:" — the predicate, brackets and all. */
+  /** Who the rule applies to — "Finance and Mehak Rao". `null` is everyone the policy governs. */
+  who: string | null
+  /** Everything after "IF:" — the predicate, brackets and all. Never names people or groups. */
   iff: string
   /** Everything after "THEN: →" — what the decision does, in one sentence. */
   then: string
 }
 
-/** The rule as the two lines the review surfaces print under its name. */
+/** The rule as the lines the review surfaces print under its name: who, if, then. */
 export function ruleSentence(rule: Rule, resolve?: NameLookup): RuleProse {
-  return { iff: predicateSentence(rule.when, resolve), then: decisionSentence(rule) }
+  return { who: whoSentence(rule.who, resolve), iff: predicateSentence(rule.when, resolve), then: decisionSentence(rule) }
 }
 
-/** A short predicate for a list row — "2 alternatives" rather than a paragraph. */
+/* The who and the if as one line, for a surface that prints one.
+
+   "For Finance and Mehak Rao, if in zone Office Network" · "For Finance, any
+   sign-in" · "If in zone Office Network" · "Any sign-in that reaches this
+   rule". */
+export function ruleIfLine(rule: Rule, resolve?: NameLookup): string {
+  /* Mid-sentence: "For everyone except Contractors", not "For Everyone …". */
+  const who = whoSentence(rule.who, resolve)?.replace(/^Everyone\b/, 'everyone')
+  const empty = rule.when.cards.length === 0
+  if (!who) return empty ? 'Any sign-in that reaches this rule' : `If ${predicateSentence(rule.when, resolve)}`
+  return empty ? `For ${who}, any sign-in` : `For ${who}, if ${predicateSentence(rule.when, resolve)}`
+}
+
+/* A short rule for a list row: who in a few words, then the conditions.
+
+   "Finance · 2 conditions" · "Finance · No conditions" · "3 conditions" ·
+   "Always matches" — the last only when nobody is named and nothing is
+   checked, which is the one case it is true. */
+export function ruleSummary(rule: Rule, resolve?: NameLookup): string {
+  if (!hasWho(rule.who)) return predicateSummary(rule.when)
+  const who = whoSummary(rule.who, (kind, id) => refName(kind, id, resolve), 2)
+  const n = leafCount(rule.when)
+  return `${who} · ${n === 0 ? 'No conditions' : predicateSummary(rule.when)}`
+}
+
+/** A short predicate for a list row — "2 alternatives" rather than a paragraph. About the WHEN only; see `ruleSummary`. */
 export function predicateSummary(p: Predicate): string {
   if (p.cards.length === 0) return 'Always matches'
   const n = p.cards.reduce((t, k) => t + k.conditions.length, 0)

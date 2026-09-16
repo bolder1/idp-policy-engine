@@ -6,8 +6,11 @@ import {
   attachKind,
   attachTo,
   attachableTo,
+  decidedOnlyBy,
   decidesFor,
+  deleteDetail,
   detachFrom,
+  listPhrase,
   orderOf,
   policiesForApp,
   protectionOf,
@@ -115,8 +118,8 @@ describe('a draft', () => {
   it('is reported as unpublished, not as switched off', () => {
     // Telling somebody they switched off a thing they never published is the
     // kind of small lie that costs a screen its credibility.
-    expect(whyNotDeciding(policy({ status: 'draft' }))).toBe('Still a draft — it has never decided a sign-in.')
-    expect(whyNotDeciding(policy({ status: 'inactive' }))).toBe('Switched off — skipped.')
+    expect(whyNotDeciding(policy({ status: 'draft' }))).toBe('Draft. It decides no sign-ins.')
+    expect(whyNotDeciding(policy({ status: 'inactive' }))).toBe('Inactive. It decides no sign-ins.')
   })
 
   it('is what a new policy starts as', () => {
@@ -131,8 +134,8 @@ describe('a draft', () => {
 })
 
 describe('decidesFor', () => {
-  it('is false for a monitor policy however many rules it has', () => {
-    expect(decidesFor(policy({ status: 'monitor', rules: [ruleOf(true), ruleOf(true)] }))).toBe(false)
+  it('is false for an inactive policy however many rules it has', () => {
+    expect(decidesFor(policy({ status: 'inactive', rules: [ruleOf(true), ruleOf(true)] }))).toBe(false)
   })
 
   it('is false for an active policy with no rules at all', () => {
@@ -166,7 +169,7 @@ describe('orderOf', () => {
   })
 
   it('returns one entry per input row', () => {
-    const rows = [policy(), policy({ status: 'monitor' }), policy(), policy({ status: 'inactive' })]
+    const rows = [policy(), policy({ status: 'draft' }), policy(), policy({ status: 'inactive' })]
     expect(orderOf(rows).length).toBe(rows.length)
   })
 })
@@ -179,16 +182,12 @@ describe('whyNotDeciding', () => {
   it('reports switched-off first when a policy is both off and empty', () => {
     // Precedence, not a set. Being switched off explains the rest and is the
     // only one of the two worth acting on first.
-    expect(whyNotDeciding(policy({ status: 'inactive', rules: [] }))).toBe('Switched off — skipped.')
-  })
-
-  it('distinguishes watching from deciding', () => {
-    expect(whyNotDeciding(policy({ status: 'monitor' }))).toBe('Records what it would have done. Decides nothing.')
+    expect(whyNotDeciding(policy({ status: 'inactive', rules: [] }))).toBe('Inactive. It decides no sign-ins.')
   })
 
   it('names an empty rule list as the reason when the policy is otherwise live', () => {
     expect(whyNotDeciding(policy({ rules: [ruleOf(false)] }))).toBe(
-      'No rules enabled — every sign-in falls straight through.',
+      'No rule is turned on. Every sign-in falls through.',
     )
   })
 })
@@ -361,17 +360,17 @@ describe('detachFrom', () => {
 })
 
 describe('summarise', () => {
-  it('says an app nothing names is not protected', () => {
+  it('says an app nothing names has the default only', () => {
     const s = summarise('zoom', policiesAt('medium'))
-    expect(s).toMatchObject({ own: 0, decides: 0, label: 'Not protected', tag: null, tone: 'off' })
+    expect(s).toMatchObject({ own: 0, decides: 0, label: 'Default only', tag: null, tone: 'off' })
   })
 
   /* On a local fixture, not the estate.
 
      It read the seeds for an app with exactly one inactive policy on it, and
      the estate this console is reasoned about with no longer has one: every
-     policy in the use-case document is written to be in force, and the single
-     exception is in monitor rather than off. Rather than switch a scenario to
+     policy in the use-case document is written to be in force. Rather than
+     switch a scenario to
      `inactive` so a unit test can find it — inventing configuration to satisfy
      an assertion — this states the same property about a policy it makes
      itself. The estate-coupled assertions above are the ones that have to read
@@ -380,8 +379,19 @@ describe('summarise', () => {
     const s = summarise('workday', [policy({ appIds: ['workday'], status: 'inactive' })])
     expect(s.own).toBe(1)
     expect(s.decides).toBe(0)
-    expect(s.tag).toBe('Off')
+    expect(s.tag).toBe('Inactive')
+    expect(s.title).toBe('Inactive. It decides no sign-ins.')
     expect(s.tone).toBe('off')
+  })
+
+  it('says why one active policy with no rule turned on decides nothing', () => {
+    const s = summarise('workday', [policy({ appIds: ['workday'], rules: [] })])
+    expect(s).toMatchObject({ own: 1, decides: 0, tag: 'No rule on', tone: 'off' })
+  })
+
+  it('names none deciding when several are attached and none decides', () => {
+    const list = [policy({ appIds: ['workday'], status: 'draft' }), policy({ appIds: ['workday'], status: 'inactive' })]
+    expect(summarise('workday', list)).toMatchObject({ label: '2 policies', tag: 'None deciding', tone: 'off' })
   })
 
   it('names the shortfall when some of several do not decide', () => {
@@ -404,15 +414,82 @@ describe('summarise', () => {
     expect(s).toMatchObject({ label: '2 policies', tag: null, tone: 'on' })
   })
 
-  it('counts a monitor policy as attached but not deciding', () => {
-    /* The M&A onboarding policy watches Document Management and refuses
-       nothing — it is the document's Scenario 15, deliberately in monitor while
-       an acquired company's devices migrate. A cell reading "1 policy" with no
-       qualification would overstate the tenant's cover. */
-    const s = summarise('dms', policiesAt('medium'))
+  it('counts a draft as attached but not deciding', () => {
+    // A cell reading "1 policy" with no qualification would overstate the cover.
+    const s = summarise('workday', [policy({ appIds: ['workday'], status: 'draft' })])
     expect(s.own).toBe(1)
     expect(s.decides).toBe(0)
+    expect(s.tag).toBe('Draft')
     expect(s.tone).toBe('off')
+  })
+
+  it('finds no monitor status in any tenant', () => {
+    for (const d of DEPTHS) {
+      for (const p of policiesAt(d)) expect(['draft', 'active', 'inactive', 'always-on']).toContain(p.status)
+    }
+  })
+})
+
+describe('listPhrase', () => {
+  it('names one, two, or the first and a count', () => {
+    expect(listPhrase([])).toBe('')
+    expect(listPhrase(['Box'])).toBe('Box')
+    expect(listPhrase(['Box', 'Slack'])).toBe('Box and Slack')
+    expect(listPhrase(['Box', 'Slack', 'Jira'])).toBe('Box and 2 other applications')
+  })
+})
+
+describe('decidedOnlyBy', () => {
+  const sys = policy({ id: 'sys', isSystem: true, status: 'always-on', appIds: [] })
+
+  it('lists the apps no other deciding policy covers', () => {
+    const mine = policy({ appIds: ['box', 'slack'] })
+    const other = policy({ appIds: ['slack'] })
+    expect(decidedOnlyBy(mine, [sys, mine, other])).toEqual(['box'])
+  })
+
+  it('ignores other policies that do not decide', () => {
+    const mine = policy({ appIds: ['box'] })
+    const off = policy({ appIds: ['box'], status: 'inactive' })
+    const draft = policy({ appIds: ['box'], status: 'draft' })
+    expect(decidedOnlyBy(mine, [sys, mine, off, draft])).toEqual(['box'])
+  })
+
+  it('is empty for a policy that decides nothing, and for the system policy', () => {
+    const off = policy({ appIds: ['box'], status: 'inactive' })
+    expect(decidedOnlyBy(off, [sys, off])).toEqual([])
+    expect(decidedOnlyBy(sys, [sys])).toEqual([])
+  })
+})
+
+describe('deleteDetail', () => {
+  const sys = policy({ id: 'sys', name: 'Global Default Policy', isSystem: true, status: 'always-on', appIds: [] })
+  const box = apps.find((a) => a.id === 'box')!
+  const slack = apps.find((a) => a.id === 'slack')!
+
+  it('says the apps fall back to the default when the policy is the only one deciding them', () => {
+    const mine = policy({ appIds: ['box'] })
+    expect(deleteDetail(mine, [sys, mine], apps)).toBe(
+      `Protects ${box.name}. Sign-ins there will use the Global Default Policy.`,
+    )
+  })
+
+  it('names only the apps that fall back when another policy still decides the rest', () => {
+    const mine = policy({ appIds: ['box', 'slack'] })
+    const other = policy({ appIds: ['slack'] })
+    expect(deleteDetail(mine, [sys, mine, other], apps)).toBe(
+      // Catalogue order, as every applications cell lists them.
+      `Protects ${slack.name} and ${box.name}. Sign-ins to ${box.name} will use the Global Default Policy.`,
+    )
+  })
+
+  it('does not say protects for a policy that decides nothing', () => {
+    const off = policy({ appIds: ['box'], status: 'inactive' })
+    expect(deleteDetail(off, [sys, off], apps)).toBe(`Assigned to ${box.name}. It decides no sign-ins.`)
+  })
+
+  it('says nothing for a policy with no applications', () => {
+    expect(deleteDetail(policy({ appIds: [], status: 'draft' }), [sys], apps)).toBeNull()
   })
 })
 

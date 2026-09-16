@@ -97,10 +97,12 @@ describe('the panel', () => {
 
   it('is wired to the same change-applications flow the cell used to open', () => {
     expect(policiesSrc).toContain('<AppsPeek')
-    expect(policiesSrc).toContain('onEdit={() => setAssigning(true)}')
     expect(policiesSrc).not.toContain('btable__app--edit')
-    // The empty state is unchanged: still its own control, still opening the same dialog.
-    expect(policiesSrc).toMatch(/className="btable__assign" onClick=\{\(\) => setAssigning\(true\)\}/)
+    // Edit in the panel and the empty cell's own control open the same dialog:
+    // both are handed the one handler `PolicyApps` receives.
+    const edit = policiesSrc.match(/<AppsPeek[^>]*onEdit=\{([^}]+)\}/)?.[1]
+    expect(edit).toBeTruthy()
+    expect(policiesSrc).toContain(`className="btable__assign" onClick={${edit}}`)
   })
 
   it('scrolls its list inside a max-height, and never grows past the viewport', () => {

@@ -142,7 +142,11 @@ export const leafCount = (p: Predicate) => leaves(p).length
    by design, but a card that somehow lost its conditions matches everything
    too — and a rule that quietly matches everything is the one shape that makes
    every rule below it unreachable. The invariant says that card cannot exist;
-   this is what keeps a broken invariant from turning into a silent outage. */
+   this is what keeps a broken invariant from turning into a silent outage.
+
+   About the WHEN only. A rule with a `who` and no conditions still applies to
+   just those people, so anything asking about a whole RULE reads
+   `ruleMatchesEveryone` in `rule-who.ts`, and identity reads `ruleSig`. */
 export function matchesEverything(p: Predicate): boolean {
   if (p.cards.length === 0) return true
   const hollow = (k: ConditionCard) => k.conditions.length === 0
@@ -150,9 +154,6 @@ export function matchesEverything(p: Predicate): boolean {
      to be, or the others still constrain it. */
   return topJoin(p) === 'or' ? p.cards.some(hollow) : p.cards.every(hollow)
 }
-
-/** True when the predicate is a single card, whatever that card joins with. */
-export const isSingleCard = (p: Predicate) => p.cards.length === 1
 
 /* True when the predicate is one unbroken run of ANDs — the shape every
    interesting linter check is built on. It used to be spelled `cards.length
@@ -169,61 +170,6 @@ export function duplicatedAcrossCards(p: Predicate): string[] {
   }
   return [...seen.entries()].filter(([, n]) => n > 1).map(([key]) => key)
 }
-
-// --- The adapter -------------------------------------------------------------
-
-/* The shape the model had before this pass: a flat array where each condition
-   carried the joiner to the one before it, read strictly left to right with no
-   precedence. Kept only so the seeds, the scenarios and the gauntlet's fix
-   specs can be read in without being re-typed by hand. */
-export interface LegacyCondition {
-  id: string
-  typeId: string
-  operator: string
-  values: string[]
-  joiner?: 'AND' | 'OR'
-}
-
-let cardSeq = 0
-const kid = () => `k${(cardSeq += 1)}`
-
-/* A left-to-right fold with no precedence is a left-leaning binary tree, and
-   distributing that tree over OR gives exactly one DNF. So this is total and
-   faithful — the old evaluator WAS this fold, which is what makes the property
-   test in predicate.test.ts a proof rather than a spot check.
-
-   The trap, and the reason this is not the "obvious" implementation: do NOT
-   read it with AND binding tighter. The seed at data.ts "Off-network finance
-   access" is (zone ∧ time) ∨ device-type under the left fold and
-   zone ∧ (time ∨ device-type) under precedence — a different rule, catching
-   different sign-ins, in a policy that denies. */
-export function flatToPredicate(flat: LegacyCondition[]): Predicate {
-  if (flat.length === 0) return { cards: [] }
-
-  // Accumulated disjunction; each element is one AND-run being built up.
-  let runs: Condition[][] = [[strip(flat[0])]]
-
-  for (let i = 1; i < flat.length; i++) {
-    const next = strip(flat[i])
-    if (flat[i].joiner === 'OR') {
-      runs.push([next])
-    } else {
-      // AND binds to the whole accumulated disjunction, because the fold was
-      // `acc && ok` on a boolean that already absorbed every earlier OR. So it
-      // distributes across every run so far.
-      runs = runs.map((r) => [...r, next])
-    }
-  }
-
-  return { cards: runs.map((conditions) => ({ id: kid(), conditions })) }
-}
-
-const strip = (c: LegacyCondition): Condition => ({
-  id: c.id,
-  typeId: c.typeId,
-  operator: c.operator,
-  values: c.values,
-})
 
 // --- Blame and credit --------------------------------------------------------
 

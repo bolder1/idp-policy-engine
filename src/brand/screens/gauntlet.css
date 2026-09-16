@@ -151,7 +151,7 @@
 .bgt__kind {
   display: inline-block; margin-bottom: var(--space-3);
   padding: 1px 7px; border-radius: var(--radius-full);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: 0.04em; text-transform: uppercase;
+  font-size: 12px; font-weight: var(--fw-semibold);
 }
 .bgt__face.is-threat .bgt__kind {
   background: var(--fb-negative-bg); border: 1px solid var(--fb-negative-border); color: var(--fb-negative-fg);

@@ -30,9 +30,9 @@ import { diagnose } from './diagnostics'
    Finance rule", the other said "an Executives rule cannot shadow a Contractors
    rule". Audience is the policy's now, so a rule cannot disagree with its
    neighbours about who it governs and neither scenario exists at rule level.
-   Narrowing inside a policy is spelled as a `group` condition in the rule's
-   WHEN, so that is how both are written here — which is also what the linter
-   now reads, `audienceCovers` having been deleted.
+   Narrowing inside a policy is the rule's `who`, a field beside its WHEN, so
+   that is how both are written here — and the linter reads it alongside the
+   conditions, `audienceCovers` having been deleted.
    -------------------------------------------------------------------------- */
 
 /** The store's copy, extracted so it can be exercised without React. */
@@ -82,6 +82,14 @@ describe('copying a rule into another policy', () => {
     expect(original.operator).toBe('not in zone')
   })
 
+  it('copies who too, so choosing people on the copy leaves the source alone', () => {
+    const source = ruleWith({ name: 'Finance only', who: { groupIds: ['finance'], userIds: [] } })
+    const copy = copyInto({ ...policies[1], rules: [] }, source).rules[0]
+    expect(copy.who).toEqual(source.who)
+    copy.who!.groupIds.push('legal')
+    expect(source.who!.groupIds).toEqual(['finance'])
+  })
+
   /* The dialog builds the target as it *would* be and runs the real linter over
      it. If that stops reporting the appended rule, the dialog silently starts
      promising every copy will work. */
@@ -89,7 +97,8 @@ describe('copying a rule into another policy', () => {
     const catchAll = ruleWith({ name: 'Everyone', when: anySignIn() })
     const specific = ruleWith({
       name: 'Finance off-network',
-      when: when(card(cond('group', 'in', ['finance']), cond('zone', 'not in zone', ['office']))),
+      who: { groupIds: ['finance'], userIds: [] },
+      when: when(card(cond('zone', 'not in zone', ['office']))),
     })
     const target: Policy = { ...policies[1], isSystem: false, rules: [catchAll] }
 
@@ -102,11 +111,13 @@ describe('copying a rule into another policy', () => {
   it('reports nothing when the target cannot shadow the copy', () => {
     const narrow = ruleWith({
       name: 'Executives on Tor',
-      when: when(card(cond('group', 'in', ['executives']), cond('zone', 'in zone', ['anon']))),
+      who: { groupIds: ['executives'], userIds: [] },
+      when: when(card(cond('zone', 'in zone', ['anon']))),
     })
     const incoming = ruleWith({
       name: 'Contractors off-network',
-      when: when(card(cond('group', 'in', ['contractors']), cond('zone', 'not in zone', ['office']))),
+      who: { groupIds: ['contractors'], userIds: [] },
+      when: when(card(cond('zone', 'not in zone', ['office']))),
     })
     const would = copyInto({ ...policies[1], isSystem: false, rules: [narrow] }, incoming)
     const atCopy = diagnose(would, groups).filter((d) => d.ruleIndex === would.rules.length - 1)

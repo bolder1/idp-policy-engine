@@ -43,6 +43,7 @@ export function ApplicationField({ appIds, onChange }: { appIds: string[]; onCha
       width="fill"
       size="md"
       searchable
+      noun="applications"
       multiple
       value={appIds}
       /* Undefined while empty, deliberately: `summary` overrides the

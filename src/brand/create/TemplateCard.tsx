@@ -1,18 +1,22 @@
 import {
   Clock,
+  Eye,
   Fingerprint,
   Globe,
-  Maximize2,
+  ListFilter,
+  type LucideIcon,
   Network,
   Sparkles,
   Users,
   Webhook,
-  type LucideIcon,
 } from 'lucide-react'
 
-import { Button, DecisionChip, Modal } from '../kit'
-import { conditionType, type AccessDecision, type Scenario } from '../data'
+import { Badge, Button, DecisionChip, Modal } from '../kit'
+import { conditionType, type AccessDecision, type Rule, type Scenario } from '../data'
 import { leaves } from '../predicate'
+import { narrowToAudience, withoutMissing, type TemplateLibrary, type TemplateNeed } from '../screens/board/apply-template'
+import { whoSentence } from '../screens/predicate-prose'
+import { hasWho, type WhoDirectory } from '../rule-who'
 
 /* -----------------------------------------------------------------------------
    The template card, shared by the create gallery and the Templates library.
@@ -46,6 +50,8 @@ export interface CardRule {
   decision: AccessDecision
   /** People the rule reaches. Optional — the library's templates have no estimate. */
   reach?: number
+  /** Who the rule is for — "Contractors". Absent for everyone, or when `ifText` already says it. */
+  who?: string
 }
 
 export interface CardModel {
@@ -65,6 +71,39 @@ export interface CardModel {
      anything it does not recognise. */
   category?: string
   meta: string
+  /** Rules left out because they apply to nobody. Their rows are not in `rules`. */
+  dropped?: string[]
+  /** Library kinds the template names that this tenant does not have. */
+  needs?: TemplateNeed[]
+}
+
+const NEED_LABEL: Record<TemplateNeed, string> = { zone: 'Needs a network zone', fingerprint: 'Needs a device profile' }
+
+/* What stands between this template and using it, as tinted pills. */
+function CardNotes({ m }: { m: CardModel }) {
+  const dropped = m.dropped ?? []
+  const needs = m.needs ?? []
+  const empty = m.rules.length === 0
+  if (!empty && dropped.length === 0 && needs.length === 0) return null
+  return (
+    <span className="bgcard__notes" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+      {empty ? (
+        /* A template saved from a policy with no rules has nothing to apply either. */
+        <Badge tone="notice">{dropped.length > 0 ? 'No rules apply' : 'No rules'}</Badge>
+      ) : (
+        dropped.length > 0 && (
+          <span title={`Not included: ${dropped.join(', ')}`}>
+            <Badge tone="notice">{dropped.length === 1 ? '1 rule left out' : `${dropped.length} rules left out`}</Badge>
+          </span>
+        )
+      )}
+      {needs.map((n) => (
+        <Badge key={n} tone="notice">
+          {NEED_LABEL[n]}
+        </Badge>
+      ))}
+    </span>
+  )
 }
 
 /* `monthOf` stood here — "2026-01" into "Jan 2026", for the review line in the
@@ -104,7 +143,7 @@ const SIGNAL_ICON: Record<string, LucideIcon> = {
   Device: Fingerprint,
   Identity: Users,
   Time: Clock,
-  Attributes: Sparkles,
+  Attributes: ListFilter,
   External: Webhook,
   Everyone: Users,
 }
@@ -182,11 +221,15 @@ export function TemplateCard({
   onUse,
   onPreview,
   useLabel = 'Use template',
+  fallback = '1fa',
 }: {
   m: CardModel
-  onUse: () => void
+  /** Omitted where the template cannot be used yet: the card shows no control. */
+  onUse?: () => void
   onPreview: () => void
   useLabel?: string
+  /** What the policy's own default decides. The template does not change it. */
+  fallback?: AccessDecision
 }) {
   const shown = m.rules.slice(0, shownCount(m.rules.length))
   const rest = m.rules.length - shown.length
@@ -228,13 +271,13 @@ export function TemplateCard({
           aria-label={`Preview the rules in ${m.name}`}
           title="Preview rules"
         >
-          <Maximize2 size={13} strokeWidth={1.9} aria-hidden />
+          <Eye size={13} strokeWidth={1.9} aria-hidden />
         </button>
 
         {/* The thumbnail: the rule stack as the builder draws it, in order. */}
         <ol className="bgcard__stack">
           {shown.map((r, i) => (
-            <li key={r.name}>
+            <li key={`${i}-${r.name}`}>
               <span className="bgcard__mrow">
                 <span className="bgcard__mn" aria-hidden>
                   {i + 1}
@@ -258,15 +301,15 @@ export function TemplateCard({
             </li>
           )}
 
-          {/* The fall-through. Drawn dashed because it is not part of the
-              template — it is what the engine does when nothing above matched. */}
+          {/* The fall-through. Not part of the template: it is the policy's
+              own default, so it shows what that default decides. */}
           <li>
             <span className="bgcard__mrow bgcard__mrow--default">
               <span className="bgcard__mn" aria-hidden>
                 ⌄
               </span>
               <span className="bgcard__mname">Everyone else</span>
-              <span className="bgcard__mdec is-allow">Allow</span>
+              <span className={`bgcard__mdec is-${DEC_KEY[fallback]}`}>{DEC_WORD[fallback]}</span>
             </span>
           </li>
         </ol>
@@ -300,26 +343,29 @@ export function TemplateCard({
           {m.name}
         </h3>
         <p className="bgcard__sub">{m.description}</p>
+        <CardNotes m={m} />
       </div>
 
-      <footer className="bgcard__foot">
-        {/* One control, and nothing beside it.
+      {onUse && m.rules.length > 0 && (
+        <footer className="bgcard__foot">
+          {/* One control, and nothing beside it.
 
-            This row has now lost three things in turn: a signal-and-author line
-            (the signals were already drawn by the rules in the thumbnail above),
-            then the author itself (who last touched the file is not whether the
-            template is any good), and now the dated review claim — which was the
-            one fact here that DID speak to quality, and still lost, because it
-            was a second thing to read on a row whose job is to be pressed.
+              This row has now lost three things in turn: a signal-and-author line
+              (the signals were already drawn by the rules in the thumbnail above),
+              then the author itself (who last touched the file is not whether the
+              template is any good), and now the dated review claim — which was the
+              one fact here that DID speak to quality, and still lost, because it
+              was a second thing to read on a row whose job is to be pressed.
 
-            `Scenario.reviewed` and `Template.reviewed` are still seeded in
-            data.ts with the reasoning for a dated attribution over a rating. The
-            model no longer carries it; if it is ever wanted again, that is where
-            it comes from. */}
-        <button type="button" className="bgcard__cta" onClick={onUse}>
-          {useLabel}
-        </button>
-      </footer>
+              `Scenario.reviewed` and `Template.reviewed` are still seeded in
+              data.ts with the reasoning for a dated attribution over a rating. The
+              model no longer carries it; if it is ever wanted again, that is where
+              it comes from. */}
+          <button type="button" className="bgcard__cta" onClick={onUse}>
+            {useLabel}
+          </button>
+        </footer>
+      )}
     </article>
   )
 }
@@ -339,12 +385,16 @@ export function TemplatePreview({
   onClose,
   onUse,
   useLabel = 'Use this template',
+  fallback = '1fa',
 }: {
   m: CardModel | null
   onClose: () => void
-  onUse: () => void
+  onUse?: () => void
   useLabel?: string
+  /** What the policy's own default decides. The template does not change it. */
+  fallback?: AccessDecision
 }) {
+  const canUse = !!onUse && !!m && m.rules.length > 0
   return (
     <Modal
       open={m !== null}
@@ -356,9 +406,11 @@ export function TemplatePreview({
           <Button variant="ghost" onClick={onClose}>
             Close
           </Button>
-          <Button variant="brand" onClick={onUse}>
-            {useLabel}
-          </Button>
+          {canUse && (
+            <Button variant="brand" onClick={onUse}>
+              {useLabel}
+            </Button>
+          )}
         </>
       }
     >
@@ -381,6 +433,16 @@ export function TemplatePreview({
             </div>
           </dl>
 
+          {(m.dropped?.length ?? 0) > 0 && (
+            <p className="bprev__note">Not included: {m.dropped!.join(', ')}. These rules apply to nobody.</p>
+          )}
+          {m.rules.length === 0 && (m.dropped?.length ?? 0) === 0 && <p className="bprev__note">This template has no rules.</p>}
+          {(m.needs ?? []).map((n) => (
+            <p key={n} className="bprev__note">
+              {n === 'zone' ? 'Needs a network zone. Add one, then choose it in the rule.' : 'Needs a device profile. Add one, then choose it in the rule.'}
+            </p>
+          ))}
+
           <p className="bprev__note">
             Evaluated top to bottom. The first rule that matches decides the sign-in, and the rest
             are skipped.
@@ -388,12 +450,19 @@ export function TemplatePreview({
 
           <ol className="bprev__stack">
             {m.rules.map((r, i) => (
-              <li key={r.name} className="bprev__node">
+              <li key={`${i}-${r.name}`} className="bprev__node">
                 <span className="bprev__n">{i + 1}</span>
                 <span className="bprev__body">
                   <strong>{r.name}</strong>
+                  {r.who && (
+                    <span>
+                      <i>Who</i> {r.who}
+                    </span>
+                  )}
+                  {/* A one-line rule already opens with its who ("For Executives,
+                      any sign-in"), and IF in front of that would misread. */}
                   <span>
-                    <i>IF</i> {r.ifText}
+                    {r.ifText.startsWith('For ') ? r.ifText : <><i>If</i> {r.ifText}</>}
                   </span>
                 </span>
                 <span className="bprev__right">
@@ -412,15 +481,12 @@ export function TemplatePreview({
                 <span>Nothing above matched</span>
               </span>
               <span className="bprev__right">
-                <DecisionChip decision="1fa" size="sm" />
+                <DecisionChip decision={fallback} size="sm" />
               </span>
             </li>
           </ol>
 
-          <p className="bprev__foot">
-            The last row is not part of the template — it is what the engine already does when no
-            rule matches. You can change it after the policy is created.
-          </p>
+          {onUse && <p className="bprev__foot">The last row is this policy's own. The template does not change it.</p>}
         </>
       )}
     </Modal>
@@ -436,27 +502,60 @@ export function TemplatePreview({
    here, so the picker can have it without the page.
    -------------------------------------------------------------------------- */
 
+/* One row of the preview: the who apart from the IF.
+
+   `ifText` is written copy, and a one-line rule opens with its who — "For
+   Executives, any sign-in". When that opening names exactly the built rule's
+   who, it is lifted out onto its own line; when it names someone else (a
+   renamed group), the text is left whole and no second who is printed. */
+function cardRule(spec: Scenario['rules'][number], rule: Rule | null): CardRule {
+  const base = { name: spec.name, ifText: spec.ifText, decision: spec.decision, reach: rule?.matchEstimate }
+  const who = rule ? whoSentence(rule.who) : null
+  if (!who) return base
+  const lead = `For ${who}, `
+  if (spec.ifText.startsWith(lead)) {
+    const rest = spec.ifText.slice(lead.length)
+    return { ...base, who, ifText: rest.charAt(0).toUpperCase() + rest.slice(1) }
+  }
+  return spec.ifText.startsWith('For ') ? base : { ...base, who }
+}
+
 /** Condition groups, said the way an admin would say them. */
 const SIGNAL_OF: Record<string, string> = {
   Network: 'Network',
   Location: 'Location',
   Time: 'Time',
   Device: 'Device',
-  User: 'Identity',
-  Group: 'Identity',
   'Custom attributes': 'Attributes',
   Webhooks: 'External',
 }
 
-export function scenarioCard(s: Scenario): CardModel {
-  const built = s.rules.map((r) => r.build())
+export function scenarioCard(s: Scenario, directory?: WhoDirectory, library?: TemplateLibrary): CardModel {
+  /* The rules as applying the template builds them, audience included, so a
+     contractors-only template shows Identity rather than Everyone. Built one
+     spec at a time, so each row keeps its written copy. A rule that applies to
+     nobody is left out here exactly as applying leaves it out, and named in
+     `dropped`; the directory is the one applying uses, so the two agree. */
+  const pairs = s.rules.map((spec) => ({ spec, rule: narrowToAudience(spec.build(), s.audience, directory) }))
+  const kept = pairs.flatMap((p) => (p.rule ? [{ spec: p.spec, rule: p.rule }] : []))
+  const dropped = pairs.flatMap((p) => (p.rule ? [] : [p.spec.name]))
+  const needs: TemplateNeed[] = []
+  const built = kept.map(({ rule }) => {
+    if (!library) return rule
+    const checked = withoutMissing(rule, library)
+    for (const n of checked.needs) if (!needs.includes(n)) needs.push(n)
+    return checked.rule
+  })
 
   const signals: string[] = []
-  for (const r of built)
-    for (const c of leaves(r.when)) {
-      const label = SIGNAL_OF[conditionType(c.typeId).group] ?? 'Other'
-      if (!signals.includes(label)) signals.push(label)
-    }
+  const add = (label: string) => {
+    if (!signals.includes(label)) signals.push(label)
+  }
+  for (const r of built) {
+    /* Who is the rule's own field now, never a condition in its cards. */
+    if (hasWho(r.who)) add('Identity')
+    for (const c of leaves(r.when)) add(SIGNAL_OF[conditionType(c.typeId).group] ?? 'Other')
+  }
 
   const reach = built.reduce((n, r) => Math.max(n, r.matchEstimate), 0)
 
@@ -472,6 +571,8 @@ export function scenarioCard(s: Scenario): CardModel {
        recomputes, and the builder's impact panel already labels the same figure
        an estimate — the card was the one place stating it as a bare fact. */
     meta: s.provided ? `~${reach.toLocaleString()} people` : `${s.author} · ${s.when}`,
-    rules: s.rules.map((r, i) => ({ ...r, reach: built[i].matchEstimate })),
+    rules: kept.map(({ spec, rule }) => cardRule(spec, rule)),
+    dropped,
+    needs,
   }
 }

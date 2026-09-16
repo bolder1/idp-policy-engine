@@ -9,7 +9,6 @@ import {
   familySettingsFor,
   mfaMethodFor,
   settingKey,
-  siblingsOf,
 } from './mfa-join'
 
 /* The join is the kind of code that fails silently: a lookup that misses returns
@@ -80,25 +79,8 @@ describe('every catalogue method reaches the sheet', () => {
   })
 })
 
-describe('siblings are read off the catalogue, not the sheet', () => {
-  it('never names a method that has no row', () => {
-    // The sheet carries Vasco OTP and Digital Persona; the catalogue does not.
-    const rows = new Set(AUTH_METHODS.map((m) => m.name))
-    for (const m of FACTORS) {
-      for (const s of siblingsOf(m)) {
-        expect(rows.has(s.name), `${m.name} names an unreachable sibling: ${s.name}`).toBe(true)
-      }
-    }
-  })
-
-  it('excludes the method itself', () => {
-    for (const m of FACTORS) {
-      expect(siblingsOf(m).some((s) => s.id === m.id)).toBe(false)
-    }
-  })
-
-  it('claims siblings only where a family setting actually exists', () => {
-    // If a family has shared settings, the drawer says so and names the others.
+describe('family settings reach every method in the family', () => {
+  it('shares the OTP pair across the SMS family', () => {
     // SMS is the case that matters: three methods, one OTP length between them.
     const sms = AUTH_METHODS.find((m) => m.id === 'otp-sms')!
     // Contains, not equals — this asserts the shared pair reaches SMS, and an
@@ -106,7 +88,6 @@ describe('siblings are read off the catalogue, not the sheet', () => {
     expect(familySettingsFor(sms.channel).map((s) => s.id)).toEqual(
       expect.arrayContaining(['otp-length', 'otp-validity']),
     )
-    expect(siblingsOf(sms).map((s) => s.id).sort()).toEqual(['otp-sms-email', 'sms-link'])
   })
 })
 

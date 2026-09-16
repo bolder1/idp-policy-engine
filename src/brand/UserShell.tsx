@@ -1,9 +1,11 @@
 import { useState, type ReactNode } from 'react'
-import { Globe } from 'lucide-react'
+import { Languages, Moon, Sun } from 'lucide-react'
 
+import { Tip } from './kit'
 import { ProfileMenu } from './ProfileMenu'
 import { Picker } from './picker'
 import { useBrand, type BrandScreen } from './store'
+import { useTheme } from './theme-mode'
 
 /* -----------------------------------------------------------------------------
    The end-user site's chrome, which is the admin console's minus almost all of
@@ -33,6 +35,10 @@ const LANGUAGES = ['English', 'Arabic', 'French', 'German', 'Italian', 'Portugue
 export function UserShell({ children }: { children: ReactNode }) {
   const { screen, go } = useBrand()
   const [lang, setLang] = useState('English')
+  /* The same theme as the console, so a round trip through the User Dashboard
+     keeps it, and the same control to change it. */
+  const [theme, setTheme] = useTheme()
+  const next = theme === 'light' ? 'dark' : 'light'
 
   return (
     <div className="bus">
@@ -64,7 +70,7 @@ export function UserShell({ children }: { children: ReactNode }) {
               that this site is for everyone in the tenant, not for the person
               who configured it. */}
           <label className="bus__lang">
-            <Globe size={18} strokeWidth={1.7} aria-hidden />
+            <Languages size={18} strokeWidth={1.7} aria-hidden />
             <span className="u-sr-only">Language</span>
             <Picker
               label="Language"
@@ -73,7 +79,12 @@ export function UserShell({ children }: { children: ReactNode }) {
               onChange={setLang}
             />
           </label>
-          <ProfileMenu initials="MD" />
+          <Tip text={`Switch to ${next} theme`}>
+            <button type="button" className="bshell__icon" onClick={() => setTheme(next)} aria-label={`Switch to ${next} theme`}>
+              {theme === 'light' ? <Moon size={20} strokeWidth={1.7} /> : <Sun size={20} strokeWidth={1.7} />}
+            </button>
+          </Tip>
+          <ProfileMenu />
         </div>
       </header>
 

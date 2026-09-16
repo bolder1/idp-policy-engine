@@ -8,61 +8,59 @@
    at two moments.
    -------------------------------------------------------------------------- */
 
-.bfp2 { display: flex; flex-direction: column; gap: 18px; }
-
-.bfp2__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+/* The page root and its head take their layout from console-theme.css
+   (`.bpage`, `.bfp2__head`). */
 .bfp2__head h1 { margin: 0; }
-.bfp2__head p {
-  margin: 5px 0 0; max-width: 72ch;
-  font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55;
-}
+
 .bfp2__pagehead { display: flex; align-items: center; gap: 12px; min-width: 0; }
+/* The type pill and the change-state pill keep their size beside a long name;
+   the name ellipsises first, and its full text is on the heading's title.
+   Risk profiles share this line. */
+.bfp2__pagehead > .bx-badge { flex: none; }
+.bfp2__pagehead h1 {
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* The Rename pencil, straight after the name. Always shown: a control that
+   appears on hover is one a keyboard or touch user never finds. Centred on the
+   heading by the row's `align-items`; pulled in by half the row gap because the
+   ghost button's own padding already puts air between the glyph and the name,
+   so the pencil reads as the name's and the pills keep the full gap. It never
+   gives up width to a long name. */
+.bfp2__rename { flex: none; display: inline-flex; margin-left: -6px; }
 
 /* --- The name, edited in place ---------------------------------------------
 
    A card with a heading and one text field stood below this, holding the same
    string the h1 already showed. One rendering now, and it is the heading.
 
-   The pencil is quiet until the header is hovered or it is focused. A permanent
-   button beside a title reads as part of the title; an affordance that appears
-   where you are already looking does the same job without spending weight on
-   it — and it stays reachable by keyboard, which a hover-only control would
-   not. */
-.bfp2__rename {
-  flex: none;
-  display: grid; place-items: center;
-  width: 26px; height: 26px;
-  border: 0; border-radius: var(--radius-sm);
-  background: none; color: var(--text-muted); cursor: pointer;
-  opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard);
-}
-.bfp2__head:hover .bfp2__rename,
-.bfp2__rename:focus-visible { opacity: 1; }
-.bfp2__rename:hover { background: var(--surface-inset); color: var(--text-primary); }
-.bfp2__rename:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
+   Rename is the pencil beside it, and the field it opens is the kit's
+   NameField: the input, its count, and ✕ ✓ under its right edge. The
+   `.bfp2__nameinput` that stood here — a borderless heading-styled input — went
+   with the hand-rolled field. Risk profiles share this line and this field. */
+/* The pills sit level with the input, not with the whole field. The field is
+   the input plus a row under it, so the line's centring put them beside the
+   gap between the two. Top-aligned, then each is dropped to the middle of the
+   input — half the kit input's 40px — and lifted by half its own height, which
+   centres a pill of any height. `translate`, so no `transform` is overwritten. */
+/* The line also takes the header's width while the field is open. Sized to its
+   content it gave the field's `min(460px, 100%)` nothing to be a percentage of,
+   and the field shrank to the length of the name it opened on. It wraps
+   because the field, unlike the heading, cannot ellipsise: below the width of
+   its count and ✕ ✓ the pills go under it rather than out of the page. */
+.bfp2__pagehead:has(> .bx-namefield) { flex: 1 1 auto; flex-wrap: wrap; align-items: flex-start; }
+.bfp2__pagehead:has(> .bx-namefield) > :not(.bx-namefield) { margin-top: 20px; translate: 0 -50%; }
 
-/* Styled as the heading, not as a field. Same 20px/700 the `.bpage h1` rule
-   sets, so swapping one for the other does not move a pixel of the page — the
-   only visible change is that the text is now selectable and has a caret in
-   it. */
-.bfp2__nameinput {
-  min-width: 0; flex: 1 1 auto; max-width: 520px;
-  padding: 2px 8px; margin: -2px -8px;
-  border: 0; border-radius: var(--radius-sm);
-  background: var(--surface-inset);
-  font-family: inherit; font-size: 20px; font-weight: 700; letter-spacing: 0;
-  color: var(--text-primary);
-}
-.bfp2__nameinput:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-
+/* The page's way back: a link the size of its words. As a grid child it
+   stretched across the whole page, so the empty right of the row was a click
+   target too; and it had a hover fill no other link has. Only the words click. */
 .bfp2__back {
-  align-self: flex-start;
+  justify-self: start; align-self: flex-start; width: max-content; max-width: 100%;
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 8px 4px 4px; border-radius: var(--radius-sm);
+  padding: 4px 0; border-radius: var(--radius-sm);
   background: none; cursor: pointer;
   font-size: var(--fs-md); color: var(--text-link);
 }
-.bfp2__back:hover { background: var(--surface-inset); }
 .bfp2__back:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 /* The tile says which of the two kinds this is, and it is the only place the
@@ -112,9 +110,9 @@
 
 /* --- Create form ----------------------------------------------------------------- */
 
-.bfp2__form { display: flex; flex-direction: column; gap: 18px; }
+.bfp2__form { display: flex; flex-direction: column; gap: var(--space-7); }
 
-.bfp2__field { display: flex; flex-direction: column; gap: 6px; }
+.bfp2__field { display: flex; flex-direction: column; gap: var(--space-4); }
 .bfp2__field > span { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
 .bfp2 .bfp2__field input, .bfp2__form .bfp2__field input {
   height: var(--ctl-height-md); padding: 0 11px;
@@ -124,74 +122,136 @@
 }
 .bfp2__field input:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
 
-/* Stacked, not side by side — the same shape the zone kind picker settled on,
-   and for the same reason. Two cards across a 520px dialog leaves each about
-   230px, which wraps both sentences to four lines and turns a choice between
-   two things into a block of text you read rather than a pair you pick from.
-   Down the page each card has the full width, its sentence lands in one or two
-   lines, and the two are compared in the order they are offered.
+/* --- Pick one: a tile per answer --------------------------------------------------
 
-   No auto-fit any more: the column was there so a wider surface could put them
-   side by side, and every surface that shows this is a 520px dialog or drawer. */
-.bfp2__modes {
-  display: flex; flex-direction: column; gap: 8px;
+   See `ChoiceTiles`. A tile fills its half of the row, so a pair of answers
+   reads as a pair and neither floats in empty width. Two across wherever each
+   gets 260px, one above the other below that.
+
+   Equal height (`stretch`), content on the top edge, and one line of summary
+   under the name — never a paragraph; that is the `?`. */
+.bfp2__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  align-items: stretch;
+  gap: var(--space-4);
+  min-width: 0;
   border: 0; padding: 0; margin: 0;
 }
-.bfp2__modes legend {
-  padding: 0 0 8px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+.bfp2__choices > legend {
+  padding: 0 0 var(--space-3);
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
 }
-.bfp2__mode-card {
-  position: relative;
-  display: flex; align-items: flex-start; gap: 11px;
-  padding: 13px 14px; text-align: left; cursor: pointer;
+
+/* A hairline edge in the current look: inside a drawer `--surface-raised` IS the
+   drawer, so a fill alone would draw nothing. Selected takes the accent pair —
+   slate in the current look, the console's blue under the rebrand, from the
+   same tokens. */
+.bfp2__answer {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  width: 100%; min-width: 0;
+  padding: var(--space-5);
   background: var(--surface-raised);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-md);
+  text-align: left; font: inherit; color: inherit; cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
 }
-.bfp2__mode-card:hover { border-color: var(--border-strong); }
-/* Brand tint, not a surface step — inside a Modal, --surface-raised is the
-   modal's own background, so a raised "selected" card is invisible. */
-.bfp2__mode-card.is-on { border-color: var(--accent); background: var(--accent-soft); }
-.bfp2__mode-card:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-/* No tile behind the icon, in either state — and that is what fixes the
-   alignment rather than a nudge.
-
-   It was a 30px rounded square filled with `--surface-inset`, and the SELECTED
-   card removed the fill. So the two cards in a pair never matched: one had a
-   grey chip with a glyph centred in it, the other had a bare glyph floating in
-   a 30px box, and the glyph's optical position moved between them even though
-   nothing about it had. Two things were being asked to say "chosen" — the
-   card's own border and tint, which already say it, and the disappearance of a
-   container — and the second one only registered as the icon jumping.
-
-   So the box goes, both states, and the icon is an icon: 18px, on the first
-   line of the title beside it, grey at rest and brand when the card is chosen.
-   One thing changes on selection and it is the colour. */
-.bfp2__mode-ico {
-  flex: none; display: grid; place-items: center;
-  width: 18px; height: 18px;
-  /* The card is `align-items: flex-start`, so the icon sits on the title's line
-     rather than in the middle of a three-line card. `--fs-md` at 1.4 makes an
-     18px line box, which is the icon's own box — so this is a single pixel of
-     optical correction, not a layout. */
-  margin-top: 1px;
-  color: var(--text-tertiary);
+.bfp2__answer:hover { border-color: var(--border-strong); }
+.bfp2__answer.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.bfp2__answer:focus-visible {
+  outline: none;
+  border-color: var(--ctl-border-focus);
+  box-shadow: 0 0 0 4px var(--focus-halo);
 }
-/* No type colour on these either. Two icons in two hues, on a card that already
-   spells out its own name in bold above a sentence explaining it, is colour
-   spent on a distinction the words have already made. Grey at rest, brand for
-   the one that is chosen. */
-.bfp2__mode-card.is-on .bfp2__mode-ico { color: var(--accent-strong); }
-.bfp2__mode-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.bfp2__mode-body strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bfp2__mode-body em { font-style: normal; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.45; }
-.bfp2__mode-tick { flex: none; margin-left: auto; color: var(--accent-strong); }
 
-/* The hint under the name. Two classes, so it beats `.bfp2__field > span` and
-   is not styled as a second label. */
-.bfp2__field > span.bfp2__hint {
-  font-size: var(--fs-xs); font-weight: var(--fw-regular);
-  color: var(--text-tertiary); line-height: 1.45;
+/* The mark sits on the name's line, not in the middle of a two-line tile. */
+.bfp2__answer > .bfp2__radio { margin-top: 2px; }
+
+.bfp2__answerbody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+/* WRAPS, so a limit pill never eats the name it sits beside. Side by side the
+   tiles are 282px, and "Windows only" held its width while the name shrank to
+   fit around it — the answer read "Agent-bas…", which is the one word on the
+   tile that has to survive. Wrapping puts the pill on a second line instead,
+   and only when the name's whole word leaves no room for it. */
+.bfp2__answerhead {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--space-2) var(--space-3); min-width: 0; min-height: 20px;
+}
+.bfp2__answerico { flex: none; display: grid; place-items: center; width: 18px; color: var(--text-tertiary); }
+.bfp2__answer.is-on .bfp2__answerico { color: var(--accent-strong); }
+.bfp2__answername {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+}
+/* A hard limit on the answer ("Windows only") sits at the end of the name line,
+   where it is read before choosing rather than after. */
+.bfp2__answerhead > .bx-badge { margin-left: auto; }
+/* The size of what the answer leads to, on the name line and pushed to its end:
+   metadata about the choice, a step quieter than the description under it, and
+   never run into that sentence. */
+.bfp2__answermeta {
+  flex: none; margin-left: auto;
+  font-size: var(--fs-xs); color: var(--text-muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* One line of what the answer is, indented under the name so the icon column
+   stays clean. Allowed a second line at narrow widths; never a third. */
+.bfp2__answerline {
+  padding-left: calc(18px + var(--space-3));
+  font-size: var(--fs-sm); line-height: 1.45; color: var(--text-tertiary);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* Round, because the answer is one of these; the check list's square mark means
+   any of them. Same size, edge and ink as `.bx-tick`, so the two read as one
+   family — and filled from `--accent-strong`, so the rebrand's retokenising turns
+   both blue with no rule of its own. */
+.bfp2__radio {
+  flex: none; position: relative;
+  width: 16px; height: 16px; border-radius: 50%;
+  border: var(--bw-thin) solid var(--border-strong);
+  background: var(--surface-raised);
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.bfp2__radio::after {
+  content: ''; position: absolute; inset: 3px; border-radius: 50%;
+  background: var(--accent-strong);
+  transform: scale(0);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.bfp2__choice:not(.is-on):hover .bfp2__radio { border-color: var(--accent); }
+.bfp2__choice.is-on .bfp2__radio { border-color: var(--accent-strong); }
+.bfp2__choice.is-on .bfp2__radio::after { transform: scale(1); }
+
+/* The tile a pending switch is about, marked while the confirmation below waits —
+   without it the panel says "removes MAC address" with nothing on screen pointing
+   at which press caused it. `:hover` is named because the pointer is still on the
+   tile it just pressed. */
+.bfp2__answer.is-pending,
+.bfp2__answer.is-pending:hover { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.bfp2__choice.is-pending .bfp2__radio,
+.bfp2__choice.is-pending:hover .bfp2__radio { border-color: var(--fb-notice-fg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bfp2__answer, .bfp2__radio, .bfp2__radio::after { transition: none; }
+}
+
+/* What is wrong with the name, under it. Two classes, so it beats
+   `.bfp2__field > span` and is not styled as a second label. Notice tone, not
+   red: red is for destructive actions. */
+.bfp2__field > span.bfp2__fielderror {
+  font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  color: var(--fb-notice-fg); line-height: 1.45;
+}
+.bfp2 .bfp2__field input[aria-invalid='true'], .bfp2__form .bfp2__field input[aria-invalid='true'] {
+  border-color: var(--fb-notice-border);
+}
+
+/* Why the drawer's main button is disabled, at the start of its footer. */
+.bfp2__footreason {
+  margin-right: auto; min-width: 0;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--fb-notice-fg);
 }
 
 /* --- Step two, the picker -----------------------------------------------------------
@@ -233,9 +293,12 @@
    at.
 
    One scroller: the drawer's. The list is as long as the list. */
+/* A named inline-size container, so the bar can put its search on a line of
+   its own when the panel is too narrow for one line — see `.bfp2__pickbar`. */
 .bfp2__pick {
   display: flex; flex-direction: column; gap: 10px;
   min-height: 0;
+  container: bfp2-pick / inline-size;
 }
 
 /* --- The picker's search row ----------------------------------------------------
@@ -245,21 +308,6 @@
 /* --- Inner page ------------------------------------------------------------------ */
 
 .bfp2__rows { display: flex; flex-direction: column; }
-.bfp2__attrow {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 0; border-bottom: 1px solid var(--border-subtle);
-}
-.bfp2__attrow:last-child { border-bottom: none; }
-.bfp2__attmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-/* Truncation lands on the WORDS, so the mark beside them never leaves.
-
-   A rule doing this was deleted from here as a duplicate, on the reasoning that
-   the flex rules further down already arranged it. They did not, and could not:
-   `text-overflow` has no effect on a bare text node inside a flex container,
-   because the node becomes an anonymous flex item. The name overflowed in
-   silence until the row had two controls and a narrow column, and then it
-   collided with them. It is a span now, and this is the rule. */
-.bfp2__attword { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* One line, and the tip stays on it.
 
    `flex-wrap: wrap` let the name break and then dropped the `?` onto a line of
@@ -267,38 +315,10 @@
    name now takes the width it needs and truncates if it ever cannot — a name
    that is too long to fit is a naming problem, not a layout one, and an ellipsis
    says so where a silent second line does not. */
-.bfp2__attname {
-  display: flex; align-items: center; gap: 7px; flex-wrap: nowrap; min-width: 0;
-  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
-  white-space: nowrap;
-}
-.bfp2__attname > .bx-tip { flex: none; }
-.bfp2__attpurpose { font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.45; }
 .bfp2__nocfg { font-size: var(--fs-xs); color: var(--text-muted); font-style: italic; }
 
-/* Phase 2 in the sheet: modelled, not yet collected. Saying so beats letting
-   somebody build a policy on a signal that never arrives. */
-.bfp2__soon {
-  font-style: normal; padding: 1px 6px; border-radius: var(--radius-sm);
-  background: var(--fb-notice-bg); color: var(--fb-notice-fg);
-  font-size: 10px; white-space: nowrap;
-}
-
-/* The remove button, always drawn.
-
-   It sat at `opacity: 0` until the row was hovered — and stayed clickable while
-   invisible, so a click in the blank space right of the dropdown removed the
-   attribute without anybody having seen a bin, and on a touch screen it never
-   appeared at all. Quiet at rest, one step darker while its row is under the
-   pointer, red only under the pointer itself. */
-.bfp2__drop {
-  flex: none; display: grid; place-items: center; width: 28px; height: 28px;
-  border-radius: var(--radius-sm); background: none; cursor: pointer; color: var(--text-muted);
-  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
-}
-.bfp2__attrow:hover .bfp2__drop { color: var(--text-tertiary); }
-.bfp2__drop:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bfp2__drop:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+/* `.bfp2__soon` stood here. "Not collected yet" is a kit Badge in the notice
+   tone now, the same pill every other state wears. */
 
 .bfp2__num { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: var(--text-secondary); }
 .bfp2__num input {
@@ -313,8 +333,7 @@
    open, which is the whole reason `Picker` was written. */
 
 @media (max-width: 720px) {
-  .bfp2__head { flex-direction: column; gap: 12px; }
-  .bfp2__attrow { flex-wrap: wrap; gap: 10px; }}
+  .bfp2__head { flex-direction: column; }}
 
 /* --- Score bands, as a strip ------------------------------------------------------
    Risk mode only. It used to be a panel above the attributes and it did not
@@ -328,7 +347,6 @@
    The categories are the landmarks the picker already taught you, so the page
    you configure on is organised the way the page you chose on was — same five
    tints, same order. */
-
 
 /* --- An operator and a value, read as one line ------------------------------------
    The attribute's name is already to the left of these, so the row runs as a
@@ -358,24 +376,6 @@
 .bfp2__rule .bx-picker__trigger { border: 0; background: none; height: 26px; }
 .bfp2__rule .bx-picker:first-child .bx-picker__trigger { min-width: 88px; border-right: 1px solid var(--border-subtle); border-radius: 0; color: var(--text-tertiary); }
 .bfp2__rule .bx-picker:last-child .bx-picker__trigger { min-width: 140px; font-weight: var(--fw-medium); }
-
-/* --- The restriction slide-over --------------------------------------------------
-   One surface where there were three steps, in the same dependency order. The
-   headings are what the steps used to be, so the sequencing survives as
-   structure rather than as paging. */
-.bfp2__restform { display: flex; flex-direction: column; gap: 22px; }
-.bfp2__restform > section { display: flex; flex-direction: column; gap: 9px; }
-/* A row, so the tip sits beside the heading rather than under it — and no caps.
-
-   These were 11px uppercase with letter-spacing, which is a label treatment: it
-   shouts, and in a drawer carrying three sections and six sentences the shouting
-   was part of the clutter. Sentence case at the body size reads as a heading
-   without raising its voice. */
-.bfp2__restform h4 {
-  display: flex; align-items: center; gap: 6px;
-  margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold);
-  letter-spacing: 0; text-transform: none; color: var(--text-primary);
-}
 /* `.bfp2__modes--stack` stood here — the drawer opting out of the side-by-side
    columns. Stacking is the base now, so the modifier had nothing left to say. */
 
@@ -384,10 +384,7 @@
    sections of one and two, more heading than content, and no way to read what
    the profile watched without reading five boxes. One list and a filter now. */
 
-/* --- Card and table views ----------------------------------------------------------
-   Same arrangement Zones uses, for the same reason: a profile is COMPARED by
-   what it watches — which is a card — and AUDITED by attribute count and usage,
-   which is a table. Neither answers both. */
+/* --- The list ---------------------------------------------------------------------- */
 
 /* The profile name, in the table's second column. */
 /* Matches .btable__link on the policies screen — 14px medium, not 15px
@@ -408,72 +405,24 @@
    the same raised card around it — radius-lg with the low shadow, not the flat
    radius-md box these had. */
 
-/* The mode as a chip, in the same colour as its own tile in the first column,
-   so a row states its kind twice in one colour rather than once in colour and
-   once in grey. The border is what keeps a pale tint legible where the row
-   behind it is already white. */
-/* The shared pill geometry - see the --pill-* block in console-theme.css. */
-.bfp2__modechip {
-  display: inline-flex; align-items: center;
-  padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
-  line-height: var(--pill-line);
-  border: var(--bw-thin) solid transparent;
-  font-style: normal; font-size: var(--pill-fs); font-weight: var(--pill-fw);
-  white-space: nowrap;
-}
-/* Keyed on the feedback ramp, not on the mode.
-
-   `.is-match` / `.is-risk` meant that renaming a mode had to be mirrored here,
-   in a stylesheet, by hand — and a class that matches nothing renders an
-   untinted chip: no error, no failing test, a chip that quietly stops saying
-   anything. The component emits `MODE_META[mode].tint` now, so a kind renamed
-   in the model keeps its colour without this file being opened. */
-/* A hue per mode, on ramps that mean nothing else here.
-
-   Both chips were drained to neutral, on the argument that the column was
-   borrowing two semantic tones — blue means information, violet means
-   "New / Beta / Recommended" — to separate two categories that are neither.
-   That objection was about WHICH hues, not about whether a taxonomy may carry
-   one, and the console's own pill rule says colour stays per family "since a
-   pill's tint is what it means".
-
-   So the tints come back on `--fb-lime-*` and `--fb-magenta-*`, the two ramps
-   the feedback scale carries for categorical rather than graded meaning.
-   Neither is spoken for by a status anywhere in the product, so nothing has to
-   be un-learned to read them. Blue and violet stay where they are.
-
-   Still not a status: a profile's mode is a fact about what it reads, so these
-   are pale fills that separate two kinds at a glance without competing with the
-   name beside them. */
-.bfp2__modechip.is-info {
-  background: var(--fb-lime-bg); border-color: var(--fb-lime-border); color: var(--fb-lime-fg);
-}
-.bfp2__modechip.is-accent {
-  background: var(--fb-magenta-bg); border-color: var(--fb-magenta-border); color: var(--fb-magenta-fg);
-}
+/* `.bfp2__modechip` stood here: the profile type is a kit Badge now, lime for a
+   health profile and magenta for a trusted device, the same tints it had. */
 /* `.bfp2__tnum` stood here, for the `Attributes` cell in the list table. The
    column is gone — a raw count with no unit and no threshold — so the rule that
    set its digits in tabular figures went with it. */
 
-/* Row actions, matching the zones table. */
-/* Centred under a centred header — see `.btable__actions` in screens.css. */
-.bfp2__menuwrap { position: relative; display: flex; justify-content: center; }
-.bfp2__kebab {
-  display: grid; place-items: center; width: 26px; height: 26px;
-  border-radius: var(--radius-sm); background: none; cursor: pointer;
-  color: var(--text-muted); line-height: 1;
-}
-.bfp2__kebab:hover { background: var(--surface-inset); color: var(--text-primary); }
-.bfp2__kebab:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+/* Row actions are the kit RowMenu now; the hand-built kebab and menu went. */
 
+/* The card view's rules stood here — its badge cap and open-menu lift. The
+   card view is `LibraryRows`' now (screens.css, `.blib__cards`). */
 
 /* --- Used by ---------------------------------------------------------------
 
    The same shape as the zones page's equivalent. Two pages answering the same
    question about two shared objects should not answer it in two visual
    languages. */
-/* `.bfp2__usecount` moved to used-by.css as `.buse__count` — the two screens
-   draw the same button and had drawn it differently. */
+/* `.bfp2__usecount` stood here, for the count on the header's Used by button.
+   Used by is a row-menu drawer now, with no count. */
 
 /* The used-by drawer's own list stood here — a policy name on the left, its
    rule names run together on the right. It is `.buse` in used-by.css now,
@@ -484,10 +433,6 @@
    The two sections the profile page was missing: how the mode decides, and
    what the profile is allowed to read.
    ========================================================================== */
-
-/* Settings that are questions rather than attributes reuse the attribute row,
-   so the page has one row shape rather than two. */
-.bfp2__rows--form { display: flex; flex-direction: column; }
 
 /* --- Per-attribute weight, risk mode -----------------------------------------
    `weights` was a field the score read and no screen could write, so every risk
@@ -502,18 +447,6 @@
    ordering, hue and accessible name within a release, so the markup and the
    styling are shared and the arguments that shaped them travelled with it. */
 
-/* --- A platform limit, on the choice it limits -------------------------------
-   The console puts "Windows only" in the third bullet of a callout that appears
-   after agent-based has been chosen — one screen too late to be a decision
-   input, so it sits on the card instead. */
-.bfp2__mode-note {
-  display: flex; align-items: flex-start; gap: 5px;
-  margin-top: 6px;
-  font-style: normal; font-size: var(--fs-xs); line-height: 1.45;
-  color: var(--fb-notice-fg);
-}
-.bfp2__mode-note svg { flex: none; margin-top: 2px; }
-
 /* Said before the switch happens, not after it. */
 .bfp2__prereq {
   display: flex; align-items: flex-start; gap: 7px;
@@ -525,7 +458,6 @@
 
 /* An attribute this reach cannot collect. Shown and refused rather than hidden:
    "why is TPM ID missing" is a support ticket, and a greyed row is the answer. */
-
 
 /* The uploaded roster, as a file card.
 
@@ -561,31 +493,6 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .bfp2__file-body em { font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); }
-
-/* The name cell, which now carries the icon too. */
-
-
-/* `.bfp2__steps` stood here, and half of it was inside a comment that never
-   closed — which is how four rules for a control nothing rendered survived a
-   deletion. The restriction dialog stopped being stepped a long time ago.
-
-   Its recorded intent was right and is kept: "three is few enough to name every
-   step rather than counting them, which is the difference between a progress
-   bar and a table of contents". `.bfp2__wizsteps` further down is that idea,
-   built for the create wizard, which really does have two or three. What it
-   does NOT keep is the brand tint on the current step — see there. */
-
-/* `.bfp2__stephint` has gone with the last paragraph that used it.
-
-   Every step's explanation is on its heading now, as the `TipDot` the rest of
-   this screen uses, and the one remaining prose line — a placeholder under a
-   section whose question had not been answered yet — went when that section
-   stopped rendering until it had something to ask. */
-
-/* A form row's answer where there is nothing to choose. The same weight as the
-   value inside a control, without the box: a border drawn around one immovable
-   string is a control refusing to be used. */
-.bfp2__setvalue { font-size: var(--fs-md); color: var(--text-primary); }
 
 /* The answers as a sentence on the page, now that the controls live behind the
    button. Reads as a statement, not as a row of disabled fields. */
@@ -693,37 +600,275 @@
    and cannot be switched off.
 
    So: no pane, no sections, no headings, no dividers, no per-row box, and no
-   fill on anything that is not under the pointer. The list is a grid because
-   the names are short and the panel is wide — see below. */
+   fill on anything that is not under the pointer. */
 .bfp2__picklist {
-  /* Two to a line at the default 724px, three when the drawer is dragged out,
-     one when it is dragged in — so the device catalogue is a 19-line block
-     instead of a 38-row scroll and the OS one fits on screen whole.
+  /* One check to a line, top to bottom.
 
-     `auto-fill` with a 320px floor rather than a fixed count: this drawer is
-     resizable 560-1120 and the same panel also renders inside the create
-     wizard, so the column count has to come from the width it actually gets.
+     It was a grid — `repeat(auto-fill, minmax(320px, 1fr))` with a 20px column
+     gap — sized for a 780px drawer that could be dragged to 1120, so the device
+     catalogue read as a 19-line block. The drawer is 560 now and the ask was one
+     line each; a second column at that width is two 260px cells, and the first
+     casualty was the "Not collected yet" pill on the longest names. A column
+     count that is always one is not a grid, so the grid, its gap and the
+     empty state's `grid-column` span all went.
 
-     Row gap 0 — the rows have their own padding and a hover tint that has to
-     meet its neighbours, or the tint reads as a chip rather than a row. Column
-     gap is wide, because that gap is the only thing separating two columns of
-     names and it is doing the work a rule would otherwise do. */
-  display: grid;
-  /* Bled by the row's own padding, so the tint has somewhere to go while the
-     names stay on the margin the search box above them uses. */
+     No gap between rows: each row is its own 36px line. */
+  display: flex; flex-direction: column;
+  /* Bled by the row's own padding, so the focus ring has somewhere to go while
+     the names stay on the margin the search box above them uses. */
   margin: 0 calc(var(--space-5) * -1);
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  /* 20px and not 24: at the 780px default the panel is two 360px cells, and the
-     longest name in the catalogue — "Session duration and navigation", wearing
-     a "Not collected yet" pill — needs 359 of them. The four pixels are the
-     difference between thirty-eight names reading whole and one of them
-     ellipsising for no reason a reader could work out. */
-  column-gap: var(--space-7);
-  align-content: start;
   min-height: 0;
 }
-/* The empty state spans whatever the grid is that day. */
-.bfp2__picklist > .bfp2__none { grid-column: 1 / -1; }
+
+/* --- The check lists ---------------------------------------------------------------
+
+   Two lists of checks live in this file. The profile page's (Checks, Signals,
+   and the wizard's Set values step, all `ChosenList`) is the zone page's IP
+   networks list: a field per check, a trash can beside it, "Add checks" under
+   it — see `.bfp2__chosen`. The create wizard's inline step (Version 1) is the
+   aligned grid further down, `.bfp2__checklist`, where every offered check is
+   a row with a tick.
+
+   This wrapper is both lists' section: the heading and what is under it, 16px
+   apart, so the heading reads as the list's and not as its first row. A named
+   container, which the wizard's grid reads its control width from.
+
+   No hover tint on either. The row does nothing when pressed — its control and
+   its Remove are the presses — so a tint under the pointer would promise a
+   click that is not there. */
+.bfp2__checks {
+  display: flex; flex-direction: column; gap: var(--space-6);
+  min-width: 0;
+  container: bfp2-checks / inline-size;
+}
+
+/* The heading and its count on one line: a heading, not a card's header band.
+   Basic details' section headings (`.bfp2__sechead`) are the same line, so the
+   two tabs head their columns in one voice.
+
+   The heading is text only — the lists' door is the Add under them (15 Sep
+   2026). */
+.bfp2__checkshead, .bfp2__sechead {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  min-height: var(--ctl-height-sm);
+}
+.bfp2__checkshead h2, .bfp2__sechead h2 {
+  margin: 0;
+  font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bfp2__sechead > .bx-tip, .bfp2__checkshead > .bx-tip { flex: none; }
+.bfp2__checkscount { font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* --- The profile page's list: a plain list with dropdowns --------------------
+
+   One line a check: the mark, the name and its ?, the dropdown, and the trash
+   can (or the lock) at the end. No box around the row. For a moment the row was
+   the zone page's field with the setting inside its outline; the owner turned
+   that down the same day — "just give me a basic list view with dropdowns"
+   (15 Sep 2026) — so the dropdown keeps its own edge, as every picker does.
+
+   Half the column, as the zone list is, with a 560px floor so a name keeps
+   room beside a 264px setting; full width at the zone list's breakpoint. The
+   Add link under the list shares its width. `.bz7__fields` gives the list and
+   the error line; `.bz7__rowdel` the trash can's slot. A named container, so
+   the setting can give the name room when the list is narrow. */
+.bfp2__chosen {
+  /* How wide the dropdown is. Set, not sized to its value, so the dropdowns
+     and trash cans line up down the list. 264px holds the longest answer
+     whole: "Not rooted, jailbroken or tampered", 223px of text, plus the
+     trigger's padding and chevron. A weight is three short words. */
+  --bfp2-chosen-ctl: 264px;
+  display: flex; flex-direction: column; gap: 12px;
+  width: 100%; max-width: max(50%, 560px); min-width: 0;
+  container: bfp2-chosen / inline-size;
+}
+.bfp2__chosen.is-weights { --bfp2-chosen-ctl: 96px; }
+/* 40px rows 4px apart: with no edge round a row, its own height is what
+   separates one check from the next, and the zone fields' 8px would double it. */
+.bfp2__chosen .bz7__fields { gap: 4px; }
+@media (max-width: 720px) {
+  .bfp2__chosen { max-width: none; }
+}
+/* A list too narrow for a name beside 264px (the page at 1100 wide) gives the
+   answer 200px, and a phone 160. A longer answer that is cut is said by the
+   setting's hover title. */
+@container bfp2-chosen (max-width: 519px) {
+  .bfp2__chosen:not(.is-weights) .bfp2__chosenctl { --bfp2-chosen-ctl: 200px; }
+}
+@container bfp2-chosen (max-width: 399px) {
+  .bfp2__chosen:not(.is-weights) .bfp2__chosenctl { --bfp2-chosen-ctl: 160px; }
+}
+
+/* The row: a flex line, 40px tall, no edge and no fill. */
+.bfp2__chosenbox {
+  flex: 1; min-width: 0; min-height: 40px;
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* The name, its ? and at most one tag, taking what the dropdown leaves.
+   `--badge-max` because the kit's 14ch clips "Not collected yet"; the name,
+   which has a title, gives up the width instead. */
+.bfp2__chosenline {
+  flex: 1 1 0; min-width: 0;
+  display: flex; align-items: center; gap: var(--space-3);
+  --badge-max: 24ch;
+}
+.bfp2__chosenline > .bx-tip,
+.bfp2__chosenline > .bx-badge { flex: none; }
+.bfp2__chosenname {
+  flex: 0 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text-primary);
+}
+
+/* The dropdown at a set width, filled by its picker, so the left and right
+   edges line up. Shrinks only once the name has nothing left to give. */
+.bfp2__chosenctl {
+  flex: 0 1 auto; width: var(--bfp2-chosen-ctl); min-width: 0;
+  display: flex; align-items: center;
+}
+.bfp2__chosenctl > .bx-picker,
+.bfp2__chosenctl > .bx-tierpick,
+.bfp2__chosenctl > .bfp2__expr { flex: 1 1 auto; min-width: 0; }
+.bfp2__chosenctl .bfp2__expr > .bx-picker { flex: 1 1 auto; min-width: 0; }
+/* A TYPED version fills the column too (16 Sep 2026). `.bfp2__exprval` carries
+   a 118–180px measure of its own for the inline operator pair, and the wizard's
+   rows lifted it (`.bfp2__checkslot`, below) while these did not — so on the
+   profile page "Chrome 120" stopped 180px in, under two dropdowns that ran to
+   the column's edge. */
+.bfp2__chosenctl .bfp2__expr > .bfp2__exprval { flex: 1 1 auto; width: auto; min-width: 0; max-width: none; }
+.bfp2__chosenctl .bx-picker .bx-picker__trigger { width: 100%; max-width: none; }
+
+/* --- The create wizard's inline list: one aligned grid --------------------------
+
+   Version 1's step (`InlineChecks` in device-profile-wizard.tsx), where every
+   offered check is a row with a tick and its value. The profile page's own list
+   was this grid until it became the zone's fields (15 Sep 2026); the wizard
+   keeps it, because a list of ticks wants its values in one column.
+
+   One grid for the whole list, and each row takes its columns from it — a
+   subgrid — so the controls line up down one edge whatever the names are. A
+   grid per row would size each row's control column to its own control, and a
+   Weight next to an OS version would start at a different place on every line.
+
+   Four columns, and only the name's is elastic: a 20px mark, the name, a set
+   width for the control, and 32px for the lock. The space between name and
+   setting is the separator.
+
+   The control column is a set width rather than `auto`. Sized to the widest
+   control, the pickers were each as wide as their own value (168 to 240px), so
+   the left edges wandered down the list. Set, and filled by its control, both
+   edges line up. 260px is sized to the longest CHOICE, not the longest version:
+   at 200 the trigger's 166px of text cut "Not rooted, jailbroken or tampered"
+   (223px) and "PIN, passcode or password" (174px), and a closed picker names
+   itself "Require", so the answer could only be read by opening it (15 Sep
+   2026). 260 holds every choice whole. A weight is three short words and takes
+   96px — the risk signal page's width for the same control — so a Signals list
+   gives its names the difference.
+
+   44px a line, no gap and no rule. The row's first track is the 44px; a version
+   error under it takes a second track of its own height, so a row without one
+   is exactly one line tall. */
+.bfp2__checklist {
+  --bfp2-ctl: 260px;
+  display: grid; grid-template-columns: 20px minmax(0, 1fr) var(--bfp2-ctl) 32px;
+  column-gap: var(--space-5);
+  list-style: none; margin: 0; padding: 0;
+}
+.bfp2__checklist.is-weights { --bfp2-ctl: 96px; }
+/* A column too narrow to give a name 180px beside a 260px control — the aside
+   stacked on a phone, or the two-column page just above the zones breakpoint,
+   where the column is 477px — gives the control 200px, not 160. At 160 even the
+   default "Not rooted or jailbroken" (153px) was cut; at 200 the two short
+   answers show whole, names keep 189px, and a longer answer that is cut is
+   still said by the row's hover title. A weight is already as small as it
+   gets. */
+@container bfp2-checks (max-width: 519px) {
+  .bfp2__checklist { --bfp2-ctl: 200px; }
+}
+.bfp2__checkrow {
+  grid-column: 1 / -1;
+  display: grid; grid-template-columns: subgrid; grid-template-rows: minmax(44px, auto);
+  align-items: center;
+}
+
+/* `.bfp2__checkline` and `.bfp2__checkname` stood here: the page list's name
+   cell in this grid. The wizard's rows draw their names with the picker's
+   `.bfp2__pickname`, and the page's are `.bfp2__chosenline` inside the field
+   now (15 Sep 2026). */
+
+/* A typed version that can't be saved: said under the row, from the name's
+   edge. It spans the name's column so its length never widens the control
+   column the whole list shares. */
+.bfp2__checkerror {
+  grid-column: 2 / -1; align-self: start;
+  padding-bottom: var(--space-4);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--fb-notice-fg);
+}
+.bfp2__expr .bfp2__exprval[aria-invalid='true'] { border-color: var(--fb-notice-border); }
+
+/* The mark's column is 20px, and a glyph that files the check is grey rather
+   than muted: `--text-tertiary`, the Basic details rows' icon colour and the
+   lock's, so both tabs mark their rows in one ink. */
+.bfp2__checkrow .bfp2__pickico,
+.bfp2__chosenbox .bfp2__pickico { width: 20px; color: var(--text-tertiary); }
+/* A logo is read, not filed: a monochrome one (Apple) takes the name's colour
+   rather than the grey the category glyphs wear. */
+.bfp2__pickico.is-brand { color: var(--text-primary); }
+.bfp2__pickico.is-brand > img { display: block; }
+
+/* Remove, last on the line, in its own column so every Remove in the list sits
+   on one x. An always-on row has the lock in the same slot (`.bfp2__checklock`). */
+.bfp2__checkdel { grid-column: 4; justify-self: center; display: inline-flex; }
+
+/* Why this row has no Remove. A 14px lock where the Remove would be — this
+   grid's last column, or the slot beside the page list's field — in the icon
+   grey, the size of the button it stands in for so the rows end on one x.
+
+   A button because the kit's `TipDot` is one: a tooltip only a pointer can open
+   is a sentence a keyboard never reaches, and the lock carries its words in its
+   accessible name as well. It does nothing when pressed, so it takes the `?`'s
+   `help` cursor rather than a pointer, and draws no fill under it. */
+.bfp2__checklock {
+  display: grid; place-items: center;
+  width: var(--ctl-height-sm); height: var(--ctl-height-sm); padding: 0;
+  border: 0; border-radius: var(--radius-sm); background: none;
+  color: var(--text-tertiary); cursor: help;
+}
+.bfp2__checklock:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+
+/* One control, filling the control column and ending on its right edge. The
+   pickers, a weight and a version floor stretch to the column, so their left
+   edges line up as well as their right; a number with its unit, or a stated
+   count, keeps its own width against the right edge. */
+.bfp2__checkslot {
+  grid-column: 3; min-width: 0;
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+}
+.bfp2__checkslot > .bx-picker,
+.bfp2__checkslot > .bx-tierpick,
+.bfp2__checkslot > .bfp2__expr { flex: 1 1 auto; min-width: 0; }
+.bfp2__checkslot .bx-picker__trigger { width: 100%; min-width: 0; }
+/* A floor stored with another operator: the glyph keeps its 40px and the value
+   takes the rest of the column. */
+.bfp2__checkslot .bfp2__expr > .bx-picker,
+.bfp2__checkslot .bfp2__expr > .bfp2__exprval { flex: 1 1 auto; width: auto; min-width: 0; max-width: none; }
+/* A floor with no operator is just its value, so the wrapper that joined the two
+   halves has nothing to join: no edge, no fill, no halo of its own. A Picker
+   brings its own field; a typed value is given the same one, so a column of
+   values reads as one kind of control whether the version was picked or typed. */
+.bfp2__expr.is-bare { border: 0; background: none; }
+.bfp2__expr.is-bare:focus-within { box-shadow: none; }
+.bfp2__expr.is-bare .bfp2__exprval {
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
+  background: var(--ctl-bg);
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.bfp2__expr.is-bare .bfp2__exprval:hover { border-color: var(--ctl-border-hover); background: var(--ctl-bg-hover); }
+.bfp2__expr.is-bare .bfp2__exprval:focus-visible {
+  border-color: var(--ctl-border-focus); background: var(--surface-raised);
+  box-shadow: 0 0 0 4px var(--focus-halo);
+}
 
 /* `.bfp2__selectall` stood here — the per-group "Select all / Clear these"
    link. It went with the group headings that carried it. Selecting in bulk is
@@ -731,77 +876,14 @@
    category filter plus shift-click is the same intent with one fewer control on
    the screen. */
 
-
-.bfp2__none { padding: var(--space-9) 0; text-align: center; font-size: var(--fs-md); color: var(--text-tertiary); }
-
-
 /* =============================================================================
    THE CREATE WIZARD, AND THE CATALOGUE AS A STEP IN IT
    ========================================================================== */
 
-/* Where you are, how far in, and how much is left.
-
-   Numbered and named. It was words alone, and the argument for that — three is
-   few enough to name every step, and naming is the difference between a
-   progress bar and a table of contents — was right about the labels and was
-   never an argument against the numerals. A contents page has page numbers.
-
-   The connector is a fixed length, and the ladder sits left rather than
-   spanning the panel. Letting the steps grow was the first attempt and it makes
-   the ladder's proportions depend on how many steps there are: with three the
-   connectors are 60px, with two the single connector is 500px and the two
-   labels are pushed to opposite ends of the panel like a progress bar at 50%.
-   A fixed 56px reads identically at both lengths.
-
-   The brand appears once, on the step you are standing in. That is the one
-   thing on this ladder worth finding without reading it; every other state is
-   carried by weight and grey. */
-.bfp2__wizsteps {
-  display: flex; align-items: center;
-  list-style: none; margin: 0 0 var(--space-7); padding: 0;
-}
-.bfp2__wizstep {
-  display: inline-flex; align-items: center; gap: var(--space-3); flex: none;
-  min-width: 0;
-  font-size: var(--fs-md); color: var(--text-muted);
-}
-.bfp2__wizstep:not(:last-child)::after {
-  content: ''; flex: none; width: 56px; height: 1px;
-  margin: 0 var(--space-4);
-  background: var(--border-default);
-}
-
-.bfp2__wizstep__n {
-  flex: none;
-  display: grid; place-items: center;
-  width: 22px; height: 22px; border-radius: 50%;
-  border: 1px solid var(--border-default);
-  font-size: var(--fs-sm); font-weight: var(--fw-medium);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-}
-
-.bfp2__wizstep.is-done { color: var(--text-secondary); }
-.bfp2__wizstep.is-done .bfp2__wizstep__n {
-  border-color: var(--border-strong);
-  color: var(--text-secondary);
-}
-
-.bfp2__wizstep.is-on { color: var(--text-primary); font-weight: var(--fw-medium); }
-.bfp2__wizstep.is-on .bfp2__wizstep__n {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
-
-/* The third line on a mode card: how long this kind takes, and how much it
-   holds. Both are facts about the choice and neither is guessable from the
-   blurb — "three steps" is the honest disclosure that picking this one is
-   picking a longer path. */
-.bfp2__mode-steps {
-  font-style: normal; font-size: var(--fs-xs); color: var(--text-muted);
-  letter-spacing: 0.01em;
-}
+/* `.bfp2__wizsteps` stood here — the create drawer's numbered ladder. It went
+   with the drawer (15 Sep 2026). The create wizard page draws its own,
+   pressable, in device-profile-wizard.css (`.bdpw__steps`), and keeps its
+   single accent on the current step. */
 
 /* --- A catalogue row -----------------------------------------------------------
 
@@ -829,33 +911,40 @@
    except behind a `?`. The purpose is on the row now, so the mark went, and the
    machinery went with the mark.
 
-   What is left is one element: no border, no fill, no radius until it is
-   hovered or focused, and no gap to the row above it. */
+   What is left is one element: no border, no fill, no gap to the row above it,
+   and a radius only the focus ring ever draws. */
 .bfp2__pickrow {
   /* 6px between the four things on a row — tick, mark, name, pill. It is tight
-     on purpose: every pixel here is a pixel the longest name in the catalogue
-     does not have, and at this size the four are read as one line rather than
-     as four columns. */
+     on purpose: at this size the four are read as one line rather than as four
+     columns. */
   display: flex; align-items: center; gap: var(--space-3);
   width: 100%;
-  /* 12px all round, and the height follows from it rather than being set: a
-     20px content line inside 24px of padding is a 44px row and a 44px hit area.
+  /* A set 36px line, with the side padding kept and none above or below.
 
-     It was `6px 0` — a 34px row with no horizontal padding at all, so the hover
-     tint stopped flush with the text and there was nothing to press but the
-     words themselves. Thirty-eight of those in two columns read as a wall. The
-     list is bled back out by the same 12px below, so the names still start on
-     the drawer body's own left margin and only the pressable area grew. */
-  padding: var(--space-5);
+     It was 12px all round, a 44px row whose height followed from its content —
+     and the content is not the same on every row: a pill is taller than a bare
+     name, so a list where some rows carry "Always on" was not quite a list of
+     equal lines. A fixed floor makes every row the same height whatever it is
+     wearing. Thirty-eight rows at 44 in one column is the scroll the two
+     columns existed to avoid; at 36 it is a fifth shorter.
+
+     The 12px sides stay, bled back out by the list, so the focus ring has room
+     and the names start on the drawer body's own margin. */
+  min-height: 36px;
+  padding: 0 var(--space-5);
   border: 0; border-radius: var(--radius-sm);
   background: none; text-align: left; cursor: pointer;
   font: inherit; color: inherit;
-  transition: background var(--dur-fast) var(--ease-standard);
 }
-/* console-theme's own states, used literally. Fill now means exactly one
-   thing — under the pointer — because selection no longer takes one. */
-.bfp2__pickrow:hover { background: var(--state-hover-bg); }
-.bfp2__pickrow:active { background: var(--state-press-bg); }
+/* No fill under the pointer, and none on press.
+
+   The tint was the row's only hover state while the rows sat two to a line
+   and a cell's edges were otherwise invisible. In one column the whole line is
+   the target and the pointer already says so; a grey band chasing the cursor
+   down thirty-eight rows was the loudest thing in the drawer and it meant
+   nothing about the check. What a pressable row minimally needs is kept: the
+   pointer cursor, the tick's edge darkening to say which box the press lands
+   in, and a focus ring for the keyboard. */
 .bfp2__pickrow:hover .bx-tick { border-color: var(--accent); }
 .bfp2__pickrow:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
 
@@ -868,9 +957,9 @@
    done vertically, by something that was already going to be there.
 
    A fixed 264px basis stood here, sized to hold the longest name in either
-   catalogue beside a sentence lane. The sentence lane is gone and the grid cell
-   is the measure now, so the name simply takes what its column gives it and the
-   pill sits at the end of the cell. */
+   catalogue beside a sentence lane. The sentence lane is gone, and so is the
+   grid cell that measured the name after it: the name is as long as its words
+   and the pill follows it. */
 /* The family mark, between the tick and the name — see `CAT_ICON` in the TSX.
 
    A fixed 18px box around a 15px glyph, rather than letting each icon size
@@ -888,28 +977,42 @@
   width: 18px; color: var(--text-muted);
 }
 
+/* Shrinks, never grows: the pill after it sits against the name rather than at
+   the far end of a 520px line, where it would read as belonging to nothing. */
 .bfp2__pickname {
-  flex: 1 1 auto; min-width: 0;
+  flex: 0 1 auto; min-width: 0;
   display: flex; align-items: center; gap: var(--pill-gap);
   font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-secondary);
   transition: color var(--dur-fast) var(--ease-standard);
 }
 /* The ellipsis belongs on the text, not on the flex box holding it — a bare
    text node inside a flex container becomes an anonymous flex item, which
-   `text-overflow` cannot reach. This file has been bitten by that once already;
-   see `.bfp2__attword`. */
+   `text-overflow` cannot reach. This file has been bitten by that once already,
+   on the row the check list replaced. */
 .bfp2__pickword { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* `.bfp2__pickwhy` stood here: the whole `purpose` sentence in a third lane
    across the width the cards used to waste. It read well at thirteen rows and
    turned thirty-eight into a wall of grey prose — the panel's job is to be
    ticked, not read. The sentence is back on `TipMark`, which costs nothing
-   until it is wanted, and the width goes to a second column instead. */
+   until it is wanted. */
 
-/* Lane three, pushed to the edge by lane two's flex-grow, so the pills align
-   into a column of their own rather than shoving each name sideways by however
-   long its own label happens to be. */
-.bfp2__pickstate { flex: none; display: flex; align-items: center; gap: var(--pill-gap); }
+/* Lane three, straight after the name — the way `.bfp2__checkline` places the
+   same pills on the profile page, so a check wears its tag in the same place in
+   the drawer and on the page behind it.
+
+   It was pushed to the row's end, aligning the pills into a column of their
+   own. That column made sense in a 360px cell; at the end of a 520px line a
+   pill is a long way from the name it describes.
+
+   `flex: none` and `--badge-max` so the pill never gives up a letter: the kit's
+   14ch cap clipped "Not collected yet" to "Not collected y…", the one word on
+   the row that changes whether you pick it. The name, which truncates on its
+   own span, gives up the width instead. */
+.bfp2__pickstate {
+  flex: none; display: flex; align-items: center; gap: var(--pill-gap);
+  --badge-max: 24ch;
+}
 
 /* Selected is the tick and the name's weight, and that is all it is.
 
@@ -928,13 +1031,12 @@
 }
 
 /* A container query hiding the sentence lane below 600px stood here. There is
-   no sentence lane to hide — the grid's own `auto-fill` is what responds to
-   width now, dropping to one column when the panel cannot hold two, which is
-   the same adaptation with no rule to write. The mark is on every row at every
-   width, so nothing has to reappear. */
+   no sentence lane to hide, and the list is one column at every width, so
+   nothing on the row has to respond to width. The mark is on every row at
+   every width, so nothing has to reappear. */
 
 @media (prefers-reduced-motion: reduce) {
-  .bfp2__pickrow, .bfp2__pickname { transition: none; }
+  .bfp2__pickname { transition: none; }
 }
 /* `.bfp2__pickpurpose`, `.bfp2__pickvals` and the five `.bfp2__pickcfg` rules
    stood here — the purpose sentence under each attribute name, and the settings
@@ -973,7 +1075,6 @@
    hidden: it still says the family exists, and its count reads 0/0, which is
    the honest denominator. */
 
-
 /* --- Rules that were emitted and styled nowhere ---------------------------------
 
    All four of these are markup that has been on the screen for a while with no
@@ -998,9 +1099,25 @@
 /* `.bfp2__search` stood here — this drawer's own magnifier-and-field. It is
    `SearchBox` from the kit now, like every other search in the console; what
    remains is the one thing that genuinely belongs to THIS row, which is that
-   the box stretches and the filter beside it does not. */
-.bfp2__pickbar > .bx-search { flex: 1; min-width: 16ch; width: auto; }
-.bfp2__pickcount { font-size: var(--fs-sm); color: var(--text-tertiary); margin-left: auto; }
+   the box stretches and the filter beside it does not.
+
+   A 12ch basis and floor rather than `flex: 1` over 16ch. The bar has to hold
+   on one line in a 520px body with "Clear the rest" showing, and 16ch was the
+   one thing on it that would not give. The basis matters as much as the floor:
+   with `flex: 1` the box's line-breaking size was its intrinsic width, so the
+   bar wrapped before anything was actually short of room. */
+.bfp2__pickbar > .bx-search { flex: 1 1 12ch; min-width: 12ch; width: auto; }
+/* Narrower than the bar can hold on one line — a phone, where the drawer is
+   clamped to the window — the search takes a line to itself and the filter,
+   the count and Clear share the next, rather than wrapping one at a time into a
+   ragged second row. */
+@container bfp2-pick (max-width: 479px) {
+  .bfp2__pickbar > .bx-search { flex-basis: 100%; }
+}
+.bfp2__pickcount {
+  flex: none; white-space: nowrap;
+  font-size: var(--fs-sm); color: var(--text-tertiary); margin-left: auto;
+}
 .bfp2__pickcount.is-on { color: var(--text-secondary); font-weight: var(--fw-medium); }
 .bfp2__clear {
   flex: none; padding: 0; border: 0; background: none; cursor: pointer;
@@ -1008,114 +1125,10 @@
 }
 .bfp2__clear:hover { text-decoration: underline; }
 .bfp2__clear:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-xs); }
-.bfp2__attico { flex: none; display: grid; place-items: center; width: 20px; color: var(--text-tertiary); }
 
-
-/* =============================================================================
-   THE INNER PAGE
-   ========================================================================== */
-
-/* Two buttons where there was one, so the header needs a row of its own. */
-.bfp2__headacts { display: flex; align-items: center; gap: 8px; flex: none; }
-
-/* The row's right-hand slot. It holds one control, or two on a device row, or a
-   stated value and sometimes a button beside it.
-
-   It was `flex: none` and nothing else, declared beside the row it belongs to.
-   With no display of its own a second child sat UNDER the first, which is what
-   a device row's weight-and-precision pair and the overview's value-and-Change
-   pair would both have done. */
-/* Wraps. Two controls, a name and a delete button do not fit across the main
-   column of a two-column page at every width, and the alternative to wrapping
-   is truncating the name down to three characters to protect a dropdown. */
-.bfp2__attctl { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-/* Nothing in the slot is elastic, and the two controls a device row carries get
-   a width each. The kit gives a bare `<select>` `width: 100%` at zero
-   specificity — correct in a form column, and here it meant the precision
-   dropdown ate the row and squeezed the weight beside it down to "Mi…". */
-.bfp2__attctl > * { flex: none; }
-.bfp2__attctl .bx-tierpick { width: 96px; }
-.bfp2__attctl .bx-picker__trigger { min-width: 128px; }
-/* The floor above is for the PRECISION dropdown, whose values are long enough
-   to need it. On the weight it was 32px wider than the 96px wrapper holding it,
-   so the trigger overflowed its own box and painted over the delete button 20px
-   to its right — the button stayed clickable, which is why this survived: it
-   looked like a trash can inside the dropdown rather than a broken layout.
-
-   The tier trigger fills its wrapper instead, and the wrapper is the width. */
-.bfp2__attctl .bx-tierpick .bx-picker__trigger { min-width: 0; width: 100%; }
-
-/* --- The summary --------------------------------------------------------------
-
-   No controls anywhere in here, deliberately. Every other surface on this page
-   answers "what would I change"; this one answers "what does this profile do",
-   which is the question you have before touching anything and the one you have
-   to answer to somebody else afterwards. The moment it grows an editor it stops
-   being readable as a statement and becomes a fourth place to change things. */
-.bfp2__sum { display: flex; flex-direction: column; gap: 20px; }
-
-.bfp2__sumfacts { display: flex; flex-direction: column; gap: 0; margin: 0; }
-.bfp2__sumfacts > div {
-  display: flex; align-items: baseline; gap: 16px;
-  padding: 9px 0; border-bottom: 1px solid var(--border-subtle);
-}
-.bfp2__sumfacts > div:last-child { border-bottom: 0; }
-.bfp2__sumfacts dt { flex: none; width: 44%; font-size: var(--fs-sm); color: var(--text-tertiary); }
-.bfp2__sumfacts dd {
-  margin: 0; flex: 1; min-width: 0;
-  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
-}
-
-.bfp2__sumhead {
-  display: flex; align-items: baseline; gap: 10px;
-  margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-.bfp2__sumhead i { font-style: normal; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-tertiary); }
-
-.bfp2__sumlist { list-style: none; margin: -8px 0 0; padding: 0; }
-.bfp2__sumlist li {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
-  padding: 9px 0; border-bottom: 1px solid var(--border-subtle);
-}
-.bfp2__sumlist li:last-child { border-bottom: 0; }
-.bfp2__sumname {
-  display: flex; align-items: center; gap: 7px; min-width: 0; flex-wrap: wrap;
-  font-size: var(--fs-md); color: var(--text-primary);
-}
-.bfp2__sumval { flex: none; display: flex; align-items: baseline; gap: 8px; }
-.bfp2__sumval strong {
-  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.bfp2__sumval em { font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary); }
-
-.bfp2__sumnote { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.6; }
-.bfp2__sumwarn {
-  display: flex; align-items: flex-start; gap: 8px; margin: 0;
-  padding: 10px 12px; border-radius: var(--radius-md);
-  background: var(--fb-notice-bg); border: 1px solid var(--fb-notice-border);
-  font-size: var(--fs-sm); color: var(--fb-notice-fg); line-height: 1.5;
-}
-.bfp2__sumwarn svg { flex: none; margin-top: 2px; }
-
-/* --- The create panel's sections ------------------------------------------------
-
-   The Devices step asks two questions with a dependency between them — what the
-   collector can read, and how machines enrol — so they are two headed sections
-   rather than one run of controls. Which is also what lets the second one be
-   present-but-waiting: it is on the page from the moment the step opens, so the
-   shape of the form is honest before you touch anything, and a section that
-   appeared out of nowhere on a press would read as a step that grew. */
-.bfp2__wizsection { display: flex; flex-direction: column; gap: var(--space-4); }
-/* The heading carries the step's explanation on a mark, so it is a flex row
-   rather than a bare line of text — and the mark is baseline-aligned with the
-   words rather than centred on them, which is where a footnote marker sits. */
-.bfp2__wizsection > h4 {
-  margin: 0;
-  display: flex; align-items: center; gap: 6px;
-  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-.bfp2__restform h4 { display: flex; align-items: center; gap: 6px; }
+/* `.bfp2__wizsection` stood here — the create drawer's headed sections. The
+   wizard page's steps use the profile page's own section headings
+   (`.bfp2__basicsec`, `.bfp2__sechead`). */
 /* `.is-waiting` stood here — the dimmed state for a section whose question
    above it was unanswered. The section is not rendered at all until then, so
    there is nothing left to dim. */
@@ -1134,15 +1147,6 @@
 }
 .bfp2__confirm .bfp2__prereq { margin: 0; padding: 0; border: 0; background: none; }
 .bfp2__confirmacts { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); }
-/* The card the confirmation is about, marked while it waits — without it the
-   panel says "removes MAC address" with nothing on screen pointing at which
-   press caused it. */
-.bfp2__mode-card.is-pending {
-  border-color: var(--fb-notice-border);
-  background: var(--fb-notice-bg);
-}
-
-
 /* =============================================================================
    THE DETAIL PAGE, IN TWO TABS
    ========================================================================== */
@@ -1162,158 +1166,108 @@
    it" — passes to the action bar, which is what now separates looking from
    committing. */
 
-.bfp2__tabs { margin: var(--space-6) 0 var(--space-6); }
+/* The tabs sit right under the name they belong to. The page grid already puts
+   16px between rows; the shared page-head margin (24px, console-theme.css) and
+   16px of the tabs' own on top of that left 56px between the name and its
+   tabs, and 32px again before the panel. The head margin is for a title over a
+   page; here the tabs are part of the head. */
+.bfp2 .bfp2__head:has(+ .bfp2__tabs) { margin-bottom: 0; }
+.bfp2__tabs { margin: var(--space-2) 0 0; }
+/* A health profile has no tabs, and its name sat 40px above the Checks heading
+   — the page head's 24px on the grid's 16px — which read as a page title over a
+   separate page rather than a profile over its own checks. The same 20px the
+   tabs get (owner, 15 Sep 2026). `.bfp2__panel` is only ever the head's next
+   sibling on a profile without tabs; the risk signal profile's head is followed
+   by its scale, so it keeps the shared margin. */
+.bfp2 .bfp2__head:has(+ .bfp2__panel) { margin-bottom: var(--space-2); }
 
-/* Room for the action bar to float over, so the last control on the page is not
-   permanently underneath it. Only when there is a bar: the padding is on the
-   panel rather than the page so an unedited profile does not end in 80px of
-   nothing.
-
-   It grew with the bar going `fixed`. Sticky bars sit in the flow until they
-   pin, so the page ended below one; a fixed bar never occupies a line, and the
-   reserved space is the only thing standing between it and the last row. */
+/* No room reserved for the save footer: it is in the column's flow now, under
+   the page, so it cannot cover the last control. */
 .bfp2__panel { padding-bottom: var(--space-4); }
-.bfp2 .bfp2__panel:has(~ .bx-savebar) { padding-bottom: 84px; }
 
-/* --- The cards --------------------------------------------------------------
+/* The scrollbar's room is kept whether or not the page scrolls, while a profile
+   is open. Basic details is tall enough to scroll and a Signals list of six is
+   not, so the shell column's 15px scrollbar came and went with every tab
+   switch, and the list's right edge, every control, every Remove and the aside
+   moved sideways under the pointer. A health profile did the same as checks
+   were added, and on a column near the list's 519px step the pickers changed
+   width with it (15 Sep 2026). Scoped to the open profile — the compact list
+   page is laid out for its own column — rather than set on the shell, where it
+   would take the strip from screens that never scroll. */
+.bshell__main:has(.bfp2:not(.bpage--compact)) { scrollbar-gutter: stable; }
 
-   Same card as the attribute list, and deliberately: `Name`, `What it can read`
-   and `How devices enrol` are sections of one form, not three panels of three
-   different kinds. The heading sits inside the card with its explanation on the
-   same line, which is where the attribute list already put its count. */
-.bfp2__card {
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-.bfp2__cardhead {
-  display: flex; align-items: center; gap: var(--space-4);
-  padding: var(--space-5) var(--space-6);
-  border-bottom: 1px solid var(--border-subtle);
-}
-.bfp2__cardhead h2 {
-  margin: 0; flex: none;
-  font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-/* The count beside the name rather than as a row of its own. It is a property
-   of THIS list, and a list that says how long it is at the top of itself does
-   not need a fact stating the same number elsewhere. On the form cards the same
-   slot carries the sentence that used to be a tip behind a dot — there is room
-   for it on a full-width heading, and a sentence you can read beats one you
-   have to hover for. */
-.bfp2__cardcount {
-  flex: 1; min-width: 0;
-  font-size: var(--fs-sm); color: var(--text-tertiary);
-  line-height: 1.5;
-}
-.bfp2__cardcount i { font-style: normal; color: var(--fb-notice-fg); }
-.bfp2__card > .bfp2__rows { padding: 0 var(--space-6); }
-.bfp2__card > .bx-empty { padding: var(--space-7) var(--space-6); }
-/* A stack with a gap, not a plain block.
+/* --- Basic details, as sections ----------------------------------------------
 
-   It was `padding` only, and every child in it carried `margin: 0` — the two
-   reach cards, the "install the agent first" panel and the switch confirmation
-   sat edge to edge, so a bordered notice appeared welded to the bottom of the
-   fieldset above it. The gap is the card's, not each child's: whichever
-   combination of the three is rendered, the spacing between them is the same
-   one, and nothing has to remember to bring its own margin. */
-.bfp2__cardbody {
-  display: flex; flex-direction: column; gap: var(--space-5);
-  padding: var(--space-6);
+   `.bfp2__card`, its header band and its body stood here: `What it can read`,
+   `How devices enrol` and `Can't be changed` as three bordered cards across the
+   whole panel. The tab is the Signals tab's two columns now (owner, 15 Sep
+   2026), and the Signals list has no box, so neither has this. The rebrand's
+   own de-boxing of those cards went with them — there is nothing left to undo.
+
+   The form takes the check list's width, which is the whole work column (owner,
+   15 Sep 2026), so switching tabs moves neither edge. It was half the column,
+   480px at least, and every row in it was a label touching its control. With
+   the width the form lays out as a settings page does: a label on the left, its
+   control on the right edge, and the space between them doing the separating.
+   Sections are split by space, not rules, and so are the rows in them.
+
+   A named container, because what decides whether two tiles fit side by side
+   is this column's width, and a viewport query cannot know that — the aside
+   takes 368px of it above the zones breakpoint and none below.
+
+   The form is drawn in two places: the profile page's Basic details tab and the
+   create wizard's Devices step, both at the work column's width, by these same
+   container rules. */
+.bfp2__basic {
+  display: flex; flex-direction: column; gap: var(--space-9);
+  min-width: 0;
+  container: bfp2-basic / inline-size;
 }
-/* The facts keep their own rhythm — flush rows with rules between them — so the
-   body loses its vertical padding and the first rule lands on the header. */
-.bfp2__cardbody--facts { display: block; padding: 0 var(--space-6); }
+/* The check list's gap, so a heading sits as far above its controls here. */
+.bfp2__basicsec { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
 
-/* Two across, now that there is width for two.
+/* Agentless and Agent-based SIDE BY SIDE at the work column's width — two
+   answers to one question read as a pair, and stacked they read as two
+   unrelated settings (owner, 16 Sep 2026).
 
-   The stacked column was chosen for a 520px drawer, where side-by-side left
-   each card 230px and wrapped both sentences to four lines. On a full-width tab
-   each gets around 450px and the sentence lands in one or two, so the pair is
-   compared side by side as a pair rather than read as a list. Scoped to the
-   tab: the create drawer still shows these at 520px and still wants them
-   stacked. */
-@media (min-width: 860px) {
-  .bfp2__formcard .bfp2__modes { flex-direction: row; align-items: stretch; }
-  .bfp2__formcard .bfp2__modes > .bfp2__mode-card { flex: 1 1 0; min-width: 0; }
+   The threshold was 640px, which the 50/50 page's work column (586px) misses by
+   54, so the pair stacked everywhere it actually appears. 520px gives each tile
+   ~287px: the summary line wraps to two there, and a wrapped line inside a tile
+   costs less than the pairing does. Below that — a phone, a narrow drawer —
+   they still stack. Set here rather than on the tiles: the type tiles, on the
+   wizard's first step and in the name-first dialog, keep their `auto-fit`. */
+.bfp2__basic .bfp2__choices { grid-template-columns: minmax(0, 1fr); }
+@container bfp2-basic (min-width: 520px) {
+  .bfp2__basic .bfp2__choices { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
 }
 
-/* The action bar's rules moved to `.bx-savebar` in the kit.
+/* The enrolment questions (`EnrolmentFields`), without hairlines or padding —
+   here and on the create wizard's Devices step, which sits in the same
+   `.bfp2__basic`. They stack now (`.bfp2__enrolfield`), so the gap below is the
+   space between one question and the next, not between rows. */
+/* The file card one width too, so a long file name ellipsises rather than
+   deciding whether the card fits beside its label. 340px, the card's own cap,
+   holds "24 devices, uploaded 12 Aug 2026" (190px) whole beside Replace; at 300
+   that line wrapped and the card grew to 72px. Narrower, it ellipsises. */
+.bfp2__basicsec .bfp2__file { width: 340px; max-width: 100%; }
+.bfp2__basicsec .bfp2__file-body em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The stepper's range hint appears under it while it is focused, and the kit
+   reserves its line even while it is hidden — 21px under a 36px box — so the
+   label beside it centred on a 57px row, 10px below the number. Here the hint
+   hangs below the box instead: it is the last row in its section, so what it
+   hangs into is the 32px before the next heading. */
+.bfp2__basicsec .bx-stepwrap { position: relative; }
+.bfp2__basicsec .bx-step__hint {
+  position: absolute; top: 100%; left: 0; right: 0; margin-top: 3px;
+  white-space: nowrap;
+}
+.bfp2__basicsec .bfp2__enrolwarn { margin: 0; }
+/* The Signals list's own breakpoint, for the same reason: below it half a
+   column is not a column. */
 
-   Zones and risk profiles commit through the same strip now, and the one thing
-   in it that is easy to get wrong — centring without a transform, because the
-   animation owns the element's transform — is worth writing once. What stays
-   here is only the space the page reserves for it, above. */
-
-/* --- The facts that stayed facts ---------------------------------------------
-
-   Three rows: the kind, which is fixed for the life of the profile; the
-   platform list, which is derived from the other tab; and Used by, which
-   belongs to the policies. None of the three has a control anywhere, which is
-   what earns them a stated row rather than a field. */
-.bfp2__facts { display: flex; flex-direction: column; }
-.bfp2__facts h3 {
-  margin: 0 0 var(--space-3);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--text-tertiary);
-}
-.bfp2__fact {
-  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);
-  padding: var(--space-4) 0;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.bfp2__fact:last-child { border-bottom: 0; }
-.bfp2__factlabel {
-  flex: none; display: inline-flex; align-items: center; gap: 5px;
-  font-size: var(--fs-sm); color: var(--text-tertiary);
-}
-.bfp2__factval {
-  min-width: 0; text-align: right;
-  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
-  /* Numbers line up down the column, which is most of what a column of facts is
-     for. */
-  font-variant-numeric: tabular-nums;
-}
-/* Not a badge. A word in the notice colour, which is as much weight as "no
-   platform is named" needs when the tip beside it says why. */
-.bfp2__factval.is-warn { color: var(--fb-notice-fg); }
-button.bfp2__factval {
-  border: 0; background: none; padding: 0; cursor: pointer;
-  font-family: inherit; color: var(--text-link);
-}
-button.bfp2__factval:hover { text-decoration: underline; }
-button.bfp2__factval:focus-visible {
-  outline: none; border-radius: var(--radius-xs);
-  box-shadow: 0 0 0 4px var(--focus-halo);
-}
-
-/* --- The delete confirmation ------------------------------------------------- */
-
-.bfp2__confirmbody { display: flex; flex-direction: column; gap: var(--space-4); }
-.bfp2__confirmbody p { margin: 0; font-size: var(--fs-md); line-height: 1.6; color: var(--text-secondary); }
-.bfp2__confirmbody strong { color: var(--text-primary); font-weight: var(--fw-medium); }
-
-/* --- The agent prerequisite ------------------------------------------------------
-
-   Informational, so it takes the info ramp rather than the notice one: nothing
-   is wrong, there is something to do. The console's own version of this panel
-   is the same shape and the same colour, which is the point — an admin who has
-   seen the old console should recognise it. */
-.bfp2__prereqbox {
-  display: flex; gap: var(--space-4);
-  padding: var(--space-5);
-  border: 1px solid var(--fb-info-border); border-radius: var(--radius-md);
-  background: var(--fb-info-bg);
-}
-.bfp2__prereqico { flex: none; display: grid; place-items: center; width: 20px; height: 20px; color: var(--fb-info-fg); }
-.bfp2__prereqbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; }
-.bfp2__prereqbody strong {
-  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-.bfp2__prereqbody ul { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); }
-.bfp2__prereqbody li { font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.55; }
+/* `.bfp2__prereqbox` stood here — the drawer's "Needs the Device Agent"
+   callout. On a page the agent's cost is said in the side panel beside the
+   reach tiles (`BasicAside`), in the same words. */
 
 /* --- The category filter, and the rows that cannot be turned off ----------------- */
 
@@ -1322,8 +1276,13 @@ button.bfp2__factval:focus-visible {
    takes everything the search box does not. */
 /* A fixed width, since the control inside it fills its wrapper now — `auto`
    let the trigger collapse to the width of whichever category was chosen, so
-   the filter changed size as you used it. */
-.bfp2__catfilter { flex: none; width: 190px; }
+   the filter changed size as you used it.
+
+   168 rather than 190: in the 560px drawer the bar has 520px for a search, this,
+   "N selected" and "Clear the rest", and the 22px came out of the search box.
+   "All categories", the longest thing the trigger ever says, still fits whole,
+   and 168 is the check list's own trigger floor. */
+.bfp2__catfilter { flex: none; width: 168px; }
 
 /* Ticked, and not by you — which this screen has not actually been saying.
 
@@ -1337,7 +1296,11 @@ button.bfp2__factval:focus-visible {
    The row is a `<div>` rather than a disabled `<button>` now, so there is
    nothing here about cursors on a control — there is no control. */
 .bfp2__pickrow.is-fixed { cursor: default; }
-.bfp2__pickrow.is-fixed:hover { background: none; }
+/* The lock that says why, at the end of the line — where the check list puts
+   it, in the Remove column (15 Sep 2026). */
+.bfp2__picklock { flex: none; display: inline-flex; margin-left: auto; }
+/* `.is-fixed:hover { background: none }` stood here, cancelling a hover tint
+   no row wears any more. */
 .bfp2__pickrow.is-fixed:hover .bx-tick { border-color: var(--border-strong); }
 .bfp2__pickrow.is-fixed .bx-tick {
   border-color: var(--border-strong);
@@ -1346,16 +1309,7 @@ button.bfp2__factval:focus-visible {
 }
 .bfp2__pickrow.is-fixed .bfp2__pickname { font-weight: var(--fw-regular); color: var(--text-secondary); }
 
-/* Says why, on the row, in the two words it takes. The group heading says it
-   once for the group; after a search there is no group. */
-.bfp2__fixedtag {
-  flex: none; font-style: normal;
-  padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
-  line-height: var(--pill-line);
-  background: var(--surface-inset); color: var(--text-tertiary);
-  font-size: var(--pill-fs); font-weight: var(--pill-fw);
-  letter-spacing: 0; white-space: nowrap;
-}
+/* `.bfp2__fixedtag` stood here. "Always on" is a neutral kit Badge now. */
 
 /* --- Warnings that lost their rail -------------------------------------------
 
@@ -1379,11 +1333,108 @@ button.bfp2__factval:focus-visible {
 .bfp2__enrolwarn > svg { flex: none; margin-top: 1px; }
 .bfp2__enrolwarn b { font-weight: var(--fw-semibold); }
 
-/* The same fact when it is not a warning: what the profile does check. */
-.bfp2__osfoot {
-  margin: var(--space-2) 0 0;
-  font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55;
-}
-.bfp2__osfoot b { font-weight: var(--fw-medium); color: var(--text-secondary); }
+/* `.bfp2__osfoot` stood here: the sentence under the OS list that said which
+   platforms it checks. It is a line in the side column's summary now, and so is
+   the no-platform case that used a `.bfp2__enrolwarn` box there.
+   `.bfp2__osuses` went too; nothing rendered it. */
 
-.bfp2__osuses { margin-top: var(--space-5); }
+/* =============================================================================
+   THE SIDE COLUMN
+   ========================================================================== */
+
+/* The grid, the column and the info panel are the zone page's own classes
+   (`.bz7__cols`, `.bz7__aside`, `.bz7__side` in zones-final.css), so the two
+   inner pages share one width, one gap and one breakpoint. What is here is
+   only what a profile adds to that shape. */
+
+/* One short line per check, inside the info panel. Not the zone page's
+   sample-and-gloss list: these are sentences, not samples. */
+/* 12px between lines, not 4. These are whole sentences, and at 4px with a 1.5
+   line-height the gap between two sentences was smaller than the gap between
+   two lines of the same sentence — so four facts read as one paragraph. */
+.bfp2__sumlines {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: var(--space-5);
+  font-size: var(--fs-sm); line-height: 1.55;
+}
+
+/* `.bfp2__addside` and its rows stood here: a "You can also check" catalogue
+   with an Add per row under the info panel. Removed 15 Sep 2026; the list's
+   Edit button opens the same catalogue. */
+
+/* --- An enrolment question, stacked ----------------------------------------------
+
+   `Profile name`'s shape, applied to the whole enrolment section — see
+   `EnrolField`. These were rows with the label pushed left and the control
+   pushed right, which is right for a LIST of forty signals and wrong for a form
+   of four unlike questions: the answer ends up as far from its label as the
+   widest row allows, and a dropdown, a switch and a stepper have nothing to
+   line up with each other about.
+
+   FULL WIDTH, not capped at a 420px measure (owner, 16 Sep 2026). The cap was
+   there so a dropdown's value could not end a hand's span from the label naming
+   it — the fault the old rows had, rotated. What makes that safe now is the
+   50/50 page: the work column is ~586px, not a page width, and the type tiles
+   directly above these questions already fill it. A field stopping 166px short
+   of the tiles read as a ragged right edge, which is a worse fault than the one
+   the cap prevented. If this section ever lands in a full-width column again,
+   the cap comes back. */
+/* 8px between a label and its control, 20px between one question and the next
+   (`.bfp2__rows--form` below). The pair was 6 and 12, close enough that the
+   four questions read as one twelve-line block rather than as four; the label
+   nearest a control is what says which control it names, so that gap has to be
+   the smaller one by a clear margin. */
+.bfp2__enrolfield { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+/* A SWITCH answers on its label's line.
+
+   Stacked like the others, a 36px toggle hung alone under a full-width question
+   with nothing to its right — the shape says "a field follows" and what follows
+   is a dot. A switch is the answer itself, not a field to fill, so the question
+   and its state belong on one line, the state at the measure's right edge where
+   the dropdown and the stepper also end.
+
+   Wrapping, so a `help` line under an inline pair goes full width rather than
+   squeezing into the row. */
+.bfp2__enrolfield--inline {
+  flex-direction: row; flex-wrap: wrap; align-items: center;
+  gap: var(--space-4) var(--space-6); min-height: 32px;
+}
+.bfp2__enrolfield--inline > .bfp2__enrollabel { flex: 1 1 auto; }
+.bfp2__enrolfield--inline > .bfp2__enrolctl { flex: none; margin-left: auto; }
+.bfp2__enrollabel {
+  display: flex; align-items: center; gap: var(--space-3);
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+}
+/* A switch sits at its own width — stretched to the field it would draw a
+   200px-wide toggle. The things that read as fields, the dropdown and the
+   number field, fill it. */
+.bfp2__enrolctl { display: flex; align-items: center; min-width: 0; }
+.bfp2__enrolctl > .bx-picker { width: 100%; }
+
+/* The section's own rhythm: four questions, each a block, with air between them
+   rather than the 4px a list of rows uses. */
+.bfp2__rows--form { display: flex; flex-direction: column; gap: var(--space-7); }
+
+/* --- Tooltips, off for now -----------------------------------------------------
+
+   Every `?` on the device-profile screens is hidden (owner, 16 Sep 2026: "too
+   many of them, some are not even needed ... hide it as of now, if needed I'll
+   tell you"). Hidden and not deleted, so the words stay in the source and one
+   rule brings them back.
+
+   Only the dot and its wrapper: `:has(> .bx-tipdot)` so a `Tip` wrapping a real
+   control — a button with a tooltip — is left alone. Scoped to this product's
+   roots: the page (`.bfp2`, which the full-page wizard also renders in), the
+   slide-over wizard, and the two things that portal out of both — the type and
+   reach tiles, and the signal picker. Risk signal profiles borrow a few `bfp2__`
+   classes for their header, but not the root, so their tips stay.
+
+   `display: none` takes the dot out of the accessibility tree too, which is the
+   honest match for "not shown": a control a screen reader can reach and a
+   sighted user cannot would be the worse half of hiding it. */
+.bfp2 .bx-tip:has(> .bx-tipdot),
+.bdpw--drawer .bx-tip:has(> .bx-tipdot),
+.bfp2__choices .bx-tip:has(> .bx-tipdot),
+[class*='bfp2__pick'] .bx-tip:has(> .bx-tipdot) {
+  display: none;
+}

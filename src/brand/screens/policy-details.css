@@ -5,3 +5,14 @@
 
 .bpd .bname2__form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .bpd .bname2__form > .bname2__field:first-child { grid-column: 1 / -1; max-width: 520px; }
+
+/* The title and the change-state pill, on one line. */
+.bpd__title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+/* The one line under Applications when an empty list will send the policy back to draft. */
+.bpd__note { margin: 0; font-size: var(--fs-sm); line-height: 1.4; color: var(--text-secondary); }
+
+/* Why the name cannot be saved. The notice tone the save bar uses for the same
+   reason, not red: red is kept for destructive actions. */
+.bpd__error { margin: 0; font-size: var(--fs-sm); line-height: 1.4; font-weight: var(--fw-medium); color: var(--fb-notice-fg); }
+.bpd .bname2 .bname2__field > input[type='text'][aria-invalid='true'] { border-color: var(--fb-notice-border); }

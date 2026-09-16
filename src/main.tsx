@@ -56,9 +56,13 @@ import './brand/screens/impact-arena.css'
 import './brand/screens/recovery.css'
 import './brand/screens/method-forms.css'
 import './brand/screens/auth-methods.css'
+// The Display tokens page and its sliders, reached from Authentication methods.
+import './brand/screens/display-token-page.css'
 import './brand/screens/hooks.css'
 import './brand/screens/zones-final.css'
 import './brand/screens/device-fingerprint-v2.css'
+// The create wizard page, after the profile sheet whose classes it borrows.
+import './brand/screens/device-profile-wizard.css'
 import './brand/screens/used-by.css'
 import './brand/screens/applications.css'
 import './brand/create/create.css'

@@ -1,30 +1,29 @@
-import { Fragment, useMemo, useRef, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Check,
   Clock,
   Copy,
-  Fingerprint,
   Gauge,
   Globe,
   Info,
   ListFilter,
+  type LucideIcon,
   MapPin,
   MonitorSmartphone,
   MoreHorizontal,
   Plus,
   ShieldAlert,
-  Users,
+  UserCheck,
   Webhook,
   X,
   XCircle,
-  type LucideIcon,
 } from 'lucide-react'
 
-import { Counter, MenuButton, Tip, TipDot, Toggle, type MenuItem } from '../kit'
+import { MenuButton, Tip, TipDot, Toggle, type MenuItem } from '../kit'
 import { Picker } from '../picker'
 import { cardJoin, cardLetter, ckey, duplicatedAcrossCards, topJoin } from '../predicate'
-import { predicateParts, type NameLookup } from './predicate-prose'
+import { predicateParts, whoSentence, type NameLookup } from './predicate-prose'
 import {
   card,
   cond,
@@ -32,16 +31,12 @@ import {
   type AccessDecision,
   type Condition,
   type ConditionCard,
-  type Policy,
   type Rule,
 } from '../data'
 import { ConditionList, ConditionPopover, condSummary, valueSource } from './ConditionPopover'
 import { conditionTone } from './board/tones'
 import { useBrand, useNameLookup } from '../store'
-import { ruleSentence } from './builder-dialogs'
-import { impactOf, type Diagnostic } from './diagnostics'
-import { SITUATIONS, sweep } from './impact-arena'
-import { SIM_USERS, type SimContext, type SimEnv } from './simulate'
+import type { Diagnostic } from './diagnostics'
 
 /* -----------------------------------------------------------------------------
    The rule form, and the live preview that answers it.
@@ -61,8 +56,6 @@ const GROUP_ICON: Record<string, LucideIcon> = {
   Location: MapPin,
   Device: MonitorSmartphone,
   Risk: Gauge,
-  User: Fingerprint,
-  Group: Users,
   Time: Clock,
   'Custom attributes': ListFilter,
   Webhooks: Webhook,
@@ -104,7 +97,7 @@ const GROUP_ICON: Record<string, LucideIcon> = {
    — and collapsing it would throw that away to tidy a form. Only the
    presentation changes. */
 export const OUTCOMES: { id: AccessDecision; label: string; sub: string; icon: LucideIcon }[] = [
-  { id: '1fa', label: 'Allow', sub: 'The sign-in goes through', icon: Users },
+  { id: '1fa', label: 'Allow', sub: 'The sign-in goes through', icon: UserCheck },
   { id: 'deny', label: 'Deny', sub: 'The sign-in is refused outright', icon: ShieldAlert },
 ]
 
@@ -164,35 +157,6 @@ export function ruleState(diags: Diagnostic[]): RuleState {
    already says something", and it is why the old picker felt like it was
    choosing a zone rather than choosing what to check. A new row now inserts
    unset, shows "Needs a value" in neutral, and opens its own value control. */
-
-export interface PreviewState {
-  userId: string
-  place: string
-  device: string
-  authState: string
-  risk: string
-}
-
-export const DEFAULT_PREVIEW: PreviewState = {
-  userId: SIM_USERS[0].id,
-  place: 'Office Network',
-  device: 'Known < 90 days',
-  authState: 'Normal returning user',
-  risk: 'Low',
-}
-
-/** The context every preview and checklist in a host is answered against. */
-export function previewContext(pv: PreviewState): SimContext {
-  const now = new Date()
-  return {
-    user: SIM_USERS.find((u) => u.id === pv.userId) ?? SIM_USERS[0],
-    place: pv.place,
-    device: pv.device,
-    authState: pv.authState,
-    risk: pv.risk,
-    nowMinutes: now.getHours() * 60 + now.getMinutes(),
-  }
-}
 
 /* `RuleForm` lived here: the whole rule as one long scrolling form with a
    sticky identity header and its own section numbering. It existed for v5,
@@ -262,9 +226,10 @@ export function Section({
 /* --- WHEN: the composer ---------------------------------------------------------
 
    A rule's WHEN is a disjunction of cards: a card holds conditions that are all
-   required, and two cards are alternatives. `(location and IP) or (user and
-   group)` is two cards, and needs no brackets on screen because the boxes ARE
-   the brackets.
+   required, and two cards are alternatives. `(location and IP) or (device and
+   risk)` is two cards, and needs no brackets on screen because the boxes ARE
+   the brackets. Who the rule is for is not a card: it is `rule.who`, edited
+   above the cards, and ANDed with all of them.
 
    **There is no AND/OR control anywhere.** Inside a card the connective is the
    lowercase word `and`, rendered as static text at every position; between
@@ -276,7 +241,7 @@ export function Section({
    an OR group". A mixed run is now unrepresentable rather than discouraged.
 
    The asymmetry is deliberate and does the teaching: `and` is punctuation and
-   costs a small dashed button inside the card, `or` is a full-width commitment
+   costs a small plain button inside the card, `or` is a full-width commitment
    that opens a new box. Nobody has to be told what they mean.
    -------------------------------------------------------------------------- */
 
@@ -327,6 +292,9 @@ export function WhenSection({
   const setAdding = hoisted ? onCatalogue! : setOwnAdding
 
   const cards = rule.when.cards
+  /* Who is never drawn here — it has its own field above — but an empty WHEN
+     has to say whose sign-ins it decides. */
+  const who = whoSentence(rule.who, resolve)
   /* `...rule.when`, not a fresh object.
 
      This wrote `{ cards: next }`, which drops `when.join` — so the moment
@@ -440,7 +408,11 @@ export function WhenSection({
 
         {cards.length === 0 ? (
           <div className="bf__whenempty">
-            <p>This rule has no conditions, so it decides every sign-in that reaches it.</p>
+            <p>
+              {who
+                ? `This rule has no conditions, so it decides every sign-in from ${who.startsWith('Everyone') ? who.charAt(0).toLowerCase() + who.slice(1) : who} that reaches it.`
+                : 'This rule has no conditions, so it decides every sign-in that reaches it.'}
+            </p>
             <CatalogueButton
               open={adding === 'first'}
               onToggle={() => setAdding(adding === 'first' ? null : 'first')}
@@ -460,7 +432,7 @@ export function WhenSection({
                      trunk had a joiner at all, so a predicate whose
                      alternatives are ANDed described itself as alternatives. */
                   <li className="bf__or" aria-hidden>
-                    <span>{topJoin(rule.when).toUpperCase()}</span>
+                    <span>{topJoin(rule.when)}</span>
                   </li>
                 )}
                 <CardBlock
@@ -560,10 +532,22 @@ function CardBlock({
   const patchOne = (id: string, p: Partial<Condition>) =>
     set(k.conditions.map((c) => (c.id === id ? { ...c, ...p } : c)))
 
+  /* A disabled item says why, or it reads as broken. */
   const menu: MenuItem[] = [
     { id: 'name', label: k.label ? 'Rename this branch' : 'Name this branch' },
-    { id: 'merge', label: 'Merge into the branch above', disabled: index === 0, divide: true },
-    { id: 'delete', label: 'Delete this branch', disabled: total === 1 },
+    {
+      id: 'merge',
+      label: 'Merge into the branch above',
+      disabled: index === 0,
+      hint: index === 0 ? 'This is the first branch' : undefined,
+      divide: true,
+    },
+    {
+      id: 'delete',
+      label: 'Delete this branch',
+      disabled: total === 1,
+      hint: total === 1 ? 'A rule needs at least one branch' : undefined,
+    },
   ]
 
   return (
@@ -577,7 +561,7 @@ function CardBlock({
         <input
           className="bf__cardname"
           aria-label={`Name for branch ${cardLetter(index)}`}
-          placeholder={total > 1 ? 'Name this branch (optional)' : ''}
+          placeholder="Branch name"
           value={k.label ?? ''}
           onChange={(e) => onPatch(k.id, { ...k, label: e.target.value || undefined })}
         />
@@ -690,7 +674,6 @@ function ConditionRow({
      name anything. */
   const stale = c.values.filter(Boolean).some((id) => !options.some((o) => o.value === id))
 
-
   /* Every condition type, grouped by major component, so changing a row's field
      never means deleting and re-adding it.
 
@@ -710,9 +693,12 @@ function ConditionRow({
       hint: 'These are required together. Split only if this should be a separate branch.',
       disabled: !canSplit,
     },
-    ...cards
-      .filter((k) => k.id !== cardId)
-      .map((k, i) => ({ id: `move:${k.id}`, label: `Move to ${k.label?.trim() || `branch ${cardLetter(i)}`}` })),
+    /* Lettered by the branch's place in the FULL list, as its header is. The
+       index used to come from the list with this branch filtered out, so every
+       letter after it was one short and "Move to branch A" moved to B. */
+    ...cards.flatMap((k, i) =>
+      k.id === cardId ? [] : [{ id: `move:${k.id}`, label: `Move to ${k.label?.trim() || `branch ${cardLetter(i)}`}` }],
+    ),
     { id: 'remove', label: 'Remove', divide: true },
   ]
 
@@ -866,13 +852,13 @@ function CatalogueButton({
   onToggle,
   onPick,
   label,
-  variant = 'dashed',
+  variant = 'plain',
 }: {
   open: boolean
   onToggle: () => void
   onPick: (typeId: string) => void
   label: string
-  variant?: 'dashed' | 'solid' | 'or'
+  variant?: 'plain' | 'solid' | 'or'
 }) {
   if (open) {
     return (
@@ -976,7 +962,9 @@ export function ThenSection({
                     onPatch(pickOutcome(OUTCOMES[(i + d + OUTCOMES.length) % OUTCOMES.length].id, lastAllow.current))
                   }}
                 >
-                  <span className="bf__outdot" aria-hidden />
+                  <span className="bf__outmark" aria-hidden>
+                    {on && <Check size={15} strokeWidth={2.4} />}
+                  </span>
                   <Ico size={16} strokeWidth={1.9} aria-hidden />
                   <span className="bf__outname">
                     <strong>{o.label}</strong>
@@ -1041,13 +1029,24 @@ export function ThenSection({
 
               {rule.firstFactor === 'Specific' && (
                 <Prop label="Which first-factor method" indent>
+                  {/* Empty until chosen. It used to show the first method
+                      while the rule stored none, so the card said a method
+                      was chosen and the saved rule had nothing to ask for. */}
                   <Picker
                     label="First-factor method"
-                    value={rule.firstFactorMethod ?? METHODS[0]}
+                    value={rule.firstFactorMethod ?? null}
+                    placeholder="Choose a method"
+                    invalid={!rule.firstFactorMethod}
                     options={METHODS.map((m) => ({ value: m, label: m }))}
                     onChange={(firstFactorMethod) => onPatch({ firstFactorMethod })}
                   />
                 </Prop>
+              )}
+              {rule.firstFactor === 'Specific' && !rule.firstFactorMethod && (
+                <p className="bf__factorwarn">
+                  <XCircle size={13} strokeWidth={2} aria-hidden />
+                  No first factor method chosen. Choose a method or pick Password.
+                </p>
               )}
 
               {rule.decision === '2fa' && (
@@ -1150,17 +1149,11 @@ export function ThenSection({
               {rule.decision === '2fa' && rule.rememberMfa && (
                 <>
                   <Prop label="Trust that device for" indent>
-                    <span className="bf__val bf__val--range">
-                      <input
-                        type="number"
-                        min={1}
-                        max={365}
-                        aria-label="Days to remember"
-                        value={rule.rememberDays ?? 30}
-                        onChange={(e) => onPatch({ rememberDays: Number(e.target.value) || 30 })}
-                      />
-                      <em>days</em>
-                    </span>
+                    <DaysField
+                      key={rule.id}
+                      value={rule.rememberDays ?? 30}
+                      onCommit={(rememberDays) => onPatch({ rememberDays })}
+                    />
                   </Prop>
                   <Prop label="Prompt every time anyway, remembered or not" indent>
                     <Toggle
@@ -1212,6 +1205,69 @@ function pickOutcome(id: AccessDecision, lastAllow: AccessDecision): Partial<Rul
   return { decision: 'deny', rememberMfa: false, allowDisable2fa: false, secondFactor: 'any' }
 }
 
+/* How many days a device that passed the second factor is trusted.
+
+   Typed as text and committed on blur or Enter, the board's way. It used to
+   write on every keystroke with `Number(v) || 30`, so clearing the field
+   snapped it back to 30 under the cursor, and -5, 2.5 and 9999 were all
+   stored. A whole number from 1 to 365 is kept; anything else puts the stored
+   value back and says what is allowed. */
+const DAYS_MIN = 1
+const DAYS_MAX = 365
+
+function DaysField({ value, onCommit }: { value: number; onCommit: (days: number) => void }) {
+  const [text, setText] = useState(String(value))
+  const [bad, setBad] = useState(false)
+  /* An undo, or the other builder, changes the stored value: show it. */
+  const [seen, setSeen] = useState(value)
+  if (seen !== value) {
+    setSeen(value)
+    setText(String(value))
+    setBad(false)
+  }
+
+  const commit = () => {
+    const n = Number(text)
+    const ok = text.trim() !== '' && Number.isInteger(n) && n >= DAYS_MIN && n <= DAYS_MAX
+    if (!ok) {
+      setText(String(value))
+      setBad(text.trim() !== String(value))
+      return
+    }
+    setBad(false)
+    if (n !== value) onCommit(n)
+  }
+
+  return (
+    <span className="bf__val bf__val--range">
+      <input
+        type="number"
+        inputMode="numeric"
+        min={DAYS_MIN}
+        max={DAYS_MAX}
+        step={1}
+        aria-label="Days to remember"
+        aria-invalid={bad || undefined}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value)
+          setBad(false)
+        }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit()
+        }}
+      />
+      <em>days</em>
+      {bad && (
+        <em className="bf__valerr" role="alert">
+          Enter 1–365 days
+        </em>
+      )}
+    </span>
+  )
+}
+
 /* A settings row: what it does on the left, the control that does it on the
    right, and nothing in between.
 
@@ -1241,137 +1297,10 @@ function Prop({
   )
 }
 
-/* --- Checks & impact ------------------------------------------------------------ */
-
-const SEVERITY_ICON = { error: XCircle, warning: AlertTriangle, info: Info }
-
-export function ChecksSection({
-  policy,
-  index,
-  env,
-  diagnostics,
-  onJump,
-  bare,
-  n = 5,
-}: {
-  policy: Policy
-  index: number
-  env: SimEnv
-  diagnostics: Diagnostic[]
-  onJump: (i: number) => void
-  bare?: boolean
-  n?: number
-}) {
-  const store = useBrand()
-  const resolve = useNameLookup()
-  const impact = impactOf(policy, index, store.groups, undefined, store.users)
-
-  /* The reach number is swept, not estimated.
-
-     `impactOf().matches` reads `matchEstimate`, which is seed data that never
-     recomputes — honest enough beside a rule you are reading, and not honest
-     enough beside a rule you are about to publish. The sweep answers the same
-     question exactly over a space it can state: how many of the 1,440 modelled
-     situations does THIS rule actually win, first-match and all.
-
-     The two numbers in this row are deliberately in different units and say so.
-     The audience is people and is exact. The reach is situations and is exact
-     over the model. Presenting situations as people would be the same fake
-     precision in a new costume. */
-  const swept = useMemo(() => sweep(policy, env, 570), [policy, env])
-  const reach = swept.reach[index] ?? 0
-  const share = Math.round((reach / swept.total) * 100)
-  const rule = policy.rules[index]
-  const { iff, then } = ruleSentence(rule, resolve)
-
-  return (
-    <Section id="checks" n={n} bare={bare} title="Checks &amp; impact">
-      <>
-        <div className="bf__prose">
-          <p>
-            <span>IF</span> {iff}
-          </p>
-          <p>
-            <span>THEN</span> {then}
-          </p>
-        </div>
-
-        <div className="bf__impact">
-          <div>
-            <strong>
-              <Counter value={impact.audience} />
-            </strong>
-            <em>
-              people in the audience <b className="bf__basis is-exact">exact</b>
-            </em>
-          </div>
-          <div className={reach === 0 && policy.rules[index].enabled ? 'is-empty' : ''}>
-            <strong>
-              <Counter value={reach} />
-            </strong>
-            <em>
-              {reach === 0 && policy.rules[index].enabled ? (
-                <>
-                  modelled situations reach it — nothing gets this far{' '}
-                  <b className="bf__basis is-stale">check this</b>
-                </>
-              ) : (
-                <>
-                  of {SITUATIONS.length.toLocaleString()} modelled situations, {share}%{' '}
-                  <b className="bf__basis is-exact">exact</b>
-                </>
-              )}
-            </em>
-          </div>
-          <div>
-            {impact.fallsTo ? (
-              <>
-                <strong className="bf__falls">
-                  <button type="button" onClick={() => onJump(impact.fallsTo!.index)}>
-                    Rule {impact.fallsTo.index + 1} · {impact.fallsTo.name}
-                  </button>
-                </strong>
-                <em>takes over if this rule stops matching</em>
-              </>
-            ) : (
-              <>
-                <strong>Default rule</strong>
-                <em>takes over if this rule stops matching</em>
-              </>
-            )}
-          </div>
-        </div>
-
-        {diagnostics.length === 0 ? (
-          <p className="bf__clean">
-            <Check size={13} strokeWidth={3} aria-hidden />
-            Nothing the linter can prove wrong about this rule.
-          </p>
-        ) : (
-          <ul className="bf__diags">
-            {diagnostics.map((d) => {
-              const Ico = SEVERITY_ICON[d.severity]
-              return (
-                <li key={d.id} className={`is-${d.severity}`}>
-                  <Ico size={14} strokeWidth={2} aria-hidden />
-                  <span>
-                    <strong>{d.title}</strong>
-                    {d.detail}
-                    {d.relatedIndex !== undefined && (
-                      <button type="button" className="bf__diaggo" onClick={() => onJump(d.relatedIndex!)}>
-                        Open rule {d.relatedIndex + 1} →
-                      </button>
-                    )}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </>
-    </Section>
-  )
-}
+/* `ChecksSection` stood here: the rule's IF and THEN lines, the policy's
+   audience printed as the rule's, and the linter's findings. Nothing rendered
+   it, and it read the audience and the sentence from before a rule had its own
+   Who. The review stage and the rule card's checks strip say the same things. */
 
 /* `PreviewPanel` and `PvAxis` lived here: the standing "what would this do"
    panel that used to take turns with two others behind an icon in the top

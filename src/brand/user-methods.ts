@@ -47,6 +47,8 @@ export type EnrolKind =
   | 'push-app'
   /** A hardware token, identified by its serial. */
   | 'token'
+  /** Issued by an admin, who assigns it on the tokens page. Nothing for the person to enter. */
+  | 'assigned'
   /** The browser's own credential ceremony — Face ID, a security key. */
   | 'passkey'
   /** Nothing to fill in. The card has a toggle and no Edit. */
@@ -102,7 +104,11 @@ const SHAPES: Record<string, EnrolShape> = {
 
   // --- Hardware -------------------------------------------------------------
   yubikey: { kind: 'token', label: 'Token serial', placeholder: 'Tap the token to fill this' },
-  'display-token': { kind: 'token', label: 'Token serial', placeholder: 'Printed on the back' },
+  /* Not a serial the person types. An admin adds each display token and
+     assigns it to the person who carries it (Authentication methods > Display
+     Token), so the card says so instead of offering a form that would claim a
+     token nobody assigned. */
+  'display-token': { kind: 'assigned', note: 'Your admin assigns this token.' },
   rsa: { kind: 'token', label: 'RSA token serial', placeholder: 'Printed on the back' },
 
   // --- The browser's own ceremony -------------------------------------------
@@ -161,7 +167,84 @@ export const SEED_ENROLMENT: UserEnrolment = {
   configured: ['otp-email', 'fido2'],
   active: 'otp-email',
   values: {
-    'otp-email': { email: 'mehak.d@acme.com' },
+    'otp-email': { email: 'priya@mo.com' },
     fido2: {},
   },
+}
+
+/* --- Whether a card can be switched on ------------------------------------------ */
+
+/** Ready to use: enrolled, nothing to set up, or a token the admin assigned to this person. */
+export function readyFor(methodId: string, e: Pick<UserEnrolment, 'configured'>, heldTokens = 0): boolean {
+  const kind = enrolShapeFor(methodId).kind
+  return e.configured.includes(methodId) || kind === 'none' || (kind === 'assigned' && heldTokens > 0)
+}
+
+/** Switching a method on or off. One method is active at a time, and the last one cannot be switched off: turning off the active method hands over to the first other ready method, or leaves it on (`kept`). */
+export function activateIn(
+  e: UserEnrolment,
+  id: string,
+  on: boolean,
+  ready: string[],
+): { next: UserEnrolment; handedTo: string | null; kept: boolean } {
+  if (on) return { next: { ...e, active: id }, handedTo: null, kept: false }
+  if (e.active !== id) return { next: e, handedTo: null, kept: false }
+  const other = ready.find((x) => x !== id) ?? null
+  if (!other) return { next: e, handedTo: null, kept: true }
+  return { next: { ...e, active: other }, handedTo: other, kept: false }
+}
+
+/* --- Validating what a person types ---------------------------------------------- */
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE = /^\+?[0-9 ()-]{7,}$/
+
+export const isEmail = (v: string) => EMAIL.test(v.trim())
+export const isPhone = (v: string) => PHONE.test(v.trim()) && v.replace(/\D/g, '').length >= 7
+
+/** How the Security Questions form splits the admin's "Questions to configure": presets from the list, the rest the person writes. */
+export function questionPlan(total: number): { presets: number; custom: number } {
+  const n = Math.max(2, Math.round(total))
+  const presets = Math.min(n - 1, SECURITY_QUESTIONS.length)
+  return { presets, custom: n - presets }
+}
+
+export type EnrolIssue = { field: string; message: string }
+
+/** The first thing wrong with a form, or null when it can be saved. Blank fields are "missing" rather than wrong: `message` is empty for those, and Save is simply off. */
+export function enrolIssue(kind: EnrolKind, draft: Record<string, string>, questions = 3): EnrolIssue | null {
+  const v = (k: string) => (draft[k] ?? '').trim()
+  const blank = (field: string): EnrolIssue => ({ field, message: '' })
+  const email = (k: string): EnrolIssue | null =>
+    !v(k) ? blank(k) : isEmail(v(k)) ? null : { field: k, message: 'Enter a valid email address.' }
+  const phone = (k: string): EnrolIssue | null =>
+    !v(k) ? blank(k) : isPhone(v(k)) ? null : { field: k, message: 'Enter a phone number with country code.' }
+
+  switch (kind) {
+    case 'phone':
+      return phone('phone')
+    case 'email':
+    case 'alt-email':
+      return email('email')
+    case 'phone-and-email':
+      return phone('phone') ?? email('email')
+    case 'token':
+      return v('serial') ? null : blank('serial')
+    case 'authenticator':
+      return v('code').length === 6 ? null : blank('code')
+    case 'questions': {
+      const { presets, custom } = questionPlan(questions)
+      const asked: string[] = []
+      for (let i = 0; i < presets + custom; i++) {
+        if (!v(`q${i}`)) return blank(`q${i}`)
+        if (!v(`a${i}`)) return blank(`a${i}`)
+        const q = v(`q${i}`).toLowerCase()
+        if (asked.includes(q)) return { field: `q${i}`, message: 'Pick different questions.' }
+        asked.push(q)
+      }
+      return null
+    }
+    default:
+      return null
+  }
 }

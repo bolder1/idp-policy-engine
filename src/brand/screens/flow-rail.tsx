@@ -1,11 +1,24 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { LayoutGroup, motion, useReducedMotion } from 'motion/react'
-import { GripVertical, Home, KeyRound, PanelLeftClose, Plus, ShieldAlert, UserCheck } from 'lucide-react'
+import {
+  AlertTriangle,
+  Asterisk,
+  GripVertical,
+  KeyRound,
+  LogIn,
+  PanelLeftClose,
+  Plus,
+  ShieldAlert,
+  UserCheck,
+  XCircle,
+} from 'lucide-react'
 
 import type { AccessDecision, Policy } from '../data'
+import { Badge } from '../kit'
 import { ruleState } from './rule-form'
 import type { Diagnostic } from './diagnostics'
-import { predicateSummary } from './predicate-prose'
+import { useNameLookup } from '../store'
+import { ruleLabel, ruleSummary } from './predicate-prose'
 
 /* -----------------------------------------------------------------------------
    The flow — v1's left side, brought forward.
@@ -73,9 +86,13 @@ export function FlowRail({
   fallbackOn?: boolean
 }) {
   const reduce = useReducedMotion()
+  const resolve = useNameLookup()
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null)
   const rules = policy.rules
   const fallback = policy.fallback?.decision ?? '1fa'
+  /* The terminal rule's own findings: policy-wide (ruleIndex -1), told apart
+     from the audience's by their id. */
+  const fallbackState = ruleState(diagnostics.filter((d) => d.ruleIndex === -1 && d.id.endsWith('-fallback')))
   const scroller = useRef<HTMLDivElement | null>(null)
 
   /* Keep the selected rule in view.
@@ -99,9 +116,8 @@ export function FlowRail({
       <header className="bf__flowhead">
         <span className="bf__flowtitle">
           <span className="u-label">Evaluation order</span>
-          <em>Top to bottom · first match wins</em>
+          <em>Top to bottom, first match wins</em>
         </span>
-        <span className="bf__flowcount">{rules.length}</span>
         {onClose && (
           <button
             type="button"
@@ -117,11 +133,12 @@ export function FlowRail({
 
       <div className="bf__flowscroll" ref={scroller} tabIndex={0} role="region" aria-label="Evaluation order">
         <div className="bf__flowstage">
-          {/* The audience is not drawn here. It is a property of the policy,
-              not the first node of its program, and it has one home: the strip
-              above the builder, beside the name and the applications. */}
+          {/* The policy audience is not drawn here. It is a property of the
+              policy, not the first node of its program, and it has one home:
+              the strip above the builder. A rule's own who is part of each
+              node's subline. */}
           <p className="bf__flowstart">
-            <span aria-hidden />
+            <LogIn size={13} strokeWidth={1.9} aria-hidden />
             A user attempts to sign in
           </p>
 
@@ -129,11 +146,27 @@ export function FlowRail({
             {rules.map((r, i) => {
               const st = ruleState(diagnostics.filter((d) => d.ruleIndex === i))
               const Tile = TILE[r.decision]
+              const name = ruleLabel(r)
+              /* After a move the row is keyed by id, but React may re-insert its
+                 node to reorder, which blurs the arrow pressed; and at the top
+                 or bottom that arrow disables. Either way focus would drop on
+                 <body>, so it is put back: the same arrow, else the other one. */
+              const moveAndKeepFocus = (to: number) => {
+                onMove(i, to)
+                const dir = to < i ? 'up' : 'down'
+                window.setTimeout(() => {
+                  const row = scroller.current?.querySelector<HTMLElement>(`[data-rule-id="${CSS.escape(r.id)}"]`)
+                  const same = row?.querySelector<HTMLButtonElement>(`[data-move="${dir}"]:not(:disabled)`)
+                  const other = row?.querySelector<HTMLButtonElement>(`[data-move="${dir === 'up' ? 'down' : 'up'}"]:not(:disabled)`)
+                  ;(same ?? other ?? row?.querySelector<HTMLElement>('.bf__nodeselect'))?.focus()
+                }, 0)
+              }
               return (
                 <Fragment key={r.id}>
-                  <Link label={i === 0 ? undefined : 'no match'} onInsert={() => onInsert(i)} />
+                  <Link label={i === 0 ? undefined : 'No match'} onInsert={() => onInsert(i)} />
 
                   <motion.div
+                    data-rule-id={r.id}
                     layout={!reduce}
                     transition={{ type: 'spring', stiffness: 480, damping: 40 }}
                     className={`bf__node ${selected === i ? 'is-on' : ''} ${r.enabled ? '' : 'is-off'} ${
@@ -179,27 +212,40 @@ export function FlowRail({
                     </span>
 
                     <button type="button" className="bf__nodeselect" aria-pressed={selected === i} onClick={() => onSelect(i)}>
-                      <strong title={r.name}>{r.name}</strong>
-                      {/* The rule's SHAPE, not just its size — "2 alternatives"
-                          tells you there is an OR in there without opening it,
-                          which is the one thing a count could never say. */}
-                      <em>
-                        {predicateSummary(r.when)}
-                        {!r.enabled && ' · off'}
-                      </em>
+                      <strong title={name}>{name}</strong>
+                      {/* Who, then the rule's SHAPE — "Finance · 2 alternatives"
+                          tells you who it is for and that there is an OR in
+                          there without opening it. */}
+                      <em>{ruleSummary(r, resolve)}</em>
+                      {st !== 'ready' && (
+                        <span className="u-sr-only">{st === 'warn' ? 'Worth a look' : 'Needs fixing'}</span>
+                      )}
                     </button>
 
-                    <span className={`bf__nodepip is-${st}`} title={st === 'ready' ? 'Nothing to fix' : st === 'warn' ? 'Worth a look' : 'Needs setting up'} />
+                    {/* State as a pill or an icon, never a dot. Off is a word;
+                        a problem is its icon, named on hover. */}
+                    {!r.enabled ? (
+                      <Badge tone="neutral">Off</Badge>
+                    ) : st === 'setup' ? (
+                      <span className="bf__nodestate is-setup" title="Needs fixing" aria-hidden>
+                        <XCircle size={14} strokeWidth={2} />
+                      </span>
+                    ) : st === 'warn' ? (
+                      <span className="bf__nodestate is-warn" title="Worth a look" aria-hidden>
+                        <AlertTriangle size={14} strokeWidth={2} />
+                      </span>
+                    ) : null}
 
                     <span className="bf__nodemove">
-                      <button type="button" aria-label={`Move ${r.name} up`} disabled={i === 0} onClick={() => onMove(i, i - 1)}>
+                      <button type="button" data-move="up" aria-label={`Move ${name} up`} disabled={i === 0} onClick={() => moveAndKeepFocus(i - 1)}>
                         ↑
                       </button>
                       <button
                         type="button"
-                        aria-label={`Move ${r.name} down`}
+                        data-move="down"
+                        aria-label={`Move ${name} down`}
                         disabled={i === rules.length - 1}
-                        onClick={() => onMove(i, i + 1)}
+                        onClick={() => moveAndKeepFocus(i + 1)}
                       >
                         ↓
                       </button>
@@ -210,7 +256,7 @@ export function FlowRail({
             })}
           </LayoutGroup>
 
-          <Link label={rules.length > 0 ? 'no match' : undefined} onInsert={() => onInsert(rules.length)} always />
+          <Link label={rules.length > 0 ? 'No match' : undefined} onInsert={() => onInsert(rules.length)} always />
 
           {/* The terminal, and it opens like every other row.
 
@@ -226,7 +272,7 @@ export function FlowRail({
             onClick={onFallback}
           >
             <span className="bf__nodeidx is-lock" aria-hidden>
-              <Home size={12} strokeWidth={1.8} />
+              <Asterisk size={12} strokeWidth={1.8} />
             </span>
             <span className={`bf__nodetile is-${TONE[fallback]}`} aria-hidden>
               {(() => {
@@ -237,7 +283,19 @@ export function FlowRail({
             <span className="bf__nodeselect as-static">
               <strong>Nothing else matched</strong>
               <em>{FALLBACK_SUB[fallback]}</em>
+              {fallbackState !== 'ready' && (
+                <span className="u-sr-only">{fallbackState === 'warn' ? 'Worth a look' : 'Needs fixing'}</span>
+              )}
             </span>
+            {fallbackState === 'setup' ? (
+              <span className="bf__nodestate is-setup" title="Needs fixing" aria-hidden>
+                <XCircle size={14} strokeWidth={2} />
+              </span>
+            ) : fallbackState === 'warn' ? (
+              <span className="bf__nodestate is-warn" title="Worth a look" aria-hidden>
+                <AlertTriangle size={14} strokeWidth={2} />
+              </span>
+            ) : null}
           </button>
         </div>
       </div>

@@ -2,7 +2,8 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Check, Copy, Keyboard, ListOrdered, PanelRightClose, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
 import { Button, Modal } from '../../kit'
-import { appsLabel, appsOf, fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
+import { appsOf, fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
+import { commitToast, committed, differsFromLive, hasUnsavedChanges, openForEditing, type CommitIntent } from '../../policy-draft'
 import { useBrand, useNameLookup } from '../../store'
 import { TemplateSheet } from '../../create/TemplateSheet'
 import { ReviewDialog } from '../builder-dialogs'
@@ -10,17 +11,21 @@ import { CommandBar, type Cmd } from '../command-bar'
 import { BoardBar, BoardBarActions } from './BoardBar'
 import { BoardEmpty } from './BoardEmpty'
 import { BoardSheet } from './BoardSheet'
+import { buildTemplate, templateBlocker } from './apply-template'
 import { diagnose, shadowedBy } from '../diagnostics'
 import { runGauntlet } from '../gauntlet'
 import { compare, sweep } from '../impact-arena'
-import { canRedo, canUndo, commit, historyKey, historyOf, redo, undo, type History } from '../history'
+import { canRedo, canUndo, commit, historyKey, historyOf, redo, revertTo, undo, type History } from '../history'
 import { walk, type SimEnv } from '../simulate'
 import { Board } from './Board'
 import { Inspector } from './Inspector'
-import { nextPart, ruleAt, type Part, type Selection, type Tab, type Trace } from './model'
+import { nextPart, patchRule as patchOne, ruleAt, type Part, type Selection, type Tab, type Trace } from './model'
+import { copyName } from './parts'
+import { boardShortcuts, chord, isMacPlatform } from './shortcuts'
 
 import { boardTourSeen } from '../../tour/board-tour'
 
+import { useLeaveGuard } from '../../leave-guard'
 import './board.css'
 
 /* Lazy, the way the trail loads its own.
@@ -44,31 +49,38 @@ const DemoPlayer = lazy(() => import('../../tour/DemoPlayer').then((m) => ({ def
    either of them changes anything.
    -------------------------------------------------------------------------- */
 
-/* The bindings, in one place, so the sheet and the handler cannot drift.
+/* The bindings the sheet lists live in shortcuts.ts, filtered by edition and
+   spelt for the platform. If a binding changes in the handler below and not
+   there, the sheet lies — and a lying shortcut sheet is worse than none. */
+const MAC = isMacPlatform()
 
-   Written as data rather than as markup because it is documentation of
-   behaviour that lives elsewhere: if a binding changes in the handler and not
-   here, the sheet lies — and a lying shortcut sheet is worse than none.
-   Keeping the two adjacent is the cheapest guard short of generating one from
-   the other. */
-const SHORTCUTS: [string, string][] = [
-  ['↑ ↓', 'Select the previous or next rule, staying on the part you are on'],
-  ['⌥↑ ⌥↓', 'Move the selected rule up or down'],
-  ['[ ]', 'Who, Condition or Then, on the selected rule'],
-  ['⌘D', 'Duplicate the selected rule'],
-  ['Del', 'Delete the selected rule'],
-  ['E', 'Switch the selected rule on or off'],
-  ['⌘K', 'Command palette'],
-  ['⌘↵', 'Review and publish'],
-  ['⌘\\', 'Show or hide the panel, while a card is selected'],
-  ['⌘Z ⇧⌘Z', 'Undo, redo'],
-  ['Esc', 'Clear the rehearsal, then the selection'],
-  ['?', 'This list'],
-]
+/* Focus a control that is about to exist, or already does.
+
+   Several edits here remove the control that had focus — deleting a card,
+   closing the panel, the empty board giving way to the chain — and focus fell
+   to <body>, where Backspace and the arrow keys act on the board. One frame
+   for React to draw the new control, and a second try in case an animation
+   or a closing dialog put focus somewhere else first. */
+function focusSoon(find: () => HTMLElement | null) {
+  const go = () => {
+    const el = find()
+    if (el && el.isConnected) el.focus({ preventScroll: false })
+  }
+  window.requestAnimationFrame(go)
+  window.setTimeout(() => {
+    const active = document.activeElement
+    if (!active || active === document.body) go()
+  }, 150)
+}
+const byId = (id: string) => () => document.getElementById(id)
 
 /* Referentially stable "no overrides", so the deck is not re-dealt on every
    render for a tenant that has overruled nothing. */
 const NO_OVERRIDES: Record<string, never> = {}
+
+/* Controls that take keys of their own. A rule shortcut never fires from inside
+   one — Backspace in a picker is not "delete this rule". */
+const OWNS_KEYS = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="combobox"], [role="listbox"], [role="menu"], [role="dialog"]'
 
 export function BoardBuilder({
   policyId,
@@ -78,7 +90,6 @@ export function BoardBuilder({
   openSheet?: Tab
 }) {
   const store = useBrand()
-  const { registerLeaveGuard } = store
   /* The edition, which this surface ignored entirely.
 
      The trail gates eleven things on it; the board gated none, so Lite showed
@@ -89,11 +100,13 @@ export function BoardBuilder({
   const saved = store.policyById(policyId)
   const resolve = useNameLookup()
 
-  const [hist, setHist] = useState<History>(() => historyOf(saved ?? ({} as Policy)))
+  /* Opens on the saved draft when there is one, not on the live rules. */
+  const [hist, setHist] = useState<History>(() => historyOf(saved ? openForEditing(saved) : ({} as Policy)))
   const [selection, setSelection] = useState<Selection>({ kind: 'none' })
   const [trace, setTrace] = useState<Trace | null>(null)
   const [hover, setHover] = useState<number | null>(null)
   const [review, setReview] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [cmd, setCmd] = useState(false)
   const [keys, setKeys] = useState(false)
   /* Seeded from the route, not forced by it.
@@ -241,7 +254,7 @@ export function BoardBuilder({
   }, [])
 
   useEffect(() => {
-    if (saved) setHist(historyOf(saved))
+    if (saved) setHist(historyOf(openForEditing(saved)))
   }, [saved?.id])
 
 
@@ -251,26 +264,37 @@ export function BoardBuilder({
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
       fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
-      groupName: (id) => store.groupById(id).name,
+      hasZone: (id) => !!store.zoneById(id),
+      hasFingerprint: (id) => !!store.fingerprintById(id),
+      /* Not `groupById`, which falls back to the first group: a who naming a
+         deleted group would be named as the first group in the trace. */
+      groupName: (id) => store.groups.find((g) => g.id === id)?.name ?? id,
+      userName: (id) => store.userById(id)?.name ?? id,
       riskScale: store.riskScale,
     }),
     [store],
   )
 
-  const diagnostics = useMemo(() => (saved ? diagnose(draft, store.groups, store.hooks, store.users) : []), [draft, store.groups, store.hooks, store.users, saved])
+  const diagnostics = useMemo(() => (saved ? diagnose(draft, store.groups, store.hooks, store.users, { zones: store.zones, fingerprints: store.fingerprints }) : []), [draft, store.groups, store.hooks, store.users, store.zones, store.fingerprints, saved])
   const shadowed = useMemo(() => (hover === null ? [] : shadowedBy(draft, hover)), [draft, hover])
-  const dirty = !!saved && JSON.stringify({ r: saved.rules, f: saved.fallback }) !== JSON.stringify({ r: draft.rules, f: draft.fallback })
+  /* Draft mode — see policy-draft.ts.
 
-  /* The draft lives in this component, so leaving the board destroys it.
+     `unsaved` is measured against the last save or draft: it drives the leave
+     guard, Save draft and the pill. `live` is measured against the rules that
+     decide sign-ins: it drives the readings and, with a never-published policy,
+     the publish gate. */
+  const unsaved = !!saved && hasUnsavedChanges(saved, draft)
+  const live = !!saved && differsFromLive(saved, draft)
+  const toPublish = live || saved?.status === 'draft'
+  const hasDraft = !!saved?.pendingDraft
 
-     That was silent: the layout switch on the policy bar, "Edit details", the
-     back arrow and every nav-rail item all called `store.go` straight through,
-     and an unsaved policy went with the unmount. The guard says "safe to leave
-     when clean"; `go` holds the navigation and hands it back as
-     `store.pendingNav` when it is not, and the dialog below decides.
+  const saveDraft = () => {
+    if (!saved) return false
+    store.saveDraft(saved.id, { rules: draft.rules, fallback: draft.fallback })
+    store.showToast('Draft saved')
+    return true
+  }
 
-     Cleared on unmount, or the guard would keep answering for whatever screen
-     came next. */
   /* First arrival only, and never on top of something else.
 
      Arriving with a sheet already asked for — "this policy has four holes",
@@ -287,10 +311,10 @@ export function BoardBuilder({
     return () => window.clearTimeout(t)
   }, [openSheet])
 
-  useEffect(() => {
-    registerLeaveGuard(() => !dirty)
-    return () => registerLeaveGuard(null)
-  }, [dirty, registerLeaveGuard])
+  /* The draft lives in this component, so leaving the board would destroy it.
+     Every way out asks first, and Save as draft keeps the work without
+     publishing it. */
+  useLeaveGuard({ dirty: unsaved, save: saveDraft, saveLabel: 'Save as draft' })
 
   /* A rehearsal shown while you edit would go stale. Re-walked on every draft,
      silently — same run, updated verdicts — so the cards say what the rules
@@ -313,7 +337,12 @@ export function BoardBuilder({
      Nothing fires while a dialog is open or a field has focus. `typing` covers
      the fields; the dialog check is the same one Escape uses, and it matters
      most for the single-letter bindings — `e` and `?` would otherwise be
-     unusable characters anywhere on the board. */
+     unusable characters anywhere on the board.
+
+     The rule bindings also stand down inside a control that takes keys of its
+     own (`OWNS_KEYS`), inside the panel, and when something already handled
+     the key. `typing` alone missed selects and pickers: Backspace in one
+     deleted the rule being edited. */
   /* The handler in a ref, and one listener for the life of the board.
 
      The dependency array here was `[trace]` while the handler read two keys'
@@ -333,13 +362,21 @@ export function BoardBuilder({
     const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
     const modal = !!document.querySelector('[role="dialog"], .bx-scrim')
     const action = historyKey(e)
-    if (action && !typing) {
+    /* Not behind a dialog: undo would change the draft where nobody can see it.
+       The walkthrough card is a non-modal dialog beside the board, and the
+       edits it makes are meant to be undone, so it does not block undo. */
+    const blocking = !!document.querySelector('[role="dialog"]:not([aria-modal="false"]), .bx-scrim')
+    if (action && !typing && !blocking) {
       e.preventDefault()
       setHist(action === 'redo' ? redo : undo)
       return
     }
 
     if (typing || modal) return
+
+    const inControl = t instanceof Element && !!t.closest(OWNS_KEYS)
+    /* Rule bindings only: not in a control, not in the panel, not handled. */
+    const owned = e.defaultPrevented || inControl || (t instanceof Element && !!t.closest('.bb__insp'))
 
     const cmd = e.metaKey || e.ctrlKey
     const rules = draft.rules
@@ -368,7 +405,8 @@ export function BoardBuilder({
     /* ⌘↵ — straight to the gate, which is where a finished edit is going. */
     if (cmd && e.key === 'Enter') {
       e.preventDefault()
-      if (dirty) setReview(true)
+      if (toPublish) setReview(true)
+      else store.showToast('No changes to review')
       return
     }
     /* ⌘ — the panel is a lot of the screen, and reading the chain is a
@@ -383,6 +421,10 @@ export function BoardBuilder({
       if (at >= 0 || selection.kind === 'fallback') setInspOpen((v) => !v)
       return
     }
+    /* Everything below acts on the selected rule, or is a single key. Escape
+       still reaches the board from the panel; it has its own test at the end. */
+    if (owned && e.key !== 'Escape') return
+
     if (cmd && e.key.toLowerCase() === 'd') {
       if (at < 0) return
       e.preventDefault()
@@ -413,9 +455,8 @@ export function BoardBuilder({
        Not ← / →, and the reason is mechanical rather than aesthetic. Two
        focused controls on this surface already handle the horizontal arrows
        and neither calls `stopPropagation`, so this window listener would fire
-       as well: the resize grip below, and — worse — `Seg`, which is the
-       operator control inside the Who panel this feature exists to build.
-       Pressing ← there would flip `in`/`not in` AND switch the part,
+       as well: the resize grip below, and — worse — any `Seg` in the panel.
+       Pressing ← there would change the segment AND switch the part,
        unmounting the form mid-edit.
 
        `[` and `]` are the standard previous/next-pane idiom, are unbound here,
@@ -426,16 +467,21 @@ export function BoardBuilder({
       return
     }
 
-    if ((e.key === 'Delete' || e.key === 'Backspace') && at >= 0) {
+    /* Delete only. Backspace is the key focus lands on by accident after a
+       click on the canvas, and it deleted the selected rule silently. */
+    if (e.key === 'Delete' && at >= 0) {
       e.preventDefault()
       remove(at)
       return
     }
     /* Unmodified `e`, because it is a toggle you reach for repeatedly while
-       narrowing down which rule is doing something. */
-    if (e.key.toLowerCase() === 'e' && at >= 0 && !cmd) {
+       narrowing down which rule is doing something. It says what it did,
+       because nothing near the keyboard shows it. */
+    if (e.key.toLowerCase() === 'e' && at >= 0 && !cmd && !e.altKey) {
       e.preventDefault()
-      patchRule(at, { enabled: !rules[at].enabled })
+      const on = !rules[at].enabled
+      patchRule(at, { enabled: on })
+      store.showToast(`Rule ${at + 1} switched ${on ? 'on' : 'off'}`)
       return
     }
     if (e.key === '?') {
@@ -450,7 +496,7 @@ export function BoardBuilder({
        backing out of choosing an attribute threw away the whole panel you
        were working in. Anything modal owns Escape while it is open; the
        board only gets it when nothing is over the board. */
-    if (e.key === 'Escape' && !typing && !document.querySelector('[role="dialog"], .bx-scrim')) {
+    if (e.key === 'Escape' && !typing && !e.defaultPrevented && !inControl && !document.querySelector('[role="dialog"], .bx-scrim')) {
       if (trace) setTrace(null)
       else setSelection({ kind: 'none' })
     }
@@ -478,8 +524,8 @@ export function BoardBuilder({
   const gradable = draft.rules.some((r) => r.enabled)
   const test = useMemo(() => (gradable ? runGauntlet(draft, env, overrides) : null), [gradable, draft, env, overrides])
   const movement = useMemo(
-    () => (dirty && saved ? compare(sweep(saved, env, 570), sweep(draft, env, 570)) : null),
-    [dirty, saved, draft, env],
+    () => (live && saved ? compare(sweep(saved, env, 570), sweep(draft, env, 570)) : null),
+    [live, saved, draft, env],
   )
   const blockers = diagnostics.filter((d) => d.severity === 'error' && (d.ruleIndex === -1 || draft.rules[d.ruleIndex]?.enabled)).length
 
@@ -551,14 +597,14 @@ export function BoardBuilder({
     { id: 'add', label: 'Add a rule', icon: Plus },
     ...(selAt >= 0
       ? ([
-          { id: 'dup', label: `Duplicate rule ${selAt + 1} · ${selName}`, kbd: '⌘D', icon: Copy },
+          { id: 'dup', label: `Duplicate rule ${selAt + 1} · ${selName}`, kbd: chord(['mod'], 'D', MAC), icon: Copy },
           { id: 'del', label: `Delete rule ${selAt + 1} · ${selName}`, kbd: 'Del', icon: Trash2, danger: true },
         ] as Cmd[])
       : []),
-    ...(dirty ? ([{ id: 'publish', label: 'Review and publish', kbd: '⌘↵', icon: Check }] as Cmd[]) : []),
-    ...(canUndo(hist) ? ([{ id: 'undo', label: 'Undo', kbd: '⌘Z', icon: Undo2 }] as Cmd[]) : []),
-    ...(canRedo(hist) ? ([{ id: 'redo', label: 'Redo', kbd: '⇧⌘Z', icon: Redo2 }] as Cmd[]) : []),
-    ...(hasSubject ? ([{ id: 'panel', label: inspOpen ? 'Hide the panel' : 'Show the panel', kbd: '⌘\\', icon: PanelRightClose }] as Cmd[]) : []),
+    ...(toPublish ? ([{ id: 'publish', label: features.publish ? 'Review and publish' : 'Review and save', kbd: chord(['mod'], 'Enter', MAC), icon: Check }] as Cmd[]) : []),
+    ...(canUndo(hist) ? ([{ id: 'undo', label: 'Undo', kbd: chord(['mod'], 'Z', MAC), icon: Undo2 }] as Cmd[]) : []),
+    ...(canRedo(hist) ? ([{ id: 'redo', label: 'Redo', kbd: chord(['mod', 'shift'], 'Z', MAC), icon: Redo2 }] as Cmd[]) : []),
+    ...(hasSubject ? ([{ id: 'panel', label: inspOpen ? 'Hide the panel' : 'Show the panel', kbd: chord(['mod'], '\\', MAC), icon: PanelRightClose }] as Cmd[]) : []),
     { id: 'keys', label: 'Keyboard shortcuts', kbd: '?', icon: Keyboard },
     ...draft.rules.map((r, i) => ({ id: `rule:${i}`, label: `Go to rule ${i + 1} · ${r.name}`, icon: ListOrdered }) as Cmd),
   ]
@@ -567,7 +613,12 @@ export function BoardBuilder({
 
   /* --- Edits -------------------------------------------------------------------- */
   const commitDraft = (next: Policy) => setHist((h) => commit(h, next))
-  const patchRule = (i: number, p: Partial<Rule>) => commitDraft({ ...draft, rules: draft.rules.map((r, j) => (j === i ? { ...r, ...p } : r)) })
+  /* Through `patchRule` in model.ts: a who patch is normalised and never touches
+     the WHEN, and a rule taken back to everyone compares as JSON equal to the
+     rule that never had a who — with the key kept in place, so removing a group
+     and adding it back leaves the save bar dark. */
+  const patchRule = (i: number, p: Partial<Rule>) =>
+    commitDraft({ ...draft, rules: draft.rules.map((r, j) => (j !== i ? r : patchOne(r, p))) })
   /* By id, for the walkthrough.
 
      Everything else on this surface holds an index, because it got one from the
@@ -603,66 +654,98 @@ export function BoardBuilder({
     commitDraft({ ...draft, rules })
   }
 
+  /* Says what it did and how to get it back, and puts focus on the rule that
+     took its place — the delete button went with the card, and focus on <body>
+     is where the next Delete would act on the board. */
   const remove = (i: number) => {
     const gone = draft.rules[i]
+    if (!gone) return
+    const next = draft.rules[i + 1] ?? draft.rules[i - 1]
     commitDraft({ ...draft, rules: draft.rules.filter((_, j) => j !== i) })
-    if (selection.kind === 'rule' && selection.id === gone?.id) setSelection({ kind: 'none' })
+    if (selection.kind === 'rule' && selection.id === gone.id) setSelection({ kind: 'none' })
+    store.showToast(`Rule ${i + 1} deleted. Press ${chord(['mod'], 'Z', MAC)} to undo.`)
+    focusSoon(next ? byId(`bb-rule-${next.id}-title`) : () => document.querySelector<HTMLElement>('.bb__empty button'))
   }
-  const duplicate = (i: number) => insert(reidRule({ ...draft.rules[i], name: `${draft.rules[i].name} (copy)` }), i + 1)
+  /* One " (copy)" suffix, numbered, never stacked. */
+  const duplicate = (i: number) =>
+    insert(reidRule({ ...draft.rules[i], name: copyName(draft.rules[i].name, draft.rules.map((r) => r.name)) }), i + 1)
 
   /* A template, applied to a policy that already exists.
 
      One `commitDraft`, which is the whole point of routing it through here:
-     the rules land on the undo stack, `dirty` notices, and Review & publish
+     the rules land on the undo stack, `unsaved` notices, and Review & publish
      wakes up. `setHist(historyOf(next))` would look identical on screen and be
      un-undoable — that call belongs to publish and discard, and undo is the
      only thing standing between a mis-clicked template and lost work.
 
-     Rules ONLY. A `Scenario` also declares an audience, and writing it into the
-     draft would commit an edit that can never be saved: `dirty` compares rules
-     and the fallback, so the publish button would stay disabled over a policy
-     whose audience had silently changed. Who a policy governs is a standing
-     fact, edited where the other standing facts are.
+     Rules ONLY — the policy audience is left as it is. A `Scenario`'s audience
+     is written into each built rule's `who` instead (`buildTemplate`), so a
+     template for Contractors stays a template for Contractors on a policy that
+     governs everyone. Dropping it widened those rules, Deny rules included.
+     The policy audience is not the place: `unsaved` compares rules and the
+     fallback, and the board neither shows nor edits it.
+
+     A rule whose own who shares nobody with the template's audience would apply
+     to nobody, and a who cannot store "nobody", so `buildTemplate` leaves it
+     out and names it. The toast says how many. If that is every rule, nothing
+     is applied: replacing the policy's rules with an empty list is not what
+     anybody pressed the template for.
 
      The panel lands on rule 1 rather than on nothing, the same courtesy
      `insert` does — five rules arriving with an empty inspector beside them
      reads as a screen that has not finished loading. */
+  /* Zones and device profiles the tenant does not have are cleared from the
+     built rules (`buildTemplate`), so the condition reads "Choose…" and the
+     blank-value check names it, rather than pointing at an id that never
+     existed. A template with nothing to apply is refused, whatever the reason. */
   const applyTemplate = (t: Scenario) => {
-    const built = t.rules.map((r) => r.build())
+    const build = buildTemplate(t, store.users, { zones: store.zones, fingerprints: store.fingerprints })
+    const blocked = templateBlocker(t, build)
+    if (blocked) {
+      store.showToast(blocked)
+      return
+    }
+    const { rules: built, dropped } = build
     commitDraft({ ...draft, rules: built })
-    if (built[0]) select(ruleAt(built[0].id))
-    store.showToast(`${t.name} applied — ${built.length} rule${built.length === 1 ? '' : 's'}, not saved yet`)
+    select(ruleAt(built[0].id))
+    const d = dropped.length
+    const left = d > 0 ? ` ${d === 1 ? '1 rule' : `${d} rules`} left out.` : ''
+    const needs = build.needs.length > 0 ? ' Choose the missing zone or device profile.' : ''
+    store.showToast(`${t.name} applied. Not saved yet.${left}${needs}`)
+    focusSoon(byId(`bb-rule-${built[0].id}-title`))
   }
 
-  const publish = () => {
-    /* Publishing is what ends a draft.
-
-       A draft that stayed a draft through its own publish step would make the
-       status decorative — the one transition the word implies is the one thing
-       it could not do. It becomes `inactive`: a real, published policy that is
-       switched off, which is the promise the create flow has always made and
-       the only landing that cannot start refusing sign-ins without being asked.
-
-       Any other status publishes unchanged. Republishing an active policy must
-       not quietly park it. */
-    const status = draft.status === 'draft' ? 'inactive' : draft.status
-    const next = { ...draft, status, lastModified: 'Just now', modifiedBy: 'You' }
-    /* `next`, not `draft`. This saved the pre-stamp object while seeding the
-       history from the stamped one, so the store and the undo stack disagreed
-       about the record by two fields from the moment it was published. */
+  const publish = (intent: CommitIntent) => {
+    /* One commit rule for both builders — see `committed` in policy-draft.ts.
+       No applications: a draft. A draft with applications: off, or on if the
+       admin chose it. Anything published keeps the status it has in the store,
+       which the bar can change while this edit is open, so `saved` rather than
+       `draft` supplies it. `committed` also clears a saved draft. */
+    const next = committed(saved, draft, intent)
+    /* `next`, not `draft`, into both the store and the undo stack, so they
+       agree about the record from the moment it is saved. The store stamps
+       lastModified only when something besides the stamp changed. */
     store.savePolicy(next)
     setHist(historyOf(next))
     setReview(false)
-    store.showToast(
-      draft.status === 'draft'
-        ? `${draft.name} published — switched off until you turn it on`
-        : `${draft.name} published`,
-    )
+    store.showToast(commitToast(saved, next))
   }
-  const discard = () => {
-    setHist(historyOf(saved))
+  /* Back to the live rules, and a saved draft goes too — that case asks first,
+     and only that case resets the undo stack. */
+  const revert = () => {
+    setHist(historyOf({ ...saved, pendingDraft: undefined }))
     setTrace(null)
+    if (saved.pendingDraft) store.discardDraft(saved.id)
+    setConfirmDiscard(false)
   }
+  /* Unsaved edits alone are rolled back as one more step, so undo brings them
+     back. Discard sits next to Save draft, and a mis-click cost the session. */
+  const discardEdits = () => {
+    setHist((h) => revertTo(h, saved))
+    setTrace(null)
+    store.showToast(`Changes discarded. Press ${chord(['mod'], 'Z', MAC)} to undo.`)
+  }
+  const discard = () => (saved.pendingDraft ? setConfirmDiscard(true) : discardEdits())
 
   return (
     <>
@@ -672,8 +755,12 @@ export function BoardBuilder({
           places it and the board below it takes what is left. The verbs in it
           act on the DRAFT, which is why this component renders the bar rather
           than the page above it. */}
+      {/* The bar's status control reads the store itself, so the draft's copy of
+          the status is never shown. */}
       <BoardBar
         policy={draft}
+        unsaved={unsaved}
+        draftSaved={hasDraft}
         onLearn={() => setTour(true)}
         onWatchDemo={() => setDemo(true)}
         actions={
@@ -681,9 +768,12 @@ export function BoardBuilder({
             test={test}
             movement={movement}
             sheet={sheet}
-            dirty={dirty}
+            toPublish={toPublish}
+            unsaved={unsaved}
+            canDiscard={unsaved || hasDraft}
             blockers={blockers}
             onSheet={setSheet}
+            onSaveDraft={saveDraft}
             onDiscard={discard}
             onReview={() => setReview(true)}
           />
@@ -702,7 +792,22 @@ export function BoardBuilder({
           screen. `BoardEmpty` is an ordinary screen; `Board` is the canvas; and
           the board only ever mounts one of them. */}
       {draft.rules.length === 0 ? (
-        <BoardEmpty onUseTemplate={() => setPicking(true)} onScratch={() => insert(blankRule(), 0)} />
+        <BoardEmpty
+          /* "No rules" once the policy is live or had rules; the first-run
+             question only for a new draft nobody has written in yet. */
+          fresh={saved.status === 'draft' && saved.rules.length === 0 && !canUndo(hist)}
+          fallback={(draft.fallback ?? fallbackRule()).decision}
+          onEditDefault={() => select({ kind: 'fallback' })}
+          onUndo={canUndo(hist) ? () => setHist(undo) : undefined}
+          undoLabel={`Undo (${chord(['mod'], 'Z', MAC)})`}
+          onUseTemplate={() => setPicking(true)}
+          onScratch={() => {
+            insert(blankRule(), 0)
+            /* The empty board, and the button, go; the rule's name is the
+               first thing to fill in. */
+            focusSoon(() => document.querySelector<HTMLElement>('.bb__insp input[aria-label="Rule name"]'))
+          }}
+        />
       ) : (
       <Board
         policy={draft}
@@ -715,17 +820,16 @@ export function BoardBuilder({
            is what it now is. */
         destination={
           /* The chain's first node names ONE application, so a policy on
-             several says the first and how many more — the same summary the
-             policies table and the board bar print, from `appsLabel`, so the
-             three cannot disagree about how a multi-app policy is spoken. */
+             several names only the first. How many more is the board bar's to
+             say, right above, and saying it here too would print it twice. */
           draft.appIds.length > 0
-            ? (appsLabel(appsOf(draft, store.apps)) ?? null)
+            ? (appsOf(draft, store.apps)[0]?.name ?? null)
             : draft.isSystem
               ? 'any application'
               : null
         }
-        /* The first application's id, for its logo in the start pill. The label
-           beside it already says how many more there are. */
+        /* The first application's id, for its logo in the start pill, so the
+           logo and the name beside it are the same application. */
         destinationAppId={draft.appIds.length > 0 ? (appsOf(draft, store.apps)[0]?.id ?? null) : null}
         selection={selection}
         diagnostics={diagnostics}
@@ -757,10 +861,10 @@ export function BoardBuilder({
                 or ⌘\. A fourth control, on the far side of the canvas from the
                 panel it acts on, was a second door for a room that was not
                 short of them. */}
-            <button type="button" className="bb__act" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo(hist)} onClick={() => setHist(undo)}>
+            <button type="button" className="bb__act" aria-label="Undo" title={`Undo (${chord(['mod'], 'Z', MAC)})`} disabled={!canUndo(hist)} onClick={() => setHist(undo)}>
               <Undo2 size={14} strokeWidth={2} />
             </button>
-            <button type="button" className="bb__act" aria-label="Redo" title="Redo (⇧⌘Z)" disabled={!canRedo(hist)} onClick={() => setHist(redo)}>
+            <button type="button" className="bb__act" aria-label="Redo" title={`Redo (${chord(['mod', 'shift'], 'Z', MAC)})`} disabled={!canRedo(hist)} onClick={() => setHist(redo)}>
               <Redo2 size={14} strokeWidth={2} />
             </button>
           </>
@@ -842,14 +946,21 @@ export function BoardBuilder({
           leaving={panelLeaving}
           draft={draft}
           selection={selection}
+          /* What is wrong with the rule on screen, said where it is edited.
+             Lite has no Check sheet, so this is the only place the reason for
+             "Needs setup" is written down. */
+          diagnostics={selAt >= 0 ? diagnostics.filter((d) => d.ruleIndex === selAt) : []}
           onPatchRule={patchRule}
           onPatchFallback={patchFallback}
-          /* The one part-changing control the panel owns: the stood-down Who
-             pane handing you to the one that can do the job. */
-          onOpenPart={(part) => {
-            if (selection.kind === 'rule') select({ ...selection, part })
+          onClose={() => {
+            setInspOpen(false)
+            /* The close button goes with the panel; focus goes to the card it was editing. */
+            focusSoon(
+              selection.kind === 'rule'
+                ? byId(`bb-rule-${selection.id}-title`)
+                : () => document.getElementById('bb-terminal-title') ?? document.querySelector<HTMLElement>('.bb__empty button'),
+            )
           }}
-          onClose={() => setInspOpen(false)}
           wide={wide}
           onToggleWidth={() => setInspW(setW(wide ? NARROW : 560))}
         />
@@ -890,9 +1001,9 @@ export function BoardBuilder({
           shortcut nobody knows about is a shortcut nobody has. `?` is the
           convention, and it is listed here too so the sheet explains how it
           was reached. */}
-      <Modal open={keys} onClose={() => setKeys(false)} title="Keyboard" width={480}>
+      <Modal open={keys} onClose={() => setKeys(false)} title="Keyboard shortcuts" width={480}>
         <dl className="bb__keys">
-          {SHORTCUTS.map(([k, what]) => (
+          {boardShortcuts({ mac: MAC, commands: features.commands, gauntlet: features.gauntlet, publish: features.publish }).map(([k, what]) => (
             <div key={k}>
               <dt>
                 {k.split(' ').map((part) => (
@@ -911,7 +1022,7 @@ export function BoardBuilder({
         onClose={() => setSheet(null)}
         draft={draft}
         saved={saved}
-        dirty={dirty}
+        dirty={live}
         env={env}
         diagnostics={diagnostics}
         trace={trace}
@@ -930,7 +1041,12 @@ export function BoardBuilder({
           of its own, which the key handler above reads — without it, browsing
           templates would leave Del, ⌘D and the arrow keys live on the rule
           underneath. */}
-      <TemplateSheet open={picking} onClose={() => setPicking(false)} onChoose={applyTemplate} />
+      <TemplateSheet
+        open={picking}
+        onClose={() => setPicking(false)}
+        onChoose={applyTemplate}
+        fallback={(draft.fallback ?? fallbackRule()).decision}
+      />
 
       {/* The guided demo.
 
@@ -969,36 +1085,28 @@ export function BoardBuilder({
         </Suspense>
       )}
 
-      <ReviewDialog open={review} policy={draft} onClose={() => setReview(false)} onConfirm={publish} />
+      <ReviewDialog open={review} policy={draft} from="board" onClose={() => setReview(false)} onCommit={publish} />
 
-      {/* Named, and it says what leaving costs.
-
-          Not a `confirm()`: the count comes from the same diff that drives the
-          Discard button, so the number in the sentence is the number of rules
-          that would go. "Keep editing" is the default action because it is the
-          recoverable one — discarding a draft cannot be undone once the
-          component is gone. */}
+      {/* Only when a saved draft would go. Unsaved edits alone revert as an undoable step. */}
       <Modal
-        open={!!store.pendingNav}
-        onClose={store.cancelNav}
-        title="Leave without publishing?"
-        width={480}
+        open={confirmDiscard}
+        onClose={() => setConfirmDiscard(false)}
+        title="Discard draft?"
+        width={440}
         footer={
           <>
-            <Button variant="ghost" onClick={store.cancelNav}>
-              Keep editing
+            <Button variant="ghost" onClick={() => setConfirmDiscard(false)}>
+              Keep draft
             </Button>
-            <Button variant="danger" onClick={store.confirmNav}>
-              Discard and leave
+            <Button variant="danger" onClick={revert}>
+              Discard
             </Button>
           </>
         }
       >
-        <p style={{ margin: 0, fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
-          This draft has changes that are not published. Leaving the builder discards them — there is nothing to come
-          back to.
-        </p>
+        <p className="bx-leave__body">The policy goes back to its live rules.</p>
       </Modal>
+
     </div>
     </>
   )

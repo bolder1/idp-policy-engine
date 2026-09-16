@@ -318,9 +318,10 @@ describe('a fix must not create a policy that cannot be published', () => {
     const p = policy([
       rule({
         name: 'Contractor baseline',
-        // The same predicate the `nightshift` fix now proposes, so the fix has
-        // a twin to re-aim rather than a gap to insert into.
-        when: when(card(cond('group', 'in', ['contractors']))),
+        // The same who and WHEN the `nightshift` fix now proposes, so the fix
+        // has a twin to re-aim rather than a gap to insert into.
+        who: { groupIds: ['contractors'], userIds: [] },
+        when: anySignIn(),
         decision: '1fa',
       }),
     ])
@@ -338,6 +339,21 @@ describe('a fix must not create a policy that cannot be published', () => {
     // ...and the policy is still publishable.
     expect(diagnose(after, groups).filter((d) => d.severity === 'error')).toEqual([])
     expect(after.rules).toHaveLength(1)
+  })
+
+  it('inserts a who-only fix as a rule with that who and no conditions, never re-aiming an unrelated rule', () => {
+    /* A spec with no conditions contains every one of nothing. Without the who
+       test, the first single-card rule in the policy would count as its twin. */
+    const p = policy([rule({ name: 'Office step-up', when: when(card(cond('zone', 'in zone', ['office']))), decision: '1fa' })])
+    const round = runGauntlet(p, rawEnv).rounds.find((r) => r.challenge.id === 'nightshift')!
+    expect(round.outcome).toBe('breach')
+    const fix = proposeFix(round, p)!
+    expect(fix.kind).toBe('insert')
+    expect(fix.rule.who).toEqual({ groupIds: ['contractors'], userIds: [] })
+    expect(fix.rule.when.cards).toEqual([])
+    const after = { ...p, rules: applyFix(p.rules, fix) }
+    expect(runGauntlet(after, rawEnv).rounds.find((r) => r.challenge.id === 'nightshift')!.outcome).toBe('held')
+    expect(diagnose(after, groups).filter((d) => d.severity === 'error')).toEqual([])
   })
 
   it('leaves every seeded policy publishable after applying every fix it offers', () => {

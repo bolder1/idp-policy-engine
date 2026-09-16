@@ -246,11 +246,8 @@ export function Tour({
           </div>
 
           <footer className="btr__foot">
-            <span className="btr__dots" aria-hidden>
-              {STOPS.map((s, n) => (
-                <i key={s.id} className={n === i ? 'is-on' : n < i ? 'is-done' : ''} />
-              ))}
-            </span>
+            {/* Spacer. The progress dots that sat here repeated "Stop N of M". */}
+            <span className="btr__dots" aria-hidden />
             <button type="button" className="btr__skip" onClick={leave}>
               Skip
             </button>

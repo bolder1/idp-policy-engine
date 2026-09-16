@@ -453,11 +453,8 @@ export function BoardTour({
           />
 
           <footer className="btr__foot">
-            <span className="btr__dots" aria-hidden>
-              {stops.map((s, n) => (
-                <i key={s.id} className={n === at ? 'is-on' : n < at ? 'is-done' : ''} />
-              ))}
-            </span>
+            {/* Spacer. The progress dots that sat here repeated "Step N of M". */}
+            <span className="btr__dots" aria-hidden />
             <button type="button" className="btr__skip" onClick={leave}>
               Skip
             </button>

@@ -52,4 +52,33 @@ describe('the route union', () => {
   it('reaches the Applications screen from the rail', () => {
     expect(shellSrc).toContain("screen: { name: 'applications' }")
   })
+
+  /* Display tokens is opened from Authentication methods, and the rail has to
+     keep saying so. The console's own "Assign Hardware Token to Users" item
+     opens it too, without lighting a second place. */
+  it('lights Authentication methods on the Display tokens page', () => {
+    expect(ROUTES).toContain('display-tokens')
+    expect(shellSrc).toContain("methods: ['display-tokens']")
+  })
+
+  it('opens Display tokens from the rail item the live console uses, unlit', () => {
+    const line = shellSrc.split('\n').find((l) => l.includes("label: 'Assign Hardware Token to Users'")) ?? ''
+    expect(line).toContain("screen: { name: 'display-tokens', tab: 'assignments' }")
+    expect(line).toContain('lights: false')
+  })
+
+  /* A lazy screen that is not prewarmed shows a blank busy page on its first
+     open. Risk signal profile and Policy details were both missing. */
+  it('prewarms every lazily loaded screen', () => {
+    const lazySpecs = [...appSrc.matchAll(/lazy\(\(\) => import\('([^']+)'\)/g)].map((m) => m[1])
+    const warm = appSrc.slice(appSrc.indexOf('const warm = () => {'))
+    const warmBody = warm.slice(0, warm.indexOf('\n}'))
+    expect(lazySpecs.length).toBeGreaterThan(5)
+    for (const spec of lazySpecs) expect(`${spec}: ${warmBody.includes(`import('${spec}')`)}`).toBe(`${spec}: true`)
+  })
+
+  it('wraps the screen in an error boundary, inside the provider', () => {
+    expect(appSrc).toContain('<ScreenErrorBoundary')
+    expect(appSrc.indexOf('<ScreenErrorBoundary')).toBeGreaterThan(appSrc.indexOf('function Chrome()'))
+  })
 })

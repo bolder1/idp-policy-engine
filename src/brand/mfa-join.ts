@@ -1,4 +1,3 @@
-import { AUTH_METHODS, type AuthMethod } from './methods'
 import { FAMILIES, type MfaFamily, type MfaMethod, type MfaSetting } from './mfa-settings'
 
 /* -----------------------------------------------------------------------------
@@ -89,19 +88,6 @@ export function familySettingsFor(channel: string): MfaSetting[] {
   return familyForChannel(channel)?.settings ?? []
 }
 
-/* The other methods a family setting also changes.
-
-   Read off the CATALOGUE, never off `FAMILIES[].methods`. The sheet carries two
-   methods the catalogue does not — Vasco OTP and Digital Persona — and naming a
-   sibling that has no row on the table sends the admin looking for something
-   that is not there. The count has to match what they can actually see. */
-export function siblingsOf(
-  m: Pick<AuthMethod, 'id' | 'channel'>,
-  all: AuthMethod[] = AUTH_METHODS,
-): { id: string; name: string }[] {
-  return all.filter((x) => x.channel === m.channel && x.id !== m.id).map((x) => ({ id: x.id, name: x.name }))
-}
-
 /* -----------------------------------------------------------------------------
    What the sheet supersedes.
 
@@ -119,6 +105,4 @@ export function siblingsOf(
    sheet. Anything an admin now tunes on the Settings tab is removed from the
    Connection form, which keeps only what it should ever have held: credentials
    and endpoints. A gateway's API key belongs there. A sender name does not. */
-
-
 

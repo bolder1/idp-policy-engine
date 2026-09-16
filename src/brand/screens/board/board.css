@@ -226,6 +226,9 @@
 }
 .bbtop__name:hover { background: var(--surface-sunken); border-color: var(--border-subtle); color: var(--text-secondary); }
 .bbtop__name:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+/* The status and the change-state pill never shrink; the policy name gives way first. */
+.bbtop__crumbs > .bx-status,
+.bbtop__crumbs > .bx-badge { flex: none; }
 
 /* `.bbtop__gov` and `.bbtop__peek` stood here: the audience as a glyph, a
    phrase, a count and a hover panel. Gone with the markup — see BoardBar.tsx.
@@ -375,6 +378,13 @@
   font-size: var(--fs-2xl); font-weight: var(--fw-semibold); letter-spacing: -0.015em;
   color: var(--text-primary); text-align: center;
 }
+/* What the policy does with no rules, and the two controls the canvas would
+   otherwise carry: the default, and undo. One line under the heading. */
+.bb__empty__now {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-2);
+  margin: calc(-1 * var(--space-6)) 0 var(--space-7);
+}
+.bb__empty__now p { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); }
 
 /* --- The two ways in ---------------------------------------------------------
 
@@ -433,12 +443,11 @@
 
 .bb__ill__panel { fill: var(--surface-raised); stroke: var(--border-subtle); stroke-width: 1.25; }
 .bb__ill__bar { stroke: var(--border-subtle); stroke-width: 1.25; fill: none; }
-.bb__ill__dot { fill: var(--border-strong); opacity: 0.5; }
-.bb__ill__split { stroke: var(--border-subtle); stroke-width: 1.25; stroke-dasharray: 3 3; fill: none; }
+.bb__ill__split { stroke: var(--border-subtle); stroke-width: 1.25; fill: none; }
 .bb__ill__line { fill: var(--border-strong); opacity: 0.3; transition: fill 0.22s var(--ease-standard), opacity 0.22s var(--ease-standard); }
 .bb__ill__line.is-lead { opacity: 0.45; }
 .bb__ill__line.is-small { opacity: 0.22; }
-.bb__ill__slot { fill: none; stroke: var(--border-strong); stroke-width: 1.25; stroke-dasharray: 4 3; opacity: 0.55; }
+.bb__ill__slot { fill: none; stroke: var(--border-strong); stroke-width: 1.25; opacity: 0.55; }
 .bb__ill__plus { stroke: var(--border-strong); stroke-width: 1.6; stroke-linecap: round; fill: none; opacity: 0.55; }
 .bb__ill__slot,
 .bb__ill__plus { transition: stroke 0.22s var(--ease-standard), opacity 0.22s var(--ease-standard); }
@@ -532,7 +541,7 @@
   width: 22px; height: 22px; border-radius: 50%;
   background: var(--accent); color: #fff;
   box-shadow: 0 0 0 4px rgba(235, 84, 36, 0.18);
-  font-size: 11px; font-weight: var(--fw-semibold);
+  font-size: 12px; font-weight: var(--fw-semibold);
 }
 
 /* A connector: a rule, a line, a `+`, the next rule. */
@@ -643,7 +652,7 @@
   position: absolute; left: 20px; top: 50%;
   padding: 4px 2px;
   background: none; color: var(--brand);
-  font-size: 11px; font-weight: var(--fw-semibold); white-space: nowrap;
+  font-size: 12px; font-weight: var(--fw-semibold); white-space: nowrap;
   opacity: 0; transform: translateY(-50%) translateX(-4px);
   transition: opacity 0.16s var(--ease-standard), transform 0.16s var(--ease-standard);
   pointer-events: none;
@@ -687,13 +696,14 @@
 
 /* The same three tones, on the badge rather than on a card ancestor.
 
-   `.bb__idx` is drawn in three places: inside a rule card, in the inspector's
-   header, and in the rule library. Only the first sits inside `.bb__card`, so
-   the other two resolved `--tone-bg` and `--tone-fg` to nothing and rendered
-   transparent on inherited text — the tone-coloured pill simply never appeared
-   away from the stage. Declaring the vars on the badge's own tone class fixes
-   both call sites without touching the card, which carries no tone class here
-   and so keeps inheriting from `.bb__card.is-*` exactly as before. */
+   `.bb__idx` was drawn in three places: inside a rule card, in the inspector's
+   header (gone now: the inspector title already says which rule), and in the
+   rule library. Only the first sits inside `.bb__card`, so the others resolved
+   `--tone-bg` and `--tone-fg` to nothing and rendered transparent on inherited
+   text — the tone-coloured pill simply never appeared away from the stage.
+   Declaring the vars on the badge's own tone class fixes that without touching
+   the card, which carries no tone class here and so keeps inheriting from
+   `.bb__card.is-*` exactly as before. */
 /* The BADGE is a position; only `.bb__reach` keeps the verdict tones.
 
    `1` in a green tile and `2` in a red one made every card a different colour
@@ -955,45 +965,7 @@
 .bb__cardsum__n { font-size: var(--fs-sm); color: var(--text-secondary); }
 /* The folded line reads who · how much test · what it decides, and the dot is
    what stops the first two running together. */
-.bb__cardsum__dot { color: var(--border-strong); }
 .bb__cardsum > svg { flex: none; color: var(--text-muted); }
-
-/* --- The panel's two tabs ------------------------------------------------------
-
-   The doors between Who and Condition were a row of buttons on the CARD, which
-
-/* A labelled row inside the card: WHEN / THEN. */
-.bb__row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
-.bb__row > dt {
-  padding-top: 5px;
-  font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--text-tertiary);
-}
-.bb__row > dd { margin: 0; min-width: 0; }
-
-/* WHEN, as brackets. */
-.bb__brackets { display: flex; flex-direction: column; gap: var(--space-2); }
-.bb__bracket {
-  position: relative;
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
-  padding: var(--space-2) var(--space-3) var(--space-2) 26px;
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-}
-.bb__bracket__letter {
-  position: absolute; left: 6px; top: 50%; transform: translateY(-50%);
-  width: 16px; height: 16px; border-radius: var(--radius-xs);
-  display: grid; place-items: center;
-  background: var(--surface-raised); border: 1px solid var(--border-default);
-  font-size: 11px; font-weight: var(--fw-semibold); color: var(--text-tertiary);
-}
-.bb__or {
-  align-self: flex-start; margin-left: 8px;
-  font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--text-tertiary);
-}
-.bb__and { font-size: var(--fs-xs); color: var(--text-muted); padding: 0 1px; }
-.bb__any { font-size: var(--fs-sm); color: var(--text-tertiary); padding-top: 4px; }
 
 /* `.bb__cond` is DEFINED ONCE, and this is not the place.
 
@@ -1054,16 +1026,6 @@
   background: var(--tone-bg); color: var(--tone-fg); border: 1px solid var(--tone-border);
   font-size: var(--fs-xs); font-weight: var(--fw-semibold);
 }
-.bb__journey { display: inline-flex; align-items: center; gap: 4px; min-width: 0; flex-wrap: wrap; }
-/* `.bb__step` is gone rather than kept for later.
-
-   Nothing has emitted it since the journey became a running line, but the name
-   stayed reserved — and it cost an afternoon: a new section class called
-   `bb__step` matched this rule's `height: 26px` and collapsed an entire
-   full-screen dialog to the height of a chip, with nothing about the symptom
-   pointing at the cause. A dead rule with a plausible name is a trap set for
-   the next person, so it is deleted, not commented out. */
-.bb__arrow { color: var(--border-strong); display: grid; }
 
 /* The rehearsal's verdict on a card. */
 .bb__verdict {
@@ -1231,7 +1193,7 @@
 .bb__pip b { font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bb__pip .bb__grade {
   display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 4px;
-  font-size: 11px; font-weight: var(--fw-semibold);
+  font-size: 12px; font-weight: var(--fw-semibold);
   background: var(--fb-positive-bg); color: var(--fb-positive-fg);
 }
 .bb__grade.is-B { background: var(--fb-lime-bg); color: var(--fb-lime-fg); }
@@ -1328,7 +1290,7 @@
 .bb__inspbar > b {
   flex: 1; min-width: 0;
   font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-tertiary);
+  color: var(--text-tertiary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
@@ -1362,10 +1324,10 @@
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border-subtle);
 }
-.bb__insphead .bb__idx { width: 26px; height: 26px; font-size: var(--fs-xs); cursor: default; }
-.bb__insphead .bb__idx:hover { transform: none; }
 .bb__insphead h2 { margin: 0; min-width: 0; flex: 1; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bb__insphead p { margin: 0; font-size: var(--fs-xs); color: var(--text-muted); }
+/* Why the card says "Needs setup" or "Check", under the name it is about. */
+.bb__findings { padding: var(--space-2) var(--space-5); border-bottom: 1px solid var(--border-subtle); }
 .bb__inspbody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
 /* A section: Figma's grammar — a title row you can collapse, an action on the
@@ -1390,22 +1352,15 @@
    `.bb__secact` to bare single-class rules. This is the file whose comments
    record three separate bugs caused by exactly that kind of global, and a
    fourth is not needed to make the point. */
-.bb__sechead .bb__count,
-.bb__ask__head .bb__count { font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.bb__sechead .bb__secact,
-.bb__ask__head .bb__secact {
+.bb__sechead .bb__count { font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bb__sechead .bb__secact {
   display: grid; place-items: center; width: 26px; height: 26px; border-radius: var(--radius-sm);
   border: none; background: none; color: var(--text-tertiary); cursor: pointer;
 }
-.bb__sechead .bb__secact:hover,
-.bb__ask__head .bb__secact:hover { background: var(--surface-sunken); color: var(--text-primary); }
-.bb__sechead .bb__secact:focus-visible,
-.bb__ask__head .bb__secact:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bb__sechead .bb__secact:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bb__sechead .bb__secact:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 /* Same arrangement `.bb__rulehead` already makes: the count sits with the
    heading, the action goes to the far edge. */
-.bb__ask__head .bb__count { margin-right: auto; }
-.bb__ask__head .bb__secact { margin-left: auto; }
-.bb__ask__head .bb__count + .bb__secact { margin-left: 0; }
 .bb__secbody { padding: var(--space-2) var(--space-4) var(--space-5); }
 .bb__sec.is-closed .bb__secbody { display: none; }
 .bb__secnote { margin: 0 0 var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
@@ -1471,35 +1426,6 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__thenparts { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-5); }
 .bb__thenparts > * { margin-top: 0; margin-bottom: 0; }
 
-.bb__ladder {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--space-2);
-}
-.bb__rung {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-}
-.bb__rung__n {
-  display: grid; place-items: center;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--surface-sunken); color: var(--text-tertiary);
-  font-size: 11px; font-weight: var(--fw-semibold);
-}
-.bb__rung__body {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 88px) minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-3);
-}
-.bb__rung__body > b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
-.bb__rung__body .bx-picker { width: 100%; }
-
 /* A rung's own settings sit under it, indented past the number so the ladder
    still reads as a ladder. */
 /* The rung that is a sentence rather than a control — what stands where the
@@ -1531,38 +1457,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__chip svg { opacity: 0.8; }
 .bb__chip.is-removable svg:last-child { opacity: 0.6; }
 .bb__chip.is-removable:hover svg:last-child { opacity: 1; }
-.bb__chip.is-add { border-style: dashed; color: var(--text-tertiary); }
-
-/* A chain of steps, ordered. */
-.bb__chain2 { display: flex; flex-direction: column; gap: 6px; }
-.bb__chainrow { display: grid; grid-template-columns: 20px minmax(0, 1fr) 24px; gap: 6px; align-items: center; }
-.bb__chainrow > b { font-size: var(--fs-xs); color: var(--text-muted); text-align: center; font-variant-numeric: tabular-nums; }
-
-/* --- The WHEN editor -------------------------------------------------------- */
-
-.bb__alts { display: flex; flex-direction: column; gap: var(--space-3); }
-.bb__alt {
-  position: relative;
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-}
-.bb__alt::before { content: ''; position: absolute; left: -1px; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: var(--border-strong); }
-.bb__alt.is-focus::before { background: var(--accent); }
-.bb__althead { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
-.bb__althead .bb__bracket__letter { position: static; transform: none; }
-.bb__althead input {
-  flex: 1; min-width: 0; height: 24px; padding: 0 6px; border: 1px solid transparent; border-radius: var(--radius-xs);
-  background: transparent; font-family: inherit; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary);
-}
-.bb__althead input:hover { border-color: var(--border-subtle); }
-.bb__althead input:focus-visible { outline: none; border-color: var(--focus-ring); background: var(--surface-raised); }
-.bb__althead input::placeholder { color: var(--text-muted); font-weight: var(--fw-regular); }
-.bb__altdiv {
-  display: flex; align-items: center; gap: var(--space-3);
-  font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
-}
-.bb__altdiv::before, .bb__altdiv::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
+.bb__chip.is-add { color: var(--text-tertiary); }
 
 /* The previous WHEN editor's rules stood here — `.bb__conds`, `.bb__condrow`,
    `.bb__condtop`, `.bb__condmark`, `.bb__condname`, `.bb__condval`,
@@ -1571,55 +1466,6 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
    live `.bb__cond__mark`. Deleted for the reason `.bb__step` was: a dead rule
    with a plausible name is a trap. The keyframes stay — two live rules use it. */
 @keyframes bb-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-.bb__andpill {
-  align-self: flex-start; margin: -8px 0 -8px 8px; position: relative; z-index: 1;
-  padding: 1px 6px; border-radius: 3px; background: var(--surface-inset, #eef1f4);
-  font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary);
-}
-/* `.bb__addrow` stood here — the dashed `Add method` under the method list.
-   The list is a multi-select now, so there is no row to add. */
-.bb__addalt { width: 100%; justify-content: center; margin-top: var(--space-3); }
-.bb__readback {
-  margin: var(--space-3) 0 0; padding: var(--space-3) var(--space-4);
-  border-left: 2px solid var(--border-default);
-  font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.5;
-}
-.bb__readback b { font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__emptywhen {
-  padding: var(--space-4); border: 1px dashed var(--border-default); border-radius: var(--radius-lg);
-  font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.5;
-}
-.bb__emptywhen p { margin: 0 0 var(--space-3); }
-
-/* The catalogue — a popover under the `+`, not a modal. */
-.bb__cat {
-  position: fixed; z-index: var(--z-popover);
-  width: 360px; max-height: 440px; display: flex; flex-direction: column;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
-  background: var(--surface-overlay, var(--surface-raised)); box-shadow: var(--el-high);
-  overflow: hidden;
-}
-.bb__catbar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-subtle); color: var(--text-muted); }
-.bb__catbar input { flex: 1; height: 30px; border: none; background: none; font-family: inherit; font-size: var(--fs-sm); color: var(--text-primary); }
-.bb__catbar input:focus-visible { outline: none; }
-.bb__catgroups { display: flex; gap: 4px; padding: var(--space-2) var(--space-3); overflow-x: auto; border-bottom: 1px solid var(--border-subtle); scrollbar-width: none; }
-.bb__catgroups > button {
-  flex: none; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: var(--radius-full);
-  border: 1px solid transparent; background: none; font-family: inherit; font-size: 11px; color: var(--text-secondary); cursor: pointer; white-space: nowrap;
-}
-.bb__catgroups > button:hover { background: var(--surface-sunken); }
-.bb__catgroups > button.is-on { background: var(--text-primary); color: var(--surface-raised); }
-.bb__catlist { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-2); }
-.bb__catsec { margin: var(--space-2) var(--space-2) 2px; font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary); }
-.bb__catitem {
-  display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--space-3); align-items: center;
-  width: 100%; padding: 6px var(--space-2); border: none; border-radius: var(--radius-sm); background: none;
-  text-align: left; font-family: inherit; cursor: pointer;
-}
-.bb__catitem:hover, .bb__catitem.is-cursor { background: var(--surface-sunken); }
-.bb__catitem b { display: block; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__catitem em { display: block; font-style: normal; font-size: 11px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bb__catempty { padding: var(--space-5); font-size: var(--fs-sm); color: var(--text-muted); text-align: center; }
 
 /* --- Checks & reach inside the Rule tab ------------------------------------- */
 
@@ -1637,22 +1483,18 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__diag.is-warning > svg { color: var(--text-secondary); }
 .bb__diag b { font-weight: var(--fw-medium); color: var(--text-primary); }
 .bb__diag button { margin-left: 4px; border: none; background: none; padding: 0; font: inherit; color: var(--text-link); cursor: pointer; }
-.bb__ok { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); color: var(--fb-positive-fg); }
 
 .bb__reach { display: grid; gap: var(--space-2); }
 .bb__reachbar { height: 6px; border-radius: 3px; background: var(--surface-inset, #eef1f4); overflow: hidden; }
 .bb__reachbar > i { display: block; height: 100%; border-radius: 3px; background: var(--tone-dot, var(--accent)); }
-.bb__reachline { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--text-secondary); }
-.bb__reachline b { font-weight: var(--fw-semibold); color: var(--text-primary); font-variant-numeric: tabular-nums; }
-
 
 /* --- Check tab -------------------------------------------------------------- */
 
 .bb__ctx { display: grid; gap: var(--space-3); }
 .bb__ctxrow { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: var(--space-3); align-items: start; }
-.bb__ctxrow > span { padding-top: 6px; font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary); }
+.bb__ctxrow > span { padding-top: 6px; font-size: 12px; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
 .bb__ctxrow .bb__chips { gap: 4px; }
-.bb__ctxrow .bb__chip { height: 24px; padding: 0 8px; font-size: 11px; }
+.bb__ctxrow .bb__chip { height: 24px; padding: 0 8px; font-size: 12px; }
 
 .bb__result {
   margin-top: var(--space-4); padding: var(--space-4);
@@ -1678,30 +1520,27 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__gradetext b { display: block; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bb__gradetext em { font-style: normal; font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.45; }
 .bb__tally { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3); }
-.bb__tally > span { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); padding: 2px 8px; border-radius: var(--radius-full); background: var(--surface-sunken); }
+.bb__tally > span { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-secondary); padding: 2px 8px; border-radius: var(--radius-full); background: var(--surface-sunken); }
 .bb__tally b { font-weight: var(--fw-semibold); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 
 .bb__rounds { display: flex; flex-direction: column; }
 .bb__round { border-top: 1px solid var(--border-subtle); }
 .bb__round > button {
-  display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3); align-items: center;
   width: 100%; padding: var(--space-3) 0; border: none; background: none; text-align: left; font-family: inherit; cursor: pointer;
 }
 .bb__round > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-xs); }
-.bb__round i { width: 8px; height: 8px; border-radius: 50%; background: var(--fb-positive-dot, #128f43); }
-.bb__round.is-breach i { background: var(--fb-negative-dot, #d01243); }
-.bb__round.is-lockout i { background: var(--fb-negative-dot, #d01243); }
-.bb__round.is-friction i { background: var(--fb-notice-dot, #b07a00); }
+/* The outcome dot is gone; the outcome word carries the tone. */
 .bb__round b { display: block; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__round em { display: block; font-style: normal; font-size: 11px; color: var(--text-tertiary); }
-.bb__round .bb__outcome { font-size: 11px; font-weight: var(--fw-medium); color: var(--text-secondary); white-space: nowrap; }
+.bb__round em { display: block; font-style: normal; font-size: 12px; color: var(--text-tertiary); }
+.bb__round .bb__outcome { font-size: 12px; font-weight: var(--fw-medium); color: var(--text-secondary); white-space: nowrap; }
 .bb__round.is-breach .bb__outcome { color: var(--fb-negative-fg); }
 .bb__round.is-lockout .bb__outcome { color: var(--fb-negative-fg); }
 .bb__round.is-friction .bb__outcome { color: var(--fb-notice-fg); }
 .bb__roundbody { padding: 0 0 var(--space-4) 20px; font-size: var(--fs-xs); color: var(--text-secondary); line-height: 1.5; }
 .bb__roundbody p { margin: 0 0 var(--space-2); }
 .bb__wantgot { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin: var(--space-2) 0; }
-.bb__wantgot .bb__decision { height: 22px; font-size: 11px; }
+.bb__wantgot .bb__decision { height: 22px; font-size: 12px; }
 .bb__wantgot .bb__decision.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); }
 .bb__wantgot .bb__decision.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); }
 .bb__wantgot .bb__decision.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); }
@@ -1716,8 +1555,8 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__fix p { margin: 4px 0 0; font-size: var(--fs-xs); color: var(--fb-info-fg); line-height: 1.5; opacity: 0.9; }
 .bb__fixpreview { display: grid; gap: 4px; margin: var(--space-3) 0; padding: var(--space-3); border-radius: var(--radius-md); background: rgba(255,255,255,0.55); }
 :root[data-theme='dark'] .bb__fixpreview, :root:not([data-theme='light']) .bb__fixpreview { background: rgba(0,0,0,0.18); }
-.bb__fixpreview span { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); }
-.bb__fixpreview span b { display: inline; font-size: 11px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.bb__fixpreview span { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
+.bb__fixpreview span b { display: inline; font-size: 12px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .bb__fixacts { display: flex; gap: var(--space-2); }
 
 .bb__ready { display: grid; gap: var(--space-2); }
@@ -1726,7 +1565,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__readyrow.is-bad > svg { color: var(--fb-negative-fg); }
 .bb__readyrow.is-warn > svg { color: var(--fb-notice-fg); }
 .bb__readyrow b { display: block; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__readyrow em { display: block; font-style: normal; font-size: 11px; color: var(--text-tertiary); line-height: 1.4; }
+.bb__readyrow em { display: block; font-style: normal; font-size: 12px; color: var(--text-tertiary); line-height: 1.4; }
 
 /* --- Impact tab ------------------------------------------------------------- */
 
@@ -1735,7 +1574,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__impacthead b small { font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-muted); margin-left: 6px; }
 .bb__impacthead em { font-style: normal; font-size: var(--fs-xs); color: var(--text-secondary); }
 .bb__moves { display: flex; gap: var(--space-2); flex-wrap: wrap; margin: var(--space-2) 0 var(--space-3); }
-.bb__move { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--radius-full); font-size: 11px; font-weight: var(--fw-medium); }
+.bb__move { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--radius-full); font-size: 12px; font-weight: var(--fw-medium); }
 .bb__move.is-stricter { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
 .bb__move.is-looser { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
 .bb__move.is-same { background: var(--surface-sunken); color: var(--text-secondary); }
@@ -1753,15 +1592,15 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__lane.is-allow .bb__lanebar.is-after > i { background: var(--fb-positive-dot, #128f43); }
 .bb__lane.is-mfa .bb__lanebar.is-after > i { background: var(--fb-notice-dot, #b07a00); }
 .bb__lane.is-deny .bb__lanebar.is-after > i { background: var(--fb-negative-dot, #d01243); }
-.bb__lanelegend { display: flex; gap: var(--space-4); font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+.bb__lanelegend { display: flex; gap: var(--space-4); font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
 .bb__lanelegend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; background: var(--border-strong); opacity: 0.55; margin-right: 4px; vertical-align: middle; }
 .bb__lanelegend i.is-after { background: var(--text-primary); opacity: 1; }
 
 .bb__flows { display: grid; gap: 4px; margin-top: var(--space-3); }
-.bb__flow { display: grid; grid-template-columns: auto 14px auto minmax(0, 1fr) auto; gap: 6px; align-items: center; font-size: 11px; color: var(--text-secondary); }
+.bb__flow { display: grid; grid-template-columns: auto 14px auto minmax(0, 1fr) auto; gap: 6px; align-items: center; font-size: 12px; color: var(--text-secondary); }
 .bb__flow > svg { color: var(--text-muted); }
 .bb__flow > b { font-weight: var(--fw-semibold); color: var(--text-primary); font-variant-numeric: tabular-nums; text-align: right; }
-.bb__flow .bb__decision { height: 20px; font-size: 11px; padding: 0 8px 0 6px; }
+.bb__flow .bb__decision { height: 20px; font-size: 12px; padding: 0 8px 0 6px; }
 .bb__flow .bb__decision.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); }
 .bb__flow .bb__decision.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); }
 .bb__flow .bb__decision.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); }
@@ -1786,7 +1625,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__dot.is-picked { transform: scale(1.6); z-index: 1; box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 3.5px var(--accent); }
 .bb__dot:hover { transform: scale(1.5); z-index: 1; }
 .bb__dot:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.bb__fieldkey { display: flex; gap: var(--space-4); flex-wrap: wrap; font-size: 11px; color: var(--text-tertiary); }
+.bb__fieldkey { display: flex; gap: var(--space-4); flex-wrap: wrap; font-size: 12px; color: var(--text-tertiary); }
 .bb__fieldkey i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; background: var(--dot, var(--border-default)); }
 .bb__fieldkey i.is-changed { background: transparent; box-shadow: inset 0 0 0 1.5px var(--surface-raised), 0 0 0 1px var(--text-primary); }
 
@@ -1798,21 +1637,21 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__situation .bb__wantgot { margin: var(--space-2) 0; }
 .bb__situation button { margin-top: 2px; }
 .bb__sitfacts { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
-.bb__sitfacts span { padding: 1px 7px; border-radius: var(--radius-full); background: var(--surface-sunken); font-size: 11px; color: var(--text-secondary); }
+.bb__sitfacts span { padding: 1px 7px; border-radius: var(--radius-full); background: var(--surface-sunken); font-size: 12px; color: var(--text-secondary); }
 
 .bb__cohorts { display: grid; gap: 4px; }
-.bb__cohort { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-3); align-items: center; font-size: 11px; color: var(--text-secondary); padding: 3px 0; }
+.bb__cohort { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-3); align-items: center; font-size: 12px; color: var(--text-secondary); padding: 3px 0; }
 .bb__cohort > b { font-weight: var(--fw-semibold); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 
 .bb__wins { display: grid; gap: 6px; }
 .bb__win { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; border: none; background: none; padding: 3px 0; text-align: left; font-family: inherit; cursor: pointer; border-radius: var(--radius-xs); }
 .bb__win:hover b { color: var(--accent); }
 .bb__win:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.bb__win .bb__idx { width: 22px; height: 22px; font-size: 11px; cursor: inherit; }
+.bb__win .bb__idx { width: 22px; height: 22px; font-size: 12px; cursor: inherit; }
 .bb__win .bb__idx:hover { transform: none; }
 .bb__winmid { min-width: 0; display: grid; gap: 3px; }
-.bb__winmid b { font-size: 11px; font-weight: var(--fw-medium); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bb__win > em { font-style: normal; font-size: 11px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.bb__winmid b { font-size: 12px; font-weight: var(--fw-medium); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bb__win > em { font-style: normal; font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .bb__win.is-dead b { color: var(--fb-negative-fg); }
 
 .bb__badges { display: grid; gap: var(--space-2); }
@@ -1820,11 +1659,12 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__badge > span { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
 .bb__badge.is-lost > span { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
 .bb__badge b { display: block; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__badge em { display: block; font-style: normal; font-size: 11px; color: var(--text-tertiary); line-height: 1.4; }
+.bb__badge em { display: block; font-style: normal; font-size: 12px; color: var(--text-tertiary); line-height: 1.4; }
 .bb__badge.is-lost em { color: var(--fb-negative-fg); }
 
-/* --- Save bar sits over the stage, not the inspector -------------------------- */
-.bb__stage .bx-savebar { position: absolute; left: 50%; bottom: var(--space-5); transform: translateX(-50%); z-index: 4; }
+/* `.bb__stage .bx-savebar` stood here. The board commits through its own top
+   row, never the kit SaveBar, and its transform would have fought the bar's
+   motion-owned transform anyway. */
 
 /* --- Narrow ----------------------------------------------------------------- */
 
@@ -2008,7 +1848,6 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
    while its own comment claimed it applied to both. The seam between members is
    the operator row, which is a mark that exists. */
 
-
 /* 14px, and no negative margin.
 
    The icon box was intrinsic width with `margin-right: -2px` pulling the
@@ -2042,8 +1881,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
 .bb__ifkw.is-or {
   height: 18px; padding: 0 var(--space-3); border-radius: var(--radius-pill);
   display: inline-flex; align-items: center;
-  font-size: 11px; font-weight: var(--fw-semibold);
-  letter-spacing: 0.04em; text-transform: uppercase;
+  font-size: 12px; font-weight: var(--fw-semibold);
 }
 /* Notice, not accent. It was violet here and amber in the editor's OR chip —
    one operator, two colours, on two surfaces that are on screen together
@@ -2055,7 +1893,6 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
    an operator lined up with the conditions on the row `if` had opened; the
    body is indented as a whole now, so an operator that keeps its own margin
    sits 16px further in than the conditions it joins. */
-
 
 /* --- What belongs under a keyword ---------------------------------------------
 
@@ -2102,7 +1939,7 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%;
   height: 22px; padding: 0 var(--space-3); border-radius: var(--radius-pill);
   background: var(--if-chip); border: 1px solid var(--if-chip-border);
-  color: var(--text-primary); font-family: inherit; font-size: 11px; font-weight: var(--fw-medium); white-space: nowrap;
+  color: var(--text-primary); font-family: inherit; font-size: 12px; font-weight: var(--fw-medium); white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
 /* The category mark, unboxed.
@@ -2117,9 +1954,9 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   display: grid; place-items: center; width: 14px; height: 14px; flex: none;
   background: none; color: var(--cond-fg, var(--text-tertiary));
 }
-.bb__ifchip.is-muted { background: transparent; border-style: dashed; color: var(--if-muted); font-weight: var(--fw-regular); }
+.bb__ifchip.is-muted { background: transparent; color: var(--if-muted); font-weight: var(--fw-regular); }
 .bb__ifchip.is-muted > i { background: transparent; color: var(--if-muted); }
-.bb__ifchip.is-unset { border-color: var(--fb-negative-border); color: var(--fb-negative-fg); border-style: dashed; }
+.bb__ifchip.is-unset { border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
 /* The same three tones the decision carries everywhere else in the console,
    rather than three colours picked to sit on a navy slab. */
 .bb__ifchip.is-tone-deny { background: var(--fb-negative-bg); border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
@@ -2139,12 +1976,12 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
    are still offers rather than values. The value adder keeps the neutral
    muted chip, so the pair no longer rhyme. */
 .bb__ifchip.is-tone-and,
-.bb__ifchip.is-tone-or { border-style: dashed; font-weight: var(--fw-semibold); }
+.bb__ifchip.is-tone-or { font-weight: var(--fw-semibold); }
 /* The adder that inserts an `and` is spelled the way the `and` it inserts is
    spelled. "AND" between two conditions and "and" on the button that makes one
    read as two different words at this size. "another way in" stays a phrase —
    it is not an operator, it is what pressing it gets you. */
-.bb__ifchip.is-tone-and { text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; }
+.bb__ifchip.is-tone-and { font-size: 12px; }
 .bb__ifchip.is-tone-and { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
 .bb__ifchip.is-tone-or { background: var(--fb-accent-bg); border-color: var(--fb-accent-border); color: var(--fb-accent-fg); }
 button.bb__ifchip.is-tone-and:hover { background: var(--fb-info-bg); border-style: solid; border-color: var(--fb-info-fg); color: var(--fb-info-fg); }
@@ -2154,14 +1991,13 @@ button.bb__ifchip.is-tone-or:hover { background: var(--fb-accent-bg); border-sty
 /* Where an `and`/`or` pill would sit, holding the row's indent and nothing
    else. Matches the pill's width plus its margin so the label beside it lines
    up with the labels on the condition rows above. */
-.bb__ifindent { flex: none; width: 16px; }
 button.bb__ifchip { cursor: pointer; transition: background-color 0.12s ease, border-color 0.12s ease; }
 button.bb__ifchip:hover { background: var(--if-chip-hover); border-color: var(--border-strong); color: var(--text-primary); }
 button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifchip:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.bb__ifdupe { font-size: 11px; color: var(--if-muted); }
+.bb__ifdupe { font-size: 12px; color: var(--if-muted); }
 
-.bb__ifjourney { display: inline-flex; align-items: center; gap: 4px; color: var(--if-muted); font-size: 11px; min-width: 0; flex-wrap: wrap; }
+.bb__ifjourney { display: inline-flex; align-items: center; gap: 4px; color: var(--if-muted); font-size: 12px; min-width: 0; flex-wrap: wrap; }
 .bb__ifjourney svg { opacity: 0.6; }
 /* A step's second line, inline rather than stacked.
 
@@ -2185,37 +2021,12 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__if .bx-picker__trigger {
   height: 22px; min-height: 22px; padding: 0 22px 0 7px; border-radius: 5px;
   background: var(--if-chip); border-color: var(--if-chip-border); color: var(--text-primary);
-  font-size: 11px; font-weight: var(--fw-medium);
+  font-size: 12px; font-weight: var(--fw-medium);
 }
 .bb__if .bx-picker__trigger:hover { background: var(--if-chip-hover); border-color: var(--border-strong); }
-.bb__if .bx-picker__trigger.is-invalid { border-color: var(--fb-negative-border); border-style: dashed; color: var(--fb-negative-fg); }
+.bb__if .bx-picker__trigger.is-invalid { border-color: var(--fb-negative-border); color: var(--fb-negative-fg); }
 .bb__if .bx-picker__trigger:focus-visible { box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__if .bx-picker__value { color: inherit; }
-.bb__ifop .bx-picker__trigger { background: transparent; border-color: transparent; color: var(--if-muted); font-weight: var(--fw-regular); padding-left: 4px; }
-.bb__ifop .bx-picker__trigger:hover { background: var(--if-chip); color: var(--text-primary); }
-.bb__ifdecide { display: inline-flex; align-items: center; gap: 6px; }
-.bb__ifdot { width: 8px; height: 8px; border-radius: 50%; }
-.bb__ifdot.is-deny { background: var(--fb-negative-dot); }
-.bb__ifdot.is-mfa { background: var(--fb-notice-dot); }
-.bb__ifdot.is-allow { background: var(--fb-positive-dot); }
-
-.bb__ifinput {
-  height: 22px; padding: 0 7px; border-radius: 5px;
-  background: var(--if-chip); border: 1px solid var(--if-chip-border); color: var(--text-primary);
-  font-family: inherit; font-size: 11px;
-}
-/* A time field is as wide as a time.
-
-   The kit defaults every input to `width: 100%` at zero specificity — its own
-   comment says only an explicit width wins — and this class never set one. So
-   the two ends of a time range each took a whole row, and "Time between 09:00
-   and 17:00" rendered as three stacked lines: the one condition on the panel
-   that is genuinely two values, drawn as the tallest thing on it. */
-.bb__ifinput[type='time'] { width: 92px; }
-.bb__ifinput.is-num { width: 58px; text-align: right; font-variant-numeric: tabular-nums; }
-.bb__ifinput.is-text { flex: 1; min-width: 120px; }
-.bb__ifinput:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.bb__ifinput::placeholder { color: var(--if-muted); }
 
 /* On the card the block is the body. */
 .bb__cardbody > .bb__if { margin: 0; }
@@ -2269,6 +2080,13 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 /* The who row: same shape as `if`, above it, one notch quieter — it is the
    subject of the sentence rather than a test in it. */
 .bb__ifwho .bb__ifkw { color: var(--text-tertiary); }
+/* "Finance, Legal and 2 more" or "Everyone except Contractors": one line,
+   ellipsised, with the full list on the title. */
+.bb__ifwho__text {
+  min-width: 0;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .bb__ifwho + .bb__ifplain,
 .bb__ifwho + .bb__ifgroup { margin-top: 2px; }
 
@@ -2292,7 +2110,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifgrouptag {
   display: flex; align-items: center; gap: var(--space-2); min-height: 18px;
   padding: 0 0 var(--space-3);
-  font-size: 11px; color: var(--text-tertiary);
+  font-size: 12px; color: var(--text-tertiary);
 }
 .bb__ifgrouptag svg { flex: none; opacity: 0.7; }
 .bb__ifgrouptag b { font-weight: var(--fw-semibold); color: var(--text-secondary); letter-spacing: 0.01em; }
@@ -2412,7 +2230,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   display: grid; place-items: center;
   width: 26px; height: 26px; padding: 0;
   border: none; border-radius: var(--radius-sm); background: none;
-  font-family: inherit; font-size: 11px; color: var(--text-secondary);
+  font-family: inherit; font-size: 12px; color: var(--text-secondary);
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
@@ -2435,7 +2253,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   display: inline-flex; align-items: center; gap: 5px;
   height: 28px; padding: 0 8px; border-radius: var(--radius-sm);
   border: 0; background: none; cursor: pointer;
-  font-size: 11px; font-weight: var(--fw-medium); color: var(--text-secondary);
+  font-size: 12px; font-weight: var(--fw-medium); color: var(--text-secondary);
   transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
 .bb__ifadd:hover { background: var(--surface-sunken); color: var(--text-primary); }
@@ -2544,44 +2362,15 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    between its two halves, and the caption at the top of each column. Neither
    has had markup since the two-column split did. */
 
-
 /* --- Name and description, in one block ---------------------------------------
    The description is no longer a section of its own; it sits under the name it
    belongs to and grows with what is typed into it. */
 .bb__inspname { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.bb__input--desc {
-  resize: vertical; min-height: 34px;
-  font-size: var(--fs-xs); line-height: 1.5; color: var(--text-secondary);
-}
-/* Quiet until it holds something or is being written in — an empty field under
-   every rule name would be a second heading on every card in the panel. */
-.bb__input--desc:not(:focus):placeholder-shown {
-  border-color: transparent; background: none; padding-left: 0;
-}
-.bb__input--desc:not(:focus):placeholder-shown::placeholder { color: var(--text-muted); }
 
 /* The block's foot: the two places a condition can go that are not already
    inside a group somebody made. */
 .bb__iffoot { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .bb__iffoot .bb__ifaddgroup { margin-top: 0; }
-
-/* --- The read-back, folded ----------------------------------------------------
-   Shut by default: it says in prose what the rows above say in structure, which
-   is a check you run occasionally rather than a thing you read continuously. */
-.bb__reads { margin-top: 10px; }
-.bb__reads > summary {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 8px 3px 4px; border-radius: var(--radius-sm);
-  font-size: 11px; font-weight: var(--fw-medium); color: var(--text-tertiary);
-  cursor: pointer; list-style: none; user-select: none;
-}
-.bb__reads > summary::-webkit-details-marker { display: none; }
-.bb__reads > summary::marker { content: ''; }
-.bb__reads > summary:hover { background: var(--surface-inset); color: var(--text-secondary); }
-.bb__reads > summary:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.bb__reads > summary svg { flex: none; transition: transform var(--dur-fast) var(--ease-standard); }
-.bb__reads[open] > summary svg { transform: rotate(180deg); }
-.bb__reads .bb__readback { margin: 4px 0 0; }
 
 /* ---------------------------------------------------------------------------
    Three corrections: the connector, the selection, and the panel's edge.
@@ -2671,7 +2460,6 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    you approach it moves the controls either side of the zoom away from where
    you were aiming. One object, one width. */
 .bb__zoom { cursor: default; border-radius: var(--radius-sm); padding: 2px 4px; }
-
 
 /* A group that holds nothing yet.
 
@@ -2763,7 +2551,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifslot {
   display: flex; align-items: center; gap: var(--space-2);
   width: 100%; min-height: 42px; padding: 0 var(--space-4);
-  border: 1px dashed var(--border-default); border-radius: var(--radius-md);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
   background: var(--surface-raised);
   font: inherit; font-size: var(--fs-sm); text-align: left;
   color: var(--text-tertiary); cursor: pointer;
@@ -2795,7 +2583,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   margin-left: auto; flex: none;
   padding: 2px 6px; border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle); background: var(--surface-sunken);
-  font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px;
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px;
   color: var(--text-tertiary); white-space: nowrap;
 }
 
@@ -2812,7 +2600,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   padding: 2px 6px; border-radius: var(--radius-sm);
   border: 1px solid var(--border-default); background: var(--surface-sunken);
   box-shadow: 0 1px 0 var(--border-default);
-  font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px;
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px;
   color: var(--text-primary); white-space: nowrap;
 }
 
@@ -2863,7 +2651,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   transition: color 0.14s var(--ease-standard), border-color 0.14s var(--ease-standard);
 }
 .bb__sheettabs > button:hover { color: var(--text-primary); }
-.bb__sheettabs > button.is-on { color: var(--text-primary); border-bottom-color: var(--accent); }
+.bb__sheettabs > button.is-on { color: var(--brand-text); border-bottom-color: var(--brand); }
 .bb__sheettabs > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
 
 .bb__sheetbody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
@@ -3024,8 +2812,8 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235A6775' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 6px center;
-  font-family: inherit; font-size: 11px; font-weight: var(--fw-medium);
-  text-transform: uppercase; letter-spacing: 0.03em;
+  font-family: inherit; font-size: 12px; font-weight: var(--fw-medium);
+
   color: var(--text-secondary); cursor: pointer;
 }
 .bb__joinsel:hover { border-color: var(--border-strong); }
@@ -3041,76 +2829,15 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__joinsel:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 .bb__cond__body { min-width: 0; display: block; position: relative; }
-/* `.bb__cond__acts` stood here — the hover-revealed `Move into a group of its
-   own` over the block's top-right corner. The gesture is withdrawn until it has
-   a better home; see the note in `WhenEditor`. */
 
-/* --- The form, as numbered steps ---------------------------------------------
+/* --- WHO: the people a rule applies to ---------------------------------------
 
-   Two questions, asked in order, each with its number and a line running down
-   to the next. It was one header reading "If and then" over an undivided body,
-   which named both halves in one breath and then left the reader to work out
-   where one ended. */
-/* `bb__ask`, not `bb__step`.
-
-   It was `bb__step` for about an hour, and `.bb__step` has been taken since the
-   card's journey row was written: an inline-flex chip with `height: 26px` on
-   it. So every one of these collapsed to 26px, and because the collapse
-   happened at the container the whole dialog folded to a sliver — two columns
-   of controls clipped to the height of a chip that belongs to a different
-   component entirely.
-
-   Worth the note because nothing about the symptom pointed at the cause. The
-   computed styles showed no height on the element I was measuring, the parent
-   grid looked like the culprit, and a clone lifted out of the modal collapsed
-   just the same — which is what finally said "this element's own styles",
-   rather than anything about where it sat. A name is a global in CSS. */
-.bb__ask { display: block; }
-.bb__ask__head { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3); }
-/* `.bb__ask__n` — a numeral in a filled circle before each heading — is gone.
-
-   It was there to say there are two halves and which comes first. The words
-   already do that: `If` and `Then` are a sequence in English, they sit side by
-   side in reading order, and each carries a caption saying what it asks. A
-   number in front of a word that is already an ordinal is the form explaining
-   how to read two words — and it took the heading's whole left edge, so `If`
-   started further right than every control under it. Deleted, not left dead. */
-.bb__ask__head p { flex-basis: 100%; }
-.bb__ask__head h3 { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bb__ask__head p { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
-
-/* --- WHO: the people a rule is about ------------------------------------------
-
-   Its own step, above the circumstances, because that is the order a rule gets
-   written in. What it edits are the `group` and `user` conditions the rule
-   could always hold — see audience-ops.ts — so nothing here is a second place
-   to store an audience. */
-/* Two rows of pills stood here, then two stacked lists under three paragraphs
-   of prose. The pills were the right size for a third of a shared column and
-   the wrong shape for the question; the prose was true and unread, which is
-   what a form's first screenful of explanation always is.
-
-   One list at a time behind two tabs, and what is chosen rides above them as
-   faces — visible whichever tab is open, which is the thing two stacked
-   sections could never do. */
-.bb__who { display: flex; flex-direction: column; gap: var(--space-3); }
-
-/* One colour, two states.
-
-   The tint used to be derived from the name, which gave a list of twenty-four
-   people twenty-four pastel circles carrying no meaning — and spent the one
-   thing colour is for on this screen. Quiet until picked, brand once it is, so
-   the list and the chosen row above it say the same thing the same way.
-
-   Size comes from the component: the card draws these smaller than the panel
-   does. */
-.bb__avatar {
-  flex: none; display: grid; place-items: center;
-  border-radius: 50%;
-  background: var(--surface-sunken); color: var(--text-tertiary);
-  font-weight: var(--fw-semibold); line-height: 1;
-}
-.bb__avatar.is-on { background: var(--accent-soft); color: var(--accent-strong); }
+   The Who section edits `rule.who` through the shared picker (who-picker.css).
+   Nothing here is about conditions: people are never a condition. */
+.bb__who { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+/* Focusable only so focus has somewhere to land when a chip's remove button
+   goes with its chip (WhoEditor.tsx). It is not a control, so no ring. */
+.bb__who:focus { outline: none; }
 /* --- The colour the panel does not share with the canvas ----------------------
 
    `.bb__act.is-danger:hover` is also the card's Delete-rule button — the one
@@ -3125,134 +2852,6 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 
    `.bb__insp` is the panel: one `<aside>`, one mount, rendered nowhere else. */
 .bb__insp .bb__act.is-danger:hover { background: var(--surface-inset, var(--surface-sunken)); color: var(--text-primary); }
-.bb__avatar.is-all { width: 18px; height: 18px; }
-
-/* --- The stack: the same width at five names and at five thousand ------------
-
-   The card's `who` row drew one named chip per person, which wrapped to four
-   lines at eighteen and would be unreadable at a real tenant's numbers. Five
-   marks, the first name in words, and a count — fixed size, whatever it holds.
-
-   Overlapped with a ring in the card's own background colour, which is what
-   makes a row of circles read as one group of people rather than five separate
-   marks. */
-.bb__stack { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; }
-.bb__stack__faces { display: inline-flex; align-items: center; }
-.bb__stack__faces .bb__avatar + .bb__avatar { margin-left: -6px; }
-.bb__stack__faces .bb__avatar { box-shadow: 0 0 0 1.5px var(--surface-raised); }
-.bb__stack__lead {
-  min-width: 0; font-size: var(--fs-xs); color: var(--text-body);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bb__stack__more { flex: none; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.bb__stack__none { font-size: var(--fs-xs); color: var(--text-muted); }
-
-/* --- The two lists, one at a time -------------------------------------------- */
-
-/* A segmented control, not a second row of tabs.
-
-   This was an underlined tab strip sitting directly beneath the panel's own
-   underlined tab strip — two identical switchers back to back, with nothing
-   saying which moved you between FORMS and which moved you within one. The
-   panel's strip changes the subject; this changes a filter inside it, and a
-   segmented control is what that means everywhere else in this kit. */
-.bb__whopick {
-  display: inline-flex; align-items: center; gap: 2px;
-  padding: 2px;
-  background: var(--surface-sunken);
-  border-radius: var(--radius-md);
-}
-.bb__whopick > button {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 26px; padding: 0 var(--space-4);
-  border: none; border-radius: var(--radius-sm); background: none;
-  font-family: inherit; font-size: var(--fs-md); color: var(--text-tertiary);
-  cursor: pointer;
-}
-.bb__whopick > button:hover { color: var(--text-primary); }
-.bb__whopick > button.is-on {
-  background: var(--surface-raised); color: var(--text-primary);
-  box-shadow: var(--el-low);
-}
-.bb__whopick > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.bb__whopick > button svg { opacity: 0.75; }
-/* The count rides on the control, so the list you are not looking at still
-   says how much is in it. */
-.bb__whopick > button b {
-  min-width: 16px; padding: 0 4px; border-radius: var(--radius-pill);
-  background: var(--surface-inset, var(--surface-sunken)); color: var(--text-secondary);
-  font-size: 11px; font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums;
-}
-
-.bb__whorows {
-  display: flex; flex-direction: column;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  max-height: 260px; overflow-y: auto;
-}
-
-.bb__whoitem {
-  display: flex; align-items: center; gap: var(--space-3);
-  padding: 6px var(--space-4);
-  border: none; border-top: 1px solid var(--border-subtle); background: none;
-  font-family: inherit; text-align: left; cursor: pointer; min-width: 0;
-}
-.bb__whoitem:first-child { border-top: none; }
-.bb__whoitem:hover { background: var(--surface-sunken); }
-.bb__whoitem:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
-.bb__whoitem.is-on { background: var(--surface-sunken); }
-.bb__whoitem b {
-  min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-body);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bb__whoitem.is-on b { font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__whoitem em {
-  margin-left: auto; flex: none; padding-left: var(--space-3);
-  font-style: normal; font-size: var(--fs-xs); color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-/* A real tick box, because this is a multi-select and the shape is what says
-   so — a check with no box reads as "the current one". */
-/* `.bb__whotick` stood here. Every tick in the console is `.bx-tick` from the kit now;
-   see the note there for the five shapes this replaced. */
-
-/* Informs, never blocks. There are no disabled rows here, because a redundant
-   or unusual selection is legal and sometimes deliberate. */
-/* The shared pill geometry - see the --pill-* block in console-theme.css. */
-.bb__whotag {
-  flex: none; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
-  line-height: var(--pill-line);
-  background: var(--fb-neutral-bg); border: var(--bw-thin) solid var(--fb-neutral-border);
-  color: var(--fb-neutral-fg); font-size: var(--pill-fs); font-weight: var(--pill-fw);
-  white-space: nowrap;
-}
-/* The two badges print different WORDS — "Empty" and "Outside" — so the amber
-   was telling apart two things that already read apart. It keeps a dashed edge
-   instead: the plain badge states a fact about the group, this one states a
-   mismatch with the policy, and dashed is how this pane draws "not settled". */
-.bb__whotag.is-warn { border-style: dashed; border-color: var(--border-strong); color: var(--text-secondary); }
-
-/* `.bb__whosearch` stood here — this surface's own magnifier-and-field. Every search in
-   the console is `SearchBox` from the kit now; see the note on `.bx-search`. */
-
-.bb__whohint { margin: 0; padding: var(--space-4); font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
-.bb__who > .bb__whohint { padding: 0; }
-/* An exclusion this pane can no longer build, but must not misdraw. */
-/* "These are EXCLUDED — the rule covers everyone else."
-
-   The most consequential sentence this pane can print, and the amber box was
-   the only thing separating it from ordinary help text. Losing the tint would
-   have flattened it into help, so the weight moves to an edge: a 2px rule down
-   the left, the text at the page's own colour, and the `<b>` it already carries.
-   A bar beside a paragraph is how this console marks the line worth reading
-   twice, and it does not need a hue to do it. */
-.bb__whohint.is-warn {
-  padding: var(--space-3) var(--space-4);
-  border-left: 2px solid var(--border-strong); border-radius: 0;
-  background: var(--surface-sunken); color: var(--text-primary);
-}
-.bb__whohint.is-warn b { font-weight: var(--fw-semibold); }
 
 /* The note is asked for, not offered — a two-row textarea sat under every
    rule's name, empty on most of them, pushing the question the panel exists to
@@ -3261,55 +2860,12 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   align-self: start;
   display: inline-flex; align-items: center; gap: 5px;
   height: 24px; padding: 0 8px 0 6px;
-  border: 1px dashed var(--border-default); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
   background: none; font-family: inherit; font-size: var(--fs-xs);
   color: var(--text-tertiary); cursor: pointer;
 }
 .bb__addnote:hover { border-style: solid; border-color: var(--border-strong); color: var(--text-primary); }
 .bb__addnote:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-
-/* The stand-down. Not an error and not styled as one: an OR-shaped rule is a
-   legitimate rule, and this pane is explaining where its who actually lives. */
-.bb__whodown { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); }
-.bb__whodown h4 { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bb__whodown p { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.55; }
-.bb__whodown__lead { color: var(--text-secondary) !important; }
-.bb__whodown__list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: var(--space-2); }
-.bb__whodown__list li {
-  display: flex; align-items: baseline; gap: var(--space-3);
-  padding: var(--space-3);
-  background: var(--surface-sunken); border-radius: var(--radius-sm);
-  font-size: var(--fs-xs); color: var(--text-body);
-}
-/* The same letters the brackets and the If block use for an alternative. */
-.bb__whodown__letter { flex: none; font-weight: var(--fw-semibold); color: var(--text-tertiary); }
-/* One sentence, and only when it is true: a rule that names nobody covers
-   everyone the POLICY governs, not everyone in the tenant. That is what
-   somebody needs before deciding whether leaving it blank is safe. */
-.bb__whonote { margin: 2px 0 0; font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.5; }
-/* The second question sits under the first with a rule between them, so the two
-   read as one form in two parts rather than two unrelated blocks. */
-.bb__ask--next { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
-/* `.bb__ask` was a block inside a shared column; as a pane it IS the panel
-   body and has to carry its own room. */
-.bb__ask--pane { padding: var(--space-4) var(--space-5) var(--space-5); }
-
-
-/* --- The second factor's methods -------------------------------------------
-
-   `.bb__methods`, `.bb__methodrow` and `.bb__methodn` stood here — one dropdown
-   per chosen method, numbered when the order was walked. The control is a
-   single multi-select now: the list is the catalogue and the ticks are the
-   answer, so there are no rows to lay out. */
-
-/* A label and a control on one line, for a rung's single sub-setting. */
-.bb__subrow {
-  display: grid; grid-template-columns: minmax(0, 88px) minmax(0, 1fr);
-  align-items: center; gap: var(--space-3); min-width: 0;
-}
-.bb__subrow > b { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
-.bb__subrow .bx-picker { width: 100%; }
-
 
 /* --- The two halves of a condition, on the card --------------------------------
 
@@ -3382,7 +2938,6 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifjoin.is-run { padding: var(--space-2) 0; }
 .bb__ifjoin.is-run::after { display: none; }
 
-
 /* --- On/off, in the hover strip --------------------------------------------
 
    A switch used to sit at the right of every card head, on at rest — so a chain
@@ -3409,7 +2964,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   flex: none; font-style: normal;
   padding: 1px 5px; border-radius: var(--radius-pill);
   background: var(--surface-inset); color: var(--text-tertiary);
-  font-size: 10px; font-weight: var(--fw-medium);
+  font-size: 12px; font-weight: var(--fw-medium);
 }
 
 /* =============================================================================
@@ -3498,70 +3053,6 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 }
 .bb__insp .bb__sec.is-focused .bb__sec__body { border-left-color: var(--border-strong); }
 
-/* --- Who ---------------------------------------------------------------------
-
-   A summary and one button. The two lists moved into a dialog, which is most of
-   why this panel now fits a whole rule: they were a 340px column of checkboxes
-   that pushed the conditions and the outcome below the fold. */
-.bb__who { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }
-
-/* One row: the mark, the state, and the way out of it.
-
-   It was a two-line stack with a button underneath — four rows to say "nobody
-   in particular", on the section that is answered by leaving it alone. The
-   second line explained what the button does, which the button says. */
-/* The empty Who: a tinted note that says what the rule does, and the way out.
-
-   It was `.bb__whonone` — one flex row, a glyph, a bold phrase and a link — and
-   the phrase sat close enough under the `Who` heading to read as part of it.
-
-   Violet, from the theme's own `--fb-accent-*` ramp. Not blue: the linter's
-   notes in this panel are blue, and a second blue box here would read as a
-   finding about the rule rather than as context. Not amber or red: nothing is
-   wrong. The ramp is otherwise unused on this surface, which is what lets it
-   mean one thing.
-
-   The button is a real `Button` rather than the old bare link. On a single-line
-   status a filled control would have claimed to be the section's primary
-   action, which was the argument for the link; inside a note that already
-   explains itself, a link at the end of two lines of prose is the thing nobody
-   sees. */
-.bb__whonote {
-  display: flex; align-items: flex-start; gap: var(--space-3);
-  width: 100%; padding: var(--space-4);
-  border: 1px solid var(--fb-accent-border);
-  border-radius: var(--radius-md);
-  background: var(--fb-accent-bg);
-  color: var(--fb-accent-fg);
-}
-/* Optically on the first line of the sentence, not on the top of the box. */
-.bb__whonote > svg { flex: none; margin-top: 2px; color: var(--fb-accent-dot); }
-.bb__whonote p {
-  flex: 1; min-width: 0; margin: 0;
-  font-size: var(--fs-sm); line-height: 1.5; color: var(--fb-accent-fg);
-}
-.bb__whonote b { font-weight: var(--fw-semibold); }
-/* The button keeps the panel's own colours — a violet-on-violet control would
-   dissolve into the note it sits in. */
-.bb__whonote > .bx-btn { flex: none; background: var(--surface-raised); }
-
-/* Below ~360px the note stacks: a two-line sentence and a button side by side
-   in a narrowed inspector leaves the sentence four words wide. */
-@container (max-width: 360px) {
-  .bb__whonote { flex-wrap: wrap; }
-  .bb__whonote > .bx-btn { margin-left: auto; }
-}
-/* `.bb__wholink` is gone with the bare link the note replaced. */
-
-
-/* --- Who, in the dialog ------------------------------------------------------ */
-.bb__whopicker { display: flex; flex-direction: column; gap: var(--space-4); }
-.bb__whopicker__lede { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55; }
-.bb__whopicker .bb__whorows {
-  max-height: 340px; overflow-y: auto;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-}
-
 /* --- The second factor, as a card --------------------------------------------
 
    The one box this section draws, and it earns it: everything inside is about
@@ -3587,7 +3078,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   flex: none; display: grid; place-items: center;
   width: 20px; height: 20px; border-radius: var(--radius-full);
   background: var(--surface-sunken); color: var(--text-tertiary);
-  font-size: 11px; font-weight: var(--fw-semibold);
+  font-size: 12px; font-weight: var(--fw-semibold);
 }
 .bb__second__drop {
   flex: none; display: grid; place-items: center; width: 24px; height: 24px;
@@ -3625,7 +3116,6 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   background: var(--state-hover-bg); border-color: var(--border-default); color: var(--text-primary);
 }
 .bb__addsecond:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-
 
 /* --- The options, stacked --------------------------------------------------------
 
@@ -3750,7 +3240,7 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   flex: none; display: grid; place-items: center;
   width: 20px; height: 20px; border-radius: var(--radius-full);
   background: var(--surface-sunken); color: var(--text-tertiary);
-  font-size: 11px; font-weight: var(--fw-semibold);
+  font-size: 12px; font-weight: var(--fw-semibold);
 }
 .bb__part__body {
   display: flex; flex-direction: column; gap: var(--space-4);
@@ -3798,70 +3288,6 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   text-align: left; text-align-last: left;
 }
 
-/* --- Who, summarised on one line --------------------------------------------
-
-   Four overlapped faces, a count, and the way in. It was a chip per group and
-   per person, each with its own remove — so a rule naming fourteen filled the
-   section with five rows of chips and pushed the conditions off the panel. A
-   summary that grows with its content is not a summary. */
-.bb__whosum {
-  display: flex; align-items: center; gap: var(--space-3);
-  width: 100%; min-width: 0;
-  padding: 5px 6px 5px 8px;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  font: inherit; text-align: left; cursor: pointer;
-}
-.bb__whosum:hover { border-color: var(--border-default); background: var(--surface-inset); }
-.bb__whosum:focus-visible { outline: none; border-color: var(--border-strong); box-shadow: 0 0 0 4px var(--focus-halo); }
-
-/* Overlapped, because the faces are a GROUP rather than four separate things —
-   and because the overlap is what buys the fourth one its room. */
-.bb__whosum__faces { flex: none; display: inline-flex; align-items: center; }
-.bb__whosum__faces > * { margin-left: -5px; box-shadow: 0 0 0 2px var(--surface-raised); }
-.bb__whosum__faces > *:first-child { margin-left: 0; }
-.bb__whosum__more {
-  display: inline-grid; place-items: center;
-  height: 18px; padding: 0 5px; margin-left: -5px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-inset); color: var(--text-tertiary);
-  box-shadow: 0 0 0 2px var(--surface-raised);
-  font-style: normal; font-size: 10px; font-weight: var(--fw-semibold);
-}
-
-.bb__whosum__text {
-  flex: 1; min-width: 0;
-  display: inline-flex; align-items: baseline; gap: var(--space-2);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
-}
-/* The one qualification worth keeping in the summary, counted rather than
-   repeated on every face. */
-.bb__whosum__text em {
-  flex: none; font-style: normal;
-  padding: 1px 5px; border-radius: var(--radius-pill);
-  background: var(--fb-notice-bg); color: var(--fb-notice-fg);
-  font-size: 10px; font-weight: var(--fw-medium);
-}
-/* A link, not a chip.
-
-   It was padded and rounded, and grew a tinted brand BACKGROUND on hover — so
-   pointing at the summary lit a small orange tablet inside a row that is itself
-   a button. Two nested pressable-looking things, and the inner one looked more
-   pressable than the outer one that actually does the work.
-
-   Now it is what it reads as: the last clause of the row, in link colour, going
-   darker and underlined when the row is pointed at. The colour carries the
-   affordance; nothing needs a fill to say it is live. */
-.bb__whosum__edit {
-  flex: none; display: inline-flex; align-items: center; gap: 4px;
-  color: var(--text-link); font-size: var(--fs-xs); font-weight: var(--fw-medium);
-}
-.bb__whosum:hover .bb__whosum__edit {
-  color: var(--text-primary);
-  text-decoration: underline; text-underline-offset: 2px;
-}
-
 /* Why there is no adder under Flag.
 
    A sentence rather than a disabled button, because the reason is a property of
@@ -3872,24 +3298,3 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.55;
 }
 .bb__addnote b { font-weight: var(--fw-medium); color: var(--text-secondary); }
-
-/* Select-all, over the Who list rather than in it.
-
-   A row at the top of the scroller would scroll away, and a checkbox whose job
-   is to tick the other checkboxes reads as one of them. Above the box, on the
-   line that says how many are on, it is plainly a control ABOUT the list. */
-.bb__whoall {
-  display: flex; align-items: center; gap: var(--space-3);
-  margin-bottom: var(--space-2);
-}
-.bb__whoall > button {
-  padding: 0; border: 0; background: none; cursor: pointer;
-  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium);
-  color: var(--text-link);
-}
-.bb__whoall > button:hover { text-decoration: underline; text-underline-offset: 2px; }
-.bb__whoall > button:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 4px var(--focus-halo); }
-.bb__whoall > span {
-  margin-left: auto;
-  font-size: var(--fs-xs); color: var(--text-tertiary); font-variant-numeric: tabular-nums;
-}

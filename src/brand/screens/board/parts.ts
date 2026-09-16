@@ -1,19 +1,14 @@
-import { Split, Users, type LucideIcon } from 'lucide-react'
-
-import { restConditions, whoEditable, whoIds } from '../../audience-ops'
-import type { Rule } from '../../data'
-import type { NameLookup } from '../predicate-prose'
-import { summarise } from '../ConditionPopover'
-import { DECISION_SHORT, type Part } from './model'
+import { blankRule, type Rule } from '../../data'
+import { leafCount } from '../../predicate'
+import { hasWho } from '../../rule-who'
+import type { RuleState } from '../rule-form'
+import type { Part } from './model'
 
 /* -----------------------------------------------------------------------------
-   How the three parts of a rule are named and summarised.
+   How the parts of a rule are named, and when a rule is still untouched.
 
-   Pure — no React, no store, no DOM — and kept out of both neighbours on
-   purpose. `model.ts` is the board's vocabulary rather than its presentation,
-   and `audience-ops.ts` is `Predicate → Predicate`: a formatter living there
-   would be the first crack in the one module that is only allowed to be a
-   writer.
+   Pure — no React, no store, no DOM — and kept out of `model.ts` on purpose:
+   that file is the board's vocabulary rather than its presentation.
    -------------------------------------------------------------------------- */
 
 /* The three questions, as a person reads them.
@@ -24,57 +19,58 @@ import { DECISION_SHORT, type Part } from './model'
    the person asking for it used. The id underneath is still `'when'`. */
 export const PART_LABEL: Record<Part, string> = { who: 'Who', when: 'Condition' }
 
-export const PART_HINT: Record<Part, string> = {
-  who: 'Which people is this rule about?',
-  when: 'In what circumstances, and what happens then?',
+/* A rule nobody has answered anything on yet.
+
+   Not "no who and no conditions": a rule with neither that says Deny catches
+   every sign-in that reaches it, and the card must say so. Pristine means it
+   still holds exactly what `blankRule` writes — the name aside, which says
+   nothing about what the rule does. */
+export function isPristine(rule: Rule): boolean {
+  const b = blankRule()
+  return (
+    !hasWho(rule.who) &&
+    leafCount(rule.when) === 0 &&
+    rule.decision === b.decision &&
+    rule.firstFactor === b.firstFactor &&
+    !rule.firstFactorMethod &&
+    rule.secondFactor === b.secondFactor &&
+    (rule.secondFactorMethods?.length ?? 0) === 0 &&
+    (rule.methodChain?.length ?? 0) === 0 &&
+    !rule.preferredFallback &&
+    !rule.rememberMfa &&
+    !rule.allowDisable2fa
+  )
 }
 
-/* Glyphs the card already draws with: `Users` is what the who rows used and
-   `Split` is the branch mark at the head of every `if`. Nothing new is
-   introduced — the buttons label parts of the card that were already there. */
-export const PART_ICON: Record<Part, LucideIcon> = { who: Users, when: Split }
+/* The name a duplicated rule takes.
 
-/** What a part button says after its label, and whether that reads as unset. */
-export interface PartSummary {
-  text: string
-  /** Nothing chosen — drawn muted, so the chain shows at a glance what is set. */
-  dim: boolean
-}
-
-/* The value on each of the card's three buttons.
-
-   The condition count is `restConditions`, not every leaf. It used to be every
-   leaf, and that was right while the card had one number for the whole
-   predicate — but a card that reports its groups and people under `Who` and
-   then counts them again under `Condition` is telling you the same fact twice
-   and inflating the second telling. `WhenEditor` has always hidden them from
-   the If list on exactly this argument; `IfBlock` now does too, so all three
-   agree about what a condition is.
-
-   "Any sign-in" for the empty case, because a rule with no conditions does not
-   test less — it tests nothing, and it catches everything that reaches it. */
-export function partSummary(rule: Rule, part: Part, resolve: NameLookup): PartSummary {
-  if (part === 'when') {
-    /* The count AND the outcome, because they share a pane now. "2 conditions
-       → Deny" is the whole of the second question in one phrase, which is what
-       the folded card used to say before any of this. */
-    const n = restConditions(rule.when).length
-    const outcome = DECISION_SHORT[rule.decision]
-    return n === 0
-      ? { text: `Any sign-in → ${outcome}`, dim: true }
-      : { text: `${n} condition${n === 1 ? '' : 's'} → ${outcome}`, dim: false }
+   Appending " (copy)" to a copy stacked into "(copy) (copy)". The suffix is
+   stripped first, and the copies are numbered: "MFA (copy)", "MFA (copy 2)". */
+export function copyName(name: string, taken: readonly string[]): string {
+  const base = name.trim().replace(/\s*\(copy(?: \d+)?\)$/, '') || 'Untitled rule'
+  const names = new Set(taken.map((n) => n.trim()))
+  let n = 1
+  let next = `${base} (copy)`
+  while (names.has(next)) {
+    n += 1
+    next = `${base} (copy ${n})`
   }
+  return next
+}
 
-  /* On an OR of alternatives the who belongs to each way in rather than to the
-     rule, so no single phrase is true of it. The button stays — a control that
-     vanishes when a rule grows an OR is a card changing shape for a reason
-     nobody can see — and it says what is actually the case. The pane it opens
-     does the explaining. */
-  if (!whoEditable(rule.when)) return { text: 'Per alternative', dim: true }
+const STATE_LABEL: Record<RuleState, string> = { ready: 'Ready', setup: 'Needs setup', warn: 'Check' }
 
-  const names = [
-    ...whoIds(rule.when, 'group').map((id) => resolve('group', id) ?? `deleted · ${id}`),
-    ...whoIds(rule.when, 'user').map((id) => resolve('user', id) ?? `deleted · ${id}`),
-  ]
-  return names.length === 0 ? { text: 'Everyone', dim: true } : { text: summarise(names, 'Everyone'), dim: false }
+/** Findings that mean another rule always matches first, so this one never runs. */
+export const UNREACHABLE_CODES: readonly string[] = ['PE101', 'PE102', 'PE103']
+
+/** The pill beside a rule's name. A rule another rule always catches first is unreachable, not unfinished. */
+export function stateLabel(state: RuleState, enabled: boolean, unreachable: boolean): string {
+  if (!enabled) return 'Off'
+  if (state === 'setup' && unreachable) return 'Unreachable'
+  return STATE_LABEL[state]
+}
+
+/** The name to keep when a rule's name field is left blank. */
+export function settledName(typed: string, previous: string, index: number): string {
+  return typed.trim() || previous.trim() || `Rule ${index + 1}`
 }

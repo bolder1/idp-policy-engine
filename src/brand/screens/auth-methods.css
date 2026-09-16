@@ -47,6 +47,8 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 .bm8__tab {
+  /* Icon and label in one line, the zone tabs' spacing. */
+  display: inline-flex; align-items: center; gap: 7px;
   padding: 0 0 10px;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -55,74 +57,15 @@
   transition: color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
 }
 .bm8__tab:hover { color: var(--text-secondary); }
-.bm8__tab.is-on { color: var(--text-primary); font-weight: var(--fw-semibold); border-bottom-color: var(--accent); }
+.bm8__tab.is-on { color: var(--brand-text); font-weight: var(--fw-semibold); border-bottom-color: var(--brand); }
 .bm8__tab:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
 
-.bm8__pane { display: flex; flex-direction: column; gap: 14px; }
-
-/* --- Section head -------------------------------------------------------------- */
-
-.bm8__sechead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.bm8__sechead h2 {
-  margin: 0; font-size: var(--fs-2xl); font-weight: var(--fw-semibold);
-  color: var(--text-primary); letter-spacing: -0.01em;
-}
-.bm8__sechead p { margin: 4px 0 0; font-size: var(--fs-md); color: var(--text-tertiary); }
-
-/* Beside the heading, and secondary.
-
-   It was a solid brand pill pinned to the far right of the section row — the
-   loudest object on the page, describing a count, about 700px from the words it
-   counted. Read left to right you got "Categories", a sentence, and eventually
-   a number with nothing attached to it.
-
-   Neutral now, because a count is not an action and the page already spends its
-   orange on the primary button. Two of them sit together, so a filled pair
-   would read as a pair of buttons. */
-.bm8__sectitle { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-
-/* The shared pill geometry - see the --pill-* block in console-theme.css. */
-.bm8__chip {
-  flex: none; padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
-  line-height: var(--pill-line);
-  background: var(--surface-inset);
-  border: var(--bw-thin) solid var(--border-subtle);
-  color: var(--text-secondary);
-  font-size: var(--pill-fs); font-weight: var(--pill-fw); white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.bm8__chip.is-quiet { background: var(--surface-inset); color: var(--text-tertiary); }
-
-.bm8__search {
-  display: flex; align-items: center; gap: 8px;
-  height: var(--ctl-height-md); padding: 0 11px;
-  background: var(--ctl-bg);
-  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
-  color: var(--text-muted);
-}
-.bm8 .bm8__search input {
-  flex: 1; min-width: 0; height: auto; padding: 0;
-  background: none; border: 0;
-  font-size: var(--fs-md); color: var(--text-primary);
-}
-.bm8 .bm8__search input:focus-visible { outline: none; }
-.bm8__search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--focus-halo); }
-
-/* --- The primary factor ---------------------------------------------------------
-   Password, above the eleven and outside them.
-
-   Same card as a category so it reads as part of the same catalogue, minus
-   every affordance that would suggest it can be acted on: no chevron, no hover
-   lift, no pointer. What is left is a row that states a fact — this is on, for
-   everyone, and not from here. */
-.bm8__primary { display: flex; flex-direction: column; gap: 12px; }
-/* Tighter than the category list below it: three rows that belong together
-   read as a group, where 14px apart they read as three more categories. */
-.bm8__primarylist { display: flex; flex-direction: column; gap: 8px; }
-/* Sits closer to the section it introduces than to the one above it. */
-.bm8__primary + .bm8__sechead { margin-top: 10px; }
-
-.bm8__card--locked { cursor: default; }
+/* `.bm8__pane` stood here: a 14px column holding the bar and the list. They are
+   children of the page grid now (see `CategoryList` for why), where the gap is
+   the grid's 16px — so the two joints the column used to space are held to
+   what it gave them, and the list does not move. */
+.bm8 > .bm8__bar + .bm8__list { margin-top: -2px; }
+.bm8 > .bmact { margin-bottom: 12px; }
 
 /* The row carries no control at all, so its whole state has to be in words. */
 /* The shared pill geometry - see the --pill-* block in console-theme.css. */
@@ -167,6 +110,16 @@
   border: 1px solid var(--border-default); border-radius: var(--radius-lg);
   overflow: hidden;
 }
+
+ul.bm8__list { margin: 0; padding: 0; list-style: none; }
+
+/* The page's list is the whole catalogue, not paged, but every row keeps one
+   height: the name on one line, the detail on its tip, and anything past the
+   edge clipped rather than wrapped into a taller row. Tips portal out, so
+   clipping never cuts one off. */
+.bm8__list--oneline > .bm8__card { height: 84px; min-height: 0; padding-block: 0; overflow: hidden; }
+.bm8__list--oneline .bm8__info { overflow: hidden; }
+.bm8__list--oneline .bm8__name { flex-wrap: nowrap; min-width: 0; white-space: nowrap; }
 
 /* A row in that panel: no fill of its own, no edge of its own, one divider.
 
@@ -236,7 +189,6 @@
 .bm8__card > svg, .bm8__rowchev > svg { color: var(--text-muted); transition: transform var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard); }
 .bm8__name { transition: color var(--dur-fast) var(--ease-standard); }
 
-
 /* --- The tile ------------------------------------------------------------------
    Identity, not status: a family keeps its colour whether or not anything in it
    is on. A family with nothing enabled gets the neutral tile instead, which is
@@ -286,16 +238,9 @@
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
 }
-.bm8__desc {
-  font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.45;
-  overflow: hidden; text-overflow: ellipsis;
-}
-/* Not brand. The prototype puts this in orange and it does not earn it: a
-   count is information, not an action, and eleven of them down a page spends
-   the brand on the one thing that never needs clicking. Orange is reserved for
-   what is ACTIVE — the current tab, a selected chip, the row under the cursor. */
-.bm8__usage { font-size: var(--fs-sm); color: var(--text-secondary); }
-.bm8__usage.is-quiet { color: var(--text-muted); }
+/* `.bm8__desc` and `.bm8__usage` stood here: a description and a "used in N
+   rules" line under each name. Row details are on the tip beside the name now,
+   and how many rules use a method is said when it is turned off. */
 
 .bm8__badge {
   display: inline-flex; align-items: center; gap: var(--pill-gap);
@@ -424,9 +369,9 @@
 .bm8__txn.is-empty { border-color: var(--fb-negative-border); color: var(--fb-negative-fg); background: var(--fb-negative-bg); }
 
 @media (max-width: 900px) {
-  /* The funding tag goes before the enabled chip does — it qualifies a state
-     rather than being one. */
-  .bm8__txn { display: none; }}
+  /* The plain count goes first. "No transactions left" and a low balance stay:
+     they are the only place the row says its codes will not send. */
+  .bm8__txn:not(.is-empty):not(.is-low) { display: none; }}
 
 /* The figure reads first and the word explains it, rather than one muted string
    where the number has to be found inside the sentence. */
@@ -453,9 +398,6 @@
 .bm8__card.is-off .bm8__reach b { color: var(--text-secondary); }
 
 @media (max-width: 720px) {
-  /* The blurb is the first thing to go: the name and the two figures are what
-     the row is for. */
-  .bm8__card .bm8__desc { display: none; }
   .bm8__reach { min-width: 0; }
   .bm8__list { --bm8-endgap: 10px; }}
 
@@ -463,7 +405,6 @@
    text, never by `opacity` on the row — opacity would take the toggle down with
    it, and the toggle is the one control that still has to look operable. */
 .bm8__card.is-off .bm8__name { color: var(--text-secondary); }
-.bm8__card.is-off .bm8__desc { color: var(--text-muted); }
 
 /* --- Slide-over -----------------------------------------------------------------
    The category opens over the list rather than replacing it. Only the head
@@ -483,25 +424,40 @@
    saying the same thing beside it is the tint stated twice. */
 .bm8__dwhead {
   flex: 1; min-width: 0;
-  display: flex; align-items: flex-start; gap: 13px;}
-
-.bm8__dwtile {
-  flex: none; display: grid; place-items: center;
-  width: 38px; height: 38px; border-radius: var(--radius-md);
-  background: var(--surface-inset); color: var(--text-tertiary);
+  display: flex; align-items: center; gap: var(--space-4);
 }
 
-.bm8__dwtext { flex: 1; min-width: 0; }
-.bm8__dwtext h2 { margin: 0; font-size: var(--fs-lg); }
-/* A family of one is headed by its method, with the family as a chip — the
-   same way its row is named on the list. */
-.bm8__dwtitle { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.bm8__dwtext p { margin: 3px 0 0; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.45; }
+/* The head is a name and nothing else, so it is set to be seen: the page-title
+   size, bold, beside a 36px tile. What it used to carry under the name — the
+   blurb and the numbers, in 13px and 12px grey — went to an overview card, and
+   that card is gone too (15 Sep 2026): the list and the head already say it. */
+.bm8__dwtile {
+  flex: none; display: grid; place-items: center;
+  width: 36px; height: 36px; border-radius: var(--radius-md);
+  background: var(--surface-inset); color: var(--text-secondary);
+}
+/* Scoped through the drawer and the head so it outranks `.bpage h2` in
+   console-theme.css and its `[data-brand=rebrand]` twin (0,2,1), which set every
+   h2 on a page to 16px/600 and would quietly take the title back down. */
+.bx-drawer .bm8__dwhead > h2.bm8__dwtitle {
+  margin: 0; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-xl); font-weight: var(--fw-bold); line-height: 1.3;
+  color: var(--text-primary);
+}
+.bm8__dwhead > .bx-badge { flex: none; --badge-max: 28ch; }
 
-.bm8__dwstats { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
-.bm8__dwstats span { font-size: var(--fs-xs); color: var(--text-tertiary); }
-.bm8__dwstats strong { font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bm8__dwstats .is-warn strong { color: var(--fb-notice-fg); }
+/* Settings sections: a plain heading over its rows. What the section reaches is
+   said once, in the Note at the top of the Settings pane, not as an italic tail
+   on every heading. */
+.bm8__settings { display: flex; flex-direction: column; gap: var(--space-6); }
+/* The pane's scope note: one kit callout, a sentence per line. */
+.bm8__setnote p { margin: 0; }
+.bm8__setnote p + p { margin-top: var(--space-2); }
+.bm8__setlabel {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
 
 /* --- Panel tabs ------------------------------------------------------------------
    These shipped as markup with no stylesheet, which is why they rendered as
@@ -521,13 +477,8 @@
   transition: color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
 }
 .bm8__dwtab:hover { color: var(--text-secondary); }
-.bm8__dwtab.is-on { color: var(--text-primary); font-weight: var(--fw-semibold); border-bottom-color: var(--accent); }
+.bm8__dwtab.is-on { color: var(--brand-text); font-weight: var(--fw-semibold); border-bottom-color: var(--brand); }
 .bm8__dwtab:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
-.bm8__dwtab em {
-  font-style: normal; padding: 0 6px; border-radius: var(--radius-sm);
-  background: var(--surface-inset); font-size: var(--fs-xs); color: var(--text-muted);
-}
-.bm8__dwtab.is-on em { background: var(--accent-soft); color: var(--accent-strong); }
 
 /* The settings list. The row brings its own dividers, so this only stacks. */
 .bm8__setlist { display: flex; flex-direction: column; }
@@ -560,7 +511,6 @@
 /* A vendor mark in place of the family glyph — MethodIcon brings its own box. */
 .bm8__dwtile--logo { width: auto; height: auto; background: none; }
 
-
 /* The category holding it. Brand-tinted rather than green: the enabled chip
    beside it is a count, and this is a choice somebody made. */
 .bm8__defchip {
@@ -574,15 +524,9 @@
 }
 
 /* --- The setup form ---------------------------------------------------------------
-   Behind the Set up button. The blurb states what the integration actually
-   does, because the field labels are the vendor's vocabulary — "IA Resource
-   Prompt Token" tells an admin nothing about whether they need it. */
-.bm8__setup { display: flex; flex-direction: column; gap: 16px; }
-.bm8__setupblurb {
-  margin: 0; padding: 10px 12px; border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-  font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary);
-}
+   Behind the Set up button. No blurb over it: the prerequisites and the field
+   tips carry what an admin needs, and the sentence above them was read past. */
+.bm8__setup { display: flex; flex-direction: column; gap: var(--space-7); }
 
 /* --- Prerequisites, and the grouped form -------------------------------------------
    RSA is twenty-six fields with two required. Ungrouped it is one scroll where
@@ -591,69 +535,27 @@
 */
 .bm8__prereqs {
   padding: 12px 14px; border-radius: var(--radius-md);
-  background: var(--fb-info-bg); border: 1px solid var(--fb-info-border);
+  background: var(--fb-info-bg);
   color: var(--fb-info-fg);
 }
 .bm8__prereqhead { margin: 0 0 6px; font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
 .bm8__prereqs ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .bm8__prereqs li { font-size: var(--fs-xs); line-height: 1.5; }
 
-/* Each group is a panel rather than a rule under a heading.
-
-   A hairline was enough while only Advanced could close: two static headings
-   and one control. Now all three collapse, and a header you can click needs to
-   look like a surface you can click — so the section gets a border, the header
-   gets its own ground, and the fields sit visibly inside it rather than
-   floating in the same column as the blurb and the prerequisites above. */
-.bm8__setupgroup {
-  display: flex; flex-direction: column;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
-  background: var(--surface-raised); overflow: hidden;
+/* One straight form. A group is a plain heading over its fields: no panel,
+   no tinted header, no divider and nothing that collapses. The space above a
+   heading is what separates one group from the next. */
+.bm8__setupgroup { display: flex; flex-direction: column; gap: var(--space-5); }
+.bm8__setupgroup + .bm8__setupgroup { margin-top: var(--space-6); }
+.bm8__setup .bm8__setuphead {
+  margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); letter-spacing: 0; color: var(--text-primary);
 }
-.bm8__setupgrouphead {
-  display: flex; align-items: center; gap: 9px;
-  width: 100%; padding: 10px 13px; text-align: left; cursor: pointer;
-  background: var(--surface-sunken); border: 0;
-  border-bottom: 1px solid var(--border-subtle);
-  transition: background 0.14s ease;
-}
-/* Closed, the header is the whole panel — no rule under it to divide nothing. */
-.bm8__setupgroup.is-shut .bm8__setupgrouphead { border-bottom-color: transparent; }
-.bm8__setupgrouphead:hover { background: var(--surface-inset); }
-.bm8__setupchev { flex: none; color: var(--text-tertiary); transition: transform 0.16s ease; }
-.bm8__setupgroup.is-shut .bm8__setupchev { transform: rotate(-90deg); }
-.bm8__setupgrouphead > span { flex: none; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
-/* One line, clipped. The blurb is orientation, not something to wrap a header
-   around. */
-.bm8__setupgrouphead > em {
-  flex: 1; min-width: 0;
-  font-style: normal; font-size: var(--fs-xs); color: var(--text-tertiary);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.bm8__setupcount {
-  flex: none; font-style: normal; font-size: var(--fs-xs);
-  padding: 2px 7px; border-radius: 999px;
-  background: var(--surface-raised); border: 1px solid var(--border-subtle);
-  color: var(--text-tertiary); font-weight: var(--fw-medium); white-space: nowrap;
-}
-/* Outstanding work reads as outstanding whether the section is open or shut. */
-.bm8__setupcount.is-gap {
-  background: var(--fb-negative-bg); border-color: var(--fb-negative-border);
-  color: var(--fb-negative-fg);
-}
-.bm8__setupgrouphead:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
-.bm8__setupgroupbody { padding: 4px 13px 12px; }
 
 /* --- A setup card ------------------------------------------------------------------
    An authenticator app's whole setup, on one card in the slider: a code app's
    install, scan and code, or Microsoft Push's server. One card, one step's worth
    of controls. */
-.bm8__setcard {
-  display: flex; flex-direction: column; gap: 16px;
-  padding: 18px 20px;
-  background: var(--surface-raised);
-  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg);
-}
+.bm8__setcard { display: flex; flex-direction: column; gap: 16px; }
 .bm8__setcardtitle { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bm8__setcardlabel { font-weight: var(--fw-medium); color: var(--text-primary); }
 
@@ -702,9 +604,6 @@
 .bm8__codefield { max-width: 180px; }
 .bm8__codefield input { font-family: var(--font-mono); letter-spacing: 0.24em; }
 
-@media (prefers-reduced-motion: reduce) {
-  .bm8__setupchev, .bm8__setupgrouphead { transition: none; }}
-
 /* --- The configured card's two actions ----------------------------------------
    Edit and the switch share a row, and the row sits where Set up sat before the
    method was configured — so the card reads as one control that changes its
@@ -720,7 +619,6 @@
    with it: funding and enrolment are the two numbers this column reports, and
    they are read together. */
 .bm8__right .bm8__txn { margin-bottom: 2px; }
-
 
 /* --- One list, and the row that narrows it ---------------------------------------
    v1's toolbar. It replaces a tab bar, two section heads and their paragraphs:
@@ -739,14 +637,14 @@
 .bm8__bar {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
-.bm8__bar .bm8__search { flex: 0 1 300px; min-width: 0; }
+.bm8__bar .bx-search { flex: 0 1 300px; width: auto; min-width: 0; }
 
 /* The phishing-resistant pill that stood here is gone: it is a row in the
    filter menu now, not a second control beside it. */
 
 @media (max-width: 720px) {
   .bm8__bar { align-items: stretch; }
-  .bm8__bar .bm8__search { flex-basis: 100%; }
+  .bm8__bar .bx-search { flex-basis: 100%; }
 }
 
 /* What kind of method a row is, where its surroundings do not already say.
@@ -856,12 +754,6 @@
 .bmu__head { display: flex; align-items: flex-start; gap: 14px; }
 .bmu__card.is-open { border-color: var(--accent-soft-border); background: var(--surface-raised); }
 
-/* Enrolled, which is a different fact from the tenant having configured the
-   method — hence a different word and a different colour from the admin chip. */
-.bm8__badge.bmu__badge--set {
-  background: var(--fb-positive-bg); border-color: var(--fb-positive-border); color: var(--fb-positive-fg);
-}
-
 /* --- The inline form ---------------------------------------------------------- */
 
 .bmu__form {
@@ -874,6 +766,8 @@
 .bmu__hint { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.55; max-width: 62ch; }
 
 .bmu__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+/* What is wrong with a typed value, under it. */
+.bmu__error { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--fb-negative-fg); }
 .bmu__field > span { font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary); }
 /* Scoped to the block so the kit default wins over nothing else — these sit
    inside a card that already sets its own type scale. */
@@ -908,18 +802,3 @@
 @media (max-width: 720px) {
   .bmu__pair { grid-template-columns: minmax(0, 1fr); }
   .bmu__scan { flex-direction: column; }}
-
-/* --- The family's balance ------------------------------------------------------
-   The tag says what a family has left to spend. Two things have to be undone
-   for it to read in a panel header: `.bm8__dwstats span` greys every child,
-   which would flatten the empty state into the same tertiary as "612 enrolled"
-   — the colour IS the warning — and the tag hides itself under 900px, which is
-   right on a row carrying a name, two counts and a chevron and wrong in a panel
-   showing a single family. */
-.bm8__dwstats .bm8__txn { color: var(--text-tertiary); }
-.bm8__dwstats .bm8__txn.is-low { color: var(--fb-notice-fg); }
-.bm8__dwstats .bm8__txn.is-empty { color: var(--fb-negative-fg); }
-
-@media (max-width: 900px) {
-  .bm8__dwstats .bm8__txn { display: inline-flex; }
-}

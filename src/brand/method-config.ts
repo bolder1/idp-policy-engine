@@ -40,7 +40,8 @@ export type ConfigField =
      taken down while being inspected. Stored secrets show as held, with an
      explicit path to replace them. */
   | { kind: 'secret'; group?: ConfigGroup; id: string; label: string; help?: string; required?: boolean; stored?: boolean; value: string }
-  | { kind: 'select'; group?: ConfigGroup; id: string; label: string; help?: string; options: string[]; value: string }
+  /* `placeholder` is what an empty select shows; its value is then ''. A 'Select' option would save as a value. */
+  | { kind: 'select'; group?: ConfigGroup; id: string; label: string; help?: string; options: string[]; placeholder?: string; value: string }
   | { kind: 'number'; group?: ConfigGroup; id: string; label: string; help?: string; min: number; max: number; unit?: string; value: number }
   | { kind: 'toggle'; group?: ConfigGroup; id: string; label: string; help?: string; value: boolean }
   | { kind: 'radio'; group?: ConfigGroup; id: string; label: string; help?: string; options: { value: string; label: string; help?: string }[]; value: string }
@@ -204,7 +205,7 @@ const BUILDERS: Record<string, (live: boolean) => MethodConfig> = {
       { kind: 'text', group: 'connect', id: 'server', label: 'Default Base URL', value: live ? 'https://rsa.acme.com:5555' : '', placeholder: 'https://rsa-server:5555', help: 'Base URL of the RSA Authentication Manager REST API (e.g. https://rsa-server:5555).' },
 
       // --- Policy ------------------------------------------------------------
-      { kind: 'select', group: 'policy', id: 'assurance', label: 'Assurance Level', options: ['Select', 'LOW', 'MEDIUM', 'HIGH'], value: 'Select', help: 'Required authentication assurance level for RSA verification.' },
+      { kind: 'select', group: 'policy', id: 'assurance', label: 'Assurance Level', options: ['LOW', 'MEDIUM', 'HIGH'], placeholder: 'Select', value: '', help: 'Required authentication assurance level for RSA verification.' },
       { kind: 'text', group: 'policy', id: 'policy-id', label: 'Default Policy ID', value: '', help: 'ID of the authentication policy configured in RSA Authentication Manager.' },
       { kind: 'text', group: 'policy', id: 'policy-cond', label: 'Default Policy Condition', value: '', help: 'Condition or rule applied to the default authentication policy.' },
       { kind: 'text', group: 'policy', id: 'method-id', label: 'Method ID', value: 'RSA SecurID', help: 'Authentication methods allowed for RSA Authenticator (SecurID) verification.' },
@@ -213,7 +214,7 @@ const BUILDERS: Record<string, (live: boolean) => MethodConfig> = {
       // --- Advanced ----------------------------------------------------------
       { kind: 'number', group: 'advanced', id: 'read-timeout', label: 'Read Timeout', min: 5, max: 30, unit: 'seconds', value: 10, help: 'Timeout in seconds for HTTP read operations to the RSA server (5–30).' },
       { kind: 'number', group: 'advanced', id: 'attempt-timeout', label: 'Attempt Timeout', min: 5, max: 120, unit: 'seconds', value: 30, help: 'Timeout in seconds for a single authentication attempt.' },
-      { kind: 'select', group: 'advanced', id: 'auth-method-version', label: 'Auth Method Version', options: ['Select', '1.0.0', '2.0.0'], value: 'Select', help: 'Version of the authentication method used by RSA.' },
+      { kind: 'select', group: 'advanced', id: 'auth-method-version', label: 'Auth Method Version', options: ['1.0.0', '2.0.0'], placeholder: 'Select', value: '', help: 'Version of the authentication method used by RSA.' },
       { kind: 'toggle', group: 'advanced', id: 'keep-attempt', label: 'Keep Attempt', value: false, help: 'Whether to retain authentication attempt history.' },
       { kind: 'text', group: 'advanced', id: 'api-version', label: 'RSA API Version', value: '', help: 'Version of the RSA REST API to use for communication.' },
       { kind: 'text', group: 'advanced', id: 'context-msg-id', label: 'RSA Context Message ID', value: '', help: 'Context message identifier used in RSA API requests.' },
@@ -275,8 +276,14 @@ const BUILDERS: Record<string, (live: boolean) => MethodConfig> = {
     ],
   }),
   yubikey: (live: boolean) => hardwareToken('Yubikey', live),
-  'display-token': (live: boolean) => hardwareToken('Display token', live),
+  /* No 'display-token'. It had the Yubico validation-server form above, which
+     is not how a display token works: its codes are checked against the secret
+     each token was added with, so setting it up means adding tokens and
+     assigning them — the Display tokens page (screens/DisplayTokensPage.tsx), not a form. */
 }
+
+/** Methods whose setup is something other than this schema. See `setupTargetFor` in auth-panel.ts. */
+export const SETUP_WITHOUT_FORM = ['display-token'] as const
 
 /* The form reflects the method's ACTUAL state.
 
@@ -286,10 +293,12 @@ const BUILDERS: Record<string, (live: boolean) => MethodConfig> = {
    contradiction its own test caught — a live SMS gateway rendering an empty
    required API key, which reads as "your working integration is broken", and
    invites the admin to retype a key they may not have to hand. */
-export function configFor(id: string): MethodConfig | null {
+export function configFor(id: string, configured?: boolean): MethodConfig | null {
   const build = BUILDERS[id]
   if (!build) return null
-  return build(methodById(id)?.configured ?? false)
+  /* The tenant's live state when the caller has it — a method set up this
+     session is configured in the store, not in the static catalogue. */
+  return build(configured ?? methodById(id)?.configured ?? false)
 }
 
 /** A field the admin must fill before the method can issue anything. A stored
@@ -302,6 +311,24 @@ export const isMissing = (f: ConfigField) => {
 /** Which required fields are still blank. Empty means the method is ready. */
 export function missingFields(fields: ConfigField[]): ConfigField[] {
   return fields.filter(isMissing)
+}
+
+/** What is wrong with a filled-in value, or null. Blank is `isMissing`'s business, not this. */
+export function fieldIssue(f: ConfigField): string | null {
+  if (f.kind === 'text' && f.id === 'server' && f.value.trim() !== '' && !/^https:\/\/[^\s/:]+(:\d+)?(\/\S*)?$/.test(f.value.trim())) {
+    return 'Enter a URL starting with https://'
+  }
+  return null
+}
+
+/** Filled-in fields whose value is wrong. */
+export function invalidFields(fields: ConfigField[]): ConfigField[] {
+  return fields.filter((f) => fieldIssue(f) !== null)
+}
+
+/** A saved form holds its secrets: a typed secret becomes a stored one, so the form reopens with it held and blank. */
+export function storeSecrets(fields: ConfigField[]): ConfigField[] {
+  return fields.map((f) => (f.kind === 'secret' && f.value.trim() !== '' ? { ...f, value: '', stored: true } : f))
 }
 
 /** Apply a single edit, keeping the union type intact. */

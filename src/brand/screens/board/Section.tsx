@@ -1,5 +1,5 @@
 import { useState, type MouseEvent, type ReactNode } from 'react'
-import { ChevronDown, Plus, type LucideIcon } from 'lucide-react'
+import { ChevronDown, type LucideIcon, Plus } from 'lucide-react'
 
 /* -----------------------------------------------------------------------------
    An inspector section — Figma's grammar.

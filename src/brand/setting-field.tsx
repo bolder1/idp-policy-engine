@@ -1,28 +1,25 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
-  ArrowUpRight,
-  Bell,
   Check,
   ChevronDown,
+  ChevronRight,
   Fingerprint,
-  Gauge,
   Grid3x3,
   Hash,
-  HelpCircle,
+  Hourglass,
   KeyRound,
-  Languages,
-  Link2,
-  Server,
-  ShieldCheck,
-  Smartphone,
-  Timer,
-  Trash2,
-  Type,
   type LucideIcon,
+  MessageCircleQuestion,
+  PencilLine,
+  RectangleEllipsis,
+  Route,
+  Settings,
+  ShieldQuestion,
+  Trash2,
 } from 'lucide-react'
 
-import { Button, Toggle } from './kit'
+import { Button, TipDot, Toggle } from './kit'
 import { fieldValue, type MfaSetting } from './mfa-settings'
 import type { MfaValue } from './mfa-join'
 
@@ -54,27 +51,34 @@ import type { MfaValue } from './mfa-join'
      the chosen option can carry a tick and the list can breathe.
    -------------------------------------------------------------------------- */
 
-/* An icon per setting. Not decoration — in a column of forty-two rows it is the
-   thing that lets you find "the timing one" without reading every label. Keyed
-   by id with a suffix fallback, because ids are stable and labels are not. */
-const ICON: { match: RegExp; icon: LucideIcon }[] = [
-  { match: /length$/, icon: Hash },
-  { match: /validity|timeout|expiry|drift/, icon: Timer },
-  { match: /rate|limit/, icon: Gauge },
-  { match: /sender|issuer|subject/, icon: Type },
-  { match: /provider|gateway/, icon: Server },
-  { match: /language/, icon: Languages },
-  { match: /^bio-/, icon: Fingerprint },
-  { match: /^push-/, icon: Bell },
-  { match: /^kba-/, icon: HelpCircle },
-  { match: /^grid-/, icon: Grid3x3 },
-  { match: /qr-email|auth-type/, icon: Smartphone },
-  { match: /backup|token-type/, icon: KeyRound },
-  { match: /magic/, icon: Link2 },
-  { match: /attestation|uv|passkeys/, icon: ShieldCheck },
-]
+/* An icon per setting, for what the setting IS — never for the control it
+   happens to use.
 
-const iconFor = (id: string): LucideIcon => ICON.find((x) => x.match.test(id))?.icon ?? Hash
+   This was a pattern table that mostly drew the input type: a # on every
+   "…length" (a number), a timer on every duration, and a # again as the
+   fallback, so "OTP length" and "Grid size" wore the same glyph as any other
+   number. The owner read them as "the type of selection inside the dropdown",
+   which is what they were. Now each setting names its own subject, by id, and
+   the fallback is a neutral one that says nothing about the control. */
+const ICON: Record<string, LucideIcon> = {
+  /* The code itself: how many characters, and how long it lasts. */
+  'otp-length': RectangleEllipsis,
+  'otp-validity': Hourglass,
+  /* Approving a push. */
+  'push-biometric': Fingerprint,
+  'push-number': Hash,
+  /* The keyfob being handed to a person. */
+  'token-assign': KeyRound,
+  /* Security questions: asked at sign-in, set up at enrolment, edited later. */
+  'kba-verify': ShieldQuestion,
+  'kba-limit': MessageCircleQuestion,
+  'kba-change': PencilLine,
+  /* The grid card, and the path read off it. */
+  'grid-size': Grid3x3,
+  'grid-length': Route,
+}
+
+const iconFor = (id: string): LucideIcon => ICON[id] ?? Settings
 
 /** How a row reaches the values of the settings it reveals. */
 export interface ChildAccess {
@@ -128,22 +132,17 @@ export function SettingField({
     <div className="bsf">
       <div className="bsf__head">
         <span className="bsf__ico" aria-hidden>
-          <Icon size={15} strokeWidth={1.9} />
+          <Icon size={18} strokeWidth={1.8} />
         </span>
 
-        {/* The setting, and one line about it underneath.
-
-            The line went into a hover for a revision, with where the setting had
-            moved from folded in beside it. Both were the wrong call: the line is
-            the one thing on the row that says what the control does, and which
-            old screen a setting used to live on is history, not configuration.
-            The line is back, one sentence long, and the history is gone. */}
+        {/* The setting's name, and what it does on the tip beside it: row details
+            go in tooltips, not on a second line under the name. */}
         <span className="bsf__main">
           <span className="bsf__label">
             {setting.label}
+            {setting.help && <TipDot text={setting.help} label={`About ${setting.label}`} />}
             {extra}
           </span>
-          {setting.help && <span className="bsf__about">{setting.help}</span>}
         </span>
 
         <span className="bsf__ctl">
@@ -177,12 +176,13 @@ export function SettingField({
               />
             ))}
           {/* A door, not a dial. The row exists so the option is findable from
-              the family it belongs to; the surface it opens is a table of users
-              and serials, which is not a settings row. */}
+              the family it belongs to; the page it opens (Display tokens) is a
+              page of this console, so it wears a chevron, not an arrow out of
+              the product. `onChange` is how the screen hears the press. */}
           {f.kind === 'link' && (
             <Button variant="secondary" size="sm" onClick={() => onChange(String(Date.now()))}>
               {f.cta}
-              <ArrowUpRight size={14} strokeWidth={2} aria-hidden />
+              <ChevronRight size={14} strokeWidth={2} aria-hidden />
             </Button>
           )}
           {f.kind === 'text' && (

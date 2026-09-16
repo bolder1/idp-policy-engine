@@ -1,5 +1,6 @@
-import { DECISION_LABEL, groups as seedGroups, users as seedUsers, type Group, type Policy, type Rule, type User } from '../data'
+import { DECISION_LABEL, FALLBACK_NAME, fallbackRule, groups as seedGroups, users as seedUsers, type Group, type Policy, type Rule, type User } from '../data'
 import { leafCount, sig } from '../predicate'
+import { hasWho, normaliseWho, whoKey, type WhoList } from '../rule-who'
 
 /* -----------------------------------------------------------------------------
    What changed, in words.
@@ -88,6 +89,29 @@ export function describeChanges(
     if (before.decision !== r.decision)
       out.push(`“${r.name}” now ${DECISION_LABEL[r.decision]} instead of ${DECISION_LABEL[before.decision]}`)
 
+    /* Who, named the way the audience is. It is not a condition and is not
+       counted as one: choosing Finance changes who the rule is for, and "1
+       condition added" would say something else. */
+    if (whoKey(before.who) !== whoKey(r.who)) {
+      if (!hasWho(r.who)) {
+        out.push(`“${r.name}” now applies to everyone`)
+      } else {
+        const was = normaliseWho(before.who)
+        const now = normaliseWho(r.who)!
+        const ids = (w: typeof was, list: WhoList) => (w ? (w[list] ?? []) : [])
+        const lists: { list: WhoList; name: (id: string) => string; added: string; removed: string }[] = [
+          { list: 'groupIds', name: gname, added: 'added to Who on', removed: 'removed from Who on' },
+          { list: 'userIds', name: uname, added: 'added to Who on', removed: 'removed from Who on' },
+          { list: 'exceptGroupIds', name: gname, added: 'added as an exception on', removed: 'no longer an exception on' },
+          { list: 'exceptUserIds', name: uname, added: 'added as an exception on', removed: 'no longer an exception on' },
+        ]
+        for (const { list, name, added, removed } of lists) {
+          for (const id of ids(now, list)) if (!ids(was, list).includes(id)) out.push(`${name(id)} ${added} “${r.name}”`)
+          for (const id of ids(was, list)) if (!ids(now, list).includes(id)) out.push(`${name(id)} ${removed} “${r.name}”`)
+        }
+      }
+    }
+
     if (conditionKey(before) !== conditionKey(r)) {
       /* Leaves, not containers. Counting `cards` would report "+1 condition
          added" when the author merely wrapped two existing conditions in a new
@@ -112,6 +136,14 @@ export function describeChanges(
 
     if (factorKey(before) !== factorKey(r)) out.push(`Authentication settings changed on “${r.name}”`)
   })
+
+  /* The last rule decides every sign-in no rule above catches, so a change to it
+     is reported like any other rule's. */
+  const fbBefore = saved.fallback ?? fallbackRule()
+  const fbAfter = draft.fallback ?? fallbackRule()
+  if (fbBefore.decision !== fbAfter.decision)
+    out.push(`“${FALLBACK_NAME}” now ${DECISION_LABEL[fbAfter.decision]} instead of ${DECISION_LABEL[fbBefore.decision]}`)
+  else if (factorKey(fbBefore) !== factorKey(fbAfter)) out.push(`Authentication settings changed on “${FALLBACK_NAME}”`)
 
   /* Named, not counted. "Now applies to 1 app" was true and useless; which
      applications a policy gained or lost is the whole of what changed — and

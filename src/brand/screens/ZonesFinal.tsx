@@ -1,16 +1,14 @@
-import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
   Check,
+  CirclePlus,
   Copy,
   Globe,
   Info,
-  LayoutGrid,
   Layers,
   Link2,
-  List,
   MapPin,
   Network,
   Pencil,
@@ -21,58 +19,59 @@ import {
   X,
 } from 'lucide-react'
 
-import { Button, Drawer, Modal, SaveBar, SearchBox } from '../kit'
+import { Button, Drawer, IconButton, Modal, NameField, RowMenu, SaveBar, SearchBox, type MenuItem } from '../kit'
+import { PageHead } from '../Shell'
+import { Picker } from '../picker'
 import {
   ASN_DIRECTORY,
   emptyLocation,
   ipSectionEmpty,
   locationEmpty,
-  type Policy,
+  nameTaken,
+  newId,
+  uniqueName,
   type Zone,
   type ZoneLocation,
 } from '../data'
-import { coveredBy, placeContext, searchPlaces, type Place } from '../places'
+import { PLACES, coveredBy, placeContext, searchPlaces, type Place } from '../places'
 import { useBrand } from '../store'
-import { EmptyState } from '../empty'
-import { classifyIp, describeZone, isValidAsn, validateZone } from './zone-validation'
-import { parseEntries } from './zone-entries'
-import { policiesUsing, rulesUsing } from './usage'
-import { UsedByList, UsedByPeek } from './used-by'
+import { ChangeState, useLeaveGuard } from '../leave-guard'
+import { EmptyState, NoMatches } from '../empty'
+import { describeZone, explainBadEntry, validateZone } from './zone-validation'
+import {
+  hasEntry,
+  locationEntries,
+  normaliseEntry,
+  parseEntries,
+  takenZoneIds,
+  zoneChanges,
+  zoneReviewRows,
+} from './zone-entries'
+import { deleteImpact, policiesUsing } from './usage'
+import { UsedByList } from './used-by'
+import { ConfirmDelete } from './confirm-delete'
+import { ListPager } from './list-pager'
+import { usePagedList } from './paged-list'
+import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
+import { PageBar } from './page-bar'
+import { libRowHeight, useLibView, type LibView } from './library-view-state'
 
 /* -----------------------------------------------------------------------------
-   Zones · final.
+   Zones.
 
-   Three things separate this from the five versions before it.
+   A zone has two halves, IP networks and locations, and both must match. An
+   empty half matches any value, so a zone with neither matches everything and
+   cannot be saved.
 
-   ONE. Creation is a popup that collects the whole zone — name, addresses,
-   places — before it exists. Every earlier version created an empty shell and
-   dropped you into an editor to fill it, which is why every earlier version
-   also needed the editor to be the main event. Collect it up front and the
-   detail page stops being a mandatory second step.
-
-   TWO. The popup does create AND edit, and the inner page is therefore a
-   read-only answer to "what is this, and what breaks if I change it". Two
-   editors for one object is how two editors drift.
-
-   THREE. An empty section is drawn LOUDER than a full one. This is the whole
-   subtlety of the model: an empty section matches ANY, not none, so a zone with
-   no addresses and no places matches every request on earth. Every previous
-   version rendered that as small muted grey — the visual language of "nothing
-   here" — which is the exact inverse of what it means. Here it is a filled,
-   bordered band that outweighs the chips beside it, tinted with the same
-   `--fb-info-*` the linter already grades that state as.
-
-   The allowed/blocked classification v5 introduced is gone, as asked. `kind`
-   stays on the model because v5 still renders it; nothing here surfaces it and
-   everything created here is 'custom'.
+   The list pages to fit the window. New zone asks for a name and opens the
+   zone's page; nothing is stored until that page's first save, so an empty zone
+   never reaches the list or a rule picker. Every edit on the page lands in a
+   draft that the save bar commits.
    -------------------------------------------------------------------------- */
 
-type View = 'cards' | 'list'
 type Shape = 'net' | 'loc' | 'both' | 'none'
 
-/* Derived, never stored — which is what stops it drifting the way `usedIn`
-   did. It is also the taxonomy that replaces `kind`: not what a zone is FOR,
-   which only the rule knows, but which half of the AND it actually constrains. */
+/* Derived, never stored: which half of the zone actually constrains. */
 function shapeOf(z: Zone): Shape {
   const net = !ipSectionEmpty(z)
   const loc = !locationEmpty(z.location)
@@ -82,290 +81,327 @@ function shapeOf(z: Zone): Shape {
   return 'none'
 }
 
-/* "IP networks", not "Addresses".
-
-   A zone has two halves and they were called Addresses and Locations, which
-   are not opposites — an address IS a location, and a reader working out which
-   tab holds what had to know in advance that one of them meant the network
-   sense of the word and the other meant the geographic one. Naming the first
-   half after the thing it actually holds ends the overlap: one half is where
-   the request comes FROM on the network, the other is where it comes from on
-   the map. ASNs live in this half too, and an ASN is a set of networks, so the
-   name still covers everything the field accepts. */
-const SHAPE: Record<Shape, { label: string; icon: typeof Network; tint: string }> = {
-  net: { label: 'IP networks', icon: Network, tint: 'blue' },
-  loc: { label: 'Locations', icon: Globe, tint: 'green' },
-  both: { label: 'Both', icon: Layers, tint: 'indigo' },
-  none: { label: 'Matches everything', icon: AlertTriangle, tint: 'warn' },
+const SHAPE: Record<Shape, { icon: typeof Network; tint: string }> = {
+  net: { icon: Network, tint: 'blue' },
+  loc: { icon: Globe, tint: 'green' },
+  both: { icon: Layers, tint: 'indigo' },
+  none: { icon: AlertTriangle, tint: 'warn' },
 }
+
+type ZoneShapeFilter = 'all' | 'net' | 'loc'
+const ZONE_SHAPE_OPTIONS: { value: ZoneShapeFilter; label: string }[] = [
+  { value: 'all', label: 'All zones' },
+  { value: 'net', label: 'Networks' },
+  { value: 'loc', label: 'Locations' },
+]
+const SHAPE_FILTER: Record<Exclude<ZoneShapeFilter, 'all'>, Shape[]> = {
+  net: ['net', 'both'],
+  loc: ['loc', 'both'],
+}
+
+/** Longest zone name the dialogs and rename accept. */
+const NAME_MAX = 50
+
+/* The paged list's row height is the view's now — `libRowHeight`. */
+
+const NAME_IN_USE = 'A zone with this name already exists.'
+
+const ZONE_MENU: MenuItem[] = [
+  { id: 'open', label: 'Edit', icon: Pencil },
+  { id: 'duplicate', label: 'Duplicate', icon: Copy },
+  { id: 'uses', label: 'Used by', icon: Link2 },
+  { id: 'delete', label: 'Delete', icon: Trash2, danger: true, divide: true },
+]
+
+/* After a delete the row, its menu and the dialog are all gone. Focus the row
+   that took its place, or the search box, or the empty state's button. */
+function focusRowOrSearch(rowId: string | undefined, searchRef: RefObject<HTMLElement | null>) {
+  window.setTimeout(() => {
+    const row = rowId
+      ? document.querySelector<HTMLElement>(`[data-zone-id="${CSS.escape(rowId)}"] .blist__open`)
+      : null
+    const search = searchRef.current
+    const target =
+      row ?? (search?.isConnected ? search : document.querySelector<HTMLElement>('.bz7 .bempty__action button'))
+    target?.focus({ preventScroll: true })
+  }, 0)
+}
+
+/* The zone page after it replaces the list or remounts on a new id. */
+const focusZoneHeading = () =>
+  window.setTimeout(
+    () => document.querySelector<HTMLElement>('.bz7__pagehead h1')?.focus({ preventScroll: true }),
+    0,
+  )
 
 export function ZonesFinal() {
   const store = useBrand()
-  /* Table first. Cards are the better browse and the table is the better
-     answer — and by the time a tenant has more than a handful of zones, the
-     question is almost always "which one has that address in it", which is a
-     column scan. Cards stay one click away. */
-  const [view, setView] = useState<View>('list')
   const [q, setQ] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
+  /* A zone that has a name and nothing else yet. Held here, not in the store,
+     until the zone page saves it. */
+  const [creating, setCreating] = useState<Zone | null>(null)
   const open = openId ? store.zones.find((z) => z.id === openId) ?? null : null
+  const detail = creating ?? open
+  const searchRef = useRef<HTMLInputElement | null>(null)
+  /* The one filter this page exposes: what a zone is made of. */
+  const [shape, setShape] = useState<ZoneShapeFilter>('all')
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    if (!needle) return store.zones
-    return store.zones.filter(
+    /* A zone with both halves is in both filters: it IS a network zone, and a
+       location zone. */
+    const byShape = shape === 'all' ? store.zones : store.zones.filter((z) => SHAPE_FILTER[shape].includes(shapeOf(z)))
+    if (!needle) return byShape
+    const hit = (v: string | undefined) => !!v && v.toLowerCase().includes(needle)
+    return byShape.filter(
       (z) =>
-        z.name.toLowerCase().includes(needle) ||
-        z.ip.some((v) => v.toLowerCase().includes(needle)) ||
-        z.asn.some((v) => v.toLowerCase().includes(needle)) ||
-        [...z.location.countries, ...z.location.states, ...z.location.cities].some((v) =>
-          v.toLowerCase().includes(needle),
-        ),
+        hit(z.name) ||
+        z.ip.some(hit) ||
+        /* The operator names the row shows, not only the AS numbers. */
+        z.asn.some((a) => hit(a) || hit(ASN_DIRECTORY[a])) ||
+        [...z.location.countries, ...z.location.states, ...z.location.cities].some(hit) ||
+        hit(z.location.radius?.label),
     )
-  }, [store.zones, q])
+  }, [store.zones, q, shape])
 
-  /* The only way in. See NameOnlyModal. */
+  const [view, setView] = useLibView('zones')
+  const paged = usePagedList(shown, {
+    rowHeight: libRowHeight(view),
+    grid: view === 'card',
+    resetKey: [q, shape, view],
+  })
+
   const [naming, setNaming] = useState(false)
-  /* The zone a duplicate is pending on. Duplicating used to happen on the click
-     with a fabricated name, so doing it twice produced two zones called
-     "Office (copy)" and the only way to find out what a duplicate takes with it
-     was to make one. */
   const [duping, setDuping] = useState<Zone | null>(null)
+  const [deleting, setDeleting] = useState<Zone | null>(null)
+  /* The zone whose "Used by" drawer is open, from its row menu. Up here rather
+     than on the zone page: which rules name a zone is a question asked of the
+     list, beside Duplicate and Delete, and answering it should not mean opening
+     the zone and its draft. */
+  const [usesFor, setUsesFor] = useState<Zone | null>(null)
+  const usesUsers = usesFor ? policiesUsing('zone', usesFor.id, store.policies) : []
+
+  const allNames = store.zones.map((z) => z.name)
+  /* Not only the zones that exist: a deleted zone's id may still be named by a rule. */
+  const allIds = takenZoneIds(store.zones, store.policies)
+
+  const remove = (z: Zone) => {
+    const at = shown.findIndex((x) => x.id === z.id)
+    const next = at === -1 ? undefined : (shown[at + 1] ?? shown[at - 1])?.id
+    store.removeZone(z.id)
+    setDeleting(null)
+    /* Only ever from a list row: the zone page has no Delete, so there is no open
+       page or draft to close here. */
+    store.showToast(`${z.name} deleted`)
+    focusRowOrSearch(next, searchRef)
+  }
 
   const duplicate = (z: Zone, name: string) => {
-    const copy: Zone = {
+    const id = store.addZone({
       ...z,
-      /* Slugged from the NEW name, the way a created zone's id is. An id nested
-         inside the source's — `z-office-copy-4` — says the copy is a child of
-         the original, and it is not. */
-      id: `z-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'zone'}-${store.zones.length}`,
-      name: name.trim(),
-      /* Copied, not aliased. The shallow spread left both rows pointing at one
-         `ip` array and one `location` object. Nothing writes through the alias
-         today because every writer here replaces rather than mutates — a
-         property of the current code, not of the data. */
+      id: newId('z', allIds, name),
+      name,
+      /* Copied, not aliased: the copy must not share arrays with the original. */
       ip: [...z.ip],
       asn: [...z.asn],
       location: { ...z.location },
-      /* Everything made on this screen is custom: `blank()` says so, and a
-         duplicate inheriting a seeded zone's `blocked` classification would be
-         the one way to create one here. */
       kind: 'custom',
       usedIn: 0,
-    }
-    store.addZone(copy)
+    })
     setDuping(null)
-    store.showToast(`${copy.name} created`)
+    /* Opened, so the copy is on screen: in a filtered or paged list it could be
+       hidden, and "created" would look untrue. */
+    setQ('')
+    setOpenId(id)
+    store.showToast(`${name} created`)
+    focusZoneHeading()
   }
 
-  const createByName = (name: string) => {
-    const id = `z-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${store.zones.length}`
-    store.addZone({ ...blank(), id, name: name.trim() })
+  const startCreate = (name: string) => {
+    setCreating({ ...blank(), id: newId('z', allIds, name), name })
     setNaming(false)
-    /* Straight to the inner page. The zone exists and matches nothing yet,
-       which is exactly the state the page is being asked to make workable. */
+    focusZoneHeading()
+  }
+
+  const openZone = (id: string) => {
     setOpenId(id)
+    focusZoneHeading()
   }
 
   return (
-    <div className="bpage bz7">
-      {open ? (
-        /* Keyed, and the key is load-bearing now that the page holds a draft:
-           without it, opening a second zone would hand the same component a new
-           `zone` prop while its `useState` seed kept the first one's unsaved
-           edits. */
+    /* Compact only while the list shows: the zone page keeps the full width. */
+    <div className={detail ? 'bpage bz7' : 'bpage bpage--compact bz7'}>
+      {detail ? (
+        /* Keyed so opening another zone starts from that zone, not the last draft.
+           A new zone is stored under the id it was given here, so its first save
+           keeps the page, its tab and its focus instead of remounting. */
         <ZoneDetail
-          key={open.id}
-          zone={open}
-          policies={store.policies}
-          onBack={() => setOpenId(null)}
-          onSave={(z) => {
-            store.updateZone(z)
-            store.showToast(`${z.name} saved`)
-          }}
-          onDelete={() => {
-            store.removeZone(open.id)
+          key={detail.id}
+          zone={detail}
+          isNew={!!creating}
+          otherNames={store.zones.filter((z) => z.id !== detail.id).map((z) => z.name)}
+          onBack={() => {
+            /* Back on the list, on the row this page was about. */
+            setCreating(null)
             setOpenId(null)
-            store.showToast(`${open.name} deleted`)
+            focusRowOrSearch(creating ? undefined : detail.id, searchRef)
+          }}
+          onSave={(z) => {
+            if (creating) {
+              const id = store.addZone(z)
+              setCreating(null)
+              setOpenId(id)
+              store.showToast(`${z.name} created`)
+              /* Stored under another id only if this one was taken meanwhile; the page then remounts. */
+              if (id !== z.id) focusZoneHeading()
+            } else {
+              store.updateZone(z)
+              store.showToast(`${z.name} saved`)
+            }
           }}
         />
       ) : (
         <>
-          <header className="bz7__head">
-            <div>
-              <h1>Zones</h1>
-              <p>IP networks and locations that policy rules reference.</p>
-            </div>
-            {/* Hidden while the page is empty, because the empty state below
-                already offers this and two brand buttons on one screen make a
-                reader work out whether they do the same thing. It comes back
-                the moment there is a list for it to sit above. */}
-            {store.zones.length > 0 && (
-            <div className="bz7__headactions">
-              {/* One way in now.
-
-                 Two sat here while the question was open: a panel that asked
-                 everything before it would commit, and a dialog that commits a
-                 name and lets the inner page carry the rest. The second one
-                 won, so the first is gone and the winner takes the plain name.
-
-                 The panel itself survives — it is still what "Edit zone" opens,
-                 which is the job it was always better at: changing something
-                 that already exists and already has a shape. */}
-              <Button variant="brand" onClick={() => setNaming(true)}>
-                <Plus size={15} strokeWidth={2.2} aria-hidden />
-                New zone
-              </Button>
-            </div>
-            )}
-          </header>
+          <PageHead title="Zones" caption="IP networks and locations that policy rules reference." />
 
           {store.zones.length === 0 ? (
-            <ZonesEmpty onCreate={() => setNaming(true)} />
+            <EmptyState
+              icon={Network}
+              title="No zones yet"
+              blurb="A zone names IP networks and locations for use in policy rules."
+              action={
+                <Button variant="brand" icon={Plus} onClick={() => setNaming(true)}>
+                  New zone
+                </Button>
+              }
+            />
           ) : (
             <>
-              {/* `.btoolbar`, the same element policies, applications and device
-                  profiles use — this page had its own `.bz7__toolbar` with its
-                  own gap and no margin, which is half of why the space between
-                  the search row and the table was different here than there. */}
-              <div className="btoolbar">
-                <div className="btoolbar__left">
-                  <SearchBox
-                    value={q}
-                    onChange={setQ}
-                    placeholder="Search zones, networks or places…"
-                    label="Search zones"
-                  />
-                </div>
-                <div className="btoolbar__right">
-                <span className="btoolbar__count">
-                  {shown.length} of {store.zones.length}
-                </span>
-                <div className="bviewswitch bz7__viewswitch" role="tablist" aria-label="View">
-                  <button
-                    role="tab"
-                    aria-selected={view === 'cards'}
-                    aria-label="Card view"
-                    className={view === 'cards' ? 'is-on' : ''}
-                    onClick={() => setView('cards')}
-                  >
-                    <LayoutGrid size={15} strokeWidth={1.9} aria-hidden />
-                  </button>
-                  <button
-                    role="tab"
-                    aria-selected={view === 'list'}
-                    aria-label="List view"
-                    className={view === 'list' ? 'is-on' : ''}
-                    onClick={() => setView('list')}
-                  >
-                    <List size={15} strokeWidth={1.9} aria-hidden />
-                  </button>
-                </div>
-                </div>
-              </div>
+              {/* The row every list page has — see `PageBar`: the search box,
+                  then the filter; the view and New zone on the right. Hidden
+                  with the list: the empty state offers the same New zone. */}
+              <PageBar
+                left={
+                  <>
+                    <SearchBox
+                      value={q}
+                      onChange={setQ}
+                      inputRef={searchRef}
+                      placeholder="Search zones, networks or places…"
+                      label="Search zones"
+                    />
+                    <span className={`btoolbar__filter bbar__filter ${shape !== 'all' ? 'is-set' : ''}`}>
+                      <Picker
+                        label="Filter by what a zone is made of"
+                        size="md"
+                        prefix="Show"
+                        value={shape}
+                        options={ZONE_SHAPE_OPTIONS}
+                        onChange={(v) => setShape(v as ZoneShapeFilter)}
+                      />
+                    </span>
+                  </>
+                }
+                right={
+                  <>
+                    <ViewSwitch value={view} onChange={setView} label="Zone view" />
+                    <Button variant="brand" icon={Plus} onClick={() => setNaming(true)}>
+                      New zone
+                    </Button>
+                  </>
+                }
+              />
 
               {shown.length === 0 ? (
-                <p className="bz7__none">
-                  Nothing matches “{q}”.{' '}
-                  <button type="button" className="bz7__link" onClick={() => setQ('')}>
-                    Clear
-                  </button>
-                </p>
-              ) : view === 'cards' ? (
-                <ul className="bz7__grid">
-                  {shown.map((z) => (
-                    <ZoneCard key={z.id} zone={z} policies={store.policies} onOpen={() => setOpenId(z.id)} />
-                  ))}
-                </ul>
+                <NoMatches
+                  noun="zones"
+                  query={q}
+                  filtered={shape !== 'all'}
+                  onClear={() => {
+                    setQ('')
+                    setShape('all')
+                  }}
+                />
               ) : (
-                <ZoneTable
-                zones={shown}
-                policies={store.policies}
-                onOpen={setOpenId}
-                onDuplicate={setDuping}
-                onDelete={(z) => {
-                  store.removeZone(z.id)
-                  store.showToast(`${z.name} deleted`)
-                }}
-              />
+                <>
+                  <ZoneList
+                    view={view}
+                    zones={paged.pageRows}
+                    listRef={paged.listRef}
+                    onOpen={openZone}
+                    onDuplicate={setDuping}
+                    onUses={setUsesFor}
+                    onDelete={setDeleting}
+                  />
+                  <ListPager {...paged.pager} label="Zone pages" />
+                </>
               )}
             </>
           )}
+
+          <Drawer
+            open={!!usesFor}
+            onClose={() => setUsesFor(null)}
+            title="Used by"
+            caption={`Policy rules that use ${usesFor?.name ?? ''}.`}
+          >
+            {usesUsers.length === 0 ? (
+              <EmptyState compact icon={Unlink} title="Not used by any policy" blurb="No policy rule uses this zone." />
+            ) : (
+              <UsedByList users={usesUsers} />
+            )}
+          </Drawer>
         </>
       )}
 
-      <NameOnlyModal open={naming} onClose={() => setNaming(false)} onCreate={createByName} />
-      <DuplicateZoneModal zone={duping} onClose={() => setDuping(null)} onDuplicate={duplicate} />
+      <NameOnlyModal open={naming} names={allNames} onClose={() => setNaming(false)} onCreate={startCreate} />
+      <DuplicateZoneModal
+        zone={duping}
+        names={allNames}
+        onClose={() => setDuping(null)}
+        onDuplicate={duplicate}
+      />
+      <ConfirmDelete
+        open={!!deleting}
+        name={deleting?.name ?? ''}
+        noun="zone"
+        impact={deleting ? deleteImpact('zone', deleting.id, store.policies) : undefined}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => deleting && remove(deleting)}
+      />
     </div>
   )
 }
 
-/* --- Empty ---------------------------------------------------------------------- */
+/* --- Chips and bands -------------------------------------------------------------- */
 
-function ZonesEmpty({ onCreate }: { onCreate: () => void }) {
-  return (
-    <EmptyState
-      icon={Network}
-      title="No zones yet"
-      /* Named things, not a definition. "A named boundary your policy rules
-         can point at" is the page caption reworded — true of a zone, a
-         profile and a hook alike, and so of no use to somebody deciding
-         whether they want one. Three examples of an actual zone say it in
-         the same space. */
-      blurb="An office IP range, a country you operate in, a hosting provider nobody should sign in from — named once here, then reused by every rule that needs it."
-      /* The one thing this screen has to teach, because getting it backwards is
-         the model's sharpest edge. */
-      action={
-        <Button variant="brand" onClick={onCreate}>
-          <Plus size={15} strokeWidth={2.2} aria-hidden />
-          Create your first zone
-        </Button>
-      }
-    />
-  )
-}
-
-/* --- Card ------------------------------------------------------------------------ */
-
-/* The "matches anything" band. Deliberately the loudest thing on the card.
-
-   The dangerous misreading is that a blank half means "off". A filled, bordered
-   band that outweighs the chips next to it cannot read as blank — and it is
-   tinted with the same info tone `validateZone` already grades this state as,
-   so the card's colour is the linter's verdict rather than a second opinion. */
+/* "Any network", "Any location": the half that constrains nothing. Tinted with
+   the info tone the validator grades that state as. */
 export function AnyBand({ what }: { what: string }) {
-  return (
-    /* Two words and a tint, no glyph. It went from an infinity sign to an
-       asterisk to nothing: the tint already separates it from the grey chips
-       beside it, and neither symbol added a syllable the words were missing. */
-    <span className="bz7__any">Any {what}</span>
-  )
+  return <span className="bz7__any">Any {what}</span>
 }
 
-export function addressBits(z: Zone): string[] {
+function addressBits(z: Zone): string[] {
   const out: string[] = []
-  /* Counted as networks rather than addresses, matching the half's own name —
-     and more accurate for it, since one entry here can be a single host, a /16
-     or an entire ASN. */
+  /* Addresses are counted; ASNs are named, because an operator name is
+     recognisable and an address is not. */
   if (z.ip.length) out.push(`${z.ip.length} network${z.ip.length === 1 ? '' : 's'}`)
-  /* ASNs get named, addresses get counted. Nobody recognises 198.51.100.0/24,
-     so six of them is six units of noise; everybody recognises "Reliance Jio". */
   for (const a of z.asn) out.push(ASN_DIRECTORY[a] ?? a)
   return out
 }
 
-export function placeBits(l: ZoneLocation): string[] {
-  const out = [...l.countries, ...l.states, ...l.cities]
-  if (l.radius) out.push(l.radius.label ?? `${l.radius.km}km radius`)
-  return out
+function placeBits(l: ZoneLocation): string[] {
+  return locationEntries(l)
 }
 
 export function Chips({ items, max = 3 }: { items: string[]; max?: number }) {
   const rest = items.length - max
   return (
     <>
-      {items.slice(0, max).map((v) => (
-        <i className="bz7__chip" key={v}>
+      {/* Keyed by position too: a state and a city can share a name (Berlin). */}
+      {items.slice(0, max).map((v, i) => (
+        <i className="bz7__chip" key={`${i}-${v}`}>
           {v}
         </i>
       ))}
@@ -374,531 +410,382 @@ export function Chips({ items, max = 3 }: { items: string[]; max?: number }) {
   )
 }
 
-function ZoneCard({ zone, policies, onOpen }: { zone: Zone; policies: Policy[]; onOpen: () => void }) {
-  const shape = shapeOf(zone)
-  const meta = SHAPE[shape]
-  const uses = rulesUsing('zone', zone.id, policies)
-  /* One pass, two questions. This read `validateZone(zone).find(error) ??
-     validateZone(zone).find(warning)`, which ran the whole validation — every
-     entry through the IP classifier — a second time for every card without an
-     error, which is most of them. */
-  const issues = validateZone(zone)
-  const worst = issues.find((i) => i.level === 'error') ?? issues.find((i) => i.level === 'warning')
-
-  return (
-    <li className="bz7__card">
-      <div className="bz7__cardhead">
-        <span className={`bz7__tile is-${meta.tint}`} aria-hidden>
-          <meta.icon size={16} strokeWidth={1.9} />
-        </span>
-        {/* The whole tile is the target, but the name is the button — a kebab
-            cannot nest inside a button, and the stretched ::after keeps one tab
-            stop rather than one per card region. */}
-        <button type="button" className="bz7__open" onClick={onOpen}>
-          {zone.name}
-        </button>
-      </div>
-
-      <div className="bz7__ops">
-        <div className="bz7__op">
-          <Network size={13} strokeWidth={1.9} aria-hidden />
-          {ipSectionEmpty(zone) ? <AnyBand what="network" /> : <Chips items={addressBits(zone)} />}
-        </div>
-        <div className="bz7__op">
-          <Globe size={13} strokeWidth={1.9} aria-hidden />
-          {locationEmpty(zone.location) ? (
-            <AnyBand what="location" />
-          ) : (
-            <Chips items={placeBits(zone.location)} />
-          )}
-        </div>
-      </div>
-
-      <div className="bz7__cardfoot">
-        <span className={uses === 0 ? 'is-quiet' : ''}>
-          {uses === 0 ? 'Not used by any rule' : `Used by ${uses} rule${uses === 1 ? '' : 's'}`}
-        </span>
-        {worst && (
-          <span className={`bz7__flag is-${worst.level}`} title={worst.detail}>
-            <AlertTriangle size={12} strokeWidth={2.2} aria-hidden />
-            {worst.title}
-          </span>
-        )}
-      </div>
-    </li>
-  )
-}
-
 /* --- List ------------------------------------------------------------------------- */
 
-function ZoneTable({
+function ZoneList({
+  view,
   zones,
-  policies,
+  listRef,
   onOpen,
   onDuplicate,
+  onUses,
   onDelete,
 }: {
+  view: LibView
   zones: Zone[]
-  policies: Policy[]
+  listRef: (el: HTMLElement | null) => void
   onOpen: (id: string) => void
   onDuplicate: (z: Zone) => void
+  onUses: (z: Zone) => void
   onDelete: (z: Zone) => void
 }) {
-  /* Which row's menu is open, by id. One at a time, and the page closes it on
-     any click that is not the kebab — same contract the policies table uses, so
-     the two tables behave identically. */
-  const [menuFor, setMenuFor] = useState<string | null>(null)
-
-  /* Picking an item closes the menu — see the same helper in
-     DeviceFingerprintV2. Delete hid this by taking the row away with it;
-     Duplicate left the menu open over a table that had just grown a row. */
-  const choose = (run: () => void) => {
-    setMenuFor(null)
-    run()
-  }
-
-  return (
-    /* A list, not a table — the shape Authentication methods uses. See `.blist`
-       in screens.css for why these pages read one object at a time. */
-    <ul className="blist" onClick={() => setMenuFor(null)}>
-      {zones.map((z) => {
-        const meta = SHAPE[shapeOf(z)]
-        const users = policiesUsing('zone', z.id, policies)
-        return (
-          <li className="blist__row" key={z.id}>
-            <span className={`blist__tile bz7__tile is-${meta.tint}`} aria-hidden>
-              <meta.icon size={18} strokeWidth={1.8} />
-            </span>
-            <span className="blist__main">
-              <span className="blist__name">
-                <button type="button" className="blist__open" onClick={() => onOpen(z.id)}>
-                  {z.name}
-                </button>
-              </span>
-              {/* What the two columns said, on one line, each with the word its
-                  heading used to supply. */}
-              <span className="blist__meta">
-                <span className="blist__fact">
-                  <span className="blist__label">Networks</span>
-                  {ipSectionEmpty(z) ? <AnyBand what="network" /> : <Chips items={addressBits(z)} max={2} />}
-                </span>
-                <span className="blist__fact">
-                  <span className="blist__label">Locations</span>
-                  {locationEmpty(z.location) ? <AnyBand what="location" /> : <Chips items={placeBits(z.location)} max={2} />}
-                </span>
-              </span>
-            </span>
-            <span className="blist__side">
-              {/* Policies, not rules, and the count opens — WHICH policies is the
-                  question, not how many. */}
-              <UsedByPeek users={users} />
-              <span className="bz7__menuwrap">
-                <button
-                  type="button"
-                  className="bz7__kebab"
-                  aria-label={`Actions for ${z.name}`}
-                  aria-expanded={menuFor === z.id}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setMenuFor((m) => (m === z.id ? null : z.id))
-                  }}
-                >
-                  ⋯
-                </button>
-                <AnimatePresence>
-                  {menuFor === z.id && (
-                    <motion.div
-                      className="bmenu"
-                      initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                      transition={{ duration: 0.13 }}
-                      onClick={(e) => e.stopPropagation()}
-                      role="menu"
-                    >
-                      <button role="menuitem" onClick={() => choose(() => onOpen(z.id))}>
-                        <Pencil size={14} strokeWidth={1.9} aria-hidden />
-                        Edit
-                      </button>
-                      <button role="menuitem" onClick={() => choose(() => onDuplicate(z))}>
-                        <Copy size={14} strokeWidth={1.9} aria-hidden />
-                        Duplicate
-                      </button>
-                      <span className="bmenu__rule" />
-                      <button role="menuitem" className="is-danger" onClick={() => choose(() => onDelete(z))}>
-                        <Trash2 size={14} strokeWidth={1.9} aria-hidden />
-                        Delete zone
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </span>
-            </span>
-          </li>
-        )
-      })}
-    </ul>
-  )
+  /* Table, list or card — the one shape `LibraryRows` draws for every library. */
+  const rows: LibRow[] = zones.map((z) => {
+    const meta = SHAPE[shapeOf(z)]
+    return {
+      id: z.id,
+      name: z.name,
+      tile: <meta.icon size={18} strokeWidth={1.8} />,
+      tileClass: `bz7__tile is-${meta.tint}`,
+      attrs: { 'data-zone-id': z.id },
+      onOpen: () => onOpen(z.id),
+      facts: [
+        {
+          label: 'Networks',
+          value: ipSectionEmpty(z) ? <AnyBand what="network" /> : <Chips items={addressBits(z)} max={2} />,
+        },
+        {
+          label: 'Locations',
+          value: locationEmpty(z.location) ? <AnyBand what="location" /> : <Chips items={placeBits(z.location)} max={2} />,
+        },
+      ],
+      /* No used-by count on the row: the menu's Used by opens the rules in a drawer. */
+      menu: (
+        <RowMenu
+          label={`Actions for ${z.name}`}
+          items={ZONE_MENU}
+          onSelect={(id) => {
+            if (id === 'open') onOpen(z.id)
+            else if (id === 'duplicate') onDuplicate(z)
+            else if (id === 'uses') onUses(z)
+            else if (id === 'delete') onDelete(z)
+          }}
+        />
+      ),
+    }
+  })
+  return <LibraryRows view={view} rows={rows} columns={['Networks', 'Locations']} listRef={listRef} nameColumn="Zone" />
 }
 
-/* --- Inner page --------------------------------------------------------------------
-   Read-only. The popup owns editing, so this answers the two questions a list
-   cannot: exactly what is in here, and what breaks if it changes. */
+/* --- Zone page ---------------------------------------------------------------------- */
+
+/* Why Save is blocked, per validator error. Shown in the save bar and the leave dialog. */
+const ZONE_BLOCKED: Record<string, string> = {
+  name: 'Enter a zone name.',
+  dupname: NAME_IN_USE,
+  empty: 'Add an IP network or a location.',
+  badip: 'Fix the entries that are not valid.',
+  badasn: 'Fix the ASNs that are not valid.',
+}
+
+const ROWS_NOT_ADDED = 'Fix or remove the entries that were not added.'
+
+/** Rows still in the IP networks list that are not part of the draft yet. */
+type Pending = { typed: number; unread: number }
 
 function ZoneDetail({
   zone,
-  policies,
+  isNew,
+  otherNames,
   onBack,
   onSave,
-  onDelete,
 }: {
   zone: Zone
-  policies: Policy[]
+  /** Not stored yet: the first save creates it. */
+  isNew: boolean
+  /** Every other zone's name, for the duplicate-name check. */
+  otherNames: string[]
   onBack: () => void
   onSave: (z: Zone) => void
-  onDelete: () => void
 }) {
-  /* The edit buffer.
-
-     Everything on this page used to write straight through to the store as it
-     was typed — `onChange={store.updateZone}` — which is why the header said
-     "the sections below save as they are typed", and why the rename needed its
-     own commit and its own toast to stand apart from them.
-
-     A zone is a boundary policy rules are evaluated against, so every keystroke
-     in that model was a live change to what those rules match. Half-typed CIDR
-     is the ordinary case while typing one — `10.0.` is a prefix of what you
-     mean and matches nothing — and the page had no way to say "I have not
-     finished yet". The draft is that, and it makes the validator's warnings
-     advice about a change you have not committed rather than a report on one
-     you already have. */
+  /* The edit buffer. A zone is what live rules match against, so nothing here
+     writes to the store until the save bar commits. */
   const [draft, setDraft] = useState<Zone>(zone)
-  const dirty = JSON.stringify(draft) !== JSON.stringify(zone)
-  /* `useBrand` stood here, for the rename's toast. The bar owns saving now, so
-     the only thing this page told the store directly has gone with it — and
-     the toast the rename used to raise is the one the save raises, once, for
-     every change it commits rather than for that one field. */
-  /* "Used by" is a panel now, not a section. It is the question you ask BEFORE
-     changing something and then not again — so it earns a button at the top and
-     none of the page's vertical space the rest of the time. */
-  const [showUses, setShowUses] = useState(false)
+  const [pending, setPending] = useState<Pending>({ typed: 0, unread: 0 })
+  /* Bumped by Save, so the sections drop their half-typed rows, filter and
+     notes along with the draft they were typed against. */
+  const [resetKey, setResetKey] = useState(0)
 
-  /* Renaming, in place — and it is no longer the exception it was.
+  /* Dirty only once something has actually changed. A zone just named in the
+     dialog is not stored yet, but it opens clean all the same: an unsaved pill
+     and a save footer on a page nobody has touched ask for a review of nothing.
+     Leaving it untouched goes straight back, since the name is all there is to
+     lose and the dialog is one click away.
+     Read off the same comparison the footer describes, which treats each list
+     as a set: an entry removed and typed back in lands at the end of its list,
+     and an order-sensitive check called that a change with nothing to name. */
+  const changes = zoneChanges(zone, draft)
+  const dirty = changes.length > 0 || pending.typed > 0
 
-     The name used to be the one field here with its own commit and its own
-     toast, because every other field wrote through as it was typed and a
-     rename needed to stand apart from them. Nothing writes through now, so a
-     rename is an edit like the rest: it lands in the draft, and the bar at the
-     bottom commits it with everything else.
-
-     What survives is the local buffer, because the input still needs somewhere
-     to hold a half-typed name that Escape can throw away without touching the
-     draft. */
+  /* Renaming in place. The input holds a half-typed name that Escape can throw
+     away; a committed rename lands in the draft like every other edit. */
   const [renaming, setRenaming] = useState(false)
   const [draftName, setDraftName] = useState(zone.name)
+  const [nameErr, setNameErr] = useState<string | null>(null)
+  /* The pencil's wrapper, there so focus can return to it: IconButton takes no ref. */
+  const renameSlot = useRef<HTMLSpanElement | null>(null)
+  const focusRename = () =>
+    window.setTimeout(() => renameSlot.current?.querySelector('button')?.focus({ preventScroll: true }), 0)
+
+  /* Why the typed name cannot be used, or null when it can. Worked out from the
+     render rather than the error on show: the field closing after a press asks
+     again once the keep has landed, and the error may not have been set yet. */
+  const nameProblem = !draftName.trim()
+    ? 'Enter a zone name.'
+    : nameTaken(draftName.trim(), otherNames)
+      ? NAME_IN_USE
+      : null
+
+  /* Puts a usable name in the draft, or shows why it is not one and leaves the
+     field open to fix it. Does not close the field: that is `commitName` for
+     Enter and the tick, and the kit's `onClose` for focus leaving. */
+  const keepName = () => {
+    if (nameProblem) {
+      setNameErr(nameProblem)
+      return false
+    }
+    const name = draftName.trim()
+    setNameErr(null)
+    setDraftName(name)
+    if (name !== draft.name) setDraft((d) => ({ ...d, name }))
+    return true
+  }
 
   const commitName = () => {
-    const name = draftName.trim()
+    if (!keepName()) return
     setRenaming(false)
-    /* An empty name is not a rename, it is a mistake — and `validateZone`
-       already errors on one, so accepting it here would be creating the error
-       the panel below is about to complain about. */
-    if (!name || name === draft.name) {
-      setDraftName(draft.name)
-      return
-    }
-    setDraft((d) => ({ ...d, name }))
+    focusRename()
   }
-  /* The DRAFT is validated, not the saved zone. The warnings are the reason to
-     look before saving, so judging what is already stored would put them one
-     save behind the thing they are warning about.
 
-     `users` stays keyed on the saved zone: a policy references a zone by id,
-     and an id is the one field this page cannot edit. */
-  const issues = validateZone(draft)
-  const users = policiesUsing('zone', zone.id, policies)
+  const cancelName = () => {
+    setDraftName(draft.name)
+    setNameErr(null)
+    setRenaming(false)
+    focusRename()
+  }
+
+  /* The draft is validated, not the saved zone: the warnings are about what
+     Save would commit. */
+  const issues = validateZone(draft, otherNames)
+
+  const blockedBy = issues.find((i) => i.level === 'error')
+  const blockedReason =
+    pending.unread > 0
+      ? ROWS_NOT_ADDED
+      : blockedBy
+        ? (ZONE_BLOCKED[blockedBy.id] ?? `${blockedBy.title}.`)
+        : null
+
+  /* No discard here: the footer has none, and leaving through the leave dialog's
+     Discard unmounts this page and its draft together. */
+  const commit = () => {
+    onSave(draft)
+    setResetKey((k) => k + 1)
+  }
+
+  const confirmLeave = useLeaveGuard({
+    dirty,
+    save: () => {
+      if (blockedReason) return false
+      commit()
+      return true
+    },
+    saveLabel: isNew ? 'Create zone' : 'Save',
+    blocked: blockedReason,
+  })
+
+  if (pending.typed > 0 && !changes.includes('IP networks')) changes.push('IP networks')
 
   const netCount = draft.ip.length + draft.asn.length
-  /* A radius is a location. Without this term a zone whose only content is a
-     circle on the map read "Locations 0" and opened on the empty networks tab —
-     and `locationEmpty`, which this same page's validator uses, has always
-     counted it. */
-  const placeCount =
-    draft.location.countries.length +
-    draft.location.states.length +
-    draft.location.cities.length +
-    (draft.location.radius ? 1 : 0)
+  const placeCount = locationEntries(draft.location).length
 
-  /* Which half is on screen. Always one of them, including on a zone that has
-     just been named and holds nothing.
-
-     It used to be a pair of checkboxes: tick a half to reveal its form, untick
-     to hide it and throw its contents away. A checkbox that deletes data on
-     untick is a destructive control wearing the least destructive affordance
-     there is, and both halves rendered at once, so a zone with two hundred
-     addresses buried its locations under a scroll.
-
-     It then had a third state — nothing chosen — which showed an empty state
-     offering the two ways in. That was a click to reveal a form the page could
-     simply have shown, on a page whose only purpose is to fill that form in.
-     An empty zone opens on Addresses with the field ready. */
-  const [tab, setTab] = useState<'net' | 'place'>(
-    netCount === 0 && placeCount > 0 ? 'place' : 'net',
-  )
+  /* Opens on the half that has something in it; an empty zone opens on IP networks. */
+  const [tab, setTab] = useState<'net' | 'place'>(netCount === 0 && placeCount > 0 ? 'place' : 'net')
 
   return (
     <>
-      <button type="button" className="bz7__back" onClick={onBack}>
+      <button type="button" className="bz7__back" onClick={() => confirmLeave(onBack)}>
         <ArrowLeft size={14} strokeWidth={2} aria-hidden />
         All zones
       </button>
 
-      {/* A heading, not a banner.
-
-          This was a tinted hero that changed colour with the zone's shape —
-          amber when it matched everything, blue for addresses, green for
-          places. The tint was doing a job the page already does better: a zone
-          that constrains nothing is an error the validator raises by name
-          ("This zone would match everything"), in the panel below with the
-          reason attached. What was left was a coloured slab whose colour meant
-          something you had to learn.
-
-          Same shape as every other inner page here: back link, name, one line
-          of what it is, actions on the right. */}
       <header className="bz7__pagehead">
         <div className="bz7__namewrap">
-          {renaming ? (
-            <input
-              className="bz7__nameinput"
-              value={draftName}
-              autoFocus
-              aria-label="Zone name"
-              onChange={(e) => setDraftName(e.target.value)}
-              onBlur={commitName}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitName()
-                /* Escape restores rather than saves. A rename you are halfway
-                   through is not a rename you asked for. */
-                if (e.key === 'Escape') {
-                  setDraftName(draft.name)
-                  setRenaming(false)
-                }
-              }}
-            />
-          ) : (
-            <span className="bz7__nameline">
-              <h1>{draft.name}</h1>
-              <button
-                type="button"
-                className="bz7__rename"
-                aria-label={`Rename ${draft.name}`}
-                onClick={() => {
-                  setDraftName(draft.name)
-                  setRenaming(true)
+          <div className={`bz7__titleline ${renaming ? 'is-renaming' : ''}`}>
+            {renaming ? (
+              /* The kit's rename chrome: the count under the field, and a cross and
+                 a tick under its right edge for anyone who reaches for a pointer
+                 rather than Enter or Escape. The commit rules stay this page's.
+                 Focus leaving the field keeps a usable name and closes; a name
+                 that cannot be used shows its error and the field stays open, as
+                 the tick would leave it. When a leave counts is the kit's. */
+              <NameField
+                value={draftName}
+                max={NAME_MAX}
+                label="Zone name"
+                errorId={nameErr ? 'bz7-name-err' : undefined}
+                invalid={!!nameErr}
+                onChange={(v) => {
+                  setDraftName(v)
+                  setNameErr(null)
                 }}
-              >
-                <Pencil size={14} strokeWidth={1.9} aria-hidden />
-              </button>
-            </span>
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    commitName()
+                  }
+                  if (e.key === 'Escape') {
+                    e.preventDefault()
+                    cancelName()
+                  }
+                }}
+                /* A bad name says so at close, not on leave. The error line sits
+                   in the flow under the field; shown on the mousedown that left,
+                   it pushed the tabs down under the pointer and the click that
+                   left never landed. The kit runs the close after that click. */
+                onLeave={() => {
+                  if (!nameProblem) keepName()
+                }}
+                onClose={() => {
+                  if (nameProblem) setNameErr(nameProblem)
+                  else setRenaming(false)
+                }}
+                onApply={commitName}
+                onCancel={cancelName}
+              />
+            ) : (
+              <>
+                <h1 tabIndex={-1}>{draft.name}</h1>
+                {/* Beside the name it renames and always shown, not a hover reveal:
+                    a control that only appears under a pointer is not there for
+                    anyone reading the page, or moving through it with Tab. */}
+                <span className="bz7__pencil" ref={renameSlot}>
+                  <IconButton
+                    icon={Pencil}
+                    size="sm"
+                    tone="ghost"
+                    label="Rename"
+                    onClick={() => {
+                      setDraftName(draft.name)
+                      setNameErr(null)
+                      setRenaming(true)
+                    }}
+                  />
+                </span>
+              </>
+            )}
+            <ChangeState unsaved={dirty} />
+          </div>
+          {nameErr && (
+            <p className="bz7__fielderr" id="bz7-name-err" role="alert">
+              {nameErr}
+            </p>
           )}
           <p>{describeZone(draft)}</p>
         </div>
-        <div className="bz7__actions">
-          {/* Carries the count, so the answer to "does anything depend on this"
-              is on the page without opening anything — and opening it is only
-              needed for WHICH. */}
-          <Button variant="secondary" size="sm" onClick={() => setShowUses(true)}>
-            <Link2 size={14} strokeWidth={1.9} aria-hidden />
-            Used by
-            <i className="buse__count">{users.length}</i>
-          </Button>
-          {/* No Edit button for the zone's CONTENTS, and none needed: the
-              sections below ARE the editor, so "edit" is just being on the
-              page. What has changed is the committing — they used to write
-              through as they were typed, and now they fill a draft that the bar
-              at the bottom saves. The name is no longer an exception to that;
-              it lands in the same draft as the rest. */}
-          {/* Danger, not neutral. The kit reserves red for the confirming
-              control inside a destructive dialog, on the argument that a
-              trigger only opens that dialog. It is the one action on this
-              header that destroys something a rule may be pointing at, and
-              looking identical to "Used by" beside it is the wrong kind of
-              quiet. */}
-          <Button variant="danger" size="sm" onClick={onDelete}>
-            <Trash2 size={14} strokeWidth={1.9} aria-hidden />
-            Delete
-          </Button>
-        </div>
+        {/* No action trail on the right. Rename is the pencil above; Duplicate,
+            Used by and Delete are questions about a zone on the list, and live
+            in its row menu there. */}
       </header>
 
-      {/* The adding, on the page rather than behind an Edit button.
-
-          This is the half of "New zone 2" that matters. The panel is a form you
-          fill in and submit; here the zone already exists, so the page can be
-          left and returned to and the work is not lost between visits. That is
-          the difference worth comparing — not the modal, which is one field.
-
-          It no longer follows that every change is saved as it is made. A zone
-          is what live rules match against, and a half-typed CIDR is the
-          ordinary state of typing one, so the page collects the edit and asks
-          before committing it. */}
       <section className="bz7__build">
-            {/* Both tabs, always — including the empty one.
+        <div
+          className="bz7__buildtabs"
+          role="tablist"
+          aria-label="What this zone matches on"
+          /* Arrow keys, Home and End move between the two tabs; Tab moves on to the panel. */
+          onKeyDown={(e) => {
+            const other = tab === 'net' ? 'place' : 'net'
+            const to =
+              e.key === 'Home'
+                ? 'net'
+                : e.key === 'End'
+                  ? 'place'
+                  : e.key === 'ArrowLeft' || e.key === 'ArrowRight'
+                    ? other
+                    : null
+            if (!to) return
+            e.preventDefault()
+            setTab(to)
+            document.getElementById(to === 'net' ? 'bz7-tab-net' : 'bz7-tab-place')?.focus()
+          }}
+        >
+          <button
+            type="button"
+            role="tab"
+            id="bz7-tab-net"
+            tabIndex={tab === 'net' ? 0 : -1}
+            aria-selected={tab === 'net'}
+            aria-controls="bz7-panel-net"
+            className={tab === 'net' ? 'is-on' : ''}
+            onClick={() => setTab('net')}
+          >
+            <Network size={14} strokeWidth={1.9} aria-hidden />
+            IP networks
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="bz7-tab-place"
+            tabIndex={tab === 'place' ? 0 : -1}
+            aria-selected={tab === 'place'}
+            aria-controls="bz7-panel-place"
+            className={tab === 'place' ? 'is-on' : ''}
+            onClick={() => setTab('place')}
+          >
+            <Globe size={14} strokeWidth={1.9} aria-hidden />
+            Locations
+          </button>
+        </div>
 
-                It is how the second facet gets added once the first exists, and
-                the count on each says which is which without opening it. */}
-            <div className="bz7__buildtabs" role="tablist" aria-label="What this zone matches on">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'net'}
-                className={tab === 'net' ? 'is-on' : ''}
-                onClick={() => setTab('net')}
-              >
-                <Network size={14} strokeWidth={1.9} aria-hidden />
-                IP networks
-                <em>{netCount}</em>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'place'}
-                className={tab === 'place' ? 'is-on' : ''}
-                onClick={() => setTab('place')}
-              >
-                <Globe size={14} strokeWidth={1.9} aria-hidden />
-                Locations
-                <em>{placeCount}</em>
-              </button>
+        <div className="bz7__cols">
+          <div className="bz7__work">
+            {/* Both panels stay mounted, so a half-typed row survives a tab switch. */}
+            <div role="tabpanel" id="bz7-panel-net" aria-labelledby="bz7-tab-net" hidden={tab !== 'net'}>
+              <AddressSection key={`net-${resetKey}`} draft={draft} onChange={setDraft} onPending={setPending} />
             </div>
+            <div role="tabpanel" id="bz7-panel-place" aria-labelledby="bz7-tab-place" hidden={tab !== 'place'}>
+              <PlaceSection key={`place-${resetKey}`} draft={draft} onChange={setDraft} />
+            </div>
+          </div>
 
-            {/* Two columns: the work on the left, everything that only
-                describes the work on the right.
+          <aside className="bz7__aside">
+            {tab === 'net' ? <AcceptsNote /> : <PlacesNote />}
 
-                It used to be one column, and the reading order was the
-                problem. The formats reference and the validator's warnings
-                both sat in the flow — above the field and below the list —
-                so filling the zone in meant scrolling past prose to reach a
-                text box, and the warning about what the zone currently
-                matches was under the fold exactly when the list was long
-                enough to be worth warning about.
-
-                Neither of them is a step. They are the things you glance at
-                WHILE typing, which is what a column beside the work is for,
-                and it is the shape the rest of this console already uses on
-                its configuration pages. */}
-            <div className="bz7__cols">
-              <div className="bz7__work">
-                {tab === 'net' ? (
-                  <AddressSection draft={draft} onChange={setDraft} />
-                ) : (
-                  <PlaceSection draft={draft} onChange={setDraft} />
-                )}
+            {issues.length > 0 && (
+              <div className="bz7__issues">
+                {issues.map((i) => (
+                  <p key={i.id} className={`bz7__issue is-${i.level}`}>
+                    <AlertTriangle size={14} strokeWidth={1.9} aria-hidden />
+                    <span>
+                      <strong>{i.title}.</strong> {i.detail}
+                    </span>
+                  </p>
+                ))}
               </div>
-
-              <aside className="bz7__aside">
-                {/* Per tab, because the two halves accept different things: a
-                    location takes a country, so CIDR notation next to it would
-                    document something that tab cannot do. */}
-                {tab === 'net' ? <AcceptsNote /> : <PlacesNote />}
-
-                {/* The validator, beside the thing it is judging rather than
-                    under it. Still only the issues the section does not
-                    already say for itself. */}
-                {issues.length > 0 && (
-                  <div className="bz7__issues">
-                    {issues.map((i) => (
-                      <p key={i.id} className={`bz7__issue is-${i.level}`}>
-                        <AlertTriangle size={14} strokeWidth={1.9} aria-hidden />
-                        <span>
-                          <strong>{i.title}.</strong> {i.detail}
-                        </span>
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </aside>
-            </div>
+            )}
+          </aside>
+        </div>
       </section>
 
-      {/* The same strip device profiles and risk profiles commit through.
-
-          Blocked while the zone has an ERROR rather than merely a warning. The
-          validator already separates the two: "this zone would match
-          everything" is a warning about a zone somebody may have meant, and an
-          empty name or an unparseable entry is a zone the rest of the product
-          cannot resolve. Letting the second kind save would put a broken
-          boundary behind live rules, which is the one thing this page exists to
-          prevent. */}
+      {/* Blocked while the draft has an error, with the reason in the bar. */}
       <SaveBar
         open={dirty}
-        changes={zoneChanges(zone, draft)}
-        onDiscard={() => {
-          setDraft(zone)
-          setDraftName(zone.name)
-          setRenaming(false)
-        }}
-        onSave={() => onSave(draft)}
-        blocked={issues.some((i) => i.level === 'error')}
+        changes={isNew ? ['New zone'] : changes}
+        saveLabel={isNew ? 'Create zone' : 'Save changes'}
+        onSave={commit}
+        blocked={!!blockedReason}
+        blockedReason={blockedReason ?? undefined}
+        review={zoneReviewRows(isNew ? { ...zone, name: '' } : zone, draft)}
       />
-
-      <Drawer
-        open={showUses}
-        onClose={() => setShowUses(false)}
-        title="Used by"
-        caption={`Policy rules that name ${zone.name}.`}
-      >
-        {users.length === 0 ? (
-          <EmptyState
-            compact
-            icon={Unlink}
-            title="Nothing references this zone"
-            blurb="No policy rule points at it, so renaming or deleting it changes nothing."
-          />
-        ) : (
-          /* This screen's own card, which is where the shared one came from —
-             its rule chips said the rule names and stopped there. */
-          <UsedByList users={users} />
-        )}
-      </Drawer>
     </>
   )
 }
 
-/* What is unsaved, named rather than counted.
-
-   Addresses and locations are counted rather than listed for the same reason
-   the bar caps its own naming at two: pasting a /16 block is routinely twenty
-   entries at once, and a strip listing twenty CIDRs is a strip nobody reads.
-   The name is named, because it is the one edit here that changes what every
-   rule referencing this zone displays. */
-function zoneChanges(before: Zone, after: Zone): string[] {
-  const parts: string[] = []
-  if (before.name !== after.name) parts.push('name')
-
-  const nets = (z: Zone) => [...z.ip, ...z.asn]
-  const added = nets(after).filter((v) => !nets(before).includes(v)).length
-  const removed = nets(before).filter((v) => !nets(after).includes(v)).length
-  if (added > 0) parts.push(`${added} network${added === 1 ? '' : 's'} added`)
-  if (removed > 0) parts.push(`${removed} network${removed === 1 ? '' : 's'} removed`)
-
-  /* Locations compared as a whole rather than per list. A radius, a country and
-     a city are three shapes of one answer — "where" — and an edit that swaps a
-     country for a circle is one change to that answer, not two. */
-  if (JSON.stringify(before.location) !== JSON.stringify(after.location)) parts.push('locations')
-
-  return parts.length > 0 ? parts : ['changes']
-}
-
-/* --- The popup ---------------------------------------------------------------------
-   One form, two titles. Creating and editing are the same shape of decision and
-   two components for it is how two components drift. */
-
 const blank = (): Zone => ({
   id: '',
   name: '',
-  /* v6 does not surface the classification, so everything it makes is custom.
-     The field stays because v5 still reads it. */
+  /* Nothing on this page surfaces the classification, so everything it makes is custom. */
   kind: 'custom',
   ip: [],
   asn: [],
@@ -907,56 +794,44 @@ const blank = (): Zone => ({
 })
 
 /* --- Duplicating -----------------------------------------------------------------
-
-   Duplicate used to happen on the click: a zone named `${name} (copy)` appeared
-   in the list and a toast said so. Two problems, both real. Doing it twice gave
-   two zones with the same name, which is a support ticket rather than a design
-   opinion. And the row action's scope — do I get an empty zone with a familiar
-   name, or the whole entry list? — was only answerable by doing it.
-
-   So it asks, with the obvious answer already typed: one Return still covers
-   the common case, and the sentence underneath says what is coming along. */
+   Asks for the name with the next free one typed in, and says what the copy
+   takes with it. */
 function DuplicateZoneModal({
   zone,
+  names,
   onClose,
   onDuplicate,
 }: {
   zone: Zone | null
+  names: string[]
   onClose: () => void
   onDuplicate: (from: Zone, name: string) => void
 }) {
   const [name, setName] = useState('')
 
   /* Seeded on the way in, so reopening on a different zone does not offer the
-     last one's name. */
+     last one's name. `names` is read, not watched: the list does not change
+     while the dialog is open. */
   useEffect(() => {
-    if (zone) setName(`${zone.name} copy`)
+    if (zone) setName(uniqueName(zone.name, names, NAME_MAX))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zone])
 
   if (!zone) return null
 
-  /* Both halves counted, because a v1 zone has both — and counted from the
-     entries, not from `addressBits`, which returns SUMMARY strings ("6
-     networks") and whose length is therefore 1 for any non-empty half.
-
-     The empty case does not say "it is empty, so the copy will be too": an
-     empty zone here matches everything, and so will its copy, which is the one
-     sentence somebody about to duplicate one needs to read. */
   const nets = zone.ip.length + zone.asn.length
-  const l = zone.location
-  const places = l.countries.length + l.states.length + l.cities.length + (l.radius ? 1 : 0)
+  const places = locationEntries(zone.location).length
   const parts = [
     nets > 0 && `${nets} network ${nets === 1 ? 'entry' : 'entries'}`,
-    places > 0 && `${places} ${places === 1 ? 'place' : 'places'}`,
+    places > 0 && `${places} ${places === 1 ? 'location' : 'locations'}`,
   ].filter(Boolean) as string[]
-  /* "takes … with it" rather than "… come with it", so one entry and six read
-     the same way round. */
-  const what =
-    parts.length === 0
-      ? 'it draws no boundary at all, so the copy will match everything too'
-      : `the copy takes ${parts.join(' and ')} with it`
+  /* A zone with nothing in it matches everything; copying one would make a second. */
+  const empty = parts.length === 0
 
   const clean = name.trim()
+  const taken = nameTaken(clean, names)
+  const ok = !!clean && !taken && !empty
+  const go = () => ok && onDuplicate(zone, clean)
 
   return (
     <Modal
@@ -969,8 +844,8 @@ function DuplicateZoneModal({
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="brand" disabled={!clean} onClick={() => onDuplicate(zone, clean)}>
-            Duplicate zone
+          <Button variant="brand" disabled={!ok} onClick={go}>
+            Duplicate
           </Button>
         </>
       }
@@ -982,20 +857,30 @@ function DuplicateZoneModal({
             type="text"
             value={name}
             autoFocus
-            aria-label={`Name for the copy of ${zone.name}`}
+            maxLength={NAME_MAX}
+            aria-invalid={taken ? true : undefined}
+            aria-describedby={taken ? 'bz7-dup-err' : undefined}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && clean) onDuplicate(zone, clean)
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                go()
+              }
             }}
           />
+          {taken && (
+            <span className="bz7__fielderr" id="bz7-dup-err">
+              {NAME_IN_USE}
+            </span>
+          )}
         </label>
 
-        {/* Stated before the click rather than discovered after it. */}
         <p className="bz7__dupnote">
           <Copy size={14} strokeWidth={1.9} aria-hidden />
           <span>
-            Everything inside this zone is copied: {what}. No policy rule points at the copy, so
-            nothing changes until you name it in one.
+            {empty
+              ? 'This zone has no networks or locations.'
+              : `Copies ${parts.join(' and ')}. No policy rule uses the copy until you add it to one.`}
           </span>
         </p>
       </div>
@@ -1003,71 +888,59 @@ function DuplicateZoneModal({
   )
 }
 
-/* --- The other way in --------------------------------------------------------------
-   "New zone 2": one field, then the inner page.
-
-   It exists to test the opposite bet from the panel. The panel asks for
-   everything and commits once, which is right when the answer is short and
-   wrong when it is four hundred networks pasted in three goes — a form you
-   cannot leave is a form you cannot come back to. This one commits the only
-   thing that has to be decided up front, the name a rule will refer to, and
-   treats the contents as work done on a page that already exists and already
-   saves.
-
-   The zone it creates matches nothing, which is not a broken state: the list
-   already renders "Any network, anywhere" for it, and the detail page opens
-   asking what it should match on. */
+/* --- New zone ------------------------------------------------------------------------
+   One field, then the zone page. The zone is stored when that page first saves. */
 function NameOnlyModal({
   open,
+  names,
   onClose,
   onCreate,
 }: {
   open: boolean
+  names: string[]
   onClose: () => void
   onCreate: (name: string) => void
 }) {
   const [name, setName] = useState('')
 
-  /* Cleared when it OPENS, not when it closes.
-
-     The success path never called `close` — it flips `naming` off directly —
-     and the kit's Modal only unmounts its children, so this component's own
-     state survived. Create "Pune office", reopen New zone, and the field still
-     said "Pune office". */
+  /* Cleared when it opens: the Modal only unmounts its children, so this state
+     would otherwise keep the last name. */
   useEffect(() => {
     if (open) setName('')
   }, [open])
 
-  const close = () => onClose()
-
-  const go = () => {
-    if (name.trim()) onCreate(name)
-  }
+  const clean = name.trim()
+  const taken = nameTaken(clean, names)
+  const ok = !!clean && !taken
+  const go = () => ok && onCreate(clean)
 
   return (
     <Modal
       open={open}
-      onClose={close}
-      title="Name the zone"
+      onClose={onClose}
+      title="New zone"
       width={480}
       footer={
         <>
-          <Button variant="ghost" onClick={close}>
+          <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="brand" disabled={!name.trim()} onClick={go}>
-            Create and open
+          <Button variant="brand" disabled={!ok} onClick={go}>
+            Continue
           </Button>
         </>
       }
     >
       <label className="bz7__field">
-        <span>Zone name</span>
+        <span>Name</span>
         <input
           type="text"
           value={name}
           autoFocus
-          placeholder="Pune office egress"
+          maxLength={NAME_MAX}
+          placeholder="Pune office"
+          aria-invalid={taken ? true : undefined}
+          aria-describedby={taken ? 'bz7-new-err' : undefined}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -1076,97 +949,60 @@ function NameOnlyModal({
             }
           }}
         />
+        {taken && (
+          <span className="bz7__fielderr" id="bz7-new-err">
+            {NAME_IN_USE}
+          </span>
+        )}
       </label>
     </Modal>
   )
 }
 
-/* --- Addresses ---------------------------------------------------------------------
-   One field for both. An admin pasting a block of network identifiers does not
-   sort them into IPs and ASNs first, and asking them to is asking them to do
-   the parsing this file can do itself. */
+/* --- IP networks ---------------------------------------------------------------------
+   One field for addresses, blocks, ranges and ASNs. */
 
-/* The quick-add row.
-
-   THIS IP IS MOCKED. A browser cannot see its own public address without asking
-   a server, and this prototype has no backend and a CSP that blocks external
-   calls — so the value below is a documentation-range placeholder standing in
-   for what the real console would fill from the request. The affordance is the
-   point; the number is not real and should not be read as one. */
+/* THIS IP IS MOCKED. A browser cannot see its own public address without a
+   server, so this is a documentation-range placeholder for what the real console
+   would fill from the request. */
 const CURRENT_IP = '203.0.113.42'
 
 const QUICK: { label: string; value: string; hint: string }[] = [
-  { label: 'My current IP', value: CURRENT_IP, hint: 'The address this session is coming from' },
+  { label: 'My current IP', value: CURRENT_IP, hint: 'The address this session comes from' },
 ]
 
-/* What the field takes, at the top of the page and foldable.
-
-   Five shapes before this one: a `?` on the section heading, a panel of
-   bordered chips that looked clickable, a two-column legend costing 130px, one
-   dense inline row, and a note inside the address section. Each was tried
-   because the last one was in the way — which is the tell that the block was in
-   the wrong PLACE, not the wrong style. It is reference for the whole page, so
-   it sits under the page's own heading rather than wedged between a field and
-   the list it fills.
-
-   `<details>`, not a state hook. The disclosure keyboard behaviour, the ARIA
-   and the open/closed toggle are all free and correct, and nothing here needs
-   to know whether it is open.
-
-   Closed by default, and the summary carries the shapes — "addresses, CIDR
-   blocks, ranges, ASNs" is enough to know whether you need the examples, which
-   is what a reader is deciding when they glance at it. */
 export function AcceptsNote() {
   return (
-    /* Open, not a `<details>`.
-
-       It was foldable for as long as it sat in the flow above the field,
-       where an expanded reference pushed the work down the page and every
-       version of it was tried and found to be in the way. In a column of its
-       own nothing is behind it, so the disclosure was costing a click to
-       reveal four lines that were already paid for in layout. */
     <div className="bz7__side">
       <h3 className="bz7__sidehead">
         <Info size={14} strokeWidth={2} aria-hidden />
         What you can add
       </h3>
-      {/* The gloss is its own element rather than a bare text node, so it
-          can be dimmed without dimming the sample beside it — opacity on the
-          row would take both, since a child cannot be more opaque than its
-          parent. */}
       <ul className="bz7__sidelist">
         <li>
           <code>10.0.0.1</code>
-          <em>a single address, v4 or v6</em>
+          <em>An IPv4 or IPv6 address</em>
         </li>
         <li>
           <code>192.168.0.0/24</code>
-          <em>a CIDR block</em>
+          <em>A CIDR block</em>
         </li>
         <li>
           <code>192.168.0.1-192.168.0.254</code>
-          <em>a range</em>
+          <em>An IPv4 range</em>
         </li>
         <li>
           <code>AS15169</code>
-          <em>a network operator</em>
+          <em>An ASN</em>
         </li>
       </ul>
       <p className="bz7__sidep">
-        One row per entry. Paste a whole list into a row and it splits on commas, spaces and line
-        breaks; anything that does not parse stays in the row so you can fix it.
+        Paste a list to add several at once. Entries that can't be read stay in the row.
       </p>
     </div>
   )
 }
 
-/* The same panel for the other half.
-
-   Not a courtesy symmetry — the two tabs take genuinely different input and
-   the location one has the rule that surprises people: a country swallows the
-   states and cities inside it, and adding one after the other quietly removes
-   the narrower entry. That is worth saying next to the field rather than
-   discovering when a row disappears. */
 export function PlacesNote() {
   return (
     <div className="bz7__side">
@@ -1177,199 +1013,277 @@ export function PlacesNote() {
       <ul className="bz7__sidelist">
         <li>
           <code>India</code>
-          <em>a country</em>
+          <em>A country</em>
         </li>
         <li>
           <code>Maharashtra</code>
-          <em>a state or region</em>
+          <em>A state or region</em>
         </li>
         <li>
           <code>Pune</code>
-          <em>a city</em>
+          <em>A city</em>
         </li>
       </ul>
       <p className="bz7__sidep">
-        A country covers every state and city inside it. Add one and the narrower entries it
-        already contains are removed, because leaving them would read as a tighter zone than this
-        is.
+        A country covers its states and cities, and a state covers its cities. Adding the wider place
+        removes the narrower ones.
       </p>
-      <p className="bz7__sidep">
-        Matched on the address the sign-in arrives from, so a VPN reports where it exits.
-      </p>
+      <p className="bz7__sidep">Matched on the sign-in's IP address. A VPN shows where it exits.</p>
     </div>
   )
 }
 
-export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
+/* Focus the item now at `index` in a section's list, or the one before it, or
+   the section's add control. Used after a remove takes the focused row away.
+   Takes the ref, not the element: removing the last row swaps the section for
+   its empty state, and the element the remove started in is gone by then. */
+function focusInSection(sectionRef: RefObject<HTMLElement | null>, selector: string, index: number) {
+  window.setTimeout(() => {
+    const section = sectionRef.current
+    if (!section?.isConnected) return
+    const items = section.querySelectorAll<HTMLElement>(selector)
+    const target =
+      items[index] ?? items[index - 1] ?? section.querySelector<HTMLElement>('.bz7__addrow, .bempty__action button')
+    target?.focus({ preventScroll: true })
+  }, 0)
+}
+
+/* One line of the IP networks list: a field, and the draft entry it stands for. */
+interface NetRow {
+  key: number
+  /** What the field shows: the entry as stored, or what is being typed over it. */
+  text: string
+  /** The draft entry this row holds, or null while it holds nothing yet. */
+  value: string | null
+  err: string | null
+}
+
+let netRowSeq = 0
+const netRow = (value: string): NetRow => ({ key: ++netRowSeq, text: value, value, err: null })
+
+const ALREADY_IN = 'Already in this zone.'
+
+const unreadMessage = (bad: string[]) =>
+  bad.length === 1 ? explainBadEntry(bad[0]) : `${bad.length} entries could not be read.`
+
+export function AddressSection({
+  draft,
+  onChange,
+  onPending,
+}: {
+  draft: Zone
+  onChange: (z: Zone) => void
+  /** Told how many rows hold text that is not in the draft, and how many of those failed. */
+  onPending?: (p: Pending) => void
+}) {
+  const sectionRef = useRef<HTMLElement | null>(null)
   const [filter, setFilter] = useState('')
-  /* Says what the last paste did. A paste of four hundred lines that silently
-     drops sixty is the worst version of this field, so both numbers are
-     reported: what went in, and what did not. */
+  /* Rows committed while a filter was on. They stay shown until the filter
+     changes, whether or not their new entry matches it: a fixed entry that no
+     longer matches would otherwise vanish from under the caret, and take focus
+     with it, the moment Enter or a blur commits it. */
+  const [stay, setStay] = useState<ReadonlySet<number>>(() => new Set())
+  const changeFilter = (next: string) => {
+    setFilter(next)
+    setStay(new Set())
+  }
+  /* What the last add did, so a large paste reports how much landed. */
   const [note, setNote] = useState<string | null>(null)
 
-  /* The rows being typed, and the reason this is a list rather than one box.
+  /* Every entry is a field, all the time. There was a display row that opened
+     into an editor on click, a pencil that appeared on hover, and a tick to
+     confirm; for a list of short strings that was three states to learn where
+     one does. Click a row and you are typing in it. A row commits when it is
+     left or on Enter, and one that cannot be read keeps its text and says why
+     under it. Addresses first, then ASNs, as the draft files them. */
+  const [rows, setRows] = useState<NetRow[]>(() => [...draft.ip, ...draft.asn].map(netRow))
 
-     There was a single paste box above the list: type or paste, press Add, and
-     the entries appended below. It worked, and it read as an import tool. What
-     you were building was a list, and the control for building it sat
-     somewhere else on the page — so the first-run screen was a lone text field
-     with nothing to say that a zone is a set of entries at all.
+  /* Kept level with the draft when something else changes it: Quick add, or
+     Remove all. A row whose entry left the draft goes; an entry with no row gets
+     one at the end. A row that holds nothing yet is somebody typing, and stays. */
+  useEffect(() => {
+    setRows((rs) => {
+      const entries = [...draft.ip, ...draft.asn]
+      const inDraft = new Set(entries)
+      const kept = rs.filter((r) => r.value === null || inDraft.has(r.value))
+      const held = new Set(kept.map((r) => r.value))
+      const missing = entries.filter((v) => !held.has(v))
+      return kept.length === rs.length && missing.length === 0 ? rs : [...kept, ...missing.map(netRow)]
+    })
+  }, [draft.ip, draft.asn])
 
-     A row per entry says it. Add opens one, filling it in commits it, and the
-     row you are typing sits in the list it is joining rather than above it.
-     Bulk paste survives intact — a row still splits on commas, spaces and line
-     breaks — so the four-hundred-line case costs exactly what it did before. */
-  const [drafts, setDrafts] = useState<{ key: number; text: string; err: string | null }[]>([])
-  const nextKey = useRef(0)
+  const typed = rows.filter((r) => r.text.trim() !== '' && r.text !== r.value).length
+  const unread = rows.filter((r) => r.text.trim() !== '' && r.err !== null).length
+  useEffect(() => {
+    onPending?.({ typed, unread })
+  }, [typed, unread, onPending])
+  /* A section that unmounts takes its rows with it. */
+  useEffect(() => () => onPending?.({ typed: 0, unread: 0 }), [onPending])
 
-  /* One entry open for editing, by value — the list is keyed by value and
-     values are unique within a zone, so there is nothing else to key on. */
-  const [editing, setEditing] = useState<string | null>(null)
-  const [editText, setEditText] = useState('')
-  const [editErr, setEditErr] = useState<string | null>(null)
-
-  const startEdit = (v: string) => {
-    setEditing(v)
-    setEditText(v)
-    setEditErr(null)
-  }
-
-  /* A typo in one address used to mean removing it and retyping it, which on a
-     long list also meant finding it again afterwards — the new value appends to
-     the end. Editing keeps the row where it is. */
-  const commitEdit = (old: string, wasAsn: boolean) => {
-    const next = editText.trim()
-    if (!next || next === old) {
-      setEditing(null)
-      return
-    }
-
-    const asAsn = isValidAsn(next)
-    const asIp = classifyIp(next) !== 'invalid'
-    if (!asAsn && !asIp) {
-      setEditErr('Not an address, CIDR block, range or ASN.')
-      return
-    }
-    if (draft.ip.includes(next) || draft.asn.includes(next)) {
-      setEditErr('Already in this zone.')
-      return
-    }
-
-    /* Same kind: replaced where it sits, so the order somebody pasted survives.
-       Different kind: it has to move lists, and the end is the only honest
-       place for it — there is no position in `asn` that corresponds to one in
-       `ip`. */
-    let ip = draft.ip
-    let asn = draft.asn
-    if (asAsn === wasAsn) {
-      if (asAsn) asn = draft.asn.map((x) => (x === old ? next : x))
-      else ip = draft.ip.map((x) => (x === old ? next : x))
-    } else {
-      ip = draft.ip.filter((x) => x !== old)
-      asn = draft.asn.filter((x) => x !== old)
-      if (asAsn) asn = [...asn, next]
-      else ip = [...ip, next]
-    }
-
-    onChange({ ...draft, ip, asn })
-    setEditing(null)
-    setEditErr(null)
-  }
+  const patchRow = (key: number, patch: Partial<NetRow>) =>
+    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
 
   const addRow = () => {
-    nextKey.current += 1
-    setDrafts((d) => [...d, { key: nextKey.current, text: '', err: null }])
+    const row: NetRow = { key: ++netRowSeq, text: '', value: null, err: null }
+    setRows((rs) => [...rs, row])
+    /* Scrolled to, not only focused: in a long list the new row is below the fold. */
+    window.setTimeout(() => sectionRef.current?.querySelector<HTMLElement>(`[data-row="${row.key}"]`)?.focus(), 0)
   }
 
-  const setRow = (key: number, patch: Partial<{ text: string; err: string | null }>) =>
-    setDrafts((d) => d.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+  /* The draft's two lists without one entry. */
+  const without = (value: string | null) =>
+    value === null
+      ? { ip: draft.ip, asn: draft.asn }
+      : { ip: draft.ip.filter((x) => x !== value), asn: draft.asn.filter((x) => x !== value) }
 
-  const dropRow = (key: number) => setDrafts((d) => d.filter((r) => r.key !== key))
+  /* Only while a filter narrows the list: without one every row shows anyway. */
+  const keepShown = (keys: number[]) => {
+    if (filter.trim()) setStay((s) => new Set([...s, ...keys]))
+  }
 
-  /* `again` is Enter: commit and open the next row, because entering six
-     addresses should be six lines of typing rather than six trips to a button.
-     Everything else — the tick, clicking away — commits and stops. */
-  const commitRow = (key: number, again: boolean) => {
-    const row = drafts.find((r) => r.key === key)
-    if (!row) return
+  /* Commits one row into the draft. Says whether it landed, failed and kept its
+     text, or took the row away with it. */
+  const commitRow = (key: number): 'clean' | 'error' | 'dropped' => {
+    const row = rows.find((r) => r.key === key)
+    if (!row) return 'dropped'
     const raw = row.text.trim()
-    if (!raw) {
-      dropRow(key)
-      return
+    const base = without(row.value)
+    /* Split the way a paste is split, so "10.0.0.1," is one entry and not a typo. */
+    const parsed = parseEntries(raw, [], [])
+    const tokens = parsed.ip.length + parsed.asn.length + parsed.bad.length
+
+    /* Emptied: a new row goes, and an entry cleared out of its row leaves the zone. */
+    if (tokens === 0) {
+      if (row.value !== null) onChange({ ...draft, ...base })
+      setRows((rs) => rs.filter((r) => r.key !== key))
+      return 'dropped'
     }
 
-    const { ip, asn, bad } = parseEntries(raw, draft.ip, draft.asn)
-    const added = ip.length - draft.ip.length + (asn.length - draft.asn.length)
+    const single = tokens === 1 ? (parsed.ip[0] ?? parsed.asn[0] ?? null) : null
 
-    /* Parsed, but every entry was already in the zone. Dropping the row
-       silently would look like it had been swallowed. */
-    if (added === 0 && bad.length === 0) {
-      setRow(key, { err: 'Already in this zone.' })
-      return
+    /* The same entry, give or take case and spacing. Nothing to commit, and the
+       row shows it as stored, so a click in and out never reads as an edit. */
+    if (row.value !== null && single !== null && single === normaliseEntry(row.value)) {
+      if (row.text !== row.value || row.err) patchRow(key, { text: row.value, err: null })
+      return 'clean'
     }
 
-    /* No ceiling. There was a 500 cap here and it was ours, not the field's —
-       a zone is a list of networks and the number of networks an estate has is
-       not something this form gets to decide. What is left is the reporting:
-       a paste says how much of it landed, because a list arriving from
-       somewhere else is one nobody counted first. */
-    if (added > 0) onChange({ ...draft, ip, asn })
-
-    if (bad.length > 0) {
-      /* Whatever did not parse stays in its own row so it can be corrected
-         rather than silently swallowed. */
-      setRow(key, {
-        text: bad.join(' '),
-        err:
-          bad.length === 1
-            ? 'Not an address, CIDR block, range or ASN.'
-            : `${bad.length} entries could not be read.`,
-      })
-    } else {
-      dropRow(key)
-      if (again) addRow()
+    if (tokens === 1) {
+      /* Not readable: the text stays to be fixed, and the draft keeps what this row held. */
+      if (single === null) {
+        patchRow(key, { err: explainBadEntry(parsed.bad[0]) })
+        return 'error'
+      }
+      if (hasEntry([...base.ip, ...base.asn], single)) {
+        patchRow(key, { err: ALREADY_IN })
+        return 'error'
+      }
+      const asAsn = parsed.asn.length === 1
+      const wasAsn = row.value !== null && draft.asn.includes(row.value)
+      let { ip, asn } = base
+      if (row.value !== null && asAsn === wasAsn) {
+        /* Same kind: replaced where it stood, so a fixed typo is not a remove and a re-add. */
+        if (asAsn) asn = draft.asn.map((x) => (x === row.value ? single : x))
+        else ip = draft.ip.map((x) => (x === row.value ? single : x))
+      } else if (asAsn) {
+        asn = [...base.asn, single]
+      } else {
+        ip = [...base.ip, single]
+      }
+      onChange({ ...draft, ip, asn })
+      patchRow(key, { text: single, value: single, err: null })
+      keepShown([key])
+      setNote(null)
+      return 'clean'
     }
 
-    setNote(
-      [added > 0 ? added + ' added' : null, bad.length > 0 ? bad.length + ' could not be read' : null]
-        .filter(Boolean)
-        .join(' · ') || null,
-    )
+    /* Several at once, pasted or typed. What reads joins the zone in place of
+       what this row held; what does not stays in the row, with the reason. */
+    const res = parseEntries(raw, base.ip, base.asn)
+    const added = [...res.ip.slice(base.ip.length), ...res.asn.slice(base.asn.length)]
+    if (added.length === 0) {
+      patchRow(key, res.bad.length > 0 ? { text: res.bad.join(' '), err: unreadMessage(res.bad) } : { err: ALREADY_IN })
+      setNote(null)
+      return 'error'
+    }
+
+    onChange({ ...draft, ip: res.ip, asn: res.asn })
+    setNote(`${added.length} ${added.length === 1 ? 'entry' : 'entries'} added`)
+    if (res.bad.length > 0) {
+      /* The added ones land above the row still being fixed, which stays where the caret is. */
+      const fresh = added.map(netRow)
+      const left = { text: res.bad.join(' '), value: null, err: unreadMessage(res.bad) }
+      setRows((rs) => rs.flatMap((r) => (r.key === key ? [...fresh, { ...r, ...left }] : [r])))
+      keepShown(fresh.map((r) => r.key))
+      return 'error'
+    }
+    const [first, ...rest] = added
+    const fresh = rest.map(netRow)
+    setRows((rs) => rs.flatMap((r) => (r.key === key ? [{ ...r, text: first, value: first, err: null }, ...fresh] : [r])))
+    keepShown([key, ...fresh.map((r) => r.key)])
+    return 'clean'
   }
 
-  /* Memoized because this list has no ceiling — a row deliberately accepts as
-     many networks as an estate has, and classifyIp is a run of regexes per
-     entry. Unmemoized it re-classified the whole list on every keystroke into
-     a row and into the filter, which are exactly the two fields receiving
-     keystrokes while the list is long. */
-  const all = useMemo(
-    () => [
-      ...draft.ip.map((v) => ({ v, kind: classifyIp(v) as string, asn: false })),
-      ...draft.asn.map((v) => ({ v, kind: ASN_DIRECTORY[v] ?? 'network operator', asn: true })),
-    ],
-    [draft.ip, draft.asn],
-  )
-  /* A filter, not a search: it hides rows rather than ranking them, because the
-     question at four hundred entries is "is 10.2.x in here" and the answer is
-     the row or nothing. Only offered once scrolling starts. */
-  const needle = filter.trim().toLowerCase()
-  const rows = useMemo(
-    () => (needle ? all.filter((r) => r.v.toLowerCase().includes(needle) || r.kind.toLowerCase().includes(needle)) : all),
-    [all, needle],
-  )
+  /* The filter only exists once the list is long enough to lose something in,
+     and it only applies while its box is on screen. */
+  const filterOn = draft.ip.length + draft.asn.length > 8
+  useEffect(() => {
+    if (!filterOn && filter) setFilter('')
+  }, [filterOn, filter])
+  const needle = filterOn ? filter.trim().toLowerCase() : ''
+  /* Matched on the field's text or on the entry it holds, so a row being retyped
+     does not vanish under the caret, and a row committed under this filter stays
+     (see `stay`). A row that holds nothing yet always shows. */
+  const shown = needle
+    ? rows.filter(
+        (r) =>
+          r.value === null ||
+          stay.has(r.key) ||
+          r.text.toLowerCase().includes(needle) ||
+          r.value.toLowerCase().includes(needle),
+      )
+    : rows
+  /* Counted without the empty row that always shows, which removes nothing. */
+  const shownCount = shown.filter((r) => r.value !== null || r.text.trim() !== '').length
 
-  /* Quick add.
+  const removeRow = (key: number) => {
+    const row = rows.find((r) => r.key === key)
+    if (!row) return
+    const at = shown.findIndex((r) => r.key === key)
+    if (row.value !== null) onChange({ ...draft, ...without(row.value) })
+    setRows((rs) => rs.filter((r) => r.key !== key))
+    /* The next row's field, else the one before, else Add IP. */
+    focusInSection(sectionRef, '.bz7__rowin', Math.max(at, 0))
+  }
 
-     Two of the three most-typed entries on this form are the machine you are
-     sitting at and the network it is on — an admin allow-listing the office
-     does it from the office. One click each beats typing an address you have to
-     go and look up first, which is also why it survives into the empty state:
-     the fastest possible first entry should not require knowing anything. */
+  /* The field now at `index`, else the add control: forward only, unlike
+     focusInSection, because this follows a Tab and Tab does not go back up. */
+  const focusForward = (index: number) =>
+    window.setTimeout(() => {
+      const section = sectionRef.current
+      if (!section?.isConnected) return
+      const target =
+        section.querySelectorAll<HTMLElement>('.bz7__rowin')[index] ??
+        section.querySelector<HTMLElement>('.bz7__addrow, .bempty__action button')
+      target?.focus({ preventScroll: true })
+    }, 0)
+
+  /* With a filter on, only the rows shown are removed. */
+  const removeShown = () => {
+    const keys = new Set(shown.map((r) => r.key))
+    const gone = new Set(shown.flatMap((r) => (r.value === null ? [] : [r.value])))
+    onChange({ ...draft, ip: draft.ip.filter((x) => !gone.has(x)), asn: draft.asn.filter((x) => !gone.has(x)) })
+    setRows((rs) => rs.filter((r) => !keys.has(r.key)))
+    changeFilter('')
+    setNote(null)
+    focusInSection(sectionRef, '.bz7__rowin', 0)
+  }
+
   const quick = (
     <div className="bz7__quick">
       <span>Quick add</span>
       {QUICK.map((q) => {
-        const already = draft.ip.includes(q.value)
+        const already = hasEntry(draft.ip, q.value)
         return (
           <button
             key={q.value}
@@ -1377,9 +1291,15 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
             className={`bz7__quickbtn ${already ? 'is-in' : ''}`}
             disabled={already}
             title={q.hint}
+            /* Keeps a row being typed from committing, and moving the button, before the click lands. */
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onChange({ ...draft, ip: [...draft.ip, q.value] })}
           >
-            {already ? <Check size={12} strokeWidth={2.6} aria-hidden /> : <Plus size={12} strokeWidth={2.4} aria-hidden />}
+            {already ? (
+              <Check size={12} strokeWidth={2.6} aria-hidden />
+            ) : (
+              <Plus size={12} strokeWidth={2.4} aria-hidden />
+            )}
             {q.label}
             <code>{q.value}</code>
           </button>
@@ -1388,18 +1308,14 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
     </div>
   )
 
-  /* Nothing stored and nothing being typed — the one state where the page has
-     to say what a zone IS, because the list that would otherwise say it is the
-     thing that is missing. It also has to say what an empty section MEANS,
-     which is the trap this whole screen is built around: empty matches any. */
-  if (all.length === 0 && drafts.length === 0) {
+  if (draft.ip.length + draft.asn.length === 0 && rows.length === 0) {
     return (
-      <section className="bz7__sec bz7__sec--empty">
+      <section className="bz7__sec bz7__sec--empty" ref={sectionRef}>
         <EmptyState
           compact
           icon={Network}
           title="No IP networks yet"
-          blurb="Add the addresses, blocks, ranges or operators this zone should match. Left empty, this half matches any network."
+          blurb="Add addresses, CIDR blocks, ranges or ASNs. Left empty, any network matches."
           action={
             <>
               <Button variant="brand" icon={Plus} onClick={addRow}>
@@ -1414,188 +1330,111 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
   }
 
   return (
-    <section className="bz7__sec">
-      {/* No header. The tab above carries the same words and the same count one
-          row up — "IP networks 6" then "IP ADDRESSES AND NETWORKS · 6 entries"
-          was one label printed twice, and the box drawn around it made the
-          repetition look deliberate. */}
-
-      {/* Both only earn their place once the list is long enough to lose
-          something in. Eight is about where a column stops being scannable. */}
-      {all.length > 8 && (
+    <section className="bz7__sec" ref={sectionRef}>
+      {filterOn && (
         <div className="bz7__listbar">
-          <SearchBox
-            block
-            value={filter}
-            onChange={setFilter}
-            placeholder={`Filter ${all.length} entries…`}
-            label="Filter entries"
-          />
-          <button
-            type="button"
-            className="bz7__clear"
-            onClick={() => {
-              onChange({ ...draft, ip: [], asn: [] })
-              setDrafts([])
-              setFilter('')
-              setNote(null)
-            }}
-          >
-            Clear all
-          </button>
+          <SearchBox block value={filter} onChange={changeFilter} placeholder="Filter entries…" label="Filter entries" />
+          <Button variant="danger" size="sm" disabled={shownCount === 0} onClick={removeShown}>
+            {needle ? `Remove ${shownCount} shown` : 'Remove all'}
+          </Button>
         </div>
       )}
 
-      {/* No "Any network" pill here. The issue panel beside this section already
-          says it — with the consequence attached, which the pill could not
-          carry — so the pill was the same statement twice. It stays on the zone
-          list, where there is no issue panel to say it. */}
-      {rows.length === 0 && all.length > 0 && drafts.length === 0 ? (
-        <p className="bz7__gate">Nothing matches “{filter.trim()}”.</p>
+      {needle && shown.length === 0 ? (
+        <NoMatches compact noun="entries" query={filter} onClear={() => changeFilter('')} />
       ) : (
-        <ul className={`bz7__entries ${all.length > 8 ? 'is-scroll' : ''}`}>
-          {rows.map((r) =>
-            editing === r.v ? (
-              <li key={r.v} className="is-editing">
-                {/* The same row, in a field. Not a dialog: an address is one
-                    short string, and a modal to change four characters costs
-                    more than it protects. */}
-                <input
-                  type="text"
-                  className="bz7__editin"
-                  value={editText}
-                  autoFocus
-                  aria-label={`Edit ${r.v}`}
-                  aria-invalid={editErr ? true : undefined}
-                  onChange={(e) => {
-                    setEditText(e.target.value)
-                    setEditErr(null)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+        <ul className={`bz7__fields ${filterOn ? 'is-scroll' : ''}`}>
+          {shown.map((r) => {
+            const errId = `bz7-net-err-${r.key}`
+            return (
+              <li key={r.key}>
+                <div className="bz7__fieldline">
+                  <input
+                    type="text"
+                    className="bz7__rowin"
+                    data-row={r.key}
+                    value={r.text}
+                    placeholder={r.value === null ? '10.0.0.1, 192.168.0.0/24, AS15169' : undefined}
+                    aria-label="IP address, network or ASN"
+                    aria-invalid={r.err ? true : undefined}
+                    aria-describedby={r.err ? errId : undefined}
+                    autoComplete="off"
+                    spellCheck={false}
+                    onChange={(e) => patchRow(r.key, { text: e.target.value, err: null })}
+                    /* A one-line field drops the line breaks out of a pasted list,
+                       which glues "10.0.0.1" and "10.0.0.2" into one unreadable
+                       entry. Each line becomes a comma instead. */
+                    onPaste={(e) => {
+                      const pasted = e.clipboardData.getData('text')
+                      if (!/[\r\n]/.test(pasted)) return
                       e.preventDefault()
-                      commitEdit(r.v, r.asn)
-                    }
-                    if (e.key === 'Escape') {
-                      e.preventDefault()
-                      setEditing(null)
-                      setEditErr(null)
-                    }
-                  }}
-                />
-                {editErr && <span className="bz7__editerr">{editErr}</span>}
-                <button type="button" aria-label="Save" onClick={() => commitEdit(r.v, r.asn)}>
-                  <Check size={13} strokeWidth={2.4} />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Cancel"
-                  onClick={() => {
-                    setEditing(null)
-                    setEditErr(null)
-                  }}
-                >
-                  <X size={13} strokeWidth={2} />
-                </button>
-              </li>
-            ) : (
-              /* The whole row opens the editor, not only the pencil.
-
-                 Clicking a value you can see is wrong and having nothing happen
-                 is the small failure this list kept producing. The pencil stays
-                 as the affordance — a row that is editable only by guessing is
-                 not editable — but it is now decoration on a button that
-                 already covers the value and its kind. */
-              <li key={r.v}>
-                <button
-                  type="button"
-                  className="bz7__entryopen"
-                  aria-label={`Edit ${r.v}`}
-                  onClick={() => startEdit(r.v)}
-                >
-                  <code>{r.v}</code>
-                  <em>{r.kind}</em>
-                  <span className="bz7__entrypen" aria-hidden>
-                    <Pencil size={12} strokeWidth={2} />
+                      const el = e.currentTarget
+                      const from = el.selectionStart ?? el.value.length
+                      const to = el.selectionEnd ?? from
+                      const flat = pasted.trim().replace(/\s*[\r\n]+\s*/g, ', ')
+                      patchRow(r.key, { text: el.value.slice(0, from) + flat + el.value.slice(to), err: null })
+                    }}
+                    /* Committed on the way out: a filled row left behind is an
+                       entry somebody believes they added.
+                       Tab out of an empty row lands on that row's own trash
+                       button, and the commit then drops the row and the button
+                       with it, which leaves focus on the page body. So when the
+                       row goes and focus was headed into it, focus carries on
+                       forward: the row that took its place, else Add IP. */
+                    onBlur={(e) => {
+                      const to = e.relatedTarget
+                      const within = to instanceof Node && !!e.currentTarget.closest('li')?.contains(to)
+                      const at = shown.findIndex((x) => x.key === r.key)
+                      if (commitRow(r.key) === 'dropped' && within) focusForward(at)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        /* An empty new row is already the next row. */
+                        if (r.value === null && !r.text.trim()) return
+                        const at = shown.findIndex((x) => x.key === r.key)
+                        const last = at === shown.length - 1
+                        const done = commitRow(r.key)
+                        if (done === 'clean' && last) addRow()
+                        else if (done === 'dropped') focusInSection(sectionRef, '.bz7__rowin', at)
+                      }
+                      if (e.key === 'Escape') {
+                        if (r.value === null && !r.text.trim()) {
+                          e.preventDefault()
+                          removeRow(r.key)
+                        } else if (r.value !== null && r.text !== r.value) {
+                          /* Back to the entry as stored. */
+                          e.preventDefault()
+                          patchRow(r.key, { text: r.value, err: null })
+                        }
+                      }
+                    }}
+                  />
+                  {/* The mousedown would blur the field first, and a blur commits:
+                      an empty row would unmount this button before the click. */}
+                  <span className="bz7__rowdel" onMouseDown={(e) => e.preventDefault()}>
+                    <IconButton
+                      icon={Trash2}
+                      tone="danger"
+                      size="sm"
+                      label={`Remove ${r.text.trim() || 'this row'}`}
+                      onClick={() => removeRow(r.key)}
+                    />
                   </span>
-                </button>
-                <button
-                  type="button"
-                  className="bz7__entrydel"
-                  aria-label={`Remove ${r.v}`}
-                  onClick={() =>
-                    onChange(
-                      r.asn
-                        ? { ...draft, asn: draft.asn.filter((x) => x !== r.v) }
-                        : { ...draft, ip: draft.ip.filter((x) => x !== r.v) },
-                    )
-                  }
-                >
-                  <X size={13} strokeWidth={2} />
-                </button>
+                </div>
+                {r.err && (
+                  <p className="bz7__rowerr" id={errId}>
+                    {r.err}
+                  </p>
+                )}
               </li>
-            ),
-          )}
-
-          {/* The rows still being typed, inside the list rather than above it.
-              Deliberately not filtered: a row you are halfway through writing
-              vanishing because it does not match the filter is the worst thing
-              this list could do to you. */}
-          {drafts.map((d) => (
-            <li key={`draft-${d.key}`} className="is-editing">
-              <input
-                type="text"
-                className="bz7__editin"
-                value={d.text}
-                autoFocus
-                placeholder="10.0.0.1, 192.168.0.0/24, AS15169"
-                aria-label="New IP address or network"
-                aria-invalid={d.err ? true : undefined}
-                onChange={(e) => setRow(d.key, { text: e.target.value, err: null })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    commitRow(d.key, true)
-                  }
-                  if (e.key === 'Escape') {
-                    e.preventDefault()
-                    dropRow(d.key)
-                  }
-                }}
-                /* Committed on the way out as well. A row left filled in and
-                   abandoned is an entry somebody believes they added. */
-                onBlur={() => commitRow(d.key, false)}
-              />
-              {d.err && <span className="bz7__editerr">{d.err}</span>}
-              <button type="button" aria-label="Save" onClick={() => commitRow(d.key, false)}>
-                <Check size={13} strokeWidth={2.4} />
-              </button>
-              <button
-                type="button"
-                className="bz7__entrydel"
-                aria-label="Discard this row"
-                /* Discarding must not blur the input on the way.
-
-                   Without this the mousedown blurred the field, the blur ran
-                   `commitRow` and SAVED the entry, and the commit unmounted
-                   this button before mouseup — so the click never landed and
-                   the control labelled "discard" was a second Save. It only
-                   looked correct on a row holding something unparseable,
-                   because that commit leaves the row on screen. */
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => dropRow(d.key)}
-              >
-                <X size={13} strokeWidth={2} />
-              </button>
-            </li>
-          ))}
+            )
+          })}
         </ul>
       )}
 
-      {/* Dashed and quiet, not brand. There is one primary decision on this
-          page and it is not "another row". */}
-      <button type="button" className="bz7__addrow" onClick={addRow}>
-        <Plus size={13} strokeWidth={2.4} aria-hidden />
+      <button type="button" className="bz7__addrow" onMouseDown={(e) => e.preventDefault()} onClick={addRow}>
+        <CirclePlus size={16} strokeWidth={1.9} aria-hidden />
         Add IP
       </button>
 
@@ -1613,66 +1452,195 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
   )
 }
 
-/* --- Places -------------------------------------------------------------------------
-   The map-style search. Type anything — a country, a state, a city — and the
-   catalogue ranks the hits rather than filtering them, so three letters that
-   match a country and a city inside it offer the country first. */
+/* --- Locations -----------------------------------------------------------------------
+   The same list as IP networks: a field per place, the same remove beside each,
+   and Add location under them, so the two tabs read as one kind of list.
+
+   A place is chosen from the catalogue rather than typed, so its field is a
+   search. Add location opens an empty one at the end; clicking a place's field
+   turns that field into a search for the place to put in its stead. A search
+   that is left without a pick leaves the zone as it was. */
+
+type PlaceList = 'countries' | 'states' | 'cities'
+
+/** One row of the list. The id is the kind and the name: a state and a city can share a name (Berlin). */
+type Chosen = { id: string; kind: PlaceList | 'radius'; v: string; label: string }
+
+const LIST_OF: Record<Place['kind'], PlaceList> = { country: 'countries', state: 'states', city: 'cities' }
+
+/** The one open search row: a new place at the end, or a stand-in for a chosen one. */
+interface PlaceSearch {
+  key: number
+  /** The id of the row this search would replace, or null for a new place. */
+  replacing: string | null
+  q: string
+}
+
+let placeSearchSeq = 0
+
+/** Why a place cannot go in, or null when it can. */
+type Refusal = { kind: 'added' } | { kind: 'covered'; by: string } | null
+
+function chosenPlaces(l: ZoneLocation): Chosen[] {
+  const rows = (kind: PlaceList, label: string) => l[kind].map((v) => ({ id: `${kind}:${v}`, kind, v, label }))
+  const out: Chosen[] = [...rows('countries', 'Country'), ...rows('states', 'State'), ...rows('cities', 'City')]
+  if (l.radius) {
+    const v = l.radius.label ?? `${l.radius.lat}, ${l.radius.lon}`
+    out.push({ id: `radius:${v}`, kind: 'radius', v, label: `${l.radius.km} km radius` })
+  }
+  return out
+}
+
+/* The location without one of its rows. */
+function withoutPlace(l: ZoneLocation, c: Chosen): ZoneLocation {
+  if (c.kind === 'radius') {
+    const { radius: _gone, ...rest } = l
+    void _gone
+    return rest
+  }
+  return { ...l, [c.kind]: l[c.kind].filter((x) => x !== c.v) }
+}
+
+/* A place already in the zone, or inside one that is, would change nothing. */
+function placeRefusal(p: Place, l: ZoneLocation): Refusal {
+  if (l[LIST_OF[p.kind]].includes(p.name)) return { kind: 'added' }
+  const by = coveredBy(p, l)
+  return by ? { kind: 'covered', by } : null
+}
+
+/* `p` added to the location, or put in place of `replacing`. The caller has
+   checked `placeRefusal` against the location without `replacing`. */
+function withPlace(l: ZoneLocation, p: Place, replacing: Chosen | null): ZoneLocation {
+  const list = LIST_OF[p.kind]
+  let next: ZoneLocation
+  if (replacing?.kind === list) {
+    /* The same kind: swapped where it stood, so the list does not reorder under the edit. */
+    next = { ...l, [list]: l[list].map((x) => (x === replacing.v ? p.name : x)) }
+  } else {
+    const base = replacing ? withoutPlace(l, replacing) : l
+    next = { ...base, [list]: [...base[list], p.name] }
+  }
+  /* The reverse sweep: a wider place makes the narrower ones inside it redundant. */
+  if (p.kind === 'country') {
+    next = {
+      ...next,
+      states: next.states.filter((s) => !inCountry(s, p.name, 'state')),
+      cities: next.cities.filter((c) => !inCountry(c, p.name, 'city')),
+    }
+  }
+  if (p.kind === 'state') {
+    next = { ...next, cities: next.cities.filter((c) => !inState(c, p.name, p.country)) }
+  }
+  return next
+}
+
+/* The first hit that can be picked, so Enter on a fresh query does not land on "Added". */
+const firstOpenHit = (hits: Place[], l: ZoneLocation) => Math.max(0, hits.findIndex((p) => !placeRefusal(p, l)))
 
 export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
-  const [q, setQ] = useState('')
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [search, setSearch] = useState<PlaceSearch | null>(null)
   const [cursor, setCursor] = useState(0)
-  /* Whether the search row is on screen. The same shape as the address tab's
-     draft rows, with one row instead of many — a place is chosen from a
-     catalogue rather than typed, so the row is a picker and picking commits
-     it. It stays open afterwards, which is what makes adding four countries
-     four keystrokes and four Returns. */
-  const [adding, setAdding] = useState(false)
-  const hits = useMemo(() => searchPlaces(q), [q])
   const l = draft.location
+  const chosen = chosenPlaces(l)
 
-  const put = (next: ZoneLocation) => onChange({ ...draft, location: next })
+  /* A search standing in for a row that has since gone is no search at all. */
+  const replacing = search?.replacing ? (chosen.find((c) => c.id === search.replacing) ?? null) : null
+  const open = search && (search.replacing === null || replacing) ? search : null
+  const q = open?.q ?? ''
+  const hits = useMemo(() => searchPlaces(q), [q])
+  /* Hits are checked against the zone without the row being replaced, so that
+     place is offered back, and a place inside it is not refused as covered by it. */
+  const base = replacing ? withoutPlace(l, replacing) : l
 
-  const addPlace = (p: Place) => {
-    const key = p.kind === 'country' ? 'countries' : p.kind === 'state' ? 'states' : 'cities'
-    if (l[key].includes(p.name)) return
-    let next: ZoneLocation = { ...l, [key]: [...l[key], p.name] }
-    /* The reverse sweep. Adding India after Pune makes Pune redundant, and
-       leaving it there would imply the zone is narrower than it is. */
-    if (p.kind === 'country') {
-      next = {
-        ...next,
-        states: next.states.filter((s) => !inCountry(s, p.name, 'state')),
-        cities: next.cities.filter((c) => !inCountry(c, p.name, 'city')),
-      }
+  /* The list shows about six of its twelve hits, so a cursor moved by the keyboard,
+     or reset by typing, is scrolled into view: Enter must not add a place the user
+     cannot see. Not one moved by the pointer, which is already over what it
+     points at, and scrolling under a resting pointer would move the cursor again.
+     Before the empty state's return, so the hooks run in the same order. */
+  const cursorByPointer = useRef(false)
+  const openKey = open?.key
+  useEffect(() => {
+    if (cursorByPointer.current) {
+      cursorByPointer.current = false
+      return
     }
-    put(next)
-    setQ('')
+    if (openKey === undefined) return
+    document.getElementById(`bz7-place-hits-${openKey}-${cursor}`)?.scrollIntoView({ block: 'nearest' })
+  }, [cursor, openKey, q])
+
+  const put =(next: ZoneLocation) => onChange({ ...draft, location: next })
+
+  /* After the render that moved things: the element a selector names in this section. */
+  const focusLater = (selector: string) =>
+    window.setTimeout(() => sectionRef.current?.querySelector<HTMLElement>(selector)?.focus({ preventScroll: true }), 0)
+
+  /* The row now at `index`, else the one before it, else Add location, or the
+     empty state's button once the last place has gone. A row's field where it
+     has one, and its remove where it does not: the radius. */
+  const focusRow = (index: number) =>
+    window.setTimeout(() => {
+      const section = sectionRef.current
+      if (!section?.isConnected) return
+      const rows = section.querySelectorAll<HTMLElement>('.bz7__fields > li')
+      const row = rows[index] ?? rows[index - 1]
+      const target = row
+        ? (row.querySelector<HTMLElement>('button.bz7__place, input') ?? row.querySelector<HTMLElement>('button'))
+        : section.querySelector<HTMLElement>('.bz7__addrow, .bempty__action button')
+      target?.focus({ preventScroll: true })
+    }, 0)
+
+  const openNew = () => {
+    /* One search at a time: a second Add location goes back to the one already open. */
+    if (open && open.replacing === null) {
+      inputRef.current?.focus()
+      return
+    }
+    setSearch({ key: ++placeSearchSeq, replacing: null, q: '' })
     setCursor(0)
-    setAdding(true)
   }
 
-  const remove = (kind: keyof Pick<ZoneLocation, 'countries' | 'states' | 'cities'>, v: string) =>
-    put({ ...l, [kind]: l[kind].filter((x) => x !== v) })
+  const openReplace = (c: Chosen) => {
+    setSearch({ key: ++placeSearchSeq, replacing: c.id, q: c.v })
+    setCursor(firstOpenHit(searchPlaces(c.v), withoutPlace(l, c)))
+  }
 
-  const chosen: { kind: 'countries' | 'states' | 'cities'; v: string; label: string }[] = [
-    ...l.countries.map((v) => ({ kind: 'countries' as const, v, label: 'Country' })),
-    ...l.states.map((v) => ({ kind: 'states' as const, v, label: 'State' })),
-    ...l.cities.map((v) => ({ kind: 'cities' as const, v, label: 'City' })),
-  ]
+  /* Closes the search with this key, if it is still the open one: the blur from a
+     field that a pick has already replaced must not close the next one. */
+  const close = (key: number) => setSearch((s) => (s?.key === key ? null : s))
 
-  /* Nothing chosen and the search row not open. Same first-run shape as the
-     address tab, and the same warning in it, because an empty location section
-     is the other half of the zone that matches everything. */
-  if (chosen.length === 0 && !l.radius && !adding) {
+  const pick = (p: Place, via: 'enter' | 'click') => {
+    if (!open || placeRefusal(p, base)) return
+    put(withPlace(l, p, replacing))
+    if (via === 'enter' && open.replacing === null) {
+      /* As Enter on the last IP row: the next row, ready, so four countries are four Returns. */
+      setSearch({ key: ++placeSearchSeq, replacing: null, q: '' })
+      setCursor(0)
+    } else {
+      setSearch(null)
+      /* The field became the place: focus stays on that row. */
+      focusLater(`[data-place="${CSS.escape(`${LIST_OF[p.kind]}:${p.name}`)}"]`)
+    }
+  }
+
+  const remove = (c: Chosen) => {
+    const at = chosen.findIndex((x) => x.id === c.id)
+    put(withoutPlace(l, c))
+    if (search?.replacing === c.id) setSearch(null)
+    focusRow(at)
+  }
+
+  if (chosen.length === 0 && !open) {
     return (
-      <section className="bz7__sec bz7__sec--empty">
+      <section className="bz7__sec bz7__sec--empty" ref={sectionRef}>
         <EmptyState
           compact
           icon={Globe}
           title="No locations yet"
-          blurb="Add the countries, states or cities this zone should match. Left empty, this half matches any location."
+          blurb="Add countries, states or cities. Left empty, any location matches."
           action={
-            <Button variant="brand" icon={Plus} onClick={() => setAdding(true)}>
+            <Button variant="brand" icon={Plus} onClick={openNew}>
               Add location
             </Button>
           }
@@ -1681,142 +1649,210 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
     )
   }
 
-  return (
-    <section className="bz7__sec">
-      {/* Chosen places first, then the row that adds the next one — the same
-          order as the address tab, where the list is the thing being built and
-          the open row is the one joining it. */}
-      {chosen.length > 0 && (
-        <ul className="bz7__entries">
-          {chosen.map((c) => (
-            <li key={`${c.kind}-${c.v}`}>
-              {/* No editor behind this one, and none invented: a country is
-                  chosen from a catalogue, so changing it means choosing a
-                  different one. Remove and pick again IS the edit. */}
-              <span className="bz7__entrystatic">
-                <code>{c.v}</code>
-                <em>{c.label.toLowerCase()}</em>
-              </span>
-              <button
-                type="button"
-                className="bz7__entrydel"
-                aria-label={`Remove ${c.v}`}
-                onClick={() => remove(c.kind, c.v)}
-              >
-                <X size={13} strokeWidth={2} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {!adding ? (
-        <button type="button" className="bz7__addrow" onClick={() => setAdding(true)}>
-          <Plus size={13} strokeWidth={2.4} aria-hidden />
-          Add location
-        </button>
-      ) : (
-      <div className="bz7__combo">
-        {/* The label is the field: the icon used to be a sibling of the input
-            with the border on the input, so the magnifier sat outside the box
-            it belongs to. The "Any location" state stays below, where it is the
-            list's state rather than the field's value. */}
-        <label className="bz7__add">
-          <Search size={14} strokeWidth={1.9} aria-hidden />
-          <input
-            type="text"
-            value={q}
-            /* The button that revealed this row is unmounted by the same
-               render, so without this focus fell to `<body>` and everything
-               typed after the click went nowhere. `adding` starts false and
-               the combo only mounts when it flips, so this fires exactly on
-               the reveal and never on load or on a tab switch. */
-            autoFocus
-            placeholder="Search any country, state or city…"
-            aria-label="Search places"
-            autoComplete="off"
-            onChange={(e) => {
-              setQ(e.target.value)
-              setCursor(0)
+  /* The search field, in a new row at the end or in the row it would replace. */
+  const searchLine = (s: PlaceSearch, c: Chosen | null) => {
+    const listId = `bz7-place-hits-${s.key}`
+    const showHits = s.q.trim() !== ''
+    return (
+      <div className="bz7__fieldline">
+        <div className="bz7__combo">
+          {/* The whole label reads as the field, but only the input takes focus: a
+              mousedown on the icon or the padding would blur the input, and a blur
+              closes the search before the label's click could hand focus back. */}
+          <label
+            className="bz7__rowin bz7__place bz7__placesearch"
+            onMouseDown={(e) => {
+              if (e.target !== inputRef.current) e.preventDefault()
             }}
-            onKeyDown={(e) => {
-              /* Escape closes the row. `adding` had no path back to false, so
-                 opening the search once removed the dashed button and the
-                 first-run empty state for the life of the mount. */
-              if (e.key === 'Escape') {
-                e.preventDefault()
-                setQ('')
-                setCursor(0)
-                setAdding(false)
-                return
-              }
-              if (!hits.length) return
-              if (e.key === 'ArrowDown') {
-                e.preventDefault()
-                setCursor((c) => (c + 1) % hits.length)
-              } else if (e.key === 'ArrowUp') {
-                e.preventDefault()
-                setCursor((c) => (c - 1 + hits.length) % hits.length)
-              } else if (e.key === 'Enter') {
-                e.preventDefault()
-                addPlace(hits[cursor])
+          >
+            <Search size={14} strokeWidth={1.9} aria-hidden />
+            <input
+              ref={inputRef}
+              type="text"
+              value={s.q}
+              /* The row or the button that opened this search is gone in the same render. */
+              autoFocus
+              placeholder="Search a country, state or city"
+              aria-label={c ? `Replace ${c.v}` : 'Search places'}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={showHits}
+              aria-controls={showHits ? listId : undefined}
+              aria-activedescendant={showHits && hits.length > 0 ? `${listId}-${cursor}` : undefined}
+              autoComplete="off"
+              spellCheck={false}
+              /* Selected, so typing replaces the name and an arrow key keeps it. */
+              onFocus={(e) => {
+                if (c) e.currentTarget.select()
+              }}
+              onChange={(e) => {
+                const text = e.target.value
+                setSearch((cur) => (cur?.key === s.key ? { ...cur, q: text } : cur))
+                setCursor(firstOpenHit(searchPlaces(text), base))
+              }}
+              /* Left without a pick, nothing is half added: a new row goes, and a
+                 row being replaced shows its place again. Tab from a new row lands
+                 on its own remove, which goes with the row, so focus carries on to
+                 Add location. */
+              onBlur={(e) => {
+                const to = e.relatedTarget
+                const within = to instanceof Node && !!e.currentTarget.closest('li')?.contains(to)
+                close(s.key)
+                if (within && !c) focusLater('.bz7__addrow, .bempty__action button')
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.preventDefault()
+                  close(s.key)
+                  /* Back to the place this stood in for, or on to what brings the search back. */
+                  focusLater(
+                    c ? `[data-place="${CSS.escape(c.id)}"]` : '.bz7__addrow, .bempty__action button',
+                  )
+                  return
+                }
+                if (!hits.length) return
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  setCursor((i) => (i + 1) % hits.length)
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  setCursor((i) => (i - 1 + hits.length) % hits.length)
+                } else if (e.key === 'Enter') {
+                  e.preventDefault()
+                  const p = hits[cursor]
+                  if (p) pick(p, 'enter')
+                }
+              }}
+            />
+          </label>
+
+          {showHits && (
+            <ul
+              className="bz7__hits"
+              id={listId}
+              role="listbox"
+              aria-label="Place results"
+              /* Keeps focus in the field, which closes on blur, through a click on
+                 the list's own scrollbar or padding. */
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              {hits.length === 0 && <li className="bz7__nohit">No place matches “{s.q.trim()}”.</li>}
+              {hits.map((p, i) => {
+                const no = placeRefusal(p, base)
+                return (
+                  <li key={p.id} role="presentation">
+                    <button
+                      type="button"
+                      role="option"
+                      id={`${listId}-${i}`}
+                      tabIndex={-1}
+                      aria-selected={i === cursor}
+                      aria-disabled={no ? true : undefined}
+                      className={`bz7__hit ${i === cursor ? 'is-cursor' : ''} ${no ? 'is-off' : ''}`}
+                      /* A move, not an enter: a keyboard scroll slides options under a
+                         resting pointer, and that must not take the cursor back. */
+                      onMouseMove={() => {
+                        if (i === cursor) return
+                        cursorByPointer.current = true
+                        setCursor(i)
+                      }}
+                      onClick={() => pick(p, 'click')}
+                    >
+                      <MapPin size={13} strokeWidth={1.9} aria-hidden />
+                      <span className="bz7__hitname">{p.name}</span>
+                      <span className="bz7__hitctx">{placeContext(p)}</span>
+                      {no?.kind === 'added' && (
+                        <i className="bz7__hitnote">
+                          <Check size={12} strokeWidth={2.6} aria-hidden /> Added
+                        </i>
+                      )}
+                      {no?.kind === 'covered' && <i className="bz7__hitnote is-warn">Covered by {no.by}</i>}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+        {/* The mousedown would blur the field first, and a blur closes the search. */}
+        <span className="bz7__rowdel" onMouseDown={(e) => e.preventDefault()}>
+          <IconButton
+            icon={Trash2}
+            tone="danger"
+            size="sm"
+            label={c ? `Remove ${c.v}` : 'Remove this row'}
+            onClick={() => {
+              if (c) {
+                remove(c)
+              } else {
+                setSearch(null)
+                focusRow(chosen.length)
               }
             }}
           />
-        </label>
+        </span>
+      </div>
+    )
+  }
 
-        {q.trim() !== '' && (
-          <ul className="bz7__hits" role="listbox" aria-label="Place results">
-            {hits.length === 0 && <li className="bz7__nohit">No place matches “{q}”.</li>}
-            {hits.map((p, i) => {
-              const covered = coveredBy(p, {
-                countries: l.countries,
-                states: l.states,
-                cities: l.cities,
-              })
-              const already =
-                (p.kind === 'country' && l.countries.includes(p.name)) ||
-                (p.kind === 'state' && l.states.includes(p.name)) ||
-                (p.kind === 'city' && l.cities.includes(p.name))
-              return (
-                <li key={p.id}>
+  return (
+    <section className="bz7__sec" ref={sectionRef}>
+      <ul className="bz7__fields">
+        {chosen.map((c) => (
+          <li key={c.id}>
+            {open && replacing?.id === c.id ? (
+              searchLine(open, c)
+            ) : (
+              <div className="bz7__fieldline">
+                {c.kind === 'radius' ? (
+                  /* A circle is not in the catalogue, so there is nothing to search
+                     for in its place. It only has Remove. */
+                  <div className="bz7__rowin bz7__place is-static" data-place={c.id}>
+                    <span className="bz7__placename">{c.v}</span>
+                    <span className="bz7__placekind">{c.label}</span>
+                  </div>
+                ) : (
                   <button
                     type="button"
-                    role="option"
-                    aria-selected={i === cursor}
-                    className={`bz7__hit ${i === cursor ? 'is-cursor' : ''}`}
-                    onMouseEnter={() => setCursor(i)}
-                    onClick={() => addPlace(p)}
+                    className="bz7__rowin bz7__place"
+                    data-place={c.id}
+                    aria-label={`Change ${c.v} (${c.label.toLowerCase()})`}
+                    onClick={() => openReplace(c)}
                   >
-                    <MapPin size={13} strokeWidth={1.9} aria-hidden />
-                    <span className="bz7__hitname">{p.name}</span>
-                    <span className="bz7__hitctx">{placeContext(p)}</span>
-                    {already ? (
-                      <i className="bz7__hitnote">
-                        <Check size={11} strokeWidth={2.6} aria-hidden /> added
-                      </i>
-                    ) : (
-                      /* Adding a city to a zone that already holds its country
-                         changes nothing. Saying so beats letting it look like
-                         it narrowed something. */
-                      covered && <i className="bz7__hitnote is-warn">already covered by {covered}</i>
-                    )}
+                    <span className="bz7__placename">{c.v}</span>
+                    <span className="bz7__placekind">{c.label}</span>
                   </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </div>
-      )}
+                )}
+                {/* The same remove as an IP network row. Its mousedown keeps an open
+                    search from closing, and moving this row, before the click lands. */}
+                <span className="bz7__rowdel" onMouseDown={(e) => e.preventDefault()}>
+                  <IconButton icon={Trash2} tone="danger" size="sm" label={`Remove ${c.v}`} onClick={() => remove(c)} />
+                </span>
+              </div>
+            )}
+          </li>
+        ))}
+        {open && open.replacing === null && <li key={`search-${open.key}`}>{searchLine(open, null)}</li>}
+      </ul>
+
+      <button type="button" className="bz7__addrow" onMouseDown={(e) => e.preventDefault()} onClick={openNew}>
+        <CirclePlus size={16} strokeWidth={1.9} aria-hidden />
+        Add location
+      </button>
     </section>
   )
 }
 
 /* --- Helpers --------------------------------------------------------------------- */
 
-/* Whether a state or city name sits inside a country, asked of the catalogue
-   rather than guessed from the string. */
+/* Whether a state or city of this name sits inside a country, asked of the
+   catalogue directly. It was a ranked search capped at forty hits, which only
+   held because an exact name happens to rank first. */
 function inCountry(name: string, country: string, kind: 'state' | 'city'): boolean {
-  return searchPlaces(name, 40).some((p) => p.kind === kind && p.name === name && p.country === country)
+  return PLACES.some((p) => p.kind === kind && p.name === name && p.country === country)
+}
+
+/* Whether a city of this name sits inside a state of that country. */
+function inState(city: string, state: string, country: string): boolean {
+  return PLACES.some((p) => p.kind === 'city' && p.name === city && p.state === state && p.country === country)
 }

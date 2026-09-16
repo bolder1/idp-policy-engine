@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useMemo, useState } from 'react'
-import { ArrowRight, Award, Lock, ShieldCheck, TrendingDown, TrendingUp, Unlock } from 'lucide-react'
+import { ArrowRight, Award, Check, Lock, ShieldCheck, Target, TrendingDown, TrendingUp, Unlock } from 'lucide-react'
 
 import { Button, Counter, Modal } from '../kit'
 import type { Policy } from '../data'
@@ -66,6 +66,8 @@ export function ImpactArenaDialog({
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
       fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
+      hasZone: (id) => !!store.zoneById(id),
+      hasFingerprint: (id) => !!store.fingerprintById(id),
       groupName: (id) => store.groupById(id).name,
       riskScale: store.riskScale,
     }),
@@ -80,8 +82,8 @@ export function ImpactArenaDialog({
   const movement = useMemo(() => (dirty ? compare(before, after) : null), [dirty, before, after])
 
   const errors = useMemo(
-    () => diagnose(draft, store.groups, store.hooks).filter((d) => d.severity === 'error' && draft.rules[d.ruleIndex]?.enabled !== false).length,
-    [draft, store.groups],
+    () => diagnose(draft, store.groups, store.hooks, store.users, { zones: store.zones, fingerprints: store.fingerprints }).filter((d) => d.severity === 'error' && draft.rules[d.ruleIndex]?.enabled !== false).length,
+    [draft, store.groups, store.hooks, store.users, store.zones, store.fingerprints],
   )
   const earned = useMemo(() => badges(draft, after, movement, errors), [draft, after, movement, errors])
 
@@ -110,7 +112,11 @@ export function ImpactArenaDialog({
       footer={
         <>
           <span className="bia__foot">
-            {SITUATIONS.length.toLocaleString()} modelled situations ={' '}
+            {/* With movement the headline already says the total, so the
+                footer starts at the axes. */}
+            {movement
+              ? 'Modelled over '
+              : `${SITUATIONS.length.toLocaleString()} modelled situations = `}
             {SWEEP_AXES.map((a) => `${a.values.length} ${a.name.toLowerCase()}`).join(' × ')}. Exact over that
             space, silent about the world beyond it.
           </span>
@@ -255,7 +261,9 @@ export function ImpactArenaDialog({
             <p className="bia__fieldnote">
               One dot per modelled sign-in situation, in a fixed order — the same dot is the same situation in every
               view, so the field can be compared rather than just looked at.
-              {shown.fellThrough > 0 && (
+              {/* Published view only: the Engine default row below already
+                  prints the current figure. */}
+              {view === 'before' && shown.fellThrough > 0 && (
                 <>
                   {' '}
                   <b>{shown.fellThrough.toLocaleString()}</b> of them match no rule at all and are decided by the
@@ -356,7 +364,7 @@ export function ImpactArenaDialog({
               {earned.map((b) => (
                 <div key={b.id} className={`bia__badge ${b.earned ? 'is-earned' : ''}`}>
                   <span className="bia__badgemark" aria-hidden>
-                    {b.earned ? <ShieldCheck size={15} strokeWidth={1.9} /> : <Lock size={15} strokeWidth={1.9} />}
+                    {b.earned ? <Check size={15} strokeWidth={1.9} /> : <Lock size={15} strokeWidth={1.9} />}
                   </span>
                   <strong>{b.label}</strong>
                   <p>{b.earned ? b.claim : (b.detail ?? b.claim)}</p>
@@ -377,6 +385,8 @@ export function ImpactPip({ draft, saved, onOpen }: { draft: Policy; saved: Poli
     () => ({
       zoneName: (id) => store.zoneById(id)?.name ?? id,
       fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
+      hasZone: (id) => !!store.zoneById(id),
+      hasFingerprint: (id) => !!store.fingerprintById(id),
       groupName: (id) => store.groupById(id).name,
       riskScale: store.riskScale,
     }),
@@ -390,7 +400,7 @@ export function ImpactPip({ draft, saved, onOpen }: { draft: Policy; saved: Poli
 
   return (
     <button type="button" className={`bia__pip ${n && n.looser > 0 ? 'is-alarm' : ''}`} onClick={onOpen}>
-      <ShieldCheck size={12} strokeWidth={2} aria-hidden />
+      <Target size={12} strokeWidth={2} aria-hidden />
       Impact
       {n ? (
         <b>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { EVERYONE, blankRule, card, cond, groups, policies, when, type Policy, type Rule } from './data'
-import { SLOW_TIMEOUT_MS, canSaveHook, describeHook, seedHooks, validateHook, type Hook } from './hooks'
+import { SLOW_TIMEOUT_MS, canSaveHook, normaliseHook, seedHooks, validateHook, type Hook } from './hooks'
 import { leaves } from './predicate'
 import { diagnose } from './screens/diagnostics'
 
@@ -63,11 +63,43 @@ describe('validating a hook', () => {
   /* The request carries the identity being evaluated and the answer decides
      access. Plain HTTP makes both readable and writable in transit, which is a
      different order of problem from a missing field. */
-  it('refuses plain HTTP and merely warns about anything else unrecognised', () => {
+  it('refuses plain HTTP, a URL with no scheme, and a scheme with no host', () => {
     expect(canSaveHook(hook({ url: 'http://example.internal/check' }))).toBe(false)
-    const odd = validateHook(hook({ url: 'example.internal/check' }))
-    expect(odd.some((i) => i.level === 'warning' && i.title.includes('HTTPS'))).toBe(true)
-    expect(canSaveHook(hook({ url: 'example.internal/check' }))).toBe(true)
+    expect(validateHook(hook({ url: 'http://example.internal/check' })).some((i) => i.title.includes('HTTPS'))).toBe(true)
+    expect(canSaveHook(hook({ url: 'example.internal/check' }))).toBe(false)
+    expect(canSaveHook(hook({ url: 'https://' }))).toBe(false)
+    expect(canSaveHook(hook({ url: '  https://example.internal/check  ' }))).toBe(true)
+  })
+
+  it('refuses a name another hook already has, ignoring case and spaces', () => {
+    const other = hook({ id: 'hk-other', name: 'Fraud score lookup' })
+    const issues = validateHook(hook({ name: '  fraud SCORE lookup ' }), [other])
+    expect(issues.some((i) => i.field === 'name' && i.level === 'error')).toBe(true)
+    // Its own name is not a clash when it is edited.
+    expect(canSaveHook(other, [other])).toBe(true)
+  })
+
+  it('refuses a timeout past the limit and a freshness limit below one hour', () => {
+    expect(canSaveHook(hook({ timeoutMs: 999999999 }))).toBe(false)
+    const sync = { mode: 'attribute-sync' as const, responsePath: '', timeoutMs: 0 }
+    expect(canSaveHook(hook({ ...sync, maxAgeHours: -5 }))).toBe(false)
+    expect(canSaveHook(hook({ ...sync, maxAgeHours: 1.5 }))).toBe(false)
+    expect(canSaveHook(hook({ ...sync, maxAgeHours: 1 }))).toBe(true)
+  })
+
+  it('files every issue under a form field', () => {
+    for (const i of validateHook(hook({ name: '', url: '', responsePath: '', timeoutMs: 0 }))) {
+      expect(i.field, i.title).toBeTruthy()
+    }
+  })
+
+  it('stores trimmed text and a cleared freshness limit as no limit', () => {
+    const out = normaliseHook(hook({ name: '  Fraud  ', url: ' https://x.y/z ', responsePath: ' ok ', authHeader: '  ', mode: 'attribute-sync', maxAgeHours: 0 }))
+    expect(out.name).toBe('Fraud')
+    expect(out.url).toBe('https://x.y/z')
+    expect(out.responsePath).toBe('ok')
+    expect('authHeader' in out).toBe(false)
+    expect('maxAgeHours' in out).toBe(false)
   })
 
   it('refuses a synchronous hook with no response field or no timeout', () => {
@@ -93,10 +125,6 @@ describe('validating a hook', () => {
     expect(stale.some((i) => i.title.includes('freshness'))).toBe(true)
   })
 
-  it('describes itself without leaking the full URL into a list row', () => {
-    expect(describeHook(hook())).toContain('example.internal')
-    expect(describeHook(hook({ mode: 'attribute-sync', maxAgeHours: 12 }))).toContain('12h')
-  })
 })
 
 describe('a rule gated on a hook', () => {

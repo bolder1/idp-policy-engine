@@ -1,45 +1,65 @@
 import { motion, useReducedMotion } from 'motion/react'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect } from 'react'
 import {
   ArrowLeft,
+  BellRing,
   Check,
-  ChevronDown,
   ChevronRight,
   CreditCard,
   Fingerprint,
   Grid3x3,
   HelpCircle,
   KeyRound,
+  LifeBuoy,
+  type LucideIcon,
   Mail,
   MessageSquare,
-  Phone,
-  Search,
   Pencil,
-  Settings,
+  Phone,
+  RectangleEllipsis,
   ShieldCheck,
+  SlidersHorizontal,
   Smartphone,
-  Sparkles,
   Star,
-  type LucideIcon,
 } from 'lucide-react'
 
-import { Button, Drawer, IconButton, MenuButton, TipMark, Toggle } from '../kit'
+import { Badge, Button, Callout, Drawer, IconButton, MenuButton, Modal, SearchBox, TipDot, Toggle } from '../kit'
 import { methodBlocker, type AuthMethod } from '../methods'
 import { useBrand, type Role } from '../store'
-import { NoResults } from '../empty'
-import type { Policy } from '../data'
+import { EmptyState, NoMatches } from '../empty'
 import { MethodIcon, RecoveryTab } from './recovery'
 import { UserMethodCard } from './user-config'
-import { SEED_ENROLMENT, type UserEnrolment } from '../user-methods'
+import { activateIn, enrolIssue, enrolShapeFor, readyFor, type UserEnrolment } from '../user-methods'
 import { ActiveMethod } from './active-method'
 import { SettingField } from '../setting-field'
 import { ConfigFields } from './method-forms'
-import { configFor, isMissing, missingFields, setField, type ConfigField } from '../method-config'
-import { familySettingsFor, methodSettingsFor, mfaMethodFor, settingKey, type MfaValue, type MfaValues } from '../mfa-join'
+import { configFor, invalidFields, missingFields, setField, storeSecrets, type ConfigField } from '../method-config'
+import { familySettingsFor, methodSettingsFor, settingKey, type MfaValue, type MfaValues } from '../mfa-join'
 import { fieldValue, type MfaSetting } from '../mfa-settings'
-import { familyRow, hasConfigPage, pageKey, rowTarget, type FamilyRow, type PanelPage } from './auth-panel'
+import {
+  LINK_SCREENS,
+  backLabel,
+  canServeAsDefault,
+  clampVerify,
+  familyEnrolled,
+  familyRow,
+  firstDefaultable,
+  hasConfigPage,
+  noBalanceWarning,
+  pageKey,
+  resolveDefault,
+  rowTarget,
+  setupTargetFor,
+  tokenButtonLabel,
+  turnOffPlan,
+  type FamilyRow,
+  type PanelPage,
+} from './auth-panel'
+import { DISPLAY_TOKEN_METHOD_ID, assignedCount, tokensOf } from '../hardware-tokens'
 import { NPS_SERVERS, setupCardFor, setupReady } from '../setup-guide'
 import { AppSetupCard, NpsSetupCard } from './setup-card'
+import { useLeaveGuard } from '../leave-guard'
 
 /* -----------------------------------------------------------------------------
    Authentication methods · final.
@@ -71,9 +91,10 @@ import { AppSetupCard, NpsSetupCard } from './setup-card'
 
 type Tab = 'methods' | 'recovery'
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'methods', label: 'Methods' },
-  { id: 'recovery', label: 'Recovery' },
+/* Each tab carries an icon, as the zone page's tabs do: one tab spec across the product. */
+const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
+  { id: 'methods', label: 'Methods', icon: ShieldCheck },
+  { id: 'recovery', label: 'Recovery', icon: LifeBuoy },
 ]
 
 /* The eleven families, in the order the shipping console's rail lists them, so
@@ -139,7 +160,7 @@ const FAMILIES: Family[] = [
     blurb: 'Our own app: push approval, a code, or a barcode scan.',
     detail:
       'A push to accept or deny in one tap, a 6 to 8 digit code, or a barcode scanned off the sign-in screen. The one app where both ends are ours, so its push can require a fingerprint or number matching.',
-    icon: Sparkles,
+    icon: BellRing,
     tint: 'indigo',
   },
   {
@@ -147,7 +168,7 @@ const FAMILIES: Family[] = [
     blurb: 'SecurID tokencodes, softtokens and push, via RSA Authentication Manager.',
     detail:
       'Accepts whichever the user holds: a SecurID tokencode, an RSA display token, or a push. Codes are checked by RSA Authentication Manager, so the connection to it has to be set up before anything can be verified.',
-    icon: ShieldCheck,
+    icon: RectangleEllipsis,
     tint: 'slate',
     isNew: true,
   },
@@ -201,32 +222,13 @@ const FAMILIES: Family[] = [
   },
 ]
 
-/* Which method the tenant starts on, and where it falls back to.
+/* Which method the tenant starts on, and where it falls back to, is
+   `firstDefaultable` and `resolveDefault` in auth-panel.ts: Email first, because
+   a mailbox is the one delivery channel every account already has. */
 
-   Email first because a mailbox is the one delivery channel every account
-   already has — an SMS default needs a phone number on file, and a tenant that
-   has not collected them defaults to something that cannot reach anybody. The
-   rest of the order is the same argument, weakest assumption first. */
-const DEFAULT_PREFERENCE = ['otp-email', 'email-link', 'otp-sms', 'otp-call']
-
-/* The seeded default, and the replacement when the current one is switched off.
-   `exclude` is the method being disabled: `setEnabled` runs this against the
-   state as it was BEFORE the write, so the one on its way out has to be named. */
-function firstDefaultable(all: AuthMethod[], exclude?: string): string | null {
-  const ok = (m: AuthMethod) =>
-    m.id !== exclude && Boolean(mfaMethodFor(m.id)?.canBeDefault) && !methodBlocker(m)
-  for (const id of DEFAULT_PREFERENCE) {
-    const hit = all.find((m) => m.id === id && ok(m))
-    if (hit) return hit.id
-  }
-  return all.find(ok)?.id ?? null
-}
-
-/** The first sentence, without its full stop. Everything after it is the tail. */
-function lede(text: string): string {
-  const cut = text.search(/\.\s/)
-  return cut === -1 ? text : text.slice(0, cut + 1)
-}
+/** Security Questions' "Questions to configure", as the person's form reads it. */
+const KBA_LIMIT_KEY = settingKey('family', 'Security Questions', 'kba-limit')
+const KBA_VERIFY_KEY = settingKey('family', 'Security Questions', 'kba-verify')
 
 export function AuthMethods({ role = 'admin' }: { role?: Role }) {
   const store = useBrand()
@@ -234,17 +236,10 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
 
   /* One list, and the two axes that narrow it.
 
-     `use` is the filter: primary, second factor, recovery. It replaces both the
-     tab bar and the eleven category cards — the tabs split one catalogue into
-     three screens you could not compare across, and the categories split what
-     was left into eleven cards you had to open one at a time to see anything at
-     all. What an admin arrives asking is "what can somebody sign in with", and
-     that question was answerable on none of the three.
-
-     Recovery is a filter VALUE rather than a fourth kind, because a method can
-     be a second factor and a way back in at the same time — three of them are.
-     `use` says what a method is; `alsoRecovery` says what it can also do, and a
-     row can honestly appear under both. */
+     `use` is the filter: primary, second factor, recovery. Recovery is a filter
+     VALUE rather than a fourth kind, because a method can be a second factor and
+     a way back in at the same time. `use` says what a method is; `alsoRecovery`
+     says what it can also do, and a row can honestly appear under both. */
   const [use, setUse] = useState<UseFilter>('all')
 
   const [tab, setTab] = useState<Tab>('methods')
@@ -252,103 +247,147 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
      setup — deepest last. Empty closes it. See `PanelPage`. */
   const [panel, setPanel] = useState<PanelPage[]>([])
 
-  /* Which end a settings row wears: the chevron it has always worn, or a gear
-     with the switch moved out to the edge beside it. See `GEAR_ROWS` below for
-     the two rows this actually reaches and why it is only those two.
-
-     A piece of state and not a build flag, because the point of it is to be
-     flipped while looking at the list. It is deliberately NOT persisted: this
-     is a comparison being made now, not a preference somebody holds — a
-     variant that survives a reload is a variant people forget they are in. */
+  /* Which end a settings row wears: the chevron, or a gear with the switch
+     moved out to the edge beside it. See `gearRows` below. Deliberately not
+     persisted: it is a comparison being made now, not a preference. */
   const [gearEnds, setGearEnds] = useState(false)
 
-  /* The person's own enrolment, which is a different fact from the tenant's
-     configuration. The admin decides a method may exist; this records whether
-     THIS person has set it up and which one of theirs actually runs. */
-  const [enrolment, setEnrolment] = useState<UserEnrolment>(SEED_ENROLMENT)
-  const [openCard, setOpenCard] = useState<string | null>(null)
-  /* From the store, not the module: enrolment counts move with the tenant,
-     and a screen holding its own copy would keep the old tenant's numbers the
-     moment the persona changes underneath it. */
-  const { methods, setMethods } = useBrand()
-  /* The sheet's settings. Flat and keyed by scope+owner+id, because 'otp-length'
-     exists under both SMS and Email and a bare id would make them share one. */
-  const [behaviour, setBehaviour] = useState<MfaValues>({})
+  /* Arriving by a link that unmounted with its page — the Display tokens back
+     link, above all — focus is on <body>. It goes to the Hardware Token row
+     that page was opened from, or else the heading (15 Sep 2026). Only on
+     arrival, and only when nothing has focus: a rail click keeps its row. */
+  const heading = useRef<HTMLHeadingElement | null>(null)
+  const cameFrom = store.screen.name === 'methods' ? store.screen.from : undefined
+  useEffect(() => {
+    const active = document.activeElement
+    if (active && active !== document.body) return
+    const row =
+      cameFrom === 'display-tokens'
+        ? document.querySelector<HTMLElement>('[data-channel="Hardware Token"] .bm8__open, [data-channel="Hardware Token"] button')
+        : null
+    ;(row ?? heading.current)?.focus({ preventScroll: true })
+    // Arrival only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  /* Enabling writes both fields. `methodBlocker` reads `active` AND `allowed`,
-     so writing only one leaves a method reporting "Not offered to end users"
-     with nothing on this screen able to clear it. */
+  /* From the store, not the screen. The screen unmounts on every tab change and
+     every navigation; the catalogue, the tenant's settings and the person's own
+     enrolment all commit as they change, so they have to outlive it. */
+  const {
+    methods,
+    setMethods,
+    enrolment,
+    setEnrolment,
+    mfaBehaviour: behaviour,
+    setMfaBehaviour,
+    methodConfig: savedConfig,
+    setMethodConfig,
+    setupChoice,
+    setSetupChoice,
+  } = store
+
   /* The tenant-wide default: the method a user is sent to when nothing else has
-     been chosen for them. One at a time, so it is held as an id rather than a
-     flag per method — two defaults is not a state the product has. */
-  /* Seeded rather than null.
+     been chosen for them. One at a time, so it is an id rather than a flag per
+     method. A default that can no longer run moves on by the same rule that
+     picks the first one (see `resolveDefault`), and the store is kept in step so
+     the choice does not move again behind anybody's back. */
+  const defaultMethod = resolveDefault(store.defaultMethodId, methods)
+  const { defaultMethodId, setDefaultMethodId } = store
+  useEffect(() => {
+    if (defaultMethodId !== defaultMethod) setDefaultMethodId(defaultMethod)
+  }, [defaultMethod, defaultMethodId, setDefaultMethodId])
 
-     "No default" was an option in this dropdown and the value every tenant
-     started on — a selected state whose meaning was "this is not configured".
-     It reads as a choice and it is not one: a rule that asks for a second
-     factor without naming a method has nowhere to send the user, so the tenant
-     that leaves it alone is the tenant it fails on. The list now holds only
-     methods that can actually serve, and Email is picked to begin with. */
-  const [defaultMethod, setDefaultMethod] = useState<string | null>(() =>
-    firstDefaultable(methods),
-  )
+  /* Turning a method off, when rules name it or it is the default nothing can
+     replace, asks first. Kept after closing so the dialog's words hold while it
+     animates out. */
+  const [off, setOff] = useState<{ id: string; name: string; lines: string[] } | null>(null)
+  const [offOpen, setOffOpen] = useState(false)
 
-  const setEnabled = (id: string, on: boolean) => {
-    setMethods((all) => all.map((m) => (m.id === id ? { ...m, active: on, allowed: on } : m)))
-    /* Switching off the default moves it on rather than clearing it. A default
-       pointing at something disabled reads as configured and cannot run — and
-       with "No default" gone there is no longer a value that means "none", so
-       clearing it would leave the dropdown showing something not in its own
-       list. Null only survives when nothing qualifies at all, which the empty
-       state below already handles. */
-    if (!on && defaultMethod === id) setDefaultMethod(firstDefaultable(methods, id))
+  const applyEnabled = (id: string, on: boolean) => {
+    const m = methods.find((x) => x.id === id)
+    if (!m) return
+    /* Enabling writes both fields. `methodBlocker` reads `active` AND `allowed`,
+       so writing only one leaves a method reporting "Not offered to end users"
+       with nothing on this screen able to clear it. */
+    setMethods((all) => all.map((x) => (x.id === id ? { ...x, active: on, allowed: on } : x)))
+    if (on) {
+      const warning = noBalanceWarning(m)
+      if (defaultMethod === null && canServeAsDefault({ ...m, active: true, allowed: true })) {
+        setDefaultMethodId(id)
+        store.showToast(`Default is now ${m.name}`)
+      } else if (warning) {
+        store.showToast(warning)
+      }
+      return
+    }
+    /* Switching off the default moves it on rather than leaving it pointing at
+       something that cannot run, and says where it went. */
+    if (defaultMethod === id) {
+      const replacement = firstDefaultable(methods, id)
+      setDefaultMethodId(replacement)
+      const r = methods.find((x) => x.id === replacement)
+      store.showToast(r ? `Default is now ${r.name}` : 'No default method')
+    }
   }
 
-  /* "Set up" opens the integration's own form, as a page in the slider.
+  const setEnabled = (id: string, on: boolean) => {
+    /* Display Token cannot be switched on while nobody holds a token: every code
+       would be rejected. Its row shows Set up then, not a switch, so this only
+       stops a stale control from getting through. */
+    if (on && id === DISPLAY_TOKEN_METHOD_ID && assignedCount(store.hardwareTokens) === 0) return
+    if (!on) {
+      const plan = turnOffPlan(methods, id, defaultMethod, store.policies)
+      const m = methods.find((x) => x.id === id)
+      if (plan.confirm && m) {
+        const replacement = plan.replacement ? methods.find((x) => x.id === plan.replacement) : undefined
+        setOff({
+          id,
+          name: m.name,
+          lines: [
+            ...(plan.rules > 0 ? [`Used in ${plan.rules} policy ${plan.rules === 1 ? 'rule' : 'rules'}.`] : []),
+            ...(plan.wasDefault
+              ? [replacement ? `${replacement.name} becomes the default.` : 'No other method can be the default.']
+              : []),
+          ],
+        })
+        setOffOpen(true)
+        return
+      }
+    }
+    applyEnabled(id, on)
+  }
 
-     It used to toast the destination, because there was no form to open. There
-     is now: `configFor` has carried a field list per method all along, and the
-     RSA one was extended from the console's own dialog.
-
-     It was a centred modal, and opening it closed the slider underneath — so the
-     family you were working through was gone by the time you pressed Save. From
-     a row on the list the form is now the slider's first page; from inside a
-     family it is pushed over that family, and Back returns to it. */
-  const openSetup = (m: AuthMethod) => setPanel([{ kind: 'setup', methodId: m.id }])
-  const pushSetup = (m: AuthMethod) => setPanel((s) => [...s, { kind: 'setup', methodId: m.id }])
+  /* "Set up" opens the integration's own form, as a page in the slider. From a
+     row on the list the form is the slider's first page; from inside a family it
+     is pushed over that family, and Back returns to it. Display Token's setup is
+     the Display tokens page rather than a form — see `setupTargetFor` — so its
+     button leaves this screen, through the leave guard like any navigation. */
+  const openSetup = (m: AuthMethod) => {
+    const to = setupTargetFor(m)
+    if (to.kind === 'screen') store.go(to.screen)
+    else setPanel([to.page])
+  }
+  const pushSetup = (m: AuthMethod) => {
+    const to = setupTargetFor(m)
+    if (to.kind === 'screen') store.go(to.screen)
+    else setPanel((s) => [...s, to.page])
+  }
   const back = () => setPanel((s) => s.slice(0, -1))
 
   /* Saving marks the method configured, which is what the rest of the screen
-     reads to decide between a Set up button and a toggle. The values
-     themselves are the form's own state — this prototype has no backend to
-     send them to, and pretending otherwise by storing them somewhere would
-     imply a round trip that does not happen. */
-  /* What the form was saved with, per method id.
-
-     Needed for the preview on the card: a summary built from the schema's
-     defaults would describe a configuration nobody entered. Screen state, so it
-     lasts the session and claims nothing beyond it — there is no backend here
-     and storing it anywhere else would imply a round trip that does not
-     happen. */
-  const [savedConfig, setSavedConfig] = useState<Record<string, ConfigField[]>>({})
-
+     reads to decide between a Set up button and a toggle, and keeps what the
+     form was saved with so it reopens on it. Secrets are held, not kept. */
   const finishSetup = (m: AuthMethod, fields: ConfigField[]) => {
-    /* The same form now serves first-time setup and a later edit, so the
-       confirmation has to know which one happened. */
     const first = !m.configured
-    setSavedConfig((prev) => ({ ...prev, [m.id]: fields }))
+    setMethodConfig((prev) => ({ ...prev, [m.id]: storeSecrets(fields) }))
     setMethods((all) => all.map((x) => (x.id === m.id ? { ...x, configured: true } : x)))
     back()
-    store.showToast(
-      first ? `${m.name} configured — it can be switched on now` : `${m.name} settings updated`,
-    )
+    store.showToast(first ? `${m.name} is set up. Turn it on to use it.` : `${m.name} updated`)
   }
 
   /* What a setup card chose, per method — Microsoft Push's server, so its card
      reopens on it. A code app keeps nothing: the code it showed is checked and
      spent. */
-  const [setupChoice, setSetupChoice] = useState<Record<string, string>>({})
-
   const finishCard = (m: AuthMethod, server: string) => {
     const card = setupCardFor(m.id)
     if (card?.kind === 'nps') setSetupChoice((prev) => ({ ...prev, [m.id]: server }))
@@ -358,109 +397,150 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
     store.showToast(via ? `${m.name} will send through ${via}` : `${m.name} is set up`)
   }
 
-  /* What this viewer may see at all.
+  /* What this viewer may see at all. A person's catalogue is the tenant's with
+     everything blocked removed, and without the primaries: Password, Passkeys
+     and Magic link are how a session STARTS, decided by an admin for everybody,
+     and this page is about the second step. */
+  const reachable = isUser ? methods.filter((m) => m.use !== 'primary' && !methodBlocker(m)) : methods
 
-     `methodBlocker` answers most of it — it returns a reason whenever a method
-     is unconfigured, switched off, or not offered to end users — so a person's
-     catalogue is the tenant's with everything blocked removed.
-
-     The primaries come out too, and that is a different kind of exclusion. They
-     are not blocked; they are not this person's to see. Password, Passkeys and
-     Magic link are how the tenant lets a session START, decided once by an
-     admin for everybody — and this page is headed "Two-step verification" and
-     tells the reader to set up as many as they like. A row nobody can act on,
-     under a heading about a second step, is a promise the screen cannot keep.
-     They stay in full on the admin side, where they are a real decision. */
-  const reachable = isUser
-    ? methods.filter((m) => m.use !== 'primary' && !methodBlocker(m))
-    : methods
-
-  /* Which rows the gear variant actually reaches, by name.
-
-     Read off the same three primitives the list itself uses — `FAMILIES`,
-     `familyRow`, `rowTarget` — rather than typed out, because the set is two
-     rows today and is a consequence of the data: a family has to narrow to ONE
-     method (so its switch is on the row) and that family has to have settings
-     (so the row has a page to open). Add a second Grid method and Grid Pattern
-     leaves this list on its own; give Call Verification a setting and it joins.
-     A hard-coded pair would go quietly wrong on either. */
+  /* Which rows the gear variant reaches, read off the same primitives the list
+     uses: a family that narrows to ONE method and has settings. */
   const gearRows = useMemo(
     () =>
       FAMILIES.flatMap((f) => {
-        const inside = reachable.filter(
-          (m) => m.use === 'second' && m.channel === f.channel && matchesUse(m, use),
-        )
+        const inside = reachable.filter((m) => m.use === 'second' && m.channel === f.channel && matchesUse(m, use))
         const shape = familyRow(f.channel, inside)
         return !shape.opens && rowTarget(shape)?.kind === 'settings' ? [shape.method.name] : []
       }),
     [reachable, use],
   )
 
+  /* --- The person's side ---------------------------------------------------------- */
+
+  /* Display Tokens are assigned by an admin, so holding one is this person's
+     enrolment in Display Token. */
+  const held = tokensOf(store.hardwareTokens, store.viewerId).length
+  const heldFor = (id: string) => (id === DISPLAY_TOKEN_METHOD_ID ? held : 0)
+  /** Methods this person has set up (or holds a token for). */
+  const configuredIds = reachable
+    .filter((m) => enrolment.configured.includes(m.id) || heldFor(m.id) > 0)
+    .map((m) => m.id)
+  /** Methods this person could switch on now. */
+  const readyIds = reachable.filter((m) => readyFor(m.id, enrolment, heldFor(m.id))).map((m) => m.id)
+
   const activate = (id: string, on: boolean) => {
-    /* One active method at a time. Switching one on switches the last one off
-       rather than adding to a set. */
-    setEnrolment((e) => ({ ...e, active: on ? id : e.active === id ? null : e.active }))
-    const m = methods.find((x) => x.id === id)
-    if (m) store.showToast(on ? `${m.name} is now your active method` : `${m.name} switched off`)
+    /* One active method at a time, and never none once something is set up:
+       switching off the active one hands over to another, or stays on. */
+    /* A method the person set up takes over before one that needs nothing. */
+    const handover = [...readyIds.filter((x) => configuredIds.includes(x)), ...readyIds.filter((x) => !configuredIds.includes(x))]
+    const { next, handedTo, kept } = activateIn(enrolment, id, on, handover)
+    if (kept) {
+      store.showToast('Turn on another method first')
+      return
+    }
+    setEnrolment(next)
+    const shown = methods.find((x) => x.id === (on ? id : handedTo))
+    if (shown) store.showToast(`${shown.name} is now your active method`)
   }
 
   const saveEnrolment = (id: string, values: Record<string, string>) => {
     const first = !enrolment.configured.includes(id)
     setEnrolment((e) => ({
       ...e,
-      configured: first ? [...e.configured, id] : e.configured,
+      configured: e.configured.includes(id) ? e.configured : [...e.configured, id],
       values: { ...e.values, [id]: values },
-      active: e.active ?? id,
+      /* The first method set up becomes the active one — and so does this one
+         when the active method is no longer offered to the person. */
+      active: e.active && reachable.some((m) => m.id === e.active) ? e.active : id,
     }))
     const m = methods.find((x) => x.id === id)
     if (m) store.showToast(first ? `${m.name} is set up` : `${m.name} updated`)
   }
 
+  /* The open card's form, held here rather than in the form, so the one leave
+     guard can see it: opening another card, closing the panel and leaving the
+     page all ask before throwing typed details away. Cancel is the discard. */
+  const [openCard, setOpenCard] = useState<string | null>(null)
+  const [cardDraft, setCardDraft] = useState<Record<string, string>>({})
+  const questions = Number(behaviour[KBA_LIMIT_KEY] ?? 3)
+  const cardIssue = openCard ? enrolIssue(enrolShapeFor(openCard).kind, cardDraft, questions) : null
+  const cardDirty = !!openCard && !sameValues(cardDraft, enrolment.values[openCard] ?? {})
+
+  /* Opening another card, or closing this one from its Edit button, asks first
+     when something was typed. Cancel is the one discard that does not ask. */
+  const openEnrol = (id: string | null) => {
+    if (id === openCard) return
+    store.requestLeave(() => {
+      setOpenCard(id)
+      setCardDraft(id ? (enrolment.values[id] ?? {}) : {})
+    })
+  }
+  const cancelEnrol = () => {
+    setOpenCard(null)
+    setCardDraft({})
+  }
+  const saveCard = (): boolean => {
+    if (!openCard || cardIssue) return false
+    saveEnrolment(openCard, cardDraft)
+    setOpenCard(null)
+    setCardDraft({})
+    return true
+  }
+  const enrol: EnrolBinding = {
+    ready: readyIds,
+    configured: configuredIds,
+    held,
+    questions,
+    openCard,
+    onOpenCard: openEnrol,
+    onCancelCard: cancelEnrol,
+    draft: cardDraft,
+    onDraft: (k, v) => setCardDraft((d) => ({ ...d, [k]: v })),
+    onSave: () => {
+      saveCard()
+    },
+    onActivate: activate,
+    active: enrolment.active,
+    guard: {
+      dirty: cardDirty,
+      save: saveCard,
+      blocked: cardIssue ? cardIssue.message || 'Fill in every field to save.' : null,
+    },
+  }
+
+  const closePanel = () => {
+    setPanel([])
+    setOpenCard(null)
+    setCardDraft({})
+  }
+
   return (
-    <div className="bpage bm8">
-      {/* Title wrapped, so this head is structurally the same object as the
-          Zones and Device-profiles heads: a title block on the left, room for
-          an action on the right. It had bare children, which is why it was the
-          one page head that could not grow a button without being rebuilt. */}
+    /* Compact on both tabs and for both roles. The family, its settings and a
+       setup form all open in the slider, over the compact page. */
+    <div className="bpage bpage--compact bm8">
       <header className="bm8__head">
         <div>
-          <h1>{isUser ? 'Two-step verification' : 'Authentication methods'}</h1>
+          <h1 ref={heading} tabIndex={-1}>
+            {isUser ? 'Two-step verification' : 'Authentication methods'}
+          </h1>
           <p>{isUser ? 'How you prove it is you.' : 'How people prove who they are.'}</p>
         </div>
 
-        {/* The comparison switch, in the slot this head was rebuilt to have.
-
-            It is the one control on this screen that is about the screen rather
-            than about authentication, which is a thing the console's copy rule
-            otherwise forbids — so it is labelled as narrowly as it can be and
-            says which rows it reaches, because two of eleven is not something
-            anybody would find by flipping it and looking.
-
-            A person's own Two-step verification page never shows it: their rows
-            all open onto an enrolment form and none of them carries a switch,
-            so there is no row here for the variant to change. */}
+        {/* The comparison switch. A person's page never shows it: their rows all
+            open onto an enrolment form and none carries a switch. */}
         {!isUser && gearRows.length > 0 && (
           <div className="bm8__variant">
             <Toggle size="sm" checked={gearEnds} onChange={setGearEnds} label="Gear on settings rows" />
-            {/* Not a `<label>`: `Toggle` renders a `<button role="switch">`, and
-                a label does not forward a click to a button — it would have
-                looked like a hit target and been dead. The switch carries its
-                own accessible name and these words are the visible copy. */}
             <span>
               Gear on settings rows
-              <i>{gearRows.join(' · ')}</i>
+              <i>{gearRows.join(', ')}</i>
             </span>
           </div>
         )}
       </header>
 
-      {/* Horizontal, per the brief. V5 ran these down the left, which reads as
-          navigation between screens; across the top they read as two views of
-          one screen, which is what they are.
-
-          Recovery is a tenant policy rather than a personal setting, so a person
-          does not get the tab — and a single-tab tab bar is furniture describing
-          a choice that no longer exists. */}
+      {/* Recovery is a tenant policy rather than a personal setting, so a person
+          does not get the tab — and a single-tab tab bar is furniture. */}
       {!isUser && (
         <div className="bm8__tabbar" role="tablist" aria-label="Authentication methods">
           {TABS.map((t) => (
@@ -472,31 +552,31 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
               className={`bm8__tab ${tab === t.id ? 'is-on' : ''}`}
               onClick={() => {
                 setTab(t.id)
-                setPanel([])
+                closePanel()
               }}
             >
+              <t.icon size={14} strokeWidth={1.9} aria-hidden />
               {t.label}
             </button>
           ))}
         </div>
       )}
 
-      {/* Rendered inside a `bv5` wrapper on purpose: recovery.css writes some of
-          its rules as `.bv5 .bv5__x`, and handing the component the scope it was
-          written under is cheaper than auditing which of its nested inputs
-          happen to need it today. */}
+      {/* Inside a `bv5` wrapper: recovery.css writes some rules as `.bv5 .bv5__x`. */}
       {tab === 'recovery' && !isUser && (
         <div className="bv5">
           <RecoveryTab methods={methods} />
         </div>
       )}
 
-      {/* The list stays put and the category slides over it. Opening a category
-          is a peek at three or four rows, and making that a navigation event
-          means the eleven you were comparing disappear to show you a list that
-          fits in a corner of them. */}
       {(tab === 'methods' || isUser) && (
         <>
+          {/* Nothing can be the default. Said once, above the list, because the
+              Default chip it replaces is simply absent. */}
+          {!isUser && defaultMethod === null && (
+            <Callout tone="notice">No default method. Turn on a method that can be the default.</Callout>
+          )}
+
           <CategoryList
             methods={reachable}
             onOpen={(channel) => setPanel([{ kind: 'family', channel }])}
@@ -506,45 +586,92 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
             use={use}
             onUse={setUse}
             isUser={isUser}
-            policies={store.policies}
+            headcount={store.users.length + store.unlistedUsers}
             onToggle={setEnabled}
             onSetup={openSetup}
-            onMakeDefault={setDefaultMethod}
+            onMakeDefault={setDefaultMethodId}
             enrolment={enrolment}
-            openCard={openCard}
-            onOpenCard={setOpenCard}
-            onActivate={activate}
-            onSaveEnrolment={saveEnrolment}
+            configuredIds={configuredIds}
           />
 
           <CategoryDrawer
             pages={panel}
             methods={reachable}
-            policies={store.policies}
             onBack={back}
-            onClose={() => setPanel([])}
+            onClose={closePanel}
             onToggle={setEnabled}
             defaultMethod={defaultMethod}
             onSetup={pushSetup}
-            onMakeDefault={setDefaultMethod}
+            onMakeDefault={setDefaultMethodId}
             saved={savedConfig}
             onSaveSetup={finishSetup}
             choices={setupChoice}
             onSaveCard={finishCard}
             behaviour={behaviour}
-            onBehaviour={(p) => setBehaviour((v) => ({ ...v, ...p }))}
+            onBehaviour={(p) => setMfaBehaviour((v) => ({ ...v, ...p }))}
             use={use}
             isUser={isUser}
-            enrolment={enrolment}
-            openCard={openCard}
-            onOpenCard={setOpenCard}
-            onActivate={activate}
-            onSaveEnrolment={saveEnrolment}
+            enrol={enrol}
           />
         </>
       )}
+
+      <Modal
+        open={offOpen}
+        onClose={() => setOffOpen(false)}
+        title={off ? `Turn off ${off.name}?` : ''}
+        width={440}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setOffOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="brand"
+              onClick={() => {
+                if (off && offOpen) applyEnabled(off.id, false)
+                setOffOpen(false)
+              }}
+            >
+              Turn off
+            </Button>
+          </>
+        }
+      >
+        <div className="bx-confirm">
+          {(off?.lines ?? []).map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+        </div>
+      </Modal>
     </div>
   )
+}
+
+/** Two sets of typed values are the same when every field reads the same, blank or absent alike. */
+function sameValues(a: Record<string, string>, b: Record<string, string>): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)])
+  for (const k of keys) if ((a[k] ?? '') !== (b[k] ?? '')) return false
+  return true
+}
+
+/* Everything the person's cards need, in one object: which methods are set up
+   and ready, the open form, and the guard the slider registers for it. */
+interface EnrolBinding {
+  ready: string[]
+  configured: string[]
+  held: number
+  questions: number
+  active: string | null
+  openCard: string | null
+  onOpenCard: (id: string | null) => void
+  /** Cancel: closes the open form and drops what was typed, without asking. */
+  onCancelCard: () => void
+  draft: Record<string, string>
+  onDraft: (key: string, value: string) => void
+  onSave: () => void
+  onActivate: (id: string, on: boolean) => void
+  guard: { dirty: boolean; save: () => boolean; blocked: string | null }
 }
 
 /* --- What a method is for, as a filter -------------------------------------- */
@@ -597,10 +724,10 @@ const matchesUse = (m: AuthMethod, f: UseFilter) =>
 const isResistant = (m: AuthMethod) => m.tier === 'Phishing-resistant'
 
 
-const GROUPS: { id: 'connect' | 'policy' | 'advanced'; label: string; blurb: string }[] = [
-  { id: 'connect', label: 'Connection', blurb: 'What this console needs to reach the server.' },
-  { id: 'policy', label: 'Policy', blurb: 'Which rule it applies once it can.' },
-  { id: 'advanced', label: 'Advanced', blurb: 'Working defaults. Change these only for an unusual deployment.' },
+const GROUPS: { id: 'connect' | 'policy' | 'advanced'; label: string }[] = [
+  { id: 'connect', label: 'Connection' },
+  { id: 'policy', label: 'Policy' },
+  { id: 'advanced', label: 'Advanced' },
 ]
 
 /* --- Setting an integration up ------------------------------------------------------
@@ -626,13 +753,11 @@ function useSetupDraft(
 ) {
   const [fields, setFields] = useState<ConfigField[]>([])
   const [seeded, setSeeded] = useState<string | null>(null)
-  /* Which sections are collapsed. Advanced starts closed because its
-     seventeen fields all ship with working defaults; the other two start open
-     because nothing can be saved until they are filled in. */
-  const [shut, setShut] = useState<string[]>(['advanced'])
   /* A setup card's input: the code an app showed, or Microsoft Push's server. */
   const [passcode, setPasscode] = useState('')
   const [server, setServer] = useState('')
+  /* What the form opened with, so closing it knows whether anything was typed. */
+  const [initial, setInitial] = useState<{ fields: ConfigField[]; server: string }>({ fields: [], server: '' })
 
   /* Re-seed when the page opens on a different method, the same way the other
      forms on this screen do — keyed on the id, because the object identity
@@ -642,19 +767,27 @@ function useSetupDraft(
     setSeeded(subject)
     /* What was entered last time beats the schema's defaults — an edit form
        that opens on defaults is not an edit form. */
-    setFields(subject ? saved[subject] ?? configFor(subject)?.fields ?? [] : [])
-    setShut(['advanced'])
+    /* The method's live state decides whether a never-saved form opens as a
+       running integration or a blank one — RSA set up this session is
+       configured in the store, not in the static catalogue. */
+    const seedFields = subject ? (saved[subject] ?? configFor(subject, method?.configured)?.fields ?? []) : []
+    const seedServer = subject ? chosen[subject] ?? '' : ''
+    setFields(seedFields)
     setPasscode('')
-    setServer(subject ? chosen[subject] ?? '' : '')
+    setServer(seedServer)
+    setInitial({ fields: seedFields, server: seedServer })
   }
 
+  const dirty =
+    !!subject && (passcode !== '' || server !== initial.server || JSON.stringify(fields) !== JSON.stringify(initial.fields))
+
   return {
+    dirty,
     fields,
     setFields,
-    shut,
-    setShut,
     missing: missingFields(fields),
-    cfg: method ? configFor(method.id) : null,
+    invalid: invalidFields(fields),
+    cfg: method ? configFor(method.id, method.configured) : null,
     passcode,
     setPasscode,
     server,
@@ -665,13 +798,11 @@ function useSetupDraft(
 type SetupDraft = ReturnType<typeof useSetupDraft>
 
 function SetupForm({ draft }: { draft: SetupDraft }) {
-  const { cfg, fields, setFields, shut, setShut } = draft
+  const { cfg, fields, setFields } = draft
   if (!cfg) return null
 
   return (
     <div className="bm8__setup">
-      <p className="bm8__setupblurb">{cfg.blurb}</p>
-
       {/* What has to be true elsewhere before any of this can be filled in.
 
           RSA is the only integration that ships these, and it needs them:
@@ -690,57 +821,24 @@ function SetupForm({ draft }: { draft: SetupDraft }) {
         </div>
       )}
 
-      {/* Grouped when the integration says so, flat when it does not.
+      {/* One straight form, top to bottom. Grouped under plain headings when
+          the integration says so, flat when it does not.
 
-          RSA is twenty-six fields of which two are required; the rest have
-          working defaults. Ungrouped that is one scroll where the two that
-          matter look exactly like the twenty-four that do not.
-
-          Each section is its own panel and each one closes, so the form can
-          be collapsed down to three headers once it has been filled in —
-          and a header carries its own count, so closing one never hides
-          whether it is finished. */}
+          The groups were bordered panels that each collapsed, with a tinted
+          header, a blurb and a count pill — Advanced shut by default. On the
+          owner's word (15 Sep 2026) that was too boxy: every field shows, the
+          headings are just words, and the head's "N required fields left" is
+          the one place outstanding work is counted. */}
       {GROUPS.filter((g) => fields.some((f) => (f.group ?? 'connect') === g.id)).length > 1 ? (
         GROUPS.map((g) => {
           const own = fields.filter((f) => (f.group ?? 'connect') === g.id)
           if (own.length === 0) return null
-          const closed = shut.includes(g.id)
-          const gaps = own.filter(isMissing).length
           return (
-            <section
-              key={g.id}
-              className={`bm8__setupgroup ${closed ? 'is-shut' : ''} ${gaps ? 'has-gap' : ''}`}
-            >
-              <button
-                type="button"
-                className="bm8__setupgrouphead"
-                aria-expanded={!closed}
-                onClick={() =>
-                  setShut((cur) =>
-                    cur.includes(g.id) ? cur.filter((x) => x !== g.id) : [...cur, g.id],
-                  )
-                }
-              >
-                <ChevronDown size={15} strokeWidth={2.2} className="bm8__setupchev" aria-hidden />
-                <span>{g.label}</span>
-                <em>{g.blurb}</em>
-                {/* A closed section still has to say whether anything inside
-                    it is outstanding. Without this, collapsing Connection
-                    hides the only explanation for why Save is dead. */}
-                <i className={`bm8__setupcount ${gaps ? 'is-gap' : ''}`}>
-                  {gaps
-                    ? `${gaps} required`
-                    : `${own.length} field${own.length === 1 ? '' : 's'}`}
-                </i>
-              </button>
-              {!closed && (
-                <div className="bm8__setupgroupbody">
-                  <ConfigFields
-                    fields={own}
-                    onChange={(id, value) => setFields((f) => setField(f, id, value))}
-                  />
-                </div>
-              )}
+            <section key={g.id} className="bm8__setupgroup" aria-labelledby={`bm8-setup-${g.id}`}>
+              <h3 id={`bm8-setup-${g.id}`} className="bm8__setuphead">
+                {g.label}
+              </h3>
+              <ConfigFields fields={own} onChange={(id, value) => setFields((f) => setField(f, id, value))} />
             </section>
           )
         })
@@ -763,16 +861,13 @@ function CategoryList({
   use,
   onUse,
   isUser,
-  policies,
+  headcount,
   onToggle,
   onSetup,
   onSettings,
   onMakeDefault,
   enrolment,
-  openCard,
-  onOpenCard,
-  onActivate,
-  onSaveEnrolment,
+  configuredIds,
   gearEnds = false,
 }: {
   methods: AuthMethod[]
@@ -781,418 +876,307 @@ function CategoryList({
   use: UseFilter
   onUse: (u: UseFilter) => void
   isUser: boolean
-  /* The primaries are rows rather than a card, so this list renders methods as
-     well as families and needs everything a method row does. */
-  policies: Policy[]
+  /** People in the tenant, the ceiling for an enrolment figure. */
+  headcount: number
   onToggle: (id: string, on: boolean) => void
   onSetup: (m: AuthMethod) => void
   /** A family of one's settings, opened straight from its row. */
   onSettings: (channel: string) => void
   onMakeDefault: (id: string) => void
   enrolment: UserEnrolment
-  openCard: string | null
-  onOpenCard: (id: string | null) => void
-  onActivate: (id: string, on: boolean) => void
-  onSaveEnrolment: (id: string, values: Record<string, string>) => void
+  /** The person's set-up methods, for the Configured pill on their rows. */
+  configuredIds: string[]
   /** The variant switch in the page head. See `gearEnds` on the screen. */
   gearEnds?: boolean
 }) {
   const [q, setQ] = useState('')
+  const needle = q.trim().toLowerCase()
 
   const rows = useMemo(() => {
-    const needle = q.trim().toLowerCase()
     return FAMILIES.map((f) => {
-      /* Narrowed by the filter before anything is counted, so a card's numbers
-         describe what opening it will actually show. A count that survives the
-         filter is a count you cannot act on. */
-      const inside = methods.filter(
-        (m) => m.use === 'second' && m.channel === f.channel && matchesUse(m, use),
-      )
+      /* Narrowed by the filter before anything is counted, so a row's numbers
+         describe what opening it will actually show. */
+      const inside = methods.filter((m) => m.use === 'second' && m.channel === f.channel && matchesUse(m, use))
       const live = inside.filter((m) => !methodBlocker(m))
       /* Transactions are bought as a pool and a family can spend from one pool
-         through several methods — OTP over SMS and SMS Link both draw on "SMS
-         transactions". Keyed by the pool's own name so the balance is counted
-         once, not once per method that can spend it. Families that cost nothing
-         to send have no pool and get no tag. */
+         through several methods, so the balance is counted once per pool. */
       const pools = new Map<string, number>()
       for (const m of inside) if (m.balance) pools.set(m.balance.label, m.balance.remaining)
-      /* Whether the row opens the slider or carries its one method's controls.
-         A person's rows all open: what sits in their panel is an enrolment form,
-         not a switch, and it does not fit on a row. */
+      /* A person's rows all open: what sits in their panel is an enrolment form. */
       const shape: FamilyRow = isUser ? { opens: true } : familyRow(f.channel, inside)
       return {
         f,
         shape,
+        inside,
         total: inside.length,
         live: live.length,
-        enrolled: inside.reduce((n, m) => n + (m.enrolled ?? 0), 0),
+        enrolled: familyEnrolled(inside, headcount),
         txns: pools.size ? [...pools.values()].reduce((a, b) => a + b, 0) : null,
       }
     })
-      /* A family the filter has emptied is not a family with nothing in it, it
-         is a family this filter does not reach. */
+      /* A family the filter has emptied is a family this filter does not reach. */
       .filter((r) => r.total > 0)
       .filter(
         (r) =>
           !needle ||
           r.f.channel.toLowerCase().includes(needle) ||
-          /* Searching for a method should find the family holding it —
-             otherwise typing "passkey" on a screen of category cards finds
-             nothing and reads as "we do not have that". */
-          methods.some((m) => m.channel === r.f.channel && m.name.toLowerCase().includes(needle)),
+          /* Searching for a method finds the family holding it — among the
+             methods the filter left, so a hidden method cannot bring its row back. */
+          r.inside.some((m) => m.name.toLowerCase().includes(needle)),
       )
-  }, [methods, q, use, isUser])
+  }, [methods, needle, use, isUser, headcount])
 
-  const countOf = (f: UseFilter) => methods.filter((m) => matchesUse(m, f)).length
-  /* Recovery is a tenant policy, and the primaries are not in a person's
-     catalogue at all — so neither is offered as a filter over their own
-     methods. A filter that can only ever return nothing is a dead option. */
-  const offered = USES.filter((u) => !(isUser && (u.id === 'recovery' || u.id === 'primary')))
+  /* Recovery is a tenant policy, the primaries are not in a person's catalogue,
+     and every method a person sees is a second factor — so none of those three
+     is offered as a filter over their own methods. */
+  const offered = USES.filter((u) => !(isUser && (u.id === 'recovery' || u.id === 'primary' || u.id === 'second')))
   const current = offered.find((u) => u.id === use) ?? offered[0]
 
-  /* The primaries answer to the same search and the same filter as the cards
-     — they are in the list, not above it, so a query that excludes them has to
-     exclude them. */
-  const needle = q.trim().toLowerCase()
-  const primaries = methods
-    .filter((m) => m.use === 'primary' && matchesUse(m, use))
-    .filter(
-      (m) => !needle || m.name.toLowerCase().includes(needle) || m.description.toLowerCase().includes(needle),
+  /* The primaries answer to the same search and the same filter as the families,
+     and sit first: a session starts with one of these. A person has none. */
+  const primaries = isUser
+    ? []
+    : methods
+        .filter((m) => m.use === 'primary' && matchesUse(m, use))
+        .filter((m) => !needle || m.name.toLowerCase().includes(needle) || m.description.toLowerCase().includes(needle))
+        .sort((a, b) => PRIMARY_ORDER.indexOf(a.id) - PRIMARY_ORDER.indexOf(b.id))
+
+  type Item = { kind: 'primary'; m: AuthMethod } | { kind: 'family'; row: (typeof rows)[number] }
+  const items: Item[] = [
+    ...primaries.map((m) => ({ kind: 'primary' as const, m })),
+    ...rows.map((row) => ({ kind: 'family' as const, row })),
+  ]
+  /* The whole list, not paged. Zones, device and risk profiles page theirs;
+     the methods are one catalogue of about fifteen, and the owner wants it read
+     top to bottom on one scroll. */
+
+  /* Nothing a person can use at all: not a search that missed, an empty page. */
+  if (isUser && methods.length === 0) {
+    return (
+      <EmptyState icon={ShieldCheck} title="No methods available" blurb="Your admin hasn't turned any on." />
     )
-    /* Pinned above the cards whatever else is showing. Not because they are
-       more important than the eleven, but because they happen first: a session
-       starts with one of these and is then stepped up by the rest. A list of
-       ways in that put the second step above the first would read backwards. */
-    .sort((a, b) => PRIMARY_ORDER.indexOf(a.id) - PRIMARY_ORDER.indexOf(b.id))
+  }
 
   return (
-    <div className="bm8__pane">
-      {/* `PrimarySignIn` and the "All methods" section head stood here — a
-          block of three rows, a heading with a count chip, and a paragraph,
-          between the page title and the catalogue.
-
-          Password, Passkeys and Magic link are catalogue entries now, filed by
-          channel like everything else, so the block was a second list of things
-          that are already in the first one. What separated them was never a
-          property of the method, it was what the method is FOR — and that is a
-          filter, not a divider. It costs one row instead of a section, it
-          narrows the whole catalogue rather than sitting above part of it, and
-          nothing on the page is now above or below a line it cannot cross.
-
-          The heading went with it. "All methods" over the only list on the tab,
-          with a sentence explaining that the rows are groups, was a title for
-          something already unambiguous. */}
-
+    <>
       {/* The one method that runs, stated before the catalogue rather than
-          found inside it.
+          found inside it. Only on the person's side. */}
+      {isUser && <ActiveMethod methods={methods} enrolment={enrolment} anySetUp={configuredIds.length > 0} />}
 
-          A person opening this page is almost always asking one question — what
-          happens when I sign in — and the list answers it only by making them
-          read every row until they find the enrolled one. The line says it
-          outright.
-
-          Only on the person's side. An admin has no active method here; a
-          tenant has a default, and the star on the row already says which. */}
-      {isUser && <ActiveMethod methods={methods} enrolment={enrolment} />}
-
-      {/* What to look at, and what to look for, on one row. */}
       <div className="bm8__bar">
-        <label className="bm8__search">
-          <Search size={15} strokeWidth={1.9} aria-hidden />
-          <input
-            type="text"
-            value={q}
-            placeholder="Search methods…"
-            aria-label="Search methods"
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </label>
+        <SearchBox value={q} onChange={setQ} placeholder="Search methods" label="Search methods" />
 
-        {/* The kit's own menu, not a native select.
-
-            A `<select>` renders as the operating system draws it — a different
-            control on every platform, no room for a description under an
-            option, and no way to mark which one is current beyond the collapsed
-            label. This one is the same object the rest of the console uses for
-            a group of related choices, which means it also arrives with the
-            keyboard handling, the outside-click dismissal and the roving cursor
-            already written.
-
-            The tip that sat beside it is gone and has not been replaced. Its
-            sentences moved into the options for a revision and made the menu
-            three times taller than its four choices — a control you read
-            instead of picking from. The names carry it: somebody on this screen
-            already knows what a primary sign-in method is.
-
-            The count stays on the trigger, so "how many are primary" is
-            answered without opening anything. */}
+        {/* The kit's own menu, anchored to the trigger's right edge so it does
+            not run off the page. No count on the trigger: the list says how
+            many it holds. */}
         <MenuButton
           size="sm"
-          /* Anchored to the trigger's RIGHT edge. The control sits at the right
-             of the bar, so a menu growing rightwards from its left edge runs
-             off the page and takes the horizontal scrollbar with it. */
           align="end"
-          label={`${current.label} · ${countOf(current.id)}`}
+          label={current.label}
           items={offered.map((u) => ({
             id: u.id,
             label: u.label,
-            /* A tick on the one that is running. The trigger already names it;
-               this is so the open menu does not make you re-read the trigger to
-               find out where you are. */
             icon: u.id === use ? Check : undefined,
           }))}
           onSelect={(id) => onUse(id as UseFilter)}
         />
       </div>
 
-      {/* `is-gear` on the LIST, not on the rows it changes. The end of every row
-          reserves one width so the enrolment figures beside them read as a
-          column, and a gear is wider than the chevron it stands in for — so the
-          reservation has to move for all eleven rows or the two that grow a gear
-          would push their own figures out of line with the other nine. */}
-      <div className={`bm8__list ${isUser ? 'is-person' : ''} ${gearEnds ? 'is-gear' : ''}`}>
-        {/* The three ways a session starts, as rows.
+      {items.length === 0 ? (
+        <NoMatches
+          noun="methods"
+          query={q}
+          filtered={use !== 'all'}
+          onClear={() => {
+            setQ('')
+            onUse('all')
+          }}
+        />
+      ) : (
+        <>
+          {/* `is-gear` on the LIST, not on the rows it changes: the end of every
+              row reserves one width so the figures beside them read as a column. */}
+          <ul
+            aria-label={isUser ? 'Your methods' : 'Methods'}
+            className={`bm8__list bm8__list--oneline ${isUser ? 'is-person' : ''} ${gearEnds ? 'is-gear' : ''}`}
+          >
+            {items.map((item) =>
+              item.kind === 'primary' ? (
+                <MethodCard
+                  key={item.m.id}
+                  as="li"
+                  m={item.m}
+                  onToggle={onToggle}
+                  isDefault={defaultMethod === item.m.id}
+                  onSetup={onSetup}
+                  onMakeDefault={onMakeDefault}
+                />
+              ) : (
+                <FamilyListRow
+                  key={item.row.f.channel}
+                  row={item.row}
+                  isUser={isUser}
+                  gearEnds={gearEnds}
+                  defaultMethod={defaultMethod}
+                  configured={item.row.inside.some((m) => configuredIds.includes(m.id))}
+                  onOpen={onOpen}
+                  onSettings={onSettings}
+                  onToggle={onToggle}
+                  onSetup={onSetup}
+                  onMakeDefault={onMakeDefault}
+                />
+              ),
+            )}
+          </ul>
+        </>
+      )}
+    </>
+  )
+}
 
-            They are method rows, not cards, so they carry what a method row
-            carries — the phishing-resistant badge where the method earns it,
-            the default star, the description, and the control on the right. A
-            family card cannot show any of that, because a family is not
-            phishing-resistant; the methods inside it are, individually. */}
-        {primaries.map((m) =>
-          isUser ? (
-            <UserMethodCard
-              key={m.id}
-              m={m}
-              enrolled={enrolment.configured.includes(m.id)}
-              isActive={enrolment.active === m.id}
-              values={enrolment.values[m.id] ?? {}}
-              open={openCard === m.id}
-              onOpen={(o) => onOpenCard(o ? m.id : null)}
-              onActivate={(on) => onActivate(m.id, on)}
-              onSave={(v) => onSaveEnrolment(m.id, v)}
-            />
+/* One family on the list. A family of one is named for its method and carries
+   its controls; a family with variants opens the slider. */
+function FamilyListRow({
+  row,
+  isUser,
+  gearEnds,
+  defaultMethod,
+  configured,
+  onOpen,
+  onSettings,
+  onToggle,
+  onSetup,
+  onMakeDefault,
+}: {
+  row: { f: Family; shape: FamilyRow; inside: AuthMethod[]; live: number; enrolled: number; txns: number | null }
+  isUser: boolean
+  gearEnds: boolean
+  defaultMethod: string | null
+  /** The person has set up a method in this family. */
+  configured: boolean
+  onOpen: (channel: string) => void
+  onSettings: (channel: string) => void
+  onToggle: (id: string, on: boolean) => void
+  onSetup: (m: AuthMethod) => void
+  onMakeDefault: (id: string) => void
+}) {
+  const { f, shape, inside, live, enrolled, txns } = row
+  /* A family of one is named for its method — "CAC Card", not "Smart Cards" —
+     because that is the thing the switch on the row turns on. */
+  const single = shape.opens ? null : shape.method
+  /* Tenant facts are the admin's. A person's row says only whether they have
+     set something up here. */
+  const holdsDefault =
+    !isUser && (single ? defaultMethod === single.id : defaultMethod !== null && inside.some((m) => m.id === defaultMethod))
+  const title = single ? single.name : f.channel
+  const target = rowTarget(shape)
+  const open = !target
+    ? null
+    : target.kind === 'family'
+      ? () => onOpen(f.channel)
+      : target.kind === 'settings'
+        ? () => onSettings(f.channel)
+        : () => onSetup(target.method)
+  const gear = Boolean(gearEnds && single && target?.kind === 'settings' && open)
+  const ctl = single && (
+    <span className="bm8__rowctl">
+      <MethodControls
+        compact
+        m={single}
+        isDefault={defaultMethod === single.id}
+        onToggle={onToggle}
+        onSetup={onSetup}
+        onMakeDefault={open ? undefined : onMakeDefault}
+      />
+    </span>
+  )
+
+  return (
+    <li
+      className={`bm8__card bm8__card--family ${open ? 'is-link' : ''} ${live === 0 ? 'is-off' : ''}`}
+      data-channel={f.channel}
+    >
+      <span className="bm8__tile is-brand" aria-hidden>
+        <f.icon size={19} strokeWidth={1.7} />
+      </span>
+
+      <span className="bm8__info">
+        <span className="bm8__name">
+          {/* The row's one link, stretched over the whole row by its `::after`,
+              so the row opens from anywhere while the switch at its end stays a
+              control of its own. */}
+          {open ? (
+            <button type="button" className="bm8__open" aria-haspopup="dialog" onClick={open}>
+              {title}
+            </button>
           ) : (
-            <MethodCard
-              key={m.id}
-              m={m}
-              policies={policies}
-              onToggle={onToggle}
-              isDefault={defaultMethod === m.id}
-              onSetup={onSetup}
-              onMakeDefault={onMakeDefault}
-            />
-          ),
+            title
+          )}
+          {single && single.name !== f.channel && <i className="bm8__badge bm8__badge--use">{f.channel}</i>}
+          {f.isNew && <i className="bm8__new">New</i>}
+          {holdsDefault && (
+            <i className="bm8__defchip">
+              <Star size={10} strokeWidth={2.4} aria-hidden />
+              Default
+            </i>
+          )}
+          {/* What the family is, holds and costs, on the tip beside the name
+              rather than as a line under it. A focusable mark, as on a method
+              row, so a keyboard reaches the words too. */}
+          <TipDot text={`${f.blurb} ${f.detail}`} label={`About ${title}`} />
+        </span>
+      </span>
+
+      <span className="bm8__right">
+        {!isUser && txns !== null && (
+          <span className={`bm8__txn ${txns === 0 ? 'is-empty' : txns <= 50 ? 'is-low' : ''}`}>
+            {txns === 0 ? 'No transactions left' : `${txns.toLocaleString()} left`}
+          </span>
         )}
 
-        {rows.map(({ f, live, enrolled, txns, shape }) => {
-          /* A family of one is named for its method — "CAC Card", not "Smart
-             Cards" — because that is the thing the switch on the row turns on.
-             The family rides beside it as a chip, so the word an admin scans the
-             list for is still on the row. */
-          const single = shape.opens ? null : shape.method
-          /* A row named for its method wears Default only for that method. A
-             filter can leave a family showing one method while the default is
-             another it has hidden, and the chip beside a method name reads as
-             that method's. */
-          const holdsDefault = single
-            ? defaultMethod === single.id
-            : defaultMethod !== null && methods.some((m) => m.id === defaultMethod && m.channel === f.channel)
-          const title = single ? single.name : f.channel
-          /* Where the row goes, if anywhere: its family, its settings, or a
-             configuration worth returning to. See `rowTarget`. */
-          const target = rowTarget(shape)
-          const open = !target
-            ? null
-            : target.kind === 'family'
-              ? () => onOpen(f.channel)
-              : target.kind === 'settings'
-                ? () => onSettings(f.channel)
-                : () => onSetup(target.method)
-          return (
-            <div
-              key={f.channel}
-              className={`bm8__card bm8__card--family ${open ? 'is-link' : ''} ${live === 0 ? 'is-off' : ''}`}
-            >
-              {/* Brand on every tile, live or not.
+        {isUser ? (
+          configured && <Badge tone="positive">Configured</Badge>
+        ) : (
+          /* Reserved even at zero, so the figure stays in one column. */
+          <span className="bm8__reach">
+            {enrolled > 0 ? (
+              <>
+                <b>{enrolled.toLocaleString()}</b>
+                <em>enrolled</em>
+              </>
+            ) : (
+              <i>—</i>
+            )}
+          </span>
+        )}
 
-                  `f.tint` was here and had not resolved to anything for a while —
-                  the per-family hues were deleted from the sheet and the class
-                  kept being emitted, so every tile fell back to grey whatever its
-                  state. It was briefly conditional on `live > 0`, which made the
-                  tile a second copy of a status the row already states twice: the
-                  toggle on the right, and the enrolment figure beside it. The
-                  mark is identity, and identity does not switch off. */}
-              <span className="bm8__tile is-brand" aria-hidden>
-                <f.icon size={19} strokeWidth={1.7} />
+        {/* The end of the row: its switch, then its chevron, against the edge.
+            In the gear variant the order inverts, so every switch in the list
+            lines up at the right edge. */}
+        <span className={`bm8__rowend ${gear ? 'is-gear' : ''}`}>
+          {gear ? (
+            <>
+              <span className="bm8__rowgear">
+                {/* Sliders, not a cog, and at the full control size: the cog
+                    read as app settings, and at 14px it was the smallest thing
+                    on a row whose switch beside it is 40px wide. */}
+                <IconButton icon={SlidersHorizontal} label={`${title} settings`} tone="ghost" onClick={open ?? undefined} />
               </span>
-
-              <span className="bm8__info">
-                <span className="bm8__name">
-                  {/* The row's one link, stretched over the whole row by its
-                      `::after`, so the row opens from anywhere while the switch
-                      at its end stays a control of its own. The row cannot be
-                      the button: a switch inside a button is a button inside a
-                      button, which is invalid HTML. */}
-                  {open ? (
-                    <button type="button" className="bm8__open" aria-haspopup="dialog" onClick={open}>
-                      {title}
-                    </button>
-                  ) : (
-                    title
-                  )}
-                  {single && single.name !== f.channel && (
-                    <i className="bm8__badge bm8__badge--use">{f.channel}</i>
-                  )}
-                  {/* The same pill the sidebar already uses for a new section, so
-                      "new" looks the same wherever the product says it. */}
-                  {f.isNew && <i className="bm8__new">New</i>}
-
-                  {/* Which category holds the tenant default. On the row rather
-                      than only in the dropdown, so the answer is visible while
-                      scanning the list instead of only while changing it. */}
-                  {holdsDefault && (
-                    <i className="bm8__defchip">
-                      <Star size={10} strokeWidth={2.4} aria-hidden />
-                      Default
-                    </i>
-                  )}
-                  {/* The detail, one hover away: what the family holds, what it
-                      needs and what it costs — worth knowing before switching it
-                      on, and too long to carry on every row. */}
-                  {/* TipMark, not TipDot: a focusable dot on every row would be
-                      eleven more tab stops. The same words follow in the row's
-                      text for a screen reader instead. */}
-                  <TipMark text={f.detail} />
+              {ctl}
+            </>
+          ) : (
+            <>
+              {ctl}
+              {open && (
+                <span className="bm8__rowchev" aria-hidden>
+                  <ChevronRight size={17} strokeWidth={2} />
                 </span>
-                {/* One line on every row. Some rows went without one, on the
-                    argument that their name already said it, and the list read
-                    as two kinds of row; a line each is what lets it be scanned. */}
-                <span className="bm8__desc">{f.blurb}</span>
-                <span className="u-sr-only">{f.detail}</span>
-              </span>
-
-              {/* The two numbers the row exists to report, moved out of the text
-                  and given a column of their own.
-
-                  They were a third line of grey under the description and a muted
-                  string on the right — the same weight as the blurb, which is the
-                  one thing on the row nobody rereads. Scanning eleven categories
-                  for "what is on" and "who is on it" meant reading eleven
-                  paragraphs. Now both are chips and figures at a fixed position,
-                  so the column can be read straight down. */}
-              <span className="bm8__right">
-                {/* Funding, above the enrolment figure it qualifies.
-
-                    It was a chip on its own row under the description, which was
-                    the right call while the name also carried an "enabled" chip —
-                    three chips across the row pushed the name into wrapping. That
-                    chip is gone, so the constraint is gone with it, and the
-                    transactions belong here: "can it afford to run" and "how many
-                    people are on it" are the two numbers this column exists to
-                    report, and they are read together. */}
-                {txns !== null && (
-                  <span className={`bm8__txn ${txns === 0 ? 'is-empty' : txns <= 50 ? 'is-low' : ''}`}>
-                    {txns === 0 ? 'No transactions left' : `${txns.toLocaleString()} left`}
-                  </span>
-                )}
-
-                {/* Reserved even at zero, so the figure stays in one column down
-                    the list rather than sliding about per row. */}
-                <span className="bm8__reach">
-                  {enrolled > 0 ? (
-                    <>
-                      <b>{enrolled.toLocaleString()}</b>
-                      <em>enrolled</em>
-                    </>
-                  ) : (
-                    <i>—</i>
-                  )}
-                </span>
-
-                {/* The end of the row: its switch, then its chevron, against the
-                    edge. With no chevron the switch takes the edge itself, rather
-                    than sitting beside an empty place for one.
-
-                    --- The gear variant ------------------------------------------
-
-                    `gear` is true on exactly the rows that have BOTH: a switch of
-                    their own, because the family narrowed to one method, AND a
-                    settings page to open. Not a family row — those have no switch
-                    to move. Not a switch-only row — those have nowhere to go, so
-                    a gear would open nothing. Not RSA's `setup` target, which is
-                    a configuration form rather than the settings page. Two rows
-                    in the shipped catalogue satisfy that; the head names them.
-
-                    When it is on, the order inverts. The switch goes LAST and so
-                    takes the row's right edge — which is where every switch-only
-                    row already puts its switch, so in this variant every switch
-                    in the list lines up rather than two of them sitting a
-                    chevron's width short of the rest.
-
-                    The gear is a real button and the row still opens. That looks
-                    like the "separate Settings button" this list was told not to
-                    grow, and it is a different thing: the chevron it replaces was
-                    already only a SIGN — `aria-hidden`, unclickable, with the
-                    row's own stretched `::after` taking the press. Making that
-                    sign pressable adds an entrance; it does not add a
-                    destination, and it does not take the 870px target away from
-                    the row. */}
-                {(() => {
-                  const gear = Boolean(gearEnds && single && target?.kind === 'settings' && open)
-                  const ctl = single && (
-                    <span className="bm8__rowctl">
-                      <MethodControls
-                        compact
-                        m={single}
-                        isDefault={defaultMethod === single.id}
-                        onToggle={onToggle}
-                        onSetup={onSetup}
-                        onMakeDefault={open ? undefined : onMakeDefault}
-                      />
-                    </span>
-                  )
-                  return (
-                    <span className={`bm8__rowend ${gear ? 'is-gear' : ''}`}>
-                      {gear ? (
-                        <>
-                          <span className="bm8__rowgear">
-                            <IconButton
-                              icon={Settings}
-                              label={`${title} settings`}
-                              size="sm"
-                              tone="ghost"
-                              /* `gear` is only true where `open` is set, but the
-                                 flag is a boolean and cannot narrow it. */
-                              onClick={open ?? undefined}
-                            />
-                          </span>
-                          {ctl}
-                        </>
-                      ) : (
-                        <>
-                          {ctl}
-                          {open && (
-                            <span className="bm8__rowchev" aria-hidden>
-                              <ChevronRight size={17} strokeWidth={2} />
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </span>
-                  )
-                })()}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* A "nothing matches" line stood here, and it was firing on a list with
-          rows on it: `rows` is the family cards, and the three primaries are
-          not families, so filtering to Primary sign-in methods emptied every
-          card and tripped the message underneath three visible rows — with an
-          empty query in the quotation marks, because there was no search. */}
-    </div>
+              )}
+            </>
+          )}
+        </span>
+      </span>
+    </li>
   )
 }
 
@@ -1211,7 +1195,6 @@ const PAGE_EASE: [number, number, number, number] = [0.2, 0, 0, 1]
 function CategoryDrawer({
   pages,
   methods,
-  policies,
   onBack,
   onClose,
   onToggle,
@@ -1226,15 +1209,10 @@ function CategoryDrawer({
   onBehaviour,
   use,
   isUser,
-  enrolment,
-  openCard,
-  onOpenCard,
-  onActivate,
-  onSaveEnrolment,
+  enrol,
 }: {
   pages: PanelPage[]
   methods: AuthMethod[]
-  policies: Policy[]
   onBack: () => void
   onClose: () => void
   onToggle: (id: string, on: boolean) => void
@@ -1254,13 +1232,11 @@ function CategoryDrawer({
      more than the card said it held is a card that lied. */
   use: UseFilter
   isUser: boolean
-  enrolment: UserEnrolment
-  openCard: string | null
-  onOpenCard: (id: string | null) => void
-  onActivate: (id: string, on: boolean) => void
-  onSaveEnrolment: (id: string, values: Record<string, string>) => void
+  /** The person's cards: what is set up, the open form and its guard. */
+  enrol: EnrolBinding
 }) {
   const reduce = useReducedMotion()
+  const { go } = useBrand()
   const top = pages.length > 0 ? pages[pages.length - 1] : null
   const under = pages.length > 1 ? pages[pages.length - 2] : null
   const key = top ? pageKey(top) : 'closed'
@@ -1270,7 +1246,7 @@ function CategoryDrawer({
      Back to name it. A primary has no family, and gets no line. */
   const channel = top === null ? null : top.kind === 'setup' ? (setupOf?.channel ?? null) : top.channel
   const family = channel ? (FAMILIES.find((f) => f.channel === channel) ?? null) : null
-  const backTo = under && under.kind !== 'setup' ? under.channel : null
+  const backTo = backLabel(under)
 
   /* An authenticator app's one-card setup, where it has one — see setup-guide.ts. */
   const card = setupOf ? setupCardFor(setupOf.id) : null
@@ -1317,9 +1293,9 @@ function CategoryDrawer({
   const inside = family
     ? methods.filter((m) => m.channel === family.channel && matchesUse(m, use))
     : []
-  const live = inside.filter((m) => !methodBlocker(m)).length
-  const enrolled = inside.reduce((n, m) => n + (m.enrolled ?? 0), 0)
-  const unconfigured = inside.filter((m) => !m.configured).length
+  /* Every second factor in the family, whatever the filter shows: a family
+     setting reaches all of them, so the note has to name all of them. */
+  const wholeFamily = family ? methods.filter((m) => m.channel === family.channel && m.use === 'second') : []
   /* A family of one is headed by its method, the way its row is named — on the
      admin's list. A person's row keeps the family's name, so their panel does
      too, and its "On" would be the tenant's state above the person's own switch. */
@@ -1342,6 +1318,14 @@ function CategoryDrawer({
      you failed to find it. */
   const hasSettings = famSettings.length > 0 || ownSettings.length > 0
 
+  /* A settings row that is a way through to another screen: token assignment
+     opens the Display tokens page on its Assignments tab. Through `go`, so the
+     leave guard below still gets its say. */
+  const openLink = (settingId: string) => {
+    const to = LINK_SCREENS[settingId]
+    if (to) go(to)
+  }
+
   const slide = {
     initial: { opacity: 0, x: reduce ? 0 : 24 * dir },
     animate: { opacity: 1, x: 0 },
@@ -1349,11 +1333,52 @@ function CategoryDrawer({
   }
   /* A card has no required fields; what its Save needs is `setupReady`. */
   const missing = card ? 0 : draft.missing.length
+  const invalid = card ? 0 : draft.invalid.length
+  /* A configured integration saved again unchanged is not an update. */
+  const unchanged = !!setupOf?.configured && !draft.dirty
+  const canSaveSetup = !!setupOf && !unchanged && (card ? setupReady(card, draft) : missing === 0 && invalid === 0)
+
+  /* Typed setup is not thrown away by Esc, a click outside or Back — the shared
+     leave dialog asks first. Cancel stays an explicit discard. Saving from the
+     dialog already steps back a page (see finishSetup), so a Back that was
+     waiting on it must not step back a second time. */
+  const savedFromLeave = useRef(false)
+
+  const confirmLeave = useLeaveGuard({
+    /* The person's open enrolment form reports through this guard too: the
+       store holds one guard, and the cards live in this panel. */
+    dirty: setupOf ? draft.dirty : enrol.guard.dirty,
+    save: () => {
+      if (!setupOf) return enrol.guard.save()
+      if (!canSaveSetup) return false
+      savedFromLeave.current = true
+      if (card) onSaveCard(setupOf, draft.server)
+      else onSaveSetup(setupOf, draft.fields)
+      return true
+    },
+    blocked: !setupOf
+      ? enrol.guard.blocked
+      : canSaveSetup
+        ? null
+        : card
+          ? 'Finish the setup to save.'
+          : missing > 0
+            ? `Fill in ${missing} required ${missing === 1 ? 'field' : 'fields'} to save.`
+            : invalid > 0
+              ? 'Fix the highlighted field to save.'
+              : null,
+  })
+  const leaveThen = (run: () => void, stepsBack: boolean) =>
+    confirmLeave(() => {
+      const alreadyBack = stepsBack && savedFromLeave.current
+      savedFromLeave.current = false
+      if (!alreadyBack) run()
+    })
 
   return (
     <Drawer
       open={top !== null}
-      onClose={onClose}
+      onClose={() => leaveThen(onClose, false)}
       /* 680, not 620. The settings rows carry an icon, a label, a tip and a
          provenance chip before the control even starts, and a segmented
          control needs its options on one line to be worth using. It is also
@@ -1379,7 +1404,7 @@ function CategoryDrawer({
                 close button already sits on — the panel's two ways out, level
                 with each other. */}
             {backTo && (
-              <button type="button" className="bm8__back" onClick={onBack}>
+              <button type="button" className="bm8__back" onClick={() => leaveThen(onBack, true)}>
                 <ArrowLeft size={14} strokeWidth={2} aria-hidden />
                 {backTo}
               </button>
@@ -1387,54 +1412,27 @@ function CategoryDrawer({
             {setupOf ? (
               <div className="bm8__dwhead">
                 <span className="bm8__dwtile bm8__dwtile--logo" aria-hidden>
-                  <MethodIcon name={setupOf.name} size={38} />
+                  <MethodIcon name={setupOf.name} size={32} />
                 </span>
-                <div className="bm8__dwtext">
-                  <h2>{setupOf.name}</h2>
-                  {/* The family, where there is no Back already naming it — a
-                      row that said "RSA Authenticator" opens a page headed with
-                      the method's own name, and this is what joins the two. */}
-                  {!backTo && family && <p>{family.channel}</p>}
-                  <div className="bm8__dwstats">
-                    <span>{setupOf.configured ? 'Configured' : 'Not configured yet'}</span>
-                    {/* Why Save is dead, stated where it stays in view. Each
-                        section says it too, but a closed or scrolled-past
-                        section says it to nobody. */}
-                    {missing > 0 && (
-                      <span className="is-warn">
-                        <strong>{missing}</strong> required {missing === 1 ? 'field' : 'fields'} left
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <h2 className="bm8__dwtitle">{setupOf.name}</h2>
+                {/* Why Save is dead, stated where it stays in view: the head does
+                    not scroll, and a scrolled-past section says it to nobody. */}
+                {missing > 0 ? (
+                  <Badge tone="notice">
+                    {missing} required {missing === 1 ? 'field' : 'fields'} left
+                  </Badge>
+                ) : invalid > 0 ? (
+                  <Badge tone="notice">
+                    {invalid} {invalid === 1 ? 'field' : 'fields'} to fix
+                  </Badge>
+                ) : null}
               </div>
             ) : family ? (
               <div className={`bm8__dwhead is-${family.tint}`}>
                 <span className="bm8__dwtile" aria-hidden>
-                  <family.icon size={22} strokeWidth={1.7} />
+                  <family.icon size={20} strokeWidth={1.8} />
                 </span>
-                <div className="bm8__dwtext">
-                  <h2 className="bm8__dwtitle">
-                    {single ? single.name : family.channel}
-                    {single && single.name !== family.channel && (
-                      <i className="bm8__badge bm8__badge--use">{family.channel}</i>
-                    )}
-                  </h2>
-                  <p>{family.blurb}</p>
-                  <div className="bm8__dwstats">
-                    <span>
-                      {single ? <strong>{live ? 'On' : 'Off'}</strong> : <><strong>{live}</strong> of {inside.length} enabled</>}
-                    </span>
-                    <span>
-                      <strong>{enrolled.toLocaleString()}</strong> enrolled
-                    </span>
-                    {unconfigured > 0 && (
-                      <span className="is-warn">
-                        <strong>{unconfigured}</strong> need setup
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <h2 className="bm8__dwtitle">{single ? single.name : family.channel}</h2>
               </div>
             ) : null}
           </motion.div>
@@ -1451,7 +1449,7 @@ function CategoryDrawer({
             </Button>
             <Button
               variant="brand"
-              disabled={card ? !setupReady(card, draft) : missing > 0}
+              disabled={!canSaveSetup}
               onClick={() => (card ? onSaveCard(setupOf, draft.server) : onSaveSetup(setupOf, draft.fields))}
             >
               Save
@@ -1465,22 +1463,32 @@ function CategoryDrawer({
       }
     >
       <motion.div key={key} ref={pageRef} {...slide}>
+        {/* No overview card at the top of any page. It restated the method's
+            description, a status the head and the list already carry, and the
+            group the Back button already names — a grey block to read past
+            before the form. Removed on the owner's word, 15 Sep 2026. */}
         {setupOf ? (
-          card?.kind === 'app' ? (
-            <AppSetupCard method={setupOf} card={card} passcode={draft.passcode} onPasscode={draft.setPasscode} />
-          ) : card?.kind === 'nps' ? (
-            <NpsSetupCard servers={NPS_SERVERS} value={draft.server} onChange={draft.setServer} />
-          ) : (
-            <SetupForm draft={draft} />
-          )
+          <div className="bm8__dw">
+            {card?.kind === 'app' ? (
+              <AppSetupCard method={setupOf} card={card} passcode={draft.passcode} onPasscode={draft.setPasscode} />
+            ) : card?.kind === 'nps' ? (
+              <NpsSetupCard servers={NPS_SERVERS} value={draft.server} onChange={draft.setServer} />
+            ) : (
+              <SetupForm draft={draft} />
+            )}
+          </div>
         ) : family && top?.kind === 'settings' ? (
-          <SettingsPane
-            family={family}
-            famSettings={famSettings}
-            ownSettings={ownSettings}
-            behaviour={behaviour}
-            onBehaviour={onBehaviour}
-          />
+          <div className="bm8__dw">
+            <SettingsPane
+              family={family}
+              methods={wholeFamily}
+              famSettings={famSettings}
+              ownSettings={ownSettings}
+              behaviour={behaviour}
+              onBehaviour={onBehaviour}
+              onLink={openLink}
+            />
+          </div>
         ) : family ? (
           <div className="bm8__dw">
             {hasSettings && (
@@ -1492,7 +1500,8 @@ function CategoryDrawer({
                   className={`bm8__dwtab ${pane === 'methods' ? 'is-on' : ''}`}
                   onClick={() => setPane('methods')}
                 >
-                  Methods <em>{inside.length}</em>
+                  <ShieldCheck size={14} strokeWidth={1.9} aria-hidden />
+                  Methods
                 </button>
                 <button
                   role="tab"
@@ -1501,7 +1510,8 @@ function CategoryDrawer({
                   className={`bm8__dwtab ${pane === 'settings' ? 'is-on' : ''}`}
                   onClick={() => setPane('settings')}
                 >
-                  Settings <em>{famSettings.length + ownSettings.reduce((n, x) => n + x.settings.length, 0)}</em>
+                  <SlidersHorizontal size={14} strokeWidth={1.9} aria-hidden />
+                  Settings
                 </button>
               </div>
             )}
@@ -1513,42 +1523,55 @@ function CategoryDrawer({
                     a method for the tenant; the person's picks the one that runs
                     for them, and Edit opens their own details inline rather than
                     the tenant's connection to a provider. */}
-                <div className="bm8__list">
-                  {inside.map((m) =>
-                    isUser ? (
-                      <UserMethodCard
-                        key={m.id}
-                        m={m}
-                        enrolled={enrolment.configured.includes(m.id)}
-                        isActive={enrolment.active === m.id}
-                        values={enrolment.values[m.id] ?? {}}
-                        open={openCard === m.id}
-                        onOpen={(o) => onOpenCard(o ? m.id : null)}
-                        onActivate={(on) => onActivate(m.id, on)}
-                        onSave={(v) => onSaveEnrolment(m.id, v)}
-                      />
-                    ) : (
-                      <MethodCard
-                        key={m.id}
-                        m={m}
-                        policies={policies}
-                        onToggle={onToggle}
-                        isDefault={defaultMethod === m.id}
-                        onSetup={onSetup}
-                        onMakeDefault={onMakeDefault}
-                      />
-                    ),
-                  )}
-                </div>
-                {inside.length === 0 && <NoResults>No methods in this group yet.</NoResults>}
+                {inside.length === 0 ? (
+                  <EmptyState
+                    compact
+                    icon={ShieldCheck}
+                    title="No methods in this group"
+                    blurb={isUser ? "Your admin hasn't turned any on." : 'Set the filter to All methods to see them.'}
+                  />
+                ) : (
+                  <div className="bm8__list">
+                    {inside.map((m) =>
+                      isUser ? (
+                        <UserMethodCard
+                          key={m.id}
+                          m={m}
+                          enrolled={enrol.configured.includes(m.id)}
+                          ready={enrol.ready.includes(m.id)}
+                          isActive={enrol.active === m.id}
+                          open={enrol.openCard === m.id}
+                          onOpen={(o) => enrol.onOpenCard(o ? m.id : null)}
+                          onCancel={enrol.onCancelCard}
+                          onActivate={(on) => enrol.onActivate(m.id, on)}
+                          draft={enrol.openCard === m.id ? enrol.draft : {}}
+                          onDraft={enrol.onDraft}
+                          onSave={enrol.onSave}
+                          questions={enrol.questions}
+                        />
+                      ) : (
+                        <MethodCard
+                          key={m.id}
+                          m={m}
+                          onToggle={onToggle}
+                          isDefault={defaultMethod === m.id}
+                          onSetup={onSetup}
+                          onMakeDefault={onMakeDefault}
+                        />
+                      ),
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <SettingsPane
                 family={family}
+                methods={wholeFamily}
                 famSettings={famSettings}
                 ownSettings={ownSettings}
                 behaviour={behaviour}
                 onBehaviour={onBehaviour}
+                onLink={openLink}
               />
             )}
           </div>
@@ -1569,36 +1592,84 @@ function CategoryDrawer({
    at. */
 function SettingsPane({
   family,
+  methods,
   famSettings,
   ownSettings,
   behaviour,
   onBehaviour,
+  onLink,
 }: {
   family: Family
+  /** The methods the family's shared settings reach — named in the note and the section. */
+  methods: AuthMethod[]
   famSettings: MfaSetting[]
   ownSettings: { m: AuthMethod; settings: MfaSetting[] }[]
   behaviour: MfaValues
   onBehaviour: (p: MfaValues) => void
+  /** A row that is a way through to a page, rather than a value, was pressed. */
+  onLink?: (settingId: string) => void
 }) {
   const read = (key: string, fallback: MfaValue): MfaValue => behaviour[key] ?? fallback
 
+  /* Who a change here reaches, said once at the top of the pane in its own note,
+     naming the methods rather than leaving the reader to count them. A family
+     whose only "setting" is a way through to another page changes nothing
+     itself, so it gets no note and no "Shared settings" heading. */
+  const onlyLinks = famSettings.length > 0 && famSettings.every((s) => s.field.kind === 'link')
+  const names = methods.map((m) => m.name)
+  const named = names.length <= 1 ? (names[0] ?? family.channel) : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+  const notes = [
+    famSettings.length > 0 &&
+      !onlyLinks &&
+      (methods.length > 1
+        ? `Shared settings apply to every ${family.channel} method: ${named}.`
+        : `These settings apply to everyone who uses ${named}.`),
+    ownSettings.length > 0 && methods.length > 1 && "Settings under a method's name apply to that method only.",
+  ].filter((x): x is string => Boolean(x))
+
+  /* Security Questions: "Questions to verify" can't be more than "Questions to
+     configure". Lowering the limit brings verify down with it, and verify only
+     offers what the limit allows. */
+  const writeFamily = (id: string, v: MfaValue) => {
+    const key = settingKey('family', family.channel, id)
+    if (key !== KBA_LIMIT_KEY) return onBehaviour({ [key]: v })
+    const verifySetting = famSettings.find((x) => x.id === 'kba-verify')
+    if (!verifySetting || verifySetting.field.kind !== 'number') return onBehaviour({ [key]: v })
+    const verify = Number(read(KBA_VERIFY_KEY, fieldValue(verifySetting.field)))
+    const next = clampVerify(verify, Number(v), verifySetting.field.options)
+    onBehaviour(next === verify ? { [key]: v } : { [key]: v, [KBA_VERIFY_KEY]: next })
+  }
+  const limitSetting = famSettings.find((x) => x.id === 'kba-limit')
+  const kbaLimit = limitSetting ? Number(read(KBA_LIMIT_KEY, fieldValue(limitSetting.field))) : null
+  const shown = (setting: MfaSetting): MfaSetting =>
+    setting.id === 'kba-verify' && kbaLimit !== null && setting.field.kind === 'number'
+      ? { ...setting, field: { ...setting.field, options: setting.field.options.filter((n) => n <= kbaLimit) } }
+      : setting
+
   return (
     <div className="bm8__settings">
+      {notes.length > 0 && (
+        <section className="bm8__setnote" aria-label="Note">
+          <Callout tone="info" title="Note">
+            {notes.map((n) => (
+              <p key={n}>{n}</p>
+            ))}
+          </Callout>
+        </section>
+      )}
+
       {famSettings.length > 0 && (
         <section>
-          <p className="bm8__setlabel">
-            Shared across {family.channel}
-            <i>changes every method in this group</i>
-          </p>
+          <h3 className="bm8__setlabel">{methods.length > 1 && !onlyLinks ? 'Shared settings' : 'Settings'}</h3>
           <div className="bm8__setlist">
             {famSettings.map((s) => {
               const key = settingKey('family', family.channel, s.id)
               return (
                 <SettingField
                   key={s.id}
-                  setting={s}
+                  setting={shown(s)}
                   value={read(key, fieldValue(s.field))}
-                  onChange={(v) => onBehaviour({ [key]: v })}
+                  onChange={(v) => (s.field.kind === 'link' ? onLink?.(s.id) : writeFamily(s.id, v))}
                   /* Revealed settings store against the same scope as the row
                      that revealed them, so a custom SMS gateway is remembered
                      per family the way every other family setting is. */
@@ -1615,10 +1686,7 @@ function SettingsPane({
 
       {ownSettings.map(({ m, settings }) => (
         <section key={m.id}>
-          <p className="bm8__setlabel">
-            {m.name}
-            <i>this method only</i>
-          </p>
+          <h3 className="bm8__setlabel">{m.name}</h3>
           <div className="bm8__setlist">
             {settings.map((s) => {
               const key = settingKey('method', m.id, s.id)
@@ -1627,7 +1695,7 @@ function SettingsPane({
                   key={s.id}
                   setting={s}
                   value={read(key, fieldValue(s.field))}
-                  onChange={(v) => onBehaviour({ [key]: v })}
+                  onChange={(v) => (s.field.kind === 'link' ? onLink?.(s.id) : onBehaviour({ [key]: v }))}
                   child={{
                     read: (id, fb) => read(settingKey('method', m.id, id), fb),
                     write: (id, v) => onBehaviour({ [settingKey('method', m.id, id)]: v }),
@@ -1644,27 +1712,24 @@ function SettingsPane({
 
 function MethodCard({
   m,
-  policies,
   onToggle,
   isDefault,
   onSetup,
   onMakeDefault,
+  as: Tag = 'div',
 }: {
   m: AuthMethod
-  policies: Policy[]
   onToggle: (id: string, on: boolean) => void
   isDefault: boolean
   onSetup: (m: AuthMethod) => void
   onMakeDefault: (id: string) => void
+  /** `li` on the page's list, `div` inside the slider's. */
+  as?: 'div' | 'li'
 }) {
   const blocked = methodBlocker(m)
 
-  /* Computed by walking the rules. The catalogue carries a stored count and it
-     disagrees with reality. */
-  const uses = useMemo(() => rulesUsing(m.name, policies), [m.name, policies])
-
   return (
-    <div className={`bm8__card bm8__card--method ${blocked ? 'is-off' : ''}`}>
+    <Tag className={`bm8__card bm8__card--method ${blocked ? 'is-off' : ''}`}>
       <span className="bm8__tile bm8__tile--logo" aria-hidden>
         <MethodIcon name={m.name} size={36} />
       </span>
@@ -1672,19 +1737,9 @@ function MethodCard({
       <div className="bm8__info">
         <span className="bm8__name">
           {m.name}
-          {/* A "Primary sign-in" chip stood on the first three rows. It was
-              answering a question their position already answers — they are the
-              three rows above every family card, in the order a session
-              actually happens — and it said the same three words three times
-              running down the top of the list. The filter still names them, for
-              anyone who wants only those.
-
-              Recovery keeps its chip, because nothing else on the row says it:
-              a method can be a second factor and a way back in at once, and
-              which ones are is not derivable from where they sit. */}
-          {m.alsoRecovery && (
-            <i className="bm8__badge bm8__badge--use">Recovery</i>
-          )}
+          {/* Recovery keeps its chip, because nothing else on the row says it: a
+              method can be a second factor and a way back in at once. */}
+          {m.alsoRecovery && <i className="bm8__badge bm8__badge--use">Recovery</i>}
           {m.tier === 'Phishing-resistant' && (
             <i className="bm8__badge">
               <ShieldCheck size={11} strokeWidth={2.2} aria-hidden />
@@ -1697,26 +1752,11 @@ function MethodCard({
               Default
             </i>
           )}
+          {/* The description is a tip beside the name, not a line under it. How
+              many rules use a method is said where it matters: when it is
+              turned off. */}
+          <TipDot text={m.description} label={`About ${m.name}`} />
         </span>
-        {/* The first sentence on the row, the rest on hover.
-
-            Every description here is built the same way: what the method is,
-            then the security caveat that goes with it — "…and only ever as
-            strong as the mailbox behind it". Both are worth having and only one
-            of them is worth two lines of every row in a list of twenty-four.
-            The row states the method; the caveat is a hover away and rides on
-            the row's accessible name for anyone not using a pointer. */}
-        <span className="bm8__desc" title={m.description}>
-          {lede(m.description)}
-        </span>
-        {uses > 0 ? (
-          <span className="bm8__usage">
-            Used in {uses} policy rule{uses === 1 ? '' : 's'}
-          </span>
-        ) : (
-          !m.configured && <span className="bm8__usage is-quiet">Not configured yet</span>
-        )}
-
       </div>
 
       <div className="bm8__right">
@@ -1728,7 +1768,7 @@ function MethodCard({
           onMakeDefault={onMakeDefault}
         />
       </div>
-    </div>
+    </Tag>
   )
 }
 
@@ -1758,7 +1798,6 @@ function MethodControls({
      the configuration. */
   compact?: boolean
 }) {
-  const blocked = methodBlocker(m)
 
   /* Whether this method could be the default, on the same rule the section that
      used to own this decision applied: the sheet says which methods qualify, and
@@ -1771,12 +1810,14 @@ function MethodControls({
      of them only so you could point at a row in it. Now the row is the control:
      the one that holds it wears the badge, and the handful that could take it
      offer to. */
-  const canBeDefault = Boolean(mfaMethodFor(m.id)?.canBeDefault) && !blocked
+  const canBeDefault = canServeAsDefault(m)
 
   /* Edit only where the configuration is worth returning to — see
      `hasConfigPage`. A compact row opens that page itself, so it carries no
      button for it. */
   const canEdit = hasConfigPage(m) && !compact
+  /* "Manage tokens" once Display Token is configured; null for every other method. */
+  const tokenLabel = m.configured ? tokenButtonLabel(m) : null
 
   /* Two states, and only one control each.
 
@@ -1844,6 +1885,13 @@ function MethodControls({
                 Set up
               </Button>
             )}
+            {/* Display Token's inventory, beside its switch once a token is
+                assigned — the same page its Set up opened. */}
+            {tokenLabel && (
+              <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
+                {tokenLabel}
+              </Button>
+            )}
             {canEdit && (
               <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
                 <Pencil size={13} strokeWidth={2} aria-hidden />
@@ -1858,39 +1906,16 @@ function MethodControls({
           </div>
         </>
       ) : (
-        <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
-          Set up
+        /* "Configure", as a blue text button (owner, 16 Sep 2026). A boxed
+           "Set up" was the heaviest thing on an unconfigured row — heavier than
+           the switches on the configured rows around it, for the rows that do
+           the least. The word matches the gear on configured rows: both open the
+           method's configuration. */
+        <Button variant="link" size="sm" onClick={() => onSetup(m)}>
+          Configure
         </Button>
       )}
     </>
-  )
-}
-
-/* How many rules actually name this method.
-
-   Walked, never read off the model — a stored count on this catalogue has been
-   wrong before. A rule names a method through one of four fields and it does so
-   by NAME, not by id: `firstFactorMethod` when the first factor is Specific,
-   `secondFactorMethods` when the second is Specific, `methodChain` when it is a
-   chain, and `preferredFallback` for the user who set no preference. There is
-   no 'method' condition type, which is what an earlier draft of this function
-   assumed — it would have returned zero for all twenty-one and looked correct.
-
-   Worth knowing while reading this screen: the seeded policies barely exercise
-   any of it, so most cards show no usage line at all. That is the data being
-   thin, not the count being broken. */
-function rulesUsing(name: string, policies: Policy[]): number {
-  return policies.reduce(
-    (n, p) =>
-      n +
-      p.rules.filter(
-        (r) =>
-          r.firstFactorMethod === name ||
-          r.preferredFallback === name ||
-          r.secondFactorMethods?.includes(name) ||
-          r.methodChain?.includes(name),
-      ).length,
-    0,
   )
 }
 

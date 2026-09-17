@@ -158,15 +158,23 @@
   transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
 }
 .bfp2__answer:hover { border-color: var(--border-strong); }
-.bfp2__answer.is-on { border-color: var(--accent); background: var(--accent-soft); }
+/* Selected is a 2px edge (the border plus an inset line) as well as the fill —
+   the live console's selected card. With the round mark gone (16 Sep 2026) the
+   fill alone was a 1.1:1 step, and a focused tile's focus border hid the rest. */
+.bfp2__answer.is-on {
+  border-color: var(--accent); background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
 .bfp2__answer:focus-visible {
   outline: none;
   border-color: var(--ctl-border-focus);
   box-shadow: 0 0 0 4px var(--focus-halo);
 }
-
-/* The mark sits on the name's line, not in the middle of a two-line tile. */
-.bfp2__answer > .bfp2__radio { margin-top: 2px; }
+/* Focus adds its halo and never takes the selected edge away. */
+.bfp2__answer.is-on:focus-visible {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 4px var(--focus-halo);
+}
 
 .bfp2__answerbody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 /* WRAPS, so a limit pill never eats the name it sits beside. Side by side the
@@ -203,26 +211,10 @@
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
-/* Round, because the answer is one of these; the check list's square mark means
-   any of them. Same size, edge and ink as `.bx-tick`, so the two read as one
-   family — and filled from `--accent-strong`, so the rebrand's retokenising turns
-   both blue with no rule of its own. */
-.bfp2__radio {
-  flex: none; position: relative;
-  width: 16px; height: 16px; border-radius: 50%;
-  border: var(--bw-thin) solid var(--border-strong);
-  background: var(--surface-raised);
-  transition: border-color var(--dur-fast) var(--ease-standard);
-}
-.bfp2__radio::after {
-  content: ''; position: absolute; inset: 3px; border-radius: 50%;
-  background: var(--accent-strong);
-  transform: scale(0);
-  transition: transform var(--dur-fast) var(--ease-standard);
-}
-.bfp2__choice:not(.is-on):hover .bfp2__radio { border-color: var(--accent); }
-.bfp2__choice.is-on .bfp2__radio { border-color: var(--accent-strong); }
-.bfp2__choice.is-on .bfp2__radio::after { transform: scale(1); }
+/* `.bfp2__radio` stood here — a round mark at the start of each tile. Removed
+   (owner, 16 Sep 2026): the tile's own edge and fill say which answer is
+   chosen, and the family icon beside the name was a second mark on the same
+   line. The tile is still a radio to assistive tech (`role="radio"`). */
 
 /* The tile a pending switch is about, marked while the confirmation below waits —
    without it the panel says "removes MAC address" with nothing on screen pointing
@@ -230,11 +222,9 @@
    tile it just pressed. */
 .bfp2__answer.is-pending,
 .bfp2__answer.is-pending:hover { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
-.bfp2__choice.is-pending .bfp2__radio,
-.bfp2__choice.is-pending:hover .bfp2__radio { border-color: var(--fb-notice-fg); }
 
 @media (prefers-reduced-motion: reduce) {
-  .bfp2__answer, .bfp2__radio, .bfp2__radio::after { transition: none; }
+  .bfp2__answer { transition: none; }
 }
 
 /* What is wrong with the name, under it. Two classes, so it beats
@@ -293,12 +283,9 @@
    at.
 
    One scroller: the drawer's. The list is as long as the list. */
-/* A named inline-size container, so the bar can put its search on a line of
-   its own when the panel is too narrow for one line — see `.bfp2__pickbar`. */
 .bfp2__pick {
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex; flex-direction: column; gap: var(--space-4);
   min-height: 0;
-  container: bfp2-pick / inline-size;
 }
 
 /* --- The picker's search row ----------------------------------------------------
@@ -594,10 +581,10 @@
    still too much furniture: a screenful of chrome wrapped around rows that are
    three words each.
 
-   What a heading answered is already on the bar. The category filter narrows
-   the list to one family; the search finds anything by name, purpose or
-   category. A heading that repeats what a filter does costs a row every time
-   and cannot be switched off.
+   What a heading answered is already on the row and the bar: the family mark
+   says which one a row belongs to, and the search finds anything by name,
+   purpose or category. A heading that repeats that costs a row every time and
+   cannot be switched off.
 
    So: no pane, no sections, no headings, no dividers, no per-row box, and no
    fill on anything that is not under the pointer. */
@@ -612,7 +599,7 @@
      count that is always one is not a grid, so the grid, its gap and the
      empty state's `grid-column` span all went.
 
-     No gap between rows: each row is its own 36px line. */
+     No gap between rows: each row is its own 44px line. */
   display: flex; flex-direction: column;
   /* Bled by the row's own padding, so the focus ring has somewhere to go while
      the names stay on the margin the search box above them uses. */
@@ -870,11 +857,9 @@
   box-shadow: 0 0 0 4px var(--focus-halo);
 }
 
-/* `.bfp2__selectall` stood here — the per-group "Select all / Clear these"
-   link. It went with the group headings that carried it. Selecting in bulk is
-   not lost: shift-click writes a run, "Clear the rest" is on the bar, and the
-   category filter plus shift-click is the same intent with one fewer control on
-   the screen. */
+/* The per-group "Select all / Clear these" link that once had the name
+   `.bfp2__selectall` went with the group headings that carried it. The name is
+   the bar's one Select all / Clear all now — see `.bfp2__pickbar`. */
 
 /* =============================================================================
    THE CREATE WIZARD, AND THE CATALOGUE AS A STEP IN IT
@@ -914,10 +899,10 @@
    What is left is one element: no border, no fill, no gap to the row above it,
    and a radius only the focus ring ever draws. */
 .bfp2__pickrow {
-  /* 6px between the four things on a row — tick, mark, name, pill. It is tight
-     on purpose: at this size the four are read as one line rather than as four
-     columns. */
-  display: flex; align-items: center; gap: var(--space-3);
+  /* 8px between the mark, the name and the pill, and 12px after the tick (its
+     margin, below). It was 6px everywhere, which read as cramped (owner,
+     16 Sep 2026: "make it spacious"). */
+  display: flex; align-items: center; gap: var(--space-4);
   width: 100%;
   /* A set 36px line, with the side padding kept and none above or below.
 
@@ -929,8 +914,12 @@
      columns existed to avoid; at 36 it is a fifth shorter.
 
      The 12px sides stay, bled back out by the list, so the focus ring has room
-     and the names start on the drawer body's own margin. */
-  min-height: 36px;
+     and the names start on the drawer body's own margin.
+
+     44px since 16 Sep 2026 ("add some spacing in the lists"): still a fixed
+     floor, so every row is the same height whatever it wears, and now a
+     comfortable pointer target too. */
+  min-height: 44px;
   padding: 0 var(--space-5);
   border: 0; border-radius: var(--radius-sm);
   background: none; text-align: left; cursor: pointer;
@@ -945,6 +934,7 @@
    nothing about the check. What a pressable row minimally needs is kept: the
    pointer cursor, the tick's edge darkening to say which box the press lands
    in, and a focus ring for the keyboard. */
+.bfp2__pickrow > .bx-tick { margin-right: var(--space-2); }
 .bfp2__pickrow:hover .bx-tick { border-color: var(--accent); }
 .bfp2__pickrow:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
 
@@ -970,7 +960,7 @@
    column; the glyph centres in it.
 
    `--text-muted` because it is a filing aid rather than a thing to read: it has
-   to be findable down the column without competing with the tick 6px to its
+   to be findable down the column without competing with the tick 12px to its
    left, which is the one mark on the row that changes when you press it. */
 .bfp2__pickico {
   flex: none; display: grid; place-items: center;
@@ -1071,10 +1061,6 @@
 }
 .bfp2__locked svg { flex: none; }
 .bfp2__locked span { flex: 1; min-width: 12ch; }
-/* A category an agentless profile cannot reach at all. Dimmed rather than
-   hidden: it still says the family exists, and its count reads 0/0, which is
-   the honest denominator. */
-
 /* --- Rules that were emitted and styled nowhere ---------------------------------
 
    All four of these are markup that has been on the screen for a while with no
@@ -1082,8 +1068,8 @@
    three children stacked vertically because the flex that was meant to lay them
    out lived on the other picker's class. */
 /* Sticky, because the list under it is now as long as the catalogue and the
-   count, the filter and the search are what you use to get back to a manageable
-   one. It sticks to the drawer body's own scroll, which is the only scroll
+   count, Select all and the search are what you use to get back to a
+   manageable one. It sticks to the drawer body's own scroll, which is the only scroll
    there is. */
 /* A real hairline, instead of `padding-bottom: 10px; margin-bottom: -10px`
    faking one so rows would not scroll under the bar unannounced. The pane
@@ -1091,29 +1077,47 @@
    tinted now, so the edge has to be an edge. */
 .bfp2__pickbar {
   position: sticky; top: 0; z-index: 2;
-  flex: none; display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap;
-  padding: 0 0 var(--space-5);
+  flex: none; display: flex; align-items: center; gap: var(--space-5) var(--space-6); flex-wrap: wrap;
+  /* 16px under the bar before its hairline: the list below is spaced out now
+     (16 Sep 2026), and a bar sitting tight on its rule read as the tight one. */
+  padding: 0 0 var(--space-6);
   background: var(--surface-raised);
   border-bottom: var(--bw-thin) solid var(--border-subtle);
 }
 /* `.bfp2__search` stood here — this drawer's own magnifier-and-field. It is
    `SearchBox` from the kit now, like every other search in the console; what
    remains is the one thing that genuinely belongs to THIS row, which is that
-   the box stretches and the filter beside it does not.
+   the box stretches and Select all and the count beside it do not.
 
    A 12ch basis and floor rather than `flex: 1` over 16ch. The bar has to hold
-   on one line in a 520px body with "Clear the rest" showing, and 16ch was the
+   on one line in a 520px body with Select all and the count, and 16ch was the
    one thing on it that would not give. The basis matters as much as the floor:
    with `flex: 1` the box's line-breaking size was its intrinsic width, so the
    bar wrapped before anything was actually short of room. */
 .bfp2__pickbar > .bx-search { flex: 1 1 12ch; min-width: 12ch; width: auto; }
-/* Narrower than the bar can hold on one line — a phone, where the drawer is
-   clamped to the window — the search takes a line to itself and the filter,
-   the count and Clear share the next, rather than wrapping one at a time into a
-   ragged second row. */
-@container bfp2-pick (max-width: 479px) {
-  .bfp2__pickbar > .bx-search { flex-basis: 100%; }
+/* No narrow-width reordering. A container query put the search on a line of its
+   own below 480px — which the wizard's half column reaches on a 1280px laptop —
+   and moving it ahead of Select all there made the Tab order disagree with the
+   screen. The bar now keeps its order and wraps only when it must, the count
+   going to a second line last. */
+
+/* Select all / Clear all (`PickBar`). Unboxed, like the rows it acts on: the
+   kit's tick, then its words, with the tick at the bar's left edge so it stands
+   in the same column as every tick under it. The box fills for some or all —
+   a dash for some — through the kit's `.is-on .bx-tick`. */
+.bfp2__selectall {
+  flex: none; display: inline-flex; align-items: center; gap: var(--space-5);
+  height: var(--ctl-height-sm); padding: 0; border: 0; border-radius: var(--radius-sm);
+  background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap;
 }
+.bfp2__selectall:hover { color: var(--text-primary); }
+.bfp2__selectall:hover .bx-tick { border-color: var(--accent); }
+.bfp2__selectall.is-on:hover .bx-tick { border-color: var(--accent-strong); }
+.bfp2__selectall:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bfp2__selectall:disabled { cursor: not-allowed; opacity: var(--disabled-opacity); }
+.bfp2__selectall:disabled:hover { color: var(--text-secondary); }
+.bfp2__selectall:disabled:hover .bx-tick { border-color: var(--border-strong); }
 .bfp2__pickcount {
   flex: none; white-space: nowrap;
   font-size: var(--fs-sm); color: var(--text-tertiary); margin-left: auto;
@@ -1193,8 +1197,9 @@
    were added, and on a column near the list's 519px step the pickers changed
    width with it (15 Sep 2026). Scoped to the open profile — the compact list
    page is laid out for its own column — rather than set on the shell, where it
-   would take the strip from screens that never scroll. */
-.bshell__main:has(.bfp2:not(.bpage--compact)) { scrollbar-gutter: stable; }
+   would take the strip from screens that never scroll. Keyed on `bfp2--list`
+   rather than on the compact class, which the list drops at Full width. */
+.bshell__main:has(.bfp2:not(.bfp2--list)) { scrollbar-gutter: stable; }
 
 /* --- Basic details, as sections ----------------------------------------------
 
@@ -1269,20 +1274,10 @@
    callout. On a page the agent's cost is said in the side panel beside the
    reach tiles (`BasicAside`), in the same words. */
 
-/* --- The category filter, and the rows that cannot be turned off ----------------- */
+/* --- The rows that cannot be turned off --------------------------------------------
 
-/* The rail, as one control on the bar. `width: auto` because the kit gives a
-   bare select `width: 100%` at zero specificity, which in a flex bar means it
-   takes everything the search box does not. */
-/* A fixed width, since the control inside it fills its wrapper now — `auto`
-   let the trigger collapse to the width of whichever category was chosen, so
-   the filter changed size as you used it.
-
-   168 rather than 190: in the 560px drawer the bar has 520px for a search, this,
-   "N selected" and "Clear the rest", and the 22px came out of the search box.
-   "All categories", the longest thing the trigger ever says, still fits whole,
-   and 168 is the check list's own trigger floor. */
-.bfp2__catfilter { flex: none; width: 168px; }
+   `.bfp2__catfilter` stood here, the category dropdown's slot on the bar. The
+   dropdown went (owner, 16 Sep 2026); the search matches a category by name. */
 
 /* Ticked, and not by you — which this screen has not actually been saying.
 

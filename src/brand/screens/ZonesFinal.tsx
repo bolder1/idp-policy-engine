@@ -53,7 +53,8 @@ import { ConfirmDelete } from './confirm-delete'
 import { ListPager } from './list-pager'
 import { usePagedList } from './paged-list'
 import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
-import { PageBar } from './page-bar'
+import { PageBar, WidthSwitch } from './page-bar'
+import { compactClass, usePageWidth } from '../page-width'
 import { libRowHeight, useLibView, type LibView } from './library-view-state'
 
 /* -----------------------------------------------------------------------------
@@ -136,6 +137,7 @@ const focusZoneHeading = () =>
 
 export function ZonesFinal() {
   const store = useBrand()
+  const [width] = usePageWidth()
   const [q, setQ] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
   /* A zone that has a name and nothing else yet. Held here, not in the store,
@@ -230,8 +232,9 @@ export function ZonesFinal() {
   }
 
   return (
-    /* Compact only while the list shows: the zone page keeps the full width. */
-    <div className={detail ? 'bpage bz7' : 'bpage bpage--compact bz7'}>
+    /* Compact only while the list shows and the width switch says so: the zone
+       page keeps the full width. */
+    <div className={detail ? 'bpage bz7' : `bpage${compactClass(width)} bz7`}>
       {detail ? (
         /* Keyed so opening another zone starts from that zone, not the last draft.
            A new zone is stored under the id it was given here, so its first save
@@ -263,7 +266,11 @@ export function ZonesFinal() {
         />
       ) : (
         <>
-          <PageHead title="Zones" caption="IP networks and locations that policy rules reference." />
+          <PageHead
+            title="Zones"
+            caption="IP networks and locations that policy rules reference."
+            preview={<WidthSwitch />}
+          />
 
           {store.zones.length === 0 ? (
             <EmptyState

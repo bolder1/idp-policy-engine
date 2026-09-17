@@ -21,6 +21,8 @@ import {
   reviewSections,
   stepDone,
   stepIssue,
+  shownSelection,
+  toggleAllShown,
   toggleRun,
   withConfig,
   withMode,
@@ -233,24 +235,49 @@ describe('moving between steps', () => {
 describe('the inline list', () => {
   const offered = offeredAttributes('device', 'agentless')
 
-  it('puts the always-on signals first, and narrows by search, category and selection', () => {
-    const all = filterAttributes(offered, '', '', [])
+  it('puts the always-on signals first, and narrows by search', () => {
+    const all = filterAttributes(offered, '')
     const always = all.filter((a) => a.always)
     expect(all.slice(0, always.length)).toEqual(always)
-    expect(filterAttributes(offered, 'TIME', '', []).every((a) => `${a.name} ${a.purpose} ${a.category}`.toLowerCase().includes('time'))).toBe(true)
-    expect(filterAttributes(offered, '', 'Browser', []).every((a) => a.category === 'Browser')).toBe(true)
-    const picked = [offered.find((a) => !a.always)!.id]
-    expect(filterAttributes(offered, '', '@selected', picked).map((a) => a.id)).toEqual([...always.map((a) => a.id), ...picked])
+    expect(all).toHaveLength(offered.length)
+    const timed = filterAttributes(offered, 'TIME')
+    expect(timed.length).toBeGreaterThan(0)
+    expect(timed.every((a) => `${a.name} ${a.purpose} ${a.category}`.toLowerCase().includes('time'))).toBe(true)
+    // A category name finds its family, with no dropdown to do it.
+    expect(filterAttributes(offered, 'browser').some((a) => a.category === 'Browser')).toBe(true)
+  })
+
+  it('selects every choosable row on screen, or clears them once all are ticked', () => {
+    const all = filterAttributes(offered, '')
+    const free = all.filter((a) => !a.always).map((a) => a.id)
+    const locked = all.filter((a) => a.always).map((a) => a.id)
+    expect(shownSelection([], all)).toBe('none')
+    expect(toggleAllShown([], all)).toEqual(free)
+    expect(shownSelection(free, all)).toBe('all')
+    // Clear all leaves an always-on id a caller keeps in its picks alone.
+    expect(toggleAllShown([...locked, ...free], all)).toEqual(locked)
+    // Part ticked reads as some, and a press ticks the rest.
+    expect(shownSelection([free[0]], all)).toBe('some')
+    expect(toggleAllShown([free[0]], all).sort()).toEqual([...free].sort())
+    // Under a search it reaches only what matches, and leaves the rest as it was.
+    const hidden = free.find((id) => !filterAttributes(offered, 'TIME').some((a) => a.id === id))!
+    const matching = filterAttributes(offered, 'TIME')
+    const next = toggleAllShown([hidden], matching)
+    expect(next).toContain(hidden)
+    expect(matching.filter((a) => !a.always).every((a) => next.includes(a.id))).toBe(true)
+    // Nothing choosable on screen: nothing to do.
+    expect(shownSelection([], all.filter((a) => a.always))).toBe('empty')
+    expect(shownSelection([], [])).toBe('empty')
   })
 
   it('ticks one row, or a shift run from the last one pressed, skipping always-on rows', () => {
-    const rows = filterAttributes(OS_ATTRIBUTES, '', '', [])
+    const rows = filterAttributes(OS_ATTRIBUTES, '')
     const [a, b, c] = rows
     expect(toggleRun([], rows, null, a.id, false)).toEqual([a.id])
     expect(toggleRun([a.id], rows, a.id, a.id, false)).toEqual([])
     expect(toggleRun([], rows, a.id, c.id, true)).toEqual([a.id, b.id, c.id])
     expect(toggleRun([a.id, b.id, c.id], rows, a.id, c.id, true)).toEqual([])
-    const trusted = filterAttributes(offered, '', '', [])
+    const trusted = filterAttributes(offered, '')
     const firstFree = trusted.findIndex((x) => !x.always)
     const run = toggleRun([], trusted, trusted[0].id, trusted[firstFree].id, true)
     expect(run).toEqual([trusted[firstFree].id])

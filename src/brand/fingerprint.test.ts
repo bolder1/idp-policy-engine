@@ -14,7 +14,6 @@ import {
   asksReach,
   attrOf,
   attributesFor,
-  categoriesFor,
   withAlwaysOn,
   blockedAttributes,
   blankProfile,
@@ -75,8 +74,7 @@ describe('the attribute master', () => {
      two posture checks and two client versions, and at that size the filing IS
      the readable shape. What the test protects now is the property that made
      the old bound worth having — that the list is never a heap. Under ten, flat
-     and unfiled; over it, filed, with every row in a category the picker
-     actually offers.
+     and unfiled; over it, filed, with every row in a category.
 
      The ceiling stays, further out. Twenty is not a design claim, it is a
      tripwire: past it somebody should be asked whether a fourteenth family of
@@ -86,36 +84,9 @@ describe('the attribute master', () => {
     expect(OS_ATTRIBUTES.length).toBeLessThanOrEqual(20)
     expect(DEVICE_ATTRIBUTES.length).toBeGreaterThan(20)
     expect(DEVICE_ATTRIBUTES.every((a: Attribute) => a.category)).toBe(true)
-    // Filed now, and the picker's category filter is the reason it has to be:
-    // an uncategorised row falls into "Everything else" and cannot be found.
+    // Filed: a row's category picks its family mark and is matched by the
+    // search, so an uncategorised row has no mark and cannot be found by family.
     expect(OS_ATTRIBUTES.every((a: Attribute) => a.category)).toBe(true)
-  })
-
-  /* The bug a single shared `CATEGORIES` list produced, asserted from both ends.
-
-     The picker counts a category's rows and labels an empty one "needs an
-     agent". That sentence is true of Security on an agentless risk profile and
-     nonsense for Behaviour on a requirements profile, which has no behaviour
-     rows and never will — so a category offered for a catalogue it does not
-     describe is not untidy, it is a false explanation in a dropdown.
-
-     Both directions matter. Every row files under a category its own catalogue
-     offers, and every category its catalogue offers has at least one row. */
-  it('gives each catalogue a filing scheme that fits it exactly', () => {
-    for (const mode of ['os', 'device'] as ProfileMode[]) {
-      const cats = categoriesFor(mode)
-      const ids = new Set(cats.map((c) => c.id))
-      const used = new Set(attributesFor(mode).map((a) => a.category))
-
-      for (const a of attributesFor(mode)) {
-        expect(ids.has(a.category!)).toBe(true)
-      }
-      for (const c of cats) {
-        expect(used.has(c.id)).toBe(true)
-      }
-      // Named once each, or the filter shows the same option twice.
-      expect(cats.length).toBe(ids.size)
-    }
   })
 
   /* `platformsNamed` says which operating systems a profile pins, and it used to

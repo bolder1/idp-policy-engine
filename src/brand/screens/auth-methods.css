@@ -12,6 +12,12 @@
 .bm8 { display: flex; flex-direction: column; gap: 18px; }
 
 .bm8__head h1 { margin: 0; }
+/* The head wraps, as `PageHead`'s row does: the title takes the row, and the
+   preview switches drop under it before they squeeze it. Without the wrap the
+   gear switch and the width switch, side by side, pushed the page sideways
+   below about 800px (16 Sep 2026). */
+.bm8__head { flex-wrap: wrap; }
+.bm8__title { flex: 1 1 240px; min-width: 0; }
 .bm8__head p {
   margin: 4px 0 0; max-width: 68ch;
   font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55;

@@ -60,6 +60,8 @@ import { DISPLAY_TOKEN_METHOD_ID, assignedCount, tokensOf } from '../hardware-to
 import { NPS_SERVERS, setupCardFor, setupReady } from '../setup-guide'
 import { AppSetupCard, NpsSetupCard } from './setup-card'
 import { useLeaveGuard } from '../leave-guard'
+import { compactClass, usePageWidth } from '../page-width'
+import { WidthSwitch } from './page-bar'
 
 /* -----------------------------------------------------------------------------
    Authentication methods · final.
@@ -232,6 +234,7 @@ const KBA_VERIFY_KEY = settingKey('family', 'Security Questions', 'kba-verify')
 
 export function AuthMethods({ role = 'admin' }: { role?: Role }) {
   const store = useBrand()
+  const [width] = usePageWidth()
   const isUser = role === 'user'
 
   /* One list, and the two axes that narrow it.
@@ -515,28 +518,34 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
   }
 
   return (
-    /* Compact on both tabs and for both roles. The family, its settings and a
-       setup form all open in the slider, over the compact page. */
-    <div className="bpage bpage--compact bm8">
+    /* Compact on both tabs and for both roles while the width switch says so.
+       The family, its settings and a setup form all open in the slider, over
+       the page. */
+    <div className={`bpage${compactClass(width)} bm8`}>
       <header className="bm8__head">
-        <div>
+        <div className="bm8__title">
           <h1 ref={heading} tabIndex={-1}>
             {isUser ? 'Two-step verification' : 'Authentication methods'}
           </h1>
           <p>{isUser ? 'How you prove it is you.' : 'How people prove who they are.'}</p>
         </div>
 
-        {/* The comparison switch. A person's page never shows it: their rows all
-            open onto an enrolment form and none carries a switch. */}
-        {!isUser && gearRows.length > 0 && (
-          <div className="bm8__variant">
-            <Toggle size="sm" checked={gearEnds} onChange={setGearEnds} label="Gear on settings rows" />
-            <span>
-              Gear on settings rows
-              <i>{gearRows.join(', ')}</i>
-            </span>
-          </div>
-        )}
+        {/* The preview switches, together against the right edge — the same
+            slot `PageHead` gives the other library pages. */}
+        <div className="bpage__preview">
+          {/* The comparison switch. A person's page never shows it: their rows
+              all open onto an enrolment form and none carries a switch. */}
+          {!isUser && gearRows.length > 0 && (
+            <div className="bm8__variant">
+              <Toggle size="sm" checked={gearEnds} onChange={setGearEnds} label="Gear on settings rows" />
+              <span>
+                Gear on settings rows
+                <i>{gearRows.join(', ')}</i>
+              </span>
+            </div>
+          )}
+          <WidthSwitch />
+        </div>
       </header>
 
       {/* Recovery is a tenant policy rather than a personal setting, so a person
@@ -1379,12 +1388,11 @@ function CategoryDrawer({
     <Drawer
       open={top !== null}
       onClose={() => leaveThen(onClose, false)}
-      /* 680, not 620. The settings rows carry an icon, a label, a tip and a
-         provenance chip before the control even starts, and a segmented
-         control needs its options on one line to be worth using. It is also
-         the width the setup modal was, so RSA's form did not have to reflow to
-         move in here. */
-      width={680}
+      /* 560, the console's slider width (Device profiles' drawers are the
+         same). It was 680, sized for the old setup modal; the owner asked for
+         a narrower panel (16 Sep 2026), and the setup form is one stacked
+         column that reflows. */
+      width={560}
       title={setupOf ? `${setupOf.name} ${card ? 'setup' : 'configuration'}` : (single?.name ?? family?.channel ?? '')}
       /* One header, not two.
 

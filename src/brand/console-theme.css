@@ -566,8 +566,9 @@
 .bpage__headrow { align-items: flex-start; }
 .bpage__title {
   min-width: 0;
-  /* Takes the row, so a Documentation link beside it sits at the far right.
-     (A page's controls are never on this row — see `page-bar.tsx`.) */
+  /* Takes the row, so a Documentation link or the preview switches beside it
+     sit at the far right. (List controls are never on this row — see
+     `page-bar.tsx`.) */
   flex: 1 1 240px;
 }
 /* --- Side spacing on the library screens ---------------------------------------

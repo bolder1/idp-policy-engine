@@ -213,12 +213,12 @@ button.bdpw__stepbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--
 @container bfp2-checks (max-width: 399px) {
   .bdpw__list:not(.is-weights),
   .bdpw__list.no-lock:not(.is-weights) { grid-template-columns: 20px minmax(0, 1fr) 32px; }
-  /* Under the name's first letter: the tick (16px) and the mark (20px, the
-     same as the mark column) with a 6px gap after each, less the column the
-     mark already fills and the grid gap after it. */
+  /* Under the name's first letter: the tick (16px) and its 4px margin, the
+     mark (20px, the same as the mark column) and an 8px gap after each of the
+     two, less the column the mark already fills and the grid gap after it. */
   .bdpw__list:not(.is-weights) .bdpw__ctl {
     grid-column: 2 / -1; grid-row: 2;
-    margin-left: calc(16px + var(--space-3) * 2 - var(--space-5));
+    margin-left: calc(16px + var(--space-2) + var(--space-4) * 2 - var(--space-5));
     justify-content: flex-start; padding-bottom: var(--space-4);
   }
   .bdpw__list:not(.is-weights) .bfp2__checkdel { grid-column: 3; grid-row: 1; }
@@ -227,14 +227,16 @@ button.bdpw__stepbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--
 /* --- Review ------------------------------------------------------------------------
 
    One card per section; in it, label and value in two columns. */
-/* One centred column on the steps that have no panel beside them — Review.
+/* One column on the steps that have no panel beside them — Review.
 
    `.bz7__cols` is two equal halves, which is right where the left half is a
    form and the right one explains it. A summary explains itself, so the right
-   half was empty and the facts sat in the left 450px of a 900px page. Centred
-   and capped at a reading measure, the review reads as the page's own content
-   rather than as a form missing its other half. */
-.bdpw__cols--solo { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+   half was empty. The review takes one column capped at a reading measure,
+   and starts on the page's left edge, under the title and the first step.
+
+   It was centred, which put its left edge well in from everything above it
+   (owner, 16 Sep 2026: "the center alignment doesn't go well"). */
+.bdpw__cols--solo { grid-template-columns: minmax(0, 1fr); justify-items: start; }
 .bdpw__cols--solo > .bdpw__work { width: 100%; max-width: 720px; }
 
 .bdpw__review { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
@@ -290,12 +292,7 @@ button.bdpw__stepbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--
 .bdpw__fold.is-open .bdpw__foldchev { transform: rotate(180deg); }
 @media (prefers-reduced-motion: reduce) { .bdpw__foldchev { transition: none; } }
 
-/* What happens next, at the foot of what it follows. Muted and unboxed: it is
-   the quietest thing on the step and must not compete with the facts. */
-.bdpw__next {
-  margin: 0; max-width: 60ch;
-  font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.55;
-}
+/* `.bdpw__next` stood here — the note under the review. Removed 16 Sep 2026. */
 .bdpw__facts {
   display: grid; grid-template-columns: minmax(0, 1fr) auto;
   column-gap: var(--space-6);

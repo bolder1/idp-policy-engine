@@ -26,7 +26,6 @@ import {
   type Registration,
   type Roster,
 } from '../fingerprint'
-import type { CategoryValue } from './device-profile-choices'
 import { checkLine } from './profile-aside'
 
 /* -----------------------------------------------------------------------------
@@ -252,25 +251,41 @@ export function stepDone(
 
 /* --- The inline list --------------------------------------------------------- */
 
-/* The same narrowing the catalogue drawer does: a search over name, purpose and
-   category, then a category or "Selected only". Always-on first, because a
-   locked row between two tickable ones reads as one you failed to untick. */
-export function filterAttributes(
-  list: Attribute[],
-  q: string,
-  cat: CategoryValue,
-  picked: string[],
-): Attribute[] {
+/* The narrowing both check lists do — the catalogue drawer and this one: a
+   search over name, purpose and category. The category dropdown and its
+   "Selected only" went (owner, 16 Sep 2026). Always-on first, because a locked
+   row between two tickable ones reads as one you failed to untick. */
+export function filterAttributes(list: Attribute[], q: string): Attribute[] {
   const needle = q.trim().toLowerCase()
   const shown = list.filter(
     (a) =>
-      (cat === '@selected' ? a.always || picked.includes(a.id) : !cat || a.category === cat) &&
-      (!needle ||
-        a.name.toLowerCase().includes(needle) ||
-        a.purpose.toLowerCase().includes(needle) ||
-        (a.category ?? '').toLowerCase().includes(needle)),
+      !needle ||
+      a.name.toLowerCase().includes(needle) ||
+      a.purpose.toLowerCase().includes(needle) ||
+      (a.category ?? '').toLowerCase().includes(needle),
   )
   return [...shown.filter((a) => a.always), ...shown.filter((a) => !a.always)]
+}
+
+/* How much of what is on screen is ticked, for the bar's Select all. Only the
+   rows somebody can choose count: `empty` when there are none, so the control
+   has nothing to do. */
+export type ShownSelection = 'empty' | 'none' | 'some' | 'all'
+
+export function shownSelection(picked: string[], shown: Attribute[]): ShownSelection {
+  const free = shown.filter((a) => !a.always)
+  if (free.length === 0) return 'empty'
+  const on = free.filter((a) => picked.includes(a.id)).length
+  return on === 0 ? 'none' : on === free.length ? 'all' : 'some'
+}
+
+/* Select all and Clear all, as one press over the rows on screen: all of them
+   ticked clears them, anything less ticks them all. Rows a search hides keep
+   their state, and always-on rows are never written. */
+export function toggleAllShown(picked: string[], shown: Attribute[]): string[] {
+  const free = shown.filter((a) => !a.always).map((a) => a.id)
+  if (shownSelection(picked, shown) === 'all') return picked.filter((id) => !free.includes(id))
+  return [...new Set([...picked, ...free])]
 }
 
 /* One press, or a shift-press over a run. The run takes the state the pressed

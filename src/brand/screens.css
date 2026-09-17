@@ -607,6 +607,9 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
    of the page grid, so a column of padding stands on each side. Below 1280px the
    page is too narrow to give columns away and the content takes all ten again.
 
+   Only while the width switch says Compact (`page-width.ts`). On Full the page
+   drops the class and sits on the whole grid, the way Policies does.
+
    Two classes, not one: console-theme.css restates `.bpage > *` at one class
    and loads later, so a one-class rule here would lose the tie.
 
@@ -618,7 +621,8 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
 
 /* --- Head and bar (`PageHead`, `page-bar.tsx`) -----------------------------------
 
-   The head is the title block and, at most, Documentation. The bar is one line:
+   The head is the title block and, at most, Documentation or the page's preview
+   switches. The bar is one line:
    the search box and the filters on the left; the view and the primary action
    on the right. */
 .bpage__docs {
@@ -629,6 +633,19 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
   cursor: not-allowed;
 }
 .bpage__docs:hover { background: var(--surface-sunken); }
+
+/* Preview switches on the heading row (`PageHead`'s `preview`): against the
+   right edge, on the title's line. They wrap under the title with the rest of
+   the row rather than squeezing the caption. */
+.bpage__preview {
+  flex: none; display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
+}
+/* The width switch: its word, then the two segments. The word is the picker
+   prefix's tertiary ink, so "Width" and "Flow" read as the same kind of label. */
+.bwidth { display: inline-flex; align-items: center; gap: var(--space-3); }
+.bwidth__label { font-size: var(--fs-md); color: var(--text-tertiary); white-space: nowrap; }
+.bwidth .bseg { flex-wrap: nowrap; }
 
 .bbar { justify-content: space-between; min-width: 0; }
 .bbar__left, .bbar__right { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }

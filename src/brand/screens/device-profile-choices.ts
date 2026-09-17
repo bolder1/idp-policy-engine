@@ -8,7 +8,6 @@ import {
   countLabel,
   isRuleValue,
   isVersionText,
-  type AttrCategory,
   type Attribute,
   type AttrConfigValue,
   type ProfileMode,
@@ -90,9 +89,6 @@ export const reachChoices = (): Choice<ProfileReach>[] =>
     tip: r.note ? `${r.blurb} ${r.note}` : r.blurb,
     tag: r.tag,
   }))
-
-/** The category filter's value: a category, every category (''), or "Selected only". */
-export type CategoryValue = AttrCategory | '' | '@selected'
 
 /* A typed version that is blank or not a version, said under its row. */
 export function versionError(attr: Attribute, values: Record<string, AttrConfigValue>): string | null {

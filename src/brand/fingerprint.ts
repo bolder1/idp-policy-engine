@@ -46,8 +46,8 @@ import { nameTaken } from './data'
    `Hardware` there, because what that list wants to know is how hard a signal
    is to forge. They exist because the requirements list now asks two questions
    the risk list never does: what is this device RUNNING, and what miniOrange
-   software is on it. See `categoriesFor`, which is why one union can serve two
-   catalogues that file differently. */
+   software is on it. One union serves both catalogues although they file
+   differently: a category only picks a row's family mark and feeds the search. */
 export type AttrCategory = 'Platform' | 'Hardware' | 'Browser' | 'Security' | 'Client' | 'Network' | 'Behaviour'
 
 export type Priority = 'High' | 'Medium' | 'Low'
@@ -231,8 +231,9 @@ export interface Attribute {
    The consequence, said plainly: `asksReach('os')` stays false, an OS profile
    is still never asked the agent question, and this list is still offered
    whole. What changes is that it is now longer than the small-catalogue path
-   allows, so it arrives with a search field and a category filter — which at
-   thirteen rows is the right control and at five was not. */
+   allows, so it arrives with a search field (and, until 16 Sep 2026, a
+   category filter) — which at thirteen rows is the right control and at five
+   was not. */
 /* The comparisons a version supports — a symbol, and the words for it.
 
    Stored as an id and shown as a SYMBOL, which is the shape Figma's conditional
@@ -798,37 +799,11 @@ export const DEVICE_ATTRIBUTES: Attribute[] = [
   },
 ]
 
-/* The filing scheme, PER CATALOGUE, and it has to be per catalogue.
-
-   It was one list, which was correct while only one catalogue had categories.
-   The requirements list files differently — an OS version is `Platform` there
-   and `Hardware` in the risk list, because the two lists sort by different
-   questions: one asks what the device must be, the other asks how hard a signal
-   is to forge.
-
-   One shared list would also have lied in a specific, visible way. The picker's
-   filter counts `offered.filter(a => a.category === c.id)` and labels an empty
-   category "needs an agent" — true for Security on an agentless risk profile,
-   and nonsense for Behaviour on a requirements profile, which has no behaviour
-   rows and never will. A category that does not apply to a catalogue should not
-   be in that catalogue's filter at all. */
-const OS_CATEGORIES: { id: AttrCategory; label: string; blurb: string }[] = [
-  { id: 'Platform', label: 'Platform', blurb: 'What the device is, and what it runs. Arrives with the request.' },
-  { id: 'Browser', label: 'Browser', blurb: 'A version floor per family. The cheapest patch-level control there is.' },
-  { id: 'Security', label: 'Security', blurb: 'Whether the device is still the one the vendor shipped, and whether it locks.' },
-  { id: 'Client', label: 'Client', blurb: 'The miniOrange app and agent, by version.' },
-]
-
-const DEVICE_CATEGORIES: { id: AttrCategory; label: string; blurb: string }[] = [
-  { id: 'Hardware', label: 'Hardware', blurb: 'The machine itself. The strongest signals and the slowest to change.' },
-  { id: 'Browser', label: 'Browser', blurb: 'What the browser reports. Easy to collect, easy to change.' },
-  { id: 'Security', label: 'Security', blurb: 'Whether the device can be trusted to report the rest honestly.' },
-  { id: 'Network', label: 'Network', blurb: 'Where the sign-in came from. Moves with the person.' },
-  { id: 'Behaviour', label: 'Behaviour', blurb: 'Patterns over time. Needs history before it says anything.' },
-]
-
-export const categoriesFor = (mode: ProfileMode): { id: AttrCategory; label: string; blurb: string }[] =>
-  mode === 'os' ? OS_CATEGORIES : DEVICE_CATEGORIES
+/* `OS_CATEGORIES`, `DEVICE_CATEGORIES` and `categoriesFor` stood here — each
+   catalogue's filing scheme, for the picker's category dropdown. The dropdown
+   went (16 Sep 2026) and they had no other caller. A row's `category` still
+   matters: it picks the row's family mark (`CAT_ICON`) and the search matches
+   it. */
 
 /* Which catalogue a profile draws from. The two are disjoint in intent and
    overlap in one id — `device-type` is a sensible signal either way — so this

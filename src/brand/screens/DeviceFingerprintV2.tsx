@@ -64,7 +64,8 @@ import { UsedByList } from './used-by'
 import { ConfirmDelete } from './confirm-delete'
 import { pageForRow, usePagedList } from './paged-list'
 import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
-import { PageBar } from './page-bar'
+import { PageBar, WidthSwitch } from './page-bar'
+import { compactClass, usePageWidth } from '../page-width'
 import { PageHead } from '../Shell'
 import { libRowHeight, useLibView } from './library-view-state'
 import { ListPager } from './list-pager'
@@ -121,6 +122,7 @@ const focusProfileHeading = () =>
 
 export function DeviceFingerprintV2() {
   const store = useBrand()
+  const [width] = usePageWidth()
   const [openId, setOpenId] = useState<string | null>(null)
 
   const open = openId ? store.fingerprints.find((p) => p.id === openId) ?? null : null
@@ -148,6 +150,9 @@ export function DeviceFingerprintV2() {
   const created = useRef<string | null>(null)
 
   const detail = creating ?? open
+  /* The list is on screen: no profile page, and no page wizard in its place.
+     The Current slide-over opens over the list and leaves it up. */
+  const listUp = !detail && !(wizard && version !== 'current')
 
   /* The profile a delete is pending on, from its row menu — the only place
      Delete is offered; the inner page has no header actions. The dialog refuses
@@ -263,10 +268,12 @@ export function DeviceFingerprintV2() {
   const names = store.fingerprints.map((f) => f.name)
 
   return (
-    /* Compact only while the list is up: the inner page and the wizard keep the
-       full ten columns, since their panels and footers are laid out for that
-       width. */
-    <div className={`bpage bfp2${detail || wizard ? '' : ' bpage--compact'}`}>
+    /* Compact only while the list is up and the width switch says so: the inner
+       page and the page wizards keep the full ten columns, since their panels
+       and footers are laid out for that width. `bfp2--list` marks the list page
+       whichever width it is — including under the Current slide-over, which
+       leaves the list on screen and must not make it jump wider. */
+    <div className={`bpage bfp2${listUp ? ` bfp2--list${compactClass(width)}` : ''}`}>
       {detail ? (
         /* Keyed, and the key is load-bearing now that the page holds a draft:
            without it, opening a second profile would hand the same component a
@@ -514,19 +521,44 @@ function ProfileList({
 
   return (
     <>
+      {/* The create flow sits on the heading row with the width switch (owner,
+          16 Sep 2026: "move this with the heading"). Both compare versions of
+          the page rather than act on the list, and on the bar the flow picker
+          was what wrapped it to a second line. On the head it also stays over
+          an empty state, where it decides what that state's Create does.
+          Scaffolding for choosing a direction; it comes out when one is
+          chosen. Each flow's description is the option's second line. */}
       <PageHead
         title="Device profiles"
         caption="Device health checks and trusted devices, for policy rules to use."
         headRef={head}
+        preview={
+          <>
+            <Picker
+              label="Create flow"
+              size="md"
+              prefix="Flow"
+              value={version}
+              summary={CREATE_VERSIONS.find((v) => v.id === version)?.name ?? ''}
+              options={CREATE_VERSIONS.map((v) => ({
+                value: v.id,
+                label: `${v.label} · ${v.name}`,
+                meta: v.tip,
+              }))}
+              onChange={(v) => onVersion(v as CreateVersion)}
+            />
+            <WidthSwitch />
+          </>
+        }
       />
 
       {/* The row every list page has — see `PageBar`: the search box, then the
-          type filter; the create flow, the view and Create on the right. Over
-          an empty state only the create-flow switch stays: it decides what the
-          empty state's Create does. */}
-      <PageBar
-        left={
-          profiles.length > 0 && (
+          type filter; the view and Create on the right. Not rendered over the
+          empty state, as on Zones: an empty bar still took a row and its
+          margin, and the empty state offers the same Create. */}
+      {profiles.length > 0 && (
+        <PageBar
+          left={
             <>
               <SearchBox
                 value={q}
@@ -546,42 +578,22 @@ function ProfileList({
                 />
               </span>
             </>
-          )
-        }
-        right={
-          <>
-            {/* Which create flow Create opens, beside the button it governs.
-                Scaffolding for choosing a direction; it comes out when one is
-                chosen. Each flow's description is the option's second line. */}
-            <Picker
-              label="Create flow"
-              size="md"
-              prefix="Flow"
-              value={version}
-              summary={CREATE_VERSIONS.find((v) => v.id === version)?.name ?? ''}
-              options={CREATE_VERSIONS.map((v) => ({
-                value: v.id,
-                label: `${v.label} · ${v.name}`,
-                meta: v.tip,
-              }))}
-              onChange={(v) => onVersion(v as CreateVersion)}
-            />
-            {profiles.length > 0 && (
-              <>
-                <ViewSwitch value={view} onChange={setView} label="Device profile view" />
-                {/* The span is what focus finds on the way back from a create
-                    flow — the kit's Button takes no ref. */}
-                <span className="bfp2__create">
-                  <Button variant="brand" onClick={onCreate}>
-                    <Plus size={15} strokeWidth={2.2} aria-hidden />
-                    Create new profile
-                  </Button>
-                </span>
-              </>
-            )}
-          </>
-        }
-      />
+          }
+          right={
+            <>
+              <ViewSwitch value={view} onChange={setView} label="Device profile view" />
+              {/* The span is what focus finds on the way back from a create
+                  flow — the kit's Button takes no ref. */}
+              <span className="bfp2__create">
+                <Button variant="brand" onClick={onCreate}>
+                  <Plus size={15} strokeWidth={2.2} aria-hidden />
+                  Create new profile
+                </Button>
+              </span>
+            </>
+          }
+        />
+      )}
 
       {profiles.length === 0 ? (
         <EmptyState

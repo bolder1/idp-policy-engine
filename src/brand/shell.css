@@ -272,8 +272,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  /* Wraps, so the Documentation link drops under the title before it squeezes
-     the caption. */
+  /* Wraps, so the Documentation link or the preview switches drop under the
+     title before they squeeze the caption. */
   flex-wrap: wrap;
   gap: var(--space-5) var(--space-8);
 }

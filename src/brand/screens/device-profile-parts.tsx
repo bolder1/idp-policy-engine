@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   Info,
   Lock,
+  Minus,
   Monitor,
   Network,
   PanelTop,
@@ -23,7 +24,6 @@ import { Badge, Button, IconButton, MenuButton, NumberStepper, SearchBox, Tip, T
 import { TierPick } from '../tier-pick'
 import { Picker } from '../picker'
 import {
-  categoriesFor,
   DEFAULT_MAX_DEVICES,
   REGISTRATION_LABEL,
   TIER_WEIGHT,
@@ -53,7 +53,8 @@ import { EmptyState, NoMatches } from '../empty'
 import { BrandMark } from '../logos/BrandMark'
 import { CHECK_BRAND } from '../logos/check-brands'
 import { summarise } from './profile-aside'
-import { checkName, versionError, type CategoryValue, type Choice } from './device-profile-choices'
+import { checkName, versionError, type Choice } from './device-profile-choices'
+import { agentNote, filterAttributes, shownSelection, toggleAllShown, toggleRun } from './device-profile-wizard-model'
 
 /* -----------------------------------------------------------------------------
    Device profiles · the parts a profile is drawn from.
@@ -132,7 +133,7 @@ export function CheckMark({ attr }: { attr: Attribute }) {
 /* `CAT_META` and `metaOf` stood here — a tint and an icon per category, for
    the rail that filed thirty-eight attributes into five columns of one.
 
-   The rail is a dropdown now and the list is flat, so there is no per-category
+   The rail became a dropdown and then went (16 Sep 2026); the list is flat, so there is no per-category
    surface left to tint: a `<option>` cannot carry a colour that means anything,
    and a flat list tinted five ways is a list wearing its filing scheme as
    decoration. The tints themselves live on in `--cat-*` for the one thing that
@@ -168,263 +169,61 @@ export function AttrStep({
   onBack?: () => void
 }) {
   const [q, setQ] = useState('')
-  /* '' is every category, and it is the default. The rail this replaces made
-     you pick one before you could see anything, which is a filing scheme
-     presented as a prerequisite.
-
-     `@selected` rides in the same control. It is not a category — it is the
-     other question you ask of a long list, "what have I actually chosen" — and
-     on a 38-row catalogue answering it used to mean scrolling past the
-     thirty-two you did not choose. `Picker` already groups its options, so it
-     is one more option rather than one more control. */
-  const [cat, setCat] = useState<AttrCategory | '' | '@selected'>('')
+  /* The category dropdown beside the search went (owner, 16 Sep 2026), and
+     "Selected only" went with it — it rode in the same control. The search
+     still matches a row's category, and the bar's count says what is chosen. */
 
   /* Where the last press landed, so the next one can shift-select a run.
 
      A catalogue this long is picked in runs — "all of Hardware except the two
      serials", "the four browsers" — and thirty-eight individual presses is the
      part of this panel that is actually slow. The anchor is an id rather than
-     an index: the list reorders under grouping and filtering, and an index into
-     a list that moved selects the wrong rows. */
+     an index: the list reorders under searching, and an index into a list that
+     moved selects the wrong rows. */
   const anchor = useRef<string | null>(null)
 
   const offered = offeredAttributes(mode, reach)
-  const blocked = blockedAttributes(mode, reach)
-  const locked = offered.filter((a) => a.always)
 
   /* Counted against what is OFFERED, never against the whole catalogue. "6 of
      38 selected" on an agentless profile names a denominator eighteen of whose
      rows are not on the screen and cannot be reached from it. */
-  const chosen = offered.filter((a) => a.always || picked.includes(a.id)).map((a) => a.id)
+  const chosen = offered.filter((a) => a.always || picked.includes(a.id)).length
 
-  const needle = q.trim().toLowerCase()
-  const onlyPicked = cat === '@selected'
-  const matches = (a: Attribute) =>
-    !needle ||
-    a.name.toLowerCase().includes(needle) ||
-    a.purpose.toLowerCase().includes(needle) ||
-    (a.category ?? '').toLowerCase().includes(needle)
-  const shown = offered.filter(
-    (a) => (onlyPicked ? a.always || picked.includes(a.id) : !cat || a.category === cat) && matches(a),
-  )
+  /* One list, no groups and no headings. The catalogue is written in family
+     order, so related rows still arrive together, and the family mark on each
+     row says which one it is. The always-collected rows are lifted to the
+     front (see `filterAttributes`): a locked row between two tickable ones
+     reads as one you failed to untick. */
+  const ordered = filterAttributes(offered, q)
 
-  /* Every write to the picks goes through here. "Selected only" with nothing
-     selected is a filter showing nothing, so it goes back to every category. */
-  const pick = (next: string[]) => {
-    setPicked(next)
-    if (onlyPicked && !offered.some((a) => a.always || next.includes(a.id))) setCat('')
-  }
+  /* The rows an agent would unlock, under the same search as the list, so the
+     note below never names signals the search has nothing to do with. */
+  const blockedShown = filterAttributes(blockedAttributes(mode, reach), q)
 
-  const clearSearch = () => {
-    setQ('')
-    setCat('')
-  }
-
-  /* --- Where focus goes when its row leaves ------------------------------------
-
-     Two presses on this panel remove the control they were made on: "Clear the
-     rest", which only renders while there is a rest to clear, and unticking a
-     row under "Selected only", which is a filter the row no longer passes. A
-     focused element that unmounts drops focus to `<body>`, and the next Tab
-     starts from the top of the page — behind the drawer, for a keyboard user
-     unticking a run of rows one at a time.
-
-     Both move focus BEFORE the write, onto something that survives it. The
-     rows are keyed by id, so a neighbour's DOM node is the same node after the
-     render and nothing has to wait for an effect. */
-  const searchRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<HTMLDivElement>(null)
-
-  const keepFocus = (id: string, next: string[]) => {
-    const list = listRef.current
-    if (!onlyPicked || next.includes(id) || !list?.contains(document.activeElement)) return
-    /* Nothing left selected sends the filter back to every category (see
-       `pick`), and then the row does not leave at all. */
-    if (!offered.some((a) => a.always || next.includes(a.id))) return
-    /* The next row that will still be on screen, else the one before. Always-on
-       rows are not controls, so they are not somewhere to land. */
-    const at = ordered.findIndex((a) => a.id === id)
-    const stays = (a: Attribute) => !a.always && next.includes(a.id)
-    const land = ordered.slice(at + 1).find(stays) ?? ordered.slice(0, at).reverse().find(stays)
-    const el = land
-      ? list.querySelector<HTMLElement>(`[data-id="${land.id}"]`)
-      : list.parentElement?.querySelector<HTMLElement>('.bfp2__catfilter button')
-    el?.focus()
-  }
-
-  /* One press, or a run of them.
-
-     Shift extends from the last row pressed to this one and writes the SAME
-     state across the span — the state this row is moving to, not a blanket on.
-     Dragging a shift-selection back over itself therefore clears the run, which
-     is what every list that does this does, and the alternative (always
-     selecting) makes the gesture a one-way trip.
-
-     Always-on rows are filtered out of the span rather than skipped over: they
-     are not a state anybody can write, and a range that stops dead at one would
-     make the four of them walls through the middle of the list. */
+  /* One press, or a shift-press over a run — see `toggleRun`. No press removes
+     the control it was made on any more: without "Selected only" the rows stay
+     put, and Select all is always on the bar. */
   const toggle = (id: string, span: boolean) => {
-    const want = !picked.includes(id)
-    const from = span && anchor.current ? shown.findIndex((a) => a.id === anchor.current) : -1
-    const to = shown.findIndex((a) => a.id === id)
+    const next = toggleRun(picked, ordered, anchor.current, id, span)
     anchor.current = id
-
-    const commit = (next: string[]) => {
-      keepFocus(id, next)
-      pick(next)
-    }
-    if (from < 0 || to < 0 || from === to) {
-      commit(want ? [...picked, id] : picked.filter((x) => x !== id))
-      return
-    }
-    const run = shown
-      .slice(Math.min(from, to), Math.max(from, to) + 1)
-      .filter((a) => !a.always)
-      .map((a) => a.id)
-    commit(want ? [...new Set([...picked, ...run])] : picked.filter((x) => !run.includes(x)))
-  }
-
-  /* --- The list, as one list ---------------------------------------------------
-
-     Two `<section>` wrappers stood here — "Always collected" and "Everything
-     else" — and a wrapper is what invites a border, which is what both of them
-     grew. The groups survive; the containers do not. A heading is now a ROW in
-     the same column as the rows it heads, and its single top hairline is the
-     only horizontal rule anywhere in the list.
-
-     "Everything else" is retired with them. It was a group named for not being
-     the other group, and on the device catalogue it ran to thirty-four rows —
-     precisely the scroll nobody finishes. The real categories are already in
-     the data and already counted for the filter above, so this costs nothing
-     and turns one 34-row run into five named ones.
-
-     Under a search the headings collapse entirely: five groups of one is a
-     filing scheme pretending to be structure, and a row read out of its group
-     still carries "Always on" on the row itself. */
-  /* --- No groups, and no headings -----------------------------------------------
-
-     Two `<section>` wrappers stood here — "Always collected" and "Everything
-     else" — each with a sticky ruled header, and a first pass at this replaced
-     them with six named category headings. Both are gone, and the second one is
-     the more interesting deletion: it was a real improvement over the boxes and
-     it was still too much furniture. Six headings, six counts, six select-alls
-     and six one-line blurbs is a screenful of chrome wrapped around a list whose
-     rows are three words each.
-
-     What answers "which family is this" is already on the bar: the category
-     filter narrows the list to one, and the search finds anything by name,
-     purpose or category. A heading that repeats what a filter does costs a row
-     each time and cannot be switched off.
-
-     Order carries what is left. The catalogue is written in family order, so
-     related rows still arrive together — and the always-collected ones are
-     lifted to the front, because they are the only rows nobody is choosing and
-     a locked row between two tickable ones reads as one you failed to untick.
-     Each carries a lock where a heading used to say it for the group. */
-  const ordered = [...shown.filter((a) => a.always), ...shown.filter((a) => !a.always)]
-
-  /* A bare-list branch for a catalogue of eight or fewer stood here, on the
-     argument that a search box over five rows can only ever hide four of them.
-
-     It has been unreachable for a while and nobody noticed, which is the real
-     reason it goes rather than the argument being wrong. `asksReach` is false
-     only for the OS kind, and that catalogue is thirteen entries now — its
-     comment still described "five rows". A branch that cannot fire is a branch
-     that is not maintained: it was the one path still rendering the deleted
-     `.bfp2__pickrows`, and it would have rendered a list with no bar, no
-     grouping and no count if anything ever reached it. */
-
-  /* The rows an agent would unlock, under the same category and search as the
-     list, so the note below never names signals the search has nothing to do
-     with. */
-  const blockedShown = blocked.filter((a) => (!cat || cat === '@selected' || a.category === cat) && matches(a))
-  const needs = (list: Attribute[]) => {
-    const names = list.slice(0, 3).map((a) => a.name).join(', ')
-    const more = list.length > 3 ? ` and ${list.length - 3} more` : ''
-    return `${names}${more} ${list.length === 1 ? 'needs' : 'need'} an agent.`
+    setPicked(next)
   }
 
   return (
     <div className="bfp2__pick">
-      {/* --- The bar ---------------------------------------------------------
-
-          The category rail is a dropdown here, and the list below is all of
-          them by default.
-
-          The rail was five buttons down the left, and it showed ONE category at
-          a time: a filing scheme you had to operate before the catalogue would
-          show you anything, spending 196px of a panel's width to hide 80% of
-          its contents. It answered "have I done Hardware yet" with a count per
-          row, which is real — and the count now sits in the dropdown's own
-          options, where it costs no width at all.
-
-          The list is the thing. The filter is a control on the bar beside the
-          search, which is where every list in this console puts one. */}
-      <div className="bfp2__pickbar">
-        <SearchBox
-          value={q}
-          onChange={setQ}
-          placeholder={`Search ${ITEM_NOUN[mode].many}…`}
-          label={`Search ${ITEM_NOUN[mode].many}`}
-          inputRef={searchRef}
-        />
-
-        {/* `Picker`, like every filter in the console. The counts and the
-            "needs an agent" note ride on each option's `meta` line, where a
-            native `<option>` could only run them into the label. */}
-        <span className="bfp2__catfilter">
-          <CategoryFilter
-            mode={mode}
-            offered={offered}
-            picked={picked}
-            chosen={chosen.length}
-            value={cat}
-            onChange={setCat}
-          />
-        </span>
-
-        {/* How many are ticked, always-on rows included, since they are ticked
-            too. No denominator: the list is on screen. */}
-        <span className={`bfp2__pickcount ${chosen.length ? 'is-on' : ''}`}>{chosen.length} selected</span>
-        {/* Clears what can be cleared. The always-on four are not "selected" in
-            a sense anybody can undo, so a Clear that silently left four ticked
-            rows behind would read as a broken control rather than a correct
-            one — the label says which. It removes itself, so focus goes to the
-            search first — see `keepFocus`. */}
-        {chosen.length > locked.length && (
-          <button
-            type="button"
-            className="bfp2__clear"
-            onClick={() => {
-              searchRef.current?.focus()
-              pick(picked.filter((id) => locked.some((a) => a.id === id)))
-            }}
-          >
-            Clear the rest
-          </button>
-        )}
-      </div>
+      <PickBar mode={mode} q={q} onQuery={setQ} shown={ordered} picked={picked} chosen={chosen} onPick={setPicked} />
 
       {/* --- One list, one check to a line ------------------------------------
 
-          A sunken bordered pane stood here, holding bordered sections, holding a
-          column of white bordered cards: thirteen attributes arrived as one grey
-          box containing thirteen white boxes, each spending about a sixth of a
-          724px row on its text.
+          Nothing is boxed and nothing is grouped. A row is a tick, a mark, a
+          name and — where there is something to say — a pill. No fill, no
+          border, no divider, no heading above it.
 
-          Nothing is boxed now and nothing is grouped. A row is a tick, a name and
-          — where there is something to say — a pill. No fill, no border, no
-          divider, no heading above it.
-
-          It was two or three to a line, spending a 780px drawer on columns so
-          the device catalogue was a 19-line block rather than a 38-row scroll.
-          The owner's ask was the other trade: one line each, in a narrower
-          panel. A second column in 560px is two cells of 260, and the pill on a
-          long name was the first thing to give — "Not collected yet" read
-          as "Not collected y…", which is the one word on the row that changes
-          the decision. One column reads top to bottom, keeps every pill whole,
-          and the category filter is still there for the family you want. */}
-      <div className="bfp2__picklist" ref={listRef}>
+          One column at every width: a second column in 560px is two cells of
+          260, and the pill on a long name was the first thing to give — "Not
+          collected yet" read as "Not collected y…", which is the one word on
+          the row that changes the decision. */}
+      <div className="bfp2__picklist">
         {ordered.length === 0 ? (
           /* A search that only matches what an agent would unlock says so, and
              offers the way to change it where there is one. */
@@ -432,11 +231,10 @@ export function AttrStep({
             compact
             noun={ITEM_NOUN[mode].many}
             query={q}
-            filtered={cat !== ''}
-            onClear={clearSearch}
-            blurb={needle && blockedShown.length > 0 ? needs(blockedShown) : undefined}
+            onClear={() => setQ('')}
+            blurb={q.trim() && blockedShown.length > 0 ? agentNote(blockedShown) : undefined}
             secondary={
-              needle && blockedShown.length > 0 && onBack ? (
+              q.trim() && blockedShown.length > 0 && onBack ? (
                 <Button variant="secondary" onClick={onBack}>
                   Change what it reads
                 </Button>
@@ -461,7 +259,7 @@ export function AttrStep({
       {ordered.length > 0 && blockedShown.length > 0 && (
         <p className="bfp2__locked">
           <Lock size={12} strokeWidth={2} aria-hidden />
-          <span>{needs(blockedShown)}</span>
+          <span>{agentNote(blockedShown)}</span>
           {onBack && (
             <button type="button" className="bfp2__clear" onClick={onBack}>
               Change what it reads
@@ -469,6 +267,71 @@ export function AttrStep({
           )}
         </p>
       )}
+    </div>
+  )
+}
+
+/* --- The bar over a check list ------------------------------------------------------
+
+   Shared by the catalogue drawer (`AttrStep`) and the wizard's inline list, so
+   the two lists that choose checks work the same way. One line: Select all,
+   the search, and how many are ticked.
+
+   Select all and Clear all are ONE control (owner, 16 Sep 2026), in place of
+   "Clear the rest". It reaches the rows on screen — under a search, the rows
+   that match — and never the always-on ones, which are not a choice. While
+   every one of those is ticked it reads Clear all and clears them; otherwise it
+   reads Select all and ticks them. Its box is the list's own tick — empty, a
+   dash for some, full for all — in the same column as the ticks under it.
+
+   A button rather than a checkbox: its name says what a press does next, and a
+   checkbox whose name changed with its state would announce "Clear all,
+   checked". The count beside it is the state in words. */
+export function PickBar({
+  mode,
+  q,
+  onQuery,
+  searchRef,
+  shown,
+  picked,
+  chosen,
+  onPick,
+}: {
+  mode: ProfileMode
+  q: string
+  onQuery: (next: string) => void
+  searchRef?: Ref<HTMLInputElement>
+  /** The rows on screen, in order: what Select all reaches. */
+  shown: Attribute[]
+  picked: string[]
+  /** How many are ticked, always-on rows included, since they are ticked too. */
+  chosen: number
+  onPick: (next: string[]) => void
+}) {
+  const state = shownSelection(picked, shown)
+  const noun = ITEM_NOUN[mode].many
+  return (
+    <div className="bfp2__pickbar">
+      <button
+        type="button"
+        className={`bfp2__selectall${state === 'some' || state === 'all' ? ' is-on' : ''}`}
+        disabled={state === 'empty'}
+        onClick={() => onPick(toggleAllShown(picked, shown))}
+      >
+        <span className="bx-tick" aria-hidden>
+          {state === 'some' ? <Minus size={11} strokeWidth={3.2} /> : <Check size={11} strokeWidth={3.2} />}
+        </span>
+        {state === 'all' ? 'Clear all' : 'Select all'}
+      </button>
+      <SearchBox
+        value={q}
+        onChange={onQuery}
+        placeholder={`Search ${noun}…`}
+        label={`Search ${noun}`}
+        inputRef={searchRef}
+      />
+      {/* No denominator: the list is on screen. */}
+      <span className={`bfp2__pickcount ${chosen ? 'is-on' : ''}`}>{chosen} selected</span>
     </div>
   )
 }
@@ -483,7 +346,7 @@ export function AttrStep({
    way: two names floating in 760px said nothing about what either choice does,
    and the right-hand one started in the middle of nowhere.
 
-   So each answer is a tile that fills its half: the mark, the name, ONE line of
+   So each answer is a tile that fills its half: the icon, the name, ONE line of
    what it is (with a count where there is one), and the `?` for the rest. The
    line is what lets you choose without opening a tooltip; the tooltip is for the
    consequence you check once. Tiles are equal height and the pair reads as a
@@ -543,7 +406,6 @@ export function ChoiceTiles<T extends string>({
               onClick={() => onPick(o.id)}
               onKeyDown={(e) => onKeyDown(e, i)}
             >
-              <span className="bfp2__radio" aria-hidden />
               <span className="bfp2__answerbody">
                 <span className="bfp2__answerhead">
                   <span className="bfp2__answerico" aria-hidden>
@@ -564,72 +426,6 @@ export function ChoiceTiles<T extends string>({
         )
       })}
     </fieldset>
-  )
-}
-
-/* The bar's filter, shared by the create step and the profile page's check list.
-
-   One component because it is one question asked of one catalogue in two
-   places, and the counts in its options are the part most likely to drift if
-   each surface built them itself. */
-export function CategoryFilter({
-  mode,
-  offered,
-  picked,
-  chosen,
-  value,
-  onChange,
-}: {
-  mode: ProfileMode
-  offered: Attribute[]
-  picked: string[]
-  chosen: number
-  value: CategoryValue
-  onChange: (v: CategoryValue) => void
-}) {
-  return (
-    <Picker
-      label="Filter by category"
-      value={value}
-      width="fill"
-      /* `''` is a real ANSWER here — every category — not an empty field,
-         so the trigger says so instead of falling back to the "Choose…"
-         placeholder a `Picker` shows when nothing is set. */
-      summary={
-        value === '@selected'
-          ? 'Selected only'
-          : value
-            ? (categoriesFor(mode).find((c) => c.id === value)?.label ?? 'All categories')
-            : 'All categories'
-      }
-      options={[
-        /* Two questions in one control, kept apart by `Picker`'s own option
-           groups: what KIND of signal (the categories), and what have I already
-           chosen. The second is not a category and must not read as one. */
-        { value: '', label: 'All categories', group: 'Show' },
-        {
-          value: '@selected',
-          label: 'Selected only',
-          group: 'Show',
-          disabled: chosen === 0,
-        },
-        ...categoriesFor(mode).map((c) => {
-          const all = offered.filter((a) => a.category === c.id)
-          const on = all.filter((a) => a.always || picked.includes(a.id)).length
-          /* A category an agentless profile cannot reach at all is offered and
-             says so, rather than being dropped from the list — "why is Security
-             missing" is the support ticket that hiding it writes. */
-          return {
-            value: c.id,
-            label: c.label,
-            group: 'Categories',
-            meta: all.length === 0 ? 'Needs an agent' : `${on} of ${all.length} on`,
-            disabled: all.length === 0,
-          }
-        }),
-      ]}
-      onChange={(v) => onChange(v as CategoryValue)}
-    />
   )
 }
 
@@ -839,7 +635,7 @@ export function BasicAside({ draft }: { draft: FingerprintProfile }) {
    check here, ticked or not, made the page about the catalogue rather than
    about this profile: thirteen rows to read in order to learn that four apply.
 
-   Choosing is the drawer's job (search, categories, shift-select, the rows an
+   Choosing is the drawer's job (search, Select all, shift-select, the rows an
    agent would unlock); setting is this list's. Both write the page's draft, and
    the SaveBar is still the only thing that commits.
 

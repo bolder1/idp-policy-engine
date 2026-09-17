@@ -523,18 +523,23 @@ export function Toast() {
 }
 
 /** Page header used by every screen: the title and its caption, and at most a
-    Documentation link. See `PageBar` for where a page's actions go. */
+    Documentation link or a page's preview switches. See `PageBar` for where a
+    page's actions go. */
 export function PageHead({
   title,
   caption,
   docs,
+  preview,
   headRef,
 }: {
   title: string
   caption?: string
-  /** A Documentation link against the right edge — the one thing besides the
-      title the head may carry. */
+  /** A Documentation link against the right edge. */
   docs?: boolean
+  /** Switches that compare two versions of this page — its width, Device
+      profiles' create flow — against the right edge. Never a list action;
+      those are on `PageBar`. */
+  preview?: ReactNode
   /** For a page that puts focus back on its heading. */
   headRef?: Ref<HTMLElement>
 }) {
@@ -542,7 +547,7 @@ export function PageHead({
     <header className="bpage__head" ref={headRef}>
       {/* Title, then caption under it, in one container on one row (owner, 16
           Sep 2026: "the heading and subheading in one container, in one row").
-          Beside it: at most Documentation.
+          Beside it: at most Documentation, or the page's preview switches.
 
           No `title` on the caption any more. It was there because the caption
           used to truncate, and a tooltip repeating a sentence that is now
@@ -552,6 +557,7 @@ export function PageHead({
           <h1>{title}</h1>
           {caption && <p>{caption}</p>}
         </div>
+        {preview && <div className="bpage__preview">{preview}</div>}
         {/* Documentation is not built in this prototype, so the link is the top
             bar's inert one — present, named, and saying so — rather than a
             link to nowhere. */}

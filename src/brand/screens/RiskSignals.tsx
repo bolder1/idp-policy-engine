@@ -54,7 +54,8 @@ import { ConfirmDelete } from './confirm-delete'
 import { ListPager } from './list-pager'
 import { pageForRow, usePagedList } from './paged-list'
 import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
-import { PageBar } from './page-bar'
+import { PageBar, WidthSwitch } from './page-bar'
+import { compactClass, usePageWidth } from '../page-width'
 import { libRowHeight, useLibView } from './library-view-state'
 import { policiesUsingType, type PolicyUse } from './usage'
 import {
@@ -145,6 +146,7 @@ type ListFocus = { id: string } | { index: number }
 
 export function RiskSignals() {
   const store = useBrand()
+  const [width] = usePageWidth()
   const [openId, setOpenId] = useState<string | null>(null)
   const [naming, setNaming] = useState(false)
   const open = openId ? (store.riskProfiles.find((p) => p.id === openId) ?? null) : null
@@ -217,9 +219,9 @@ export function RiskSignals() {
   const active = store.riskProfiles.find((p) => p.id === store.activeRiskProfileId)
 
   return (
-    /* Compact only while the list shows; a profile's inner page keeps the full
-       width its signal table needs. */
-    <div className={open ? 'bpage brs' : 'bpage bpage--compact brs brs--list'}>
+    /* Compact only while the list shows and the width switch says so; a
+       profile's inner page keeps the full width its signal table needs. */
+    <div className={open ? 'bpage brs' : `bpage${compactClass(width)} brs brs--list`}>
       {open ? (
         /* Keyed, and the key is load-bearing: the inner page holds a draft in
            `useState`, so opening a second profile without remounting would hand
@@ -374,6 +376,7 @@ function RiskProfileList({
     <PageHead
       title="Risk signal profiles"
       caption="The profile in use sets the scores that Risk score conditions compare against."
+      preview={<WidthSwitch />}
     />
   )
 

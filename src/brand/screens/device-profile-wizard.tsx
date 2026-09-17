@@ -2,7 +2,7 @@ import { createPortal } from 'react-dom'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { ArrowLeft, Check, ChevronDown, Laptop, ListChecks, Lock, Tag, type LucideIcon } from 'lucide-react'
 
-import { Badge, Button, Drawer, SearchBox, Tip, TipDot, TipMark } from '../kit'
+import { Badge, Button, Drawer, Tip, TipDot, TipMark } from '../kit'
 import { TierPick } from '../tier-pick'
 import { NoMatches } from '../empty'
 import { useLeaveGuard } from '../leave-guard'
@@ -21,17 +21,17 @@ import {
   type FingerprintProfile,
   type ProfileMode,
 } from '../fingerprint'
-import { checkName, kindChoices, reachChoices, versionError, type CategoryValue } from './device-profile-choices'
+import { checkName, kindChoices, reachChoices, versionError } from './device-profile-choices'
 import {
   AttrControl,
   AttrStep,
   BasicAside,
-  CategoryFilter,
   CheckMark,
   ChecksAside,
   ChoiceTiles,
   ChosenList,
   EnrolmentFields,
+  PickBar,
   SidePanel,
 } from './device-profile-parts'
 import {
@@ -523,10 +523,10 @@ export function DeviceProfileWizard({
         onOpen={go}
       />
 
-      {/* A step with nothing to say on the right gets one centred column
-          instead of an empty half. Review is that step: it is a summary of
-          answers already given, so a panel beside it explains nothing, and the
-          50/50 split left the facts hugging the left edge of a wide page. */}
+      {/* A step with nothing to say on the right gets one column instead of an
+          empty half. Review is that step: it is a summary of answers already
+          given, so a panel beside it explains nothing. The column starts on the
+          title's edge, like every other step — see `.bdpw__cols--solo`. */}
       <div className={`bz7__cols bdpw__cols${aside ? '' : ' bdpw__cols--solo'}`}>
         <div className="bz7__work bdpw__work" ref={work}>
           {body}
@@ -609,8 +609,9 @@ function Steps({
    The rows are the profile page's check list (`.bfp2__checklist`), so the
    values line up down one column exactly as they will on the page — with the
    picker's row (`.bfp2__pickrow`) as the part that ticks. The bar is the
-   picker's too. Flat, no category headings: the owner took them out of this
-   list on 12 Sep, and the family mark and the category filter do their job.
+   picker's too (`PickBar`). Flat, no category headings: the owner took them
+   out of this list on 12 Sep, and the category filter on 16 Sep; the family
+   mark and the search do their job.
 
    What an agent would unlock is named under the list with a way back to
    Devices, as the picker does, rather than drawn as eighteen dead rows: the
@@ -635,95 +636,31 @@ function InlineChecks({
 }) {
   const { mode, reach, picked, config, weights } = state
   const [q, setQ] = useState('')
-  const [cat, setCat] = useState<CategoryValue>('')
   /* The last row pressed, by id, for a shift-press run. */
   const anchor = useRef<string | null>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<HTMLUListElement>(null)
 
   const offered = offeredAttributes(mode, reach)
-  const locked = offered.filter((a) => a.always)
-  const chosen = offered.filter((a) => a.always || picked.includes(a.id))
-  const shown = filterAttributes(offered, q, cat, picked)
-  const blockedShown = filterAttributes(blockedAttributes(mode, reach), q, cat === '@selected' ? '' : cat, [])
+  const chosen = offered.filter((a) => a.always || picked.includes(a.id)).length
+  const shown = filterAttributes(offered, q)
+  const blockedShown = filterAttributes(blockedAttributes(mode, reach), q)
   const hasLock = alwaysOn(mode).length > 0
-
-  /* "Selected only" with nothing selected shows nothing, so it lets go. */
-  const pick = (next: string[]) => {
-    onPick(next)
-    if (cat === '@selected' && !offered.some((a) => a.always || next.includes(a.id))) setCat('')
-  }
-
-  /* Unticking under "Selected only" takes the row away with focus on it. Focus
-     moves first, to the next row that stays, else the one before, else the
-     filter — the picker's rule, for the same reason. */
-  const keepFocus = (id: string, next: string[]) => {
-    const list = listRef.current
-    if (cat !== '@selected' || next.includes(id) || !list?.contains(document.activeElement)) return
-    if (!offered.some((a) => a.always || next.includes(a.id))) return
-    const at = shown.findIndex((a) => a.id === id)
-    const stays = (a: Attribute) => !a.always && next.includes(a.id)
-    const land = shown.slice(at + 1).find(stays) ?? shown.slice(0, at).reverse().find(stays)
-    const el = land
-      ? list.querySelector<HTMLElement>(`[data-id="${land.id}"]`)
-      : list.closest('.bfp2__pick')?.querySelector<HTMLElement>('.bfp2__catfilter button')
-    el?.focus()
-  }
 
   const toggle = (id: string, span: boolean) => {
     const next = toggleRun(picked, shown, anchor.current, id, span)
     anchor.current = id
-    keepFocus(id, next)
-    pick(next)
-  }
-
-  const clearSearch = () => {
-    setQ('')
-    setCat('')
+    onPick(next)
   }
 
   return (
     <div className="bfp2__pick bdpw__pick">
-      <div className="bfp2__pickbar">
-        <SearchBox
-          value={q}
-          onChange={setQ}
-          placeholder={`Search ${ITEM_NOUN[mode].many}…`}
-          label={`Search ${ITEM_NOUN[mode].many}`}
-          inputRef={searchRef}
-        />
-        <span className="bfp2__catfilter">
-          <CategoryFilter
-            mode={mode}
-            offered={offered}
-            picked={picked}
-            chosen={chosen.length}
-            value={cat}
-            onChange={setCat}
-          />
-        </span>
-        <span className={`bfp2__pickcount ${chosen.length ? 'is-on' : ''}`}>{chosen.length} selected</span>
-        {chosen.length > locked.length && (
-          <button
-            type="button"
-            className="bfp2__clear"
-            onClick={() => {
-              searchRef.current?.focus()
-              pick([])
-            }}
-          >
-            Clear the rest
-          </button>
-        )}
-      </div>
+      <PickBar mode={mode} q={q} onQuery={setQ} shown={shown} picked={picked} chosen={chosen} onPick={onPick} />
 
       {shown.length === 0 ? (
         <NoMatches
           compact
           noun={ITEM_NOUN[mode].many}
           query={q}
-          filtered={cat !== ''}
-          onClear={clearSearch}
+          onClear={() => setQ('')}
           blurb={q.trim() && blockedShown.length > 0 ? agentNote(blockedShown) : undefined}
           secondary={
             q.trim() && blockedShown.length > 0 && onReach ? (
@@ -738,7 +675,6 @@ function InlineChecks({
            its width from. */
         <div className="bfp2__checks">
           <ul
-            ref={listRef}
             className={`bfp2__checklist bdpw__list${mode === 'device' ? ' is-weights' : ''}${hasLock ? '' : ' no-lock'}`}
           >
             {shown.map((a) => (
@@ -908,13 +844,10 @@ function Review({
       {reviewSections(state, step3).map((sec) => (
         <ReviewFold key={sec.step} sec={sec} onEdit={() => onEdit(sec.step)} />
       ))}
-      {/* The panel this replaced (`NextAside`) sat in the right column and was
-          the only thing in it. Two sentences do not need a titled box beside
-          the summary they follow; they read as the last line of it. */}
-      <p className="bdpw__next">
-        The profile is added to Device profiles and opens. Nothing changes at sign-in until a
-        policy rule uses it.
-      </p>
+      {/* A closing note stood here — what happens after Create. Removed at the
+          owner's request (16 Sep 2026): the review is the answers. The page
+          footer says "Ready to create"; in the slide-over, Create profile is
+          the cue. */}
     </div>
   )
 }
@@ -1052,5 +985,5 @@ const SECTION_ICON: Partial<Record<WizardStepId, LucideIcon>> = {
 }
 
 /* `NextAside` stood here — "What happens next" in the review step's right
-   column. Its two lines are a paragraph at the foot of the summary now, and the
-   step has no right column at all. */
+   column. It became a paragraph at the foot of the summary, and then went
+   (16 Sep 2026). The step has no right column at all. */

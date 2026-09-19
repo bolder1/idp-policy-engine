@@ -18,10 +18,12 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  CornerDownRight,
   Info,
   type LucideIcon,
   Minus,
   MoreHorizontal,
+  PenLine,
   Plus,
   Search,
   Trash2,
@@ -30,6 +32,9 @@ import {
 
 import type { AccessDecision, PolicyStatus } from './data'
 import { appRoot, useDialogChrome } from './dialog-chrome'
+import { ChangeList, ChangeSection, type ChangeItem } from './change-list'
+import { groupSections, reviewItemName, type ReviewKind, type ReviewLine } from './review-rows'
+import { useReviewView, type ReviewView } from './review-view'
 
 /* -----------------------------------------------------------------------------
    Brand kit — the primitives from IDP · 2 Core.
@@ -1670,6 +1675,7 @@ export function Modal({
   footer,
   width = DIALOG_W.form,
   padded = true,
+  head,
 }: {
   open: boolean
   onClose: () => void
@@ -1678,6 +1684,8 @@ export function Modal({
   footer?: ReactNode
   width?: number
   padded?: boolean
+  /** Controls beside the title, before the close button. */
+  head?: ReactNode
 }) {
   const panel = useRef<HTMLDivElement | null>(null)
   useDialogChrome(open, onClose, panel)
@@ -1708,6 +1716,7 @@ export function Modal({
           >
             <header className="bx-modal__head">
               <h2>{title}</h2>
+              {head && <div className="bx-modal__extra">{head}</div>}
               <DialogClose onClose={onClose} />
             </header>
             <div className={`bx-modal__body ${padded ? '' : 'is-flush'}`}>{children}</div>
@@ -1737,22 +1746,33 @@ export function Modal({
    is true of every form ever built; "name · 3 added" is the thing somebody is
    being asked to confirm — and on a tabbed or scrolling page it is what names
    edits made where they cannot currently see them. */
-/** One line of a draft's review: what changed, as it was and as it will be saved. */
-export interface ReviewRow {
-  label: string
+/** One line of a draft's review: what changed, as it was and as it will be saved.
+    The optional fields (section, kind, name inside the section, consequence)
+    are `ReviewLine`'s — see review-rows.ts. */
+export interface ReviewRow extends Omit<ReviewLine, 'before' | 'after'> {
   before: ReactNode
   after: ReactNode
 }
 
 /* Review changes: the draft against what is saved, before committing it.
 
-   Opened from the save footer's one button. Every row is one change — added,
-   removed or edited — with the saved value on the left and the draft's on the
-   right, so a reader compares rather than remembers. Keep editing goes back to
-   the page with the draft intact.
+   Settled on 18 Sep 2026, after a carded version (filled green / blue / red
+   cells, a coloured disc on every row) read as loud and a kind-first one
+   ("Added" once, every section's rows pooled under it) lost which step a change
+   belonged to. What it is now:
 
-   No Discard. Leaving the page already asks Save, Discard or Keep editing, so a
-   red button here was a second way to throw the work away, one click from Save. */
+     - An accordion per page section (`groupSections`), consequences last under
+       "Also changes", and inside each one a tinted chip per kind over its rows.
+       A change stays in the step it belongs to.
+     - A row is a name and its value on one line, close together, and the value
+       carries the kind's ink.
+     - Two layouts behind a switch in the header, remembered per viewer
+       (`review-view.ts`): Before & after, and List — what will be saved and
+       nothing else. The body is `ChangeList`, shared with the device profile
+       wizard's Review.
+
+   Keep editing goes back to the page with the draft intact. No Discard:
+   leaving the page already asks Save, Discard or Keep editing. */
 export function ReviewChanges({
   open,
   rows,
@@ -1770,12 +1790,30 @@ export function ReviewChanges({
   blocked?: boolean
   blockedReason?: string
 }) {
+  const [view, setView] = useReviewView()
+  const sections = groupSections(rows)
+  /* Sections open, because a review that hides what it is reviewing is not a
+     review. Past this many ROWS one section starts open and the rest shut —
+     rows, not counted changes, because it is rows that make the dialog long: a
+     zone's single "10.0.0.2, 10.0.0.3 and 12 more" row counts fifteen changes
+     and takes one line.
+
+     The one left open is the biggest, not the first. The first is General — the
+     Name row — on every rename and every create, so "open the first" opened a
+     one-row section and shut everything worth reading. */
+  const rowsIn = (x: (typeof sections)[number]) => x.blocks.reduce((n, b) => n + b.rows.length, 0)
+  const many = sections.reduce((n, x) => n + rowsIn(x), 0) > REVIEW_OPEN_ALL
+  const openAt = sections.reduce((best, x, i) => (rowsIn(x) > rowsIn(sections[best]) ? i : best), 0)
   return (
     <Modal
       open={open}
       onClose={onClose}
       title="Review changes"
-      width={DIALOG_W.wide}
+      /* The before-and-after columns need the width; the list does not, and at
+         780 a name and its value sat too far apart (owner, 18 Sep 2026). */
+      width={view === 'list' ? DIALOG_W.wide : DIALOG_W.work}
+      padded={false}
+      head={<ReviewViewSwitch value={view} onChange={setView} />}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -1795,39 +1833,103 @@ export function ReviewChanges({
         </>
       }
     >
-      {blocked && blockedReason && <p className="bx-review__blocked">{blockedReason}</p>}
-      {rows.length === 0 ? (
-        <p className="bx-review__none">Nothing has changed.</p>
-      ) : (
-        <div className="bx-review__wrap">
-          <table className="bx-review">
-            <thead>
-              <tr>
-                <th scope="col">Change</th>
-                <th scope="col">Saved</th>
-                <th scope="col">After saving</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={`${r.label}-${i}`}>
-                  <th scope="row">{r.label}</th>
-                  <td className="bx-review__before">{reviewValue(r.before)}</td>
-                  <td className="bx-review__after">{reviewValue(r.after)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="bx-rv">
+        {blocked && blockedReason && <p className="bx-review__blocked">{blockedReason}</p>}
+        {rows.length === 0 ? (
+          <p className="bx-review__none">Nothing has changed.</p>
+        ) : (
+          <ChangeList layout={view}>
+            {sections.map((section, i) => {
+              const title = section.effect ? EFFECT_TITLE : section.title
+              return (
+                <ChangeSection
+                  key={section.effect ? 'effect' : section.title}
+                  layout={view}
+                  collapsible
+                  defaultOpen={!many || i === openAt}
+                  title={title}
+                  summary={changeCount(section.count)}
+                  blocks={section.blocks.map((block) => ({
+                    tone: block.kind,
+                    label: REVIEW_KIND_WORD[block.kind],
+                    mark: REVIEW_MARK[block.kind],
+                    items: block.rows.map((r, n) =>
+                      reviewItem(r, block.kind, title, `${section.title}-${block.kind}-${n}`),
+                    ),
+                  }))}
+                />
+              )
+            })}
+          </ChangeList>
+        )}
+      </div>
     </Modal>
   )
 }
 
-/* An added item has nothing saved and a removed one has nothing after: say so
-   rather than leave a blank cell that reads as a rendering fault. */
-const reviewValue = (v: ReactNode) =>
-  v === '' || v === null || v === undefined || v === false ? <span className="bx-review__nil">None</span> : v
+/* The chip over a block of rows. A consequence is not something the admin did,
+   so it says so. */
+const REVIEW_KIND_WORD: Record<ReviewKind | 'effect', string> = {
+  added: 'Added',
+  changed: 'Changed',
+  removed: 'Removed',
+  effect: 'Happens for you',
+}
+/* The consequences section, whatever the rows called it. */
+const EFFECT_TITLE = 'Also changes'
+const REVIEW_OPEN_ALL = 12
+const REVIEW_MARK: Record<ReviewKind | 'effect', LucideIcon> = {
+  added: Plus,
+  changed: PenLine,
+  removed: Minus,
+  effect: CornerDownRight,
+}
+
+/* A row as the list draws it. An added row has nothing before and a removed one
+   nothing after, whatever the producer put there.
+
+   A row named after the section it sits in has no name of its own: a zone's
+   list rows are "IP networks: added", which under the IP networks section with
+   an Added chip over it would say the phrase three times. The value takes the
+   line instead. */
+function reviewItem(r: ReviewRow, kind: ReviewKind | 'effect', section: string, id: string): ChangeItem {
+  const name = reviewItemName(r)
+  return {
+    id,
+    name: name === section ? undefined : name,
+    before: kind === 'added' ? null : r.before,
+    after: kind === 'removed' ? null : r.after,
+    leaving: kind === 'removed',
+  }
+}
+
+/** "3 changes" — a section's own count, which a row may add several to. */
+const changeCount = (n: number): string => `${n} ${n === 1 ? 'change' : 'changes'}`
+
+const REVIEW_VIEWS: { value: ReviewView; label: string }[] = [
+  { value: 'compare', label: 'Before & after' },
+  { value: 'list', label: 'List' },
+]
+
+/* The prototype's comparison switch, in the dialog's header. The page bar's
+   segments (`.bseg`), written out here because the kit sits under the screens. */
+function ReviewViewSwitch({ value, onChange }: { value: ReviewView; onChange: (v: ReviewView) => void }) {
+  return (
+    <div className="bseg bx-rv__views" role="group" aria-label="Review layout">
+      {REVIEW_VIEWS.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          aria-pressed={value === o.value}
+          className={value === o.value ? 'is-on' : ''}
+          onClick={() => onChange(o.value)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 /* Where focus goes when the bar leaves with focus inside it — after Save or
    Discard. Back to what was focused before the bar was reached, or else the

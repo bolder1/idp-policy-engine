@@ -504,6 +504,7 @@ html[data-theme='dark'] {
 .bx-toggle--sm { width: 32px; height: 18px; }
 .bx-toggle--lg { width: 52px; height: 30px; }
 
+
 /* On is GREEN, not brand.
 
    A switch says "this is running", which is a state, and the console already
@@ -1232,16 +1233,214 @@ html[data-theme='dark'] {
 .bx-confirm__rules { font-size: var(--fs-sm); color: var(--text-muted); }
 .bx-confirm__uses li > .bx-badge { align-self: flex-start; }
 
-/* Review changes (kit ReviewChanges): saved against draft, one change a row.
-   The wrap scrolls sideways on a phone rather than squeezing three columns. */
-.bx-review__wrap { overflow-x: auto; }
-.bx-review { width: 100%; min-width: 420px; border-collapse: collapse; font-size: var(--fs-md); }
-.bx-review th, .bx-review td { text-align: left; vertical-align: top; padding: var(--space-4) var(--space-5); border-bottom: var(--bw-thin) solid var(--border-subtle); overflow-wrap: anywhere; }
-.bx-review thead th { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary); }
-.bx-review tbody th { font-weight: var(--fw-medium); color: var(--text-primary); width: 28%; }
-.bx-review__before { color: var(--text-tertiary); width: 36%; }
-.bx-review__after { color: var(--text-primary); width: 36%; }
-.bx-review__nil { color: var(--text-muted); }
-.bx-review__none, .bx-review__blocked { margin: 0 0 var(--space-5); font-size: var(--fs-md); color: var(--text-secondary); }
+/* --- Review changes (kit ReviewChanges) --------------------------------------------
+
+   The dialog's frame: the layout switch in the header, and padding round the
+   change list. The list itself is `.bx-cl` below. (17 Sep 2026: the carded,
+   colour-filled `.bx-rv__*` version stood here.) */
+.bx-modal__extra {
+  flex: none; display: flex; align-items: center;
+  margin: -5px 0 -5px auto;
+}
+.bseg.bx-rv__views { flex-wrap: nowrap; }
+.bx-rv { padding: var(--space-4) var(--space-7) var(--space-6); }
+.bx-review__none, .bx-review__blocked { margin: var(--space-4) 0; font-size: var(--fs-md); color: var(--text-secondary); }
 .bx-review__blocked { color: var(--fb-notice-fg); font-weight: var(--fw-medium); }
+
+/* --- A list of changes (change-list.tsx) --------------------------------------------
+
+   Review changes' body and the device profile wizard's Review. The live
+   console's own Review Changes is the reference, on this console's tokens and
+   without its tint on every row:
+
+     a SECTION per part of the page, as an accordion — a chevron, the section's
+     name and how many changes it holds; inside it, a tinted chip per kind over
+     the rows it covers; and a row that is a name and a value on ONE line,
+     close together, on a quiet fill.
+
+   The two things being fixed on 18 Sep 2026: the name sat on the left edge and
+   the value against the right, a hand-span of white apart ("the user has to
+   read on the left and then go all the way to the right"), and every added row
+   in the review was pooled under one heading whatever section it came from.
+   ONE grid for the whole review, not one per section: every value in it
+   starts past the longest name anywhere in the review, so Profile, Devices and
+   Signals line their values up on a single x. Per section, the three columns
+   landed in three different places and read as three reviews (owner, 18 Sep
+   2026: "make it consistent in terms of spacing and width… we can make it as a
+   single review").
+
+   The rows breathe: 33px each, against the 25px they were when the same owner
+   asked for compact — "add some space between each row, it feels very
+   congested". One spacing scale all the way down: 6px inside a row, 8px
+   between blocks, 16px between sections.
+
+   Colour: the kind's chip and the value, both from the feedback ramps. Rows
+   have no rules and no icons. */
+/* The container sits on the wrapper so the narrow rules can restyle the list
+   itself; an element is never matched by its own container query. */
+.bx-cl__wrap { container: bx-cl / inline-size; min-width: 0; }
+.bx-cl { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+
+/* Before and after: one grid for the key and every row. */
+.bx-cl.is-compare .bx-cl__key,
+.bx-cl.is-compare .bx-cl__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 13px minmax(0, 1fr);
+  column-gap: var(--space-5);
+  align-items: center;
+}
+/* The key is drawn once, above the first section. It does NOT stick: past
+   twelve rows only one section is open, and a pinned key then named two
+   columns that were nowhere on screen. */
+.bx-cl__key {
+  padding: var(--space-2) var(--space-5) var(--space-3);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  font-size: var(--fs-sm); color: var(--text-tertiary);
+}
+
+/* --- A section, as an accordion -------------------------------------------------- */
+.bx-cl__sec { min-width: 0; }
+.bx-cl__head {
+  display: flex; align-items: center; gap: var(--space-4);
+  min-height: 26px;
+}
+/* `.bx-modal h3` and `.bpage h3` set the size and weight; this sets the rest. */
+.bx-cl__title {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: var(--space-4);
+  margin: 0;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+/* The whole header line opens the section — a title you can only open by
+   hitting a 15px chevron is the usual fault of this pattern. */
+.bx-cl__toggle {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: var(--space-4);
+  margin-left: -4px; padding: var(--space-1) 4px;
+  border: 0; border-radius: var(--radius-md); background: none;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.bx-cl__toggle:hover { color: var(--text-link); }
+.bx-cl__toggle:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bx-cl__chev {
+  flex: none; color: var(--text-tertiary);
+  transform: rotate(-90deg);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.bx-cl__sec.is-open .bx-cl__chev { transform: none; }
+.bx-cl__count {
+  margin-left: auto;
+  font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+.bx-cl__body { display: flex; flex-direction: column; gap: var(--space-4); padding-top: var(--space-4); }
+/* A shut section stays MOUNTED and hides with `hidden`, because the toggle's
+   `aria-controls` has to point at something that exists (change-list.tsx). The
+   UA's `[hidden] { display: none }` is the weakest rule there is, so the author
+   `display` above — and the `display: grid` the list view sets below — both
+   beat it and the section never actually collapsed. Say it again, louder, at a
+   specificity that clears the list view's three-class selector. */
+.bx-cl__body[hidden],
+.bx-cl.is-list .bx-cl__body[hidden] { display: none; }
+
+/* --- A block of rows, under its kind's chip -------------------------------------- */
+.bx-cl__block {
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+.bx-cl__kindrow { margin: 0 0 var(--space-3); }
+/* The kind's chip IS the kit's badge — see `BADGE_TONE` in change-list.tsx —
+   so it carries the one pill family's geometry, type and tones with nothing
+   restated here. Only the measure: a badge caps at 14ch for a table cell, and
+   "Happens for you" is longer than that. */
+.bx-cl__kind { --badge-max: none; }
+
+/* --- The rows -------------------------------------------------------------------- */
+/* 25px: one 14px line at the root's 1.5 line-height, plus 2px either side.
+   There is no min-height — a single line already exceeds any floor worth
+   setting, so one would only mislead the next person retuning this. */
+.bx-cl__rows { margin: 0; padding: 0; list-style: none; }
+.bx-cl__row { padding-block: var(--space-3); font-size: var(--fs-md); }
+.bx-cl__name { min-width: 0; color: var(--text-secondary); overflow-wrap: anywhere; }
+.bx-cl__before { min-width: 0; color: var(--text-tertiary); overflow-wrap: anywhere; }
+.bx-cl__after,
+.bx-cl__value { min-width: 0; color: var(--text-primary); font-weight: var(--fw-medium); overflow-wrap: anywhere; }
+.bx-cl__arrow { color: var(--text-muted); }
+
+/* List: the name, then what it will be. The grid is on the WHOLE list and
+   every level below subgrids to it — section, body, block, rows, row — so one
+   pair of columns runs through the review and a value in Signals starts where
+   a value in Profile does.
+
+   `auto`, not `max-content`: an auto track shrinks when the room runs out, so
+   a long name wraps instead of squeezing its value to nothing. Every block
+   carries the same padding, so the fills offset their tracks by the same
+   amount and the columns still agree. */
+.bx-cl.is-list {
+  display: grid; grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-7); row-gap: var(--space-6);
+}
+.bx-cl.is-list .bx-cl__sec,
+.bx-cl.is-list .bx-cl__body,
+.bx-cl.is-list .bx-cl__block,
+.bx-cl.is-list .bx-cl__rows,
+.bx-cl.is-list .bx-cl__row {
+  grid-column: 1 / -1;
+  display: grid; grid-template-columns: subgrid;
+}
+.bx-cl.is-list .bx-cl__sec { row-gap: var(--space-4); }
+.bx-cl.is-list .bx-cl__body { row-gap: var(--space-4); padding-top: 0; }
+.bx-cl.is-list .bx-cl__row { align-items: baseline; }
+/* The header, the chip, the note and the link span both tracks. */
+.bx-cl.is-list .bx-cl__head,
+.bx-cl.is-list .bx-cl__kindrow,
+.bx-cl.is-list .bx-cl__none,
+.bx-cl.is-list .bx-cl__more { grid-column: 1 / -1; }
+/* A row with no name of its own: the value takes the line. */
+.bx-cl.is-list .bx-cl__row.is-bare .bx-cl__value { grid-column: 1 / -1; }
+/* The value says what the change does, so it carries the kind's ink — the one
+   other coloured thing besides the chip. */
+.bx-cl__block.is-added .bx-cl__value,
+.bx-cl__block.is-added .bx-cl__after { color: var(--fb-positive-fg); }
+.bx-cl__block.is-changed .bx-cl__value,
+.bx-cl__block.is-changed .bx-cl__after { color: var(--fb-info-fg); }
+.bx-cl__block.is-removed .bx-cl__value,
+.bx-cl__block.is-removed .bx-cl__before { color: var(--fb-negative-fg); }
+.bx-cl__block.is-effect .bx-cl__value,
+.bx-cl__block.is-effect .bx-cl__after { color: var(--fb-notice-fg); }
+/* On its way out: struck, and never the dark ink of a value that stays. */
+.bx-cl__value.is-leaving {
+  font-weight: var(--fw-regular);
+  text-decoration: line-through; text-decoration-thickness: 1px;
+}
+/* Nothing there: a quiet word or a dash, never struck or tinted. */
+.bx-cl__nil { color: var(--text-muted); font-weight: var(--fw-regular); text-decoration: none; }
+.bx-cl__value.is-leaving .bx-cl__nil { display: inline-block; }
+
+.bx-cl__none {
+  margin: 0; padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg); background: var(--surface-sunken);
+  font-size: var(--fs-md); color: var(--text-muted);
+}
+.bx-cl__more {
+  align-self: flex-start;
+  margin: 0 0 0 var(--space-5); padding: 0;
+  border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-link);
+}
+.bx-cl__more:hover { text-decoration: underline; }
+.bx-cl__more:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 3px var(--focus-halo); }
+
+/* Narrow: the name on its own line, the values under it. */
+@container bx-cl (max-width: 519px) {
+  .bx-cl.is-compare .bx-cl__key { display: none; }
+  .bx-cl.is-compare .bx-cl__row { grid-template-columns: minmax(0, 1fr) 13px minmax(0, 1fr); row-gap: 0; padding-block: var(--space-2); }
+  .bx-cl.is-compare .bx-cl__name { grid-column: 1 / -1; }
+  /* One track, so a row's name and value stack instead of fighting over ~280px. */
+  .bx-cl.is-list { grid-template-columns: minmax(0, 1fr); }
+  .bx-cl.is-list .bx-cl__row { padding-block: var(--space-2); }
+  .bx-cl.is-list .bx-cl__value { font-weight: var(--fw-semibold); }
+}
 

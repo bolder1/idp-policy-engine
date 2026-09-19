@@ -1,35 +1,24 @@
 /* -----------------------------------------------------------------------------
-   Settings row.
+   Settings field.
+
+   A FIELD, not a row: the label on one line, the control filling the line under
+   it at the panel's full width (owner, 18 Sep 2026 — "only the vertical one,
+   label at the top, remove icons, and the selection at the bottom taking the
+   full space"). See the note in setting-field.tsx for why the side-by-side row
+   went, and which two kinds keep it.
 
    The old row was label / grey help sentence / control-on-the-right, repeated.
    At forty-two rows that reads as a wall, and the help was doing the damage —
    longest text on the row, least often wanted. It moved to the label.
-
-   What is left has to carry the weight instead, so: an icon to find rows by, a
-   value stated large enough to read at a glance, and a slider wide enough to
-   aim at. Measured against Antimetal, Fruitful and Teak, which all solve the
-   same row and all give the range the full width rather than a right-hand
-   column.
    -------------------------------------------------------------------------- */
 
 /* No rule between rows: the list gap separates them (see .bm8__setlist). */
 .bsf {
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex; flex-direction: column; gap: var(--space-4);
   padding: 10px 0;
 }
-/* A range row is two lines tall by nature, so it gets a little more air than a
-   toggle row rather than the same and looking cramped. */
-.bsf.is-range { padding-bottom: 14px; }
 
-.bsf__head { display: flex; align-items: center; gap: 11px; }
-
-/* The setting's subject, drawn plain: no tile behind it, so the row is a line
-   of text with a glyph rather than a box beside a label. */
-.bsf__ico {
-  flex: none; display: grid; place-items: center;
-  width: 24px; height: 24px;
-  color: var(--text-tertiary);
-}
+.bsf__head { display: flex; align-items: center; gap: var(--space-5); }
 
 .bsf__label {
   flex: 1; min-width: 0;
@@ -37,10 +26,24 @@
   font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
 }
 
-/* The label, with what the setting does on its tip. */
-.bsf__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bsf__ctl { display: flex; align-items: center; gap: 8px; }
 
-.bsf__ctl { flex: none; display: flex; align-items: center; gap: 8px; }
+/* --- Full width --------------------------------------------------------------------
+   Scoped to the field's OWN control (`>` from `.bsf`), so a revealed field
+   nested under it keeps its own shape rather than inheriting this one. An
+   inline field's control lives inside `.bsf__head` and never matches. */
+.bsf > .bsf__ctl { width: 100%; }
+.bsf > .bsf__ctl > * { flex: 1; min-width: 0; }
+.bsf > .bsf__ctl .bsf__dd { display: flex; }
+.bsf > .bsf__ctl .bsf__ddtrigger { width: 100%; min-width: 0; }
+/* Each segment takes an equal share, so the control reads as one field rather
+   than as a cluster of buttons floating in a full-width row. */
+.bsf > .bsf__ctl .bsf__seg { display: flex; width: 100%; }
+.bsf > .bsf__ctl .bsf__seg button { flex: 1; min-width: 0; }
+.bsf > .bsf__ctl .bsf__textwrap { display: flex; width: 100%; }
+.bsf > .bsf__ctl .bsf__text { width: 100%; }
+/* A switch or a door stays beside its label; nothing here stretches. */
+.bsf.is-inline .bsf__ctl { flex: none; }
 
 .bsf__warn {
   display: flex; align-items: flex-start; gap: 6px; margin: 0;
@@ -82,7 +85,7 @@
 .bsf__dd { position: relative; display: inline-flex; }
 .bsf__ddtrigger {
   display: inline-flex; align-items: center; gap: 8px;
-  min-width: 168px; height: var(--ctl-height-sm); padding: 0 10px;
+  min-width: 168px; height: var(--ctl-height-md); padding: 0 var(--space-4);
   background: var(--ctl-bg);
   border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   cursor: pointer; font-size: var(--fs-md); color: var(--text-primary);
@@ -118,6 +121,20 @@
 .bsf__ddlist button:hover { background: var(--surface-sunken); color: var(--text-primary); }
 .bsf__ddlist button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
+/* --- A number the set does not hold --------------------------------------------------
+   The dropdown keeps its place and the box appears UNDER it, so choosing
+   "Custom" adds a control rather than swapping one out. The unit sits beside
+   the box rather than inside it: a suffix inside a number field leaves the
+   field looking half as wide as the triggers above it. */
+.bsf__num { display: flex; flex-direction: column; gap: var(--space-4); width: 100%; }
+.bsf__customrow { display: flex; align-items: center; gap: var(--space-4); }
+.bsf__customrow .bsf__text { flex: 1; min-width: 0; }
+.bsf__unit { flex: none; font-style: normal; font-size: var(--fs-md); color: var(--text-secondary); }
+
+/* The value it sets is typed under the field rather than named in the list, so
+   it is ruled off from the ones that name themselves. It still ticks. */
+.bsf__ddaction { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border-subtle); }
+
 /* --- Text ---------------------------------------------------------------------------
    The counter sits inside the field rather than under it, so a row that is
    approaching its limit does not change height — a settings column that reflows
@@ -126,7 +143,7 @@
 .bsf__textwrap { position: relative; display: inline-flex; align-items: center; }
 
 .bsf .bsf__text {
-  width: 200px; height: var(--ctl-height-sm); padding: 0 10px;
+  width: 200px; height: var(--ctl-height-md); padding: 0 var(--space-4);
   background: var(--ctl-bg);
   border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
   font-size: var(--fs-md); color: var(--text-primary);
@@ -153,19 +170,14 @@
    everything else they read as peers. The indent alone says it — the rule that
    ran down the left went with the other dividers (15 Sep 2026). */
 .bsf__reveal {
-  margin: 2px 0 0 35px;                 /* aligns with the label, past the 24px icon and its gap */
+  margin: var(--space-2) 0 0 var(--space-6);
 }
 .bsf__reveal .bsf { padding: 8px 0; }
-/* One step down in the hierarchy, so a revealed row does not compete with the
-   row that produced it. */
-.bsf__reveal .bsf__ico { width: 20px; height: 20px; }
+/* One step down in the hierarchy, so a revealed field does not compete with the
+   one that produced it. */
 .bsf__reveal .bsf__label { font-weight: var(--fw-regular); color: var(--text-secondary); }
 
 @media (max-width: 620px) {
-  .bsf__head { flex-wrap: wrap; }
-  .bsf__ctl { width: 100%; justify-content: flex-end; }
-  .bsf .bsf__text { width: 100%; }
-  .bsf__textwrap { width: 100%; }
   .bsf__reveal { margin-left: 0; }}
 
 /* Removable rows — the fingerprint profile's attributes can be taken out of the

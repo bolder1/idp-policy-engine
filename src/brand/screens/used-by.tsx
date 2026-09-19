@@ -1,9 +1,11 @@
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Unlink } from 'lucide-react'
 
 import { DecisionChip, StatusPill } from '../kit'
+import { EmptyState } from '../empty'
 import { ChangeState } from '../leave-guard'
 import { useBrand } from '../store'
 import type { PolicyUse } from './usage'
+import { DockPanel } from './dock-panel'
 
 /* -----------------------------------------------------------------------------
    What depends on this object, drawn.
@@ -82,3 +84,32 @@ export function UsedByList({ users }: { users: PolicyUse[] }) {
    a coloured dot per policy for its status. It had no callers, and dots are out
    of the console (owner, 14 Sep 2026), so it went rather than being redrawn.
    A cell that needs it back should list names with a StatusPill each. */
+
+/* "Used by", from a library row's menu, docked beside the list — see
+   `DockPanel`. Zones and device profiles ask the same question of their rows,
+   so they share the panel; each says what "use" means for its own object. */
+export function UsedByPanel({
+  subject,
+  caption,
+  emptyBlurb,
+  users,
+  onClose,
+}: {
+  subject: string
+  /** "Policy rules that name Corporate managed." */
+  caption: string
+  /** "No policy rule names this profile." */
+  emptyBlurb: string
+  users: PolicyUse[]
+  onClose: () => void
+}) {
+  return (
+    <DockPanel title="Used by" caption={caption} subject={subject} onClose={onClose}>
+      {users.length === 0 ? (
+        <EmptyState compact icon={Unlink} title="Not used by any policy" blurb={emptyBlurb} />
+      ) : (
+        <UsedByList users={users} />
+      )}
+    </DockPanel>
+  )
+}

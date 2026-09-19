@@ -1,5 +1,6 @@
 import { nameTaken } from './data'
 import { TIER_WEIGHT, type Priority } from './fingerprint'
+import type { ReviewLine } from './review-rows'
 
 /* -----------------------------------------------------------------------------
    The risk signals, and what the tenant has decided each one is worth.
@@ -24,12 +25,28 @@ import { TIER_WEIGHT, type Priority } from './fingerprint'
    The page states the gap in a sentence instead.
    -------------------------------------------------------------------------- */
 
-export type Platform = 'android' | 'ios'
+export type Platform = 'android' | 'ios' | 'windows' | 'macos'
 
-export const PLATFORMS: { id: Platform; label: string }[] = [
+export interface PlatformOption {
+  id: Platform
+  label: string
+  /* Named on the filter, and not collected from: the SDKs ship on the two
+     mobile platforms, and the desktop ones are the roadmap said out loud
+     rather than a filter that silently offers nothing (owner, 18 Sep 2026:
+     "add other options here as well like Windows etc., add a coming soon
+     chip"). Nothing in the catalogue is `on` one of these. */
+  soon?: true
+}
+
+export const PLATFORMS: PlatformOption[] = [
   { id: 'android', label: 'Android' },
   { id: 'ios', label: 'iOS' },
+  { id: 'windows', label: 'Windows', soon: true },
+  { id: 'macos', label: 'macOS', soon: true },
 ]
+
+/** The platforms a signal can actually be collected on today. */
+export const LIVE_PLATFORMS: PlatformOption[] = PLATFORMS.filter((p) => !p.soon)
 
 /* Filed by what the signal is EVIDENCE of, not by where it is collected.
 
@@ -255,7 +272,13 @@ export const signalById = (id: string) => RISK_SIGNALS.find((s) => s.id === id)
 export interface RiskTuning {
   /** Signal ids the tenant has switched off. Everything else is on. */
   off: string[]
-  /** Per-signal, per-platform weight overrides. Keyed `${signalId}:${platform}`. */
+  /* Weight overrides, by signal id.
+
+     It was keyed `${signalId}:${platform}` — a weight per signal per platform.
+     The owner collapsed it on 18 Sep 2026 ("instead of 2 different options for
+     Android and iOS we need one"): a signal is worth what it is worth, and an
+     admin asked to say so twice said it twice. Which platforms a signal is
+     collected on is still the catalogue's `on`, and the row shows it. */
   tiers: Record<string, Priority>
 }
 
@@ -288,12 +311,9 @@ export const blankRiskProfile = (name: string, id: string): RiskProfile => ({
   name,
 })
 
-export const tierKey = (signalId: string, p: Platform) => `${signalId}:${p}`
-
 export const isOn = (profile: RiskTuning, signalId: string) => !profile.off.includes(signalId)
 
-export const tierFor = (profile: RiskTuning, s: RiskSignal, p: Platform): Priority =>
-  profile.tiers[tierKey(s.id, p)] ?? s.tier
+export const tierFor = (profile: RiskTuning, s: RiskSignal): Priority => profile.tiers[s.id] ?? s.tier
 
 /* The weight a platform currently carries, and the weight it shipped with.
 
@@ -304,15 +324,15 @@ export const tierFor = (profile: RiskTuning, s: RiskSignal, p: Platform): Priori
    thirds of the catalogue before the total fell under the cap and anything
    moved. A screen whose controls do nothing for their first ten clicks is worse
    than one that does nothing at all, because it takes longer to find out. */
-export function weightFor(profile: RiskTuning, p: Platform): number {
-  return RISK_SIGNALS.filter((s) => s.on.includes(p) && isOn(profile, s.id)).reduce(
-    (sum, s) => sum + TIER_WEIGHT[tierFor(profile, s, p)],
+export function weightFor(profile: RiskTuning, p?: Platform): number {
+  return RISK_SIGNALS.filter((s) => (!p || s.on.includes(p)) && isOn(profile, s.id)).reduce(
+    (sum, s) => sum + TIER_WEIGHT[tierFor(profile, s)],
     0,
   )
 }
 
-export function shippedWeightFor(p: Platform): number {
-  return RISK_SIGNALS.filter((s) => s.on.includes(p)).reduce((sum, s) => sum + TIER_WEIGHT[s.tier], 0)
+export function shippedWeightFor(p?: Platform): number {
+  return RISK_SIGNALS.filter((s) => !p || s.on.includes(p)).reduce((sum, s) => sum + TIER_WEIGHT[s.tier], 0)
 }
 
 /* What Low, Medium and High are WORTH, given this profile.
@@ -343,8 +363,12 @@ export function shippedWeightFor(p: Platform): number {
 const SHIPPED_BAND: Record<string, number> = { Low: 12, Medium: 48, High: 86 }
 
 export function riskScale(profile: RiskTuning): Record<string, number> {
+  /* Still the WEAKEST platform's ratio, not the catalogue's: a signal collected
+     only on Android is evidence an iPhone cannot produce, so a rule's threshold
+     has to be one both platforms can reach. One weight per signal changed what
+     an admin types, not what a phone can see. */
   const ratio = Math.min(
-    ...PLATFORMS.map((p) => {
+    ...LIVE_PLATFORMS.map((p) => {
       const shipped = shippedWeightFor(p.id)
       return shipped === 0 ? 0 : weightFor(profile, p.id) / shipped
     }),
@@ -380,20 +404,16 @@ export function setSignalOn<T extends RiskTuning>(t: T, signalId: string, on: bo
   return { ...t, off: [...known, ...unknown] }
 }
 
-/** Set one signal's weight on one platform. Setting it back to the shipped weight removes the override. */
-export function setSignalTier<T extends RiskTuning>(t: T, s: RiskSignal, p: Platform, tier: Priority): T {
-  const key = tierKey(s.id, p)
+/** Set one signal's weight. Setting it back to the shipped weight removes the override. */
+export function setSignalTier<T extends RiskTuning>(t: T, s: RiskSignal, tier: Priority): T {
   const tiers = { ...t.tiers }
-  if (tier === s.tier) delete tiers[key]
-  else tiers[key] = tier
+  if (tier === s.tier) delete tiers[s.id]
+  else tiers[s.id] = tier
   return { ...t, tiers }
 }
 
 /** The weight an override key resolves to, falling back to the catalogue. */
-const effectiveTier = (t: RiskTuning, key: string): Priority | undefined => {
-  const s = signalById(key.split(':')[0])
-  return t.tiers[key] ?? s?.tier
-}
+const effectiveTier = (t: RiskTuning, key: string): Priority | undefined => t.tiers[key] ?? signalById(key)?.tier
 
 /** Same signals off and same effective weights, whatever order they were stored in. */
 export function sameTuning(a: RiskTuning, b: RiskTuning): boolean {
@@ -416,8 +436,9 @@ export function riskProfileProblem(p: Pick<RiskProfile, 'name'> & RiskTuning, ot
   if (!p.name.trim()) return 'Enter a profile name.'
   if (nameTaken(p.name, otherNames)) return 'A risk profile with this name already exists.'
   /* With nothing on for a platform every band is 0: "Risk score above N" would
-     never fire and "below N" would always match. */
-  if (PLATFORMS.some((pl) => weightFor(p, pl.id) === 0)) return 'Turn on at least one signal on each platform.'
+     never fire and "below N" would always match. Per platform still, because
+     the scale is the weakest platform's. */
+  if (LIVE_PLATFORMS.some((pl) => weightFor(p, pl.id) === 0)) return 'Turn on at least one signal on each platform.'
   return null
 }
 
@@ -430,38 +451,71 @@ export function riskProfileNameProblem(name: string, otherNames: Iterable<string
 
 const BANDS = ['Low', 'Medium', 'High'] as const
 
-/** One line of the review: what changed, as saved and as it will be saved. */
-export interface RiskReviewLine {
-  label: string
-  before: string
-  after: string
-}
+/** One line of the review: what changed, as saved and as it will be saved.
+    The shared row shape, so the dialog can file it (see review-rows.ts). */
+export type RiskReviewLine = ReviewLine
 
-/** Every change between the saved profile and the draft, in the order the page reads. */
+/** Every change between the saved profile and the draft, in the order the page reads.
+
+    How each row is filed in the review, in the page's own words:
+      Name          no section (it leads under General), changed
+      Risk scores   the three bands, named as the page names them (Low, Medium,
+                    High). A consequence of the signal and weight edits, never
+                    an edit of its own — nobody types a score — so `effect`.
+      Signals       one row per signal switched, named by the signal
+      Weights       one row per signal and platform, "Tor exit node on iOS"
+    Every kind is 'changed' and said outright: a switch goes On ⇄ Off and a
+    weight moves tier, so nothing here is added or removed, and no value is
+    ever empty for the dialog to guess from anyway. */
 export function riskReviewRows(saved: RiskProfile, draft: RiskProfile): RiskReviewLine[] {
   const rows: RiskReviewLine[] = []
-  if (saved.name.trim() !== draft.name.trim()) rows.push({ label: 'Name', before: saved.name.trim(), after: draft.name.trim() })
+  if (saved.name.trim() !== draft.name.trim()) {
+    rows.push({ label: 'Name', before: saved.name.trim(), after: draft.name.trim(), kind: 'changed' })
+  }
 
   const fromScale = riskScale(saved)
   const toScale = riskScale(draft)
   for (const b of BANDS) {
     if (fromScale[b] !== toScale[b]) {
-      rows.push({ label: `${b} risk score`, before: String(fromScale[b]), after: String(toScale[b]) })
+      rows.push({
+        label: `${b} risk score`,
+        before: String(fromScale[b]),
+        after: String(toScale[b]),
+        group: 'Risk scores',
+        kind: 'changed',
+        item: b,
+        effect: true,
+      })
     }
   }
 
   for (const s of RISK_SIGNALS) {
     const was = isOn(saved, s.id)
     const now = isOn(draft, s.id)
-    if (was !== now) rows.push({ label: `Signal: ${s.name}`, before: was ? 'On' : 'Off', after: now ? 'On' : 'Off' })
+    if (was !== now) {
+      rows.push({
+        label: `Signal: ${s.name}`,
+        before: was ? 'On' : 'Off',
+        after: now ? 'On' : 'Off',
+        group: 'Signals',
+        kind: 'changed',
+        item: s.name,
+      })
+    }
   }
 
   for (const s of RISK_SIGNALS) {
-    for (const p of PLATFORMS) {
-      if (!s.on.includes(p.id)) continue
-      const was = tierFor(saved, s, p.id)
-      const now = tierFor(draft, s, p.id)
-      if (was !== now) rows.push({ label: `Weight: ${s.name} on ${p.label}`, before: was, after: now })
+    const was = tierFor(saved, s)
+    const now = tierFor(draft, s)
+    if (was !== now) {
+      rows.push({
+        label: `Weight: ${s.name}`,
+        before: was,
+        after: now,
+        group: 'Weights',
+        kind: 'changed',
+        item: s.name,
+      })
     }
   }
   return rows
@@ -472,6 +526,6 @@ export function riskChangeNames(saved: RiskProfile, draft: RiskProfile): string[
   const names: string[] = []
   if (saved.name.trim() !== draft.name.trim()) names.push('Name')
   if (RISK_SIGNALS.some((s) => isOn(saved, s.id) !== isOn(draft, s.id))) names.push('Signals')
-  if (RISK_SIGNALS.some((s) => s.on.some((p) => tierFor(saved, s, p) !== tierFor(draft, s, p)))) names.push('Weights')
+  if (RISK_SIGNALS.some((s) => tierFor(saved, s) !== tierFor(draft, s))) names.push('Weights')
   return names
 }

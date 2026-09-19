@@ -1,5 +1,5 @@
 import { flushSync } from 'react-dom'
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -12,7 +12,6 @@ import {
   Plus,
   Sliders,
   Trash2,
-  Unlink,
 } from 'lucide-react'
 
 import {
@@ -58,9 +57,10 @@ import {
 import { useBrand } from '../store'
 import { ChangeState, useLeaveGuard } from '../leave-guard'
 import { EmptyState, NoMatches } from '../empty'
-import { newId, uniqueName, type Policy } from '../data'
+import { DEVICES_NOTE, itemsNote } from './profile-notes'
+import { newId, uniqueName } from '../data'
 import { deleteImpact, policiesUsing } from './usage'
-import { UsedByList } from './used-by'
+import { UsedByPanel } from './used-by'
 import { ConfirmDelete } from './confirm-delete'
 import { pageForRow, usePagedList } from './paged-list'
 import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
@@ -72,19 +72,14 @@ import { ListPager } from './list-pager'
 import { MODE_ICON, reachChoices } from './device-profile-choices'
 import {
   AttrStep,
-  BasicAside,
-  ChecksAside,
   ChoiceTiles,
   ChosenList,
   EnrolmentFields,
-  ProfileAside,
   SidePanel,
 } from './device-profile-parts'
 import {
-  basicDetailsSet,
   basicSetupIssue,
   modeFixedTip,
-  unsetAsideLines,
 } from './device-profile-basic'
 import { DeviceProfileWizard } from './device-profile-wizard'
 import { NewProfileDialog } from './new-profile-dialog'
@@ -161,11 +156,15 @@ export function DeviceFingerprintV2() {
      and hooks — and the checks flag each rule left naming it. */
   const [deleting, setDeleting] = useState<FingerprintProfile | null>(null)
 
-  /* The profile whose "Used by" drawer is open, from its row menu. Up here
+  /* The profile whose "Used by" panel is open, from its row menu. Up here
      rather than on the page: Used by is a question about a profile on the list,
      asked beside Duplicate and Delete, and answering it should not mean opening
-     the profile and its draft. */
-  const [usesFor, setUsesFor] = useState<FingerprintProfile | null>(null)
+     the profile and its draft. Held by id and read from the store, so a rename
+     shows and a delete closes the panel. */
+  const [usesId, setUsesId] = useState<string | null>(null)
+  const uses = usesId ? (store.fingerprints.find((f) => f.id === usesId) ?? null) : null
+  /* The Used by panel docks beside the list — see `DockPanel`. */
+  const docked = listUp && uses !== null
 
   /* Where keyboard focus goes when the list comes back: the row just left, or
      the row next to the one just deleted. The control that had focus went with
@@ -228,6 +227,7 @@ export function DeviceFingerprintV2() {
   }
 
   const startCreate = () => {
+    setUsesId(null)
     if (version === 'name') {
       setNaming(true)
       return
@@ -273,7 +273,7 @@ export function DeviceFingerprintV2() {
        and footers are laid out for that width. `bfp2--list` marks the list page
        whichever width it is — including under the Current slide-over, which
        leaves the list on screen and must not make it jump wider. */
-    <div className={`bpage bfp2${listUp ? ` bfp2--list${compactClass(width)}` : ''}`}>
+    <div className={`bpage bfp2${listUp ? ` bfp2--list${compactClass(width)}` : ''}${docked ? ' has-dock' : ''}`}>
       {detail ? (
         /* Keyed, and the key is load-bearing now that the page holds a draft:
            without it, opening a second profile would hand the same component a
@@ -330,18 +330,28 @@ export function DeviceFingerprintV2() {
             setMode={setModeFilter}
             focus={listFocus}
             onFocused={focusDone}
-            onOpen={setOpenId}
+            onOpen={(id) => {
+              setUsesId(null)
+              setOpenId(id)
+            }}
             version={version}
             onVersion={setVersion}
             onCreate={startCreate}
             onDuplicate={duplicate}
-            onUses={setUsesFor}
+            uses={uses}
+            usesPanel={
+              uses && (
+                <UsedByPanel
+                  subject={uses.id}
+                  caption={`Policy rules that name ${uses.name}.`}
+                  emptyBlurb="No policy rule names this profile."
+                  users={policiesUsing('fingerprint', uses.id, store.policies)}
+                  onClose={() => setUsesId(null)}
+                />
+              )
+            }
+            onUses={(p) => setUsesId(p.id)}
             onDelete={setDeleting}
-          />
-          <UsedByDrawer
-            profile={usesFor}
-            policies={store.policies}
-            onClose={() => setUsesFor(null)}
           />
           {/* Current renders BESIDE the list rather than instead of it.
 
@@ -402,8 +412,8 @@ const ROW_ITEMS: MenuItem[] = [
 ]
 
 /* No "Used by" count on the row. Which policies name a profile is answered by
-   the row menu's "Used by", which opens the list in a drawer; the row says what
-   each profile is and offers its actions. */
+   the row menu's "Used by", which docks the answer beside the list; the row
+   says what each profile is and offers its actions. */
 function ProfileList({
   profiles,
   q,
@@ -417,6 +427,8 @@ function ProfileList({
   onVersion,
   onCreate,
   onDuplicate,
+  uses,
+  usesPanel,
   onUses,
   onDelete,
 }: {
@@ -433,6 +445,10 @@ function ProfileList({
   onVersion: (v: CreateVersion) => void
   onCreate: () => void
   onDuplicate: (p: FingerprintProfile) => void
+  /** The profile the Used by panel is about, marked on its row. */
+  uses: FingerprintProfile | null
+  /** That panel, placed between the bar and the rows. */
+  usesPanel: ReactNode
   onUses: (p: FingerprintProfile) => void
   onDelete: (p: FingerprintProfile) => void
 }) {
@@ -595,6 +611,10 @@ function ProfileList({
         />
       )}
 
+      {/* Before the rows, not after: the paged-list hook counts everything that
+          follows the rows as room they cannot have. */}
+      {profiles.length > 0 && usesPanel}
+
       {profiles.length === 0 ? (
         <EmptyState
           icon={MonitorSmartphone}
@@ -627,7 +647,7 @@ function ProfileList({
                 name: p.name,
                 tile: renderModeIcon(p.mode, 18),
                 tileClass: 'bfp2__tile',
-                attrs: { 'data-id': p.id },
+                attrs: uses?.id === p.id ? { 'data-id': p.id, 'data-docked': 'true' } : { 'data-id': p.id },
                 onOpen: () => onOpen(p.id),
                 facts: [
                   { label: 'Type', value: <ModeBadge mode={p.mode} /> },
@@ -650,31 +670,8 @@ export function ModeBadge({ mode }: { mode: ProfileMode }) {
   return <Badge tone={MODE_TONE[MODE_META[mode].tint]}>{modeLabel({ mode })}</Badge>
 }
 
-/* "Used by", from a row's menu. It used to be a counted button in the profile
-   page's header; the header lost its action trail, and the question moved to
-   the list with the other things you do TO a profile rather than inside one.
-
-   Live rules and saved drafts both: a rule saved in a draft still names it. */
-function UsedByDrawer({
-  profile,
-  policies,
-  onClose,
-}: {
-  profile: FingerprintProfile | null
-  policies: Policy[]
-  onClose: () => void
-}) {
-  const users = profile ? policiesUsing('fingerprint', profile.id, policies) : []
-  return (
-    <Drawer open={!!profile} onClose={onClose} title="Used by" caption={`Policy rules that name ${profile?.name ?? ''}.`}>
-      {users.length === 0 ? (
-        <EmptyState compact icon={Unlink} title="Not used by any policy" blurb="No policy rule names this profile." />
-      ) : (
-        <UsedByList users={users} />
-      )}
-    </Drawer>
-  )
-}
+/* `UsedByDrawer` stood here — "Used by" as a modal drawer over the list. It is
+   `UsedByPanel` (used-by.tsx) now, docked beside the list (16 Sep 2026). */
 
 /* --- Shared with the create flows ---------------------------------------------
 
@@ -786,11 +783,6 @@ function DiscardDialog({
 type ProfileTab = 'basic' | 'attributes'
 
 /* How a health profile works, beside a new one's empty list. */
-const HEALTH_LINES = [
-  'A device must pass every check you add before it can sign in.',
-  'Integrity and screen lock are reported by the miniOrange app. A device without it fails those checks.',
-]
-
 /* `ENROLMENT_KEYS` and `enrolmentAnswered` stood here: the save flipped
    `restrictionSet` when any enrolment value differed from the stored profile,
    because the enrolment rows were live on the page and a changed row was the
@@ -1118,7 +1110,7 @@ function ProfilePage({
                     onRemove={removeCheck}
                   />
                 </div>
-                <ProfileAside draft={draft} />
+                <SidePanel note={itemsNote(draft.mode)} />
               </div>
             )}
           </div>
@@ -1140,9 +1132,9 @@ function ProfilePage({
               onRemove={removeCheck}
             />
           </div>
-          {/* Beside a new profile's empty state, how the profile works, as the
-              wizard says it — not an empty column beside a 758px one. */}
-          {isNew ? <ChecksAside draft={draft} lines={HEALTH_LINES} /> : <ProfileAside draft={draft} />}
+          {/* How the checks work, in the wizard's words — the same panel a new
+              profile's empty state gets, since neither reads the draft. */}
+          <SidePanel note={itemsNote(draft.mode)} />
         </div>
       )}
 
@@ -1302,13 +1294,9 @@ function BasicDetailsTab({
       <div className="bz7__work">
         <BasicDetailsForm profile={draft} onChange={onChange} />
       </div>
-      {/* The panel follows the draft once there are answers to explain. Before
-          that it would be explaining the defaults as if somebody chose them. */}
-      {basicDetailsSet(draft) ? (
-        <BasicAside draft={draft} />
-      ) : (
-        <SidePanel title="How this profile works" lines={unsetAsideLines(draft)} />
-      )}
+      {/* One panel, answered or not: it describes the choices, so it does not
+          have to wait for them or change with them. */}
+      <SidePanel note={DEVICES_NOTE} />
     </div>
   )
 }

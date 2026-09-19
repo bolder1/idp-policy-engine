@@ -171,17 +171,42 @@ describe('what changed, for the save bar', () => {
     const before = zone({ ip: ['10.0.0.1'], location: { ...emptyLocation(), countries: ['India'] } })
     const after = zone({ name: 'HQ', ip: ['10.0.0.0/8'], location: emptyLocation() })
     expect(zoneReviewRows(before, after)).toEqual([
-      { label: 'Name', before: 'Office', after: 'HQ' },
-      { label: 'IP networks: added', before: '', after: '10.0.0.0/8' },
-      { label: 'IP networks: removed', before: '10.0.0.1', after: '' },
-      { label: 'Locations: removed', before: 'India', after: '' },
+      { label: 'Name', before: 'Office', after: 'HQ', kind: 'changed' },
+      { label: 'IP networks: added', before: '', after: '10.0.0.0/8', group: 'IP networks', kind: 'added' },
+      { label: 'IP networks: removed', before: '10.0.0.1', after: '', group: 'IP networks', kind: 'removed' },
+      { label: 'Locations: removed', before: 'India', after: '', group: 'Locations', kind: 'removed' },
     ])
+  })
+
+  /* The dialog files rows under the page's sections and marks each one. The
+     name leads under General; a list row names no single item, since it holds
+     every added (or removed) entry at once; nothing here is a consequence. */
+  it('files each row under its section and marks what it does', () => {
+    const before = zone({ ip: ['10.0.0.1'] })
+    const after = zone({ name: 'HQ', ip: ['10.0.0.1', '10.0.0.2', '10.0.0.3'] })
+    const rows = zoneReviewRows(before, after)
+    const [name, net] = rows
+    expect(rows).toHaveLength(2)
+    expect(name.group).toBeUndefined()
+    expect(name.kind).toBe('changed')
+    expect(net).toMatchObject({ group: 'IP networks', kind: 'added', after: '10.0.0.2, 10.0.0.3', count: 2 })
+    expect(net.item).toBeUndefined()
+    expect(rows.some((r) => r.effect)).toBe(false)
+  })
+
+  /* A new zone is reviewed against itself with no name, so its name is added
+     rather than changed. */
+  it('marks the name of a new zone as added', () => {
+    const [name] = zoneReviewRows(zone({ name: '' }), zone({ name: 'HQ' }))
+    expect(name).toEqual({ label: 'Name', before: '', after: 'HQ', kind: 'added' })
   })
 
   it('counts the rest of a long paste rather than listing it', () => {
     const ip = Array.from({ length: REVIEW_LIST_MAX + 3 }, (_, i) => `10.0.0.${i + 1}`)
     const [row] = zoneReviewRows(zone(), zone({ ip }))
     expect(row.after).toMatch(/and 3 more$/)
+    // The heading counts every entry, listed or not.
+    expect(row.count).toBe(REVIEW_LIST_MAX + 3)
   })
 
   /* A state and a city can share a name. Swapping one for the other changes what
@@ -191,8 +216,8 @@ describe('what changed, for the save bar', () => {
     const after = zone({ location: { ...emptyLocation(), cities: ['Berlin'] } })
     expect(zoneChanges(before, after)).toEqual(['Locations'])
     expect(zoneReviewRows(before, after)).toEqual([
-      { label: 'Locations: added', before: '', after: 'Berlin (city)' },
-      { label: 'Locations: removed', before: 'Berlin (state)', after: '' },
+      { label: 'Locations: added', before: '', after: 'Berlin (city)', group: 'Locations', kind: 'added' },
+      { label: 'Locations: removed', before: 'Berlin (state)', after: '', group: 'Locations', kind: 'removed' },
     ])
   })
 
@@ -200,7 +225,7 @@ describe('what changed, for the save bar', () => {
     const l = { ...emptyLocation(), radius: { km: 25, lat: 18.52, lon: 73.85, label: 'Pune HQ' } }
     expect(locationEntries(l)).toEqual(['25 km of Pune HQ'])
     expect(zoneReviewRows(zone({ location: l }), zone())).toEqual([
-      { label: 'Locations: removed', before: '25 km of Pune HQ', after: '' },
+      { label: 'Locations: removed', before: '25 km of Pune HQ', after: '', group: 'Locations', kind: 'removed' },
     ])
   })
 })

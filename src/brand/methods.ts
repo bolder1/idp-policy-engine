@@ -50,6 +50,11 @@ export interface AuthMethod {
   /** The console's own channel grouping, kept because admins know it. */
   channel: string
   description: string
+  /** The row's line, where the description runs past one. The description then
+      keeps the rest, on the tip beside the name — the line to scan by, the tip
+      for the row a reader stops on. Absent where the description IS one line,
+      and the row then carries no tip at all. */
+  summary?: string
   configured: boolean
   active: boolean
   allowed: boolean
@@ -124,6 +129,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     channel: 'Password',
     description:
       'Sign in with the device — Face ID, a fingerprint, or a security key. No password typed, and nothing a lookalike site can reuse.',
+    summary: 'Sign in with the device — Face ID, a fingerprint, or a security key.',
     configured: true,
     active: true,
     allowed: true,
@@ -140,6 +146,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     channel: 'Password',
     description:
       'A one-click sign-in link sent to the address on the account. Convenient, and only ever as strong as the mailbox behind it.',
+    summary: 'A one-click sign-in link sent to the address on the account.',
     configured: true,
     active: false,
     allowed: false,
@@ -154,6 +161,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     channel: 'Biometric',
     description:
       'Device password, PIN, Face ID, fingerprint, or Touch ID. Bound to the origin, so a lookalike site cannot use it.',
+    summary: 'Device password, PIN, Face ID, fingerprint or Touch ID.',
     configured: true,
     active: true,
     allowed: true,
@@ -166,6 +174,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     tier: 'Phishing-resistant',
     channel: 'Smart Cards',
     description: 'Tap a CAC/PIV card and pick the trusted client certificate the browser presents.',
+    summary: 'Tap a CAC/PIV card and pick a trusted client certificate.',
     configured: true,
     active: false,
     allowed: false,
@@ -239,6 +248,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     tier: 'App-based',
     channel: 'Authenticator App',
     description: 'Scan a QR code once; the app then produces a 6-digit code every 30 seconds.',
+    summary: 'Scan a QR code once; the app makes a code every 30 seconds.',
     configured: true,
     active: true,
     allowed: true,
@@ -263,6 +273,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     tier: 'App-based',
     channel: 'Authenticator App',
     description: 'Push notifications via Azure NPS. Needs the NPS configuration before it can send anything.',
+    summary: 'Push notifications via Azure NPS.',
     configured: true,
     active: false,
     allowed: false,
@@ -285,6 +296,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     tier: 'App-based',
     channel: 'RSA Authenticator',
     description: 'A SecurID tokencode, an RSA display token, or a push — whichever the user holds.',
+    summary: 'A SecurID tokencode, a display token, or a push.',
     configured: false,
     active: false,
     allowed: false,
@@ -363,6 +375,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     tier: 'Delivery-based',
     channel: 'Email',
     description: 'A code to the backup address on the profile. Also offered as a recovery method.',
+    summary: 'A code to the backup address on the profile.',
     configured: true,
     active: false,
     allowed: false,
@@ -390,6 +403,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     tier: 'Knowledge & tokens',
     channel: 'Security Questions',
     description: 'Knowledge-based answers only the user should know. Shared with the Recovery configuration.',
+    summary: 'Knowledge-based answers only the user should know.',
     configured: true,
     active: true,
     allowed: true,
@@ -403,6 +417,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     tier: 'Knowledge & tokens',
     channel: 'Grid Pattern',
     description: 'The user picks a sequence of squares on a grid at setup and repeats it to sign in.',
+    summary: 'The user repeats a sequence of squares chosen at setup.',
     configured: true,
     active: false,
     allowed: false,
@@ -440,6 +455,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     channel: 'Hardware Token',
     description:
       'A USB token that types a one-time key. In OTP mode this is still phishable — use it in FIDO2 mode for phishing resistance.',
+    summary: 'A USB token that types a one-time key.',
     configured: true,
     active: false,
     allowed: false,

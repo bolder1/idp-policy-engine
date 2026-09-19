@@ -5,6 +5,7 @@ import { blankRule, card, cond, when } from './data'
 import {
   CATEGORY_TONE,
   EMPTY_RISK_PROFILE,
+  LIVE_PLATFORMS,
   PLATFORMS,
   RISK_SIGNALS,
   SIGNAL_CATEGORIES,
@@ -23,7 +24,6 @@ import {
   setSignalOn,
   setSignalTier,
   tierFor,
-  tierKey,
   type RiskTuning,
 } from './risk-signals'
 
@@ -50,14 +50,16 @@ describe('the shipped configuration', () => {
   })
 
   it('weighs exactly what the catalogue ships, on both platforms', () => {
-    for (const p of PLATFORMS) expect(weightFor(EMPTY_RISK_PROFILE, p.id)).toBe(shippedWeightFor(p.id))
+    for (const p of LIVE_PLATFORMS) expect(weightFor(EMPTY_RISK_PROFILE, p.id)).toBe(shippedWeightFor(p.id))
+    /* And with no platform named: the catalogue's own total. */
+    expect(weightFor(EMPTY_RISK_PROFILE)).toBe(shippedWeightFor())
   })
 
   /* Stored as the difference from the catalogue, so a signal added later
      arrives on at its shipped weight rather than invisible behind a snapshot. */
   it('reads a signal the profile has never heard of at its catalogue tier', () => {
     const s = RISK_SIGNALS[0]
-    expect(tierFor(EMPTY_RISK_PROFILE, s, s.on[0])).toBe(s.tier)
+    expect(tierFor(EMPTY_RISK_PROFILE, s)).toBe(s.tier)
   })
 })
 
@@ -94,7 +96,7 @@ describe('the scale is the weaker of the two platforms', () => {
 
   it('rises when a signal is weighted up, and stops at the top of the scale', () => {
     const allHigh: Record<string, 'High'> = {}
-    for (const s of RISK_SIGNALS) for (const pl of s.on) allHigh[tierKey(s.id, pl)] = 'High'
+    for (const s of RISK_SIGNALS) allHigh[s.id] = 'High'
     const scale = riskScale(profile({ tiers: allHigh }))
     expect(scale.High).toBeGreaterThanOrEqual(86)
     expect(scale.High).toBeLessThanOrEqual(100)
@@ -111,13 +113,22 @@ describe('the catalogue', () => {
     expect(new Set(RISK_SIGNALS.map((s) => s.id)).size).toBe(RISK_SIGNALS.length)
   })
 
-  /* An override is keyed by signal AND platform, so the same signal can be
-     worth more on the platform that reports it more reliably. */
-  it('keeps per-platform overrides independent', () => {
-    const s = RISK_SIGNALS.find((x) => x.on.length === 2)!
-    const p = profile({ tiers: { [tierKey(s.id, 'android')]: 'Low' } })
-    expect(tierFor(p, s, 'android')).toBe('Low')
-    expect(tierFor(p, s, 'ios')).toBe(s.tier)
+  /* One weight per signal since 18 Sep 2026: an override is keyed by the
+     signal alone, and applies wherever the signal is collected. */
+  it('weighs a signal once, on every platform that collects it', () => {
+    const s = RISK_SIGNALS.find((x) => x.on.length === 2 && x.tier !== 'Low')!
+    const p = profile({ tiers: { [s.id]: 'Low' } })
+    expect(tierFor(p, s)).toBe('Low')
+    /* One override, counted on both platforms' totals. */
+    for (const pl of s.on) expect(weightFor(p, pl)).toBeLessThan(shippedWeightFor(pl))
+  })
+
+  /* Every live platform is real; the rest are announced and collect nothing. */
+  it('offers the platforms it cannot collect on as coming soon', () => {
+    expect(LIVE_PLATFORMS.map((p) => p.id)).toEqual(['android', 'ios'])
+    const soon = PLATFORMS.filter((p) => p.soon)
+    expect(soon.length).toBeGreaterThan(0)
+    for (const p of soon) expect(RISK_SIGNALS.some((s) => s.on.includes(p.id))).toBe(false)
   })
 })
 
@@ -196,15 +207,15 @@ describe('editing a profile draft', () => {
 
   it('drops a weight set back to its shipped value', () => {
     const other = dual.tier === 'High' ? 'Low' : 'High'
-    const moved = setSignalTier(EMPTY_RISK_PROFILE, dual, 'android', other)
-    expect(moved.tiers).toEqual({ [tierKey(dual.id, 'android')]: other })
-    const back = setSignalTier(moved, dual, 'android', dual.tier)
+    const moved = setSignalTier(EMPTY_RISK_PROFILE, dual, other)
+    expect(moved.tiers).toEqual({ [dual.id]: other })
+    const back = setSignalTier(moved, dual, dual.tier)
     expect(back.tiers).toEqual({})
     expect(sameTuning(back, EMPTY_RISK_PROFILE)).toBe(true)
   })
 
   it('reads an override equal to the shipped weight as no override', () => {
-    expect(sameTuning({ off: [], tiers: { [tierKey(dual.id, 'ios')]: dual.tier } }, EMPTY_RISK_PROFILE)).toBe(true)
+    expect(sameTuning({ off: [], tiers: { [dual.id]: dual.tier } }, EMPTY_RISK_PROFILE)).toBe(true)
   })
 
   it('compares names trimmed, the way they are saved', () => {
@@ -243,17 +254,53 @@ describe('the review of a draft', () => {
   it('names each change with its saved and new value', () => {
     let draft = { ...saved, name: 'Quiet network' }
     draft = setSignalOn(draft, 'tor', false)
-    draft = setSignalTier(draft, dual, 'ios', dual.tier === 'Low' ? 'High' : 'Low')
+    draft = setSignalTier(draft, dual, dual.tier === 'Low' ? 'High' : 'Low')
     const rows = riskReviewRows(saved, draft)
-    expect(rows[0]).toEqual({ label: 'Name', before: 'Test', after: 'Quiet network' })
-    expect(rows).toContainEqual({ label: 'Signal: Tor exit node', before: 'On', after: 'Off' })
+    expect(rows[0]).toEqual({ label: 'Name', before: 'Test', after: 'Quiet network', kind: 'changed' })
     expect(rows).toContainEqual({
-      label: `Weight: ${dual.name} on iOS`,
+      label: 'Signal: Tor exit node',
+      before: 'On',
+      after: 'Off',
+      group: 'Signals',
+      kind: 'changed',
+      item: 'Tor exit node',
+    })
+    expect(rows).toContainEqual({
+      label: `Weight: ${dual.name}`,
       before: dual.tier,
       after: dual.tier === 'Low' ? 'High' : 'Low',
+      group: 'Weights',
+      kind: 'changed',
+      item: dual.name,
     })
     expect(rows.some((r) => r.label === 'High risk score')).toBe(true)
     expect(riskChangeNames(saved, draft)).toEqual(['Name', 'Signals', 'Weights'])
+  })
+
+  /* The dialog files rows by section and shows consequences last. A band
+     moving is what the signal and weight edits DO, so it is an effect filed
+     under the page's "Risk scores" heading and named as the page names the
+     band; the name has no section and leads. */
+  it('files each row under the page section it belongs to', () => {
+    let draft = { ...saved, name: 'Quiet network' }
+    draft = setSignalOn(draft, 'tor', false)
+    const rows = riskReviewRows(saved, draft)
+    const name = rows.find((r) => r.label === 'Name')!
+    expect(name.group).toBeUndefined()
+    expect(name.effect).toBeUndefined()
+    expect(name.kind).toBe('changed')
+
+    const high = rows.find((r) => r.label === 'High risk score')!
+    expect(high).toMatchObject({ group: 'Risk scores', kind: 'changed', item: 'High', effect: true })
+    // Every band row is a consequence; no edit row is.
+    for (const r of rows) expect(r.effect === true).toBe(r.group === 'Risk scores')
+
+    const tor = rows.find((r) => r.label === 'Signal: Tor exit node')!
+    expect(tor).toMatchObject({ group: 'Signals', kind: 'changed', item: 'Tor exit node' })
+    expect(tor.effect).toBeUndefined()
+
+    // Nothing in a risk profile is added or removed: a switch flips, a weight moves.
+    expect(rows.every((r) => r.kind === 'changed')).toBe(true)
   })
 
   it('is empty when nothing changed', () => {

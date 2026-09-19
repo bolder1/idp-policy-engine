@@ -1068,8 +1068,7 @@
    three children stacked vertically because the flex that was meant to lay them
    out lived on the other picker's class. */
 /* Sticky, because the list under it is now as long as the catalogue and the
-   count, Select all and the search are what you use to get back to a
-   manageable one. It sticks to the drawer body's own scroll, which is the only scroll
+   search and Select all are what you use to get back to a manageable one. It sticks to the drawer body's own scroll, which is the only scroll
    there is. */
 /* A real hairline, instead of `padding-bottom: 10px; margin-bottom: -10px`
    faking one so rows would not scroll under the bar unannounced. The pane
@@ -1087,26 +1086,39 @@
 /* `.bfp2__search` stood here — this drawer's own magnifier-and-field. It is
    `SearchBox` from the kit now, like every other search in the console; what
    remains is the one thing that genuinely belongs to THIS row, which is that
-   the box stretches and Select all and the count beside it do not.
+   the box stretches and Select all after it does not.
 
    A 12ch basis and floor rather than `flex: 1` over 16ch. The bar has to hold
-   on one line in a 520px body with Select all and the count, and 16ch was the
+   on one line in a 520px body with Select all beside it, and 16ch was the
    one thing on it that would not give. The basis matters as much as the floor:
    with `flex: 1` the box's line-breaking size was its intrinsic width, so the
    bar wrapped before anything was actually short of room. */
 .bfp2__pickbar > .bx-search { flex: 1 1 12ch; min-width: 12ch; width: auto; }
+/* The category filter, between the search and Select all. It sizes to its own
+   word ("All", "Network", "3 categories") rather than the toolbar's fixed
+   168px, because this bar has to hold on one line in a 520px drawer. A
+   narrowed filter is marked the way every other filter in the console marks
+   itself — see `.btoolbar__filter.is-set` in screens.css. */
+.bfp2__pickfilter { flex: none; display: inline-flex; min-width: 0; }
+.bfp2__pickfilter.is-set .bx-picker__trigger {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: var(--fw-medium);
+}
 /* No narrow-width reordering. A container query put the search on a line of its
    own below 480px — which the wizard's half column reaches on a 1280px laptop —
    and moving it ahead of Select all there made the Tab order disagree with the
-   screen. The bar now keeps its order and wraps only when it must, the count
-   going to a second line last. */
+   screen. The bar now keeps its order and wraps only when it must, Select all
+   going to a second line. */
 
 /* Select all / Clear all (`PickBar`). Unboxed, like the rows it acts on: the
-   kit's tick, then its words, with the tick at the bar's left edge so it stands
-   in the same column as every tick under it. The box fills for some or all —
-   a dash for some — through the kit's `.is-on .bx-tick`. */
+   kit's tick, then its words, at the far end of the bar where the "N selected"
+   count stood (owner, 16 Sep 2026). The box fills for some or all — a dash for
+   some — through the kit's `.is-on .bx-tick`. */
 .bfp2__selectall {
   flex: none; display: inline-flex; align-items: center; gap: var(--space-5);
+  margin-left: auto;
   height: var(--ctl-height-sm); padding: 0; border: 0; border-radius: var(--radius-sm);
   background: none; cursor: pointer;
   font: inherit; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap;
@@ -1118,11 +1130,7 @@
 .bfp2__selectall:disabled { cursor: not-allowed; opacity: var(--disabled-opacity); }
 .bfp2__selectall:disabled:hover { color: var(--text-secondary); }
 .bfp2__selectall:disabled:hover .bx-tick { border-color: var(--border-strong); }
-.bfp2__pickcount {
-  flex: none; white-space: nowrap;
-  font-size: var(--fs-sm); color: var(--text-tertiary); margin-left: auto;
-}
-.bfp2__pickcount.is-on { color: var(--text-secondary); font-weight: var(--fw-medium); }
+/* `.bfp2__pickcount` stood here — the bar's "N selected". Removed 16 Sep 2026. */
 .bfp2__clear {
   flex: none; padding: 0; border: 0; background: none; cursor: pointer;
   font-family: inherit; font-size: var(--fs-sm); color: var(--text-link);

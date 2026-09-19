@@ -1,8 +1,8 @@
 import type { Platform } from '../risk-signals'
-import { BrandMark } from './BrandMark'
+import { BrandMark, type Brand } from './BrandMark'
 
 /* -----------------------------------------------------------------------------
-   The two platform marks, as paths rather than as files.
+   The platform marks, as paths rather than as files.
 
    `AppLogo` cannot do this job. It resolves an APP id against the fetched
    favicon set in public/logos, and Android and iOS are not applications — they
@@ -29,6 +29,17 @@ import { BrandMark } from './BrandMark'
    check can name, so there is one copy of each.
    -------------------------------------------------------------------------- */
 
+/* A map, not a ternary. This was `android ? 'android' : 'apple'` while `Platform`
+   was the two mobile ones, so widening it to Windows and macOS (18 Sep 2026) put
+   the APPLE mark on the Windows row of the new platform filter. A total map
+   cannot drift that way again: a fifth platform stops the build here. */
+const MARK: Record<Platform, Brand> = {
+  android: 'android',
+  ios: 'apple',
+  macos: 'apple',
+  windows: 'windows',
+}
+
 export function PlatformMark({ platform, size = 13 }: { platform: Platform; size?: number }) {
-  return <BrandMark brand={platform === 'android' ? 'android' : 'apple'} size={size} className="bplat" />
+  return <BrandMark brand={MARK[platform]} size={size} className="bplat" />
 }

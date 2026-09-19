@@ -607,14 +607,27 @@ describe('what changed, for the save bar and Review changes', () => {
     }
     expect(profileReview(corp, next)).toEqual([
       { label: 'Name', before: 'Corporate managed', after: 'Corporate laptops' },
-      { label: 'Checks: added Chrome version', before: '', after: '≥ 120' },
-      { label: 'Checks: removed Windows OS version', before: '≥ 10', after: '' },
+      { label: 'Checks: added Chrome version', before: '', after: '≥ 120', group: 'Checks', kind: 'added', item: 'Chrome version' },
+      { label: 'Checks: removed Windows OS version', before: '≥ 10', after: '', group: 'Checks', kind: 'removed', item: 'Windows OS version' },
     ])
     expect(profileChangeParts(corp, next)).toEqual(['Name', '1 check added', '1 check removed'])
 
     const tuned = { ...corp, config: { ...corp.config, 'os-windows': { op: 'gte', value: '11' } } }
-    expect(profileReview(corp, tuned)).toEqual([{ label: 'Windows OS version', before: '≥ 10', after: '≥ 11' }])
+    expect(profileReview(corp, tuned)).toEqual([
+      { label: 'Windows OS version', before: '≥ 10', after: '≥ 11', group: 'Checks', kind: 'changed', item: 'Windows OS version' },
+    ])
     expect(profileChangeParts(corp, tuned)).toEqual(['Values changed'])
+  })
+
+  /* Review changes files each row under the page's own sections (17 Sep 2026). */
+  it('files each row under its section and says what kind of change it is', () => {
+    const next: FingerprintProfile = { ...corp, name: 'Corporate laptops', enabled: ['device-type', 'browser-chrome'] }
+    const [name, added] = profileReview(corp, next)
+    /* The name files nowhere, so it leads under General; it is not an effect. */
+    expect(name.group).toBeUndefined()
+    expect(name.effect).toBeUndefined()
+    expect(added).toMatchObject({ group: 'Checks', kind: 'added', item: 'Chrome version' })
+    expect(added.effect).toBeUndefined()
   })
 
   /* The profile page counts a draft as unsaved only when this has a row, so a
@@ -629,10 +642,21 @@ describe('what changed, for the save bar and Review changes', () => {
     const kiosk = seedProfiles.find((p) => p.id === 'fp-kiosk') as FingerprintProfile
     const next: FingerprintProfile = { ...kiosk, weights: { mac: 10 }, autoRegister: true, roster: null }
     expect(profileReview(kiosk, next)).toEqual([
-      { label: 'Register silently on first sign-in', before: 'Off', after: 'On' },
-      { label: 'Approved device roster', before: 'kiosks-floor-3.csv, 24 devices', after: '' },
-      { label: 'MAC address weight', before: 'High weight', after: 'Low weight' },
+      { label: 'Register silently on first sign-in', before: 'Off', after: 'On', group: 'Basic details', kind: 'changed' },
+      /* Changed, not removed: the roster setting moves to none, which the
+         empty after would otherwise read as a removal. */
+      { label: 'Approved device roster', before: 'kiosks-floor-3.csv, 24 devices', after: '', group: 'Basic details', kind: 'changed' },
+      { label: 'MAC address weight', before: 'High weight', after: 'Low weight', group: 'Signals', kind: 'changed', item: 'MAC address weight' },
     ])
     expect(profileChangeParts(kiosk, next)).toEqual(['How devices enrol', 'Weights changed'])
+  })
+
+  it('files a signal a trusted device adds or drops under Signals', () => {
+    const kiosk = seedProfiles.find((p) => p.id === 'fp-kiosk') as FingerprintProfile
+    const next = { ...kiosk, enabled: kiosk.enabled.filter((id) => id !== 'machine-sid') }
+    expect(profileReview(kiosk, next)).toEqual([
+      { label: 'Signals: removed Machine SID', before: 'High weight', after: '', group: 'Signals', kind: 'removed', item: 'Machine SID' },
+    ])
+    expect(profileReview(next, kiosk)[0]).toMatchObject({ label: 'Signals: added Machine SID', group: 'Signals', kind: 'added', item: 'Machine SID' })
   })
 })

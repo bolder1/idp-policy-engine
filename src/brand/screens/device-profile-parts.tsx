@@ -28,7 +28,6 @@ import {
   REGISTRATION_LABEL,
   TIER_WEIGHT,
   VERSION_OPS,
-  asksReach,
   blockedAttributes,
   ITEM_NOUN,
   countLabel,
@@ -52,9 +51,17 @@ import {
 import { EmptyState, NoMatches } from '../empty'
 import { BrandMark } from '../logos/BrandMark'
 import { CHECK_BRAND } from '../logos/check-brands'
-import { summarise } from './profile-aside'
+import type { ProfileNote } from './profile-notes'
 import { checkName, versionError, type Choice } from './device-profile-choices'
-import { agentNote, filterAttributes, shownSelection, toggleAllShown, toggleRun } from './device-profile-wizard-model'
+import {
+  CATEGORY_FILTER_MIN,
+  agentNote,
+  categoriesOf,
+  filterAttributes,
+  shownSelection,
+  toggleAllShown,
+  toggleRun,
+} from './device-profile-wizard-model'
 
 /* -----------------------------------------------------------------------------
    Device profiles · the parts a profile is drawn from.
@@ -169,9 +176,12 @@ export function AttrStep({
   onBack?: () => void
 }) {
   const [q, setQ] = useState('')
-  /* The category dropdown beside the search went (owner, 16 Sep 2026), and
-     "Selected only" went with it — it rode in the same control. The search
-     still matches a row's category, and the bar's count says what is chosen. */
+  /* The category filter came back on 18 Sep 2026 for the list that needed it
+     (owner: "add categories using the filter… we had an option earlier, try
+     reverting it"). It is multi-select and starts empty, meaning every family.
+     "Selected only" did NOT come back: it rode in the same control and hid the
+     rows a press was about to make. */
+  const [cats, setCats] = useState<AttrCategory[]>([])
 
   /* Where the last press landed, so the next one can shift-select a run.
 
@@ -183,6 +193,9 @@ export function AttrStep({
   const anchor = useRef<string | null>(null)
 
   const offered = offeredAttributes(mode, reach)
+  /* The families this catalogue holds, not the whole enum, and only where the
+     list is long enough to need narrowing. */
+  const categories = offered.length >= CATEGORY_FILTER_MIN ? categoriesOf(offered) : []
 
   /* Counted against what is OFFERED, never against the whole catalogue. "6 of
      38 selected" on an agentless profile names a denominator eighteen of whose
@@ -194,11 +207,11 @@ export function AttrStep({
      row says which one it is. The always-collected rows are lifted to the
      front (see `filterAttributes`): a locked row between two tickable ones
      reads as one you failed to untick. */
-  const ordered = filterAttributes(offered, q)
+  const ordered = filterAttributes(offered, q, cats)
 
   /* The rows an agent would unlock, under the same search as the list, so the
      note below never names signals the search has nothing to do with. */
-  const blockedShown = filterAttributes(blockedAttributes(mode, reach), q)
+  const blockedShown = filterAttributes(blockedAttributes(mode, reach), q, cats)
 
   /* One press, or a shift-press over a run — see `toggleRun`. No press removes
      the control it was made on any more: without "Selected only" the rows stay
@@ -211,7 +224,18 @@ export function AttrStep({
 
   return (
     <div className="bfp2__pick">
-      <PickBar mode={mode} q={q} onQuery={setQ} shown={ordered} picked={picked} chosen={chosen} onPick={setPicked} />
+      <PickBar
+        mode={mode}
+        q={q}
+        onQuery={setQ}
+        shown={ordered}
+        picked={picked}
+        chosen={chosen}
+        onPick={setPicked}
+        categories={categories}
+        cats={cats}
+        onCats={setCats}
+      />
 
       {/* --- One list, one check to a line ------------------------------------
 
@@ -274,19 +298,25 @@ export function AttrStep({
 /* --- The bar over a check list ------------------------------------------------------
 
    Shared by the catalogue drawer (`AttrStep`) and the wizard's inline list, so
-   the two lists that choose checks work the same way. One line: Select all,
-   the search, and how many are ticked.
+   the two lists that choose checks work the same way. One line: the search,
+   then Select all at the far end.
+
+   The "N selected" count that stood at the far end went (owner, 16 Sep 2026:
+   "not needed"), and Select all took its place. The ticks in the list already
+   say what is chosen; the number is kept for screen readers only, in the
+   button's name.
 
    Select all and Clear all are ONE control (owner, 16 Sep 2026), in place of
    "Clear the rest". It reaches the rows on screen — under a search, the rows
    that match — and never the always-on ones, which are not a choice. While
    every one of those is ticked it reads Clear all and clears them; otherwise it
    reads Select all and ticks them. Its box is the list's own tick — empty, a
-   dash for some, full for all — in the same column as the ticks under it.
+   dash for some, full for all.
 
    A button rather than a checkbox: its name says what a press does next, and a
    checkbox whose name changed with its state would announce "Clear all,
-   checked". The count beside it is the state in words. */
+   checked". The hidden count after its words is the state for a screen reader
+   ("Select all, 4 selected"). */
 export function PickBar({
   mode,
   q,
@@ -296,6 +326,9 @@ export function PickBar({
   picked,
   chosen,
   onPick,
+  categories = [],
+  cats = [],
+  onCats,
 }: {
   mode: ProfileMode
   q: string
@@ -304,14 +337,54 @@ export function PickBar({
   /** The rows on screen, in order: what Select all reaches. */
   shown: Attribute[]
   picked: string[]
-  /** How many are ticked, always-on rows included, since they are ticked too. */
+  /** How many are ticked, always-on rows included, since they are ticked too.
+      Read out with the button, not shown. */
   chosen: number
   onPick: (next: string[]) => void
+  /** The families this catalogue holds. Two or more draws the filter. */
+  categories?: AttrCategory[]
+  /** The families being shown. Empty is all of them. */
+  cats?: AttrCategory[]
+  onCats?: (next: AttrCategory[]) => void
 }) {
   const state = shownSelection(picked, shown)
   const noun = ITEM_NOUN[mode].many
+  /* Drawn when the caller offers families to narrow by — see
+     `CATEGORY_FILTER_MIN` for which lists are long enough to be worth it. */
+  const filters = onCats && categories.length > 1
   return (
     <div className="bfp2__pickbar">
+      <SearchBox
+        value={q}
+        onChange={onQuery}
+        placeholder={`Search ${noun}…`}
+        label={`Search ${noun}`}
+        inputRef={searchRef}
+      />
+      {filters && (
+        <span className={`bfp2__pickfilter${cats.length > 0 ? ' is-set' : ''}`}>
+          {/* One category at a time (owner, 18 Sep 2026: "make it single
+              selector"). It was multi-select, which let you build a set no
+              row's own chip could explain — "2 categories" on the trigger and
+              nothing on the list saying which two. One name says what you are
+              looking at, and "All categories" is how you stop.
+
+              The state stays a LIST, because `filterAttributes` takes one and
+              a filter that holds one thing is a list of one. */}
+          <Picker
+            label={`Filter ${noun} by category`}
+            size="sm"
+            prefix="Category"
+            value={cats[0] ?? ALL_CATS}
+            summary={cats[0] ?? 'All'}
+            options={[
+              { value: ALL_CATS, label: 'All categories' },
+              ...categories.map((c) => ({ value: c, label: c, art: <CategoryMark category={c} /> })),
+            ]}
+            onChange={(c) => onCats(c === ALL_CATS ? [] : [c as AttrCategory])}
+          />
+        </span>
+      )}
       <button
         type="button"
         className={`bfp2__selectall${state === 'some' || state === 'all' ? ' is-on' : ''}`}
@@ -322,18 +395,20 @@ export function PickBar({
           {state === 'some' ? <Minus size={11} strokeWidth={3.2} /> : <Check size={11} strokeWidth={3.2} />}
         </span>
         {state === 'all' ? 'Clear all' : 'Select all'}
+        <span className="u-sr-only">, {chosen} selected</span>
       </button>
-      <SearchBox
-        value={q}
-        onChange={onQuery}
-        placeholder={`Search ${noun}…`}
-        label={`Search ${noun}`}
-        inputRef={searchRef}
-      />
-      {/* No denominator: the list is on screen. */}
-      <span className={`bfp2__pickcount ${chosen ? 'is-on' : ''}`}>{chosen} selected</span>
     </div>
   )
+}
+
+/* No category chosen, as an option the list can actually hold. */
+const ALL_CATS = '__all__'
+
+/* The family's mark, as the rows carry it — so the filter's options and the
+   list agree on what a category looks like. */
+function CategoryMark({ category }: { category: AttrCategory }) {
+  const Mark = CAT_ICON[category] ?? ShieldCheck
+  return <Mark size={14} strokeWidth={1.8} aria-hidden />
 }
 
 /* --- Pick one: a tile per answer --------------------------------------------------
@@ -566,67 +641,10 @@ function AttrPickRow({
   )
 }
 
-/* --- Basic details' side column: what the answers on the left mean ------------
-
-   The Signals aside's panel, saying what the form is set to rather than what
-   the list compares. Read off the draft, so it follows every press before it
-   is saved: agent-based says what the agent costs, agentless that there is
-   nothing to install, and the enrolment lines follow the registration.
-
-   The agent's two lines were the "Needs the Device Agent" callout under the
-   tiles. Prose between two controls is read on every visit; beside them it is
-   there for the visit that needs it. The create drawer's callout
-   (`AgentPrereq`) went with the drawer (15 Sep 2026): the wizard page's
-   Devices step has a side, and shows this panel in it.
-
-   `pendingReach` went (15 Sep 2026) and has not come back: the reach tiles are
-   beside this panel again on the Basic details tab (16 Sep 2026), but a pending
-   switch to agentless is described by the confirmation under the tiles, not
-   previewed here. The wizard's Devices step never had one. */
-export function BasicAside({ draft }: { draft: FingerprintProfile }) {
-  const { reach, registration, autoRegister } = draft
-  const allowed = draft.maxDevices ?? DEFAULT_MAX_DEVICES
-
-  return (
-    <aside className="bz7__aside" aria-label="About these settings">
-      <div className="bz7__side">
-        <h3 className="bz7__sidehead">
-          <Info size={14} strokeWidth={2} aria-hidden />
-          How this profile works
-        </h3>
-        <ul className="bfp2__sumlines">
-          {asksReach(draft.mode) &&
-            (reach === 'agent' ? (
-              <>
-                <li>
-                  <strong>Needs the Device Agent.</strong> Users must install the miniOrange Device Agent on each
-                  device they sign in from.
-                </li>
-                <li>
-                  Until they do, sign-in is refused with “Please install the miniOrange Device Agent on your device
-                  and try again.”
-                </li>
-              </>
-            ) : (
-              <li>Reads the browser, network and location of each sign-in. Nothing to install.</li>
-            ))}
-          {registration === 'self' ? (
-            <li>
-              Each user can register up to {allowed} {allowed === 1 ? 'device' : 'devices'}. The next one is refused.
-            </li>
-          ) : (
-            <li>Only devices on the approved roster can sign in. The roster is matched on MAC address.</li>
-          )}
-          <li>
-            {autoRegister
-              ? 'A new device registers silently on its first sign-in, including one an attacker signs in from.'
-              : 'A new device is challenged on its first sign-in before it is registered.'}
-          </li>
-        </ul>
-      </div>
-    </aside>
-  )
-}
+/* `BasicAside` stood here — the enrolment panel written from the answers
+   ("Each user can register up to 3 devices", the reach, the roster, whether a
+   device registers silently). It is `DEVICES_NOTE` in profile-notes.ts now:
+   the same panel, said once and fixed (owner, 18 Sep 2026). */
 
 /* --- The checks: what this profile is set to, and one door to change it ---------
 
@@ -933,67 +951,52 @@ function ChosenRow({
   )
 }
 
-/* --- The side column: what the list adds up to ---------------------------------
+/* --- The side column: how the step works ---------------------------------------
 
-   The zone page's aside, on a profile. The list on the left is the editor; this
-   column is what you glance at while using it: a short line per check, read off
-   the draft, so it follows every edit before it is saved. No count (the list's
-   own heading has that number), and nothing for an empty profile, whose list
-   says so already.
+   The zone page's aside, on a profile: the list on the left is the editor, and
+   this column says how the thing being edited works. Fixed copy from
+   `profile-notes.ts` — short paragraphs, named options with a line each, and a
+   closing note under a rule, which is the shape of the zone panel the owner
+   pointed at (18 Sep 2026).
 
-   A "You can also check" catalogue, an Add on every row, stood under it. It was
-   removed on the owner's word (15 Sep 2026): the list's Edit button opens the same
-   catalogue, so the column was a second, longer way to do one thing. */
-export function ProfileAside({ draft }: { draft: FingerprintProfile }) {
-  const summary = summarise(draft)
-  /* The aside keeps its grid column when empty, so the list does not widen. */
-  if (summary.length === 0) return <aside className="bz7__aside" aria-hidden />
+   `ProfileAside` and `ChecksAside` stood here. Both read the DRAFT: the first
+   listed every check the profile held ("Laptops only.", "Windows 10 or
+   later.", … — fifteen lines restating the list beside it, moving under the
+   reader on every edit), the second chose between that and a static panel.
+   Neither survives the owner's "make sure all of this is static; there's no
+   need to add dynamic values here".
 
-  return (
-    <aside className="bz7__aside" aria-label="About this profile">
-      <div className="bz7__side">
-        <h3 className="bz7__sidehead">
-          <Info size={14} strokeWidth={2} aria-hidden />
-          {draft.mode === 'os' ? 'What this profile checks' : 'What this profile compares'}
-        </h3>
-        <ul className="bfp2__sumlines">
-          {summary.map((line, i) => (
-            <li key={i}>{line}</li>
-          ))}
-        </ul>
-      </div>
-    </aside>
-  )
-}
-
-/* The same panel, saying how a step or a new profile works rather than what
-   it adds up to. Moved here from the wizard (15 Sep 2026) so a new profile's
-   page can say it too. */
-export function SidePanel({ title, lines }: { title: string; lines: string[] }) {
+   A "You can also check" catalogue, an Add on every row, stood under the panel.
+   Removed 15 Sep 2026: the list's Edit button opens the same catalogue. */
+export function SidePanel({ note }: { note: ProfileNote }) {
   return (
     <aside className="bz7__aside" aria-label="About this step">
       <div className="bz7__side">
         <h3 className="bz7__sidehead">
           <Info size={14} strokeWidth={2} aria-hidden />
-          {title}
+          {note.title}
         </h3>
-        <ul className="bfp2__sumlines">
-          {lines.map((l) => (
-            <li key={l}>{l}</li>
-          ))}
-        </ul>
+        {note.lines && note.lines.length > 0 && (
+          <ul className="bfp2__sumlines">
+            {note.lines.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        )}
+        {note.terms && note.terms.length > 0 && (
+          <ul className={`bz7__sidelist bz7__sidelist--words${note.lines?.length ? ' is-under' : ''}`}>
+            {note.terms.map((t) => (
+              <li key={t.term}>
+                <strong>{t.term}</strong>
+                <em>{t.note}</em>
+              </li>
+            ))}
+          </ul>
+        )}
+        {note.foot && <p className="bz7__sidep">{note.foot}</p>}
       </div>
     </aside>
   )
-}
-
-/* The checks' panel once there is something to sum up. Before that it would
-   be an empty column beside a list with nothing in it, so it says how the
-   checks work instead. Only a health profile is ever empty: a trusted device
-   starts with its always-on signals. */
-export function ChecksAside({ draft, lines }: { draft: FingerprintProfile; lines: string[] }) {
-  if (summarise(draft).length > 0) return <ProfileAside draft={draft} />
-  return <SidePanel title="How this profile works" lines={lines} />
 }
 
 export function AttrControl({

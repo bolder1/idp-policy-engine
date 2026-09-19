@@ -36,6 +36,7 @@
    -------------------------------------------------------------------------- */
 
 import { nameTaken } from './data'
+import type { ReviewLine } from './review-rows'
 
 /* Back, and only for the device catalogue. See DEVICE_ATTRIBUTES below: the two
    kinds ask different questions and were never well served by one list. */
@@ -1261,11 +1262,17 @@ export function rosterFromCsv(fileName: string, text: string, now: Date): Roster
 
 /* --- What changed, for the save bar and Review changes ------------------------- */
 
-export interface ProfileChange {
-  label: string
-  before: string
-  after: string
-}
+/* A shared review row (review-rows.ts). Beyond its words a row says where it
+   files and what kind of change it is, because Review changes groups by the
+   page's own sections (17 Sep 2026):
+
+     Name                  no section, so it leads under "General"
+     the setup rows        "Basic details", always changed — '' to '3' devices
+                           per person is a setting moving, not something added
+     a check or signal     "Checks" / "Signals", the noun the label already
+                           uses, added / removed / changed, with the
+                           attribute's name as the item */
+export type ProfileChange = ReviewLine
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
@@ -1278,9 +1285,12 @@ function itemValue(p: FingerprintProfile, a: Attribute): string {
 /** Every change from the saved profile to the draft, one row each. */
 export function profileReview(before: FingerprintProfile, after: FingerprintProfile): ProfileChange[] {
   const rows: ProfileChange[] = []
-  const push = (label: string, b: string, a: string) => {
-    if (b !== a) rows.push({ label, before: b, after: a })
+  /* `more` is the filing (group, kind, item). Spread only when given, so the
+     Name row stays the bare three words it always was. */
+  const push = (label: string, b: string, a: string, more: Omit<ProfileChange, 'label' | 'before' | 'after'> = {}) => {
+    if (b !== a) rows.push({ label, before: b, after: a, ...more })
   }
+  const setup = { group: 'Basic details', kind: 'changed' } as const
   push('Name', before.name, after.name)
   /* Setting up basic details is a change of its own (15 Sep 2026). A press on the
      Basic details tab can confirm every default as it stands — the one way a profile nobody
@@ -1289,27 +1299,34 @@ export function profileReview(before: FingerprintProfile, after: FingerprintProf
      where the questions are asked: a health profile has none. */
   if (asksReach(after.mode)) {
     const setUp = (p: FingerprintProfile) => (p.restrictionSet ? 'Set up' : 'Not set up')
-    push('Basic details', setUp(before), setUp(after))
-    push('What it can read', reachLabel(before.reach), reachLabel(after.reach))
+    push('Basic details', setUp(before), setUp(after), setup)
+    push('What it can read', reachLabel(before.reach), reachLabel(after.reach), setup)
   }
-  push('How a device gets registered', REGISTRATION_LABEL[before.registration], REGISTRATION_LABEL[after.registration])
-  push('Register silently on first sign-in', before.autoRegister ? 'On' : 'Off', after.autoRegister ? 'On' : 'Off')
-  push('Devices per person', before.maxDevices === null ? '' : String(before.maxDevices), after.maxDevices === null ? '' : String(after.maxDevices))
+  push('How a device gets registered', REGISTRATION_LABEL[before.registration], REGISTRATION_LABEL[after.registration], setup)
+  push('Register silently on first sign-in', before.autoRegister ? 'On' : 'Off', after.autoRegister ? 'On' : 'Off', setup)
+  push('Devices per person', before.maxDevices === null ? '' : String(before.maxDevices), after.maxDevices === null ? '' : String(after.maxDevices), setup)
   const rosterText = (r: Roster | null) => (r ? `${r.fileName}, ${r.rows} devices` : '')
-  push('Approved device roster', rosterText(before.roster), rosterText(after.roster))
+  push('Approved device roster', rosterText(before.roster), rosterText(after.roster), setup)
 
+  /* The section is the same noun the label leads with, so "Signals: added TPM
+     ID" files as "TPM ID" under Signals. */
   const noun = capital(ITEM_NOUN[after.mode].many)
   const was = chosenAttributes(before)
   const now = chosenAttributes(after)
   for (const a of now) {
-    if (!was.some((x) => x.id === a.id)) rows.push({ label: `${noun}: added ${a.name}`, before: '', after: itemValue(after, a) })
+    if (!was.some((x) => x.id === a.id)) {
+      rows.push({ label: `${noun}: added ${a.name}`, before: '', after: itemValue(after, a), group: noun, kind: 'added', item: a.name })
+    }
   }
   for (const a of was) {
-    if (!now.some((x) => x.id === a.id)) rows.push({ label: `${noun}: removed ${a.name}`, before: itemValue(before, a), after: '' })
+    if (!now.some((x) => x.id === a.id)) {
+      rows.push({ label: `${noun}: removed ${a.name}`, before: itemValue(before, a), after: '', group: noun, kind: 'removed', item: a.name })
+    }
   }
   for (const a of now) {
     if (!was.some((x) => x.id === a.id)) continue
-    push(after.mode === 'device' ? `${a.name} weight` : a.name, itemValue(before, a), itemValue(after, a))
+    const label = after.mode === 'device' ? `${a.name} weight` : a.name
+    push(label, itemValue(before, a), itemValue(after, a), { group: noun, kind: 'changed', item: label })
   }
   return rows
 }

@@ -75,7 +75,9 @@ export function rowTarget(row: FamilyRow): RowTarget | null {
    open. Setup used to shut the slider and centre a dialog over the list: the
    family you had been looking at was gone by the time you pressed Save, and
    Cancel dropped you on the list, a click further from where you started. Now
-   setup is a page in the same panel, and Back returns to the one under it. */
+   setup is a page in the same panel when a list row opens it, and inside the
+   method's card on a family page (17 Sep 2026), so nothing is pushed over a
+   family any more. */
 export type PanelPage =
   | { kind: 'family'; channel: string }
   /* A family's settings on their own — for a family of one, whose row opens
@@ -180,12 +182,6 @@ export function turnOffPlan(all: AuthMethod[], id: string, currentDefault: strin
   const wasDefault = currentDefault === id
   const replacement = wasDefault ? firstDefaultable(all, id) : null
   return { rules, wasDefault, replacement, confirm: rules > 0 || (wasDefault && replacement === null) }
-}
-
-/** People enrolled in a family: the largest method's figure, never more than the tenant has. One person can enrol in two methods. */
-export function familyEnrolled(inside: Pick<AuthMethod, 'enrolled'>[], headcount?: number): number {
-  const most = Math.max(0, ...inside.map((m) => m.enrolled ?? 0))
-  return headcount !== undefined && headcount > 0 ? Math.min(most, headcount) : most
 }
 
 /** "SMS transactions" reads mid-sentence as it is; "Call transactions" becomes "call transactions". */

@@ -11,6 +11,7 @@ import { ruleState } from '../rule-form'
 import type { Selection, Trace } from './model'
 import { UNREACHABLE_CODES } from './parts'
 import { RuleCard, TerminalCard } from './RuleCard'
+import { BOARD_SKINS, readBoardSkin, writeBoardSkin, type BoardSkin } from './board-skin'
 
 /* -----------------------------------------------------------------------------
    The stage, and the chain on it.
@@ -117,6 +118,9 @@ export function Board({
      of a full-bleed stage. The panel is a grid track beside the stage now, so
      `clientWidth` already excludes it — reserving it a second time would file
      the chain half a panel to the left. */
+  /* Which skin the canvas wears — a preview switch, remembered per viewer. */
+  const [skin, setSkinState] = useState<BoardSkin>(readBoardSkin)
+
   const {
     viewRef,
     zoomLabel,
@@ -289,7 +293,7 @@ export function Board({
   return (
     <div
       ref={stage}
-      className={`bb__stage ${panning ? 'is-panning' : ''}`}
+      className={`bb__stage ${panning ? 'is-panning' : ''} ${skin === 'workflow' ? 'is-wf' : ''}`}
       style={{ '--bb-x': `${viewRef.current.x}px`, '--bb-y': `${viewRef.current.y}px`, '--bb-z': viewRef.current.z } as CSSProperties}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -529,6 +533,27 @@ export function Board({
           What changes withheld, this strip IS the board's instrument panel. */}
       <div className="bb__dock" data-tour="board-dock">
         {aside}
+        {/* Prototype furniture, not a setting: the two skins of this canvas,
+            side by side, the way the library pages carry Width. Its own group
+            rather than a button in the view toolbar — it changes how the whole
+            board looks, where the controls beside it change what you are
+            looking at. */}
+        <div className="bb__float bb__skin" role="group" aria-label="Canvas skin">
+          {BOARD_SKINS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={skin === o.value}
+              className={skin === o.value ? 'is-on' : ''}
+              onClick={() => {
+                setSkinState(o.value)
+                writeBoardSkin(o.value)
+              }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
         <div className="bb__float" role="toolbar" aria-label="View">
           {tools}
           {tools && <span className="bb__float__sep" />}

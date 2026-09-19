@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'motion/react'
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useEffect } from 'react'
 import {
   ArrowLeft,
@@ -19,7 +19,7 @@ import {
   Phone,
   RectangleEllipsis,
   ShieldCheck,
-  SlidersHorizontal,
+  Settings,
   Smartphone,
   Star,
 } from 'lucide-react'
@@ -42,7 +42,6 @@ import {
   backLabel,
   canServeAsDefault,
   clampVerify,
-  familyEnrolled,
   familyRow,
   firstDefaultable,
   hasConfigPage,
@@ -200,7 +199,7 @@ const FAMILIES: Family[] = [
   },
   {
     channel: 'Biometric',
-    blurb: 'Bound to the device and the origin. Nothing to type, nothing to intercept.',
+    blurb: 'Bound to the device and the origin. Nothing to type or intercept.',
     detail:
       'A passkey on the device or a FIDO2 security key, unlocked with a fingerprint, face or PIN. Bound to the site it was made for, so a lookalike page cannot use it.',
     icon: Fingerprint,
@@ -250,9 +249,11 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
      setup — deepest last. Empty closes it. See `PanelPage`. */
   const [panel, setPanel] = useState<PanelPage[]>([])
 
-  /* Which end a settings row wears: the chevron, or a gear with the switch
-     moved out to the edge beside it. See `gearRows` below. Deliberately not
-     persisted: it is a comparison being made now, not a preference. */
+  /* Which mark a settings row wears at its end: the chevron every other row
+     has, or a gear that says the row opens settings rather than a list. Only
+     the mark changes — it keeps the row's right edge either way. See
+     `gearRows` below. Deliberately not persisted: it is a comparison being
+     made now, not a preference. */
   const [gearEnds, setGearEnds] = useState(false)
 
   /* Arriving by a link that unmounted with its page — the Display tokens back
@@ -360,31 +361,26 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
     applyEnabled(id, on)
   }
 
-  /* "Set up" opens the integration's own form, as a page in the slider. From a
-     row on the list the form is the slider's first page; from inside a family it
-     is pushed over that family, and Back returns to it. Display Token's setup is
-     the Display tokens page rather than a form — see `setupTargetFor` — so its
-     button leaves this screen, through the leave guard like any navigation. */
+  /* "Set up" from a row on the list opens the integration's own form as the
+     slider's first page. Inside a family it opens in the method's own card
+     instead (see `CategoryDrawer`). Display Token's setup is the Display tokens
+     page rather than a form — see `setupTargetFor` — so its button leaves this
+     screen, through the leave guard like any navigation. */
   const openSetup = (m: AuthMethod) => {
     const to = setupTargetFor(m)
     if (to.kind === 'screen') store.go(to.screen)
     else setPanel([to.page])
   }
-  const pushSetup = (m: AuthMethod) => {
-    const to = setupTargetFor(m)
-    if (to.kind === 'screen') store.go(to.screen)
-    else setPanel((s) => [...s, to.page])
-  }
   const back = () => setPanel((s) => s.slice(0, -1))
 
   /* Saving marks the method configured, which is what the rest of the screen
      reads to decide between a Set up button and a toggle, and keeps what the
-     form was saved with so it reopens on it. Secrets are held, not kept. */
+     form was saved with so it reopens on it. Secrets are held, not kept. The
+     slider decides where it lands afterwards: back a page, or the card shut. */
   const finishSetup = (m: AuthMethod, fields: ConfigField[]) => {
     const first = !m.configured
     setMethodConfig((prev) => ({ ...prev, [m.id]: storeSecrets(fields) }))
     setMethods((all) => all.map((x) => (x.id === m.id ? { ...x, configured: true } : x)))
-    back()
     store.showToast(first ? `${m.name} is set up. Turn it on to use it.` : `${m.name} updated`)
   }
 
@@ -395,7 +391,6 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
     const card = setupCardFor(m.id)
     if (card?.kind === 'nps') setSetupChoice((prev) => ({ ...prev, [m.id]: server }))
     setMethods((all) => all.map((x) => (x.id === m.id ? { ...x, configured: true } : x)))
-    back()
     const via = card?.kind === 'nps' ? NPS_SERVERS.find((x) => x.id === server)?.name : undefined
     store.showToast(via ? `${m.name} will send through ${via}` : `${m.name} is set up`)
   }
@@ -595,7 +590,6 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
             use={use}
             onUse={setUse}
             isUser={isUser}
-            headcount={store.users.length + store.unlistedUsers}
             onToggle={setEnabled}
             onSetup={openSetup}
             onMakeDefault={setDefaultMethodId}
@@ -610,7 +604,6 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
             onClose={closePanel}
             onToggle={setEnabled}
             defaultMethod={defaultMethod}
-            onSetup={pushSetup}
             onMakeDefault={setDefaultMethodId}
             saved={savedConfig}
             onSaveSetup={finishSetup}
@@ -870,7 +863,6 @@ function CategoryList({
   use,
   onUse,
   isUser,
-  headcount,
   onToggle,
   onSetup,
   onSettings,
@@ -885,8 +877,6 @@ function CategoryList({
   use: UseFilter
   onUse: (u: UseFilter) => void
   isUser: boolean
-  /** People in the tenant, the ceiling for an enrolment figure. */
-  headcount: number
   onToggle: (id: string, on: boolean) => void
   onSetup: (m: AuthMethod) => void
   /** A family of one's settings, opened straight from its row. */
@@ -919,7 +909,6 @@ function CategoryList({
         inside,
         total: inside.length,
         live: live.length,
-        enrolled: familyEnrolled(inside, headcount),
         txns: pools.size ? [...pools.values()].reduce((a, b) => a + b, 0) : null,
       }
     })
@@ -933,7 +922,7 @@ function CategoryList({
              methods the filter left, so a hidden method cannot bring its row back. */
           r.inside.some((m) => m.name.toLowerCase().includes(needle)),
       )
-  }, [methods, needle, use, isUser, headcount])
+  }, [methods, needle, use, isUser])
 
   /* Recovery is a tenant policy, the primaries are not in a person's catalogue,
      and every method a person sees is a second factor — so none of those three
@@ -1019,6 +1008,7 @@ function CategoryList({
                   isDefault={defaultMethod === item.m.id}
                   onSetup={onSetup}
                   onMakeDefault={onMakeDefault}
+                  reserveMark
                 />
               ) : (
                 <FamilyListRow
@@ -1043,6 +1033,46 @@ function CategoryList({
   )
 }
 
+/* The end of a row on the list: its control, then its mark — the chevron into
+   a page, or the gear variant's button.
+
+   BOTH slots are always drawn, empty where a row has neither, so every switch
+   down the list stands in one column and the figures beside them stay in
+   theirs (owner, 18 Sep 2026: "move all the toggles into one row, leaving
+   empty space if needed… the cards should be aligned"). Before this, a row
+   with no chevron put its switch against the edge and a row with one pushed it
+   33px in, which is what made the column look broken.
+
+   The CONTROL takes the row's right edge and the mark sits just inside it —
+   the figure, then the gear, then the switch (owner, 18 Sep 2026: "first the
+   numbers, then the gear icons wherever needed, and move the toggle and
+   configuration button all the way up to the end"). The thing you DO to a row
+   is the thing at its end, on every row and in both variants.
+
+   A row with nothing to do — a family that only opens — swaps the two, so its
+   chevron lands on that same edge instead of leaving a 92px hole where the
+   switches are. The slots keep their widths either way, so the figures beside
+   them never move. That hole is what "this view feels broken" was. */
+function RowEnd({ control, mark }: { control?: ReactNode; mark?: ReactNode }) {
+  const ctl = <span className="bm8__rowctl">{control}</span>
+  const end = <span className="bm8__rowmark">{mark}</span>
+  return (
+    <span className="bm8__rowend">
+      {control ? (
+        <>
+          {end}
+          {ctl}
+        </>
+      ) : (
+        <>
+          {ctl}
+          {end}
+        </>
+      )}
+    </span>
+  )
+}
+
 /* One family on the list. A family of one is named for its method and carries
    its controls; a family with variants opens the slider. */
 function FamilyListRow({
@@ -1057,7 +1087,7 @@ function FamilyListRow({
   onSetup,
   onMakeDefault,
 }: {
-  row: { f: Family; shape: FamilyRow; inside: AuthMethod[]; live: number; enrolled: number; txns: number | null }
+  row: { f: Family; shape: FamilyRow; inside: AuthMethod[]; live: number; txns: number | null }
   isUser: boolean
   gearEnds: boolean
   defaultMethod: string | null
@@ -1069,7 +1099,7 @@ function FamilyListRow({
   onSetup: (m: AuthMethod) => void
   onMakeDefault: (id: string) => void
 }) {
-  const { f, shape, inside, live, enrolled, txns } = row
+  const { f, shape, inside, live, txns } = row
   /* A family of one is named for its method — "CAC Card", not "Smart Cards" —
      because that is the thing the switch on the row turns on. */
   const single = shape.opens ? null : shape.method
@@ -1087,18 +1117,16 @@ function FamilyListRow({
         ? () => onSettings(f.channel)
         : () => onSetup(target.method)
   const gear = Boolean(gearEnds && single && target?.kind === 'settings' && open)
-  const ctl = single && (
-    <span className="bm8__rowctl">
-      <MethodControls
-        compact
-        m={single}
-        isDefault={defaultMethod === single.id}
-        onToggle={onToggle}
-        onSetup={onSetup}
-        onMakeDefault={open ? undefined : onMakeDefault}
-      />
-    </span>
-  )
+  const ctl = single ? (
+    <MethodControls
+      compact
+      m={single}
+      isDefault={defaultMethod === single.id}
+      onToggle={onToggle}
+      onSetup={onSetup}
+      onMakeDefault={open ? undefined : onMakeDefault}
+    />
+  ) : undefined
 
   return (
     <li
@@ -1129,11 +1157,19 @@ function FamilyListRow({
               Default
             </i>
           )}
-          {/* What the family is, holds and costs, on the tip beside the name
-              rather than as a line under it. A focusable mark, as on a method
-              row, so a keyboard reaches the words too. */}
-          <TipDot text={`${f.blurb} ${f.detail}`} label={`About ${title}`} />
+          {/* What the family holds is the line under the name; the tip carries
+              the whole story, because the line is clipped rather than wrapped
+              on a row whose balance chip takes the width.
+
+              A family of one shows that method's summary, falling back to its
+              description — so where it HAS no summary the line below already is
+              the description, and an ungated tip repeated it word for word.
+              Gated the way MethodCard gates its own. */}
+          {(single ? !!single.summary : true) && (
+            <TipDot text={single ? single.description : `${f.blurb} ${f.detail}`} label={`About ${title}`} />
+          )}
         </span>
+        <span className="bm8__blurb">{single ? single.summary ?? single.description : f.blurb}</span>
       </span>
 
       <span className="bm8__right">
@@ -1143,47 +1179,38 @@ function FamilyListRow({
           </span>
         )}
 
-        {isUser ? (
-          configured && <Badge tone="positive">Configured</Badge>
-        ) : (
-          /* Reserved even at zero, so the figure stays in one column. */
-          <span className="bm8__reach">
-            {enrolled > 0 ? (
-              <>
-                <b>{enrolled.toLocaleString()}</b>
-                <em>enrolled</em>
-              </>
-            ) : (
-              <i>—</i>
-            )}
-          </span>
-        )}
+        {/* No enrolment figure (owner, 18 Sep 2026: "remove enrolment
+            numbers"). It was the loudest thing on every row — 20px semibold,
+            eleven of them down a column — and it answered a question this page
+            does not ask: the list is for turning methods on and off, and how
+            many people have already enrolled in one changes nothing about
+            whether it should be available. A row that nobody had enrolled in
+            spent the same width on a dash. The figures live on each method in
+            `methods.ts` and can come back wherever they are actually the
+            question. See the "numbers once" rule. */}
+        {isUser && configured && <Badge tone="positive">Configured</Badge>}
 
-        {/* The end of the row: its switch, then its chevron, against the edge.
-            In the gear variant the order inverts, so every switch in the list
-            lines up at the right edge. */}
-        <span className={`bm8__rowend ${gear ? 'is-gear' : ''}`}>
-          {gear ? (
-            <>
+        {/* Both slots, always — see `RowEnd`. */}
+        <RowEnd
+          control={ctl}
+          mark={
+            gear ? (
               <span className="bm8__rowgear">
-                {/* Sliders, not a cog, and at the full control size: the cog
-                    read as app settings, and at 14px it was the smallest thing
-                    on a row whose switch beside it is 40px wide. */}
-                <IconButton icon={SlidersHorizontal} label={`${title} settings`} tone="ghost" onClick={open ?? undefined} />
+                {/* A cog, at the full control size (owner, 18 Sep 2026: "use
+                    gear icon"). It shipped as sliders on the argument that a
+                    cog reads as APP settings rather than this row's; the owner
+                    read it the other way, and a cog is what every console in
+                    this category puts on a row that opens its own settings.
+                    The Settings tab it opens wears the same glyph. */}
+                <IconButton icon={Settings} label={`${title} settings`} tone="ghost" onClick={open ?? undefined} />
               </span>
-              {ctl}
-            </>
-          ) : (
-            <>
-              {ctl}
-              {open && (
-                <span className="bm8__rowchev" aria-hidden>
-                  <ChevronRight size={17} strokeWidth={2} />
-                </span>
-              )}
-            </>
-          )}
-        </span>
+            ) : open ? (
+              <span className="bm8__rowchev" aria-hidden>
+                <ChevronRight size={17} strokeWidth={2} />
+              </span>
+            ) : undefined
+          }
+        />
       </span>
     </li>
   )
@@ -1198,9 +1225,14 @@ const PAGE_EASE: [number, number, number, number] = [0.2, 0, 0, 1]
    families that have any — the settings the MFA sheet says belong to them.
 
    One panel with pages rather than a surface per job (see `PanelPage`). A
-   method's setup is pushed over its family and Back pops it. A family of one
-   opens straight onto its settings or its setup, because its row already
-   carries everything a Methods pane would have shown. */
+   family of one opens straight onto its settings or its setup page, because
+   its row already carries everything a Methods pane would have shown.
+
+   Inside a family, a method's setup opens in its own card (owner, 17 Sep
+   2026: "open the setup inside each card"). It was a page pushed over the
+   family, which hid the other methods while one was being set up. One card
+   open at a time; the card holds Cancel and Save, and the slider's Done and
+   close still ask before typed setup is lost. */
 function CategoryDrawer({
   pages,
   methods,
@@ -1208,7 +1240,6 @@ function CategoryDrawer({
   onClose,
   onToggle,
   defaultMethod,
-  onSetup,
   onMakeDefault,
   saved,
   onSaveSetup,
@@ -1226,8 +1257,6 @@ function CategoryDrawer({
   onClose: () => void
   onToggle: (id: string, on: boolean) => void
   defaultMethod: string | null
-  /** Pushes a method's setup over the page it was pressed on. */
-  onSetup: (m: AuthMethod) => void
   onMakeDefault: (id: string) => void
   /** What each method's setup was last saved with, per id. */
   saved: Record<string, ConfigField[]>
@@ -1250,10 +1279,23 @@ function CategoryDrawer({
   const under = pages.length > 1 ? pages[pages.length - 2] : null
   const key = top ? pageKey(top) : 'closed'
 
-  const setupOf = top?.kind === 'setup' ? (methods.find((m) => m.id === top.methodId) ?? null) : null
+  /* The method whose setup is open in its card on a family page. Shut whenever
+     the page changes, so a card never reopens by itself. */
+  const [inCard, setInCard] = useState<string | null>(null)
+  const [inCardFor, setInCardFor] = useState(key)
+  if (key !== inCardFor) {
+    setInCardFor(key)
+    setInCard(null)
+  }
+
+  /* The setup being edited, whichever way it is shown: as the top page, or in
+     a card. The draft and the leave guard read this one. */
+  const pageSetup = top?.kind === 'setup' ? (methods.find((m) => m.id === top.methodId) ?? null) : null
+  const cardSetup = !pageSetup && inCard ? (methods.find((m) => m.id === inCard) ?? null) : null
+  const setupOf = pageSetup ?? cardSetup
   /* Setup belongs to a family too — it is what the head names when there is no
      Back to name it. A primary has no family, and gets no line. */
-  const channel = top === null ? null : top.kind === 'setup' ? (setupOf?.channel ?? null) : top.channel
+  const channel = top === null ? null : top.kind === 'setup' ? (pageSetup?.channel ?? null) : top.channel
   const family = channel ? (FAMILIES.find((f) => f.channel === channel) ?? null) : null
   const backTo = backLabel(under)
 
@@ -1347,10 +1389,20 @@ function CategoryDrawer({
   const unchanged = !!setupOf?.configured && !draft.dirty
   const canSaveSetup = !!setupOf && !unchanged && (card ? setupReady(card, draft) : missing === 0 && invalid === 0)
 
-  /* Typed setup is not thrown away by Esc, a click outside or Back — the shared
-     leave dialog asks first. Cancel stays an explicit discard. Saving from the
-     dialog already steps back a page (see finishSetup), so a Back that was
-     waiting on it must not step back a second time. */
+  /* Save, then land: a setup page steps back to what it was pushed over; a card
+     shuts. */
+  const saveSetup = () => {
+    if (!setupOf) return
+    if (card) onSaveCard(setupOf, draft.server)
+    else onSaveSetup(setupOf, draft.fields)
+    if (cardSetup) setInCard(null)
+    else onBack()
+  }
+
+  /* Typed setup is not thrown away by Esc, a click outside, Back or opening
+     another card — the shared leave dialog asks first. Cancel stays an explicit
+     discard. Saving from the dialog already steps back a page (see saveSetup),
+     so a Back that was waiting on it must not step back a second time. */
   const savedFromLeave = useRef(false)
 
   const confirmLeave = useLeaveGuard({
@@ -1361,8 +1413,7 @@ function CategoryDrawer({
       if (!setupOf) return enrol.guard.save()
       if (!canSaveSetup) return false
       savedFromLeave.current = true
-      if (card) onSaveCard(setupOf, draft.server)
-      else onSaveSetup(setupOf, draft.fields)
+      saveSetup()
       return true
     },
     blocked: !setupOf
@@ -1384,6 +1435,21 @@ function CategoryDrawer({
       if (!alreadyBack) run()
     })
 
+  /* A card's Set up, Configure or Edit. Display Token's setup is another screen,
+     reached through `go` so the guard has its say; every other method's opens
+     in its card, shutting the one that was open. */
+  const openInCard = (m: AuthMethod) => {
+    const to = setupTargetFor(m)
+    if (to.kind === 'screen') go(to.screen)
+    else if (m.id !== inCard) leaveThen(() => setInCard(m.id), false)
+  }
+  const setupStatus =
+    missing > 0
+      ? `${missing} required ${missing === 1 ? 'field' : 'fields'} left`
+      : invalid > 0
+        ? `${invalid} ${invalid === 1 ? 'field' : 'fields'} to fix`
+        : null
+
   return (
     <Drawer
       open={top !== null}
@@ -1393,7 +1459,7 @@ function CategoryDrawer({
          a narrower panel (16 Sep 2026), and the setup form is one stacked
          column that reflows. */
       width={560}
-      title={setupOf ? `${setupOf.name} ${card ? 'setup' : 'configuration'}` : (single?.name ?? family?.channel ?? '')}
+      title={pageSetup ? `${pageSetup.name} ${card ? 'setup' : 'configuration'}` : (single?.name ?? family?.channel ?? '')}
       /* One header, not two.
 
          The panel had the kit's own head (name + count + close) and then a
@@ -1417,23 +1483,15 @@ function CategoryDrawer({
                 {backTo}
               </button>
             )}
-            {setupOf ? (
+            {pageSetup ? (
               <div className="bm8__dwhead">
                 <span className="bm8__dwtile bm8__dwtile--logo" aria-hidden>
-                  <MethodIcon name={setupOf.name} size={32} />
+                  <MethodIcon name={pageSetup.name} size={32} />
                 </span>
-                <h2 className="bm8__dwtitle">{setupOf.name}</h2>
+                <h2 className="bm8__dwtitle">{pageSetup.name}</h2>
                 {/* Why Save is dead, stated where it stays in view: the head does
                     not scroll, and a scrolled-past section says it to nobody. */}
-                {missing > 0 ? (
-                  <Badge tone="notice">
-                    {missing} required {missing === 1 ? 'field' : 'fields'} left
-                  </Badge>
-                ) : invalid > 0 ? (
-                  <Badge tone="notice">
-                    {invalid} {invalid === 1 ? 'field' : 'fields'} to fix
-                  </Badge>
-                ) : null}
+                {setupStatus && <Badge tone="notice">{setupStatus}</Badge>}
               </div>
             ) : family ? (
               <div className={`bm8__dwhead is-${family.tint}`}>
@@ -1447,7 +1505,7 @@ function CategoryDrawer({
         ) : undefined
       }
       actions={
-        setupOf ? (
+        pageSetup ? (
           <>
             {/* Cancel goes where Back goes when there is somewhere to go back
                 to. Closing the whole panel from a pushed page would throw away
@@ -1455,16 +1513,16 @@ function CategoryDrawer({
             <Button variant="ghost" onClick={under ? onBack : onClose}>
               Cancel
             </Button>
-            <Button
-              variant="brand"
-              disabled={!canSaveSetup}
-              onClick={() => (card ? onSaveCard(setupOf, draft.server) : onSaveSetup(setupOf, draft.fields))}
-            >
+            <Button variant="brand" disabled={!canSaveSetup} onClick={saveSetup}>
               Save
             </Button>
           </>
         ) : (
-          <Button variant="brand" onClick={onClose}>
+          /* Through the guard, like the Drawer's own close above. The footer
+             branches on `pageSetup` but the guard watches the CARD's draft, so
+             once setup moved into the card (18 Sep 2026) this button sat on
+             screen beside a dirty form and threw it away without asking. */
+          <Button variant="brand" onClick={() => leaveThen(onClose, false)}>
             Done
           </Button>
         )
@@ -1475,15 +1533,9 @@ function CategoryDrawer({
             description, a status the head and the list already carry, and the
             group the Back button already names — a grey block to read past
             before the form. Removed on the owner's word, 15 Sep 2026. */}
-        {setupOf ? (
+        {pageSetup ? (
           <div className="bm8__dw">
-            {card?.kind === 'app' ? (
-              <AppSetupCard method={setupOf} card={card} passcode={draft.passcode} onPasscode={draft.setPasscode} />
-            ) : card?.kind === 'nps' ? (
-              <NpsSetupCard servers={NPS_SERVERS} value={draft.server} onChange={draft.setServer} />
-            ) : (
-              <SetupForm draft={draft} />
-            )}
+            <SetupBody method={pageSetup} card={card} draft={draft} />
           </div>
         ) : family && top?.kind === 'settings' ? (
           <div className="bm8__dw">
@@ -1518,7 +1570,7 @@ function CategoryDrawer({
                   className={`bm8__dwtab ${pane === 'settings' ? 'is-on' : ''}`}
                   onClick={() => setPane('settings')}
                 >
-                  <SlidersHorizontal size={14} strokeWidth={1.9} aria-hidden />
+                  <Settings size={14} strokeWidth={1.9} aria-hidden />
                   Settings
                 </button>
               </div>
@@ -1563,8 +1615,21 @@ function CategoryDrawer({
                           m={m}
                           onToggle={onToggle}
                           isDefault={defaultMethod === m.id}
-                          onSetup={onSetup}
+                          onSetup={openInCard}
                           onMakeDefault={onMakeDefault}
+                          setup={
+                            cardSetup?.id === m.id ? (
+                              <CardSetup
+                                method={m}
+                                status={setupStatus}
+                                canSave={canSaveSetup}
+                                onCancel={() => setInCard(null)}
+                                onSave={saveSetup}
+                              >
+                                <SetupBody method={m} card={card} draft={draft} />
+                              </CardSetup>
+                            ) : undefined
+                          }
                         />
                       ),
                     )}
@@ -1586,6 +1651,81 @@ function CategoryDrawer({
         ) : null}
       </motion.div>
     </Drawer>
+  )
+}
+
+/* What a setup shows, on its page or in its card: an authenticator app's
+   install-and-scan card, Microsoft Push's server, or the integration's form. */
+function SetupBody({
+  method,
+  card,
+  draft,
+}: {
+  method: AuthMethod
+  card: ReturnType<typeof setupCardFor>
+  draft: SetupDraft
+}) {
+  if (card?.kind === 'app')
+    return <AppSetupCard method={method} card={card} passcode={draft.passcode} onPasscode={draft.setPasscode} />
+  if (card?.kind === 'nps') return <NpsSetupCard servers={NPS_SERVERS} value={draft.server} onChange={draft.setServer} />
+  return <SetupForm draft={draft} />
+}
+
+/* A setup open in its method's card: the setup, then Cancel and Save on the
+   card's own last line, with what still blocks Save beside them.
+
+   It takes focus when it opens — the button that opened it has just gone — and
+   hands it back to the card's control when it shuts. */
+function CardSetup({
+  method,
+  status,
+  canSave,
+  onCancel,
+  onSave,
+  children,
+}: {
+  method: AuthMethod
+  status: string | null
+  canSave: boolean
+  onCancel: () => void
+  onSave: () => void
+  children: ReactNode
+}) {
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    el.focus({ preventScroll: true })
+    const cardEl = el.closest('.bm8__card')
+    return () => {
+      /* Only when focus went down with the setup — never away from something
+         the person has since moved to. */
+      const active = document.activeElement
+      if (active && active !== document.body && cardEl?.contains(active) === false) return
+      /* Set up, Edit or Configure — the last button before the switch, after
+         any Make default. */
+      requestAnimationFrame(() => {
+        if (!cardEl?.isConnected) return
+        const opener = [...cardEl.querySelectorAll<HTMLElement>('.bm8__right button:not([role="switch"])')].at(-1)
+        opener?.focus({ preventScroll: true })
+      })
+    }
+  }, [])
+
+  return (
+    <div ref={box} className="bm8__cardsetup" role="group" aria-label={`${method.name} setup`} tabIndex={-1}>
+      {children}
+      <div className="bm8__cardfoot">
+        {status && <span className="bm8__cardstatus">{status}</span>}
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button variant="brand" size="sm" disabled={!canSave} title={status ?? undefined} onClick={onSave}>
+          Save
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -1725,6 +1865,8 @@ function MethodCard({
   onSetup,
   onMakeDefault,
   as: Tag = 'div',
+  setup,
+  reserveMark = false,
 }: {
   m: AuthMethod
   onToggle: (id: string, on: boolean) => void
@@ -1733,11 +1875,26 @@ function MethodCard({
   onMakeDefault: (id: string) => void
   /** `li` on the page's list, `div` inside the slider's. */
   as?: 'div' | 'li'
+  /** The method's setup, open in the card — the slider's cards only. */
+  setup?: ReactNode
+  /** On the page's list, where the rows around it end in a chevron: reserve the
+      mark slot so this row's switch stands in the same column. */
+  reserveMark?: boolean
 }) {
   const blocked = methodBlocker(m)
+  const controls = (
+    <MethodControls
+      m={m}
+      isDefault={isDefault}
+      onToggle={onToggle}
+      onSetup={onSetup}
+      onMakeDefault={onMakeDefault}
+      setupOpen={!!setup}
+    />
+  )
 
   return (
-    <Tag className={`bm8__card bm8__card--method ${blocked ? 'is-off' : ''}`}>
+    <Tag className={`bm8__card bm8__card--method ${blocked ? 'is-off' : ''}${setup ? ' is-setup' : ''}`}>
       <span className="bm8__tile bm8__tile--logo" aria-hidden>
         <MethodIcon name={m.name} size={36} />
       </span>
@@ -1760,22 +1917,27 @@ function MethodCard({
               Default
             </i>
           )}
-          {/* The description is a tip beside the name, not a line under it. How
-              many rules use a method is said where it matters: when it is
-              turned off. */}
-          <TipDot text={m.description} label={`About ${m.name}`} />
+          {/* The tip only where the line below cannot hold the whole
+              description (owner, 18 Sep 2026: "add a one-liner for each
+              card") — either because a shorter `summary` is being shown, or
+              because the description is long enough to be clipped on a row
+              carrying a balance chip. Where the line IS the description, a tip
+              would repeat what is already on screen. */}
+          {m.summary && <TipDot text={m.description} label={`About ${m.name}`} />}
         </span>
+        <span className="bm8__blurb">{m.summary ?? m.description}</span>
       </div>
 
       <div className="bm8__right">
-        <MethodControls
-          m={m}
-          isDefault={isDefault}
-          onToggle={onToggle}
-          onSetup={onSetup}
-          onMakeDefault={onMakeDefault}
-        />
+        {/* The panel's cards have no chevrons to line up with, so they keep the
+            controls on their own. */}
+        {reserveMark ? (
+          <RowEnd control={controls} />
+        ) : (
+          controls
+        )}
       </div>
+      {setup}
     </Tag>
   )
 }
@@ -1792,6 +1954,7 @@ function MethodControls({
   onSetup,
   onMakeDefault,
   compact,
+  setupOpen = false,
 }: {
   m: AuthMethod
   isDefault: boolean
@@ -1805,6 +1968,9 @@ function MethodControls({
      "Make default" becomes a star, and there is no Edit — the row itself opens
      the configuration. */
   compact?: boolean
+  /* The setup is open in the card: the button that opened it goes, since the
+     card now holds Cancel and Save. The switch stays. */
+  setupOpen?: boolean
 }) {
 
   /* Whether this method could be the default, on the same rule the section that
@@ -1827,103 +1993,88 @@ function MethodControls({
   /* "Manage tokens" once Display Token is configured; null for every other method. */
   const tokenLabel = m.configured ? tokenButtonLabel(m) : null
 
-  /* Two states, and only one control each.
+  /* One shape, whatever state the method is in: the actions it offers, then the
+     switch slot at the end.
 
-     A method that has not been configured cannot be switched on, so the
-     switch was rendered disabled next to a button that could actually be
-     pressed — a dead control sitting above the live one, both competing
-     for the same corner. The switch is not "off" in that state, it is
-     absent: there is nothing yet to turn on. So the row shows the one
-     thing you can do, and earns its switch by being set up.
+     The slot is drawn even where there is nothing to put in it — a method that
+     is not configured yet cannot be switched on — because these rows sit in a
+     list and the switches have to read as a column. Before this, "Configure"
+     alone sat where the switches were and the column stopped dead at every
+     unconfigured row (owner, 18 Sep 2026).
 
-     The knock-on is that enabling is no longer reachable from this row
-     until setup completes, which is the truth the disabled switch was
-     only gesturing at. */
+     A method that has not been configured shows the one thing you can do, and
+     earns its switch by being set up. The one method that is not a choice says
+     "Always on" in the slot instead: a disabled toggle is still a control, and
+     invites the click it then refuses. */
   return (
-    <>
-      {/* No switch on the one method that is not a choice. A disabled toggle
-          was here to say "on, but not yours to change" — and a control you
-          cannot operate is still a control: it invites the click it then
-          refuses. The chip says the same thing in words and cannot be misread
-          as broken. */}
-      {m.locked ? (
-        <i className="bm8__always">Always on</i>
-      ) : m.configured ? (
-        <>
-          {/* Edit is the same control Set up was, in the same corner.
+    <div className="bm8__ctlrow">
+      {/* Offered only where it is available and not already true. The method
+          that IS the default says so with the badge on its name and needs no
+          button — there is nothing to press. */}
+      {m.configured && !m.locked && canBeDefault && !isDefault && onMakeDefault && (
+        compact ? (
+          /* A star rather than the words: on a list row it sits in the column
+             the switches line up in, and "Make default" in text would push the
+             row's figures out of theirs. The label is the tooltip. */
+          <IconButton
+            icon={Star}
+            label={`Make ${m.name} the default`}
+            size="sm"
+            tone="ghost"
+            onClick={() => onMakeDefault(m.id)}
+          />
+        ) : (
+          <Button variant="ghost" size="sm" onClick={() => onMakeDefault(m.id)}>
+            <Star size={13} strokeWidth={2} aria-hidden />
+            Make default
+          </Button>
+        )
+      )}
 
-              It was an underlined word at the end of a line of monospace
-              values — which is a link inside a label, not a button, and it
-              sat in the text column where nothing else is clickable. Every
-              action on this card lives on the right: Set up did before the
-              method was configured, and Edit is the same action afterwards.
-              Putting it back there costs one row of card height and makes the
-              two states read as one control that changes its name. */}
-          <div className="bm8__ctlrow">
-            {/* Offered only where it is available and not already true. The
-                method that IS the default says so with the badge on its name
-                and needs no button — there is nothing to press. */}
-            {canBeDefault &&
-              !isDefault &&
-              onMakeDefault &&
-              (compact ? (
-                /* A star rather than the words: on a list row it sits in the
-                   column the switches line up in, and "Make default" in text
-                   would push the row's figures out of theirs. The label is
-                   the tooltip. */
-                <IconButton
-                  icon={Star}
-                  label={`Make ${m.name} the default`}
-                  size="sm"
-                  tone="ghost"
-                  onClick={() => onMakeDefault(m.id)}
-                />
-              ) : (
-                <Button variant="ghost" size="sm" onClick={() => onMakeDefault(m.id)}>
-                  <Star size={13} strokeWidth={2} aria-hidden />
-                  Make default
-                </Button>
-              ))}
-            {/* The authenticator apps' one-card setup — install and scan, or
-                Microsoft Push's server — on a button of its own beside the
-                switch, because it is something you do rather than somewhere
-                you go. */}
-            {setupCardFor(m.id) && (
-              <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
-                Set up
-              </Button>
-            )}
-            {/* Display Token's inventory, beside its switch once a token is
-                assigned — the same page its Set up opened. */}
-            {tokenLabel && (
-              <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
-                {tokenLabel}
-              </Button>
-            )}
-            {canEdit && (
-              <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
-                <Pencil size={13} strokeWidth={2} aria-hidden />
-                Edit
-              </Button>
-            )}
-            <Toggle
-              checked={m.active}
-              onChange={(v) => onToggle(m.id, v)}
-              label={`Enable ${m.name}`}
-            />
-          </div>
-        </>
-      ) : (
-        /* "Configure", as a blue text button (owner, 16 Sep 2026). A boxed
-           "Set up" was the heaviest thing on an unconfigured row — heavier than
-           the switches on the configured rows around it, for the rows that do
-           the least. The word matches the gear on configured rows: both open the
-           method's configuration. */
+      {/* The authenticator apps' one-card setup — install and scan, or
+          Microsoft Push's server — on a button of its own beside the switch,
+          because it is something you do rather than somewhere you go. */}
+      {m.configured && !m.locked && setupCardFor(m.id) && !setupOpen && (
+        <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
+          Set up
+        </Button>
+      )}
+
+      {/* Display Token's inventory, beside its switch once a token is assigned
+          — the same page its Set up opened. */}
+      {m.configured && !m.locked && tokenLabel && (
+        <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
+          {tokenLabel}
+        </Button>
+      )}
+
+      {/* Edit is the same control Set up was, in the same corner: one control
+          that changes its name once the method is configured. */}
+      {m.configured && !m.locked && canEdit && !setupOpen && (
+        <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
+          <Pencil size={13} strokeWidth={2} aria-hidden />
+          Edit
+        </Button>
+      )}
+
+      {/* "Configure", as a blue text button (owner, 16 Sep 2026). A boxed
+          "Set up" was the heaviest thing on an unconfigured row — heavier than
+          the switches on the configured rows around it, for the rows that do
+          the least. */}
+      {!m.configured && !m.locked && !setupOpen && (
         <Button variant="link" size="sm" onClick={() => onSetup(m)}>
           Configure
         </Button>
       )}
-    </>
+
+      <span className="bm8__rowswitch">
+        {m.locked ? (
+          <i className="bm8__always">Always on</i>
+        ) : m.configured ? (
+          <Toggle checked={m.active} onChange={(v) => onToggle(m.id, v)} label={`Enable ${m.name}`} />
+        ) : null}
+      </span>
+    </div>
   )
 }
 

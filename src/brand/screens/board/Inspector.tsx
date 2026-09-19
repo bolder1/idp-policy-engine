@@ -358,9 +358,23 @@ function RuleHead({
    A missing first or second factor method is said under its own picker in
    Then, so it is not said twice. */
 const SHOWN_IN_THEN = new Set(['PE122', 'PE123'])
+
+/* The two who-findings this panel does not print (owner, 18 Sep 2026).
+
+   PE151 names every group and person the policy does not govern, IN FULL: a
+   rule that picks the twenty-one groups in the directory drew a 300px
+   paragraph of seventy names at the top of a 400px panel, above the rule it
+   was about. PE153 only fires on a who whose exceptions cover its own choices,
+   which this panel can no longer build.
+
+   Neither is switched off — `diagnose` still raises both, so Review & save,
+   the policy-level list and the duplicate-policy dialog still report them, and
+   the card's own pill still turns. What changed is that the rule panel does not
+   spend a screenful restating one of them. */
+const SHOWN_ELSEWHERE = new Set(['PE151', 'PE153'])
 function RuleFindings({ diagnostics }: { diagnostics: Diagnostic[] }) {
   const shown = [...diagnostics].sort((a, b) => (a.severity === 'error' ? 0 : 1) - (b.severity === 'error' ? 0 : 1))
-  const list = shown.filter((d) => d.severity !== 'info' && !SHOWN_IN_THEN.has(d.code))
+  const list = shown.filter((d) => d.severity !== 'info' && !SHOWN_IN_THEN.has(d.code) && !SHOWN_ELSEWHERE.has(d.code))
   if (list.length === 0) return null
   return (
     <div className="bb__findings" role="status">

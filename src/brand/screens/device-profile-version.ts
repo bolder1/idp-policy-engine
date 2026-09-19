@@ -84,3 +84,41 @@ export function writeCreateVersion(version: CreateVersion): void {
     /* Kept for this session only. */
   }
 }
+
+/* -----------------------------------------------------------------------------
+   The live builder, on or off, for the page versions of the create flow.
+
+   On (owner, 17 Sep 2026: "a live builder … at the end a live building
+   experience that helps the user understand the overview of the profile"),
+   the column beside each step is a preview of the profile that fills in as it
+   is answered, and at Review that preview opens out into the review itself
+   rather than Review being a page of its own. Off, the column is the step's
+   notes and Review is its own page, as before.
+
+   The slide-over has no second column, so it has no live builder either way.
+   On by default, because it is the thing being tried; remembered like the
+   create flow, and storage that throws leaves it on for the session.
+   -------------------------------------------------------------------------- */
+
+export const LIVE_BUILDER_KEY = 'idp.deviceProfileLive'
+
+/** Off only when stored off; anything else is on. */
+export function parseLiveBuilder(value: unknown): boolean {
+  return value !== 'off'
+}
+
+export function readLiveBuilder(): boolean {
+  try {
+    return parseLiveBuilder(window.localStorage.getItem(LIVE_BUILDER_KEY))
+  } catch {
+    return true
+  }
+}
+
+export function writeLiveBuilder(on: boolean): void {
+  try {
+    window.localStorage.setItem(LIVE_BUILDER_KEY, on ? 'on' : 'off')
+  } catch {
+    /* Kept for this session only. */
+  }
+}

@@ -53,6 +53,13 @@ export type MfaField =
          accept, and the tests check every option and default against them — but
          nothing outside this list is offered. */
       options: number[]
+      /* …unless the setting says otherwise. A field marked `custom` offers its
+         presets AND a way to type a number that is not among them, clamped to
+         `min`–`max` (owner, 18 Sep 2026: "add a custom button here"). Only for
+         the settings where the tail is legitimate rather than a slip: an OTP
+         that lives seven minutes is a policy somebody has a reason for, where a
+         push timeout of 287 seconds is a slider that moved. */
+      custom?: boolean
     }
   | { kind: 'toggle'; value: boolean }
   | { kind: 'choice'; value: string; options: string[] }
@@ -168,7 +175,12 @@ const otpSettings = (): MfaSetting[] => [
     label: 'OTP validity',
     help: 'How long a code stays usable.',
     source: 'prod',
-    field: { kind: 'number', value: 3, min: 1, max: 30, unit: 'minutes', options: [1, 3, 5, 10, 15, 30] },
+    /* Five minutes is the floor (owner, 18 Sep 2026: "minimum is 5, so remove 1
+       and 3"). A one-minute code fails more often than it protects: it expires
+       while the text is still in the carrier's queue, and the person asks for
+       another one, which is the same code round again over a channel that is
+       already the weakest factor here. */
+    field: { kind: 'number', value: 5, min: 5, max: 30, unit: 'minutes', options: [5, 10, 15, 30], custom: true },
   },
 ]
 

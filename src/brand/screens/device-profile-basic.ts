@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_DEVICES, MODE_META, asksReach, type FingerprintProfile } from '../fingerprint'
+import { MODE_META, asksReach, type FingerprintProfile } from '../fingerprint'
 
 /* -----------------------------------------------------------------------------
    Device profiles · Basic details: the tests the tab and the save footer run.
@@ -42,29 +42,12 @@ export const basicDetailsSet = (p: Pick<FingerprintProfile, 'restrictionSet'>): 
 export const basicSetupIssue = (p: Pick<FingerprintProfile, 'mode' | 'restrictionSet'>, isNew: boolean): string | null =>
   isNew && asksReach(p.mode) && !basicDetailsSet(p) ? 'Set up basic details.' : null
 
-const devices = (n: number) => `${n} ${n === 1 ? 'device' : 'devices'}`
-
 /* What the type is, and that nothing can change it — the tip on the page
    heading's type pill. Exported so the sentence has one home. */
 export const modeFixedTip = (p: Pick<FingerprintProfile, 'mode'>): string =>
   `${MODE_META[p.mode].blurb} The type is fixed when the profile is created. To use the other type, create a new profile.`
 
-/* The side panel before basic details are answered.
-
-   Not `BasicAside`: that panel describes the answers, and there are none to
-   describe yet. So it says what the two answers to the first question mean —
-   the wizard's Devices step says the same before its question is answered —
-   and, in one line, what the profile does in the meantime, because a stored
-   profile nobody has set up does still run on those values. */
-export function unsetAsideLines(p: Pick<FingerprintProfile, 'reach' | 'registration' | 'maxDevices'>): string[] {
-  const reads = p.reach === 'agent' ? 'uses the Device Agent' : 'is agentless'
-  const enrols =
-    p.registration === 'self'
-      ? `each user can register up to ${devices(p.maxDevices ?? DEFAULT_MAX_DEVICES)}`
-      : 'only devices on the approved roster can sign in'
-  return [
-    'Agentless reads the browser, network and location of each sign-in. Nothing to install.',
-    'Agent-based adds hardware identifiers, and needs the miniOrange Device Agent on each device.',
-    `Until this is set up, the profile ${reads} and ${enrols}.`,
-  ]
-}
+/* `unsetAsideLines` stood here — the Basic details panel's copy, with the
+   reach and the device cap written into its last line. The panel is
+   `DEVICES_NOTE` (profile-notes.ts) now, and says the same whether the details
+   are set or not (owner, 18 Sep 2026). */

@@ -15,11 +15,10 @@ import {
   Plus,
   Search,
   Trash2,
-  Unlink,
   X,
 } from 'lucide-react'
 
-import { Button, Drawer, IconButton, Modal, NameField, RowMenu, SaveBar, SearchBox, type MenuItem } from '../kit'
+import { Button, IconButton, Modal, NameField, RowMenu, SaveBar, SearchBox, type MenuItem } from '../kit'
 import { PageHead } from '../Shell'
 import { Picker } from '../picker'
 import {
@@ -48,7 +47,7 @@ import {
   zoneReviewRows,
 } from './zone-entries'
 import { deleteImpact, policiesUsing } from './usage'
-import { UsedByList } from './used-by'
+import { UsedByPanel } from './used-by'
 import { ConfirmDelete } from './confirm-delete'
 import { ListPager } from './list-pager'
 import { usePagedList } from './paged-list'
@@ -177,12 +176,13 @@ export function ZonesFinal() {
   const [naming, setNaming] = useState(false)
   const [duping, setDuping] = useState<Zone | null>(null)
   const [deleting, setDeleting] = useState<Zone | null>(null)
-  /* The zone whose "Used by" drawer is open, from its row menu. Up here rather
+  /* The zone whose "Used by" panel is open, from its row menu. Up here rather
      than on the zone page: which rules name a zone is a question asked of the
      list, beside Duplicate and Delete, and answering it should not mean opening
-     the zone and its draft. */
-  const [usesFor, setUsesFor] = useState<Zone | null>(null)
-  const usesUsers = usesFor ? policiesUsing('zone', usesFor.id, store.policies) : []
+     the zone and its draft. Held by id and read from the store, so a rename
+     shows and a delete closes the panel. */
+  const [usesId, setUsesId] = useState<string | null>(null)
+  const usesFor = usesId ? (store.zones.find((z) => z.id === usesId) ?? null) : null
 
   const allNames = store.zones.map((z) => z.name)
   /* Not only the zones that exist: a deleted zone's id may still be named by a rule. */
@@ -215,26 +215,33 @@ export function ZonesFinal() {
     /* Opened, so the copy is on screen: in a filtered or paged list it could be
        hidden, and "created" would look untrue. */
     setQ('')
+    /* Like `openZone`: the list stays mounted behind the detail page, so a
+       panel left open for the zone you copied FROM is still open when you come
+       back — docked beside a list, marking a row you are no longer looking at. */
+    setUsesId(null)
     setOpenId(id)
     store.showToast(`${name} created`)
     focusZoneHeading()
   }
 
   const startCreate = (name: string) => {
+    setUsesId(null)
     setCreating({ ...blank(), id: newId('z', allIds, name), name })
     setNaming(false)
     focusZoneHeading()
   }
 
   const openZone = (id: string) => {
+    setUsesId(null)
     setOpenId(id)
     focusZoneHeading()
   }
 
   return (
     /* Compact only while the list shows and the width switch says so: the zone
-       page keeps the full width. */
-    <div className={detail ? 'bpage bz7' : `bpage${compactClass(width)} bz7`}>
+       page keeps the full width. `has-dock` while the Used by panel sits beside
+       the list — see `DockPanel`. */
+    <div className={detail ? 'bpage bz7' : `bpage${compactClass(width)} bz7${usesFor ? ' has-dock' : ''}`}>
       {detail ? (
         /* Keyed so opening another zone starts from that zone, not the last draft.
            A new zone is stored under the id it was given here, so its first save
@@ -320,6 +327,18 @@ export function ZonesFinal() {
                 }
               />
 
+              {/* Before the rows, not after: the paged-list hook counts
+                  everything that follows the rows as room they cannot have. */}
+              {usesFor && (
+                <UsedByPanel
+                  subject={usesFor.id}
+                  caption={`Policy rules that use ${usesFor.name}.`}
+                  emptyBlurb="No policy rule uses this zone."
+                  users={policiesUsing('zone', usesFor.id, store.policies)}
+                  onClose={() => setUsesId(null)}
+                />
+              )}
+
               {shown.length === 0 ? (
                 <NoMatches
                   noun="zones"
@@ -338,7 +357,8 @@ export function ZonesFinal() {
                     listRef={paged.listRef}
                     onOpen={openZone}
                     onDuplicate={setDuping}
-                    onUses={setUsesFor}
+                    usesId={usesFor?.id ?? null}
+                    onUses={(u) => setUsesId(u.id)}
                     onDelete={setDeleting}
                   />
                   <ListPager {...paged.pager} label="Zone pages" />
@@ -346,19 +366,6 @@ export function ZonesFinal() {
               )}
             </>
           )}
-
-          <Drawer
-            open={!!usesFor}
-            onClose={() => setUsesFor(null)}
-            title="Used by"
-            caption={`Policy rules that use ${usesFor?.name ?? ''}.`}
-          >
-            {usesUsers.length === 0 ? (
-              <EmptyState compact icon={Unlink} title="Not used by any policy" blurb="No policy rule uses this zone." />
-            ) : (
-              <UsedByList users={usesUsers} />
-            )}
-          </Drawer>
         </>
       )}
 
@@ -425,6 +432,7 @@ function ZoneList({
   listRef,
   onOpen,
   onDuplicate,
+  usesId,
   onUses,
   onDelete,
 }: {
@@ -433,18 +441,20 @@ function ZoneList({
   listRef: (el: HTMLElement | null) => void
   onOpen: (id: string) => void
   onDuplicate: (z: Zone) => void
+  /** The zone the Used by panel is about, marked on its row. */
+  usesId: string | null
   onUses: (z: Zone) => void
   onDelete: (z: Zone) => void
 }) {
   /* Table, list or card — the one shape `LibraryRows` draws for every library. */
-  const rows: LibRow[] = zones.map((z) => {
+  const rows: LibRow[] = zones.map((z): LibRow => {
     const meta = SHAPE[shapeOf(z)]
     return {
       id: z.id,
       name: z.name,
       tile: <meta.icon size={18} strokeWidth={1.8} />,
       tileClass: `bz7__tile is-${meta.tint}`,
-      attrs: { 'data-zone-id': z.id },
+      attrs: usesId === z.id ? { 'data-zone-id': z.id, 'data-docked': 'true' } : { 'data-zone-id': z.id },
       onOpen: () => onOpen(z.id),
       facts: [
         {
@@ -456,7 +466,7 @@ function ZoneList({
           value: locationEmpty(z.location) ? <AnyBand what="location" /> : <Chips items={placeBits(z.location)} max={2} />,
         },
       ],
-      /* No used-by count on the row: the menu's Used by opens the rules in a drawer. */
+      /* No used-by count on the row: the menu's Used by docks the rules beside the list. */
       menu: (
         <RowMenu
           label={`Actions for ${z.name}`}

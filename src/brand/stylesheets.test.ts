@@ -149,6 +149,8 @@ describe('the stylesheets', () => {
         '.bb__grip',
         '.bb__if', // a condition row
         '.bb__rule',
+        '.bb__stage.is-wf', // the Workflow skin — every other anchor here is Classic
+        '.bb__skin', // the Classic/Workflow switch, which sits outside the stage
       ],
     ],
     [

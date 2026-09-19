@@ -6,7 +6,6 @@ import {
   backLabel,
   canServeAsDefault,
   clampVerify,
-  familyEnrolled,
   familyRow,
   firstDefaultable,
   hasConfigPage,
@@ -206,16 +205,6 @@ describe('turnOffPlan', () => {
 
   test('turns a method nobody uses off without asking', () => {
     expect(turnOffPlan(AUTH_METHODS, byId('kba').id, 'otp-email', []).confirm).toBe(false)
-  })
-})
-
-describe('familyEnrolled', () => {
-  test('is the largest method figure, not the sum, and never above the headcount', () => {
-    const mo = AUTH_METHODS.filter((m) => m.channel === 'miniOrange Authenticator')
-    expect(familyEnrolled(mo)).toBe(Math.max(...mo.map((m) => m.enrolled ?? 0)))
-    expect(familyEnrolled([{ enrolled: 1203 }, { enrolled: 1203 }], 1240)).toBe(1203)
-    expect(familyEnrolled([{ enrolled: 2000 }], 1240)).toBe(1240)
-    expect(familyEnrolled([])).toBe(0)
   })
 })
 

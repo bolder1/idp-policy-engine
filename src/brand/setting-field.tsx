@@ -1,23 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import {
-  AlertTriangle,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Fingerprint,
-  Grid3x3,
-  Hash,
-  Hourglass,
-  KeyRound,
-  type LucideIcon,
-  MessageCircleQuestion,
-  PencilLine,
-  RectangleEllipsis,
-  Route,
-  Settings,
-  ShieldQuestion,
-  Trash2,
-} from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 
 import { Button, TipDot, Toggle } from './kit'
 import { fieldValue, type MfaSetting } from './mfa-settings'
@@ -31,6 +13,27 @@ import type { MfaValue } from './mfa-join'
    number input was styled by `.bv5 .bv5__dnum input`, so anything rendering it
    outside a `.bv5` ancestor silently lost the styling. A form control should
    not need to know which screen it is on.
+
+   --- Stacked, not side by side -------------------------------------------------
+
+   The label sits on its own line and the control fills the line below it, at
+   the full width of the panel (owner, 18 Sep 2026: "don't use this kind of
+   horizontal inputs anywhere — only the vertical one, label at the top, remove
+   icons, and the selection at the bottom taking the full space").
+
+   The row used to be icon / label / control-on-the-right. In a 560px drawer
+   that gives the control about 170px and spends the rest on air between the
+   two halves, so the eye crosses the panel for every value and the triggers
+   read as a narrow right-hand column rather than as fields. Stacked, each
+   setting is one field of the form the pane already is — the same shape the
+   method setup cards use (method-forms.css) and the same one the pages use
+   (label over field). The icons went with it: they named the subject a second
+   time, under a label that already says it.
+
+   A TOGGLE and a LINK keep the row form. Neither is a value you pick from a
+   set: a switch is small enough to sit beside its label and stacking one
+   spends a line saying nothing, and a link row is a door, the same shape as a
+   list row that opens a page.
 
    --- What changed in the polish pass ------------------------------------------
 
@@ -50,35 +53,6 @@ import type { MfaValue } from './mfa-join'
    · Four or more are a DROPDOWN, and a custom one rather than `<select>`, so
      the chosen option can carry a tick and the list can breathe.
    -------------------------------------------------------------------------- */
-
-/* An icon per setting, for what the setting IS — never for the control it
-   happens to use.
-
-   This was a pattern table that mostly drew the input type: a # on every
-   "…length" (a number), a timer on every duration, and a # again as the
-   fallback, so "OTP length" and "Grid size" wore the same glyph as any other
-   number. The owner read them as "the type of selection inside the dropdown",
-   which is what they were. Now each setting names its own subject, by id, and
-   the fallback is a neutral one that says nothing about the control. */
-const ICON: Record<string, LucideIcon> = {
-  /* The code itself: how many characters, and how long it lasts. */
-  'otp-length': RectangleEllipsis,
-  'otp-validity': Hourglass,
-  /* Approving a push. */
-  'push-biometric': Fingerprint,
-  'push-number': Hash,
-  /* The keyfob being handed to a person. */
-  'token-assign': KeyRound,
-  /* Security questions: asked at sign-in, set up at enrolment, edited later. */
-  'kba-verify': ShieldQuestion,
-  'kba-limit': MessageCircleQuestion,
-  'kba-change': PencilLine,
-  /* The grid card, and the path read off it. */
-  'grid-size': Grid3x3,
-  'grid-length': Route,
-}
-
-const iconFor = (id: string): LucideIcon => ICON[id] ?? Settings
 
 /** How a row reaches the values of the settings it reveals. */
 export interface ChildAccess {
@@ -108,7 +82,6 @@ export function SettingField({
   child?: ChildAccess
 }) {
   const f = setting.field
-  const Icon = iconFor(setting.id)
   const num = f.kind === 'number' ? Number(value) : 0
   const warn = f.kind === 'number' && f.warnAbove && num > f.warnAbove.value ? f.warnAbove.why : null
 
@@ -128,74 +101,79 @@ export function SettingField({
       ? f.rule
       : null
 
+  /* A switch and a door stay beside their label; everything you pick a value
+     from stacks under it. See the module note. */
+  const inline = f.kind === 'toggle' || f.kind === 'link'
+
+  const control = (
+    <span className="bsf__ctl">
+      {f.kind === 'toggle' && (
+        <Toggle checked={Boolean(value)} onChange={onChange} label={setting.label} size="sm" />
+      )}
+      {f.kind === 'number' && (
+        <NumberChoice
+          value={num}
+          options={f.options}
+          unit={f.unit}
+          label={setting.label}
+          warn={Boolean(warn)}
+          custom={f.custom}
+          min={f.min}
+          max={f.max}
+          onChange={(v) => onChange(v)}
+        />
+      )}
+      {f.kind === 'choice' &&
+        (f.options.length <= 3 ? (
+          <Segmented
+            options={f.options}
+            value={String(value)}
+            label={setting.label}
+            onChange={onChange}
+          />
+        ) : (
+          <Dropdown
+            options={f.options}
+            value={String(value)}
+            label={setting.label}
+            onChange={onChange}
+          />
+        ))}
+      {/* A door, not a dial. The row exists so the option is findable from
+          the family it belongs to; the page it opens (Display tokens) is a
+          page of this console, so it wears a chevron, not an arrow out of
+          the product. `onChange` is how the screen hears the press. */}
+      {f.kind === 'link' && (
+        <Button variant="secondary" size="sm" onClick={() => onChange(String(Date.now()))}>
+          {f.cta}
+          <ChevronRight size={14} strokeWidth={2} aria-hidden />
+        </Button>
+      )}
+      {f.kind === 'text' && (
+        <TextBox
+          value={String(value)}
+          placeholder={f.placeholder}
+          maxLength={f.maxLength}
+          pattern={f.pattern}
+          label={setting.label}
+          onChange={onChange}
+        />
+      )}
+    </span>
+  )
+
   return (
-    <div className="bsf">
+    <div className={`bsf${inline ? ' is-inline' : ''}`}>
+      {/* The setting's name, and what it does on the tip beside it: row details
+          go in tooltips, not on a second line under the name. */}
       <div className="bsf__head">
-        <span className="bsf__ico" aria-hidden>
-          <Icon size={18} strokeWidth={1.8} />
+        <span className="bsf__label">
+          {setting.label}
+          {setting.help && <TipDot text={setting.help} label={`About ${setting.label}`} />}
+          {extra}
         </span>
 
-        {/* The setting's name, and what it does on the tip beside it: row details
-            go in tooltips, not on a second line under the name. */}
-        <span className="bsf__main">
-          <span className="bsf__label">
-            {setting.label}
-            {setting.help && <TipDot text={setting.help} label={`About ${setting.label}`} />}
-            {extra}
-          </span>
-        </span>
-
-        <span className="bsf__ctl">
-          {f.kind === 'toggle' && (
-            <Toggle checked={Boolean(value)} onChange={onChange} label={setting.label} size="sm" />
-          )}
-          {f.kind === 'number' && (
-            <NumberChoice
-              value={num}
-              options={f.options}
-              unit={f.unit}
-              label={setting.label}
-              warn={Boolean(warn)}
-              onChange={(v) => onChange(v)}
-            />
-          )}
-          {f.kind === 'choice' &&
-            (f.options.length <= 3 ? (
-              <Segmented
-                options={f.options}
-                value={String(value)}
-                label={setting.label}
-                onChange={onChange}
-              />
-            ) : (
-              <Dropdown
-                options={f.options}
-                value={String(value)}
-                label={setting.label}
-                onChange={onChange}
-              />
-            ))}
-          {/* A door, not a dial. The row exists so the option is findable from
-              the family it belongs to; the page it opens (Display tokens) is a
-              page of this console, so it wears a chevron, not an arrow out of
-              the product. `onChange` is how the screen hears the press. */}
-          {f.kind === 'link' && (
-            <Button variant="secondary" size="sm" onClick={() => onChange(String(Date.now()))}>
-              {f.cta}
-              <ChevronRight size={14} strokeWidth={2} aria-hidden />
-            </Button>
-          )}
-          {f.kind === 'text' && (
-            <TextBox
-              value={String(value)}
-              placeholder={f.placeholder}
-              maxLength={f.maxLength}
-              pattern={f.pattern}
-              label={setting.label}
-              onChange={onChange}
-            />
-          )}
-        </span>
+        {inline && control}
 
         {onRemove && (
           <button type="button" className="bsf__drop" aria-label={`Remove ${setting.label}`} onClick={onRemove}>
@@ -203,6 +181,8 @@ export function SettingField({
           </button>
         )}
       </div>
+
+      {!inline && control}
 
       {/* The carrier's rule, or the endpoint's. Shown only once the value
           actually breaks it — a constraint stated permanently under a field is
@@ -269,13 +249,27 @@ export function SettingField({
    One control for one kind. The unit rides on each option — "6 digits", "3
    minutes" — because a dropdown's options are read one at a time with nothing
    beside them to borrow it from, and because the closed trigger then states
-   the whole value rather than a bare number. */
+   the whole value rather than a bare number.
+
+   A field marked `custom` keeps the set AND offers "Custom" as its last row.
+   Choosing it opens a box UNDER the dropdown; the dropdown stays exactly where
+   it was, reading "Custom" (owner, 18 Sep 2026: "when I select custom I don't
+   want a dedicated view — add an input field under the dropdown, don't hide it
+   or replace it with something else"). The set is still the answer for almost
+   everybody; the box is for the tenant whose reason is not on the list.
+
+   Leaving custom is picking a preset, which is why there is no third control
+   to do it: the dropdown never went away. What the box takes is clamped to the
+   field's own min and max, so "custom" never means "anything". */
 function NumberChoice({
   value,
   options,
   unit,
   label,
   warn,
+  custom = false,
+  min,
+  max,
   onChange,
 }: {
   value: number
@@ -283,18 +277,111 @@ function NumberChoice({
   unit?: string
   label: string
   warn: boolean
+  /** The field allows a number outside `options`, typed. */
+  custom?: boolean
+  min: number
+  max: number
   onChange: (v: number) => void
 }) {
+  /* A value the set does not hold can only have been typed, so the box opens
+     holding it rather than a dropdown that cannot show where it is. */
+  const [typing, setTyping] = useState(custom && !options.includes(value))
+  const [draft, setDraft] = useState(String(value))
+  /* The "Custom" row unmounts with the list that holds it, so the button the
+     admin just pressed leaves the DOM and focus falls to <body> — the next Tab
+     restarts at the top of the console instead of entering the box they asked
+     for. Moved on the PRESS, not in an effect on `typing`: `typing` can start
+     true for a value the set does not hold, and that must not pull focus the
+     moment a panel opens. */
+  const box = useRef<HTMLInputElement | null>(null)
+
+  /* A value arriving from outside — another family's settings under the same
+     control, a panel reopened — replaces whatever is half-typed. */
+  useEffect(() => {
+    setDraft(String(value))
+  }, [value])
+
+  /* Clamped on the way out, not on the way in: clamping as you type turns "40"
+     into "30" at the "4", and then the "0" makes it "300". */
+  const commit = () => {
+    const n = Number(draft)
+    const next = Number.isFinite(n) && draft !== '' ? Math.min(max, Math.max(min, Math.round(n))) : value
+    setDraft(String(next))
+    if (next !== value) onChange(next)
+  }
+
+  const typed = Number(draft)
+  const outside = draft !== '' && Number.isFinite(typed) && (typed < min || typed > max)
+
   return (
-    <span className={warn ? 'is-warn' : undefined}>
+    <span className={`bsf__num${warn ? ' is-warn' : ''}`}>
       <Dropdown
-        options={options.map((n) => (unit ? `${n} ${unit}` : String(n)))}
-        value={unit ? `${value} ${unit}` : String(value)}
+        options={options.map((n) => amount(n, unit))}
+        /* "Custom" while the box below is holding the value: the trigger would
+           otherwise read a number that is also on screen a line lower, and the
+           row you chose would show no tick. */
+        value={typing ? CUSTOM : amount(value, unit)}
         label={label}
-        onChange={(v) => onChange(Number(String(v).split(' ')[0]))}
+        action={
+          custom
+            ? {
+                label: CUSTOM,
+                active: typing,
+                onSelect: () => {
+                  setTyping(true)
+                  /* After the state flush has rendered the box, not before. */
+                  requestAnimationFrame(() => box.current?.focus())
+                },
+              }
+            : undefined
+        }
+        onChange={(v) => {
+          /* Picking a preset is how you leave custom. */
+          setTyping(false)
+          onChange(Number(String(v).split(' ')[0]))
+        }}
       />
+
+      {typing && (
+        <span className="bsf__customrow">
+          <input
+            ref={box}
+            type="text"
+            inputMode="numeric"
+            className="bsf__text"
+            value={draft}
+            aria-label={unit ? `${label}, in ${unit}` : label}
+            onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ''))}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              commit()
+            }}
+          />
+          {unit && <i className="bsf__unit">{unit}</i>}
+        </span>
+      )}
+
+      {typing && outside && (
+        <p className="bsf__warn">
+          <AlertTriangle size={12} strokeWidth={2} aria-hidden />
+          {unit ? `Pick between ${min} and ${max} ${unit}.` : `Pick between ${min} and ${max}.`}
+        </p>
+      )}
     </span>
   )
+}
+
+/* The last row, and what the trigger reads while the box below is open. */
+const CUSTOM = 'Custom'
+
+
+/* "6 digits", "1 minute". The unit is written plural in the sheet because that
+   is how it reads on almost every option; one of anything is not. */
+function amount(n: number, unit?: string): string {
+  if (!unit) return String(n)
+  return `${n} ${n === 1 ? unit.replace(/s$/, '') : unit}`
 }
 
 /* --- Text, with the rule it has to keep -------------------------------------------
@@ -392,11 +479,14 @@ export function Dropdown({
   options,
   value,
   label,
+  action,
   onChange,
 }: {
   options: string[]
   value: string
   label: string
+  /** A last row that opens a control of its own instead of setting a value. */
+  action?: { label: string; active: boolean; onSelect: () => void }
   onChange: (v: string) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -456,6 +546,26 @@ export function Dropdown({
               </button>
             </li>
           ))}
+          {/* An option like the others — it is a choice, and it ticks when it is
+              the one in force — under a rule, because what it sets is typed
+              below rather than named here. */}
+          {action && (
+            <li className="bsf__ddaction">
+              <button
+                type="button"
+                role="option"
+                aria-selected={action.active}
+                className={action.active ? 'is-on' : ''}
+                onClick={() => {
+                  action.onSelect()
+                  setOpen(false)
+                }}
+              >
+                <Check size={13} strokeWidth={2.6} aria-hidden />
+                {action.label}
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </span>

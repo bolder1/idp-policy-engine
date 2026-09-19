@@ -1,5 +1,6 @@
 import type { Policy, Zone, ZoneLocation } from '../data'
 import { leaves } from '../predicate'
+import type { ReviewLine } from '../review-rows'
 import { classifyIp, isValidAsn } from './zone-validation'
 
 /** Ids a new zone must not take: every zone's, and every zone id a policy rule
@@ -124,11 +125,11 @@ function locationDiff(before: ZoneLocation, after: ZoneLocation): { added: strin
   return { added: shown(added, removed), removed: shown(removed, added) }
 }
 
-export interface ZoneReviewRow {
-  label: string
-  before: string
-  after: string
-}
+/* A zone's review row is the shared review line. The sections are the page's
+   own — IP networks, Locations — and the name leads under General. Each list
+   row holds every added (or removed) entry joined, so it names no single item,
+   and says how many it holds (`count`) when that is more than one. */
+export type ZoneReviewRow = ReviewLine
 
 /** Values listed in one review cell before the rest are counted. */
 export const REVIEW_LIST_MAX = 10
@@ -138,22 +139,37 @@ const listed = (values: string[]) =>
     ? values.join(', ')
     : `${values.slice(0, REVIEW_LIST_MAX).join(', ')} and ${values.length - REVIEW_LIST_MAX} more`
 
+const many = (values: string[]) => (values.length > 1 ? { count: values.length } : {})
+
 /* The draft against the saved zone, one row per kind of change. An edited entry
    reads as one removed and one added, which is what it is to a rule. */
 export function zoneReviewRows(before: Zone, after: Zone): ZoneReviewRow[] {
   const rows: ZoneReviewRow[] = []
-  if (before.name !== after.name) rows.push({ label: 'Name', before: before.name, after: after.name })
+  /* A new zone is reviewed against itself with no name (ZonesFinal), so its
+     name is added; a saved zone's name can only change. Said outright, so a
+     name cleared in the draft does not read as removed. */
+  if (before.name !== after.name) {
+    rows.push({ label: 'Name', before: before.name, after: after.name, kind: before.name === '' ? 'added' : 'changed' })
+  }
 
   const nb = netEntries(before)
   const na = netEntries(after)
   const netAdded = minus(na, nb)
   const netRemoved = minus(nb, na)
-  if (netAdded.length) rows.push({ label: 'IP networks: added', before: '', after: listed(netAdded) })
-  if (netRemoved.length) rows.push({ label: 'IP networks: removed', before: listed(netRemoved), after: '' })
+  if (netAdded.length) {
+    rows.push({ label: 'IP networks: added', before: '', after: listed(netAdded), group: 'IP networks', kind: 'added', ...many(netAdded) })
+  }
+  if (netRemoved.length) {
+    rows.push({ label: 'IP networks: removed', before: listed(netRemoved), after: '', group: 'IP networks', kind: 'removed', ...many(netRemoved) })
+  }
 
   const loc = locationDiff(before.location, after.location)
-  if (loc.added.length) rows.push({ label: 'Locations: added', before: '', after: listed(loc.added) })
-  if (loc.removed.length) rows.push({ label: 'Locations: removed', before: listed(loc.removed), after: '' })
+  if (loc.added.length) {
+    rows.push({ label: 'Locations: added', before: '', after: listed(loc.added), group: 'Locations', kind: 'added', ...many(loc.added) })
+  }
+  if (loc.removed.length) {
+    rows.push({ label: 'Locations: removed', before: listed(loc.removed), after: '', group: 'Locations', kind: 'removed', ...many(loc.removed) })
+  }
 
   return rows
 }

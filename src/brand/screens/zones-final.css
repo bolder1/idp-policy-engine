@@ -458,7 +458,7 @@ button.bz7__place:hover { border-color: var(--ctl-border-hover); }
 
 /* One column where half the width is too narrow for the form. The aside goes
    BELOW rather than above: it is reference, and reference goes after the work. */
-@media (max-width: 1080px) {
+@media (max-width: 1120px) {
   .bz7__cols { grid-template-columns: minmax(0, 1fr); gap: 18px; }
 }
 
@@ -496,6 +496,12 @@ button.bz7__place:hover { border-color: var(--ctl-border-hover); }
    dimmed without dimming the sample above it — opacity on the row would take
    both, since a child cannot be more opaque than its parent. */
 .bz7__sidelist em { font-style: normal; font-size: var(--fs-xs); opacity: 0.72; }
+/* The same list for named options rather than samples: a word, not a value, so
+   it is set in the panel's own face at the label weight instead of the
+   monospace a sample needs (device profiles, 18 Sep 2026). */
+.bz7__sidelist--words strong { font-size: var(--fs-xs); font-weight: var(--fw-semibold); }
+.bz7__sidelist--words.is-under { margin-top: var(--space-5); }
+
 .bz7__sidep {
   margin: 12px 0 0; padding-top: 10px;
   border-top: 1px solid var(--border-subtle);

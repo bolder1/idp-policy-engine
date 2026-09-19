@@ -16,8 +16,11 @@ import {
   canOpenStep,
   checkValue,
   draftOf,
+  categoriesOf,
   filterAttributes,
   initialWizard,
+  liveSections,
+  sectionStatus,
   reviewSections,
   stepDone,
   stepIssue,
@@ -247,6 +250,32 @@ describe('the inline list', () => {
     expect(filterAttributes(offered, 'browser').some((a) => a.category === 'Browser')).toBe(true)
   })
 
+  /* The category filter came back on 18 Sep 2026, multi-select, for the
+     trusted-device list. Empty means every family, so the filter starts
+     saying nothing. */
+  it('narrows to the chosen families, and offers only the ones the catalogue holds', () => {
+    const offered = offeredAttributes('device', 'agent')
+    const families = categoriesOf(offered)
+    expect(families.length).toBeGreaterThan(1)
+    /* In the catalogue's own order, each named once. */
+    expect(new Set(families).size).toBe(families.length)
+    expect(families.every((c) => offered.some((a) => a.category === c))).toBe(true)
+
+    const [first, second] = families
+    const one = filterAttributes(offered, '', [first])
+    expect(one.length).toBeGreaterThan(0)
+    expect(one.every((a) => a.category === first)).toBe(true)
+
+    const two = filterAttributes(offered, '', [first, second])
+    expect(two.length).toBeGreaterThan(one.length)
+    expect(two.every((a) => a.category === first || a.category === second)).toBe(true)
+
+    /* No category is every category, and the search still applies inside one. */
+    expect(filterAttributes(offered, '', [])).toHaveLength(filterAttributes(offered, '').length)
+    const searched = filterAttributes(offered, 'address', [first])
+    expect(searched.every((a) => a.category === first && /address/i.test(a.name + a.purpose))).toBe(true)
+  })
+
   it('selects every choosable row on screen, or clears them once all are ticked', () => {
     const all = filterAttributes(offered, '')
     const free = all.filter((a) => !a.always).map((a) => a.id)
@@ -336,5 +365,41 @@ describe('the review', () => {
     const windows = attrOf('os', 'os-windows')!
     expect(checkValue(windows, { op: 'gte', value: '11' })).toBe('Windows 11 or later')
     expect(checkValue(windows, undefined)).toBe('Windows 10 or later')
+  })
+})
+
+describe('the live builder', () => {
+  const noIssue = () => null
+
+  it('says what is not answered yet instead of showing defaults as choices', () => {
+    const blank = initialWizard()
+    const health = liveSections(blank, 'inline')
+    expect(health.map((x) => x.steps)).toEqual([['profile'], ['items']])
+    expect(health[1].pending).toBe('No checks yet')
+
+    const trusted = liveSections(withMode(blank, 'device'), 'split')
+    expect(trusted.map((x) => x.steps)).toEqual([['profile'], ['devices'], ['choose', 'values']])
+    expect(trusted[1].pending).toBe('Not chosen yet')
+    // A trusted device always collects its locked signals, so its list is never empty.
+    expect(trusted[2].pending).toBeNull()
+    expect(liveSections(withWizardReach(withMode(blank, 'device'), 'agent'), 'split')[1].pending).toBeNull()
+  })
+
+  it('marks a section here, done or not yet, as the ladder does', () => {
+    const s = withMode(initialWizard(), 'device')
+    const steps = wizardSteps('device', 'split')
+    const [profile, devices, signals] = liveSections(s, 'split')
+    // On Choose signals, having come straight from Devices.
+    const at = steps.findIndex((x) => x.id === 'choose')
+    expect(sectionStatus(signals, steps, at, at, noIssue)).toBe('current')
+    expect(sectionStatus(profile, steps, at, at, noIssue)).toBe('done')
+    expect(sectionStatus(devices, steps, at, at, noIssue)).toBe('done')
+    // On Profile: everything ahead is not yet, and a step with a problem is never done.
+    expect(sectionStatus(devices, steps, 0, 0, noIssue)).toBe('upcoming')
+    const blocked = (id: string) => (id === 'devices' ? 'Choose what the collector can read.' : null)
+    expect(sectionStatus(devices, steps, at, at, blocked)).toBe('upcoming')
+    // On Review, all three are behind you.
+    const review = steps.length - 1
+    expect([profile, devices, signals].map((x) => sectionStatus(x, steps, review, review, noIssue))).toEqual(['done', 'done', 'done'])
   })
 })

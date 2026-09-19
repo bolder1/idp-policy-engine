@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { CREATE_VERSIONS, parseCreateVersion, readCreateVersion, writeCreateVersion } from './device-profile-version'
+import {
+  CREATE_VERSIONS,
+  parseCreateVersion,
+  parseLiveBuilder,
+  readCreateVersion,
+  readLiveBuilder,
+  writeCreateVersion,
+  writeLiveBuilder,
+} from './device-profile-version'
 
 describe('the create profile version switch', () => {
   it('offers the shipped flow first, then the three proposals, each named and explained', () => {
@@ -28,5 +36,19 @@ describe('the create profile version switch', () => {
   it('falls back to Current, and does not throw, where there is no storage', () => {
     expect(readCreateVersion()).toBe('current')
     expect(() => writeCreateVersion('values')).not.toThrow()
+  })
+})
+
+describe('the live builder switch', () => {
+  it('is on unless it was stored off', () => {
+    expect(parseLiveBuilder('off')).toBe(false)
+    for (const value of ['on', null, undefined, '', 'Off', false, 0]) {
+      expect(parseLiveBuilder(value), String(value)).toBe(true)
+    }
+  })
+
+  it('stays on, and does not throw, where there is no storage', () => {
+    expect(readLiveBuilder()).toBe(true)
+    expect(() => writeLiveBuilder(false)).not.toThrow()
   })
 })

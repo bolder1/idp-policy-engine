@@ -309,52 +309,21 @@ export function RuleCard({
           </span>
         </button>
 
-        {/* The fold, at the LEADING edge, beside the index.
+        {/* The fold is not here any more. It is the first mark in the hover
+            trail above the card — see `.bb__acts` below (owner, 18 Sep 2026:
+            "remove the expand button from the card and move it to the small
+            icon button trail").
 
-            The toolbar switch sets the whole chain, which is the right control
-            for "show me the order" and the wrong one for "show me THIS one" —
-            the common move is to fold everything and then open the two rules
-            you are comparing. So the card carries its own.
-
-            It sat in the meta cluster on the right, and measured on a 560px
-            card that put it at x=601 with the hover actions occupying 631–733
-            at zero opacity and the toggle at the far edge: a control stranded
-            in the middle of the head by 102px of space it was not using and
-            could not see. Moving it here fixes that without making the head
-            reflow on hover — which is what removing the reserved space would
-            have done, jumping the toggle sideways every time the pointer
-            crossed a card.
-
-            It also belongs here. This and the index are the two structural
-            controls — where the rule sits, and how much of it you can see —
-            and a disclosure at the start of a row is where every tree, table
-            and accordion puts one. The right edge stays what it was: the
-            actions, then the switch that turns the rule off.
-
-            A two-headed arrow rather than a chevron, because a lone chevron
-            means a dropdown, a sort or a disclosure depending on where you
-            last saw one. `ChevronsUpDown` says "this grows and shrinks" and
-            swaps to its own opposite when open. */}
-        <button
-          type="button"
-          className={`bb__act bb__fold__btn ${expanded ? 'is-open' : ''}`}
-          aria-expanded={expanded}
-          aria-controls={`bb-rule-${rule.id}-body`}
-          aria-label={expanded ? `Hide what rule ${index + 1} checks` : `Show what rule ${index + 1} checks`}
-          title={expanded ? 'Fold this rule' : 'Show what it checks'}
-          /* Stopping it now, and it was a latent bug before: this is the one
-             control in the head with no `stopPropagation`, so folding a card
-             also selected it. Harmless while selection meant one thing; wrong
-             now that it would also snap the panel back to Who while you were
-             reading Then. `TerminalCard`'s equivalent already stops it. */
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggleExpand()
-          }}
-        >
-          {expanded ? <ChevronsDownUp size={14} strokeWidth={2.2} /> : <ChevronsUpDown size={14} strokeWidth={2.2} />}
-        </button>
-
+            It stood at the leading edge beside the index, on the argument that
+            the two structural controls — where a rule sits, and how much of it
+            you can see — belong together at the start of the row. What that
+            missed is that only ONE of them is read at rest. The index is a
+            fact about the rule and is worth a permanent slot; the fold is
+            something you DO to it, like duplicating or moving it, and every
+            other thing you do to a card already lives in one trail that
+            arrives when you reach for the card. A seventh action drawn
+            permanently inside the head was the only one of the seven charging
+            the resting card for its existence. */}
 
         {/* The title is the keyboard path to the rule.
 
@@ -394,6 +363,23 @@ export function RuleCard({
 
         <div className="bb__cardmeta" onClick={(e) => e.stopPropagation()}>
           <span className="bb__acts">
+            {/* How much of the card you can see — first, because it is the one
+                action in this trail that changes nothing about the rule. */}
+            <button
+              type="button"
+              className={`bb__act bb__fold__btn ${expanded ? 'is-open' : ''}`}
+              aria-expanded={expanded}
+              aria-controls={`bb-rule-${rule.id}-body`}
+              aria-label={expanded ? `Hide what rule ${index + 1} checks` : `Show what rule ${index + 1} checks`}
+              title={expanded ? 'Fold this rule' : 'Show what it checks'}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleExpand()
+              }}
+            >
+              {expanded ? <ChevronsDownUp size={13} strokeWidth={2.2} /> : <ChevronsUpDown size={13} strokeWidth={2.2} />}
+            </button>
+            <span className="bb__float__sep" />
             {/* On/off, with the other things you do TO a rule.
 
                 It was a switch pinned to the right of every card head, on at
@@ -542,33 +528,15 @@ export function TerminalCard({
           </span>
         </span>
 
-        {/* The fold, at the LEADING edge, beside the index — where every other
-            card in the chain puts it.
+        {/* The fold moved into the hover trail with every other card's, and
+            this card grew a trail to hold it (18 Sep 2026).
 
-            It was the last thing in the meta cluster on the right, so the one
-            card whose head has no actions and no switch was also the one card
-            whose disclosure was somewhere else. Two cards apart in the same
-            column, the same control at two different x positions.
-
-            A view control, so it is allowed on a card that carries no others.
-            The argument for this card having no buttons is about the POLICY:
-            move, duplicate, delete and the switch would all promise a change
-            the default cannot make. Folding changes nothing about the rule,
-            only how much of it is drawn. */}
-        <button
-          type="button"
-          className={`bb__act bb__fold__btn ${expanded ? 'is-open' : ''}`}
-          aria-expanded={expanded}
-          aria-controls="bb-terminal-body"
-          aria-label={expanded ? 'Hide what the default does' : 'Show what the default does'}
-          title={expanded ? 'Fold this rule' : 'Show what it does'}
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggleExpand()
-          }}
-        >
-          {expanded ? <ChevronsDownUp size={14} strokeWidth={2.2} /> : <ChevronsUpDown size={14} strokeWidth={2.2} />}
-        </button>
+            The argument for this card carrying no buttons is about the POLICY:
+            move, duplicate, delete and the switch would each promise a change
+            the default cannot make. Folding promises nothing — it changes how
+            much of the card is drawn and not one thing about the rule — so a
+            trail of exactly one mark is honest, and it keeps this card's
+            disclosure at the same x as every other card's. */}
         <div className="bb__title">
           {/* The state and the padlock ride beside the heading, where every
               other card in the chain carries its state pill — not at the far
@@ -617,6 +585,27 @@ export function TerminalCard({
             </div>
           </div>
           <em>Every sign-in that no rule above caught</em>
+        </div>
+
+        {/* One mark, in the same trail and at the same x as every other card's.
+            See the note where the fold used to stand. */}
+        <div className="bb__cardmeta" onClick={(e) => e.stopPropagation()}>
+          <span className="bb__acts">
+            <button
+              type="button"
+              className={`bb__act bb__fold__btn ${expanded ? 'is-open' : ''}`}
+              aria-expanded={expanded}
+              aria-controls="bb-terminal-body"
+              aria-label={expanded ? 'Hide what the default does' : 'Show what the default does'}
+              title={expanded ? 'Fold this rule' : 'Show what it does'}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleExpand()
+              }}
+            >
+              {expanded ? <ChevronsDownUp size={13} strokeWidth={2.2} /> : <ChevronsUpDown size={13} strokeWidth={2.2} />}
+            </button>
+          </span>
         </div>
       </div>
       <div className="bb__fold bb__fold--sum" aria-hidden={expanded} inert={expanded}>

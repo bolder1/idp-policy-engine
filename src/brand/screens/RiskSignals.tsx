@@ -1,9 +1,10 @@
 import { flushSync } from 'react-dom'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   ArrowLeft,
   Bug,
+  Check,
   CircleCheck,
   Copy,
   Crosshair,
@@ -30,6 +31,9 @@ import {
 } from 'lucide-react'
 
 import { PageHead } from '../Shell'
+import { SidePanel } from './device-profile-parts'
+import { RISK_SIGNALS_NOTE } from './profile-notes'
+import { RISK_PAGE_VERSIONS, readRiskPage, writeRiskPage, type RiskPageVersion } from './risk-page-version'
 import {
   Badge,
   Button,
@@ -39,7 +43,9 @@ import {
   RowMenu,
   SaveBar,
   SearchBox,
+  Tip,
   TipDot,
+  TipMark,
   Toggle,
   type MenuItem,
 } from '../kit'
@@ -61,6 +67,7 @@ import { policiesUsingType, type PolicyUse } from './usage'
 import {
   CATEGORY_TONE,
   EMPTY_RISK_PROFILE,
+  LIVE_PLATFORMS,
   PLATFORMS,
   RISK_PROFILE_NAME_MAX,
   RISK_SIGNALS,
@@ -78,6 +85,7 @@ import {
   setSignalTier,
   tierFor,
   type RiskProfile,
+  type Platform,
   type RiskSignal,
   type RiskTuning,
 } from '../risk-signals'
@@ -583,6 +591,16 @@ function RiskProfileDetail({
   const [draft, setDraft] = useState<RiskProfile>(profile)
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<string>(ALL)
+  /* Which SDKs the admin is working on. Empty is every platform, so the filter
+     starts saying nothing (owner, 18 Sep 2026: "add a filter for platform…
+     the user can select multiple"). */
+  const [plats, setPlats] = useState<Platform[]>([])
+  /* Table or list — the two shapes of this page, remembered per viewer. */
+  const [version, setVersionState] = useState<RiskPageVersion>(readRiskPage)
+  const setVersion = (v: RiskPageVersion) => {
+    setVersionState(v)
+    writeRiskPage(v)
+  }
   const [renaming, setRenaming] = useState(false)
   const head = useRef<HTMLElement | null>(null)
   /* The pencil's wrapper. IconButton takes no ref, and focus goes back to the
@@ -622,18 +640,20 @@ function RiskProfileDetail({
   const shown = useMemo(() => {
     const n = q.trim().toLowerCase()
     return RISK_SIGNALS.filter((s) => {
+      /* The platform filter holds through a search: it says which SDK the
+         admin is working on, which a query does not change. */
+      if (plats.length > 0 && !plats.some((p) => s.on.includes(p))) return false
       /* Searching leaves the category behind: a query that matched nothing in
          the chosen category would show an empty table with the answer one
          click away. */
       if (!n) return cat === ALL || s.category === cat
       return `${s.name} ${s.purpose} ${s.category}`.toLowerCase().includes(n)
     })
-  }, [q, cat])
+  }, [q, cat, plats])
 
   const toggle = (s: RiskSignal, on: boolean) => setDraft((d) => setSignalOn(d, s.id, on))
 
-  const setTier = (s: RiskSignal, p: 'android' | 'ios', t: RiskSignal['tier']) =>
-    setDraft((d) => setSignalTier(d, s, p, t))
+  const setTier = (s: RiskSignal, t: RiskSignal['tier']) => setDraft((d) => setSignalTier(d, s, t))
 
   const touched = draft.off.length > 0 || Object.keys(draft.tiers).length > 0
 
@@ -686,6 +706,27 @@ function RiskProfileDetail({
           <ChangeState unsaved={dirty} />
         </div>
 
+        {/* Prototype furniture, not a setting: the two shapes of this page,
+            side by side, the way the library pages carry Width. */}
+        <div className="bpage__preview brs__preview">
+          <span className="bwidth__label" aria-hidden>
+            Version
+          </span>
+          <div className="bseg" role="group" aria-label="Page version">
+            {RISK_PAGE_VERSIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                aria-pressed={version === o.value}
+                className={version === o.value ? 'is-on' : ''}
+                onClick={() => setVersion(o.value)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* The one action left in the header, at the right of the row: it edits
             the draft, so it belongs to the page. Only once there is something
             to restore. */}
@@ -731,6 +772,32 @@ function RiskProfileDetail({
       <div className="btoolbar">
         <SearchBox value={q} onChange={setQ} placeholder="Search signals…" label="Search risk signals" />
         <div className="btoolbar__right">
+          <span className={`btoolbar__filter bbar__filter${plats.length > 0 ? ' is-set' : ''}`}>
+            <Picker
+              label="Filter by platform"
+              multiple
+              prefix="Platform"
+              value={plats}
+              summary={platformSummary(plats)}
+              options={PLATFORMS.map((p) => ({
+                value: p.id,
+                label: p.label,
+                art: <PlatformMark platform={p.id} />,
+                /* Announced, not offered: nothing in the catalogue is collected
+                   on a desktop platform yet, so the row says when rather than
+                   filtering to an empty table. */
+                meta: p.soon ? 'Coming soon' : undefined,
+                disabled: p.soon,
+              }))}
+              onChange={(id) =>
+                setPlats(
+                  plats.includes(id as Platform)
+                    ? plats.filter((x) => x !== id)
+                    : LIVE_PLATFORMS.filter((p) => p.id === id || plats.includes(p.id)).map((p) => p.id),
+                )
+              }
+            />
+          </span>
           <Picker
             label="Filter by category"
             value={cat}
@@ -748,28 +815,38 @@ function RiskProfileDetail({
         </div>
       </div>
 
-      {/* Here as well as on the list: the dashes it explains are in the table below. */}
+      {/* Here as well as on the list, and the same words in both places. It
+          also explained a dash — the per-platform columns carried one for a
+          signal that platform does not report. Those columns are marks on the
+          name now (18 Sep 2026), so there is no dash left to explain. */}
       <p className="brs__gap">
         <Info size={13} strokeWidth={2} aria-hidden />
         <span>Mobile SDKs only.</span>
-        <TipDot
-          label="About risk signals"
-          text="Browser sign-ins carry none of these signals. A dash means the platform does not report the signal."
-        />
+        <TipDot label="About risk signals" text="Browser sign-ins carry none of these signals." />
       </p>
 
       {shown.length === 0 ? (
         <NoMatches
           noun="signals"
           query={q}
-          filtered={!q.trim() && cat !== ALL}
+          filtered={(!q.trim() && cat !== ALL) || plats.length > 0}
           onClear={() => {
             /* Only what the button says. A search ignores the category, so the
                category the picker still shows comes back with the list. */
             if (q.trim()) setQ('')
             else setCat(ALL)
+            setPlats([])
           }}
         />
+      ) : version === 'list' ? (
+        /* The device profile's inner page, on these signals: the work on the
+           left, one line per signal, and what the page does on the right. */
+        <div className="bz7__cols brs__cols">
+          <div className="bz7__work">
+            <SignalList items={shown} profile={draft} onToggle={toggle} onTier={setTier} />
+          </div>
+          <SidePanel note={RISK_SIGNALS_NOTE} />
+        </div>
       ) : (
         <SignalTable items={shown} profile={draft} onToggle={toggle} onTier={setTier} />
       )}
@@ -967,7 +1044,159 @@ function EditableProfileName({
   )
 }
 
-/* Every signal, in one table, with the category as a tinted pill on the row. */
+/* Every signal as one line, in the device profile's own picked row: the tick
+   that turns it on FIRST, then the mark, the name and its tip, the platforms
+   it is collected on, and the weight at the end (owner, 18 Sep 2026: "convert
+   them into a checkbox and place it at the first of each row like we have in
+   Device profile").
+
+   A switch at the row's end said the same thing, in the one place a device
+   profile's rows keep their Remove. The tick is the gesture this list is
+   actually for — turning sixteen signals on and off — and it is where the eye
+   starts. An off signal's weight is disabled with it: a signal that is not
+   collected has nothing to weigh. */
+function SignalList({
+  items,
+  profile,
+  onToggle,
+  onTier,
+}: {
+  items: RiskSignal[]
+  profile: RiskTuning
+  onToggle: (s: RiskSignal, on: boolean) => void
+  onTier: (s: RiskSignal, t: RiskSignal['tier']) => void
+}) {
+  return (
+    <section className="bfp2__checks brs__list">
+      <header className="bfp2__checkshead">
+        <h2>Signals</h2>
+        <TipDot
+          label="About risk signals"
+          text="Each signal that fires on a sign-in adds its weight to the score. A signal switched off is not collected at all."
+        />
+        {/* No count here. The Risk scores block above already says how many are
+            on, the Table version of this page never repeated it, and a number
+            gets one useful place per view. */}
+      </header>
+
+      <ul className="brs__rows">
+        {items.map((s) => (
+          <SignalRow key={s.id} signal={s} on={isOn(profile, s.id)} tier={tierFor(profile, s)} onToggle={onToggle} onTier={onTier} />
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function SignalRow({
+  signal,
+  on,
+  tier,
+  onToggle,
+  onTier,
+}: {
+  signal: RiskSignal
+  on: boolean
+  tier: RiskSignal['tier']
+  onToggle: (s: RiskSignal, on: boolean) => void
+  onTier: (s: RiskSignal, t: RiskSignal['tier']) => void
+}) {
+  const descId = useId()
+  const Ico = signalIcon(signal.id)
+  return (
+    <li className="brs__row2">
+      {/* The row IS the checkbox, as the device profile's is: one press target
+          from the tick to the platform marks. `TipMark` rather than `TipDot`
+          because a button cannot hold another button. */}
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={on}
+        aria-describedby={descId}
+        className={`bfp2__pickrow${on ? ' is-on' : ''}`}
+        onClick={() => onToggle(signal, !on)}
+      >
+        <span className="bx-tick" aria-hidden>
+          <Check size={11} strokeWidth={3.2} />
+        </span>
+        <span className="bfp2__pickico" aria-hidden>
+          <Ico size={15} strokeWidth={1.7} />
+        </span>
+        <span className="bfp2__pickname">
+          <span className="bfp2__pickword" title={signal.name}>
+            {signal.name}
+          </span>
+          <TipMark text={signal.purpose} />
+        </span>
+        <span className="brs__rowplats">
+          <SignalPlatforms signal={signal} plain />
+        </span>
+      </button>
+      {/* The purpose, for a keyboard: `TipMark` is a pointer's way to it. */}
+      <span id={descId} hidden>
+        {signal.purpose}
+      </span>
+
+      {/* A `fieldset`, so the weight dims and stops taking presses with no
+          `disabled` prop on the picker — the device profile's own trick. */}
+      <fieldset
+        className="brs__rowctl"
+        disabled={!on}
+        title={on ? undefined : `Turn ${signal.name} on to weigh it`}
+      >
+        <TierPick value={tier} label={`${signal.name} weight`} onChange={(t) => onTier(signal, t)} />
+      </fieldset>
+    </li>
+  )
+}
+
+/* The platform filter's own word. Never "2 selected": a filter says what it is
+   showing, and one platform says it by name. */
+function platformSummary(plats: Platform[]): string {
+  if (plats.length === 0) return 'All'
+  if (plats.length === 1) return PLATFORMS.find((p) => p.id === plats[0])?.label ?? 'All'
+  return `${plats.length} platforms`
+}
+
+/* The platforms a signal is collected on, as the marks the table used to head
+   its columns with. Named as well as drawn: two logos side by side are a
+   picture, and "Android, iOS" is what a reader would say. */
+function SignalPlatforms({ signal, plain = false }: { signal: RiskSignal; plain?: boolean }) {
+  const on = LIVE_PLATFORMS.filter((p) => signal.on.includes(p.id))
+  return (
+    <span className="brs__plats">
+      {on.map((p) =>
+        /* `plain` inside the list's row, which is itself a button: a tooltip
+           there would be a button inside a button. The platform's name is read
+           out either way. */
+        plain ? (
+          <span className="brs__plat" key={p.id} title={`Collected on ${p.label}`}>
+            <PlatformMark platform={p.id} />
+            <span className="u-sr-only">{p.label}</span>
+          </span>
+        ) : (
+          <Tip key={p.id} text={`Collected on ${p.label}`}>
+            <span className="brs__plat">
+              <PlatformMark platform={p.id} />
+              <span className="u-sr-only">{p.label}</span>
+            </span>
+          </Tip>
+        ),
+      )}
+    </span>
+  )
+}
+
+/* Every signal, in one table, with the category as a tinted pill on the row.
+
+   Two columns after the name, not three and never four: the platforms a signal
+   is collected on are marks ON ITS LABEL, and the weight is one control (owner,
+   18 Sep 2026: "can we add it with the label only instead of a dedicated
+   column", and before that "instead of 2
+   different options for Android and iOS we need one… add icons in each row for
+   which platform supports this signal"). A weight per platform asked an admin
+   to say the same thing twice; a column for two logos spent a seventh of the
+   table on them. */
 function SignalTable({
   items,
   profile,
@@ -977,22 +1206,20 @@ function SignalTable({
   items: RiskSignal[]
   profile: RiskTuning
   onToggle: (s: RiskSignal, on: boolean) => void
-  onTier: (s: RiskSignal, p: 'android' | 'ios', t: RiskSignal['tier']) => void
+  onTier: (s: RiskSignal, t: RiskSignal['tier']) => void
 }) {
   return (
     <div className="brs__table" role="table" aria-label="Risk signals">
       <div className="brs__row brs__row--head" role="row">
         <span role="columnheader">Signal</span>
-        {/* Mapped from PLATFORMS, like the cells underneath, so a third
-            platform cannot arrive as two columns of weights under one heading. */}
-        {PLATFORMS.map((p) => (
-          <span role="columnheader" className="brs__col" key={p.id}>
-            <PlatformMark platform={p.id} />
-            {p.label}
-          </span>
-        ))}
+        <span role="columnheader" className="brs__col">
+          Weight
+        </span>
+        {/* "Enabled", not "On": the column says what the switch makes the
+            signal, and its two states are words an admin says out loud
+            (owner, 18 Sep 2026). */}
         <span role="columnheader" className="brs__col brs__col--on">
-          On
+          Enabled
         </span>
       </div>
 
@@ -1013,35 +1240,28 @@ function SignalTable({
                   <TipDot label={`About ${s.name}`} text={s.purpose} />
                   {/* One tint per category, from CATEGORY_TONE. */}
                   <i className={`brs__cat is-${CATEGORY_TONE[s.category]}`}>{s.category}</i>
+                  {/* The platforms that collect it, on the label rather than in
+                      a column of their own (owner, 18 Sep 2026): two marks are
+                      a property of the signal, and a column for them spent a
+                      seventh of the table on four pixels of logo. */}
+                  <SignalPlatforms signal={s} />
                 </span>
               </span>
             </span>
 
-            {PLATFORMS.map((p) => (
-              /* `data-label` feeds the narrow layout, where the header row is
-                 hidden and each cell prints its own column name. */
-              <span className="brs__col" role="cell" data-label={p.label} key={p.id}>
-                {s.on.includes(p.id) ? (
-                  <TierPick
-                    value={tierFor(profile, s, p.id)}
-                    label={`${s.name} weight on ${p.label}`}
-                    onChange={(t) => onTier(s, p.id, t)}
-                  />
-                ) : (
-                  /* A dash, with the words kept for a pointer and a screen reader. */
-                  <span className="bx-tiers--none" title={`Not collected on ${p.label}`}>
-                    <span aria-hidden>—</span>
-                    <span className="u-sr">Not collected</span>
-                  </span>
-                )}
-              </span>
-            ))}
+            <span className="brs__col" role="cell" data-label="Weight">
+              <TierPick
+                value={tierFor(profile, s)}
+                label={`${s.name} weight`}
+                onChange={(t) => onTier(s, t)}
+              />
+            </span>
 
-            <span className="brs__col brs__col--on" role="cell">
+            <span className="brs__col brs__col--on" role="cell" data-label="Enabled">
               <Toggle
                 checked={live}
                 onChange={(v) => onToggle(s, v)}
-                label={`${s.name} is ${live ? 'on' : 'off'}`}
+                label={`${s.name} is ${live ? 'enabled' : 'disabled'}`}
                 size="sm"
               />
             </span>

@@ -9,11 +9,7 @@ import {
   type FingerprintProfile,
 } from '../fingerprint'
 import { draftOf, initialWizard } from './device-profile-wizard-model'
-import {
-  basicDetailsSet,
-  basicSetupIssue,
-  unsetAsideLines,
-} from './device-profile-basic'
+import { basicDetailsSet, basicSetupIssue } from './device-profile-basic'
 
 const seed = (id: string) => seedProfiles.find((p) => p.id === id) as FingerprintProfile
 const kiosk = seed('fp-kiosk')
@@ -53,22 +49,13 @@ describe('creating a profile whose basic details are not set up', () => {
   })
 })
 
-describe('the side panel before basic details are answered', () => {
-  it('says what the profile does until it is set up', () => {
-    expect(unsetAsideLines(unmanaged)[2]).toBe(
-      'Until this is set up, the profile is agentless and each user can register up to 3 devices.',
-    )
-    expect(unsetAsideLines({ ...kiosk })[2]).toBe(
-      'Until this is set up, the profile uses the Device Agent and only devices on the approved roster can sign in.',
-    )
-  })
-})
-
 /* Apply on the defaults changes no value and must still reach the footer. */
 describe('setting up basic details, as a change', () => {
   it('is a review row and a footer part of its own', () => {
     const applied = { ...unmanaged, restrictionSet: true }
-    expect(profileReview(unmanaged, applied)).toEqual([{ label: 'Basic details', before: 'Not set up', after: 'Set up' }])
+    expect(profileReview(unmanaged, applied)).toEqual([
+      { label: 'Basic details', before: 'Not set up', after: 'Set up', group: 'Basic details', kind: 'changed' },
+    ])
     expect(profileChangeParts(unmanaged, applied)).toEqual(['Basic details'])
   })
 
@@ -76,6 +63,20 @@ describe('setting up basic details, as a change', () => {
     const applied = { ...withReach(unmanaged, 'agent'), restrictionSet: true }
     expect(profileChangeParts(unmanaged, applied)).toEqual(['What it can read'])
     expect(profileReview(unmanaged, applied).map((r) => r.label)).toEqual(['Basic details', 'What it can read'])
+  })
+
+  /* Review changes files every setup answer under Basic details, and an answer
+     going from none to a number is a setting that changed, not an addition. */
+  it('files every setup answer under Basic details as a change', () => {
+    const applied = { ...unmanaged, restrictionSet: true, maxDevices: null, autoRegister: !unmanaged.autoRegister }
+    const rows = profileReview(unmanaged, applied)
+    expect(rows.map((r) => r.label)).toEqual(['Basic details', 'Register silently on first sign-in', 'Devices per person'])
+    for (const r of rows) expect(r).toMatchObject({ group: 'Basic details', kind: 'changed' })
+    expect(rows.every((r) => r.item === undefined && r.effect === undefined)).toBe(true)
+    expect(profileReview(applied, unmanaged).find((r) => r.label === 'Devices per person')).toMatchObject({
+      before: '',
+      kind: 'changed',
+    })
   })
 
   it('is not a change on a health profile, which has no basic details to set up', () => {

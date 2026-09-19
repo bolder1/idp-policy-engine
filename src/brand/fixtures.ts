@@ -390,12 +390,12 @@ const seedRiskProfiles: RiskProfile[] = [
     id: 'rp-strict',
     name: 'High assurance — a tampered device is decisive',
     off: [],
+    /* Keyed by signal, since 18 Sep 2026: a weight is the signal's, not the
+       signal's on a platform. */
     tiers: {
-      'cloned:android': 'High',
-      'dev-mode:android': 'High',
-      'dev-mode:ios': 'High',
-      'high-activity:android': 'High',
-      'high-activity:ios': 'High',
+      cloned: 'High',
+      'dev-mode': 'High',
+      'high-activity': 'High',
     },
   },
 ]

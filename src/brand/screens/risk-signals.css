@@ -75,12 +75,16 @@
   background: var(--surface-raised);
   overflow: hidden;
 }
-/* One grid for every row, so the two weight columns line up down the whole
-   table rather than per row. `minmax(0, 1fr)` on the name is what lets a long
-   purpose wrap instead of pushing the columns out of alignment. */
+/* One grid for every row, so the columns line up down the whole table rather
+   than per row. `minmax(0, 1fr)` on the name is what lets a long purpose wrap
+   instead of pushing the columns out of alignment.
+
+   Four columns to two (18 Sep 2026): the two per-platform weight columns became
+   one weight, and the platforms a signal is collected on went onto its label —
+   a column for two logos spent a seventh of the table on them. */
 .brs__row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 190px 190px 64px;
+  grid-template-columns: minmax(0, 1fr) 190px 74px;
   align-items: center; gap: var(--space-4);
   /* The cell inset is the table recipe's, so a signal name starts on the same
      pixel as a zone name and a policy name. It was 8px here — half of what
@@ -230,6 +234,10 @@
    it correct in both themes without a second asset. */
 .brs__col .bplat { flex: none; }
 .brs__col--on { justify-content: flex-end; }
+/* The platform marks: a row of logos on the signal's label, each its own
+   tooltip target. */
+.brs__plats { display: inline-flex; align-items: center; gap: var(--space-3); }
+.brs__plat { display: inline-flex; align-items: center; }
 
 /* Below the two-column width the weights stack under the name rather than
    shrinking into something unreadable. */
@@ -335,3 +343,32 @@
   font-size: var(--fs-xs); color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }
+
+/* --- The list version of this page (18 Sep 2026) ---------------------------------
+   The device profile's inner page, on these signals: the work in the left
+   column, the panel saying how the score is made on the right. The rows are the
+   device profile's own (`.bz7__fieldline`, `.bfp2__chosen*`), so a signal reads
+   the way a check does; what belongs to THIS page is the switch at the row's
+   end and the list's own measure. */
+.brs__cols { align-items: start; }
+.brs__list { width: 100%; min-width: 0; }
+
+/* The rows: the device profile's picked row (`.bfp2__pickrow` — tick, mark,
+   name, tip) taking the line, and the weight in a slot at its end.
+
+   Its own flex list, NOT `.bfp2__checklist`: that one is a five-track grid whose
+   rows subgrid into it, so a row borrowed without the wizard's placement classes
+   put the whole button in the 24px tick track and clipped every name to nothing.
+   A list with two parts per row does not need five tracks. */
+.brs__rows { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.brs__row2 { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.brs__rows .bfp2__pickrow { flex: 1 1 auto; min-width: 0; }
+/* The weight, in the column the device profile gives a weight. */
+.brs__rowctl { flex: none; width: 96px; min-width: 0; border: 0; padding: 0; margin: 0; }
+.brs__rowctl > .bx-tierpick { width: 100%; }
+.brs__rowctl[disabled] { opacity: var(--disabled-opacity); }
+/* The platform marks ride at the end of the row's own button, before the
+   weight, so the name keeps the rest of the line. */
+.brs__rowplats { flex: none; display: inline-flex; align-items: center; margin-left: var(--space-4); }
+/* The version switch, on the profile header's own row. */
+.brs__preview { margin-left: auto; }

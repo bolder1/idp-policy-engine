@@ -18,6 +18,7 @@ import {
   tierOf,
   valueLabel,
   withAlwaysOn,
+  type AttrCategory,
   type AttrConfigValue,
   type Attribute,
   type FingerprintProfile,
@@ -252,19 +253,44 @@ export function stepDone(
 /* --- The inline list --------------------------------------------------------- */
 
 /* The narrowing both check lists do — the catalogue drawer and this one: a
-   search over name, purpose and category. The category dropdown and its
-   "Selected only" went (owner, 16 Sep 2026). Always-on first, because a locked
-   row between two tickable ones reads as one you failed to untick. */
-export function filterAttributes(list: Attribute[], q: string): Attribute[] {
+   search over name, purpose and category, and a category filter beside it.
+
+   The category dropdown went on 16 Sep 2026 and came back on 18 Sep, for the
+   list it was needed on: a trusted device offers 38 signals across five
+   families, and "show me the network ones" is not a search anybody can spell.
+   Empty `cats` is every category, so the filter starts saying nothing.
+
+   Always-on first, because a locked row between two tickable ones reads as one
+   you failed to untick. */
+export function filterAttributes(list: Attribute[], q: string, cats: AttrCategory[] = []): Attribute[] {
   const needle = q.trim().toLowerCase()
   const shown = list.filter(
     (a) =>
-      !needle ||
-      a.name.toLowerCase().includes(needle) ||
-      a.purpose.toLowerCase().includes(needle) ||
-      (a.category ?? '').toLowerCase().includes(needle),
+      (cats.length === 0 || (a.category !== undefined && cats.includes(a.category))) &&
+      (!needle ||
+        a.name.toLowerCase().includes(needle) ||
+        a.purpose.toLowerCase().includes(needle) ||
+        (a.category ?? '').toLowerCase().includes(needle)),
   )
   return [...shown.filter((a) => a.always), ...shown.filter((a) => !a.always)]
+}
+
+/* How many rows a list needs before its category filter is worth drawing.
+
+   A trusted device offers 38 signals across five families and "show me the
+   network ones" is not a search anybody can spell; device health offers 13,
+   whose names carry their family ("Chrome version", "Windows OS version"), and
+   a filter over thirteen rows is a control to read past (owner, 18 Sep 2026:
+   "for Device Health we might not need categories, but for this case we do").*/
+export const CATEGORY_FILTER_MIN = 16
+
+/* The categories a catalogue actually holds, in the order the catalogue names
+   them — never the whole enum, which would offer families this list has none
+   of. */
+export function categoriesOf(list: Attribute[]): AttrCategory[] {
+  const seen: AttrCategory[] = []
+  for (const a of list) if (a.category && !seen.includes(a.category)) seen.push(a.category)
+  return seen
 }
 
 /* How much of what is on screen is ticked, for the bar's Select all. Only the
@@ -333,9 +359,9 @@ export interface ReviewSection {
   /** The step its Edit opens. */
   step: WizardStepId
   title: string
-  /** The one thing worth knowing while the section is folded shut — the type,
-      the reach, the count. Shown on the header beside the title, so a closed
-      section still says something. */
+  /** The section in a few words — the type, the reach, the count. The wizard's
+      Review no longer shows it (its rows say the same); the unwired live
+      builder reads it. */
   summary: string
   facts: ReviewFact[]
 }
@@ -399,4 +425,49 @@ export function reviewSections(s: WizardState, step3: Step3Shape): ReviewSection
     })),
   })
   return sections
+}
+
+/* --- The live builder ------------------------------------------------------------
+
+   The same sections Review shows, drawn beside every step while the profile is
+   being answered (`device-profile-live.tsx`). Two things Review never needed:
+   which steps a section belongs to, so it can say done / here / not yet, and a
+   placeholder for a section nothing has been answered on — a default shown as
+   if it were chosen would be a preview that lies. */
+
+export type LiveStatus = 'done' | 'current' | 'upcoming'
+
+export interface LiveSection extends ReviewSection {
+  /** The steps it covers. The checks section spans Choose and Set values on the split shape. */
+  steps: WizardStepId[]
+  /** Said in place of the facts while nothing on the section is answered. */
+  pending: string | null
+}
+
+export function liveSections(s: WizardState, step3: Step3Shape): LiveSection[] {
+  return reviewSections(s, step3).map((sec) => {
+    const steps: WizardStepId[] = sec.step === 'values' ? ['choose', 'values'] : [sec.step]
+    let pending: string | null = null
+    if (sec.step === 'devices' && s.reach === null) pending = 'Not chosen yet'
+    if (steps.includes('items') || steps.includes('values')) {
+      if (sec.facts.length === 0) pending = `No ${ITEM_NOUN[s.mode].many} yet`
+    }
+    return { ...sec, steps, pending }
+  })
+}
+
+/* Here while any of its steps is the one open; done once every one of them is
+   ticked on the ladder (`stepDone`, so the preview and the ladder agree);
+   otherwise not yet. */
+export function sectionStatus(
+  sec: LiveSection,
+  steps: WizardStep[],
+  at: number,
+  reached: number,
+  issueOf: (id: WizardStepId) => string | null,
+): LiveStatus {
+  const idx = sec.steps.map((id) => steps.findIndex((x) => x.id === id)).filter((i) => i >= 0)
+  if (idx.includes(at)) return 'current'
+  if (idx.length > 0 && idx.every((i) => stepDone(steps, at, reached, i, issueOf))) return 'done'
+  return 'upcoming'
 }

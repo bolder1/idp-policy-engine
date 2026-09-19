@@ -65,6 +65,29 @@ describe('number options', () => {
       expect(`${named(s)}: unit=${s.field.unit ?? 'MISSING'}`).not.toBe(`${named(s)}: unit=MISSING`)
     }
   })
+
+  /* "Custom…" is only worth a row where the set leaves something to type. A
+     field whose options already step one at a time from min to max would open
+     a box that can only reproduce a value the list already offers. */
+  it('leaves a custom field something to type', () => {
+    for (const s of settings()) {
+      if (s.field.kind !== 'number' || !s.field.custom) continue
+      const { options, min, max } = s.field
+      const room = options.some((o, i) => i > 0 && o - options[i - 1] > 1) || options[0] > min || options[options.length - 1] < max
+      expect(`${named(s)}: room outside [${options.join(',')}] in ${min}-${max} → ${room}`).toBe(
+        `${named(s)}: room outside [${options.join(',')}] in ${min}-${max} → true`,
+      )
+    }
+  })
+
+  /* The owner's floor, 18 Sep 2026. A code that expires in a minute is asked
+     for twice — the same secret round again over the weakest channel here —
+     so neither the presets nor a typed value may go under five. */
+  it('holds the OTP validity floor at five minutes', () => {
+    const otp = settings().find((s) => s.id === 'otp-validity')!
+    if (otp.field.kind !== 'number') throw new Error('otp-validity is no longer a number')
+    expect(`min=${otp.field.min} first=${otp.field.options[0]}`).toBe('min=5 first=5')
+  })
 })
 
 describe('text constraints', () => {

@@ -814,10 +814,116 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
       row, on the bottom edge. The paged-list hook counts the pager by its
       height, not its position, for exactly this. */
 .bpage:has(> .blist__pager) { grid-template-rows: auto auto 1fr auto; }
-.bpage:has(> .blist__pager) > :not(.blist__pager) { align-self: start; }
+/* Not the overlays and not the docked panel. A kit Drawer renders in place, so
+   on a paged page its scrim and panel are grid children too — and Chrome
+   honours `align-self` on fixed boxes, so `start` shrank the drawer to its
+   content and the scrim to nothing (16 Sep 2026). The docked panel stretches
+   down to the pager on purpose. */
+.bpage:has(> .blist__pager) > :not(.blist__pager, .bdock, .bx-scrim, .bx-drawer) { align-self: start; }
 .bpage > .blist__pager { grid-row: -2 / -1; }
 /* 3. Display tokens keeps the pager inside its tab panel, a flex column: the
       panel takes the free space and the pager goes to its end. */
 .bpage.bdt:has(.bdt__panel > .blist__pager) { grid-template-rows: auto auto auto 1fr; }
 .bdt__panel > .blist__pager { margin-top: auto; }
+
+/* --- A panel docked beside the list (`DockPanel`) ---------------------------------
+
+   The policy builder's inspector, on a library page: "Used by" on Zones and
+   Device profiles. The head and the bar keep the page's width; below them the
+   list gives up a column on the right and the panel stands in it, from the
+   bar down to the pager. The list's LEFT edge never moves, so opening the panel
+   narrows the list rather than shifting it.
+
+   Two tracks on Full. On Compact the one-column insets stay either side, as
+   explicit tracks one tenth of the ten-column grid wide, so the head, the bar,
+   the list's left edge and the panel's right edge line up with the page they
+   were on before the panel opened. */
+.bpage.has-dock {
+  --dock-w: clamp(340px, 34%, 440px);
+  grid-template-columns: minmax(0, 1fr) var(--dock-w);
+}
+.bpage.has-dock > :not(.bpage__head, .bbar, .bdock, .bx-scrim, .bx-drawer) { grid-column: 1; }
+/* Rows 3 and 4: the list's and the pager's. Explicit so it sits beside the
+   rows whatever order auto-placement meets it in. */
+.bpage.has-dock > .bdock { grid-column: 2; grid-row: 3 / span 2; }
+.bpage.has-dock:not(:has(> .blist__pager)) > .bdock { grid-row: 3; }
+/* An empty LIST is not an empty PAGE. `empty.css` turns a page whose content IS
+   an empty state into a flex column so it can centre it — and that quietly
+   voids every `grid-column` above, which put the docked panel full-width and
+   ABOVE the empty state as soon as a search narrowed the list to nothing with
+   "Used by" open. While the panel is open the page still has two columns.
+   (0,4,0) beats empty.css's (0,3,0), so sheet order does not matter. */
+.bpage.has-dock:has(> .bempty:not(.is-compact)) { display: grid; }
+@media (min-width: 1280px) {
+  .bpage.bpage--compact.has-dock {
+    --dock-inset: calc((100% - 9 * var(--space-6)) / 10);
+    grid-template-columns: var(--dock-inset) minmax(0, 1fr) var(--dock-w) var(--dock-inset);
+  }
+  .bpage.bpage--compact.has-dock > :not(.bpage__head, .bbar, .bdock, .bx-scrim, .bx-drawer) { grid-column: 2; }
+  .bpage.bpage--compact.has-dock > .bdock { grid-column: 3; }
+}
+
+/* The panel: the inspector's card — its own edge and radius, a head with the
+   close control, a body that scrolls on its own so the page never does. */
+.bdock {
+  display: flex; flex-direction: column;
+  min-width: 0; min-height: 0;
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  overflow: hidden;
+  animation: bdock-in var(--dur-normal) var(--ease-standard);
+}
+@keyframes bdock-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bdock { animation: none; }
+}
+.bdock__head {
+  flex: none; display: flex; align-items: flex-start; gap: var(--space-4);
+  padding: var(--space-5) var(--space-4) var(--space-5) var(--space-6);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+}
+.bdock__title { flex: 1; min-width: 0; }
+.bdock__title h2 {
+  margin: 0;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+/* Focus lands on the heading when the panel opens, as a place to read from,
+   not as a control, so it draws no ring. */
+.bdock__title h2:focus { outline: none; }
+.bdock__title p {
+  margin: 2px 0 0;
+  font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.bdock__body {
+  flex: 1; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: var(--space-5);
+}
+
+/* The row the panel is about, marked while it is open — the builder marks its
+   selected card the same way. */
+.blist__row[data-docked],
+.blist__row[data-docked]:hover { background: var(--accent-soft); }
+.blib__card[data-docked] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.btable tbody tr[data-docked] td,
+.btable tbody tr[data-docked]:hover td { background: var(--accent-soft); }
+
+/* Too narrow for a list and a panel side by side: the list keeps the page and
+   the panel lays over its right edge, full height under the top bar, as the
+   kit's drawer does — but still without a scrim, so the list stays live. */
+@media (max-width: 899px) {
+  .bpage.has-dock { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+  .bpage.has-dock > :not(.bpage__head, .bbar, .bdock, .bx-scrim, .bx-drawer) { grid-column: 1 / -1; }
+  .bpage.has-dock > .bdock {
+    position: fixed; top: var(--nav-topbar-h); right: 0; bottom: 0;
+    width: min(420px, calc(100% - 32px));
+    z-index: var(--z-overlay);
+    border-width: 0 0 0 var(--bw-thin); border-radius: 0;
+    box-shadow: var(--el-overlay);
+  }
+}
 .blist__range { margin-right: var(--space-4); font-variant-numeric: tabular-nums; white-space: nowrap; }

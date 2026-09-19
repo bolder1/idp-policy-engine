@@ -97,9 +97,10 @@ export function UserMethodCard({
                 Phishing-resistant
               </i>
             )}
-            {/* The description is a tip beside the name, not a line under it. */}
-            <TipDot text={m.description} label={`About ${m.name}`} />
+            {m.summary && <TipDot text={m.description} label={`About ${m.name}`} />}
           </span>
+          {/* The line, as on the admin's rows. */}
+          <span className="bm8__blurb">{m.summary ?? m.description}</span>
         </div>
 
         {/* One control per state. Before enrolment there is nothing to turn on,

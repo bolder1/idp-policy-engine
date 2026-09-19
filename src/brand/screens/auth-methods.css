@@ -126,6 +126,10 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
 .bm8__list--oneline > .bm8__card { height: 84px; min-height: 0; padding-block: 0; overflow: hidden; }
 .bm8__list--oneline .bm8__info { overflow: hidden; }
 .bm8__list--oneline .bm8__name { flex-wrap: nowrap; min-width: 0; white-space: nowrap; }
+/* The line under the name: one line on the page's list, clipped rather than
+   wrapped, because every row there keeps one height. In the slider, where rows
+   size to their content, it wraps. */
+.bm8__list--oneline .bm8__blurb { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* A row in that panel: no fill of its own, no edge of its own, one divider.
 
@@ -240,6 +244,16 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
 /* --- Row text ------------------------------------------------------------------ */
 
 .bm8__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* What the method or family is, in one line under its name (owner, 18 Sep
+   2026). It was a tip beside the name and nothing else, which asked a reader
+   scanning eleven rows to hover each one to tell them apart. The tip stays
+   where there is more to say than the line holds. */
+.bm8__blurb {
+  min-width: 0;
+  font-size: var(--fs-sm); line-height: 1.45; color: var(--text-tertiary);
+  overflow-wrap: anywhere;
+}
+.bm8__card.is-off .bm8__blurb { color: var(--text-muted); }
 .bm8__name {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
@@ -300,43 +314,74 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
 /* A family row's end sits beside the count, not under it — whether that end is
    a chevron or the one method's controls. */
 .bm8__card--family .bm8__right { flex-direction: row; align-items: center; gap: var(--bm8-endgap); }
-/* The end of a family row: its switch, then its chevron, against the edge. A row
-   with no chevron puts its switch at the edge rather than beside an empty place
-   for one. The end keeps one width down the list — room for a switch and a
-   chevron together — so the figures beside it still read as a single column
-   whatever the row ends in. */
-.bm8__list { --bm8-endgap: 16px; --bm8-chev: 17px; --bm8-switch: 56px; --bm8-gear: var(--ctl-height-sm); }
+/* The end of a row: one slot for its mark, one for its control, both drawn on
+   every row. Fixed widths, because each row is its own box — nothing lines a
+   column up across rows except the width being the same in all of them. The
+   control track is the OUTER one: a switch, "Configure" or "Always on" sits on
+   the row's right edge, and a gear or chevron just inside it (owner, 18 Sep
+   2026). See `RowEnd` in AuthMethods.tsx for the one row that swaps them. */
+/* The control track is a SWITCH wide, and a wider control ("Always on" at
+   74px, "Configure" at 73px) overflows it to the left — which is safe because
+   the rows that carry one never carry a mark, so the space to their left is
+   empty, and the end still reserves mark + gap + switch = 77px before the
+   enrolment figure's own 16px. It was a 76px track: that kept every control
+   inside its own box, but it also parked the 32px of slack between the mark
+   and the switch, so a gear sat 16px from the figure and 48px from the toggle
+   it belongs with (owner, 18 Sep 2026: "move it in between, in the centre
+   between the two — right now it feels close to the number and far from the
+   toggle"). The slack moved outward, and the gear now sits 16px from each. */
+.bm8__list { --bm8-endgap: 16px; --bm8-mark: 17px; --bm8-switch: 44px; }
+/* Two fixed tracks, not a flex row: a track keeps its width whatever lands in
+   it, so the switch column, the mark column and the figures to their left all
+   hold their x on every row. A control wider than its track ("Configure"
+   where the others have a switch) overflows to the left instead of moving
+   them. In flex, its extra width pushed the neighbouring column along.
+
+   Mark first, control second, and a row with no control puts its mark in the
+   second slot instead — the order is the DOM's, so the two cases cost nothing
+   but a swap and the end keeps one width in both. */
 .bm8__rowend {
-  flex: none; display: flex; align-items: center; justify-content: flex-end; gap: var(--bm8-endgap);
-  min-width: calc(var(--bm8-switch) + var(--bm8-endgap) + var(--bm8-chev));
+  flex: none; display: grid; align-items: center; justify-items: end;
+  grid-template-columns: var(--bm8-mark) var(--bm8-switch);
+  column-gap: var(--bm8-endgap);
 }
-.bm8__rowctl { display: flex; align-items: center; }
-.bm8__rowchev { display: flex; align-items: center; width: var(--bm8-chev); }
+.bm8__rowctl, .bm8__rowmark {
+  min-width: 0;
+  display: flex; align-items: center; justify-content: flex-end;
+}
+.bm8__rowchev, .bm8__rowgear { display: flex; align-items: center; }
+/* The switch's own column inside a control cluster, so "Configure" on a row
+   with no switch and "Set up" on a row with one end on the same x. A switch's
+   width, not the whole end's: this one sits INSIDE the cluster. */
+.bm8__rowswitch {
+  flex: none; display: flex; align-items: center; justify-content: flex-end;
+  min-width: var(--bm8-switch);
+}
+/* Inside a row end the slot already reserves the width, so the switch itself
+   reserves nothing, and an empty one leaves altogether — otherwise its gap
+   alone held a lone "Configure" 10px off the column the switches make. */
+.bm8__rowctl .bm8__rowswitch { min-width: 0; }
+.bm8__rowctl .bm8__rowswitch:empty { display: none; }
 
 /* --- The gear variant ------------------------------------------------------------
-   The same row end with its order inverted: a gear where the chevron was, and
-   the switch moved past it to the edge. See the note in AuthMethods.tsx for
-   which two rows this reaches and why it is a variant rather than a change.
+   The same row end wearing a gear where the chevron was. See the note in
+   AuthMethods.tsx for which two rows this reaches and why it is a variant
+   rather than a change.
 
-   The reservation moves for the WHOLE list, because a gear is 31px against the
-   chevron's 17px: widen it only on the rows that grow one and those two rows'
-   enrolment figures step 14px left of the nine above them. The gap closes at
-   the right edge instead, where nothing is lined up against it.
+   Only the mark's WIDTH changes, and it changes for the whole list: a gear is
+   40px against the chevron's 17px, so widening the track on the rows that grow
+   one would step those rows' switches 23px out of the column. The ORDER does
+   not change — the mark keeps the right edge in both variants, because a
+   chevron that stops short of an edge its neighbours' switches reach is the
+   one thing this row end exists to prevent.
 
-   `justify-content: flex-end` on the end means the extra width is absorbed on
-   the left, so a chevron row keeps its chevron against the edge and only the
-   empty space in front of it grows. */
-.bm8__list.is-gear .bm8__rowend {
-  min-width: calc(var(--bm8-switch) + var(--bm8-endgap) + var(--bm8-gear));
-}
-/* Tighter than `--bm8-endgap`: the gear and the switch are one cluster — the
-   two things you can do to this row — against the 16px that separates that
-   cluster from the figures it is not part of. */
-.bm8__rowend.is-gear { gap: var(--space-4); }
-.bm8__rowgear { display: flex; align-items: center; }
-/* A person's rows end in a chevron and never a switch, so their end reserves no
-   room for one. */
-.bm8__list.is-person .bm8__rowend { min-width: 0; }
+   `--ctl-height-md`, the icon button's own box, not the `-sm` it was: at 34px
+   the 40px button overflowed its track to the left and took 6px out of the gap
+   that holds it off the switch. */
+.bm8__list.is-gear { --bm8-mark: var(--ctl-height-md); }
+/* A person's rows end in a chevron and never a switch, so nothing is reserved
+   for one: the chevron takes the outer slot and the inner one collapses. */
+.bm8__list.is-person .bm8__rowend { grid-template-columns: 0 var(--bm8-mark); }
 
 /* --- Status and reach, on the category row --------------------------------------
    The two facts the row reports: whether anything in this category is on, and
@@ -381,30 +426,11 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
 
 /* The figure reads first and the word explains it, rather than one muted string
    where the number has to be found inside the sentence. */
-.bm8__reach {
-  display: flex; flex-direction: column; align-items: flex-end;
-  min-width: 62px; white-space: nowrap;}
-.bm8__reach b {
-  font-size: var(--fs-lg); font-weight: var(--fw-semibold);
-  color: var(--text-primary); font-variant-numeric: tabular-nums; line-height: 1.15;
-}
-/* 12px, sentence case, tertiary. It was 10px uppercase in `--text-muted`, which
-   is 3.3:1 - under the 4.5:1 any word somebody is expected to read has to
-   clear - and letterspaced caps at that size are the hardest combination in the
-   product to read. It is the unit on a number; it has to be legible or the
-   number is just a number. */
-.bm8__reach em {
-  font-style: normal; font-size: var(--fs-xs); letter-spacing: 0;
-  color: var(--text-tertiary);
-}
-/* A category nobody has enrolled in. The dash holds the column open so the
-   chips beside it stay in line. */
-.bm8__reach i { font-style: normal; font-size: var(--fs-lg); color: var(--text-disabled); line-height: 1.15; }
-
-.bm8__card.is-off .bm8__reach b { color: var(--text-secondary); }
+/* The enrolment figure that stood here is gone (18 Sep 2026) — see the note in
+   `FamilyListRow`. What is left on a row's right is the balance chip, where a
+   family spends a pool, and the end itself. */
 
 @media (max-width: 720px) {
-  .bm8__reach { min-width: 0; }
   .bm8__list { --bm8-endgap: 10px; }}
 
 /* A family with nothing on, or a method that is off. Dimmed by desaturating the
@@ -565,6 +591,34 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
 .bm8__setcardtitle { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bm8__setcardlabel { font-weight: var(--fw-medium); color: var(--text-primary); }
 
+/* --- A setup open in its card (CardSetup) --------------------------------------------
+   Inside a family, Set up opens under the method's own row rather than as a page
+   over the list (owner, 17 Sep 2026). The card wraps: its row stays the first
+   line, and the setup sits under it, starting under the name (logo 36 + gap 16),
+   with the card's Cancel and Save on its last line. No fill and no box of its
+   own — the card's divider already says where it ends. */
+.bm8__card.is-setup { flex-wrap: wrap; row-gap: 16px; }
+.bm8__cardsetup {
+  flex: 1 0 100%; min-width: 0;
+  display: flex; flex-direction: column; gap: 20px;
+  padding-left: 52px;
+  outline: none;
+  animation: bm8-cardsetup var(--dur-normal) var(--ease-standard);
+}
+@keyframes bm8-cardsetup {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.bm8__cardfoot {
+  display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-4);
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+/* What still blocks Save, at the line's start. */
+.bm8__cardstatus { margin-right: auto; font-size: var(--fs-sm); color: var(--fb-notice-fg); }
+@media (max-width: 520px) { .bm8__cardsetup { padding-left: 0; } }
+@media (prefers-reduced-motion: reduce) { .bm8__cardsetup { animation: none; } }
+
 .bm8__steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
 .bm8__step { position: relative; display: flex; gap: 12px; padding-bottom: 20px; }
 .bm8__step:last-child { padding-bottom: 0; }
@@ -616,7 +670,7 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
    name rather than a button that vanishes and a link that appears somewhere
    else. Costs one row of card height, which is the right trade for an action
    that was previously an underlined word inside a line of values. */
-.bm8__ctlrow { display: flex; align-items: center; gap: 10px; }
+.bm8__ctlrow { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 
 /* --- Funding, in the right-hand column ----------------------------------------
    The transactions chip used to sit on its own row under the description,

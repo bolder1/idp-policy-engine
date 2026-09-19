@@ -8,12 +8,13 @@ import { QR_SIZE, qrMatrix, secretFor, type NpsServer, type SetupCard } from '..
 import { useBrand } from '../store'
 
 /* -----------------------------------------------------------------------------
-   The setup card an authenticator app opens onto, as a page in the slider.
+   The setup an authenticator app opens onto: in its card in the slider, or as
+   the slider's page when its row on the list is pressed.
 
    One card each, holding the one step's worth of controls the console asks for
    and nothing more: a code app's install, scan and code, or Microsoft Push's
    server. The console opened the second as a centred dialog over the list; here
-   it is the same page every other setup is, with Back to the family under it.
+   it opens where every other setup does.
    -------------------------------------------------------------------------- */
 
 type AppCard = Extract<SetupCard, { kind: 'app' }>

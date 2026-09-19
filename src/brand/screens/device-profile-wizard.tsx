@@ -1,8 +1,10 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Check, ChevronDown, Laptop, ListChecks, Lock, Tag, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, Check, Lock } from 'lucide-react'
 
 import { Badge, Button, Drawer, Tip, TipDot, TipMark } from '../kit'
+import { ChangeList, ChangeSection } from '../change-list'
+import { DEVICES_NOTE, TYPE_NOTE, itemsNote } from './profile-notes'
 import { TierPick } from '../tier-pick'
 import { NoMatches } from '../empty'
 import { useLeaveGuard } from '../leave-guard'
@@ -16,6 +18,7 @@ import {
   nameIssue,
   offeredAttributes,
   tierOf,
+  type AttrCategory,
   type AttrConfigValue,
   type Attribute,
   type FingerprintProfile,
@@ -25,9 +28,9 @@ import { checkName, kindChoices, reachChoices, versionError } from './device-pro
 import {
   AttrControl,
   AttrStep,
-  BasicAside,
+
   CheckMark,
-  ChecksAside,
+
   ChoiceTiles,
   ChosenList,
   EnrolmentFields,
@@ -35,8 +38,10 @@ import {
   SidePanel,
 } from './device-profile-parts'
 import {
+  CATEGORY_FILTER_MIN,
   agentNote,
   arrive,
+  categoriesOf,
   canOpenStep,
   draftOf,
   filterAttributes,
@@ -51,7 +56,6 @@ import {
   withWizardReach,
   wizardStarted,
   wizardSteps,
-  type ReviewSection,
   type Step3Shape,
   type WizardState,
   type WizardStep,
@@ -248,7 +252,7 @@ export function DeviceProfileWizard({
           </div>
         </section>
       )
-      aside = <TypeAside mode={s.mode} />
+      aside = <SidePanel note={TYPE_NOTE} />
       break
 
     case 'devices':
@@ -301,7 +305,7 @@ export function DeviceProfileWizard({
           )}
         </div>
       )
-      aside = s.reach === null ? <ReachAside /> : <BasicAside draft={draft} />
+      aside = <SidePanel note={DEVICES_NOTE} />
       break
 
     case 'items':
@@ -327,15 +331,7 @@ export function DeviceProfileWizard({
           />
         </section>
       )
-      aside = (
-        <ChecksAside
-          draft={draft}
-          lines={[
-            'A device must pass every check you tick before it can sign in.',
-            'A check’s value unlocks when you tick it.',
-          ]}
-        />
-      )
+      aside = <SidePanel note={itemsNote(s.mode)} />
       break
 
     case 'choose':
@@ -363,15 +359,7 @@ export function DeviceProfileWizard({
           />
         </section>
       )
-      aside = (
-        <ChecksAside
-          draft={draft}
-          lines={[
-            'A device must pass every check you choose before it can sign in.',
-            'You set each check’s value on the next step.',
-          ]}
-        />
-      )
+      aside = <SidePanel note={itemsNote(s.mode)} />
       break
 
     case 'values':
@@ -399,15 +387,7 @@ export function DeviceProfileWizard({
           onRemove={(id) => update((cur) => ({ ...cur, picked: cur.picked.filter((x) => x !== id) }))}
         />
       )
-      aside = (
-        <ChecksAside
-          draft={draft}
-          lines={[
-            'A device must pass every check you choose before it can sign in.',
-            'Each check you choose is set here.',
-          ]}
-        />
-      )
+      aside = <SidePanel note={itemsNote(s.mode)} />
       break
 
     case 'review':
@@ -636,13 +616,17 @@ function InlineChecks({
 }) {
   const { mode, reach, picked, config, weights } = state
   const [q, setQ] = useState('')
+  /* The families being shown; empty is all of them. Same filter the catalogue
+     drawer carries, so the step and the drawer narrow the same way. */
+  const [cats, setCats] = useState<AttrCategory[]>([])
   /* The last row pressed, by id, for a shift-press run. */
   const anchor = useRef<string | null>(null)
 
   const offered = offeredAttributes(mode, reach)
+  const categories = offered.length >= CATEGORY_FILTER_MIN ? categoriesOf(offered) : []
   const chosen = offered.filter((a) => a.always || picked.includes(a.id)).length
-  const shown = filterAttributes(offered, q)
-  const blockedShown = filterAttributes(blockedAttributes(mode, reach), q)
+  const shown = filterAttributes(offered, q, cats)
+  const blockedShown = filterAttributes(blockedAttributes(mode, reach), q, cats)
   const hasLock = alwaysOn(mode).length > 0
 
   const toggle = (id: string, span: boolean) => {
@@ -653,14 +637,29 @@ function InlineChecks({
 
   return (
     <div className="bfp2__pick bdpw__pick">
-      <PickBar mode={mode} q={q} onQuery={setQ} shown={shown} picked={picked} chosen={chosen} onPick={onPick} />
+      <PickBar
+        mode={mode}
+        q={q}
+        onQuery={setQ}
+        shown={shown}
+        picked={picked}
+        chosen={chosen}
+        onPick={onPick}
+        categories={categories}
+        cats={cats}
+        onCats={setCats}
+      />
 
       {shown.length === 0 ? (
         <NoMatches
           compact
           noun={ITEM_NOUN[mode].many}
           query={q}
-          onClear={() => setQ('')}
+          filtered={cats.length > 0}
+          onClear={() => {
+            setQ('')
+            setCats([])
+          }}
           blurb={q.trim() && blockedShown.length > 0 ? agentNote(blockedShown) : undefined}
           secondary={
             q.trim() && blockedShown.length > 0 && onReach ? (
@@ -823,8 +822,14 @@ function InlineRow({
 
    Everything the profile will be, in the order it was asked, each part with an
    Edit that opens its step. Read off the same draft Create writes, so a value
-   left on an unticked row is not reported as going in. Label and value in two
-   columns, no rules between lines. */
+   left on an unticked row is not reported as going in.
+
+   The List layout of Review changes (`ChangeList`), since 17 Sep 2026 — owner:
+   "use the same version here as well"; a new profile has no before, so it is
+   always the list. A heading per step with Edit at its end, then label and
+   value. It was a stack of folding cards with an icon per section and pills
+   for values. A long signal list shows its first rows and "Show N more"
+   rather than folding the whole section shut. */
 function Review({
   state,
   step3,
@@ -841,9 +846,30 @@ function Review({
           (15 Sep 2026). Hidden: the ladder and the footer already say Review
           on screen, and a visible one would stack two headings over one line. */}
       <h2 className="u-sr-only">Review</h2>
-      {reviewSections(state, step3).map((sec) => (
-        <ReviewFold key={sec.step} sec={sec} onEdit={() => onEdit(sec.step)} />
-      ))}
+      <ChangeList layout="list">
+        {reviewSections(state, step3).map((sec) => (
+          <ChangeSection
+            key={sec.step}
+            layout="list"
+            title={sec.title}
+            /* The checks section says how many it holds; the others' rows are
+               the answers, and counting them says nothing. */
+            summary={sec.step === 'items' || sec.step === 'values' ? sec.summary : undefined}
+            action={
+              <button
+                type="button"
+                className="bfp2__clear"
+                aria-label={`Edit ${sec.title.toLowerCase()}`}
+                onClick={() => onEdit(sec.step)}
+              >
+                Edit
+              </button>
+            }
+            blocks={[{ items: sec.facts.map((f) => ({ id: f.attr?.id ?? f.label, name: f.label, after: f.value })) }]}
+            empty={`No ${sec.title.toLowerCase()}`}
+          />
+        ))}
+      </ChangeList>
       {/* A closing note stood here — what happens after Create. Removed at the
           owner's request (16 Sep 2026): the review is the answers. The page
           footer says "Ready to create"; in the slide-over, Create profile is
@@ -852,137 +878,11 @@ function Review({
   )
 }
 
-/* --- The side column, per step ------------------------------------------------------
-
-   The profile page's panel (`.bz7__side`), saying what the answers on the left
-   mean. Devices uses Basic details' own panel and the checks steps the Checks
-   tab's, so a step reads the way its tab will. These three are the steps the
-   page has no tab for. `SidePanel` and `ChecksAside` are in the parts file,
-   since a new profile's page says the same. */
-
-function TypeAside({ mode }: { mode: ProfileMode }) {
-  return (
-    <SidePanel
-      title="How this profile works"
-      lines={
-        mode === 'os'
-          ? [
-              'A device must pass every check you choose before it can sign in.',
-              'Integrity and screen lock are reported by the miniOrange app. A device without it fails those checks.',
-              'The type can’t be changed once the profile is created.',
-            ]
-          : [
-              'Recognises a machine it has seen before.',
-              'Each signal has a weight. What changed since the last sign-in adds up to a score, and the score picks the outcome.',
-              'The type can’t be changed once the profile is created.',
-            ]
-      }
-    />
-  )
-}
-
-function ReachAside() {
-  return (
-    <SidePanel
-      title="How this profile works"
-      lines={[
-        'Agentless reads the browser, network and location of each sign-in. Nothing to install.',
-        'Agent-based adds hardware identifiers, and needs the miniOrange Device Agent on each device.',
-      ]}
-    />
-  )
-}
-
-/* --- One section of the review, folded ---------------------------------------------
-
-   Each section is a disclosure: a header you can press, and the settings under
-   it. Three reasons it is not a flat list of headings any more (owner, 16 Sep
-   2026, against the live console's own review screen):
-
-     - The last section is one row per chosen signal. Thirty-eight of them is a
-       wall nobody reads, and it pushes Create off the screen.
-     - A folded section still has to say something, so the header carries the one
-       thing worth knowing while it is shut — the type, the reach, the count.
-     - Edit belongs beside the section it edits, not inside a control that also
-       folds it. Two buttons on one row, never a button inside a button.
-
-   Flat inside: no sub-headings, no groups within a section. The live console
-   puts a "Device Management Settings" label between the header and the rows;
-   here that is a level of hierarchy over four rows, so the rows sit directly
-   under the header they belong to.
-
-   Open by default, because a review that hides what it is reviewing is not a
-   review. The exception is a long list — over eight rows the section starts
-   shut with its count showing, which is the case the fold exists for. */
-function ReviewFold({ sec, onEdit }: { sec: ReviewSection; onEdit: () => void }) {
-  const bodyId = useId()
-  const [open, setOpen] = useState(sec.facts.length <= LONG_SECTION)
-  const Mark = SECTION_ICON[sec.step] ?? ListChecks
-
-  return (
-    <section className={`bdpw__fold ${open ? 'is-open' : ''}`}>
-      <div className="bdpw__foldhead">
-        {/* The heading holds the toggle, not the other way round: a button's
-            children are presentational, so an h3 inside it never reached the
-            accessibility tree and heading navigation could not find a section. */}
-        <h3 className="bdpw__foldtitle">
-          <button
-            type="button"
-            className="bdpw__foldbtn"
-            aria-expanded={open}
-            aria-controls={bodyId}
-            onClick={() => setOpen((v) => !v)}
-          >
-            <span className="bdpw__foldico" aria-hidden>
-              <Mark size={16} strokeWidth={1.8} />
-            </span>
-            <span className="bdpw__foldname">{sec.title}</span>
-            <Badge tone="system">{sec.summary}</Badge>
-            <ChevronDown className="bdpw__foldchev" size={16} strokeWidth={2} aria-hidden />
-          </button>
-        </h3>
-        <button
-          type="button"
-          className="bfp2__clear"
-          aria-label={`Edit ${sec.title.toLowerCase()}`}
-          onClick={onEdit}
-        >
-          Edit
-        </button>
-      </div>
-
-      {/* Unmounted rather than hidden. A review has at most three sections and
-          no state inside them worth keeping alive, and `hidden` rows stay in
-          the accessibility tree of some screen readers. */}
-      {open && (
-        <dl className="bdpw__facts" id={bodyId}>
-          {sec.facts.map((f) => (
-            <div key={f.attr?.id ?? f.label} className="bdpw__fact">
-              <dt>
-                {f.attr && <CheckMark attr={f.attr} />}
-                <span>{f.label}</span>
-              </dt>
-              <dd>{f.pill ? <Badge tone="neutral">{f.value}</Badge> : f.value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-    </section>
-  )
-}
-
-/* Over this many rows a section starts folded. Eight is the longest list that
-   still reads as a handful: a trusted device's four enrolment answers and a
-   short list of checks stay open, and the 20-to-38-row
-   signal lists — the ones that made the review unreadable — start shut. */
-const LONG_SECTION = 8
-
-const SECTION_ICON: Partial<Record<WizardStepId, LucideIcon>> = {
-  profile: Tag,
-  devices: Laptop,
-  items: ListChecks,
-  values: ListChecks,
-}
+/* `TypeAside` and `ReachAside` stood here — two panels whose lines followed
+   the type tile and the reach tile that had just been pressed. They are
+   `TYPE_NOTE` and `DEVICES_NOTE` in profile-notes.ts now: both options
+   described once, so a panel says the same before and after a choice is made
+   (owner, 18 Sep 2026). */
 
 /* `NextAside` stood here — "What happens next" in the review step's right
    column. It became a paragraph at the foot of the summary, and then went

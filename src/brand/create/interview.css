@@ -343,12 +343,12 @@
    past the fold, and a summary you have to scroll past the options to reach is
    a summary nobody opens. */
 
-@media (max-width: 1080px) {
+@media (max-width: 1120px) {
   .biv__body { grid-template-columns: minmax(0, 1fr) 300px; gap: var(--space-6); padding: var(--space-6); }
   .biv__panel.is-build { grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: var(--space-6); }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   /* Flex, not a one-column grid.
 
      The panel changes height when its disclosure opens, and in a grid the row

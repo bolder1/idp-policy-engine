@@ -1038,7 +1038,7 @@ button.bov__step:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focu
 }
 .bf__railstub button:hover { background: var(--surface-raised); color: var(--text-primary); }
 
-@media (max-width: 880px) {
+@media (max-width: 900px) {
   .bf__pips .bgt__pip em, .bf__pips .bia__pip b { display: none; }
   .bf__pips .bgt__pip, .bf__pips .bia__pip { white-space: nowrap; }
   .bf.is-main .bf__stage { padding: var(--space-5) var(--space-5) var(--space-7); }

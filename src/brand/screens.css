@@ -1,3 +1,47 @@
+/* ============================================================================
+   THE WIDTH SCALE — four numbers, and what each one means.
+
+   This console had SIXTEEN distinct width breakpoints (1439, 1120, 1100, 1080,
+   1000, 900, 899, 880, 860, 820, 720, 620, 600, 560, 540, 520), most of them a
+   one-off typed where a layout happened to look cramped. Two of them were the
+   same intent 1px apart: the page grid dropped its second column at 899 while
+   the shell kept its rail to 900, so at exactly 900px the two disagreed.
+
+   Pick from these. A new number needs a reason the four cannot cover.
+
+     1120  Two columns get tight. The rail narrows 235 → 200; a page with a
+           side column pulls that column in rather than dropping it.
+     900   There is no room for a second column. The rail stops being one and
+           overlays the page (shell.css); a docked panel stops being a grid
+           column and becomes a fixed overlay; two-column pages go to one.
+     720   A page's own furniture stops fitting the row — toolbars wrap, a
+           caption or a label is dropped. The largest cluster in the sheet.
+      600  Phone. What is left has to stack.
+
+   They are written out as literals on purpose. A custom property cannot be
+   read inside a media condition, and `@custom-media` needs a lightningcss
+   drafts flag this build does not set — so tokenising them would mean changing
+   the CSS pipeline for every sheet, which is not worth it for four numbers.
+
+   THE TWO DELIBERATE EXCEPTIONS, so nobody has to re-derive them:
+     1000  board.css, the canvas top bar. Wider furniture than a page's, so it
+           runs out of row before 900 — dropping it to 900 would keep pips on a
+           bar that has already stopped fitting them.
+     1439  builder-v4.css, `--rail-w`. Not a narrow rule at all: it is a WIDE
+           one written inside out, giving the builder's rail its extra width
+           only above 1440. Read it as `min-width: 1440px`.
+
+   COMPONENTS SHOULD PREFER `@container`. A media query asks how wide the
+   WINDOW is, which is the wrong question for anything that sits in a panel, a
+   drawer or a column: kit.css's `bx-cl`, device-fingerprint-v2.css's
+   `bfp2-*` and device-profile-wizard.css's `bdpw-steps` already ask how wide
+   THEY are. The sub-720 one-offs still in this codebase (620 in
+   setting-field.css, 560 in tour.css, 540 in interview.css, 520 in
+   auth-methods.css) are each a component guessing at a window width; they are
+   left alone here because the fix for them is a container query, not a
+   different number.
+   ============================================================================ */
+
 /* --- Toolbar --------------------------------------------------------------- */
 
 .btoolbar {
@@ -915,7 +959,11 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
 /* Too narrow for a list and a panel side by side: the list keeps the page and
    the panel lays over its right edge, full height under the top bar, as the
    kit's drawer does — but still without a scrim, so the list stays live. */
-@media (max-width: 899px) {
+/* 900, not 899. The shell drops its rail to an overlay at 900 (shell.css), and
+   this is the same judgement — there is no room for a second column — so at
+   exactly 900px the page used to keep a grid column for the panel while the
+   rail had already left the grid. See the width scale at the top of this file. */
+@media (max-width: 900px) {
   .bpage.has-dock { grid-template-columns: repeat(10, minmax(0, 1fr)); }
   .bpage.has-dock > :not(.bpage__head, .bbar, .bdock, .bx-scrim, .bx-drawer) { grid-column: 1 / -1; }
   .bpage.has-dock > .bdock {

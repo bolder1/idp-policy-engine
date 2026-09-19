@@ -225,12 +225,44 @@ function isActive(current: BrandScreen, item: NavItem): boolean {
   return item.screen ? current.name === item.screen.name : false
 }
 
+/* Below this the rail stops being a column and becomes an overlay drawer.
+
+   The console had no phone layout at all: `.bshell` is a two-track grid and its
+   last width breakpoint was 1120px, which only takes the rail 235px → 200px. On
+   a 375px screen that left the rail holding 53% of the width and the content
+   column 175px, with the page overflowing 308px. Measured 18 Sep 2026.
+
+   900px, the same number `PolicyBuilderMain` floats its rules panel at — one
+   breakpoint for "there is no room for a second column", not two. */
+const RAIL_OVERLAYS = '(max-width: 900px)'
+
+function useNarrow() {
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(RAIL_OVERLAYS).matches,
+  )
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+    const mq = window.matchMedia(RAIL_OVERLAYS)
+    const on = () => setNarrow(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return narrow
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const { screen, go } = useBrand()
   const main = useRef<HTMLElement>(null)
   const nav = useRef<HTMLElement>(null)
   const [theme, setTheme] = useTheme()
   const [collapsed, setCollapsed] = useState(false)
+  const narrow = useNarrow()
+  /* The overlay drawer's own state, kept apart from `collapsed` on purpose.
+     `collapsed` means "the rail is a 64px icon strip" and the builder drives it;
+     reusing it for "the drawer is off-canvas" would make leaving a builder slide
+     the drawer OPEN on a phone. Two meanings, two flags. Closed to start with:
+     an overlay that covers the page is not what you want on arrival. */
+  const [navOpen, setNavOpen] = useState(false)
   /* The rail row to put focus back on after the rail changes width. A row
      gains or loses its Tip wrapper when the rail collapses or expands, which
      remounts the button that had focus and drops focus to the page. */
@@ -274,6 +306,11 @@ export function Shell({ children }: { children: ReactNode }) {
      cards back to a navigation menu, and switching back took it away again.
      The board is the surface with the stronger claim to the space of the two. */
   useEffect(() => {
+    /* Nothing to hand over on a phone: the rail is already off the page, and
+       running this here would leave `collapsed` true after the admin leaves a
+       builder, so the rail came back as the 64px strip once the window widened
+       again. */
+    if (narrow) return
     if (BUILDER_SCREENS.includes(screen.name)) {
       setCollapsed((c) => {
         if (!c) autoCollapsed.current = true
@@ -283,13 +320,49 @@ export function Shell({ children }: { children: ReactNode }) {
       autoCollapsed.current = false
       setCollapsed(false)
     }
+  }, [screen.name, narrow])
+
+  /* The drawer covers the page, so it closes the moment it has done its job —
+     on arrival at a screen, and when the window grows back into a real column. */
+  useEffect(() => {
+    setNavOpen(false)
   }, [screen.name])
+  useEffect(() => {
+    if (!narrow) setNavOpen(false)
+  }, [narrow])
+  /* Escape shuts it, the way every other overlay in the console closes. */
+  useEffect(() => {
+    if (!navOpen) return
+    const on = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNavOpen(false)
+    }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [navOpen])
 
   function toggleRail() {
+    /* One button, two jobs, because there is only ever one of them on screen:
+       narrow, it opens and shuts the overlay; wide, it sets the rail's width. */
+    if (narrow) {
+      setNavOpen((o) => !o)
+      return
+    }
     // A deliberate choice, so the builder stops managing it from here.
     autoCollapsed.current = false
     setCollapsed((c) => !c)
   }
+
+  /* What the burger says, in whichever layout is on screen. A drawer opens and
+     closes; a column expands and collapses — the wide wording is the console's
+     own and is left exactly as it was. */
+  const railShut = narrow ? !navOpen : collapsed
+  const railLabel = narrow
+    ? railShut
+      ? 'Open navigation'
+      : 'Close navigation'
+    : railShut
+      ? 'Expand navigation'
+      : 'Collapse navigation'
 
   function toggle(item: NavItem) {
     /* A submenu cannot render in 64px, so a parent has to open the rail — and
@@ -315,15 +388,15 @@ export function Shell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className={`bshell ${collapsed ? 'is-collapsed' : ''}`}>
+    <div className={`bshell ${!narrow && collapsed ? 'is-collapsed' : ''} ${narrow && navOpen ? 'is-navopen' : ''}`}>
       <header className="bshell__top">
-        <Tip text={collapsed ? 'Expand navigation' : 'Collapse navigation'}>
+        <Tip text={railLabel}>
           <button
             type="button"
             className="bshell__burger"
             onClick={toggleRail}
-            aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
-            aria-expanded={!collapsed}
+            aria-label={railLabel}
+            aria-expanded={!railShut}
           >
             <PanelLeft size={21} strokeWidth={1.7} />
           </button>
@@ -380,7 +453,13 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <aside className="bshell__rail">
+      {/* The way out of an overlay that covers the page. A button, not a div:
+          it is a real control, so it is reachable and it says what it does. */}
+      {narrow && navOpen && (
+        <button type="button" className="bshell__scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />
+      )}
+
+      <aside className="bshell__rail" inert={narrow && !navOpen ? true : undefined}>
         <nav className="bshell__nav" aria-label="Console" ref={nav}>
           {NAV.map((group, gi) => (
             <div key={group.section ?? gi} className="bshell__group">

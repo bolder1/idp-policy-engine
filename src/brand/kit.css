@@ -504,6 +504,35 @@ html[data-theme='dark'] {
 .bx-toggle--sm { width: 32px; height: 18px; }
 .bx-toggle--lg { width: 52px; height: 30px; }
 
+/* --- Touch: the hit area, not the drawing ------------------------------------
+
+   Measured on a 375px screen: the row menu is 34×34, a switch 44×24, the small
+   switch 32×18. All comfortably clickable with a cursor and all under the 44px
+   a fingertip wants.
+
+   So the BOX grows and the control does not. `pointer: coarse` keeps every
+   pixel of the console's density on a desktop — this is not a phone layout, it
+   is a phone INPUT — and a centred `max(100%, 44px)` pseudo-element reaches 44
+   in whichever axis falls short while leaving the drawing exactly where it was.
+
+   Deliberately NOT on `.bx-tipdot`: it is 16px and sits inline a few pixels
+   from the name it annotates, so a 44px box around it would cover the text and
+   swallow taps meant for the row. A tip is also the one control here that
+   nobody needs to hit — its text is on the row for a screen reader already. */
+@media (pointer: coarse) {
+  .bx-toggle,
+  .bx-rowmenu { position: relative; }
+  .bx-toggle::after,
+  .bx-rowmenu::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
 
 /* On is GREEN, not brand.
 

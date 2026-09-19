@@ -288,6 +288,95 @@
   .bshell.is-collapsed { --nav-sidebar-w: 64px; }
 }
 
+/* --- No room for a second column ------------------------------------------ */
+
+/* 900px and under, the rail leaves the grid and overlays the page (Shell.tsx
+   drives it with `is-navopen`; the same 900px `PolicyBuilderMain` floats its
+   rules panel at).
+
+   Everything above only ever narrowed the rail — 235 → 200 → 64 — and a phone
+   has no width to give it at any of those. Measured on a 375px screen before
+   this block: the rail held 200px of it, the content column 175px, and the page
+   overflowed 308px with 434 elements past the right edge. */
+@media (max-width: 900px) {
+  .bshell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'top'
+      'main';
+  }
+
+  .bshell__rail {
+    position: fixed;
+    top: var(--nav-topbar-h);
+    left: 0;
+    bottom: 0;
+    z-index: 70;
+    /* Wide enough for the longest row ("Risk signal profile"), never the whole
+       screen: the page behind it is what tells you where the drawer will land. */
+    width: min(280px, 82vw);
+    transform: translateX(-100%);
+    transition: transform var(--dur-normal) var(--ease-standard);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.28);
+  }
+  .bshell.is-navopen .bshell__rail { transform: none; }
+
+  .bshell__scrim {
+    position: fixed;
+    inset: var(--nav-topbar-h) 0 0 0;
+    z-index: 65;
+    border: 0;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  /* An overlay is never the icon strip: the drawer is either off the page or
+     showing its rows with their names. */
+  .bshell.is-collapsed { --nav-sidebar-w: 0px; }
+
+  /* The topbar could not shrink — 31 of its elements hung past the right edge
+     of a 375px screen, which is what forced the whole page to 683px. The two
+     PROTOTYPE controls (persona, rebrand) and the two INERT icons (docs,
+     settings — both `aria-disabled`, neither does anything yet) are what took
+     the room. They are hidden here, not removed: the desktop bar is untouched,
+     and this is one media query to delete when they earn their place on a
+     phone. What is left is the burger, the logo, the theme toggle and the
+     account menu. */
+  .bshell__top { padding-right: 8px; }
+  /* The Tip WRAPPER, not just the control inside it: `.bx-tip` is an
+     inline-flex item, so hiding only its child left an empty box still
+     spending the row's gap. */
+  .bshell__top .bpb,
+  .bshell__topright > .bx-tip:has(.bshell__brand),
+  .bshell__topright > .bx-tip:has(.bshell__icon.is-inert) { display: none; }
+  .bshell__topright { gap: 4px; }
+  .bshell__logo img { height: 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bshell__rail { transition: none; }
+}
+
+/* The topbar's own controls, on the same terms as the kit's — see the note
+   beside `.bx-toggle` in kit.css. The burger matters most of the three: on a
+   phone it is the only way to the navigation, and it was a 37px target. */
+@media (pointer: coarse) {
+  .bshell__burger,
+  .bshell__icon,
+  .bshell__avatar { position: relative; }
+  .bshell__burger::after,
+  .bshell__icon::after,
+  .bshell__avatar::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
 /* `.bshell__quick` — a floating rail of two icon buttons down the right edge —
    stood here. Removed with the markup; the topbar still carries both.
 

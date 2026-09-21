@@ -54,7 +54,7 @@
   font-weight: 400; font-size: var(--fs-sm); color: var(--text-muted);
 }
 /* `1fr` rows and stretched items: every card in a row matches the tallest, and
-   the footer pins to the bottom of whatever that turns out to be. The old fixed
+   the card's body takes up the slack. The old fixed
    362px was sized for a card that always had a thumbnail — with the thumbnail
    withheld in lite it became 362px of mostly nothing. */
 .bgal__grid {
@@ -63,8 +63,8 @@
 }
 
 /* --- Template card ---------------------------------------------------------
-   A thumbnail of the rule stack, then the heading, then the description, then a
-   trailing action row.
+   A thumbnail of the rule stack, then the heading with its one action at the end
+   of the line, then the description.
 
    The face was a tinted panel with a category icon in the middle. Both said the
    same thing the heading said, and they cost 150px to say it. It now carries a
@@ -100,23 +100,26 @@
   box-shadow: 0 1px 2px rgba(33, 37, 41, 0.04);
   transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
 }
-.bgcard:hover,
-.bgcard:focus-within { border-color: var(--border-default); box-shadow: 0 8px 22px rgba(33, 37, 41, 0.1); }
+.bgcard:is(:hover, :has(:focus-visible)) { border-color: var(--border-default); box-shadow: 0 8px 22px rgba(33, 37, 41, 0.1); }
 
-/* The canvas. Sunken and dotted, because that is what the builder's canvas is —
-   the thumbnail reads as a scaled-down artboard rather than a decorative panel. */
+/* The canvas. Sunken and dotted, because that is what the builder's canvas is,
+   so the thumbnail reads as a scaled-down artboard.
+
+   Three bands: 36px for the pill and the eye, the stack, and at least 20px of
+   open sky above the readout, where the hover sunrise shows. Every row in front
+   of the light is solid, so the light needs room of its own. */
 .bgcard__canvas {
+  --horizon: 30px; /* the readout's height, and the line the sun rises from */
+  --sky: 20px;
   position: relative;
   flex: none;
   height: 212px;
-  /* Centred, with the top inset reserving room for the badge and the bottom
-     inset for the readout, so a one-rule template and a five-rule one both sit
-     on the same optical line instead of one hugging the ceiling. */
+  /* Centred in what is left. The tallest stack, three rules plus the
+     fall-through, is 124px of the 125px between the insets. */
   display: flex; flex-direction: column; justify-content: center;
-  padding: 32px 13px 43px;
-  background:
-    radial-gradient(circle at 1px 1px, var(--card-dot) 1px, transparent 0) 0 0 / 12px 12px,
-    var(--surface-sunken);
+  padding: 36px 13px calc(var(--horizon) + var(--sky));
+  background: var(--surface-sunken);
+  isolation: isolate;
   border-bottom: 1px solid var(--border-subtle);
   overflow: hidden;
 }
@@ -130,18 +133,21 @@
   flex-direction: column;
   gap: 4px;
 }
-/* The spine linking the numbers — the same connector the builder canvas draws
-   between rules, which is what makes the order read as order. */
+/* The fall-through belongs to the policy, not the template: 6px off the rules. */
+.bgcard__stack > li:last-child:not(:first-child) { margin-top: 2px; }
+/* The spine, from the centre of the first badge to the centre of the last.
+   Every row is opaque, so it shows only in the gaps and never crosses the light. */
 .bgcard__stack::before {
   content: '';
   position: absolute;
   left: 15px;
-  top: 11px;
-  bottom: 11px;
+  top: 14px;
+  bottom: 13px;
   width: 1px;
   background: var(--border-default);
 }
 
+/* Every row is solid. A row the grid shows through reads as half-drawn. */
 .bgcard__mrow {
   position: relative;
   z-index: 1;
@@ -150,13 +156,13 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  height: 30px;
+  height: 28px;
   padding: 0 7px 0 5px;
   text-align: left;
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  box-shadow: 0 1px 1px rgba(33, 37, 41, 0.03);
+  box-shadow: var(--el-low);
 }
 
 .bgcard__mn {
@@ -176,9 +182,11 @@
   color: var(--text-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Line height pinned so the chip is 20px in both looks and fits the 26px fall-through. */
 .bgcard__mdec {
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
+  line-height: 16px;
   padding: 2px 6px;
   border-radius: var(--radius-pill);
   white-space: nowrap;
@@ -187,29 +195,39 @@
 .bgcard__mdec.is-mfa { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
 .bgcard__mdec.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
 
-/* Not part of the template: what the engine does when nothing above matched.
-   Set apart by an unfilled row and muted text; the edge stays solid, because
-   dashed outlines are out of the design system. */
+/* "+3 more rules": the rules it stands for, as a deck. White like them,
+   shorter because it is a count, with one sheet showing 3px beneath it. The
+   sheet is two offset shadows (its fill, then its edge). It lands in the gap
+   above the fall-through, which always comes straight after this row. */
+.bgcard__mrow--rest {
+  height: 22px;
+  box-shadow: 0 5px 0 -3px var(--surface-raised), 0 5px 0 -2px var(--border-subtle);
+}
+.bgcard__mrow--rest .bgcard__mname { font-size: var(--fs-xs); color: var(--text-secondary); }
+
+/* Everyone else: what the engine does when nothing above matched, which is
+   the policy's own default. A grey slab with no edge, a step shorter than a
+   rule. It is solid, so neither the grid nor the hover light shows through.
+   Dashed outlines are out of the design system. The decision chip stays at
+   full strength, because its colour is what the row means. */
 .bgcard__mrow--default {
-  background: transparent;
+  height: 26px;
+  background: var(--surface-inset);
+  border-color: transparent;
   box-shadow: none;
 }
 .bgcard__mrow--default .bgcard__mname { color: var(--text-tertiary); font-weight: var(--fw-regular); }
-.bgcard__mrow--default .bgcard__mdec { opacity: 0.7; }
 
-.bgcard__mrow--rest {
-  background: transparent;
-  box-shadow: none;
-}
-.bgcard__mrow--rest .bgcard__mname { color: var(--text-secondary); }
+/* Neither end row is a numbered rule, so neither glyph sits in a numbered tile. */
+.bgcard__mrow--rest .bgcard__mn,
+.bgcard__mrow--default .bgcard__mn { background: transparent; border-color: transparent; }
 
-/* Fixed height and pinned to the canvas floor. Idle it states the posture;
-   pointing at a row swaps in that rule's condition. Nothing reflows either
-   way, which is what lets the strip carry real text. */
+/* Fixed height and pinned to the canvas floor, so nothing reflows. Its top edge
+   is the horizon the hover sun rises from. */
 .bgcard__readout {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  height: 30px;
+  height: var(--horizon);
   display: flex; align-items: center; gap: 7px;
   padding: 0 13px;
   background: var(--surface-raised);
@@ -250,14 +268,21 @@
   transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
 .bgcard__peek:hover { background: var(--surface-raised); color: var(--text-primary); border-color: var(--border-strong); }
-.bgcard__peek:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* The global focus ring draws (`box-shadow: var(--focus-ring)` stood here, and
+   `--focus-ring` is a colour, so it drew nothing); this keeps the button round. */
+.bgcard .bgcard__peek:focus-visible { border-radius: 50%; }
 
 .bgcard__body {
   flex: 1;
   min-height: 0;
   display: flex; flex-direction: column; gap: 5px;
-  padding: 13px 16px 0;
+  /* The body is the card's bottom edge now the footer strip has gone. */
+  padding: var(--space-5) var(--space-6) var(--space-6);
 }
+/* The name and the Use button on one line. Flex rather than a grid, so without
+   a button the name simply takes the row. */
+.bgcard__head { display: flex; align-items: center; gap: var(--space-5); min-height: var(--ctl-height-sm); }
+.bgcard__head .bgcard__h { flex: 1; min-width: 0; }
 .bgcard__h {
   font-size: var(--fs-lg);
   font-weight: var(--fw-semibold);
@@ -275,32 +300,35 @@
   overflow: hidden;
 }
 
-.bgcard__foot {
-  flex: none;
-  height: 54px;
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 0 12px 0 16px;
-  background: var(--surface-raised);
-  border-top: 1px solid var(--border-subtle);
-}
 
 .bgcard__cta {
-  flex: none;
-  height: 30px;
-  padding: 0 13px;
+  position: relative; flex: none;
+  height: var(--ctl-height-sm);
+  padding: 0 var(--space-5);
   border-radius: var(--radius-md);
   background: var(--int-neutral-bg);
-  border: 1px solid var(--int-neutral-border);
+  border: var(--bw-thin) solid var(--int-neutral-border);
   color: var(--int-neutral-text);
-  font-size: var(--fs-md);
-  font-weight: var(--fw-medium);
+  font-size: var(--fs-md); font-weight: var(--fw-medium); white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
-.bgcard__cta:hover { background: var(--int-neutral-bg-hover); border-color: var(--int-neutral-border-hover); }
+/* Orange on the card you point at, or on the button when it has keyboard focus
+   (owner, 21 Sep 2026) — at most one on screen and none at rest, so 60/30/10
+   holds. The fill is `--brand-on-fill`, the primary button's own: white on the
+   bare `--brand` is 3.6:1, and `--accent` is slate in the classic look and blue
+   in the rebrand. Not `:focus-within`: an orange Use while the preview eye has
+   focus would suggest Enter applies the template. */
 .bgcard:hover .bgcard__cta,
-.bgcard:focus-within .bgcard__cta { background: var(--accent); border-color: var(--accent); color: var(--text-on-brand); }
+.bgcard__cta:focus-visible { background: var(--brand-on-fill); border-color: var(--brand-on-fill); color: var(--text-on-brand); }
+.bgcard .bgcard__cta:hover { background: var(--brand-active); border-color: var(--brand-active); }
+/* The global focus ring draws; this only keeps it from squaring the corners. */
+.bgcard .bgcard__cta:focus-visible { border-radius: var(--radius-md); }
+@media (pointer: coarse) {
+  .bgcard__cta::after { content: ''; position: absolute; top: 50%; left: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%); }
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .bgcard, .bgcard__peek { transition: none; }
+  .bgcard, .bgcard__peek, .bgcard__cta { transition: none; }
 }
 
 /* --- Preview dialog --------------------------------------------------------
@@ -349,9 +377,8 @@
   border-radius: 8px;
   box-shadow: 0 1px 1px rgba(33, 37, 41, 0.03);
 }
-.bprev__node--default {
-  background: transparent; box-shadow: none;
-}
+.bprev__node--default { background: var(--surface-inset); border-color: transparent; box-shadow: none; }
+.bprev__node--default .bprev__n { background: transparent; border-color: transparent; }
 .bprev__node--default .bprev__body strong { color: var(--text-secondary); font-weight: var(--fw-medium); }
 
 .bprev__n {
@@ -883,10 +910,10 @@ html[data-theme='dark'] .bguided__sheen {
    map. Grey rather than a hue picked at random. */
 .bgcard__cat.is-neutral { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); border-color: var(--fb-neutral-border); }
 
-/* --- Signals, tags, and the pinned footer -------------------------------------
+/* --- Signals and tags ------------------------------------------------------------
    Apollo's card grammar: a row of round glyphs for what the thing contains, a
-   row of tinted labels for what it is, then the words, then one action pinned
-   to the bottom edge so the button is on the same line across the whole grid.
+   row of tinted labels for what it is, then the words — the name with the card's
+   one action at the end of its line.
    --------------------------------------------------------------------------- */
 
 .bgcard__signals { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
@@ -921,10 +948,6 @@ html[data-theme='dark'] .bguided__sheen {
 .bgcard__tag.is-allow { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
 .bgcard__tag.is-none { background: var(--surface-inset); color: var(--text-muted); }
 
-/* The body takes the slack so the footer sits on the card's floor whatever the
-   description length — which is what keeps the Use buttons on one line. */
-.bgcard__body { flex: 1; min-height: 0; }
-.bgcard__foot { margin-top: auto; }
 
 /* --- The audience picker, inline -------------------------------------------
 
@@ -947,3 +970,92 @@ html[data-theme='dark'] .bguided__sheen {
    should exist, so it is a display rule rather than a deletion. */
 .bgcard__signals,
 .bgcard__tags { display: none; }
+
+/* --- The hover sunrise ----------------------------------------------------------
+   Light in the category pill's hue, rising from the bottom of the thumbnail on
+   hover (owner, 21 Sep 2026). It has two parts.
+   The horizon: a 1px line on the readout's top edge, drawn out from the centre.
+   The sun: a wide half-circle centred on that edge, rising from behind the readout.
+   Every row is solid, so the light shows only where the canvas does: the sky
+   band, the side margins and the gaps. The rows stand in silhouette against it.
+   Nothing on the thumbnail moves except the light.
+
+   Each card takes one hue, the strongest shade of its pill's colour family,
+   mixed toward transparent. The same percentages give a tint in light mode and
+   a glow in dark. */
+.bgcard {
+  --sun: var(--fb-neutral-dot);
+  --sun-core: color-mix(in oklab, var(--sun) 34%, transparent);
+  --sun-halo: color-mix(in oklab, var(--sun) 10%, transparent);
+  --sun-line: color-mix(in oklab, var(--sun) 70%, transparent);
+  --sun-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bgcard.is-cat-quick { --sun: var(--fb-lime-dot); }
+.bgcard.is-cat-device { --sun: var(--fb-accent-dot); }
+.bgcard.is-cat-risk { --sun: var(--fb-info-dot); }
+.bgcard.is-cat-compliance { --sun: var(--fb-magenta-dot); }
+/* Uncategorized: a grey sun looks like a smudge, so only the horizon lights. */
+.bgcard.is-cat-neutral { --sun-core: transparent; --sun-halo: transparent; }
+
+.bgcard__canvas::before,
+.bgcard__canvas::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+}
+/* The sun. Its box ends at the horizon, so each layer centred on its bottom
+   edge is a half-circle, and anything the rise pushes below the line hides
+   behind the opaque readout. The core is wide and low enough to sit in the sky
+   band. The halo reaches halfway up behind the stack. */
+.bgcard__canvas::before {
+  bottom: var(--horizon);
+  background:
+    radial-gradient(ellipse 38% 52px at 50% 100%, var(--sun-core), var(--sun-halo) 45%, transparent),
+    radial-gradient(ellipse 72% 104px at 50% 100%, var(--sun-halo), transparent);
+  opacity: 0;
+  transform-origin: 50% 100%;
+  transition: opacity var(--dur-normal) var(--ease-standard);
+}
+/* The dot grid sits over the light, so the light tints it instead of washing it out. */
+.bgcard__canvas::after {
+  background: radial-gradient(circle at 1px 1px, var(--card-dot) 1px, transparent 0) 0 0 / 12px 12px;
+}
+/* The horizon: the readout's own top hairline, brightest under the sun. */
+.bgcard__readout::before {
+  content: '';
+  position: absolute; left: 0; right: 0; top: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 6%, var(--sun-line) 50%, transparent 94%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-normal) var(--ease-standard);
+}
+
+/* Lit on hover, or while a control in the card has keyboard focus.
+   :focus-visible rather than :focus-within, because :focus-within kept the card
+   lit after the preview was closed with the mouse (focus returns to the eye).
+   The :has() sits inside :is(), so a browser without :has() still lights on hover. */
+.bgcard:is(:hover, :has(:focus-visible)) .bgcard__canvas::before,
+.bgcard:is(:hover, :has(:focus-visible)) .bgcard__readout::before { opacity: 1; }
+
+/* The motion. With reduced motion, only the opacity above applies, at
+   --dur-normal, which tokens.css sets to 0ms. */
+@media (prefers-reduced-motion: no-preference) {
+  /* Setting: quick and all at once. The sun sinks behind the readout and narrows. */
+  .bgcard__canvas::before {
+    transform: translateY(52px) scaleX(0.8);
+    transition: opacity 180ms var(--ease-standard), transform 240ms var(--ease-standard);
+  }
+  .bgcard__readout::before {
+    transform: scaleX(0.3);
+    transition: opacity 160ms var(--ease-standard), transform 200ms var(--ease-standard);
+  }
+  /* Rising: slower and in order. The horizon draws out from the centre, then
+     the sun follows it up and spreads along it. */
+  .bgcard:is(:hover, :has(:focus-visible)) .bgcard__readout::before {
+    transform: none;
+    transition: opacity 200ms var(--ease-standard), transform 560ms var(--sun-ease);
+  }
+  .bgcard:is(:hover, :has(:focus-visible)) .bgcard__canvas::before {
+    transform: none;
+    transition: opacity 320ms var(--ease-standard) 60ms, transform 700ms var(--sun-ease) 60ms;
+  }
+}

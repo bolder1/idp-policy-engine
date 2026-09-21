@@ -280,3 +280,7 @@ button.bdpw__stepbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--
   font-size: var(--fs-sm);
   color: var(--text-tertiary);
 }
+
+/* The wizard's footer keeps a heading ("Step 2 of 4: Checks") over a caption,
+   where the SaveBar it borrows from now has only the one line. */
+.bdpw__foot .bx-savebar__text span:not(.is-blocked) { font-size: var(--fs-sm); color: var(--text-tertiary); }

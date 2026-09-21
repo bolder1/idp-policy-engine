@@ -894,9 +894,9 @@ export const MODES: ModeMeta[] = [
   {
     id: 'device',
     label: 'Trusted device',
-    summary: 'Recognises machines it has seen, by weighted signals',
+    summary: 'Recognises machines it has seen, by prioritised signals',
     blurb:
-      'Recognises a machine it has seen before. Each signal carries a weight, what changed since last time adds up to a score, and the score picks the outcome.',
+      'Recognises a machine it has seen before. Each signal has a priority, what changed since last time adds up to a score, and the score picks the outcome.',
     tint: 'accent',
   },
 ]
@@ -1276,9 +1276,12 @@ export type ProfileChange = ReviewLine
 
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-/* What one check is set to, in the words a review cell has room for. */
+/* What one check is set to, in the words a review cell has room for. A signal's
+   value is its tier alone — "High", not "High priority": the section is
+   Signals and a changed row is already labelled "X priority", so the word on
+   every line was the same word eight times (owner, 21 Sep 2026). */
 function itemValue(p: FingerprintProfile, a: Attribute): string {
-  if (p.mode === 'device') return `${tierOf(p.weights[a.id] ?? a.weight)} weight`
+  if (p.mode === 'device') return tierOf(p.weights[a.id] ?? a.weight)
   return a.config ? valueLabel(a, p.config[a.id]) : 'On'
 }
 
@@ -1325,7 +1328,7 @@ export function profileReview(before: FingerprintProfile, after: FingerprintProf
   }
   for (const a of now) {
     if (!was.some((x) => x.id === a.id)) continue
-    const label = after.mode === 'device' ? `${a.name} weight` : a.name
+    const label = after.mode === 'device' ? `${a.name} priority` : a.name
     push(label, itemValue(before, a), itemValue(after, a), { group: noun, kind: 'changed', item: label })
   }
   return rows
@@ -1351,7 +1354,7 @@ export function profileChangeParts(before: FingerprintProfile, after: Fingerprin
   const tuned = now.some(
     (a) => was.includes(a.id) && itemValue(before, a) !== itemValue(after, a),
   )
-  if (tuned) parts.push(after.mode === 'device' ? 'Weights changed' : 'Values changed')
+  if (tuned) parts.push(after.mode === 'device' ? 'Priorities changed' : 'Values changed')
   return parts
 }
 

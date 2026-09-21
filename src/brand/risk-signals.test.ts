@@ -232,11 +232,11 @@ describe('what blocks a save', () => {
   })
 
   it('refuses a name another profile has, ignoring case and spaces', () => {
-    expect(riskProfileProblem({ ...base, name: ' shipped WEIGHTING ' }, ['Shipped weighting'])).toBe(
+    expect(riskProfileProblem({ ...base, name: ' shipped PRIORITIES ' }, ['Shipped priorities'])).toBe(
       'A risk profile with this name already exists.',
     )
-    expect(riskProfileNameProblem('Shipped weighting', ['Shipped weighting'])).not.toBeNull()
-    expect(riskProfileProblem(base, ['Shipped weighting'])).toBeNull()
+    expect(riskProfileNameProblem('Shipped priorities', ['Shipped priorities'])).not.toBeNull()
+    expect(riskProfileProblem(base, ['Shipped priorities'])).toBeNull()
   })
 
   it('refuses a profile that scores every band 0', () => {
@@ -266,15 +266,15 @@ describe('the review of a draft', () => {
       item: 'Tor exit node',
     })
     expect(rows).toContainEqual({
-      label: `Weight: ${dual.name}`,
+      label: `Priority: ${dual.name}`,
       before: dual.tier,
       after: dual.tier === 'Low' ? 'High' : 'Low',
-      group: 'Weights',
+      group: 'Priorities',
       kind: 'changed',
       item: dual.name,
     })
     expect(rows.some((r) => r.label === 'High risk score')).toBe(true)
-    expect(riskChangeNames(saved, draft)).toEqual(['Name', 'Signals', 'Weights'])
+    expect(riskChangeNames(saved, draft)).toEqual(['Name', 'Signals', 'Priorities'])
   })
 
   /* The dialog files rows by section and shows consequences last. A band

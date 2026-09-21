@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { useEffect } from 'react'
 import {
   AlertTriangle,
@@ -23,8 +23,9 @@ import {
 
 import { Toggle } from '../../kit'
 import { Picker } from '../../picker'
-import type { AccessDecision, Rule } from '../../data'
+import { DEFAULT_DENY_MESSAGE, DENY_MESSAGE_MAX, type AccessDecision, type Rule } from '../../data'
 import { METHODS } from '../rule-form'
+import { METHOD_PREFIX, firstFactorPatch, firstFactorValue } from './first-factor'
 import { isPristine } from './parts'
 import { Prop } from './Section'
 
@@ -305,48 +306,41 @@ export function WhatEditor({
           nothing to prove, so the panel says so in a line instead of showing
           controls that cannot run. */}
       {!walksFactors ? (
-        <p className="bb__addnote">{chosen?.hint ?? 'Refused outright. No factor is ever asked for.'}</p>
+        <>
+          <p className="bb__addnote">{chosen?.hint ?? 'Refused outright. No factor is ever asked for.'}</p>
+          <DenyMessage rule={rule} onPatch={onPatch} />
+        </>
       ) : (
         <>
           <div className="bb__thenfield">
             <span className="bb__thenlabel">First factor</span>
-            {/* Three choices, and the third opens the list rather than being
-                the list: one choice out of seven named methods is a dropdown's
-                question, and Password is the answer almost every time. */}
+            {/* One picker, not two (21 Sep 2026). The two plain answers first —
+                Password is the answer almost every time — then every named
+                method under an "A specific method" heading, so choosing one
+                IS choosing a specific method. It used to take a second picker
+                to say which, and "A specific method" with nothing chosen was a
+                state the rule could be left in. See first-factor.ts. */}
             <Picker
               label="First factor"
               width="fill"
-              value={rule.firstFactor}
+              value={firstFactorValue(rule)}
+              placeholder="Choose a method"
               options={[
                 { value: 'Password', label: 'Password', icon: Lock },
                 { value: 'Any', label: 'Any enabled method', icon: Layers },
-                { value: 'Specific', label: 'A specific method', icon: KeyRound },
+                ...METHODS.map((m) => ({ ...methodOption(m), value: METHOD_PREFIX + m, group: 'A specific method' })),
               ]}
-              onChange={(v) =>
-                v === 'Specific'
-                  ? onPatch({ firstFactor: 'Specific' })
-                  : onPatch({ firstFactor: v as Rule['firstFactor'], firstFactorMethod: undefined })
-              }
+              onChange={(v) => onPatch(firstFactorPatch(v))}
             />
-            {rule.firstFactor === 'Specific' && (
-              <>
-                <Picker
-                  label="Which method"
-                  width="fill"
-                  value={rule.firstFactorMethod ?? ''}
-                  placeholder="Choose a method"
-                  options={METHODS.map(methodOption)}
-                  onChange={(firstFactorMethod) => onPatch({ firstFactorMethod })}
-                />
-                {!rule.firstFactorMethod && (
-                  <p className="bb__diag is-error" role="alert">
-                    <XCircle size={13} strokeWidth={2} aria-hidden />
-                    <span>
-                      <b>No method chosen.</b> Choose a method or pick Password.
-                    </span>
-                  </p>
-                )}
-              </>
+            {/* Only reachable by a rule saved before the merge: no choice in the
+                picker above can leave Specific without a method. */}
+            {rule.firstFactor === 'Specific' && !rule.firstFactorMethod && (
+              <p className="bb__diag is-error" role="alert">
+                <XCircle size={13} strokeWidth={2} aria-hidden />
+                <span>
+                  <b>No method chosen.</b> Choose a method or pick Password.
+                </span>
+              </p>
             )}
           </div>
 
@@ -436,8 +430,15 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
   const invalid = days.trim() === '' || !validDays(typed)
   return (
     <div className="bb__after">
-      <Prop label="Remember this device">
-        <Toggle checked={rule.rememberMfa} onChange={(rememberMfa) => onPatch({ rememberMfa })} label="Remember this device" size="sm" />
+      {/* The live console's names for these three (owner, 21 Sep 2026: "use
+          this kind of naming"): Remember MFA, Force MFA on each login, Allow
+          end users to disable 2FA. They are also the model's own words —
+          `rememberMfa`, `forceMfaEachLogin`, `allowDisable2fa` — so an admin
+          who knows the console reads the setting they already know, and the
+          label and the field it writes finally say the same thing. Each
+          switch's accessible name is its visible label, word for word. */}
+      <Prop label="Remember MFA">
+        <Toggle checked={rule.rememberMfa} onChange={(rememberMfa) => onPatch({ rememberMfa })} label="Remember MFA" size="sm" />
       </Prop>
       {rule.rememberMfa && (
         <>
@@ -476,13 +477,13 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
               <span>Enter 1 to 365 days.</span>
             </p>
           )}
-          <Prop label="Force at every sign-in" indent>
-            <Toggle checked={rule.forceMfaEachLogin ?? false} onChange={(forceMfaEachLogin) => onPatch({ forceMfaEachLogin })} label="Force at every sign-in" size="sm" />
+          <Prop label="Force MFA on each login" indent>
+            <Toggle checked={rule.forceMfaEachLogin ?? false} onChange={(forceMfaEachLogin) => onPatch({ forceMfaEachLogin })} label="Force MFA on each login" size="sm" />
           </Prop>
         </>
       )}
-      <Prop label="Allow user opt-out">
-        <Toggle checked={rule.allowDisable2fa} onChange={(allowDisable2fa) => onPatch({ allowDisable2fa })} label="Let users disable their second factor" size="sm" />
+      <Prop label="Allow end users to disable 2FA">
+        <Toggle checked={rule.allowDisable2fa} onChange={(allowDisable2fa) => onPatch({ allowDisable2fa })} label="Allow end users to disable 2FA" size="sm" />
       </Prop>
       {rule.allowDisable2fa && (
         <p className="bb__diag is-warning">
@@ -490,12 +491,43 @@ function RememberBlock({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rul
               `> svg`, so a diagnostic without one renders as plain body text
               and the tone says nothing. */}
           <AlertTriangle size={13} strokeWidth={2} aria-hidden />
-          <span>
-            <b>Opt-outs leave coverage.</b> This rule stops applying to them.
-          </span>
+          <span>Users can opt out of their second factor.</span>
         </p>
       )}
     </div>
   )
 }
 
+
+/* --- What a denied user is told ---------------------------------------------------
+
+   The console's "Deny message" (owner, 21 Sep 2026), on the rule that denies.
+   Empty is the default, said under the label in full so nobody has to guess
+   what a blank field sends; typing replaces it. Written as typed, like the
+   rule's name, and an emptied field stores nothing rather than "". */
+function DenyMessage({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule>) => void }) {
+  const id = useId()
+  const value = rule.denyMessage ?? ''
+  return (
+    <div className="bb__thenfield bb__deny">
+      <label className="bb__thenlabel" htmlFor={id}>
+        Deny message
+      </label>
+      <p className="bb__denyhelp" id={`${id}-help`}>
+        What the user sees when this rule refuses them. <b>Default:</b> {DEFAULT_DENY_MESSAGE}
+      </p>
+      <textarea
+        id={id}
+        rows={3}
+        maxLength={DENY_MESSAGE_MAX}
+        value={value}
+        placeholder="Leave empty to use the default"
+        aria-describedby={`${id}-help ${id}-count`}
+        onChange={(e) => onPatch({ denyMessage: e.target.value === '' ? undefined : e.target.value })}
+      />
+      <span className="bb__denycount" id={`${id}-count`}>
+        {value.length}/{DENY_MESSAGE_MAX}
+      </span>
+    </div>
+  )
+}

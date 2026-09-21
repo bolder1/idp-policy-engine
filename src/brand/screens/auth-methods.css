@@ -763,15 +763,26 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
   letter-spacing: 0; color: var(--text-secondary);
 }
 
+/* The positive tint, not grey (owner, 21 Sep 2026: "make it a little
+   colourful"). Green because the colour has to MEAN something here: this is the
+   method that is on, and green is what every Active status in the console
+   already wears — so it reads as that at a glance, and as the opposite of the
+   amber "No active method" below it. Not orange, which is kept for the primary
+   action, and not blue, which the rebrand spends on selection. */
 .bmact__pill {
   display: inline-flex; align-items: center; gap: 7px;
   padding: 5px 11px; border-radius: var(--radius-md);
-  background: var(--surface-inset);
-  font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary);
+  background: var(--fb-positive-bg);
+  font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--fb-positive-fg);
   white-space: nowrap;
 }
-/* The method's own mark, at the size of the words beside it. */
+/* The method's own mark, at the size of the words beside it — and in the pill's
+   green, as a glyph rather than a tile. `.bv5__mico` (recovery.css) paints its
+   own grey glyph on a grey box with a hairline. On the old grey pill that box
+   was grey on grey and invisible; on green it would be a grey square sitting in
+   the pill. A vendor's logo keeps its white ground: a logo needs its own. */
 .bmact__pill .bv5__mico { flex: none; }
+.bmact__pill .bv5__mico:not(.bv5__mico--logo) { background: none; border: 0; color: inherit; }
 
 /* Nothing active is the opposite of this, not a quieter version of it. */
 .bmact__pill.is-none {

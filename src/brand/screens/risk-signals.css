@@ -372,3 +372,5 @@
 .brs__rowplats { flex: none; display: inline-flex; align-items: center; margin-left: var(--space-4); }
 /* The version switch, on the profile header's own row. */
 .brs__preview { margin-left: auto; }
+/* In the showcase build the switch is hidden, and Restore takes its place at the end of the row. */
+.brs__restore { margin-left: auto; }

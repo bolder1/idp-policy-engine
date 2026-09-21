@@ -128,6 +128,8 @@ export function BoardTour({
 }) {
   const reduce = useReducedMotion()
   const [i, setI] = useState(0)
+  /** The anchor the spotlight resolved to on its last measure — the alt or the main one. */
+  const [lit, setLit] = useState<string | undefined>(undefined)
   const [ruleId, setRuleId] = useState<string | null>(null)
   const [decisionAtStart, setDecisionAtStart] = useState<string | null>(null)
   const [rect, setRect] = useState<Rect | null>(null)
@@ -248,7 +250,13 @@ export function BoardTour({
       if (h > 0) setCardH((prev) => (Math.abs(prev - h) > 1 ? h : prev))
     }
 
-    const next = measureAnchor(stop.anchorAlt) ?? measureAnchor(stop.anchor)
+    const alt = measureAnchor(stop.anchorAlt)
+    const next = alt ?? measureAnchor(stop.anchor)
+    /* Which anchor is lit, so the description follows it. On an empty policy
+       step 1 lights the chooser; "Start from scratch" swaps that for the chain's
+       `+` without the step changing, and the `+` is the control that now needs
+       describing. */
+    setLit(alt ? stop.anchorAlt : stop.anchor)
     setRect((prev) => {
       if (prev === next) return prev
       if (!prev || !next) return next
@@ -282,8 +290,7 @@ export function BoardTour({
      a card that has gone. */
   useEffect(() => {
     if (!open) return
-    const name =
-      stop.anchorAlt && document.querySelector(`[data-tour="${stop.anchorAlt}"]`) ? stop.anchorAlt : stop.anchor
+    const name = lit
     if (!name) return
     const el = document.querySelector<HTMLElement>(`[data-tour="${name}"]`)
     if (!el) return
@@ -293,7 +300,7 @@ export function BoardTour({
       if (had) el.setAttribute('aria-describedby', had)
       else el.removeAttribute('aria-describedby')
     }
-  }, [open, stop.anchor, stop.anchorAlt])
+  }, [open, lit])
 
   /* --- The verbs ------------------------------------------------------------- */
 

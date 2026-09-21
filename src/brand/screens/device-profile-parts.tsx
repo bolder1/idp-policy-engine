@@ -816,7 +816,7 @@ export function ChosenList({
                   draft.mode === 'device' ? (
                     <TierPick
                       value={tierOf(draft.weights[a.id] ?? a.weight)}
-                      label={`${a.name} weight`}
+                      label={`${a.name} priority`}
                       onChange={(t) => onWeight(a.id, TIER_WEIGHT[t])}
                     />
                   ) : a.config ? (

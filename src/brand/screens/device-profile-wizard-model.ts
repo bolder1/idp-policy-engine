@@ -419,7 +419,9 @@ export function reviewSections(s: WizardState, step3: Step3Shape): ReviewSection
     summary: countLabel(d.mode, chosen.length),
     facts: chosen.map((a) => ({
       label: a.name,
-      value: d.mode === 'device' ? `${tierOf(d.weights[a.id] ?? a.weight)} weight` : checkValue(a, d.config[a.id]),
+      /* The tier alone: "Signals" heads the list, so "priority" on every row
+         was noise (owner, 21 Sep 2026). */
+      value: d.mode === 'device' ? tierOf(d.weights[a.id] ?? a.weight) : checkValue(a, d.config[a.id]),
       attr: a,
       pill: true as const,
     })),

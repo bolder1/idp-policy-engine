@@ -36,7 +36,7 @@ export const TYPE_NOTE: ProfileNote = {
   title: 'The two profile types',
   terms: [
     { term: 'Device health', note: 'Checks the OS, browser, integrity and app versions at every sign-in.' },
-    { term: 'Trusted device', note: 'Recognises a machine it has seen before, by weighted signals.' },
+    { term: 'Trusted device', note: 'Recognises a machine it has seen before, by prioritised signals.' },
   ],
   foot: 'The type can’t be changed once the profile is created.',
 }
@@ -66,9 +66,9 @@ export const SIGNALS_NOTE: ProfileNote = {
   title: 'How signals work',
   lines: ['What changed since the last sign-in adds up to a score, and the score picks the outcome.'],
   terms: [
-    { term: 'High weight', note: 'Rarely changes, so a change counts for a lot.' },
-    { term: 'Medium weight', note: 'Changes now and then.' },
-    { term: 'Low weight', note: 'Changes often, so it counts for little.' },
+    { term: 'High priority', note: 'Rarely changes, so a change counts for a lot.' },
+    { term: 'Medium priority', note: 'Changes now and then.' },
+    { term: 'Low priority', note: 'Changes often, so it counts for little.' },
   ],
   foot: 'Always-on signals can’t be removed.',
 }
@@ -84,12 +84,12 @@ export const itemsNote = (mode: ProfileMode): ProfileNote => (mode === 'os' ? CH
 export const RISK_SIGNALS_NOTE: ProfileNote = {
   title: 'How the score is made',
   lines: [
-    'Every signal that fires on a sign-in adds its weight to the score, and the score decides which band the sign-in lands in.',
+    'Every signal that fires on a sign-in adds to the score by its priority, and the score decides which band the sign-in lands in.',
   ],
   terms: [
-    { term: 'High weight', note: 'Decisive on its own — the device or its runtime is not trustworthy.' },
-    { term: 'Medium weight', note: 'Strong evidence, but not conclusive by itself.' },
-    { term: 'Low weight', note: 'Counts for a little; it takes several to move the score.' },
+    { term: 'High priority', note: 'Decisive on its own — the device or its runtime is not trustworthy.' },
+    { term: 'Medium priority', note: 'Strong evidence, but not conclusive by itself.' },
+    { term: 'Low priority', note: 'Counts for a little; it takes several to move the score.' },
   ],
   foot: 'A signal switched off is not collected at all. Only the mobile SDKs report these.',
 }

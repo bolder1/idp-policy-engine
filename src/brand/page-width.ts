@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
+import { SHOWCASE } from './showcase'
+
 /* -----------------------------------------------------------------------------
    How wide the library pages sit: compact or full.
 
@@ -32,7 +34,9 @@ export function readPageWidth(): PageWidth {
   }
 }
 
-let current: PageWidth = readPageWidth()
+/* The showcase build is always compact — the chosen width — and ignores what an
+   earlier visit stored (see showcase.ts). */
+let current: PageWidth = SHOWCASE ? 'compact' : readPageWidth()
 const listeners = new Set<() => void>()
 
 /** Sets the width for every library page, remembers it, and tells each switch. */

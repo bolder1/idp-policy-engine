@@ -26,17 +26,24 @@
 
    Measured values are in the `.bb__stage.is-wf` block in board.css.
 
+   CENTRED (owner, 21 Sep 2026: "take the classic view only and make it centre
+   aligned… might be the main view") is Classic with its axis moved to the
+   middle: the start pill sits over the centre of the cards, and the connector
+   and its `+` run down the middle of the column instead of the index rail.
+   Cards, chips and colours are Classic's own. It is first in the switch and
+   the default for anyone who has not picked one; a stored choice is kept.
+
    Remembered per viewer, the way the page width and the Rebrand switch are.
    Nothing about a policy depends on it.
    -------------------------------------------------------------------------- */
 
-export type BoardSkin = 'classic' | 'workflow'
+export type BoardSkin = 'centred' | 'classic' | 'workflow'
 
 export const BOARD_SKIN_KEY = 'idp.boardSkin'
 
-/** Only the exact stored value turns the new skin on; anything else is classic. */
+/** A stored skin is kept; anything else — nothing stored, or a value from an older build — is Centred. */
 export function parseBoardSkin(value: unknown): BoardSkin {
-  return value === 'workflow' ? 'workflow' : 'classic'
+  return value === 'workflow' || value === 'classic' ? value : 'centred'
 }
 
 export function readBoardSkin(): BoardSkin {
@@ -44,7 +51,7 @@ export function readBoardSkin(): BoardSkin {
     return parseBoardSkin(window.localStorage.getItem(BOARD_SKIN_KEY))
   } catch {
     /* No window (tests), a private window, or storage blocked by policy. */
-    return 'classic'
+    return 'centred'
   }
 }
 
@@ -57,6 +64,7 @@ export function writeBoardSkin(skin: BoardSkin): void {
 }
 
 export const BOARD_SKINS: { value: BoardSkin; label: string }[] = [
+  { value: 'centred', label: 'Centred' },
   { value: 'classic', label: 'Classic' },
   { value: 'workflow', label: 'Workflow' },
 ]

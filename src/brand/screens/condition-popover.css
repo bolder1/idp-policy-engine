@@ -148,17 +148,23 @@
    fourth group. */
 .cp__pickmark { display: grid; place-items: center; width: 15px; flex: none; color: var(--accent); }
 
+/* Under the list now, and only once a zone is chosen (21 Sep 2026). A rule
+   ABOVE it rather than below: it is the answer to a second question, asked
+   after the first — which zones — has been answered. */
 .cp__scope {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+.cp__scopelabel { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.cp__scopeopts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
-  /* A rule under it now that it opens the value menu rather than sitting in the
-     middle of a taller combined panel — it is a different question from "which
-     zones", and the two need telling apart. */
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--border-subtle);
 }
-.cp__scope > button {
+.cp__scopeopts > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -177,10 +183,10 @@
   overflow: hidden;
   cursor: pointer;
 }
-.cp__scope > button:hover { border-color: var(--border-strong); color: var(--text-primary); }
-.cp__scope > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.cp__scope > button.is-on { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
-.cp__scope > button svg { flex: none; }
+.cp__scopeopts > button:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.cp__scopeopts > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.cp__scopeopts > button.is-on { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
+.cp__scopeopts > button svg { flex: none; }
 
 .cp__search {
   display: flex;
@@ -491,26 +497,25 @@
    inside it — at a glance down a list, the box is what you see. */
 .cp__stack.is-unset { border-color: var(--fb-negative-border); }
 
-/* ONE row: attribute, operator, value, delete.
-
-   The widths are PROPORTIONAL, not equal, and that is the whole of what makes
-   three dropdowns in a row readable instead of cramped. Equal thirds gives the
-   operator — two words from a closed set — the same room as a zone name, so
-   the two halves that carry the information are the two that truncate.
-
-   The operator never shrinks below its content; the attribute and the value
-   share what is left, with the value taking slightly more because it is the
-   half that holds a library name. `min-width: 0` on both is what lets them
-   ellipsize instead of forcing the row wider than the panel. */
+/* ONE row: attribute, operator, value, delete. */
 .cp__stackrow {
   display: flex; align-items: stretch;
   min-width: 0;
 }
-.cp__stackrow > .cp__fld.is-what { flex: 1 1 34%; min-width: 0; }
-.cp__stackrow > .cp__fld.is-op { flex: 0 0 auto; width: auto; white-space: nowrap; }
-.cp__stackrow > .cp__fld.is-op .cp__fldtext { overflow: visible; }
-.cp__stackrow > .cp__fld.is-val { flex: 1 1 44%; min-width: 0; }
-.cp__stackrow > .cp__inline { flex: 1 1 44%; min-width: 0; padding: 0 var(--space-5); }
+/* FIXED widths for the first two, not proportions (owner, 21 Sep 2026: "matches,
+   in zone and between have three different widths — they don't want that; if
+   needed truncate the content"). The operator sized to its own words made
+   every row's columns start somewhere different, so a list of conditions read
+   as a ragged edge instead of three columns. Now the attribute and the
+   operator are the same width on every row and truncate; the value takes the
+   rest. They shrink together only when the panel is narrower than the three
+   can fit. */
+.cp__stackrow > .cp__fld.is-what { flex: 0 1 152px; min-width: 0; }
+/* The operator has no ground of its own in the row (owner, 21 Sep 2026): it
+   takes the same hover and open ground as its neighbours. */
+.cp__stackrow > .cp__fld.is-op { flex: 0 1 104px; min-width: 0; white-space: nowrap; background: none; }
+.cp__stackrow > .cp__fld.is-val { flex: 1 1 96px; min-width: 0; }
+.cp__stackrow > .cp__inline { flex: 1 1 96px; min-width: 0; padding: 0 var(--space-4); }
 
 /* A segment, not a field. No border, no radius, no ground of its own — the
    frame supplies all three. The hairline between segments is the only mark
@@ -733,3 +738,25 @@
   font-style: normal; font-size: var(--fs-xs); font-weight: var(--fw-medium);
   color: var(--text-tertiary); font-variant-numeric: tabular-nums;
 }
+
+/* A time window in the value column: the two times share it, and the native
+   clock glyph goes so the digits keep the room. The field still opens the
+   picker on click and takes typing. */
+.cp__stackrow > .cp__inline .cp__fldinput[type='time'] { min-width: 0; }
+.cp__stackrow > .cp__inline .cp__fldinput[type='time']::-webkit-calendar-picker-indicator { display: none; }
+
+/* --- The inspector's menus, as inline cards ---------------------------------------
+   Every menu in the panel is the "Add a condition" card: under the row, full
+   width, a titled head with a close, then the rows (see `Holder` in
+   ConditionPopover.tsx). The option rows take the catalogue's row shape — flat,
+   hairline between, 10px inset — so choosing an attribute, an operator or a
+   value looks like one list, not three kinds of menu. */
+.cp__inline-card { margin-top: var(--space-2); }
+.cp__inline-card .cp__list { padding: 0; max-height: 280px; }
+.cp__inline-card .cp__opt {
+  min-height: 0; padding: 9px 10px; gap: var(--space-3);
+  border-radius: 0; border-top: 1px solid var(--border-subtle);
+}
+.cp__inline-card .cp__list > :first-child .cp__opt,
+.cp__inline-card .cp__list > .cp__opt:first-child { border-top: 0; }
+.cp__inline-card .cp__text b { font-weight: var(--fw-medium); }

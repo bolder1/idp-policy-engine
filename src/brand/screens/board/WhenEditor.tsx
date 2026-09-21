@@ -48,9 +48,12 @@ export function WhenEditor({
   rule,
   onPatch,
   openAt,
+  onRemoved,
 }: {
   rule: Rule
   onPatch: (p: Partial<Rule>) => void
+  /** Said after a condition or group is removed — the host shows it with Undo. */
+  onRemoved?: (what: string) => void
   /* The section header's `+`, anchored. One group adds into it; several add
      a new one — the buttons inside the block are the explicit route. */
   openAt?: { nonce: number } | null
@@ -155,7 +158,13 @@ export function WhenEditor({
   /** What the opened list picks with: wherever it was opened for. */
   const add = (typeId: string) => addTo(adding?.cardId ?? 'loose', typeId)
 
-  const removeCondition = (conditionId: string) => write(ops.removeCondition(rule.when, conditionId))
+  /* Both removals say what went, so the host can offer it back (owner, 21 Sep
+     2026: a toast with Undo on every removal). */
+  const removeCondition = (conditionId: string) => {
+    const gone = cards.flatMap((k) => k.conditions).find((c) => c.id === conditionId)
+    write(ops.removeCondition(rule.when, conditionId))
+    onRemoved?.(gone ? `${conditionType(gone.typeId).label} condition removed` : 'Condition removed')
+  }
   const patchCondition = (conditionId: string, next: Partial<Condition>) => write(ops.patchCondition(rule.when, conditionId, next))
   /* "Move into a group of its own" now makes a GROUP.
 
@@ -176,7 +185,12 @@ export function WhenEditor({
      made it, and it means one thing wherever it is pressed. The conditions stay
      where they are in reading order and join the bracket around them. */
   const ungroup = (id: string) => restructure(ops.setGrouped(rule.when, id, false))
-  const removeGroup = (id: string) => restructure(ops.removeBranch(rule.when, id))
+  const removeGroup = (id: string) => {
+    const at = cards.findIndex((k) => k.id === id)
+    const k = cards[at]
+    restructure(ops.removeBranch(rule.when, id))
+    onRemoved?.(`${k?.label?.trim() || `Group ${cardLetter(Math.max(at, 0))}`} removed`)
+  }
   /* Not `addBranch`. That wrote an empty group into the rule immediately, and
      an empty group matches every sign-in — the pane then had to apologise for
      it in a sentence while the linter flagged it. The group is pending instead,
@@ -832,8 +846,8 @@ function ConditionRow({
           onFooter={onFooter}
         />
         {dupe && (
-          <span className="bb__ifdupe" title="This exact condition is also in another branch" aria-label="Also in another branch">
-            ·2
+          <span className="bb__ifdupe" title="This exact condition is also in another branch">
+            Also in another branch of this rule
           </span>
         )}
       </span>

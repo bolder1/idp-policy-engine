@@ -6,6 +6,7 @@ import { ProfileMenu } from './ProfileMenu'
 import { Picker } from './picker'
 import { useBrand, type BrandScreen } from './store'
 import { useTheme } from './theme-mode'
+import { SHOWCASE } from './showcase'
 
 /* -----------------------------------------------------------------------------
    The end-user site's chrome, which is the admin console's minus almost all of
@@ -79,11 +80,14 @@ export function UserShell({ children }: { children: ReactNode }) {
               onChange={setLang}
             />
           </label>
-          <Tip text={`Switch to ${next} theme`}>
-            <button type="button" className="bshell__icon" onClick={() => setTheme(next)} aria-label={`Switch to ${next} theme`}>
-              {theme === 'light' ? <Moon size={20} strokeWidth={1.7} /> : <Sun size={20} strokeWidth={1.7} />}
-            </button>
-          </Tip>
+          {/* Light only in the showcase build — see theme-mode.ts. */}
+          {!SHOWCASE && (
+            <Tip text={`Switch to ${next} theme`}>
+              <button type="button" className="bshell__icon" onClick={() => setTheme(next)} aria-label={`Switch to ${next} theme`}>
+                {theme === 'light' ? <Moon size={20} strokeWidth={1.7} /> : <Sun size={20} strokeWidth={1.7} />}
+              </button>
+            </Tip>
+          )}
           <ProfileMenu />
         </div>
       </header>

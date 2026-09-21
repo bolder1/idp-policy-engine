@@ -398,10 +398,14 @@ export function conditionType(id: string): ConditionType {
    default would light the save bar on every rule anybody opened. */
 export type ZoneScope = 'ip' | 'location'
 
+/* The choice's own words, under a "Match on" label (21 Sep 2026). They were
+   "IP networks only" and "Locations only" — word for word what the zone rows in
+   the same menu said about each zone's CONTENTS ("Office Network · IP networks
+   only"), so a setting of the condition read as one more zone in the list. */
 export const ZONE_SCOPE_LABEL: Record<'both' | ZoneScope, string> = {
-  both: 'IP and location',
-  ip: 'IP networks only',
-  location: 'Locations only',
+  both: 'Both',
+  ip: 'IP',
+  location: 'Location',
 }
 
 /** A single predicate. `values: []` means UNSET — a first-class, diagnosable state. */
@@ -528,6 +532,11 @@ export const DECISION_LABEL: Record<AccessDecision, string> = {
   '2fa': '2 factors',
 }
 
+/** What a denied user sees when the rule sets no message of its own. */
+export const DEFAULT_DENY_MESSAGE = 'You are not permitted to log in. Please contact your administrator.'
+/** The longest deny message the console accepts. */
+export const DENY_MESSAGE_MAX = 200
+
 export interface Rule {
   id: string
   name: string
@@ -579,6 +588,11 @@ export interface Rule {
   /** Prompt for MFA every login even on a remembered device. */
   forceMfaEachLogin?: boolean
   allowDisable2fa: boolean
+  /* What the user is told when this rule denies them (owner, 21 Sep 2026 — the
+     console's "Deny message"). ABSENT means the default, DEFAULT_DENY_MESSAGE;
+     an empty string is never stored. Kept while the rule is an Allow, so
+     switching back to Deny brings the message back. */
+  denyMessage?: string
   /** Rough population the rule matches — shown live while editing. */
   matchEstimate: number
 }

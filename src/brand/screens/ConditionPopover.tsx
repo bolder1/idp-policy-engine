@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import {
   ArrowLeftRight,
@@ -243,7 +243,7 @@ const CHIP_GAP = 4
 function ValueChips({ names, keys }: { names: string[]; keys: string[] }) {
   const row = useRef<HTMLSpanElement | null>(null)
   const ruler = useRef<HTMLSpanElement | null>(null)
-  const shown = useFitCount(row, ruler, names.length, keys.join(' '))
+  const shown = useFitCount(row, ruler, names.length, keys.join('\u0000'))
   const rest = names.length - shown
   /* Keyed by the VALUE, not by the name. Two groups can be called the same
      thing, and the id is what the row is actually about. */
@@ -377,7 +377,10 @@ export function ConditionPopover({
 
   /* Which half of a zone, when it is narrower than the zone as written. Absent
      for "both", because that is what the zone means already. */
-  const scopeTag = c.scope ? <i className="cp__scopetag">{c.scope === 'ip' ? 'network' : 'map'}</i> : null
+  /* Only when narrowed: "Both" is the zone as written, and says nothing a chip
+     needs to repeat. "IP only" rather than the menu's bare "IP" — on a chip it
+     stands alone, and "only" is what says it is a narrowing. */
+  const scopeTag = c.scope ? <i className="cp__scopetag">{c.scope === 'ip' ? 'IP only' : 'Location only'}</i> : null
 
   /* A window and a threshold are TYPED, not chosen from a list, and stacked
      there is room to type them where they belong. The pill has to send them to
@@ -597,12 +600,10 @@ export function ConditionPopover({
       {triggers}
 
       {open && !(stacked && open === 'val' && typedValue) && (
-        <Pop
+        <Holder
+          stacked={stacked}
+          title={open === 'what' ? 'Change what is checked' : open === 'op' ? `How ${t.label} is compared` : t.label}
           anchor={anchorFor[open]}
-          /* Beside the panel in the stacked layout, which is the inspector's.
-             A 340px pane cannot host a menu under a row without hiding every
-             row below it — including the one being edited. */
-          beside={stacked}
           onClose={() => {
             setOpen(null)
             anchorFor[open].current?.focus()
@@ -698,9 +699,105 @@ export function ConditionPopover({
               close={close}
             />
           )}
-        </Pop>
+        </Holder>
       )}
     </>
+  )
+}
+
+/* --- Where a menu opens ----------------------------------------------------------
+
+   In the inspector (`stacked`), every menu opens the SAME way and in the SAME
+   place: a card directly under the condition, in the flow, with a titled head
+   and a close — the shape "Add a condition" already had (owner, 21 Sep 2026:
+   "when I add a condition it's a different position, a different view, and
+   three different positions — that breaks the experience").
+
+   It used to be three answers to one gesture. Adding opened that inline card;
+   the attribute, operator and value menus opened as floating panels to the
+   LEFT of the inspector, over the canvas, each lined up with its own segment —
+   so they started at three different x positions, at three widths, one with a
+   head and two without. The argument for "beside" was that a menu under a row
+   in a 340px pane hides the rows below it. In the flow it hides nothing: the
+   rows below move down, and come back when it closes.
+
+   The pill (the card on the canvas) keeps the anchored `Pop`. */
+function Holder({
+  stacked,
+  title,
+  anchor,
+  onClose,
+  watch,
+  children,
+}: {
+  stacked?: boolean
+  title: string
+  anchor: RefObject<HTMLButtonElement | null>
+  onClose: () => void
+  watch: string
+  children: ReactNode
+}) {
+  if (!stacked) {
+    return (
+      <Pop anchor={anchor} onClose={onClose} watch={watch}>
+        {children}
+      </Pop>
+    )
+  }
+  return (
+    <InlineCard title={title} anchor={anchor} onClose={onClose}>
+      {children}
+    </InlineCard>
+  )
+}
+
+function InlineCard({
+  title,
+  anchor,
+  onClose,
+  children,
+}: {
+  title: string
+  anchor: RefObject<HTMLButtonElement | null>
+  onClose: () => void
+  children: ReactNode
+}) {
+  const box = useRef<HTMLDivElement | null>(null)
+  /* Brought into view inside the panel's own scroller — the only thing that
+     moves is the panel you are already in. */
+  useLayoutEffect(() => {
+    box.current?.scrollIntoView({ block: 'nearest' })
+  }, [])
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const n = e.target as Node
+      if (anchor.current?.contains(n) || box.current?.contains(n)) return
+      onClose()
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [anchor, onClose])
+  return (
+    <div
+      ref={box}
+      className="cp__cat cp__inline-card"
+      role="dialog"
+      aria-label={title}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation()
+          onClose()
+        }
+      }}
+    >
+      <p className="cp__cathead">
+        <span>{title}</span>
+        <button type="button" className="cp__catx" onClick={onClose} aria-label="Close">
+          <X size={13} strokeWidth={2.2} />
+        </button>
+      </p>
+      {children}
+    </div>
   )
 }
 
@@ -757,24 +854,15 @@ function Pop({
   anchor,
   onClose,
   watch,
-  beside,
   children,
 }: {
   anchor: RefObject<HTMLButtonElement | null>
   onClose: () => void
   /** Anything that changes the panel's size, so it re-measures. */
   watch: string
-  /* Open to the LEFT of the anchor rather than under it.
-
-     For the inspector, and it is the fix to a real complaint: that panel is
-     340px wide, so a menu opening underneath a row covers every row below it —
-     the condition you are editing disappears behind the list you are editing it
-     with. Beside the panel it lands over the canvas, which is empty space, and
-     the row stays visible while you pick.
-
-     Falls back to below when there is not room, so a narrow window degrades to
-     the old behaviour rather than clipping. */
-  beside?: boolean
+  /* `beside` stood here — open to the LEFT of the anchor, for the inspector.
+     The inspector's menus are inline cards now (see `Holder`), so this panel
+     only ever opens under or over the pill it belongs to. */
   children: ReactNode
 }) {
   const pop = useRef<HTMLDivElement | null>(null)
@@ -804,31 +892,13 @@ function Pop({
     const room = (up ? above : below) - GAP - MARGIN
     const maxH = Math.max(200, room)
 
-    /* Beside, when it was asked for and there is room for it.
-
-       `shown + GAP + MARGIN` is the test rather than a guessed breakpoint: the
-       question is literally whether this panel fits between the anchor and the
-       left edge, and nothing else about the window matters. Vertically it is
-       TOP-aligned to the anchor and then clamped, so the row you pressed and
-       the list you are picking from start on the same line. */
-    if (beside && a.left - GAP - MARGIN >= shown) {
-      const height = Math.min(h || maxH, window.innerHeight - MARGIN * 2)
-      setPos({
-        top: Math.max(MARGIN, Math.min(a.top, window.innerHeight - height - MARGIN)),
-        left: a.left - shown - GAP,
-        width: w,
-        maxH: window.innerHeight - MARGIN * 2,
-      })
-      return
-    }
-
     setPos({
       top: up ? Math.max(MARGIN, a.top - Math.min(h, maxH) - GAP) : a.bottom + GAP,
       left: Math.max(MARGIN, Math.min(a.left, window.innerWidth - shown - MARGIN)),
       width: w,
       maxH,
     })
-  }, [anchor, beside])
+  }, [anchor])
 
   // Before paint, so the panel is never seen at its unplaced position.
   useLayoutEffect(place, [place, watch])
@@ -1127,6 +1197,7 @@ function ValueBody({
      not an empty library, and "No hooks yet" would be wrong about it. */
   const hookCount = useBrand().hooks.length
   const [q, setQ] = useState('')
+  const scopeLabelId = useId()
   const search = useRef<HTMLInputElement | null>(null)
   const armed = useRef(false)
   const take = (el: HTMLInputElement | null) => {
@@ -1201,39 +1272,10 @@ function ValueBody({
 
   return (
     <>
-      {/* A zone's two halves. A property of the CONDITION, not of any one zone,
-          so it is asked once above the list rather than once per row with no way
-          to answer it once. */}
-      {t.valueKind === 'zone' && (
-        <div className="cp__scope" role="radiogroup" aria-label="Which half of the zone to match on">
-          {SCOPES.map((s, i) => {
-            const on = s.id === (c.scope ?? 'both')
-            const Ico = s.icon
-            return (
-              <button
-                key={s.id}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                tabIndex={on ? 0 : -1}
-                className={on ? 'is-on' : ''}
-                title={s.hint}
-                onClick={() => onScope(s.id)}
-                onKeyDown={(e) => {
-                  const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
-                  if (!d) return
-                  e.preventDefault()
-                  onScope(SCOPES[(i + d + SCOPES.length) % SCOPES.length].id)
-                }}
-              >
-                <Ico size={13} strokeWidth={2} aria-hidden />
-                {ZONE_SCOPE_LABEL[s.id]}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
+      {/* The same menu every other value has — search, then the list. The zone's
+          halves used to be asked ABOVE the list, before anything was chosen,
+          where a setting of the condition read as a filter on which zones to
+          show. It is asked below now, once there is a zone to ask it about. */}
       <SearchField value={q} onChange={setQ} label={`Search ${t.label}`} inputRef={search} />
       <List
         items={shown}
@@ -1253,6 +1295,48 @@ function ValueBody({
           if (single) close()
         }}
       />
+
+      {/* Which half of the chosen zones to test — after the choosing, and only
+          once something is chosen: until then there is no zone to take the IP
+          or the location FROM. One answer for the condition, not one per zone,
+          because the same "Reliance Jio · India" is asked about as a network by
+          one rule and as a place by another (see `Condition.scope`). Both is
+          the default and is stored as nothing, so opening a rule never marks it
+          changed. */}
+      {t.valueKind === 'zone' && values.length > 0 && (
+        <div className="cp__scope">
+          <span className="cp__scopelabel" id={scopeLabelId}>
+            Match on
+          </span>
+          <div className="cp__scopeopts" role="radiogroup" aria-labelledby={scopeLabelId}>
+            {SCOPES.map((s, i) => {
+              const on = s.id === (c.scope ?? 'both')
+              const Ico = s.icon
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  tabIndex={on ? 0 : -1}
+                  className={on ? 'is-on' : ''}
+                  title={s.hint}
+                  onClick={() => onScope(s.id)}
+                  onKeyDown={(e) => {
+                    const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
+                    if (!d) return
+                    e.preventDefault()
+                    onScope(SCOPES[(i + d + SCOPES.length) % SCOPES.length].id)
+                  }}
+                >
+                  <Ico size={13} strokeWidth={2} aria-hidden />
+                  {ZONE_SCOPE_LABEL[s.id]}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* The footer only. No "3 of 24" beside it: the rows are the count. */}
       {footer && (
@@ -1321,11 +1405,14 @@ export function valueSource(
     const kind = t.valueKind
     const options: ValueOption[] =
       kind === 'zone'
-        ? store.zones.map((z) => ({
+        ? /* One line under the name, as a device profile has — what the zone
+             holds. "Used by 6 rules" came off: it was a second line only zones
+             carried, it answers a question about the zone rather than about this
+             rule, and it made this the one value menu that read differently. */
+          store.zones.map((z) => ({
             value: z.id,
             label: z.name,
             meta: zoneShape(z),
-            note: z.usedIn ? `Used by ${z.usedIn} rule${z.usedIn === 1 ? '' : 's'}` : undefined,
             icon: Globe,
           }))
         : kind === 'fingerprint'

@@ -3,6 +3,7 @@ import { Check, Download, Eye, EyeOff, FileText, KeyRound, Plus, Upload, Users }
 
 import { Button, Callout, Modal, NumberStepper, SearchBox, TipDot } from '../kit'
 import { Picker } from '../picker'
+import { initials } from '../data'
 import { EmptyState, NoMatches } from '../empty'
 import {
   ASSIGNMENT_CSV_HEADER,
@@ -261,6 +262,13 @@ export function AssignForm({
         value: u.id,
         label: u.name,
         meta: [u.email, heldLabel(tokensOf(tokens, u.id).length)].filter(Boolean).join(', '),
+        /* A face for a person: a list of fifty-eight names reads faster with a
+           mark to scan down, and the trigger keeps it once one is chosen. */
+        art: (
+          <span className="bx-avatar" aria-hidden>
+            {initials(u.name)}
+          </span>
+        ),
       })),
     [users, tokens],
   )
@@ -297,7 +305,7 @@ export function AssignForm({
       <Callout tone="info">
         <ul className="bdt__rules">
           <li>Every token you pick goes to the person you choose.</li>
-          <li>Only tokens added on Token management are listed.</li>
+          <li>Only tokens added under Manage tokens are listed.</li>
           <li>Tokens the person already holds are skipped.</li>
         </ul>
       </Callout>

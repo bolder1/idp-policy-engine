@@ -88,10 +88,14 @@ import './brand/rebrand/trail-builder.css'
 import './brand/rebrand/board.css'
 import './brand/rebrand/create.css'
 import { applyBrand, readBrand } from './brand/brand-mode'
+import { SHOWCASE } from './brand/showcase'
 
 /* Before the first paint, so a reload in the rebrand does not flash the current
-   look for a frame. */
-applyBrand(readBrand())
+   look for a frame. The showcase build is always the rebrand — the chosen look —
+   whatever an earlier visit stored, and it sets the attribute directly rather
+   than through `applyBrand`, so it does not overwrite that stored choice. */
+if (SHOWCASE) document.documentElement.setAttribute('data-brand', 'rebrand')
+else applyBrand(readBrand())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

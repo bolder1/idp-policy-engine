@@ -333,6 +333,47 @@ html[data-theme='dark'] {
 }
 .bx-tipdot:hover { border-color: var(--border-strong); color: var(--text-secondary); }
 
+/* --- A person's mark -----------------------------------------------------------
+
+   Two initials on a neutral disc (21 Sep 2026, first on the Display tokens
+   person picker, where it rides in `Picker`'s `art` slot — beside every row
+   and on the trigger once someone is chosen).
+
+   Neutral in BOTH looks, on purpose. The audience drawer's `.baud__avatar`
+   draws in `--accent`, which the rebrand turns blue; these are the tokens that
+   stay grey in either — and in the current look they are the very same
+   #eef1f4 and slate that one already shows, so the two read as one mark. */
+.bx-avatar {
+  display: grid; place-items: center; flex: none;
+  width: 26px; height: 26px; border-radius: var(--radius-full);
+  background: var(--surface-inset); color: var(--text-secondary);
+  font-size: 11px; font-weight: var(--fw-semibold); line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+/* --- Faces (faces.tsx) ------------------------------------------------------
+   A person is a circle, a group a rounded square; initials on the inset grey.
+   The 2px ring in the surface colour is what lets a stack overlap and still
+   read as separate faces. */
+.bx-face {
+  display: inline-grid; place-items: center; flex: none;
+  background: var(--surface-inset); color: var(--text-secondary);
+  font-weight: var(--fw-semibold); line-height: 1; letter-spacing: 0.02em;
+  box-shadow: 0 0 0 2px var(--surface-raised);
+}
+.bx-face.is-sm { width: 22px; height: 22px; font-size: 9px; }
+.bx-face.is-md { width: 26px; height: 26px; font-size: 10px; }
+.bx-face.is-user { border-radius: var(--radius-full); }
+.bx-face.is-group { border-radius: 6px; }
+.bx-face.is-more {
+  width: auto; min-width: 22px; padding: 0 5px; border-radius: var(--radius-full);
+  background: var(--surface-raised); color: var(--text-tertiary);
+  box-shadow: 0 0 0 2px var(--surface-raised), inset 0 0 0 1px var(--border-default);
+  font-variant-numeric: tabular-nums;
+}
+.bx-faces { display: inline-flex; align-items: center; }
+.bx-faces > .bx-tip + .bx-tip { margin-left: -5px; }
+
 /* --- Search --------------------------------------------------------------- */
 
 /* The box is the label; the input inside it is bare.
@@ -947,7 +988,10 @@ html[data-theme='dark'] {
 .bx-savebar__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .bx-savebar__text strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bx-savebar__text span {
-  font-size: var(--fs-sm); color: var(--text-tertiary);
+  /* The SaveBar's only line now, so it reads at body size rather than as a
+     caption under a heading that has gone. The device-profile wizard still
+     puts a heading over it — see `.bdpw__foot`. */
+  font-size: var(--fs-md); color: var(--text-secondary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* Why Save is off. Notice, not red: nothing is being destroyed. It wraps rather
@@ -1227,40 +1271,95 @@ html[data-theme='dark'] {
   flex: none;
 }
 
-/* The one delete confirmation (screens/confirm-delete.tsx). */
-.bx-confirm { display: flex; flex-direction: column; gap: var(--space-4); }
+/* --- The one delete confirmation (screens/confirm-delete.tsx) ------------------
+
+   A hard delete, laid out as the decision it is: it is permanent (the callout),
+   what it does to the policies that use it (a section each), and — only when
+   live sign-ins change — DELETE typed to confirm. The gaps between those three are
+   the widest in the dialog, because they are three separate things to weigh;
+   inside a section everything is close, because it is one thing. */
+.bx-confirm { display: flex; flex-direction: column; gap: var(--space-6); }
 .bx-confirm p { margin: 0; font-size: var(--fs-md); line-height: 1.5; color: var(--text-secondary); }
+
+.bx-confirm__sec { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+/* The consequence, in one line: the loudest words after the title. */
+.bx-confirm__sec > h3 {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+/* The policies, as a list you can act on. One edge for the whole list and a
+   hairline between rows — the library lists' shape — and a ceiling, so a
+   profile used by twenty policies scrolls inside the dialog instead of pushing
+   Delete off the bottom of the window. */
 .bx-confirm__uses {
   display: flex;
   flex-direction: column;
+  max-height: 264px;
+  overflow-y: auto;
   margin: 0;
   padding: 0;
   list-style: none;
-  border-top: 1px solid var(--border-subtle);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-md);
 }
-.bx-confirm__uses li {
+.bx-confirm__use {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  padding-block: var(--space-3);
-  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  transition: background var(--dur-fast) var(--ease-standard);
 }
+.bx-confirm__use:last-child { border-bottom: 0; }
+.bx-confirm__use:hover { background: var(--surface-sunken); }
+/* Focus on the ROW, because the row is what pressing the name opens — the
+   same rule `.blist__row` follows. */
+.bx-confirm__use:has(.bx-confirm__policy:focus-visible) { box-shadow: inset 0 0 0 2px var(--focus-ring); }
+
+/* The name line is the button, and its `::after` stretches the press over the
+   whole row, rule line included: a chevron promises the row opens something,
+   so the row has to. */
 .bx-confirm__policy {
-  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
   padding: 0;
   border: 0;
   background: none;
   font: inherit;
   font-size: var(--fs-md);
   font-weight: var(--fw-medium);
-  color: var(--text-link);
+  text-align: left;
+  color: var(--text-primary);
   cursor: pointer;
 }
-.bx-confirm__policy:hover { text-decoration: underline; }
-.bx-confirm__policy:focus-visible { outline: 2px solid var(--focus-ring, var(--text-link)); outline-offset: 2px; }
-.bx-confirm__policy, .bx-confirm__rules { overflow-wrap: anywhere; }
-.bx-confirm__rules { font-size: var(--fs-sm); color: var(--text-muted); }
-.bx-confirm__uses li > .bx-badge { align-self: flex-start; }
+/* Scoped to a positioned row: unscoped, a list without `.bx-confirm__use` let
+   the stretch reach the dialog itself and swallow every click in it. The row
+   draws the focus ring, so the button draws none. */
+.bx-confirm__use > .bx-confirm__policy::after { content: ''; position: absolute; inset: 0; }
+.bx-confirm__use > .bx-confirm__policy:focus-visible { outline: none; box-shadow: none; }
+.bx-confirm__name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.bx-confirm__use:hover .bx-confirm__name { color: var(--text-link); }
+.bx-confirm__go { flex: none; margin-left: auto; color: var(--text-muted); }
+.bx-confirm__rules { font-size: var(--fs-sm); color: var(--text-muted); overflow-wrap: anywhere; }
+
+/* DELETE typed to confirm. The word is set apart in the label so there is no
+   doubt what to type. */
+.bx-confirm__type { display: flex; flex-direction: column; gap: var(--space-2); }
+.bx-confirm__type label { font-size: var(--fs-md); color: var(--text-secondary); }
+.bx-confirm__type strong { font-weight: var(--fw-semibold); color: var(--text-primary); overflow-wrap: anywhere; }
+.bx-confirm__type input { width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bx-confirm__use { transition: none; }
+}
 
 /* --- Review changes (kit ReviewChanges) --------------------------------------------
 

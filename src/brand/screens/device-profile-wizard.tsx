@@ -318,7 +318,7 @@ export function DeviceProfileWizard({
               text={
                 s.mode === 'os'
                   ? 'A device must pass every check you tick. Tick a check to set its value.'
-                  : 'What changed since the last sign-in adds up to a score. Tick a signal to set its weight.'
+                  : 'What changed since the last sign-in adds up to a score. Tick a signal to set its priority.'
               }
             />
           </header>
@@ -346,7 +346,7 @@ export function DeviceProfileWizard({
               text={
                 s.mode === 'os'
                   ? 'A device must pass every check you choose. You set each one on the next step.'
-                  : 'What changed since the last sign-in adds up to a score. You set each signal’s weight on the next step.'
+                  : 'What changed since the last sign-in adds up to a score. You set each signal’s priority on the next step.'
               }
             />
           </header>
@@ -737,7 +737,7 @@ function InlineRow({
     mode === 'device' ? (
       <TierPick
         value={tierOf(weights[attr.id] ?? attr.weight)}
-        label={`${attr.name} weight`}
+        label={`${attr.name} priority`}
         onChange={(t) => onWeight(attr.id, TIER_WEIGHT[t])}
       />
     ) : attr.config ? (

@@ -61,6 +61,7 @@ import { AppSetupCard, NpsSetupCard } from './setup-card'
 import { useLeaveGuard } from '../leave-guard'
 import { compactClass, usePageWidth } from '../page-width'
 import { WidthSwitch } from './page-bar'
+import { SHOWCASE } from '../showcase'
 
 /* -----------------------------------------------------------------------------
    Authentication methods · final.
@@ -254,7 +255,9 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
      the mark changes — it keeps the row's right edge either way. See
      `gearRows` below. Deliberately not persisted: it is a comparison being
      made now, not a preference. */
-  const [gearEnds, setGearEnds] = useState(false)
+  /* On in the showcase build — the owner's pick ("by default, gear on settings
+     rows") — with the comparison switch hidden (see showcase.ts). */
+  const [gearEnds, setGearEnds] = useState(SHOWCASE)
 
   /* Arriving by a link that unmounted with its page — the Display tokens back
      link, above all — focus is on <body>. It goes to the Hardware Token row
@@ -527,20 +530,22 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
 
         {/* The preview switches, together against the right edge — the same
             slot `PageHead` gives the other library pages. */}
-        <div className="bpage__preview">
-          {/* The comparison switch. A person's page never shows it: their rows
-              all open onto an enrolment form and none carries a switch. */}
-          {!isUser && gearRows.length > 0 && (
-            <div className="bm8__variant">
-              <Toggle size="sm" checked={gearEnds} onChange={setGearEnds} label="Gear on settings rows" />
-              <span>
-                Gear on settings rows
-                <i>{gearRows.join(', ')}</i>
-              </span>
-            </div>
-          )}
-          <WidthSwitch />
-        </div>
+        {!SHOWCASE && (
+          <div className="bpage__preview">
+            {/* The comparison switch. A person's page never shows it: their rows
+                all open onto an enrolment form and none carries a switch. */}
+            {!isUser && gearRows.length > 0 && (
+              <div className="bm8__variant">
+                <Toggle size="sm" checked={gearEnds} onChange={setGearEnds} label="Gear on settings rows" />
+                <span>
+                  Gear on settings rows
+                  <i>{gearRows.join(', ')}</i>
+                </span>
+              </div>
+            )}
+            <WidthSwitch />
+          </div>
+        )}
       </header>
 
       {/* Recovery is a tenant policy rather than a personal setting, so a person

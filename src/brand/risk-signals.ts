@@ -509,10 +509,10 @@ export function riskReviewRows(saved: RiskProfile, draft: RiskProfile): RiskRevi
     const now = tierFor(draft, s)
     if (was !== now) {
       rows.push({
-        label: `Weight: ${s.name}`,
+        label: `Priority: ${s.name}`,
         before: was,
         after: now,
-        group: 'Weights',
+        group: 'Priorities',
         kind: 'changed',
         item: s.name,
       })
@@ -526,6 +526,6 @@ export function riskChangeNames(saved: RiskProfile, draft: RiskProfile): string[
   const names: string[] = []
   if (saved.name.trim() !== draft.name.trim()) names.push('Name')
   if (RISK_SIGNALS.some((s) => isOn(saved, s.id) !== isOn(draft, s.id))) names.push('Signals')
-  if (RISK_SIGNALS.some((s) => tierFor(saved, s) !== tierFor(draft, s))) names.push('Weights')
+  if (RISK_SIGNALS.some((s) => tierFor(saved, s) !== tierFor(draft, s))) names.push('Priorities')
   return names
 }

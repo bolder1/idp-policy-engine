@@ -135,6 +135,7 @@ export function describeChanges(
 
 
     if (factorKey(before) !== factorKey(r)) out.push(`Authentication settings changed on “${r.name}”`)
+    if ((before.denyMessage ?? '') !== (r.denyMessage ?? '')) out.push(`Deny message changed on “${r.name}”`)
   })
 
   /* The last rule decides every sign-in no rule above catches, so a change to it
@@ -144,6 +145,7 @@ export function describeChanges(
   if (fbBefore.decision !== fbAfter.decision)
     out.push(`“${FALLBACK_NAME}” now ${DECISION_LABEL[fbAfter.decision]} instead of ${DECISION_LABEL[fbBefore.decision]}`)
   else if (factorKey(fbBefore) !== factorKey(fbAfter)) out.push(`Authentication settings changed on “${FALLBACK_NAME}”`)
+  if ((fbBefore.denyMessage ?? '') !== (fbAfter.denyMessage ?? '')) out.push(`Deny message changed on “${FALLBACK_NAME}”`)
 
   /* Named, not counted. "Now applies to 1 app" was true and useless; which
      applications a policy gained or lost is the whole of what changed — and

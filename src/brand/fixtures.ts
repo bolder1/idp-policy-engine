@@ -366,7 +366,7 @@ export function fingerprintsAt(depth: Depth): FingerprintProfile[] {
    decision — one that listens to less, one that listens to the same things and
    pushes harder — rather than two arbitrary tunings. */
 const seedRiskProfiles: RiskProfile[] = [
-  { id: 'rp-shipped', name: 'Shipped weighting', off: [], tiers: {} },
+  { id: 'rp-shipped', name: 'Shipped priorities', off: [], tiers: {} },
   {
     /* Network origin off. The tenant's workforce is remote and half of them are
        on a corporate VPN, so `vpn` and `datacenter` fire on people doing exactly

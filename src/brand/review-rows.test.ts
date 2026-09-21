@@ -22,20 +22,20 @@ describe('review rows', () => {
   it('groups by section in first-seen order, general first and consequences last', () => {
     const rows: ReviewLine[] = [
       { label: 'Low risk score', before: '13', after: '12', effect: true },
-      { label: 'Weight: VPN on iOS', before: 'Low', after: 'High', group: 'Weights' },
+      { label: 'Priority: VPN on iOS', before: 'Low', after: 'High', group: 'Priorities' },
       { label: 'Signal: VPN', before: 'Off', after: 'On', group: 'Signals' },
       { label: 'Name', before: 'A', after: 'B' },
-      { label: 'Weight: Tor on iOS', before: 'Low', after: 'High', group: 'Weights' },
+      { label: 'Priority: Tor on iOS', before: 'Low', after: 'High', group: 'Priorities' },
     ]
     const groups = groupReview(rows)
-    expect(groups.map((g) => g.title)).toEqual([GENERAL_GROUP, 'Weights', 'Signals', EFFECT_GROUP])
+    expect(groups.map((g) => g.title)).toEqual([GENERAL_GROUP, 'Priorities', 'Signals', EFFECT_GROUP])
     // Consequences that share a section are titled by it.
     const scored = groupReview([
       { label: 'Low risk score', before: '13', after: '12', effect: true, group: 'Risk scores' },
       { label: 'High risk score', before: '90', after: '80', effect: true, group: 'Risk scores' },
     ])
     expect(scored.map((g) => [g.title, g.effect])).toEqual([['Risk scores', true]])
-    expect(groups[1].rows.map((r) => r.label)).toEqual(['Weight: VPN on iOS', 'Weight: Tor on iOS'])
+    expect(groups[1].rows.map((r) => r.label)).toEqual(['Priority: VPN on iOS', 'Priority: Tor on iOS'])
     expect(groups.at(-1)?.effect).toBe(true)
     expect(groups.flatMap((g) => g.rows)).toHaveLength(rows.length)
     expect(groupReview([])).toEqual([])
@@ -44,10 +44,10 @@ describe('review rows', () => {
   it('groups by section, and by kind inside each one', () => {
     const rows: ReviewLine[] = [
       { label: 'Status', before: 'Active', after: 'Draft', kind: 'changed', effect: true },
-      { label: 'MAC address weight', before: 'High weight', after: 'Low weight', group: 'Signals', kind: 'changed', item: 'MAC address weight' },
-      { label: 'Signals: removed Machine SID', before: 'High weight', after: '', group: 'Signals', kind: 'removed', item: 'Machine SID' },
+      { label: 'MAC address priority', before: 'High', after: 'Low', group: 'Signals', kind: 'changed', item: 'MAC address priority' },
+      { label: 'Signals: removed Machine SID', before: 'High', after: '', group: 'Signals', kind: 'removed', item: 'Machine SID' },
       { label: 'Name', before: 'A', after: 'B', kind: 'changed' },
-      { label: 'Signals: added TPM ID', before: '', after: 'High weight', group: 'Signals', kind: 'added', item: 'TPM ID' },
+      { label: 'Signals: added TPM ID', before: '', after: 'High', group: 'Signals', kind: 'added', item: 'TPM ID' },
       { label: 'What it can read', before: 'Agentless', after: 'Agent-based', group: 'Basic details', kind: 'changed' },
     ]
     const sections = groupSections(rows)

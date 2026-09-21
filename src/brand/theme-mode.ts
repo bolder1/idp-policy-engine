@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
+import { SHOWCASE } from './showcase'
+
 /* -----------------------------------------------------------------------------
    Light or dark, for the whole console and the end-user site alike.
 
@@ -28,7 +30,9 @@ export function readTheme(): Theme {
   }
 }
 
-let current: Theme = readTheme()
+/* The showcase build is light only — dark is not in the product yet (owner,
+   14 Sep; its toggle hidden 21 Sep) — whatever an earlier visit stored. */
+let current: Theme = SHOWCASE ? 'light' : readTheme()
 const listeners = new Set<() => void>()
 
 function paint(theme: Theme): void {

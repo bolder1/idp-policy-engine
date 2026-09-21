@@ -154,6 +154,13 @@ export type PolicyDetailsFrom = 'builder' | 'board' | 'policies'
 export interface ToastMessage {
   id: number
   text: string
+  /** One verb beside the text — Undo after a removal. It stays up longer. */
+  action?: ToastAction
+}
+
+export interface ToastAction {
+  label: string
+  run: () => void
 }
 
 /* Who is signed in, for the account menu. The prototype has no auth, so these
@@ -433,7 +440,8 @@ export interface BrandStore {
   /** Adds at the top. Returns the stored id. */
   addScenario: (s: Scenario) => string
 
-  showToast: (m: string) => void
+  /** A message, and optionally one action beside it (Undo). */
+  showToast: (m: string, action?: ToastAction) => void
 }
 
 const Ctx = createContext<BrandStore | null>(null)
@@ -690,11 +698,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     [requestLeave, setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setScreen],
   )
 
-  const showToast = useCallback((m: string) => {
+  /* With an action the toast stays six seconds rather than under three: long
+     enough to read "Condition removed", decide, and reach Undo. */
+  const showToast = useCallback((m: string, action?: ToastAction) => {
     toastSeq.current += 1
     const id = toastSeq.current
-    setToast({ id, text: m })
-    window.setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 2800)
+    setToast({ id, text: m, action })
+    window.setTimeout(() => setToast((t) => (t?.id === id ? null : t)), action ? 6000 : 2800)
   }, [])
 
   const value = useMemo<BrandStore>(
@@ -839,8 +849,9 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       },
       updateFingerprint: (p) => setFingerprints((all) => all.map((x) => (x.id === p.id ? p : x))),
       /* Deleting a profile does not unlink the rules naming it. ConfirmDelete
-         refuses while a live policy uses it, and the checks flag any rule left
-         naming it (PE135), same as zones (PE134) and hooks (PE130). */
+         moves any live policy that uses it to draft (a system policy blocks the
+         delete), and the checks flag any rule left naming it (PE135), same as
+         zones (PE134) and hooks (PE130). */
       removeFingerprint: (id) => setFingerprints((all) => all.filter((p) => p.id !== id)),
       policyById: (id) => policiesRef.current.find((p) => p.id === id),
 
@@ -921,8 +932,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       },
       updateZone: (z) => setZones((all) => all.map((x) => (x.id === z.id ? z : x))),
       /* A deleted zone is not unlinked from the rules that name it. ConfirmDelete
-         refuses while a live policy uses it, and the checks flag any rule left
-         naming it. */
+         moves any live policy that uses it to draft (a system policy blocks the
+         delete), and the checks flag any rule left naming it. */
       removeZone: (id) => setZones((all) => all.filter((z) => z.id !== id)),
 
       deletePolicy: (id) => setPolicies((all) => all.filter((p) => p.id !== id)),

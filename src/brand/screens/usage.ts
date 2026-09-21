@@ -86,20 +86,46 @@ export function policiesUsingType(typeId: string, policies: Policy[]): PolicyUse
 
 /** What deleting the object would do, split by whether a policy deciding sign-ins now depends on it. */
 export interface DeleteImpact {
-  /* Policies that evaluate sign-ins today and whose live rules name it. A delete
-     is refused while this is not empty: the rule would silently stop matching. */
+  /* Policies that evaluate sign-ins today and whose live rules name it. The
+     delete MOVES EACH OF THEM TO DRAFT (21 Sep 2026 — this used to refuse).
+
+     Draft is the only honest outcome of the three. Left live, the rule would
+     name something that no longer exists, and the product has no "saved but
+     broken" state — unfinished means draft. Dropping the condition instead
+     would quietly WIDEN who gets in: "allow on a trusted device" would become
+     "allow". So the policy stops deciding sign-ins until its rules name
+     another object, and the admin is told so before they confirm. */
   live: PolicyUse[]
   /* Everything else that names it: drafts, switched-off policies, and saved
      drafts of live policies. Allowed, and those rules are flagged until fixed. */
   later: PolicyUse[]
+  /* Enforcing SYSTEM policies that name it. The one case still refused:
+     `setPolicyStatus` will not change a system policy's status, because the
+     tenant's default has to keep deciding sign-ins. Moving it to draft would
+     silently do nothing and leave a live rule naming a deleted object. */
+  stuck: PolicyUse[]
 }
 
 export function deleteImpact(typeId: string, valueId: string, policies: Policy[]): DeleteImpact {
   const live: PolicyUse[] = []
   const later: PolicyUse[] = []
+  const stuck: PolicyUse[] = []
   for (const use of policiesUsing(typeId, valueId, policies)) {
-    if (!use.draft && evaluates(use.policy)) live.push(use)
-    else later.push(use)
+    if (use.draft || !evaluates(use.policy)) later.push(use)
+    else if (use.policy.isSystem) stuck.push(use)
+    else live.push(use)
   }
-  return { live, later }
+  return { live, later, stuck }
 }
+
+/** The word a delete confirmation asks for. */
+export const DELETE_WORD = 'DELETE'
+
+/** Whether what was typed into a delete confirmation arms it.
+
+    One fixed word, not the object's name (owner, 21 Sep 2026: "we don't need
+    the whole device profile name — just type delete"). Retyping "Code
+    repository — trusted device required", dash and all, was a spelling test;
+    the pause the field exists for is the same with six letters. Any case, ends
+    trimmed: the word is the answer, not its capitals. */
+export const deleteConfirmed = (typed: string): boolean => typed.trim().toUpperCase() === DELETE_WORD

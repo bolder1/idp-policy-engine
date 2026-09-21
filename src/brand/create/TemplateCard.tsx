@@ -17,6 +17,7 @@ import { leaves } from '../predicate'
 import { narrowToAudience, withoutMissing, type TemplateLibrary, type TemplateNeed } from '../screens/board/apply-template'
 import { whoSentence } from '../screens/predicate-prose'
 import { hasWho, type WhoDirectory } from '../rule-who'
+import { SHOWCASE } from '../showcase'
 
 /* -----------------------------------------------------------------------------
    The template card, shared by the create gallery and the Templates library.
@@ -220,7 +221,7 @@ export function TemplateCard({
   m,
   onUse,
   onPreview,
-  useLabel = 'Use template',
+  useLabel = 'Use',
   fallback = '1fa',
 }: {
   m: CardModel
@@ -236,7 +237,9 @@ export function TemplateCard({
   const post = posture(m.rules)
 
   return (
-    <article className="bgcard">
+    /* The category rides on the card as well as on the pill, so the hover glow
+       in the thumbnail can take the pill's hue. */
+    <article className={`bgcard is-cat-${catKey(m.category ?? '')}`}>
       {/* The illustration is the live preview: the template's rules drawn as
           the builder would order them, plus the control that expands them.
 
@@ -338,34 +341,29 @@ export function TemplateCard({
           </span>
         </span>
 
-        {/* Truncated to one line, so the full name has to stay reachable. */}
-        <h3 className="bgcard__h" title={m.name}>
-          {m.name}
-        </h3>
+        {/* The name, and the card's one action at the end of its line.
+
+            The footer strip that held this button went 21 Sep 2026 (owner: "I
+            don't like the position of the Use button"): a 54px row with its own
+            hairline, holding one button, left-aligned only because the review
+            line that once sat opposite it had been removed. The buttons still
+            line up across a grid row, because the thumbnail is a fixed 212px
+            and the name is one line. The name is truncated, so it keeps its
+            title; the button's name says which template it uses. */}
+        <div className="bgcard__head">
+          <h3 className="bgcard__h" title={m.name}>
+            {m.name}
+          </h3>
+          {onUse && m.rules.length > 0 && (
+            <button type="button" className="bgcard__cta" onClick={onUse} aria-label={`${useLabel} ${m.name}`}>
+              {useLabel}
+            </button>
+          )}
+        </div>
         <p className="bgcard__sub">{m.description}</p>
         <CardNotes m={m} />
       </div>
 
-      {onUse && m.rules.length > 0 && (
-        <footer className="bgcard__foot">
-          {/* One control, and nothing beside it.
-
-              This row has now lost three things in turn: a signal-and-author line
-              (the signals were already drawn by the rules in the thumbnail above),
-              then the author itself (who last touched the file is not whether the
-              template is any good), and now the dated review claim — which was the
-              one fact here that DID speak to quality, and still lost, because it
-              was a second thing to read on a row whose job is to be pressed.
-
-              `Scenario.reviewed` and `Template.reviewed` are still seeded in
-              data.ts with the reasoning for a dated attribution over a rating. The
-              model no longer carries it; if it is ever wanted again, that is where
-              it comes from. */}
-          <button type="button" className="bgcard__cta" onClick={onUse}>
-            {useLabel}
-          </button>
-        </footer>
-      )}
     </article>
   )
 }
@@ -563,7 +561,10 @@ export function scenarioCard(s: Scenario, directory?: WhoDirectory, library?: Te
     id: s.id,
     name: s.name,
     description: s.description,
-    badge: s.badge,
+    /* Internal requirement-set codes ("SIB/HRS") are not customer copy; the
+       showcase build drops the code and keeps the rest ("Recommended for
+       SIB/HRS" → "Recommended"; a badge that was only the code goes). */
+    badge: SHOWCASE ? s.badge?.replace(/\s*(?:for\s+)?SIB\/HRS$/, '') || undefined : s.badge,
     category: s.category,
     // A template with no conditions applies to everyone, which is worth saying.
     signals: signals.length > 0 ? signals : ['Everyone'],

@@ -55,6 +55,7 @@ import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
 import { PageBar, WidthSwitch } from './page-bar'
 import { compactClass, usePageWidth } from '../page-width'
 import { libRowHeight, useLibView, type LibView } from './library-view-state'
+import { SHOWCASE } from '../showcase'
 
 /* -----------------------------------------------------------------------------
    Zones.
@@ -276,7 +277,7 @@ export function ZonesFinal() {
           <PageHead
             title="Zones"
             caption="IP networks and locations that policy rules reference."
-            preview={<WidthSwitch />}
+            preview={SHOWCASE ? undefined : <WidthSwitch />}
           />
 
           {store.zones.length === 0 ? (

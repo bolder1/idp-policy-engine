@@ -302,6 +302,14 @@ async function storyboard(page, ui) {
     await page.waitForTimeout(1200)
   })
 
+  /* Scratch no longer writes a rule (21 Sep 2026): it shows the empty chain with
+     one inviting `+`, and the first rule is added from there. */
+  await step('add the first rule', async () => {
+    await ui.click(page.getByRole('button', { name: /add the first rule/i }))
+    await page.getByLabel('Rule name').waitFor({ timeout: 4000 })
+    await page.waitForTimeout(600)
+  })
+
   await ui.say('A rule answers three questions: who, when, and what happens.')
   await page.waitForTimeout(2800)
 
@@ -315,12 +323,12 @@ async function storyboard(page, ui) {
 
   await ui.say('Who: naming a group hides the rule from everybody else.')
   await step('choose the audience', async () => {
-    await ui.click(page.getByRole('button', { name: /choose people/i }).first())
+    await ui.click(page.getByRole('button', { name: /^add groups$/i }).first())
     await page.waitForTimeout(900)
-    // The rows are checkboxes, and the footer counts what is ticked.
+    // The rows are checkboxes.
     await ui.click(page.getByRole('checkbox', { name: /^Finance/ }).first())
     await page.waitForTimeout(700)
-    await ui.click(page.getByRole('button', { name: /save \d+ selected/i }))
+    await ui.click(page.getByRole('button', { name: /^save$/i }))
     await page.waitForTimeout(1000)
   })
 
@@ -355,7 +363,8 @@ async function storyboard(page, ui) {
   await page.waitForTimeout(2800)
 
   await step('read every condition', async () => {
-    await ui.click(page.getByRole('radio', { name: /detailed/i }))
+    // One labelled toggle now; it reads "Expand all" while the cards are folded.
+    await ui.click(page.getByRole('button', { name: /expand all/i }))
     await page.waitForTimeout(1800)
   })
 

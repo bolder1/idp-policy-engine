@@ -15,11 +15,10 @@
 
 /* --- Page ----------------------------------------------------------------------- */
 
-/* The head's own bottom margin sits on top of the page grid's row gap; the tabs
-   belong to the head, so they sit at the gap alone. Two classes, over
-   console-theme's one. */
-.bdt > .bpage__head { margin-bottom: 0; }
-.bdt > .bdt__tabs { margin-top: calc(var(--space-2) * -1); }
+/* `.bdt > .bpage__head { margin-bottom: 0 }` and a pulled-up `.bdt__tabs`
+   stood here, so a tab bar could sit tight under the head it belonged to. The
+   tabs are gone (21 Sep 2026), so the head keeps console-theme's own margin
+   and this page's toolbar sits where every other library page's does. */
 
 .bdt__panel { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
 .bdt__panel > .btoolbar { margin-bottom: 0; }
@@ -32,12 +31,16 @@
    fires no hover in most browsers, so a tooltip would be seen by nobody. */
 .bdt__why { font-size: var(--fs-sm); color: var(--text-tertiary); }
 
+/* One typeface for the tokens (owner, 21 Sep 2026: "use one type of font only").
+   Serials were set in the monospace, so a row read in two fonts — "MO-DT-1002"
+   in one and "miniOrange" beside it in the other. They are in the UI font now.
+
+   Tabular figures stay: they are what the monospace was really buying, a
+   column of serials whose digits line up, and they do it without a second
+   face. method-forms.css gives every text field `font-family: inherit`, so the
+   typed serial needs nothing beyond the figures. */
 .bdt__mono,
-.bdt__serial,
-/* The serial where it is typed, too. method-forms.css gives every text field
-   `font-family: inherit` at two classes and an attribute, which one class loses to. */
-.bmc__control input.bdt__mono[type='text'] {
-  font-family: var(--font-mono);
+.bdt__serial {
   font-variant-numeric: tabular-nums;
 }
 
@@ -215,7 +218,9 @@
 .bdt__code input {
   width: 128px; height: var(--ctl-height-md); padding: 0 var(--space-4);
   background: var(--ctl-bg); border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
-  font-family: var(--font-mono); font-size: var(--fs-lg); letter-spacing: 0.12em; color: var(--text-primary);
+  /* The UI font, like every serial on this page. The spacing and the tabular
+     figures keep a six-digit code easy to check against the fob's screen. */
+  font-size: var(--fs-lg); letter-spacing: 0.12em; font-variant-numeric: tabular-nums; color: var(--text-primary);
 }
 .bdt__code input::placeholder { color: var(--text-placeholder); }
 .bdt__code input:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }

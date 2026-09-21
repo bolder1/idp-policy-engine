@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, UserRound, Users } from 'lucide-react'
+import { ArrowLeft, Check, Plus, UserRound, Users, X } from 'lucide-react'
 
-import { Badge, Button, Modal, SearchBox } from '../../kit'
+import { Badge, Button, IconButton, Modal, SearchBox } from '../../kit'
 import { NoMatches } from '../../empty'
+import { Face, FaceStack, type FaceItem } from '../../faces'
 import type { Audience, Rule, RuleWho } from '../../data'
 import { useBrand, useNameLookup } from '../../store'
 import { outsideAudience } from '../../audience-ops'
@@ -58,13 +59,11 @@ import { normaliseWho, type WhoKind, type WhoList } from '../../rule-who'
 /** Which field of `RuleWho` a row edits. The except lists are not edited here. */
 const FIELD: Record<WhoKind, WhoList> = { group: 'groupIds', user: 'userIds' }
 
-const KIND_WORD: Record<WhoKind, { many: string; add: string }> = {
-  group: { many: 'Groups', add: 'Add groups' },
-  user: { many: 'People', add: 'Add people' },
+const KIND_WORD: Record<WhoKind, { many: string; add: string; noun: string }> = {
+  group: { many: 'Groups', add: 'Add groups', noun: 'groups' },
+  user: { many: 'People', add: 'Add people', noun: 'people' },
 }
 
-/** How many names a row prints before the rest become a count. */
-const NAMES = 2
 
 export function WhoEditor({
   rule,
@@ -103,7 +102,7 @@ export function WhoEditor({
     <WhoRow
       key={kind}
       kind={kind}
-      names={ids(kind).map((id) => resolve(kind, id) ?? `deleted · ${id}`)}
+      faces={ids(kind).map((id) => ({ kind, key: id, name: resolve(kind, id) ?? `deleted · ${id}` }))}
       outside={kind === 'group' ? outside.groups.length : outside.users.length}
       onOpen={() => setPicking(kind)}
     />
@@ -182,18 +181,19 @@ export function WhoEditor({
 
 /* --- One entity, one row -------------------------------------------------------
 
-   A row says its kind, what it holds, and opens the list. Names rather than
-   faces: at this width two names and a count read faster than four initials,
-   and a face only helps for somebody you already know by sight — which is true
-   of a colleague and not of "Engineering". */
+   A row says its kind, what it holds, and opens the list. Faces, each named on
+   hover, rather than a line of names (owner, 21 Sep 2026: "no need to show the
+   full name — add the avatar, and on hover the user can see the full name").
+   Names truncated to "Finance, Executives and 2 more" at this width; a stack
+   holds five and a count, and the dialog behind "View" names every one. */
 function WhoRow({
   kind,
-  names,
+  faces,
   outside,
   onOpen,
 }: {
   kind: WhoKind
-  names: string[]
+  faces: FaceItem[]
   /** How many of these the POLICY does not govern. Included lists only. */
   outside: number
   onOpen: () => void
@@ -201,33 +201,44 @@ function WhoRow({
   const Ico = kind === 'group' ? Users : UserRound
   const word = KIND_WORD[kind]
   /* A row is only drawn for a kind that HAS something; an empty kind is a
-     button. So there is no empty case to word. */
-  const summary =
-    names.length <= NAMES ? names.join(', ') : `${names.slice(0, NAMES).join(', ')} and ${names.length - NAMES} more`
+     button. So there is no empty case to draw. */
   return (
-    <button type="button" className="bb__whorow is-set" onClick={onOpen} title={names.join(', ')}>
+    <button type="button" className="bb__whorow is-set" onClick={onOpen}>
       <span className="bb__whorow__ico" aria-hidden>
         <Ico size={14} strokeWidth={1.9} />
       </span>
       <span className="bb__whorow__label">{word.many}</span>
-      <span className="bb__whorow__val">{summary}</span>
+      <span className="bb__whorow__val">
+        <FaceStack faces={faces} />
+      </span>
       {outside > 0 && (
         <span title="This policy does not govern them, so this rule can never decide one of their sign-ins.">
           <Badge tone="notice">{outside} outside</Badge>
         </span>
       )}
-      <span className="bb__whorow__go">Edit</span>
+      {/* View, not Edit: the row opens the chosen list first, and adding more
+          is a step inside it (owner, 21 Sep 2026). */}
+      <span className="bb__whorow__go">View</span>
     </button>
   )
 }
 
-/* --- Choosing, in a dialog -----------------------------------------------------
+/* --- Viewing, then choosing, in one dialog ----------------------------------------
 
-   One dialog, one list, and which list it shows is the row that opened it. It
-   keeps its own draft and commits on Save, which is the one place in this panel
-   where that is true: everything else writes as it is touched because the board
-   has a save bar over the whole policy, and a dialog with a Cancel that did not
-   cancel would be a lie.
+   One dialog, two views of one list (owner, 21 Sep 2026). A row that already
+   holds names opens on THE CHOSEN ONLY: who this rule is about, each with a
+   remove, and "Add groups" to go on to the whole list. The whole list is the
+   second view, and "View N selected" brings you back. Picking one group from
+   the top of twenty-one and one from the bottom used to leave the two ticks a
+   scroll apart, with no way to see the answer in one place.
+
+   A kind with nothing chosen opens straight on the whole list — there is
+   nothing to view yet.
+
+   It keeps its own draft and commits on Save, which is the one place in this
+   panel where that is true: everything else writes as it is touched because
+   the board has a save bar over the whole policy, and a dialog with a Cancel
+   that did not cancel would be a lie.
    -------------------------------------------------------------------------- */
 function WhoDialog({
   open,
@@ -250,6 +261,7 @@ function WhoDialog({
   const store = useBrand()
   const [q, setQ] = useState('')
   const [draft, setDraft] = useState<string[]>(chosen)
+  const [view, setView] = useState<'chosen' | 'all'>(chosen.length > 0 ? 'chosen' : 'all')
 
   /* The seed as a string: `chosen` is a fresh array on every render of the
      panel behind this dialog, so depending on it directly would discard the
@@ -258,19 +270,23 @@ function WhoDialog({
   useEffect(() => {
     if (!open) return
     setDraft(seed === '' ? [] : seed.split(','))
+    setView(seed === '' ? 'all' : 'chosen')
     setQ('')
   }, [open, seed])
 
   const word = KIND_WORD[kind]
   const query = q.trim().toLowerCase()
-  const rows =
+  const every: WhoOption[] =
     kind === 'group'
-      ? store.groups
-          .filter((g) => !query || g.name.toLowerCase().includes(query))
-          .map((g) => ({ id: g.id, name: g.name, meta: `${g.memberCount.toLocaleString()} members`, empty: g.memberCount === 0 }))
-      : store.users
-          .filter((u) => !query || u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query))
-          .map((u) => ({ id: u.id, name: u.name, meta: u.email, empty: false }))
+      ? store.groups.map((g) => ({ id: g.id, name: g.name, meta: `${g.memberCount.toLocaleString()} members`, empty: g.memberCount === 0, hay: g.name }))
+      : store.users.map((u) => ({ id: u.id, name: u.name, meta: u.email, empty: false, hay: `${u.name} ${u.email}` }))
+  const matches = (r: WhoOption) => !query || r.hay.toLowerCase().includes(query)
+  const rows = every.filter(matches)
+  /* The chosen view lists the DRAFT, in the order it was chosen, and keeps a
+     name the directory no longer has so it can still be removed. */
+  const chosenRows = draft
+    .map((id): WhoOption => every.find((r) => r.id === id) ?? { id, name: `deleted · ${id}`, meta: '', empty: false, hay: id })
+    .filter(matches)
 
   const outside = outsideAudience(
     audience,
@@ -280,7 +296,7 @@ function WhoDialog({
   )
   const isOutside = (id: string) => (kind === 'group' ? outside.groups : outside.users).includes(id)
 
-  const toggle = (id: string) => setDraft(draft.includes(id) ? draft.filter((x) => x !== id) : [...draft, id])
+  const toggle = (id: string) => setDraft((now) => (now.includes(id) ? now.filter((x) => x !== id) : [...now, id]))
 
   /* Scoped to the rows the list is SHOWING, and the label says so: with a
      search typed, "Select all 4 matching" leaves the rest alone. A toggle, not
@@ -291,12 +307,33 @@ function WhoDialog({
     setDraft(allOn ? draft.filter((x) => !rows.some((r) => r.id === x)) : [...new Set([...draft, ...rows.map((r) => r.id)])])
 
   const everyone = draft.length === 0 && otherCount === 0
+  const go = (v: 'chosen' | 'all') => {
+    setView(v)
+    setQ('')
+  }
+
+  /* The badges both views print. Both inform and neither blocks: a redundant
+     or unusual choice is legal and is sometimes deliberate. */
+  const marks = (r: WhoOption) => (
+    <>
+      {r.empty && (
+        <span title="Nobody is in this group today, so a rule that names it decides nothing.">
+          <Badge tone="system">Empty</Badge>
+        </span>
+      )}
+      {isOutside(r.id) && (
+        <span title="This policy does not govern them, so this rule can never decide one of their sign-ins.">
+          <Badge tone="notice">Outside</Badge>
+        </span>
+      )}
+    </>
+  )
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Who is this rule about?"
+      title={view === 'chosen' ? `${word.many} in this rule` : `Choose ${word.noun}`}
       width={560}
       footer={
         <>
@@ -304,78 +341,119 @@ function WhoDialog({
             Cancel
           </Button>
           <Button variant="brand" onClick={() => onSave(draft)}>
-            {everyone ? 'Apply to everyone' : draft.length === 0 ? 'Save' : `Save ${draft.length} selected`}
+            {everyone ? 'Apply to everyone' : 'Save'}
           </Button>
         </>
       }
     >
-      <div className="bb__whopick">
-        <p className="bb__whopick__lede">Leave this empty and the rule covers everyone the policy governs.</p>
-
-        <SearchBox
-          block
-          value={q}
-          onChange={setQ}
-          placeholder={kind === 'group' ? 'Search groups' : `Search the ${store.users.length} people listed`}
-          label={kind === 'group' ? 'Search groups' : 'Search people'}
-        />
-
-        {/* Select-all ABOVE the list rather than in it: a checkbox whose job is
-            to tick the other checkboxes reads as one of them, and a row at the
-            top of a scroller scrolls away. */}
-        {rows.length > 0 && (
-          <div className="bb__whoall">
-            <button type="button" onClick={setMany}>
-              {allOn ? `Clear ${rows.length}` : query ? `Select all ${rows.length} matching` : `Select all ${rows.length}`}
-            </button>
-            <span>{draft.length} selected</span>
+      {view === 'chosen' ? (
+        <div className="bb__whopick">
+          {/* The count, and the way on to the whole list, on one line above the
+              names they are about. */}
+          <div className="bb__whobar">
+            <span>{draft.length === 0 ? `No ${word.noun} chosen` : `${draft.length} selected`}</span>
+            <Button variant="secondary" size="sm" icon={Plus} onClick={() => go('all')}>
+              {word.add}
+            </Button>
           </div>
-        )}
 
-        <div className="bb__wholist" role="group" aria-label={word.many}>
-          {rows.length === 0 && <NoMatches compact noun={word.many.toLowerCase()} query={q} onClear={() => setQ('')} />}
-          {rows.map((r) => {
-            const on = draft.includes(r.id)
-            return (
-              <button
-                key={r.id}
-                type="button"
-                role="checkbox"
-                aria-checked={on}
-                className={`bb__whoitem${on ? ' is-on' : ''}`}
-                onClick={() => toggle(r.id)}
-              >
-                <span className="bx-tick" aria-hidden>
-                  {on && <Check size={12} strokeWidth={3} />}
-                </span>
-                <b>{r.name}</b>
-                <em>{r.meta}</em>
-                {/* Both badges inform and neither blocks: a redundant or
-                    unusual choice is legal and is sometimes deliberate. */}
-                {r.empty && (
-                  <span title="Nobody is in this group today, so a rule that names it decides nothing.">
-                    <Badge tone="system">Empty</Badge>
-                  </span>
-                )}
-                {isOutside(r.id) && (
-                  <span title="This policy does not govern them, so this rule can never decide one of their sign-ins.">
-                    <Badge tone="notice">Outside</Badge>
-                  </span>
-                )}
-              </button>
-            )
-          })}
+          {/* A search only once the list is long enough to need one. */}
+          {draft.length > 8 && (
+            <SearchBox block value={q} onChange={setQ} placeholder={`Search the chosen ${word.noun}`} label={`Search the chosen ${word.noun}`} />
+          )}
+
+          {draft.length === 0 ? (
+            <p className="bb__whopick__lede">Nothing chosen, so the rule covers everyone the policy governs.</p>
+          ) : (
+            <ul className="bb__wholist" aria-label={`${word.many} in this rule`}>
+              {chosenRows.length === 0 && <NoMatches compact noun={word.noun} query={q} onClear={() => setQ('')} />}
+              {chosenRows.map((r) => (
+                <li key={r.id} className="bb__whoitem is-view">
+                  <Face kind={kind} name={r.name} decorative />
+                  <b>{r.name}</b>
+                  <em>{r.meta}</em>
+                  {marks(r)}
+                  <IconButton icon={X} size="sm" tone="ghost" label={`Remove ${r.name}`} onClick={() => toggle(r.id)} />
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
+      ) : (
+        <div className="bb__whopick">
+          {/* Back to the chosen list, once there is one to go back to. */}
+          {draft.length > 0 ? (
+            <button type="button" className="bb__whoback" onClick={() => go('chosen')}>
+              <ArrowLeft size={14} strokeWidth={2} aria-hidden />
+              View {draft.length} selected
+            </button>
+          ) : (
+            <p className="bb__whopick__lede">Leave this empty and the rule covers everyone the policy governs.</p>
+          )}
 
-        {/* Only where it is true: `unlistedUsers` is a count with no rows
-            behind it, so the search can only ever reach the loaded rows. */}
-        {kind === 'user' && store.unlistedUsers > 0 && (
-          <p className="bb__whopick__note">
-            {store.users.length} of {(store.users.length + store.unlistedUsers).toLocaleString()} listed. The rest can be
-            reached by naming a group.
-          </p>
-        )}
-      </div>
+          <SearchBox
+            block
+            value={q}
+            onChange={setQ}
+            placeholder={kind === 'group' ? 'Search groups' : `Search the ${store.users.length} people listed`}
+            label={kind === 'group' ? 'Search groups' : 'Search people'}
+          />
+
+          {/* Select-all ABOVE the list rather than in it: a checkbox whose job is
+              to tick the other checkboxes reads as one of them, and a row at the
+              top of a scroller scrolls away. */}
+          {rows.length > 0 && (
+            <div className="bb__whoall">
+              <button type="button" onClick={setMany}>
+                {allOn ? `Clear ${rows.length}` : query ? `Select all ${rows.length} matching` : `Select all ${rows.length}`}
+              </button>
+            </div>
+          )}
+
+          <div className="bb__wholist" role="group" aria-label={word.many}>
+            {rows.length === 0 && <NoMatches compact noun={word.noun} query={q} onClear={() => setQ('')} />}
+            {rows.map((r) => {
+              const on = draft.includes(r.id)
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  className={`bb__whoitem${on ? ' is-on' : ''}`}
+                  onClick={() => toggle(r.id)}
+                >
+                  <span className="bx-tick" aria-hidden>
+                    {on && <Check size={12} strokeWidth={3} />}
+                  </span>
+                  <Face kind={kind} name={r.name} decorative />
+                  <b>{r.name}</b>
+                  <em>{r.meta}</em>
+                  {marks(r)}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Only where it is true: `unlistedUsers` is a count with no rows
+              behind it, so the search can only ever reach the loaded rows. */}
+          {kind === 'user' && store.unlistedUsers > 0 && (
+            <p className="bb__whopick__note">
+              {store.users.length} of {(store.users.length + store.unlistedUsers).toLocaleString()} listed. The rest can be
+              reached by naming a group.
+            </p>
+          )}
+        </div>
+      )}
     </Modal>
   )
+}
+
+/** A row either view can draw: a group or a person, with what to search it by. */
+interface WhoOption {
+  id: string
+  name: string
+  meta: string
+  empty: boolean
+  hay: string
 }

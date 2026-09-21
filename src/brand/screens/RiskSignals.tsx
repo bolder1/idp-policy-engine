@@ -56,7 +56,7 @@ import { PlatformMark } from '../logos/PlatformMark'
 import { useBrand } from '../store'
 import { newId, uniqueName } from '../data'
 import { ChangeState, useLeaveGuard } from '../leave-guard'
-import { ConfirmDelete } from './confirm-delete'
+import { ConfirmDelete, UseList } from './confirm-delete'
 import { ListPager } from './list-pager'
 import { pageForRow, usePagedList } from './paged-list'
 import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
@@ -90,6 +90,7 @@ import {
   type RiskTuning,
 } from '../risk-signals'
 
+import { SHOWCASE } from '../showcase'
 import './risk-signals.css'
 
 /* A mark per signal.
@@ -384,7 +385,7 @@ function RiskProfileList({
     <PageHead
       title="Risk signal profiles"
       caption="The profile in use sets the scores that Risk score conditions compare against."
-      preview={<WidthSwitch />}
+      preview={SHOWCASE ? undefined : <WidthSwitch />}
     />
   )
 
@@ -558,7 +559,7 @@ function NameRiskProfileModal({
             {shownProblem}
           </p>
         )}
-        <p>Starts with every signal on at its shipped weight. Nothing changes until you use it.</p>
+        <p>Starts with every signal on at its shipped priority. Nothing changes until you use it.</p>
       </div>
     </Modal>
   )
@@ -574,7 +575,7 @@ function NameRiskProfileModal({
    profile as stored, not on the draft, and the list's row menu already carries
    all three; a header trail repeating them was a row of buttons to read past
    before the page's own work. What stays is what edits the draft: the name's
-   pencil, and Restore shipped weights. */
+   pencil, and Restore shipped priorities. */
 function RiskProfileDetail({
   profile,
   otherNames,
@@ -596,7 +597,9 @@ function RiskProfileDetail({
      the user can select multiple"). */
   const [plats, setPlats] = useState<Platform[]>([])
   /* Table or list — the two shapes of this page, remembered per viewer. */
-  const [version, setVersionState] = useState<RiskPageVersion>(readRiskPage)
+  /* The showcase build is always the List — the owner's pick, 21 Sep 2026 — and
+     hides the switch (see showcase.ts). */
+  const [version, setVersionState] = useState<RiskPageVersion>(() => (SHOWCASE ? 'list' : readRiskPage()))
   const setVersion = (v: RiskPageVersion) => {
     setVersionState(v)
     writeRiskPage(v)
@@ -657,7 +660,7 @@ function RiskProfileDetail({
 
   const touched = draft.off.length > 0 || Object.keys(draft.tiers).length > 0
 
-  /* Restore shipped weights clears `touched`, which takes the button out of
+  /* Restore shipped priorities clears `touched`, which takes the button out of
      the page in the same render, and focus would fall to the body. It goes to
      the pencil instead, the nearest control left in the header.
 
@@ -708,6 +711,7 @@ function RiskProfileDetail({
 
         {/* Prototype furniture, not a setting: the two shapes of this page,
             side by side, the way the library pages carry Width. */}
+        {!SHOWCASE && (
         <div className="bpage__preview brs__preview">
           <span className="bwidth__label" aria-hidden>
             Version
@@ -726,26 +730,34 @@ function RiskProfileDetail({
             ))}
           </div>
         </div>
+        )}
 
         {/* The one action left in the header, at the right of the row: it edits
             the draft, so it belongs to the page. Only once there is something
             to restore. */}
         {touched && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              restored.current = true
-              setDraft((d) => ({ ...d, ...EMPTY_RISK_PROFILE }))
-            }}
-          >
-            Restore shipped weights
-          </Button>
+          /* Right-aligned by the version switch's auto margin while it is on
+             the row; in the showcase build the switch is gone, so it takes the
+             auto margin itself. */
+          <span className={SHOWCASE ? 'brs__restore' : undefined}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                restored.current = true
+                setDraft((d) => ({ ...d, ...EMPTY_RISK_PROFILE }))
+              }}
+            >
+              Restore shipped priorities
+            </Button>
+          </span>
         )}
       </header>
 
       {/* The output, not a summary: three numbers a rule can be written
-          against, recalculated as the page is edited. */}
+          against, recalculated as the page is edited. Hidden in the showcase
+          build for now (owner, 21 Sep 2026: "hide this as of now"). */}
+      {!SHOWCASE && (
       <div className="brs__scale" aria-live="polite">
         <div className="brs__scale__what">
           <b>Risk scores</b>
@@ -768,6 +780,7 @@ function RiskProfileDetail({
           })}
         </dl>
       </div>
+      )}
 
       <div className="btoolbar">
         <SearchBox value={q} onChange={setQ} placeholder="Search signals…" label="Search risk signals" />
@@ -885,7 +898,6 @@ function SwitchProfileModal({
   onCancel: () => void
   onConfirm: () => void
 }) {
-  const store = useBrand()
   const from = riskScale(current ?? EMPTY_RISK_PROFILE)
   const to = profile ? riskScale(profile) : from
 
@@ -933,24 +945,9 @@ function SwitchProfileModal({
         ) : (
           <>
             <p>These rules use Risk score.</p>
-            <ul className="bx-confirm__uses">
-              {uses.map((u) => (
-                <li key={u.policy.id}>
-                  <button
-                    type="button"
-                    className="bx-confirm__policy"
-                    onClick={() => {
-                      onCancel()
-                      store.go({ name: 'board', policyId: u.policy.id })
-                    }}
-                  >
-                    {u.policy.name}
-                  </button>
-                  <span className="bx-confirm__rules">{u.rules.map((r) => r.name).join(', ')}</span>
-                  {u.draft && <ChangeState unsaved={false} draft />}
-                </li>
-              ))}
-            </ul>
+            {/* The delete dialog's own list, so a row here is a row there: the
+                name opens the policy, and the press covers the whole row. */}
+            <UseList uses={uses} onOpen={onCancel} />
           </>
         )}
       </div>
@@ -1072,7 +1069,7 @@ function SignalList({
         <h2>Signals</h2>
         <TipDot
           label="About risk signals"
-          text="Each signal that fires on a sign-in adds its weight to the score. A signal switched off is not collected at all."
+          text="Each signal that fires on a sign-in adds to the score by its priority. A signal switched off is not collected at all."
         />
         {/* No count here. The Risk scores block above already says how many are
             on, the Table version of this page never repeated it, and a number
@@ -1142,9 +1139,9 @@ function SignalRow({
       <fieldset
         className="brs__rowctl"
         disabled={!on}
-        title={on ? undefined : `Turn ${signal.name} on to weigh it`}
+        title={on ? undefined : `Turn ${signal.name} on to set its priority`}
       >
-        <TierPick value={tier} label={`${signal.name} weight`} onChange={(t) => onTier(signal, t)} />
+        <TierPick value={tier} label={`${signal.name} priority`} onChange={(t) => onTier(signal, t)} />
       </fieldset>
     </li>
   )
@@ -1213,7 +1210,7 @@ function SignalTable({
       <div className="brs__row brs__row--head" role="row">
         <span role="columnheader">Signal</span>
         <span role="columnheader" className="brs__col">
-          Weight
+          Priority
         </span>
         {/* "Enabled", not "On": the column says what the switch makes the
             signal, and its two states are words an admin says out loud
@@ -1249,10 +1246,10 @@ function SignalTable({
               </span>
             </span>
 
-            <span className="brs__col" role="cell" data-label="Weight">
+            <span className="brs__col" role="cell" data-label="Priority">
               <TierPick
                 value={tierFor(profile, s)}
-                label={`${s.name} weight`}
+                label={`${s.name} priority`}
                 onChange={(t) => onTier(s, t)}
               />
             </span>

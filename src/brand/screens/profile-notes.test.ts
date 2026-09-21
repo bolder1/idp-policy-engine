@@ -38,6 +38,6 @@ describe('the device profile side panels', () => {
     expect(TYPE_NOTE.terms?.map((t) => t.term)).toEqual(['Device health', 'Trusted device'])
     expect(DEVICES_NOTE.terms?.map((t) => t.term)).toContain('Agentless')
     expect(DEVICES_NOTE.terms?.map((t) => t.term)).toContain('Agent-based')
-    expect(SIGNALS_NOTE.terms?.map((t) => t.term)).toEqual(['High weight', 'Medium weight', 'Low weight'])
+    expect(SIGNALS_NOTE.terms?.map((t) => t.term)).toEqual(['High priority', 'Medium priority', 'Low priority'])
   })
 })

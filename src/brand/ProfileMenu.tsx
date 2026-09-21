@@ -5,6 +5,7 @@ import { LayoutGrid, Lock, LogOut, UserRound } from 'lucide-react'
 
 import { Tip } from './kit'
 import { useBrand } from './store'
+import { SHOWCASE } from './showcase'
 
 /* -----------------------------------------------------------------------------
    The account menu, and the only way between the two sides.
@@ -29,7 +30,8 @@ import { useBrand } from './store'
    are not built in this prototype, and their Tips say so.
    -------------------------------------------------------------------------- */
 
-const NOT_BUILT = 'Not built in this prototype.'
+/* The showcase build says what a customer would be told (see showcase.ts). */
+const NOT_BUILT = SHOWCASE ? 'Coming soon.' : 'Not built in this prototype.'
 
 /* Switching sides swaps the whole shell, so the avatar that was used is gone.
    The avatar in the new shell takes focus when it mounts, instead of focus

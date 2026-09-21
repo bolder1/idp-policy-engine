@@ -107,7 +107,9 @@ export const BOARD_STOPS: BoardStop[] = [
     /* The empty board draws a chooser instead of a chain, so the thing to point
        at on a brand new policy is not the thing to point at on one that already
        has rules. Two anchors, and the alt is tried first because it only exists
-       in the emptier of the two cases. */
+       in the emptier of the two cases. "Start from scratch" swaps the chooser
+       for an empty chain whose `+` is 'add-rule', so the step follows it there;
+       the step is done when a rule exists, not when scratch is pressed. */
     anchorAlt: 'empty-start',
     heading: 'A policy is a list of rules',
     body: 'Add one and it joins a chain that every sign-in falls down until something matches it, which makes where a rule sits as much of the policy as what it says.',

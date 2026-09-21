@@ -29,6 +29,7 @@ import {
 import { ProfileMenu } from './ProfileMenu'
 import { PersonaBar } from './PersonaBar'
 import { BrandSwitch } from './BrandSwitch'
+import { SHOWCASE } from './showcase'
 import { Tip } from './kit'
 import { useBrand, useToast, type BrandScreen } from './store'
 import { useTheme } from './theme-mode'
@@ -93,7 +94,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
              than letting somebody find out by opening them. A quiet tag, not
              the brand-filled badge "New" gets: one is an announcement and the
              other is a caveat, and they must not read alike. */
-          { label: 'Templates', screen: { name: 'templates' }, tag: 'In progress' },
+          { label: 'Templates', screen: { name: 'templates' }, tag: SHOWCASE ? undefined : 'In progress' },
           { label: 'Zones', screen: { name: 'zones' } },
           /* The page calls itself "Device fingerprint"; so does the screen id
              and every sentence on it. The rail was the only place still saying
@@ -104,7 +105,7 @@ const NAV: { section?: string; items: NavItem[] }[] = [
              anything about it is suspicious. */
           { label: 'Risk signal profile', screen: { name: 'risk-signals' } },
           { label: 'Authentication methods', screen: { name: 'methods' } },
-          { label: 'External Hooks', screen: { name: 'hooks' }, tag: 'In progress' },
+          { label: 'External Hooks', screen: { name: 'hooks' }, tag: SHOWCASE ? undefined : 'In progress' },
         ],
       },
       {
@@ -179,7 +180,8 @@ const NAV: { section?: string; items: NavItem[] }[] = [
 
 /* What a row says in its Tip. These were native titles, which a keyboard never
    reached. */
-const NOT_BUILT = 'Not built in this prototype.'
+/* The showcase build says what a customer would be told (see showcase.ts). */
+const NOT_BUILT = SHOWCASE ? 'Coming soon.' : 'Not built in this prototype.'
 const WIP_TIP = 'The page opens, but it is not finished.'
 
 /* Every screen that lives under Policies.
@@ -412,8 +414,10 @@ export function Shell({ children }: { children: ReactNode }) {
           {/* Two prototype controls, side by side and both labelled as such.
               The edition switch changes what the product CAN do; the persona
               switch changes who is looking and what is in their tenant. */}
-          <PersonaBar />
-          <BrandSwitch />
+          {/* Both hidden in the showcase build (see showcase.ts): the persona is
+              the default tenant, and the look is the rebrand. */}
+          {!SHOWCASE && <PersonaBar />}
+          {!SHOWCASE && <BrandSwitch />}
           {/* `<EditionBar />` stood here: the Lite / Full switch and the
               "N things this cannot answer" button beside it.
 
@@ -429,16 +433,19 @@ export function Shell({ children }: { children: ReactNode }) {
               uncommenting this line. */}
           {/* Each icon shows its name in a Tip. A native title never reached a
               keyboard. */}
-          <Tip text={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
-            <button
-              type="button"
-              className="bshell__icon"
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
-            >
-              {theme === 'light' ? <Moon size={20} strokeWidth={1.7} /> : <Sun size={20} strokeWidth={1.7} />}
-            </button>
-          </Tip>
+          {/* Light only in the showcase build — see theme-mode.ts. */}
+          {!SHOWCASE && (
+            <Tip text={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
+              <button
+                type="button"
+                className="bshell__icon"
+                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+              >
+                {theme === 'light' ? <Moon size={20} strokeWidth={1.7} /> : <Sun size={20} strokeWidth={1.7} />}
+              </button>
+            </Tip>
+          )}
           <Tip text={`Documentation. ${NOT_BUILT}`}>
             <button type="button" className="bshell__icon is-inert" aria-label="Documentation" aria-disabled="true">
               <BookOpen size={20} strokeWidth={1.7} />
@@ -582,18 +589,28 @@ export function Toast() {
       <div className="u-sr-only" role="status" aria-live="polite" aria-atomic="true">
         {toast && <span key={toast.id}>{toast.text}</span>}
       </div>
+      {/* Top right, under the bar (owner, 21 Sep 2026: "a toaster in the top
+          right with an undo option"). One place for every toast, so a removal
+          and a save confirm in the same spot. The pill is hidden from assistive
+          tech when it only repeats the live region; with an action it is a
+          real control and stays in the tree. */}
       <AnimatePresence>
         {toast && (
           <motion.div
             key={toast.id}
-            className="bshell__toast"
-            initial={{ opacity: 0, y: 14, scale: 0.98 }}
+            className={`bshell__toast ${toast.action ? 'has-action' : ''}`}
+            initial={{ opacity: 0, y: -10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.99 }}
+            exit={{ opacity: 0, y: -6, scale: 0.99 }}
             transition={{ type: 'spring', stiffness: 500, damping: 38 }}
-            aria-hidden="true"
+            aria-hidden={toast.action ? undefined : true}
           >
-            {toast.text}
+            <span className="bshell__toasttext">{toast.text}</span>
+            {toast.action && (
+              <button type="button" className="bshell__toastact" onClick={toast.action.run}>
+                {toast.action.label}
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

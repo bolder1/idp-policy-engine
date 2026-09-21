@@ -865,9 +865,12 @@ button.btable__app--peek.is-open .btable__logos > .applogo { box-shadow: 0 0 0 2
    down to the pager on purpose. */
 .bpage:has(> .blist__pager) > :not(.blist__pager, .bdock, .bx-scrim, .bx-drawer) { align-self: start; }
 .bpage > .blist__pager { grid-row: -2 / -1; }
-/* 3. Display tokens keeps the pager inside its tab panel, a flex column: the
-      panel takes the free space and the pager goes to its end. */
-.bpage.bdt:has(.bdt__panel > .blist__pager) { grid-template-rows: auto auto auto 1fr; }
+/* 3. Display tokens keeps the pager inside its panel, a flex column: the panel
+      takes the free space and the pager goes to its end. Three rows — back
+      link, head, panel. It was four while a tab bar sat between the head and
+      the panel (gone 21 Sep 2026); left at four, the panel took an `auto` row
+      and the free space went to an empty fourth, unpinning the pager. */
+.bpage.bdt:has(.bdt__panel > .blist__pager) { grid-template-rows: auto auto 1fr; }
 .bdt__panel > .blist__pager { margin-top: auto; }
 
 /* --- A panel docked beside the list (`DockPanel`) ---------------------------------

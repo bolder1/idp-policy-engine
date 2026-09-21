@@ -54,7 +54,10 @@ import type { SimContext, TraceResult } from '../simulate'
    evaluator, linter, gauntlet or sweep will ever read — an invisible gate on
    the one rule that has to catch everybody. Making the fallback partless is
    not a hidden button; it is a value that cannot be spelt. */
-export type Selection = { kind: 'none' } | { kind: 'rule'; id: string; part: Part } | { kind: 'fallback' }
+/* `apps` is the start node: the applications a sign-in arrives from. It has
+   no part and no rule, and its pane saves straight to the policy rather than
+   into the rules' draft — see AppsPane.tsx. */
+export type Selection = { kind: 'none' } | { kind: 'rule'; id: string; part: Part } | { kind: 'fallback' } | { kind: 'apps' }
 
 /* The three questions a rule answers, in the order it is written.
 

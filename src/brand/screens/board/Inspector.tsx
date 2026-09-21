@@ -17,6 +17,7 @@ import {
 import { Toggle } from '../../kit'
 import { fallbackRule, type Policy, type Rule } from '../../data'
 import type { Diagnostic } from '../diagnostics'
+import { AppsPane } from './AppsPane'
 import { type Selection } from './model'
 import { settledName } from './parts'
 import { WhatEditor } from './WhatEditor'
@@ -49,6 +50,8 @@ export function Inspector({
   diagnostics = [],
   onPatchRule,
   onPatchFallback,
+  onRemoved,
+  onAppsSaved,
   onClose,
   wide,
   onToggleWidth,
@@ -60,6 +63,10 @@ export function Inspector({
   diagnostics?: Diagnostic[]
   onPatchRule: (i: number, p: Partial<Rule>) => void
   onPatchFallback: (p: Partial<Rule>) => void
+  /** A condition or group was removed — the board offers Undo. */
+  onRemoved?: (what: string) => void
+  /** The Applications pane saved; the board closes the panel. */
+  onAppsSaved?: () => void
   onClose: () => void
   /** Whether the panel is at its full width, and the way to change that. */
   wide: boolean
@@ -78,7 +85,7 @@ export function Inspector({
   /* The bar names the RULE, not a third of it. It used to append the open part
      — "Rule 1 · Condition" — which was the tab strip saying its own state
      twice. There is no tab strip. */
-  const what = rule ? `Rule ${at + 1}` : 'The default'
+  const what = rule ? `Rule ${at + 1}` : selection.kind === 'apps' ? 'Applications' : 'The default'
 
   return (
     <aside className={`bb__insp ${leaving ? 'is-leaving' : ''}`} aria-label="Inspector">
@@ -170,13 +177,17 @@ export function Inspector({
                 <WhoEditor rule={rule} audience={draft.audience} onPatch={patch} />
               </Section>
 
-              <ConditionSection rule={rule} onPatch={patch} focused={part === 'when'} />
+              <ConditionSection rule={rule} onPatch={patch} onRemoved={onRemoved} focused={part === 'when'} />
 
               <Section id="then" title="Then" icon={CornerDownRight} tour="insp-then">
                 <WhatEditor rule={rule} onPatch={patch} />
               </Section>
             </motion.div>
           </>
+        ) : selection.kind === 'apps' ? (
+          <motion.div key="apps" initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
+            <AppsPane policyId={draft.id} onSaved={onAppsSaved} />
+          </motion.div>
         ) : selection.kind === 'fallback' ? (
           /* Branching on `kind`, not on `rule` being truthy. The old test sent
              a selection of `none` into the fallback pane and was saved only by
@@ -260,10 +271,12 @@ function Section({
 function ConditionSection({
   rule,
   onPatch,
+  onRemoved,
   focused,
 }: {
   rule: Rule
   onPatch: (p: Partial<Rule>) => void
+  onRemoved?: (what: string) => void
   focused: boolean
 }) {
   /* The section header's add button, anchored by a nonce so the same button
@@ -296,7 +309,7 @@ function ConditionSection({
         </button>
       }
     >
-      <WhenEditor rule={rule} onPatch={onPatch} openAt={openAt} />
+      <WhenEditor rule={rule} onPatch={onPatch} openAt={openAt} onRemoved={onRemoved} />
     </Section>
   )
 }

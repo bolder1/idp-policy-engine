@@ -1,12 +1,12 @@
 import { ArrowLeft } from 'lucide-react'
 import { Activity, ChevronRight, GraduationCap, ListChecks, Pencil } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 
 import { DemoButton } from '../../tour/DemoButton'
-import { Button } from '../../kit'
-import { appsOf, type Policy } from '../../data'
+import { Button, IconButton, NameField } from '../../kit'
+import type { Policy } from '../../data'
 import { ChangeState } from '../../leave-guard'
-import { AppLogo } from '../../logos/AppLogo'
+import { POLICY_NAME_MAX, policyNameIssue } from '../../policy-name'
 import { useBrand } from '../../store'
 import { StatusControl } from '../status-control'
 
@@ -37,17 +37,17 @@ import { StatusControl } from '../status-control'
 
    Where the space came from, since 48px is a third of what the old strip used:
 
-   · The application stops being a labelled FACT and becomes the first crumb.
-     "APPLICATION / Workday" under a title is the same word twice — a policy
-     protects an application, so the application is what the policy hangs off,
-     and a 16px mark with a name after it says that without a label.
+   · The application stops being a labelled FACT. It was a 16px mark (and a
+     "+N") on the name chip; since 21 Sep 2026 it is not in the bar at all —
+     the start node names the applications and opens the pane that edits
+     them, and the name is a heading renamed in place.
    · `policy.type` goes. "App Access" is true of almost every policy here and
-     is not a thing anybody navigates by; it is one click away in Edit details.
+     is not a thing anybody navigates by.
    · The audience goes too. It was the last labelled fact standing, and it is
      the one thing in the row that is neither where you are nor what you can do
-     to the draft — a reading, in a bar whose job is to be quiet. Edit details
-     holds it, and each rule's Who pane says who that rule covers, which is
-     where the narrowing is actually done.
+     to the draft — a reading, in a bar whose job is to be quiet. Each rule's
+     Who pane says who that rule covers, which is where the narrowing is
+     actually done.
    -------------------------------------------------------------------------- */
 
 export function BoardBar({
@@ -80,11 +80,50 @@ export function BoardBar({
   onWatchDemo?: () => void
 }) {
   const store = useBrand()
-  /* The system policy is the one that names no application and covers all of
-     them. Every other policy names a list, and the bar has room for one mark —
-     so the first, with the count carrying the rest. */
-  const named = appsOf(policy, store.apps)
-  const app = named[0] ?? null
+  /* Renaming in place, as on the library pages: the heading and an
+     always-shown pencil, and the kit's NameField while it is open.
+
+     Saved straight to the policy on ✓, Enter or leaving the field — a name is
+     a fact about the policy, not a rule edit, so it stays out of the rules'
+     draft and undo stack (see PolicyDetails.tsx). The builder reads the name
+     back from the store, so the heading and Review agree at once. */
+  const [renaming, setRenaming] = useState(false)
+  /* Where focus goes when the rename ends. The field unmounts with the focus in
+     it, and focus on <body> is where the board's single-key shortcuts act. Only
+     rescued when it actually landed on <body> after a leave: a click or Tab to
+     a real control keeps it. */
+  const pencil = useRef<HTMLSpanElement | null>(null)
+  const focusPencil = (onlyIfLost = false) =>
+    requestAnimationFrame(() => {
+      const at = document.activeElement
+      if (onlyIfLost && at && at !== document.body) return
+      pencil.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true })
+    })
+  const [name, setName] = useState(policy.name)
+  const [nameErr, setNameErr] = useState<string | null>(null)
+  const problem = policyNameIssue(name, store.policies, policy.id)
+  const keepName = () => {
+    const saved = store.policyById(policy.id)
+    const trimmed = name.trim()
+    if (!saved || problem || trimmed === saved.name) return
+    store.savePolicy({ ...saved, name: trimmed })
+    store.showToast('Name saved')
+  }
+  const applyName = () => {
+    if (problem) {
+      setNameErr(problem)
+      return
+    }
+    keepName()
+    setRenaming(false)
+    focusPencil()
+  }
+  const cancelName = () => {
+    setName(policy.name)
+    setNameErr(null)
+    setRenaming(false)
+    focusPencil()
+  }
 
   return (
     <header className="bbtop">
@@ -98,52 +137,70 @@ export function BoardBar({
 
         <ChevronRight size={13} strokeWidth={2} className="bbtop__sl" aria-hidden />
 
-        {/* One crumb, not two, and the mark is what merged them.
-
-            The application had a crumb of its own — a 16px mark, its name, and
-            a chevron before the policy — on the argument that a policy hangs
-            off the thing it protects. True, and it read as a stutter, because
-            most policies here are NAMED after the application they govern:
-            "Production Monitoring › Production Monitoring — On-Call Override"
-            is one word said twice with a chevron between the halves.
-
-            So the mark comes across onto the policy's own chip and the crumb
-            goes. The mark is the application: it carries its name as a title,
-            it is the same glyph the policy list and the picker use, and the
-            place that spells the application out in words is one click away
-            behind this very chip.
-
-            One control for all three standing facts — the name, the
-            application, the audience — because they are one idea: what this
-            policy is, as opposed to what its rules do. It was a separate
-            "Edit details" button in the old strip's action row, which put a
-            navigation among the publishing verbs.
-
-            `from: 'board'` is load-bearing. Policy details sends you back to
-            whichever builder you came from, and defaults to the trail for
-            callers that predate the board — without it, editing the name is a
-            one-way door out of the board you were working in. */}
-        <button
-          type="button"
-          className="bbtop__name"
-          title="Edit the policy's name and applications"
-          onClick={() => store.go({ name: 'policy-details', policyId: policy.id, from: 'board' })}
-        >
-          {app && <AppLogo appId={app.id} name={app.name} size={16} />}
-          {named.length > 1 && <i className="bbar__appmore">+{named.length - 1}</i>}
-          <b>{policy.name}</b>
-          <Pencil size={12} strokeWidth={2} aria-hidden />
-        </button>
-
-        {/* The two cases the mark cannot draw, kept as words after the name.
-
-            A policy naming no application is a set of rules no sign-in can ever
-            reach — the one fact in this bar worth interrupting for, so it keeps
-            its red and it never truncates. The system policy is the opposite
-            case and needs saying for the same reason: it is the only one here
-            that is not about a single application. */}
-        {policy.isSystem && <span className="bbtop__crumb is-static">Every application</span>}
-        {!policy.isSystem && !app && <span className="bbtop__crumb is-warn">No applications</span>}
+        {/* The applications are not in this row any more. The mark and the
+            "+N" beside the name said which apps the policy protects; the start
+            node at the head of the chain says it in words and opens the pane
+            that edits them, so the bar keeps to where you are and what the
+            policy is called. */}
+        {renaming ? (
+          <div className="bbtop__rename">
+            <NameField
+              value={name}
+              max={POLICY_NAME_MAX}
+              label="Policy name"
+              errorId={nameErr ? 'bbtop-name-err' : undefined}
+              invalid={!!nameErr}
+              onChange={(v) => {
+                setName(v)
+                setNameErr(null)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  applyName()
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault()
+                  cancelName()
+                }
+              }}
+              onLeave={keepName}
+              onClose={() => {
+                if (problem) setNameErr(problem)
+                else {
+                  setRenaming(false)
+                  focusPencil(true)
+                }
+              }}
+              onApply={applyName}
+              onCancel={cancelName}
+            />
+            {nameErr && (
+              <p id="bbtop-name-err" className="bbtop__nameerr" role="alert">
+                {nameErr}
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            <h1 className="bbtop__title" title={policy.name}>
+              {policy.name}
+            </h1>
+            <span className="bbtop__pencil" ref={pencil}>
+              <IconButton
+                icon={Pencil}
+                size="sm"
+                tone="ghost"
+                label="Rename"
+                onClick={() => {
+                  setName(policy.name)
+                  setNameErr(null)
+                  setRenaming(true)
+                }}
+              />
+            </span>
+          </>
+        )}
 
         {/* Read from the store, not this bar's copy: the status is switched
             here, and it is not part of the draft. */}
@@ -154,9 +211,8 @@ export function BoardBar({
       {/* Who it governs stood here — a glyph, a phrase, a count and a hover
           panel listing the groups. Removed: it is the one thing in this row
           that is neither where you are nor what you can do to the draft, and
-          the bar is meant to be quiet. It is still a click away behind the
-          name chip, and the rules themselves say who they cover on the Who
-          pane, per rule, which is where the narrowing actually happens. */}
+          the bar is meant to be quiet. The rules themselves say who they cover on
+          the Who pane, per rule, which is where the narrowing actually happens. */}
 
       <div className="bbtop__acts">
         {onWatchDemo && <DemoButton onClick={onWatchDemo} />}

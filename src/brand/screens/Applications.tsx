@@ -15,6 +15,7 @@ import { usePagedList } from './paged-list'
 import { PageBar } from './page-bar'
 import { ViewSwitch } from './library-view'
 import { LIB_VIEWS } from './library-view-state'
+import { SHOWCASE } from '../showcase'
 
 /* -----------------------------------------------------------------------------
    Applications — the console's own Apps page, and the one place an application
@@ -36,7 +37,7 @@ type SortKey = 'name' | 'type' | 'protection' | 'updated'
    than a laptop window. */
 const ROW_H = 52
 
-const NOT_BUILT = 'Not built in this prototype.'
+const NOT_BUILT = SHOWCASE ? 'Coming soon.' : 'Not built in this prototype.'
 const APP_VIEWS = LIB_VIEWS.map((v) => (v.id === 'table' ? v : { ...v, disabled: true, note: NOT_BUILT }))
 
 const ROW_ACTIONS: MenuItem[] = [
@@ -109,7 +110,7 @@ export function Applications() {
     )
   }
 
-  const addApp = () => store.showToast('Adding applications is not built in this prototype.')
+  const addApp = () => store.showToast(SHOWCASE ? 'Adding applications is coming soon.' : 'Adding applications is not built in this prototype.')
   const empty = store.apps.length === 0
 
   return (
@@ -145,7 +146,8 @@ export function Applications() {
               <>
                 {/* The live page has three views; the other two were never seen,
                     so they are disabled rather than guessed at. */}
-                <ViewSwitch value="table" onChange={() => {}} label="Application view" views={APP_VIEWS} />
+                {/* One live view, so no switch in the showcase build (see showcase.ts). */}
+                {!SHOWCASE && <ViewSwitch value="table" onChange={() => {}} label="Application view" views={APP_VIEWS} />}
                 <Button variant="brand" onClick={addApp}>
                   <Plus size={15} strokeWidth={2.2} aria-hidden />
                   Add application
@@ -212,15 +214,19 @@ function AppRow({ app, summary, onOpen }: { app: App; summary: AppSummary; onOpe
   const store = useBrand()
   return (
     <tr>
-      <td className="btable__primary">
-        <span className="btable__app">
-          <AppLogo appId={app.id} name={app.name} size={20} />
-          {/* The name opens the protection panel. The row itself is not a
-              target, so its text stays selectable and the kebab stays clear. */}
-          <button type="button" className="btable__link" onClick={onOpen}>
-            {app.name}
-          </button>
-        </span>
+      {/* Layout on a wrapper inside the cell, not on the `<td>` — see the same
+          note on the Policies table's name cell. */}
+      <td>
+        <div className="btable__primary">
+          <span className="btable__app">
+            <AppLogo appId={app.id} name={app.name} size={20} />
+            {/* The name opens the protection panel. The row itself is not a
+                target, so its text stays selectable and the kebab stays clear. */}
+            <button type="button" className="btable__link" onClick={onOpen}>
+              {app.name}
+            </button>
+          </span>
+        </div>
       </td>
       <td className="u-muted">{app.type}</td>
       <td>
@@ -235,7 +241,15 @@ function AppRow({ app, summary, onOpen }: { app: App; summary: AppSummary; onOpe
           label={`Actions for ${app.name}`}
           items={ROW_ACTIONS}
           onSelect={(id) =>
-            store.showToast(id === 'edit' ? 'Editing applications is not built in this prototype.' : 'Deleting applications is not built in this prototype.')
+            store.showToast(
+              SHOWCASE
+                ? id === 'edit'
+                  ? 'Editing applications is coming soon.'
+                  : 'Deleting applications is coming soon.'
+                : id === 'edit'
+                  ? 'Editing applications is not built in this prototype.'
+                  : 'Deleting applications is not built in this prototype.',
+            )
           }
         />
       </td>

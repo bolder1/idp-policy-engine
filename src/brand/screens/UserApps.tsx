@@ -4,6 +4,7 @@ import { AppWindow, Search } from 'lucide-react'
 import { EmptyState, NoMatches } from '../empty'
 import { AppLogo } from '../logos/AppLogo'
 import { useBrand } from '../store'
+import { SHOWCASE } from '../showcase'
 
 /* -----------------------------------------------------------------------------
    The end user's landing screen: the apps they can sign in to.
@@ -60,7 +61,7 @@ export function UserApps() {
                   <button
                     type="button"
                     className="buapps__card"
-                    onClick={() => showToast(`Opening ${a.name} is not built in this prototype.`)}
+                    onClick={() => showToast(SHOWCASE ? `Opening ${a.name} is coming soon.` : `Opening ${a.name} is not built in this prototype.`)}
                   >
                     <AppLogo appId={a.id} name={a.name} size={40} />
                     <span className="buapps__name">{a.name}</span>

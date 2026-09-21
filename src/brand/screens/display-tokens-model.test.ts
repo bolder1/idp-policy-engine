@@ -97,7 +97,7 @@ describe('assignments', () => {
     expect(filterAssignments(rows, 'nobody')).toEqual([])
   })
 
-  it('sends an empty tab with no tokens at all to Token management, and one with tokens waiting to assigning', () => {
+  it('sends an empty page with no tokens at all to Manage tokens, and one with tokens waiting to assigning', () => {
     expect(assignmentsEmpty([])).toBe('no-tokens')
     expect(assignmentsEmpty([tok('A-1')])).toBe('none-assigned')
   })

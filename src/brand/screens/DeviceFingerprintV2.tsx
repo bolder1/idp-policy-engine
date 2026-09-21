@@ -84,6 +84,7 @@ import {
 import { DeviceProfileWizard } from './device-profile-wizard'
 import { NewProfileDialog } from './new-profile-dialog'
 import { CREATE_VERSIONS, readCreateVersion, writeCreateVersion, type CreateVersion } from './device-profile-version'
+import { SHOWCASE } from '../showcase'
 
 /* -----------------------------------------------------------------------------
    Device fingerprint · profiles.
@@ -126,7 +127,9 @@ export function DeviceFingerprintV2() {
 
      Which of the three versions Create opens, from the switch on the list, and
      remembered for this viewer (see `device-profile-version.ts`). */
-  const [version, setVersionState] = useState<CreateVersion>(readCreateVersion)
+  /* The showcase build is always Version 1, Full page — the chosen flow — and
+     does not offer the picker (see showcase.ts). */
+  const [version, setVersionState] = useState<CreateVersion>(() => (SHOWCASE ? 'full' : readCreateVersion()))
   const setVersion = (v: CreateVersion) => {
     setVersionState(v)
     writeCreateVersion(v)
@@ -150,9 +153,9 @@ export function DeviceFingerprintV2() {
   const listUp = !detail && !(wizard && version !== 'current')
 
   /* The profile a delete is pending on, from its row menu — the only place
-     Delete is offered; the inner page has no header actions. The dialog refuses
-     while a live policy uses the profile, and names the drafts that will need
-     another one. Deleting does not unlink those rules — same contract as zones
+     Delete is offered; the inner page has no header actions. The dialog moves
+     any live policy that uses the profile to draft (a system policy blocks it),
+     and names the drafts that will need another one. Deleting does not unlink those rules — same contract as zones
      and hooks — and the checks flag each rule left naming it. */
   const [deleting, setDeleting] = useState<FingerprintProfile | null>(null)
 
@@ -549,6 +552,7 @@ function ProfileList({
         caption="Device health checks and trusted devices, for policy rules to use."
         headRef={head}
         preview={
+          SHOWCASE ? undefined : (
           <>
             <Picker
               label="Create flow"
@@ -565,6 +569,7 @@ function ProfileList({
             />
             <WidthSwitch />
           </>
+          )
         }
       />
 

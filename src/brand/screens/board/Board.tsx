@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
-import { AppWindow, Minus, Plus, RotateCcw } from 'lucide-react'
+import { AppWindow, ChevronRight, Minus, Plus, RotateCcw } from 'lucide-react'
 
 import { fallbackRule, type Policy } from '../../data'
 import { AppLogo } from '../../logos/AppLogo'
@@ -12,6 +12,8 @@ import type { Selection, Trace } from './model'
 import { UNREACHABLE_CODES } from './parts'
 import { RuleCard, TerminalCard } from './RuleCard'
 import { BOARD_SKINS, readBoardSkin, writeBoardSkin, type BoardSkin } from './board-skin'
+import { SHOWCASE } from '../../showcase'
+import { Tip } from '../../kit'
 
 /* -----------------------------------------------------------------------------
    The stage, and the chain on it.
@@ -32,6 +34,7 @@ export function Board({
   policy,
   destination,
   destinationAppId,
+  destinationMore = 0,
   selection,
   diagnostics,
   shadowed,
@@ -66,6 +69,8 @@ export function Board({
   destination: string | null
   /** The first application's id, when there is one, for its mark in the pill. */
   destinationAppId?: string | null
+  /** How many more applications the policy protects beyond the one named. */
+  destinationMore?: number
   selection: Selection
   diagnostics: Diagnostic[]
   /** Rules dimmed because the hovered rule puts them out of reach. */
@@ -119,7 +124,9 @@ export function Board({
      `clientWidth` already excludes it — reserving it a second time would file
      the chain half a panel to the left. */
   /* Which skin the canvas wears — a preview switch, remembered per viewer. */
-  const [skin, setSkinState] = useState<BoardSkin>(readBoardSkin)
+  /* The showcase build is always Centred — the chosen skin — and hides the
+     switch (see showcase.ts). */
+  const [skin, setSkinState] = useState<BoardSkin>(() => (SHOWCASE ? 'centred' : readBoardSkin()))
 
   const {
     viewRef,
@@ -223,9 +230,10 @@ export function Board({
   /* Two effects stood here: one that PLACED the empty state at a fixed 0.9 by
      measuring `.bb__blank` inside the world, and one that re-fitted the chain
      when the policy stopped being empty. Both are gone with the empty state
-     itself — it is a screen of its own now (BoardEmpty.tsx), so this component
-     only ever mounts with rules to draw, and the hook's own mount fit is the
-     right and only fit. */
+     itself — it is a screen of its own now (BoardEmpty.tsx). This component
+     mounts with rules to draw, or — after "Start from scratch" — with none,
+     where the chain is the start node, one inviting `+` and the default; either
+     way the hook's own mount fit is the right and only fit. */
 
   if (drag && drag.over !== drag.from) {
     order.splice(drag.from, 1)
@@ -293,7 +301,7 @@ export function Board({
   return (
     <div
       ref={stage}
-      className={`bb__stage ${panning ? 'is-panning' : ''} ${skin === 'workflow' ? 'is-wf' : ''}`}
+      className={`bb__stage ${panning ? 'is-panning' : ''} ${skin === 'workflow' ? 'is-wf' : skin === 'centred' ? 'is-centre' : ''}`}
       style={{ '--bb-x': `${viewRef.current.x}px`, '--bb-y': `${viewRef.current.y}px`, '--bb-z': viewRef.current.z } as CSSProperties}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -333,7 +341,11 @@ export function Board({
 
               `BoardBuilder` renders `BoardEmpty` in this component's place
               while there are no rules, so the canvas exists only once there is
-              something on it. See BoardEmpty.tsx. */}
+              something on it. See BoardEmpty.tsx.
+
+              One exception since 21 Sep 2026: after "Start from scratch" this
+              mounts with NO rules — the start node, one inviting connector and
+              the default — and the first rule is added from that `+`. */}
           <div className="bb__chain">
             {/* The application, said where the sign-in arrives.
 
@@ -363,7 +375,22 @@ export function Board({
                 one, and says what is true instead. The bar says the same in a
                 crumb; this says it pointing at the chain the sentence is about,
                 which is the half the bar cannot reach. */}
-            <div className="bb__start">
+            {/* A button now: it opens the Applications pane, the one place on the
+                board the policy's applications are edited. The count of the
+                rest lives here too — the bar above no longer carries a mark. */}
+            <button
+              type="button"
+              id="bb-start"
+              className={`bb__start ${selection.kind === 'apps' ? 'is-on' : ''}`}
+              aria-label={
+                destination === null
+                  ? 'No applications. Choose applications'
+                  : `Edit applications: ${destination}${destinationMore > 0 ? ` and ${destinationMore} more` : ''}`
+              }
+              aria-controls="bb-insp-body"
+              aria-expanded={selection.kind === 'apps'}
+              onClick={() => onSelect({ kind: 'apps' })}
+            >
               {/* The application's own mark, where a pulsing orange dot used to
                   be.
 
@@ -395,11 +422,24 @@ export function Board({
                 </span>
               ) : (
                 <span>
-                  A sign-in arrives at <b className="bb__start__at">{destination}</b>{' '}
-                  {trace ? <em>— {trace.ctx.user.name}, {trace.ctx.place.toLowerCase()}</em> : <em>— falls through the rules below</em>}
+                  A sign-in arrives at <b className="bb__start__at">{destination}</b>
+                  {destinationMore > 0 && (
+                    <>
+                      {' '}and <b className="bb__start__at">{destinationMore} more</b>
+                    </>
+                  )}{' '}
+                  {trace ? (
+                    <em>— {trace.ctx.user.name}, {trace.ctx.place.toLowerCase()}</em>
+                  ) : policy.rules.length === 0 ? (
+                    /* An empty scratch chain has no rules to fall through. */
+                    <em>— the default decides it</em>
+                  ) : (
+                    <em>— falls through the rules below</em>
+                  )}
                 </span>
               )}
-            </div>
+              <ChevronRight size={14} strokeWidth={2} className="bb__start__go" aria-hidden />
+            </button>
 
             {trace && !inAudience && (
               <motion.p className="bb__verdict" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ margin: '12px 0 0' }}>
@@ -478,7 +518,9 @@ export function Board({
               })}
             </AnimatePresence>
 
-            <Link lit={litLink(policy.rules.length)} at={policy.rules.length} onInsert={onInsert} last />
+            {/* With no rules this is the chain's only connector, and it is drawn
+                in its hover state — see `invite` on `Link`. */}
+            <Link lit={litLink(policy.rules.length)} at={policy.rules.length} onInsert={onInsert} last invite={policy.rules.length === 0} />
             <TerminalCard
               rule={terminal}
               resolve={resolve}
@@ -527,17 +569,18 @@ export function Board({
           slot on this component, which is what put them over the stage, is gone
           with them.
 
-          Two slots because there are two pills — a single list could not say
-          which control belonged in which. */}
+          Two slots, `aside` and `tools`, because they are two groups — a mode
+          and a row of presses. Since 21 Sep 2026 both sit in ONE pill, split by
+          a hairline, rather than two pills side by side. */}
       {/* `board-dock` is the lite edition's last tour stop: with Check and
           What changes withheld, this strip IS the board's instrument panel. */}
       <div className="bb__dock" data-tour="board-dock">
-        {aside}
         {/* Prototype furniture, not a setting: the two skins of this canvas,
             side by side, the way the library pages carry Width. Its own group
             rather than a button in the view toolbar — it changes how the whole
             board looks, where the controls beside it change what you are
             looking at. */}
+        {!SHOWCASE && (
         <div className="bb__float bb__skin" role="group" aria-label="Canvas skin">
           {BOARD_SKINS.map((o) => (
             <button
@@ -554,30 +597,52 @@ export function Board({
             </button>
           ))}
         </div>
-        <div className="bb__float" role="toolbar" aria-label="View">
+        )}
+        {/* ONE pill (owner, 21 Sep 2026: "this takes a lot of space — make it
+            minimal, it should not take attention when not in use"). Density,
+            history and zoom are three groups in it, split by hairlines. */}
+        <div className="bb__float bb__dockbar" role="toolbar" aria-label="View">
+          {aside}
+          {aside && <span className="bb__float__sep" />}
           {tools}
           {tools && <span className="bb__float__sep" />}
-          {/* Zoom out, the level, zoom in, reset — and nothing else.
+          {/* Zoom is the level alone at rest; reaching for it (hover, or
+              keyboard focus) slides zoom out in on its left and zoom in and
+              Reset on its right (owner, 21 Sep 2026: "I like the old — while
+              hover it appears — and add the Reset button").
 
-              Fit stood first. It measured the chain and re-framed it, which on a
-              column that is already centred and cannot be panned sideways is a
-              reset with a surprise in it: it also scrolled you back to the top.
-              Reset keeps your place. */}
-          <button type="button" className="bb__act" aria-label="Zoom out" title="Zoom out" onClick={() => zoomBy(1 / 1.15)}>
-            <Minus size={14} strokeWidth={2} />
-          </button>
-          {/* Written by `paint`, not by a render. `aria-live` is deliberately
-              absent: the value changes on every frame of a zoom, and a live
-              region that announces sixty times a second announces nothing. */}
-          <span className="bb__zoom" ref={zoomLabel}>
-            {Math.round(viewRef.current.z * 100)}%
-          </span>
-          <button type="button" className="bb__act" aria-label="Zoom in" title="Zoom in" onClick={() => zoomBy(1.15)}>
-            <Plus size={14} strokeWidth={2} />
-          </button>
-          <button type="button" className="bb__act" aria-label="Reset zoom" title="Reset zoom" onClick={resetZoom}>
-            <RotateCcw size={14} strokeWidth={2} />
-          </button>
+              A centred bar that changes width moves what you are aiming at, so
+              the level has to stay put. With one control left of it and two
+              right, the bar would push it 12px left; the dock slides 12px right
+              in step (see `.bb__dock:has(...)`), and the two cancel exactly. The
+              level itself also resets on click. */}
+          <div className="bb__zoomgrp">
+            <Tip text="Zoom out" placement="top">
+              <button type="button" className="bb__act bb__zoomstep" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.15)}>
+                <Minus size={14} strokeWidth={2} />
+              </button>
+            </Tip>
+            <Tip text="Reset to 100%" placement="top">
+              <button type="button" className="bb__zoombtn" aria-label="Zoom level. Reset to 100%" onClick={resetZoom}>
+                {/* Written by `paint`, not by a render. `aria-live` is deliberately
+                    absent: the value changes on every frame of a zoom, and a live
+                    region that announces sixty times a second announces nothing. */}
+                <span className="bb__zoom" ref={zoomLabel}>
+                  {Math.round(viewRef.current.z * 100)}%
+                </span>
+              </button>
+            </Tip>
+            <Tip text="Zoom in" placement="top">
+              <button type="button" className="bb__act bb__zoomstep" aria-label="Zoom in" onClick={() => zoomBy(1.15)}>
+                <Plus size={14} strokeWidth={2} />
+              </button>
+            </Tip>
+            <Tip text="Reset to 100%" placement="top">
+              <button type="button" className="bb__act bb__zoomstep" aria-label="Reset zoom to 100%" onClick={resetZoom}>
+                <RotateCcw size={13} strokeWidth={2} />
+              </button>
+            </Tip>
+          </div>
         </div>
       </div>
     </div>
@@ -587,9 +652,25 @@ export function Board({
 /* A connector with an insert point. Zapier's `+` between steps, with one
    difference: it says where the rule will land, because under first-match
    the position IS most of the rule. */
-function Link({ lit, at, onInsert, last }: { lit: string; at: number; onInsert: (at: number) => void; last?: boolean }) {
+function Link({
+  lit,
+  at,
+  onInsert,
+  last,
+  invite,
+}: {
+  lit: string
+  at: number
+  onInsert: (at: number) => void
+  last?: boolean
+  /* The empty chain's one connector (a scratch policy): drawn as if hovered —
+     the `+` coloured, the line lit, the words showing — so the way to add the
+     first rule is on screen without anybody having to find it (owner, 21 Sep
+     2026), ripple included — it keeps going until the first rule exists. */
+  invite?: boolean
+}) {
   return (
-    <div className={`bb__link ${lit}`}>
+    <div className={`bb__link ${lit} ${invite ? 'is-invite' : ''}`}>
       <button
         type="button"
         className="bb__link__add"
@@ -599,7 +680,7 @@ function Link({ lit, at, onInsert, last }: { lit: string; at: number; onInsert: 
            DOM — which is the top of the chain, the one place a rule you are
            being taught to write should NOT go. */
         data-tour={last ? 'add-rule' : undefined}
-        aria-label={last ? 'Add a rule at the end' : `Insert a rule at position ${at + 1}`}
+        aria-label={invite ? 'Add the first rule' : last ? 'Add a rule at the end' : `Insert a rule at position ${at + 1}`}
         onClick={(e) => {
           e.stopPropagation()
           onInsert(at)
@@ -607,7 +688,23 @@ function Link({ lit, at, onInsert, last }: { lit: string; at: number; onInsert: 
       >
         <Plus size={12} strokeWidth={2.4} />
       </button>
-      <span className="bb__link__hint">{last ? 'Add a rule here' : `Insert here — becomes rule ${at + 1}`}</span>
+      {/* On the invite the words are the call to action, so they press the same
+          `+` — and are hidden from assistive tech, which already hears them as
+          the button's name. */}
+      <span
+        className="bb__link__hint"
+        aria-hidden={invite || undefined}
+        onClick={
+          invite
+            ? (e) => {
+                e.stopPropagation()
+                onInsert(at)
+              }
+            : undefined
+        }
+      >
+        {invite ? 'Add the first rule' : last ? 'Add a rule here' : `Insert here — becomes rule ${at + 1}`}
+      </span>
     </div>
   )
 }

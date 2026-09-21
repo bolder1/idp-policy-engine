@@ -35,6 +35,7 @@ import { appRoot, useDialogChrome } from './dialog-chrome'
 import { ChangeList, ChangeSection, type ChangeItem } from './change-list'
 import { groupSections, reviewItemName, type ReviewKind, type ReviewLine } from './review-rows'
 import { useReviewView, type ReviewView } from './review-view'
+import { SHOWCASE } from './showcase'
 
 /* -----------------------------------------------------------------------------
    Brand kit — the primitives from IDP · 2 Core.
@@ -1790,7 +1791,10 @@ export function ReviewChanges({
   blocked?: boolean
   blockedReason?: string
 }) {
-  const [view, setView] = useReviewView()
+  /* The showcase build is always the List — the chosen layout — and hides the
+     comparison switch (see showcase.ts). */
+  const [storedView, setView] = useReviewView()
+  const view = SHOWCASE ? 'list' : storedView
   const sections = groupSections(rows)
   /* Sections open, because a review that hides what it is reviewing is not a
      review. Past this many ROWS one section starts open and the rest shut —
@@ -1813,7 +1817,7 @@ export function ReviewChanges({
          780 a name and its value sat too far apart (owner, 18 Sep 2026). */
       width={view === 'list' ? DIALOG_W.wide : DIALOG_W.work}
       padded={false}
-      head={<ReviewViewSwitch value={view} onChange={setView} />}
+      head={SHOWCASE ? undefined : <ReviewViewSwitch value={view} onChange={setView} />}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -2053,8 +2057,11 @@ export function SaveBar({
               the reader caused; an alert would interrupt a screen reader on
               every keystroke that made a form dirty, and a status region
               around the button would read its label out with it. */}
+          {/* No "Unsaved changes" heading (owner, 21 Sep 2026: "not needed"). The
+              footer only exists while something is unsaved, and the page head's
+              ChangeState pill already says so; what is left is the one line
+              worth reading — WHAT changed, or why Save is off. */}
           <span className="bx-savebar__text" role="status">
-            <strong>Unsaved changes</strong>
             {reason ? <span className="is-blocked">{reason}</span> : shown && <span>{shown}</span>}
           </span>
           {/* Blocked, the one button is off and the reason is the footer's

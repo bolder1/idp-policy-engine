@@ -638,7 +638,7 @@ describe('what changed, for the save bar and Review changes', () => {
     expect(profileReview(corp, { ...corp, config: { ...corp.config, 'os-windows': { value: '10', op: 'gte' } } })).toEqual([])
   })
 
-  it('reviews a trusted device by weight and enrolment', () => {
+  it('reviews a trusted device by priority and enrolment', () => {
     const kiosk = seedProfiles.find((p) => p.id === 'fp-kiosk') as FingerprintProfile
     const next: FingerprintProfile = { ...kiosk, weights: { mac: 10 }, autoRegister: true, roster: null }
     expect(profileReview(kiosk, next)).toEqual([
@@ -646,16 +646,16 @@ describe('what changed, for the save bar and Review changes', () => {
       /* Changed, not removed: the roster setting moves to none, which the
          empty after would otherwise read as a removal. */
       { label: 'Approved device roster', before: 'kiosks-floor-3.csv, 24 devices', after: '', group: 'Basic details', kind: 'changed' },
-      { label: 'MAC address weight', before: 'High weight', after: 'Low weight', group: 'Signals', kind: 'changed', item: 'MAC address weight' },
+      { label: 'MAC address priority', before: 'High', after: 'Low', group: 'Signals', kind: 'changed', item: 'MAC address priority' },
     ])
-    expect(profileChangeParts(kiosk, next)).toEqual(['How devices enrol', 'Weights changed'])
+    expect(profileChangeParts(kiosk, next)).toEqual(['How devices enrol', 'Priorities changed'])
   })
 
   it('files a signal a trusted device adds or drops under Signals', () => {
     const kiosk = seedProfiles.find((p) => p.id === 'fp-kiosk') as FingerprintProfile
     const next = { ...kiosk, enabled: kiosk.enabled.filter((id) => id !== 'machine-sid') }
     expect(profileReview(kiosk, next)).toEqual([
-      { label: 'Signals: removed Machine SID', before: 'High weight', after: '', group: 'Signals', kind: 'removed', item: 'Machine SID' },
+      { label: 'Signals: removed Machine SID', before: 'High', after: '', group: 'Signals', kind: 'removed', item: 'Machine SID' },
     ])
     expect(profileReview(next, kiosk)[0]).toMatchObject({ label: 'Signals: added Machine SID', group: 'Signals', kind: 'added', item: 'Machine SID' })
   })

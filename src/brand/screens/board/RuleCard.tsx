@@ -7,12 +7,12 @@ import {
   Asterisk,
   ChevronsDownUp,
   ChevronsUpDown,
-  Copy,
+  CopyPlus,
   GripVertical,
   Lock,
-  Power,
-  PowerOff,
   Split,
+  ToggleLeft,
+  ToggleRight,
   Trash2,
   Users,
 } from 'lucide-react'
@@ -391,16 +391,21 @@ export function RuleCard({
 
                 Here it is what it always was: an action, beside duplicate and
                 delete, arriving when you reach for the card. */}
+            {/* On/off as a glyph of a switch, the trail's own size (owner, 21 Sep
+                2026). The power glyph "didn't make sense"; a full switch was a
+                heavier control than every icon beside it. The toggle glyph
+                reads as on/off without a tooltip, is still a real switch to a
+                screen reader, and takes the accent while the rule is on. */}
             <button
               type="button"
-              className={`bb__act ${rule.enabled ? '' : 'is-off'}`}
+              className={`bb__act bb__onoff ${rule.enabled ? 'is-on' : ''}`}
               role="switch"
               aria-checked={rule.enabled}
               aria-label={`Rule ${index + 1} is ${rule.enabled ? 'on' : 'off'}`}
               title={rule.enabled ? 'Switch this rule off' : 'Switch this rule on'}
               onClick={() => onToggle(!rule.enabled)}
             >
-              {rule.enabled ? <Power size={13} strokeWidth={2} /> : <PowerOff size={13} strokeWidth={2} />}
+              {rule.enabled ? <ToggleRight size={15} strokeWidth={2} /> : <ToggleLeft size={15} strokeWidth={2} />}
             </button>
             <span className="bb__float__sep" />
             <button type="button" className="bb__act" aria-label="Move up" disabled={!canUp} onClick={() => onMove(-1)}>
@@ -409,8 +414,10 @@ export function RuleCard({
             <button type="button" className="bb__act" aria-label="Move down" disabled={!canDown} onClick={() => onMove(1)}>
               <ArrowDown size={13} strokeWidth={2} />
             </button>
-            <button type="button" className="bb__act" aria-label="Duplicate rule" onClick={onDuplicate}>
-              <Copy size={13} strokeWidth={2} />
+            {/* Copy-plus, not Copy: two sheets alone read as "copy to the
+                clipboard"; the plus says a second rule is made. */}
+            <button type="button" className="bb__act" aria-label="Duplicate rule" title="Duplicate" onClick={onDuplicate}>
+              <CopyPlus size={13} strokeWidth={2} />
             </button>
             <button type="button" className="bb__act is-danger" aria-label="Delete rule" onClick={onDelete}>
               <Trash2 size={13} strokeWidth={2} />

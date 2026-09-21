@@ -178,8 +178,9 @@ export function Hooks() {
 
       <HookForm hook={editing} onClose={() => setEditing(null)} onSave={save} />
 
-      {/* One dialog for every library delete. It refuses while a live policy
-          uses the hook, and names the drafts that will need another one. */}
+      {/* One dialog for every library delete. It moves any live policy that
+          uses the hook to draft (a system policy blocks it), and names the
+          drafts that will need another one. */}
       <ConfirmDelete
         open={!!confirmDelete}
         name={confirmDelete?.name ?? ''}

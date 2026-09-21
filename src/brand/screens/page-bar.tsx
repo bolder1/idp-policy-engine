@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { usePageWidth, type PageWidth } from '../page-width'
+import { SHOWCASE } from '../showcase'
 
 /* -----------------------------------------------------------------------------
    The row under a page's head. ONE shape, on every list page (owner, 16 Sep
@@ -86,6 +87,8 @@ const WIDTHS: { value: PageWidth; label: string }[] = [
 
 export function WidthSwitch() {
   const [width, setWidth] = usePageWidth()
+  /* A comparison switch: not in the showcase build, where every page is compact. */
+  if (SHOWCASE) return null
   return (
     <div className="bwidth">
       <span className="bwidth__label" aria-hidden>

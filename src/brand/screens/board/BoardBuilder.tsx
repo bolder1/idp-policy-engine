@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Copy, Keyboard, ListOrdered, PanelRightClose, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Check, ChevronsDownUp, ChevronsUpDown, Copy, Keyboard, ListOrdered, PanelRightClose, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
-import { Button, Modal } from '../../kit'
+import { Button, Modal, Tip } from '../../kit'
 import { appsOf, fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
 import { commitToast, committed, differsFromLive, hasUnsavedChanges, openForEditing, type CommitIntent } from '../../policy-draft'
 import { useBrand, useNameLookup } from '../../store'
@@ -61,7 +61,10 @@ const MAC = isMacPlatform()
    to <body>, where Backspace and the arrow keys act on the board. One frame
    for React to draw the new control, and a second try in case an animation
    or a closing dialog put focus somewhere else first. */
-function focusSoon(find: () => HTMLElement | null) {
+/* `force` retries even when focus is on something else — for a control that
+   is still mounted and still focused after it did its job (the `+` that added
+   the first rule), where waiting for <body> would wait forever. */
+function focusSoon(find: () => HTMLElement | null, force = false) {
   const go = () => {
     const el = find()
     if (el && el.isConnected) el.focus({ preventScroll: false })
@@ -69,7 +72,7 @@ function focusSoon(find: () => HTMLElement | null) {
   window.requestAnimationFrame(go)
   window.setTimeout(() => {
     const active = document.activeElement
-    if (!active || active === document.body) go()
+    if (force || !active || active === document.body) go()
   }, 150)
 }
 const byId = (id: string) => () => document.getElementById(id)
@@ -103,6 +106,35 @@ export function BoardBuilder({
   /* Opens on the saved draft when there is one, not on the live rules. */
   const [hist, setHist] = useState<History>(() => historyOf(saved ? openForEditing(saved) : ({} as Policy)))
   const [selection, setSelection] = useState<Selection>({ kind: 'none' })
+  /* "Start from scratch" was pressed on the empty board.
+
+     It used to insert a blank "New rule" and open it, so the first thing a
+     scratch policy showed was a rule nobody had written, already Ready (owner,
+     21 Sep 2026: "don't add the first rule — let the user add it; show the first
+     and last node and make the hover state active so they know how"). It now
+     only swaps the chooser for the canvas: the start node, the default card,
+     and the one connector between them drawn in its hover state. The first rule
+     is added from that `+`, like every rule after it.
+
+     Sticky for the visit, so deleting or undoing back to no rules keeps the
+     canvas rather than throwing the chooser back up mid-edit. */
+  const [scratch, setScratch] = useState(false)
+  /* The last policy handed to the history, and the history as last rendered —
+     both for Undo on a removal toast, which acts seconds after the removal. */
+  const lastCommitted = useRef<Policy | null>(null)
+  const histNow = useRef(hist)
+  useEffect(() => {
+    histNow.current = hist
+  }, [hist])
+  /* Whether this builder is still on screen. The toast outlives it by up to six
+     seconds, and an Undo pressed from another page has nothing to restore. */
+  const alive = useRef(false)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
   const [trace, setTrace] = useState<Trace | null>(null)
   const [hover, setHover] = useState<number | null>(null)
   const [review, setReview] = useState(false)
@@ -258,7 +290,23 @@ export function BoardBuilder({
   }, [saved?.id])
 
 
-  const draft = hist.present
+  /* The rules come from the draft; the policy's standing facts — its name and
+     applications — come from the store. The bar renames in place and the start
+     node's pane assigns applications, and both save straight to the policy, so
+     the draft's own copies go stale the moment either is used. Overlaid here,
+     every reader of `draft` (the bar, the start node, Review, and `committed`
+     when it spreads the draft into the store) sees the saved facts, and
+     publishing can never write an old name or app list back over a new one. */
+  const present = hist.present
+  const facts = useMemo(() => (saved ? { name: saved.name, appIds: saved.appIds, audience: saved.audience } : null), [saved])
+  const draft = useMemo(() => (facts ? { ...present, ...facts } : present), [present, facts])
+  /* "Start from scratch" is a step Undo can take back (review, 21 Sep 2026). It
+     commits nothing — the chain is simply empty — so with no history to walk
+     the toolbar Undo used to sit disabled and the template catalogue was gone
+     for the rest of the visit. The old scratch inserted a rule, and one Undo
+     brought the chooser back; this keeps that way home. */
+  const backToChooser = scratch && present.rules.length === 0 && !canUndo(hist)
+  const undoStep = () => (backToChooser ? setScratch(false) : setHist(undo))
 
   const env = useMemo<SimEnv>(
     () => ({
@@ -368,7 +416,8 @@ export function BoardBuilder({
     const blocking = !!document.querySelector('[role="dialog"]:not([aria-modal="false"]), .bx-scrim')
     if (action && !typing && !blocking) {
       e.preventDefault()
-      setHist(action === 'redo' ? redo : undo)
+      if (action === 'redo') setHist(redo)
+      else undoStep()
       return
     }
 
@@ -418,7 +467,7 @@ export function BoardBuilder({
        collapsed panel for no reason you could trace back to a keystroke. */
     if (cmd && e.key === '\\') {
       e.preventDefault()
-      if (at >= 0 || selection.kind === 'fallback') setInspOpen((v) => !v)
+      if (at >= 0 || selection.kind === 'fallback' || selection.kind === 'apps') setInspOpen((v) => !v)
       return
     }
     /* Everything below acts on the selected rule, or is a single key. Escape
@@ -543,7 +592,7 @@ export function BoardBuilder({
      The panel used to answer that case with the rule library, which is why it
      could always be open. The library has moved out, so the honest answer is
      now the empty one: no subject, no panel. */
-  const hasSubject = selection.kind === 'fallback' || selAt >= 0
+  const hasSubject = selection.kind === 'fallback' || selection.kind === 'apps' || selAt >= 0
 
   /* One way in, for both doors.
 
@@ -602,7 +651,7 @@ export function BoardBuilder({
         ] as Cmd[])
       : []),
     ...(toPublish ? ([{ id: 'publish', label: features.publish ? 'Review and publish' : 'Review and save', kbd: chord(['mod'], 'Enter', MAC), icon: Check }] as Cmd[]) : []),
-    ...(canUndo(hist) ? ([{ id: 'undo', label: 'Undo', kbd: chord(['mod'], 'Z', MAC), icon: Undo2 }] as Cmd[]) : []),
+    ...(canUndo(hist) || backToChooser ? ([{ id: 'undo', label: 'Undo', kbd: chord(['mod'], 'Z', MAC), icon: Undo2 }] as Cmd[]) : []),
     ...(canRedo(hist) ? ([{ id: 'redo', label: 'Redo', kbd: chord(['mod', 'shift'], 'Z', MAC), icon: Redo2 }] as Cmd[]) : []),
     ...(hasSubject ? ([{ id: 'panel', label: inspOpen ? 'Hide the panel' : 'Show the panel', kbd: chord(['mod'], '\\', MAC), icon: PanelRightClose }] as Cmd[]) : []),
     { id: 'keys', label: 'Keyboard shortcuts', kbd: '?', icon: Keyboard },
@@ -612,7 +661,30 @@ export function BoardBuilder({
   if (!saved) return <div className="bpage">This policy no longer exists.</div>
 
   /* --- Edits -------------------------------------------------------------------- */
-  const commitDraft = (next: Policy) => setHist((h) => commit(h, next))
+  const commitDraft = (next: Policy) => {
+    lastCommitted.current = next
+    setHist((h) => commit(h, next))
+  }
+  /* Every removal says what went, with Undo, for six seconds (owner, 21 Sep
+     2026). Undo steps back only while the removal is still the latest edit: a
+     press after anything else has changed would undo THAT instead, so it says
+     where the full history is rather than guessing. Call it straight after the
+     commit it describes, in the same event. */
+  const offerUndo = (what: string) => {
+    const after = lastCommitted.current
+    store.showToast(what, {
+      label: 'Undo',
+      run: () => {
+        if (!alive.current) return
+        if (after && histNow.current.present === after) {
+          setHist(undo)
+          store.showToast('Restored')
+        } else {
+          store.showToast(`Other changes came after it. Use Undo in the toolbar (${chord(['mod'], 'Z', MAC)}).`)
+        }
+      },
+    })
+  }
   /* Through `patchRule` in model.ts: a who patch is normalised and never touches
      the WHEN, and a rule taken back to everyone compares as JSON equal to the
      rule that never had a who — with the key kept in place, so removing a group
@@ -663,8 +735,14 @@ export function BoardBuilder({
     const next = draft.rules[i + 1] ?? draft.rules[i - 1]
     commitDraft({ ...draft, rules: draft.rules.filter((_, j) => j !== i) })
     if (selection.kind === 'rule' && selection.id === gone.id) setSelection({ kind: 'none' })
-    store.showToast(`Rule ${i + 1} deleted. Press ${chord(['mod'], 'Z', MAC)} to undo.`)
-    focusSoon(next ? byId(`bb-rule-${next.id}-title`) : () => document.querySelector<HTMLElement>('.bb__empty button'))
+    offerUndo(`Rule ${i + 1} deleted`)
+    /* With no rule left, the empty chain's `+` when the canvas stays up (a
+       scratch policy), or the chooser's first button when it comes back. */
+    focusSoon(
+      next
+        ? byId(`bb-rule-${next.id}-title`)
+        : () => document.querySelector<HTMLElement>('[data-tour="add-rule"]') ?? document.querySelector<HTMLElement>('.bb__empty button'),
+    )
   }
   /* One " (copy)" suffix, numbered, never stacked. */
   const duplicate = (i: number) =>
@@ -791,7 +869,7 @@ export function BoardBuilder({
           world, which meant the first thing anybody met could be panned off
           screen. `BoardEmpty` is an ordinary screen; `Board` is the canvas; and
           the board only ever mounts one of them. */}
-      {draft.rules.length === 0 ? (
+      {draft.rules.length === 0 && !scratch ? (
         <BoardEmpty
           /* "No rules" once the policy is live or had rules; the first-run
              question only for a new draft nobody has written in yet. */
@@ -802,10 +880,10 @@ export function BoardBuilder({
           undoLabel={`Undo (${chord(['mod'], 'Z', MAC)})`}
           onUseTemplate={() => setPicking(true)}
           onScratch={() => {
-            insert(blankRule(), 0)
-            /* The empty board, and the button, go; the rule's name is the
-               first thing to fill in. */
-            focusSoon(() => document.querySelector<HTMLElement>('.bb__insp input[aria-label="Rule name"]'))
+            /* The chooser goes and the empty chain comes up; focus lands on
+               the one control on it that adds a rule. */
+            setScratch(true)
+            focusSoon(() => document.querySelector<HTMLElement>('[data-tour="add-rule"]'))
           }}
         />
       ) : (
@@ -819,9 +897,8 @@ export function BoardBuilder({
            been deleted out from under the policy reads as no application, which
            is what it now is. */
         destination={
-          /* The chain's first node names ONE application, so a policy on
-             several names only the first. How many more is the board bar's to
-             say, right above, and saying it here too would print it twice. */
+          /* The chain's first node names ONE application, and says how many
+             more beside it — the bar no longer carries the applications. */
           draft.appIds.length > 0
             ? (appsOf(draft, store.apps)[0]?.name ?? null)
             : draft.isSystem
@@ -831,6 +908,7 @@ export function BoardBuilder({
         /* The first application's id, for its logo in the start pill, so the
            logo and the name beside it are the same application. */
         destinationAppId={draft.appIds.length > 0 ? (appsOf(draft, store.apps)[0]?.id ?? null) : null}
+        destinationMore={Math.max(appsOf(draft, store.apps).length - 1, 0)}
         selection={selection}
         diagnostics={diagnostics}
         shadowed={shadowed}
@@ -839,18 +917,21 @@ export function BoardBuilder({
         onSelect={select}
         expandedOf={expandedOf}
         onToggleExpand={toggleExpand}
-        onInsert={(at) => insert(blankRule(), at)}
+        onInsert={(at) => {
+          /* The first rule of a scratch policy: its name is the first thing
+             to fill in, as it was when the chooser inserted it. */
+          const first = draft.rules.length === 0
+          insert(blankRule(), at)
+          if (first) focusSoon(() => document.querySelector<HTMLElement>('.bb__insp input[aria-label="Rule name"]'), true)
+        }}
         onMove={move}
         onToggle={(i, on) => patchRule(i, { enabled: on })}
         onDuplicate={duplicate}
         onDelete={remove}
         onHover={setHover}
-        /* Everything that changes the VIEW, into the one centre toolbar `Board`
-           draws. Zoom is already in there because zoom state lives in `Board`;
-           these three used to sit in three separate corners.
-
-           Order is the order you reach for them: get the chrome out of the way,
-           step back through what you did, then how much of each rule. */
+        /* Undo and redo, into the one dock pill `Board` draws. Density comes
+           first in that pill (`aside`, below), then this history group, then
+           zoom, which lives in `Board` because the zoom state does. */
         tools={
           <>
             {/* A panel toggle stood here, and before that in the publishing
@@ -861,48 +942,38 @@ export function BoardBuilder({
                 or ⌘\. A fourth control, on the far side of the canvas from the
                 panel it acts on, was a second door for a room that was not
                 short of them. */}
-            <button type="button" className="bb__act" aria-label="Undo" title={`Undo (${chord(['mod'], 'Z', MAC)})`} disabled={!canUndo(hist)} onClick={() => setHist(undo)}>
-              <Undo2 size={14} strokeWidth={2} />
-            </button>
-            <button type="button" className="bb__act" aria-label="Redo" title={`Redo (${chord(['mod', 'shift'], 'Z', MAC)})`} disabled={!canRedo(hist)} onClick={() => setHist(redo)}>
-              <Redo2 size={14} strokeWidth={2} />
-            </button>
+            <Tip text={`Undo (${chord(['mod'], 'Z', MAC)})`} placement="top">
+              <button type="button" className="bb__act" aria-label="Undo" disabled={!canUndo(hist) && !backToChooser} onClick={undoStep}>
+                <Undo2 size={14} strokeWidth={2} />
+              </button>
+            </Tip>
+            <Tip text={`Redo (${chord(['mod', 'shift'], 'Z', MAC)})`} placement="top">
+              <button type="button" className="bb__act" aria-label="Redo" disabled={!canRedo(hist)} onClick={() => setHist(redo)}>
+                <Redo2 size={14} strokeWidth={2} />
+              </button>
+            </Tip>
           </>
         }
-        /* Density gets a pill of its own, docked to the left of the toolbar.
-
-           It is the one control down there that is a MODE — two named states,
-           one of them on, and it stays on until you say otherwise — where
-           everything beside it is a momentary press. Sitting inside that strip
-           it read as two buttons that happen to have words instead of glyphs;
-           in its own container it reads as the choice it is.
-
-           A radiogroup, not a toggle button. Both states are worth naming:
-           "Collapse cards" is a claim about what you get, and a single button
-           reading "Collapse cards" cannot say whether that is what you are in
-           or what you would switch to. */
         aside={
-          <div className="bb__float bb__density" role="radiogroup" aria-label="How much of each rule to show">
-              {(['outline', 'detailed'] as const).map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  role="radio"
-                  aria-checked={density === d}
-                  tabIndex={density === d ? 0 : -1}
-                  className={density === d ? 'is-on' : ''}
-                  title={d === 'outline' ? 'Names and outcomes only' : 'Every condition, on every card'}
-                  onClick={() => setChainDensity(d)}
-                  onKeyDown={(e) => {
-                    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
-                    e.preventDefault()
-                    setChainDensity(d === 'outline' ? 'detailed' : 'outline')
-                  }}
-                >
-                  {d === 'outline' ? 'Collapse cards' : 'Expand cards'}
-                </button>
-              ))}
-          </div>
+          /* ONE labelled button that says what it will do — "Expand all" while
+             the cards are folded, "Collapse all" while they are open (owner,
+             21 Sep 2026: the two bare glyphs "are not making sense, need the
+             label"). A pair of labelled segments was the widest thing in the
+             dock and the reason it was rebuilt; a pair of glyphs was the
+             narrowest and read as nothing. One verb with its mark is both short
+             and legible. The glyph is the card's own fold mark. */
+          <button
+            type="button"
+            className="bb__densitybtn"
+            onClick={() => setChainDensity(density === 'outline' ? 'detailed' : 'outline')}
+          >
+            {density === 'outline' ? (
+              <ChevronsUpDown size={14} strokeWidth={2} aria-hidden />
+            ) : (
+              <ChevronsDownUp size={14} strokeWidth={2} aria-hidden />
+            )}
+            {density === 'outline' ? 'Expand all' : 'Collapse all'}
+          </button>
         }
       />
       )}
@@ -952,13 +1023,24 @@ export function BoardBuilder({
           diagnostics={selAt >= 0 ? diagnostics.filter((d) => d.ruleIndex === selAt) : []}
           onPatchRule={patchRule}
           onPatchFallback={patchFallback}
+          onRemoved={offerUndo}
+          onAppsSaved={() => {
+            setInspOpen(false)
+            setSelection({ kind: 'none' })
+            focusSoon(() => document.getElementById('bb-start'))
+          }}
           onClose={() => {
             setInspOpen(false)
             /* The close button goes with the panel; focus goes to the card it was editing. */
             focusSoon(
               selection.kind === 'rule'
                 ? byId(`bb-rule-${selection.id}-title`)
-                : () => document.getElementById('bb-terminal-title') ?? document.querySelector<HTMLElement>('.bb__empty button'),
+                : selection.kind === 'apps'
+                  ? () => document.getElementById('bb-start')
+                  : () =>
+                      document.getElementById('bb-terminal-title') ??
+                      document.querySelector<HTMLElement>('[data-tour="add-rule"]') ??
+                      document.querySelector<HTMLElement>('.bb__empty button'),
             )
           }}
           wide={wide}
@@ -980,7 +1062,7 @@ export function BoardBuilder({
           onRun={(id) => {
             setCmd(false)
             if (id === 'add') insert(blankRule(), draft.rules.length)
-            else if (id === 'undo') setHist(undo)
+            else if (id === 'undo') undoStep()
             else if (id === 'redo') setHist(redo)
             else if (id === 'publish') setReview(true)
             else if (id === 'panel') setInspOpen((v) => !v)

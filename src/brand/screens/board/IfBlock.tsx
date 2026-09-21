@@ -1,7 +1,8 @@
 import { Fragment, type MouseEvent, type ReactNode } from 'react'
 import { ArrowRight, Braces, Split, Users } from 'lucide-react'
 
-import { hasWho as ruleHasWho, whoSummary } from '../../rule-who'
+import { hasWho as ruleHasWho, normaliseWho, whoSummary } from '../../rule-who'
+import { FaceStack, type FaceItem } from '../../faces'
 import { conditionType, type Condition, type Rule } from '../../data'
 import { cardJoin, cardLetter, topJoin } from '../../predicate'
 import type { NameLookup } from '../predicate-prose'
@@ -350,11 +351,24 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
      nothing until it has been answered (below). A who that is only exceptions
      is an answer, so "Everyone except Contractors" does get the row.
 
-     Words, not faces: "Finance, Legal and 2 more" or "Finance except Priya
-     Sharma". An exception cannot be drawn as an avatar, and the full list is
-     on the title. */
+     Faces, not words (owner, 21 Sep 2026): the groups and people as a stack,
+     each named on hover. An EXCEPTION cannot be drawn as a face, so what a rule
+     takes back out stays in words after the stack — "except Priya Sharma" —
+     and a who that is only exceptions reads "Everyone except …". */
   const whoName = (kind: 'group' | 'user', id: string) => resolve(kind, id)
-  const whoText = whoSummary(rule.who, whoName)
+  const whoNorm = normaliseWho(rule.who)
+  const whoFaces: FaceItem[] = whoNorm
+    ? [
+        ...whoNorm.groupIds.map((id) => ({ kind: 'group' as const, key: `g:${id}`, name: whoName('group', id) ?? id })),
+        ...whoNorm.userIds.map((id) => ({ kind: 'user' as const, key: `u:${id}`, name: whoName('user', id) ?? id })),
+      ]
+    : []
+  const whoExcept = whoNorm
+    ? [
+        ...(whoNorm.exceptGroupIds ?? []).map((id) => whoName('group', id) ?? id),
+        ...(whoNorm.exceptUserIds ?? []).map((id) => whoName('user', id) ?? id),
+      ]
+    : []
   const whoFull = whoSummary(rule.who, whoName, Infinity)
 
   /* Nothing is drawn until it has been ANSWERED.
@@ -406,9 +420,12 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
             <span className="bb__ifkw">who</span>
           </div>
           <IfSub className="bb__ifwho">
-            <span className="bb__ifwho__text" title={whoFull}>
-              {whoText}
-            </span>
+            {whoFaces.length > 0 ? <FaceStack faces={whoFaces} max={6} /> : <span className="bb__ifwho__text">Everyone</span>}
+            {whoExcept.length > 0 && (
+              <span className="bb__ifwho__text" title={whoFull}>
+                except {whoExcept.join(', ')}
+              </span>
+            )}
           </IfSub>
         </>
       )}

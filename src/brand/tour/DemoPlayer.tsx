@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Maximize, Minimize, Pause, Play, RotateCcw, Volume2, VolumeX, X } from 'lucide-react'
 
 import { DEMO_VIDEO } from './board-tour'
+import { SHOWCASE } from '../showcase'
 
 /* -----------------------------------------------------------------------------
    The demo player.
@@ -316,13 +317,22 @@ export function DemoPlayer({ open, onClose }: { open: boolean; onClose: () => vo
             <div className={`dpl__frame ${chrome ? 'is-awake' : ''} ${full ? 'is-full' : ''}`} ref={frame}>
               {failed ? (
                 <div className="dpl__fail">
-                  <p>
-                    <strong>The recording is not on this build.</strong>
-                  </p>
-                  <p>
-                    It is produced by <code>npm run demo:record</code>, which drives the real product in a browser and
-                    writes <code>public{DEMO_VIDEO.src}</code>.
-                  </p>
+                  {/* The build instructions are for us, not for a showcase audience. */}
+                  {SHOWCASE ? (
+                    <p>
+                      <strong>The video could not be played in this browser.</strong>
+                    </p>
+                  ) : (
+                    <>
+                      <p>
+                        <strong>The recording is not on this build.</strong>
+                      </p>
+                      <p>
+                        It is produced by <code>npm run demo:record</code>, which drives the real product in a browser and
+                        writes <code>public{DEMO_VIDEO.src}</code>.
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <video

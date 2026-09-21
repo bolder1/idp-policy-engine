@@ -340,7 +340,7 @@ describe('the review', () => {
     expect(inline.map((s) => s.summary)).toEqual(['Device health', '2 checks'])
   })
 
-  it('states the enrolment answers and each signal’s weight on a trusted device', () => {
+  it('states the enrolment answers and each signal’s priority on a trusted device', () => {
     const s = state({ name: 'Fleet', mode: 'device', reach: 'agent', picked: ['mac'], weights: { mac: TIER_WEIGHT.Low }, autoRegister: true })
     const [, devices, signals] = reviewSections(s, 'inline')
     expect(devices.facts.map((f) => [f.label, f.value])).toEqual([
@@ -357,7 +357,7 @@ describe('the review', () => {
     const single = reviewSections({ ...s, registration: 'pre-approved', maxDevices: null, roster: { ...roster, rows: 1 } }, 'inline')[1]
     expect(single.facts[2].value).toBe('fleet.csv, 1 device')
     expect(signals.title).toBe('Signals')
-    expect(signals.facts.find((f) => f.label === 'MAC address')?.value).toBe('Low weight')
+    expect(signals.facts.find((f) => f.label === 'MAC address')?.value).toBe('Low')
     expect(signals.facts).toHaveLength(alwaysOn('device').length + 1)
   })
 

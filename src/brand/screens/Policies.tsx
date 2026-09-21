@@ -39,6 +39,7 @@ import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
 import { statusOptions, type StatusTarget } from './status-options'
 import { useStatusChange } from './use-status-change'
+import { SHOWCASE } from '../showcase'
 
 /* Mounted only while it is open — the list is the landing screen and does not
    need the interview's questions, composer and figures in its chunk. */
@@ -521,7 +522,9 @@ function policyMenu(policy: Policy): MenuItem[] {
   return [
     { id: 'edit', label: 'Edit policy', icon: Pencil },
     ...statusOptions(policy).map((s) => ({ id: s.target, label: s.label, icon: s.target === 'active' ? Power : PowerOff })),
-    { id: 'trail', label: 'Open in trail', icon: Waypoints },
+    /* The older trail builder: not in the showcase build, where the board is
+       the one builder (see showcase.ts). */
+    ...(SHOWCASE ? [] : [{ id: 'trail', label: 'Open in trail', icon: Waypoints }]),
     /* A template of a policy with no rules would apply nothing. */
     ...(openForEditing(policy).rules.length > 0 ? [{ id: 'template', label: 'Save as template', icon: LayoutTemplate }] : []),
     ...(policy.isSystem
@@ -599,16 +602,22 @@ function PolicyRow({
 }) {
   return (
     <tr className={policy.isSystem ? 'is-system' : ''}>
-      <td className="btable__primary">
-        {/* The mark the list and card views give a policy, so a row reads as the
-            same object in all three. */}
-        <span className="blist__tile bpol__tile" aria-hidden>
-          <ShieldCheck size={18} strokeWidth={1.8} />
-        </span>
-        <button type="button" className="btable__link" onClick={() => onAction('edit')}>
-          {policy.name}
-        </button>
-        <PolicyMarks policy={policy} />
+      {/* The row's layout lives on a wrapper INSIDE the cell. `.btable__primary`
+          is a flex row, and set on the `<td>` itself it stopped the cell being
+          a table cell: it sized to its own content instead of the row, so its
+          bottom rule sat 5px above every other column's on each row. */}
+      <td>
+        <div className="btable__primary">
+          {/* The mark the list and card views give a policy, so a row reads as
+              the same object in all three. */}
+          <span className="blist__tile bpol__tile" aria-hidden>
+            <ShieldCheck size={18} strokeWidth={1.8} />
+          </span>
+          <button type="button" className="btable__link" onClick={() => onAction('edit')}>
+            {policy.name}
+          </button>
+          <PolicyMarks policy={policy} />
+        </div>
       </td>
       <td>
         <PolicyApps policy={policy} onAssign={() => onAction('assign')} />

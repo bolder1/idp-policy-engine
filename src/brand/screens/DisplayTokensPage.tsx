@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import {
   ArrowLeft,
-  ArrowRight,
   Check,
   KeyRound,
   Minus,
@@ -14,7 +13,7 @@ import {
   UserX,
 } from 'lucide-react'
 
-import { Badge, Button, DeleteButton, Drawer, Modal, RowMenu, SearchBox, Tabs, type MenuItem } from '../kit'
+import { Badge, Button, DeleteButton, Drawer, Modal, RowMenu, SearchBox, type MenuItem } from '../kit'
 import { Picker } from '../picker'
 import { EmptyState, NoMatches } from '../empty'
 import { useLeaveGuard } from '../leave-guard'
@@ -80,13 +79,22 @@ import {
    job is big enough to want the whole width, and a slider stacked four deep
    hid where you were.
 
-   The console's function, all of it, in this console's shapes:
+   The console's function, all of it, in this console's shapes — ONE page and
+   a page you drill into from it (21 Sep 2026), not two tabs:
 
-     Assignments       one row per token held — who, and which token. Unassign
-                       one or many, sync a Feitian C100, assign more by hand or
-                       from a CSV.
-     Token management  the inventory. Add one, upload a CSV, assign one from its
-                       row, delete what nobody holds.
+     Display tokens  the page: one row per token held — who, and which token.
+                     Unassign one or many, sync a Feitian C100, assign more by
+                     hand or from a CSV. This is the job people come here for.
+     Tokens          the stock it draws on, entered with "Manage tokens" and
+                     left with "← Display tokens". Add one, upload a CSV,
+                     assign one from its row, delete what nobody holds.
+
+   They were two tabs, "Assignments" and "Token management", and the page's own
+   empty state gave the game away: "Add tokens on Token management, then assign
+   them here". Two steps of one job, drawn as two peers. The owner's model is
+   the zones one — you keep a library, and you reach it from the place that
+   uses it (a rule's "Manage zones →"), rather than beside it. The route still
+   carries the view (`tab: 'tokens'`), so Back and every link in keep working.
 
    Lists rather than tables, because each row is read one object at a time; and
    sliders rather than the console's modals, so the list stays in view beside
@@ -114,11 +122,6 @@ type Confirm = { kind: 'unassign'; serials: string[] }
 /** Fixed row height of both lists, matching `.bdt__list`. */
 const ROW_H = 64
 
-const TABS: { value: DisplayTokenTab; label: string; icon: typeof KeyRound }[] = [
-  { value: 'assignments', label: 'Assignments', icon: UserRoundCheck },
-  { value: 'tokens', label: 'Token management', icon: KeyRound },
-]
-
 const sliderTitle = (s: Slider): string =>
   s.kind === 'add'
     ? 'Add token'
@@ -129,8 +132,6 @@ const sliderTitle = (s: Slider): string =>
         : s.mode === 'tokens'
           ? 'Upload tokens'
           : 'Upload assignments'
-
-const PANEL_ID = 'bdt-panel'
 
 /* Row menu items shared by both lists, with the icons every other row menu in
    the console carries. Unassign is red in both: it stops somebody signing in. */
@@ -189,9 +190,13 @@ export function DisplayTokensPage({ tab }: { tab: DisplayTokenTab }) {
   /* Arriving from Authentication methods, the button that brought you here has
      unmounted and focus is on <body>. The heading takes it, as a zone page's
      does when it opens. */
+  /* And again whenever the view changes. The control that switched it —
+     "Manage tokens", or a back link — goes with the view it was in (the two
+     back links are keyed so React replaces rather than relabels them), which
+     leaves focus on <body>; the new page's heading takes it. */
   useEffect(() => {
     if (!document.activeElement || document.activeElement === document.body) heading.current?.focus({ preventScroll: true })
-  }, [])
+  }, [tab])
 
   /* --- The lists' own state, kept across tab switches ----------------------------- */
 
@@ -493,29 +498,42 @@ export function DisplayTokensPage({ tab }: { tab: DisplayTokenTab }) {
   /* --- The page -------------------------------------------------------------------- */
 
   const goTab = (t: DisplayTokenTab) => store.go({ name: 'display-tokens', tab: t })
+  const inTokens = tab === 'tokens'
 
   return (
     <div className="bpage bpage--compact bdt">
-      <button type="button" className="bz7__back" onClick={() => store.go({ name: 'methods', from: 'display-tokens' })}>
-        <ArrowLeft size={14} strokeWidth={2} aria-hidden />
-        Authentication methods
-      </button>
+      {/* Up one level, which is a different place from each view: the tokens
+          page is inside Display tokens, and Display tokens is inside
+          Authentication methods. */}
+      {inTokens ? (
+        <button key="up-display" type="button" className="bz7__back" onClick={() => goTab('assignments')}>
+          <ArrowLeft size={14} strokeWidth={2} aria-hidden />
+          Display tokens
+        </button>
+      ) : (
+        <button key="up-methods" type="button" className="bz7__back" onClick={() => store.go({ name: 'methods', from: 'display-tokens' })}>
+          <ArrowLeft size={14} strokeWidth={2} aria-hidden />
+          Authentication methods
+        </button>
+      )}
 
       <header className="bpage__head">
         <div className="bpage__headrow">
           <div className="bpage__title">
             <h1 ref={heading} tabIndex={-1}>
-              Display tokens
+              {inTokens ? 'Tokens' : 'Display tokens'}
             </h1>
-            <p>Add hardware tokens and assign them to the people who carry them.</p>
+            <p>
+              {inTokens
+                ? 'Add, sync and delete the hardware tokens you hand out.'
+                : 'Assign hardware tokens to the people who carry them.'}
+            </p>
           </div>
         </div>
       </header>
 
-      <Tabs className="bx-tabs--line bdt__tabs" name="Display tokens" value={tab} options={TABS} onChange={goTab} panelId={PANEL_ID} />
-
-      <div id={PANEL_ID} role="tabpanel" aria-label={TABS.find((t) => t.value === tab)?.label} className="bdt__panel">
-        {tab === 'assignments' ? (
+      <div className="bdt__panel">
+        {!inTokens ? (
           <AssignmentsTab
             tokens={tokens}
             users={users}
@@ -527,7 +545,7 @@ export function DisplayTokensPage({ tab }: { tab: DisplayTokenTab }) {
             onUpload={() => openSlider({ kind: 'upload', mode: 'assignments' })}
             onSync={(serial) => openSlider({ kind: 'sync', serial })}
             onUnassign={(serials) => setConfirm({ kind: 'unassign', serials })}
-            onTokensTab={() => goTab('tokens')}
+            onManage={() => goTab('tokens')}
           />
         ) : (
           <TokensTab
@@ -806,7 +824,7 @@ function AssignmentsTab({
   onUpload,
   onSync,
   onUnassign,
-  onTokensTab,
+  onManage,
 }: {
   tokens: HardwareToken[]
   users: { id: string; name: string; email: string }[]
@@ -818,7 +836,8 @@ function AssignmentsTab({
   onUpload: () => void
   onSync: (serial: string) => void
   onUnassign: (serials: string[]) => void
-  onTokensTab: () => void
+  /** Into the tokens page — the stock this list draws on. */
+  onManage: () => void
 }) {
   const all = useMemo(() => assignmentsOf(tokens, users), [tokens, users])
   const shown = useMemo(() => filterAssignments(all, query), [all, query])
@@ -837,10 +856,10 @@ function AssignmentsTab({
       <EmptyState
         icon={KeyRound}
         title="No tokens to assign"
-        blurb="Add tokens on Token management, then assign them here."
+        blurb="Add tokens first, then assign them here."
         action={
-          <Button variant="brand" iconRight={ArrowRight} onClick={onTokensTab}>
-            Go to token management
+          <Button variant="brand" icon={KeyRound} onClick={onManage}>
+            Manage tokens
           </Button>
         }
       />
@@ -857,6 +876,11 @@ function AssignmentsTab({
             <Button variant="secondary" icon={Upload} onClick={onUpload}>
               Upload CSV
             </Button>
+            {/* The empty state replaces the toolbar, and with it the only other
+                way to the tokens — so it offers that way itself. */}
+            <Button variant="secondary" icon={KeyRound} onClick={onManage}>
+              Manage tokens
+            </Button>
           </>
         }
       />
@@ -867,9 +891,14 @@ function AssignmentsTab({
     <>
       <div className="btoolbar">
         <div className="btoolbar__left">
-          <SearchBox value={query} onChange={onQuery} placeholder="Search people or serials" label="Search assignments" />
+          <SearchBox value={query} onChange={onQuery} placeholder="Search people or serials" label="Search people or serials" />
         </div>
         <div className="btoolbar__right">
+          {/* The stock, reached from where it is used — as a rule reaches its
+              zones through "Manage zones". Secondary: assigning is the job. */}
+          <Button variant="secondary" icon={KeyRound} onClick={onManage}>
+            Manage tokens
+          </Button>
           <Button variant="secondary" icon={Upload} onClick={onUpload}>
             Upload CSV
           </Button>
@@ -890,7 +919,7 @@ function AssignmentsTab({
               </Button>
             )}
           </SelectAll>
-          <ul className="blist blist--paged bdt__list" ref={paged.listRef} aria-label="Assignments">
+          <ul className="blist blist--paged bdt__list" ref={paged.listRef} aria-label="Who carries which token">
             {paged.pageRows.map((r) => (
               <AssignmentRow
                 key={r.token.serial}
@@ -948,7 +977,7 @@ function AssignmentRow({
   )
 }
 
-/* --- Token management ---------------------------------------------------------------------- */
+/* --- Tokens: the page entered with "Manage tokens" --------------------------------------- */
 
 /* A token row's menu, in the same order as an assignment row's: what moves the
    token on, then under a rule the two that take something away — Unassign

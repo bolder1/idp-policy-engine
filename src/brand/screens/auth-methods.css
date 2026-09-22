@@ -721,6 +721,9 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
    with it: funding and enrolment are the two numbers this column reports, and
    they are read together. */
 .bm8__right .bm8__txn { margin-bottom: 2px; }
+/* How much of a family is on (22 Sep 2026): a grey chip on the name line,
+   after Default, whole rather than clipped. */
+.bm8__name .bm8__state { flex: none; }
 
 /* --- One list, and the row that narrows it ---------------------------------------
    v1's toolbar. It replaces a tab bar, two section heads and their paragraphs:

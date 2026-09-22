@@ -1191,15 +1191,12 @@ function FamilyListRow({
           ) : (
             title
           )}
-          {single && single.name !== f.channel && <i className="bm8__badge bm8__badge--use">{f.channel}</i>}
-          {f.isNew && <i className="bm8__new">New</i>}
-          {holdsDefault && (
-            <i className="bm8__defchip">
-              <Star size={10} strokeWidth={2.4} aria-hidden />
-              Default
-            </i>
-          )}
-          {/* What the family holds is the line under the name; the tip carries
+          {/* The name, its tip, then whatever else the row wears (owner, 22 Sep
+              2026: "heading, info, and then whatever else — don't push the
+              info icon"). The tip belongs to the name, so it stays against it
+              however many chips follow.
+
+              What the family holds is the line under the name; the tip carries
               the whole story, because the line is clipped rather than wrapped
               on a row whose balance chip takes the width.
 
@@ -1209,6 +1206,29 @@ function FamilyListRow({
               Gated the way MethodCard gates its own. */}
           {(single ? !!single.summary : true) && (
             <TipDot text={single ? single.description : `${f.blurb} ${f.detail}`} label={`About ${title}`} />
+          )}
+          {single && single.name !== f.channel && <i className="bm8__badge bm8__badge--use">{f.channel}</i>}
+          {f.isNew && <i className="bm8__new">New</i>}
+          {holdsDefault && (
+            <i className="bm8__defchip">
+              <Star size={10} strokeWidth={2.4} aria-hidden />
+              Default
+            </i>
+          )}
+          {/* How much of a family is on, on the rows that only open (owner,
+              22 Sep 2026: "it's hard to say how many or which methods are
+              enabled here — maybe a chip is enough"). A row with a switch says
+              it with the switch; a row that opens a drawer said nothing until
+              you went in. On the name, after Default, and grey (owner, same
+              day: "move this beside the heading, and use grey instead of
+              green"): a count of what is on is a fact about the row, not an
+              alert, so it takes no colour of its own. Counted after the Use
+              filter, like the row's other numbers, so it describes what
+              opening the row will show. */}
+          {!isUser && !single && (
+            <Badge tone="neutral" className="bm8__state">
+              {live === 0 ? 'Disabled' : inside.length === 1 ? 'Enabled' : `${live} of ${inside.length} enabled`}
+            </Badge>
           )}
         </span>
         <span className="bm8__blurb">{single ? single.summary ?? single.description : f.blurb}</span>
@@ -1220,7 +1240,6 @@ function FamilyListRow({
             {txns === 0 ? 'No transactions left' : `${txns.toLocaleString()} left`}
           </span>
         )}
-
         {/* No enrolment figure (owner, 18 Sep 2026: "remove enrolment
             numbers"). It was the loudest thing on every row — 20px semibold,
             eleven of them down a column — and it answered a question this page
@@ -1945,6 +1964,14 @@ function MethodCard({
       <div className="bm8__info">
         <span className="bm8__name">
           {m.name}
+          {/* The tip only where the line below cannot hold the whole
+              description (owner, 18 Sep 2026: "add a one-liner for each
+              card") — either because a shorter `summary` is being shown, or
+              because the description is long enough to be clipped on a row
+              carrying a balance chip. Where the line IS the description, a tip
+              would repeat what is already on screen. Straight after the name, before
+              any chip (owner, 22 Sep 2026: "heading, info, and then whatever else"). */}
+          {m.summary && <TipDot text={m.description} label={`About ${m.name}`} />}
           {/* Recovery keeps its chip, because nothing else on the row says it: a
               method can be a second factor and a way back in at once. */}
           {m.alsoRecovery && <i className="bm8__badge bm8__badge--use">Recovery</i>}
@@ -1960,13 +1987,6 @@ function MethodCard({
               Default
             </i>
           )}
-          {/* The tip only where the line below cannot hold the whole
-              description (owner, 18 Sep 2026: "add a one-liner for each
-              card") — either because a shorter `summary` is being shown, or
-              because the description is long enough to be clipped on a row
-              carrying a balance chip. Where the line IS the description, a tip
-              would repeat what is already on screen. */}
-          {m.summary && <TipDot text={m.description} label={`About ${m.name}`} />}
         </span>
         <span className="bm8__blurb">{m.summary ?? m.description}</span>
       </div>

@@ -90,6 +90,8 @@ export function UserMethodCard({
         <div className="bm8__info">
           <span className="bm8__name">
             {m.name}
+            {/* The tip against the name, then the chips, as on the admin's rows. */}
+            {m.summary && <TipDot text={m.description} label={`About ${m.name}`} />}
             {enrolled && <Badge tone="positive">Configured</Badge>}
             {m.tier === 'Phishing-resistant' && (
               <i className="bm8__badge">
@@ -97,7 +99,6 @@ export function UserMethodCard({
                 Phishing-resistant
               </i>
             )}
-            {m.summary && <TipDot text={m.description} label={`About ${m.name}`} />}
           </span>
           {/* The line, as on the admin's rows. */}
           <span className="bm8__blurb">{m.summary ?? m.description}</span>

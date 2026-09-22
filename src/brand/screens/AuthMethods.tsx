@@ -1224,10 +1224,16 @@ function FamilyListRow({
               green"): a count of what is on is a fact about the row, not an
               alert, so it takes no colour of its own. Counted after the Use
               filter, like the row's other numbers, so it describes what
-              opening the row will show. */}
+              opening the row will show.
+
+              Always the count, zero included: "Disabled" on the name read as
+              the whole family being switched off (owner, 22 Sep 2026: "it
+              looks like the whole SMS is disabled — remove or rename").
+              "0 of 3 enabled" says what is true — the methods inside are
+              off — in the same words as every other row. */}
           {!isUser && !single && (
             <Badge tone="neutral" className="bm8__state">
-              {live === 0 ? 'Disabled' : inside.length === 1 ? 'Enabled' : `${live} of ${inside.length} enabled`}
+              {`${live} of ${inside.length} enabled`}
             </Badge>
           )}
         </span>

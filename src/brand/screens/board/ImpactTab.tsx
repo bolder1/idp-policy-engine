@@ -126,7 +126,7 @@ export function ImpactTab({
         <Seg label="Time of day" block value={String(clock)} options={CLOCKS.map((c) => ({ value: String(c.minutes), label: `${c.label} · ${c.caption}` }))} onChange={(v) => setClock(Number(v))} />
       </div>
 
-      <Section title={movement ? 'Before → after' : 'Where sign-ins land'}>
+      <Section title={movement ? 'Before → after' : 'Where logins land'}>
         <div className="bb__lanes">
           {LANES.map((l) => {
             const a = after.counts[l.id]

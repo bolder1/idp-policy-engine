@@ -112,7 +112,7 @@ export const BOARD_STOPS: BoardStop[] = [
        the step is done when a rule exists, not when scratch is pressed. */
     anchorAlt: 'empty-start',
     heading: 'A policy is a list of rules',
-    body: 'Add one and it joins a chain that every sign-in falls down until something matches it, which makes where a rule sits as much of the policy as what it says.',
+    body: 'Add one and it joins a chain that every login falls down until something matches it, which makes where a rule sits as much of the policy as what it says.',
     task: {
       ask: 'Add a rule to the chain.',
       didIt: 'Added — and it is the rule the panel on the right is now editing.',
@@ -136,7 +136,7 @@ export const BOARD_STOPS: BoardStop[] = [
     id: 'when',
     anchor: 'insp-when',
     heading: 'What has to be true',
-    body: 'A condition is a fact about the sign-in happening right now — its risk, its network, its device, its hour — and everything inside one group has to hold before the rule fires.',
+    body: 'A condition is a fact about the login happening right now — its risk, its network, its device, its hour — and everything inside one group has to hold before the rule fires.',
     task: {
       ask: 'Add a condition.',
       didIt: 'Added — the rule now fires only when that is true of the attempt.',
@@ -148,7 +148,7 @@ export const BOARD_STOPS: BoardStop[] = [
     id: 'then',
     anchor: 'insp-then',
     heading: 'And what happens then',
-    body: 'Allow signs them in, Second factor asks for more proof and Deny ends it there — one of the three, because a rule that could do two of them would not be one rule.',
+    body: 'Allow logs them in, Second factor asks for more proof and Deny ends it there — one of the three, because a rule that could do two of them would not be one rule.',
     task: {
       /* Not "set an outcome": a new rule already HAS one. `blankRule()` seeds
          `2fa`, so a check of "is it set?" would tick the instant the step opened

@@ -93,13 +93,27 @@
      element by the grip drag, so a media query lowering it for narrow screens
      could never win. Clamping the track against the region's own width does the
      same job from inside the declaration, at every width, with no breakpoint. */
-  --bb-gap: var(--space-4);
+  /* ZERO now (owner, 22 Sep 2026: "it feels too boxy — reduce the space and
+     the border so it feels connected"). The canvas and the panel were two
+     rounded cards 8px apart on the page grey, each with its own edge; they are
+     one surface now, the canvas running to the edges and the panel docked
+     against it behind a single hairline. The note above is the argument that
+     lost. */
+  --bb-gap: 0px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) min(var(--bb-insp), 46%);
   grid-template-rows: minmax(0, 1fr);
   gap: var(--bb-gap);
   padding: var(--bb-gap);
-  background: var(--surface-page);
+  /* The canvas's dotted ground, drawn on the whole region rather than on the
+     stage alone, so it runs on behind the floating panel (owner, 22 Sep 2026:
+     "make the configure panel floating, like we have in our product"). The
+     canvas writes its pan and zoom here too (`varsOnParent`), and the stage
+     starts at this box's own corner, so the two grounds are one. */
+  background-color: var(--bb-stage);
+  background-image: radial-gradient(circle, var(--bb-dot) 1px, transparent 1.4px);
+  background-size: calc(22px * var(--bb-z, 1)) calc(22px * var(--bb-z, 1));
+  background-position: var(--bb-x, 0px) var(--bb-y, 0px);
   /* Still the containing block for anything that has to be placed against the
      region as a whole. */
   position: relative;
@@ -282,12 +296,10 @@
      the dotted ground read as a surface you are working ON, and `clip` — which
      is here for a different and much worse reason, see above — rounds the
      world with it for free. */
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  background-color: var(--bb-stage);
-  background-image: radial-gradient(circle, var(--bb-dot) 1px, transparent 1.4px);
-  background-size: calc(22px * var(--bb-z, 1)) calc(22px * var(--bb-z, 1));
-  background-position: var(--bb-x, 0px) var(--bb-y, 0px);
+  /* No edge, radius or ground of its own: the region behind it draws the dots
+     (see `.bb`), so the canvas and the ground under the floating panel are one
+     surface (22 Sep 2026). */
+  background: none;
   cursor: grab;
   user-select: none;
   touch-action: none;
@@ -326,9 +338,7 @@
   display: grid; place-items: center;
   padding: var(--space-9) var(--space-8);
   overflow-y: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-xl);
-  /* The board's own ground, exactly. A ruled, lit variant was tried here — fine
+  /* No edge or radius, like the stage (22 Sep 2026). The board's own ground, exactly. A ruled, lit variant was tried here — fine
      graph lines on the sunken surface with an ellipse of white washed over the
      middle — and it is the wrong instinct: arriving at an empty policy and
      arriving at a full one should be arriving at the same place. The texture is
@@ -785,6 +795,8 @@
 .bb__skin button:hover { color: var(--text-primary); }
 .bb__skin button.is-on { background: var(--surface-sunken); color: var(--text-primary); }
 .bb__skin button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bb__skin button { white-space: nowrap; }
+
 
 /* --- A card ---------------------------------------------------------------- */
 
@@ -916,6 +928,14 @@
   transition: background-color 0.15s ease, transform 0.15s ease;
 }
 .bb__idx:hover { transform: scale(1.06); }
+/* Not the draggable badge (owner, 22 Sep 2026: "when I hover on the drag
+   anchor it has some issue"). A transform makes an element the containing
+   block of its absolutely-positioned children, and the grip is one: the scale
+   re-anchored it from the card's trailing edge onto the badge, 480px to the
+   left, so hovering the grip moved it out from under the pointer, which ended
+   the hover, which put it back — a flicker you could not grab. The badge says
+   it is under the pointer with its ground instead. */
+button.bb__idx:hover { transform: none; background: var(--surface-inset, var(--surface-sunken)); }
 /* The number stays; the grip goes outside the card.
 
    It used to be a SWAP inside the 30px badge — number at rest, grip on hover —
@@ -970,12 +990,31 @@
   border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
   background: var(--surface-raised); color: var(--text-tertiary);
   box-shadow: var(--el-low);
-  opacity: 0; pointer-events: none;
-  transition: opacity 0.15s ease;
+  /* Hidden by VISIBILITY, which can wait, rather than by pointer-events, which
+     cannot: once the card loses the pointer the grip stays grabbable for a
+     moment while it fades, so a pointer that left the card lower down — a tall
+     card, whose grip is on its first row — and travels up to it still gets
+     there (found by the drag review, 22 Sep 2026). Reaching it hovers the card
+     again, and it stays. */
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0s linear 0.35s;
 }
 .bb__card:hover .bb__idx__grip,
 .bb__card.is-selected .bb__idx__grip,
-.bb__card:focus-within .bb__idx__grip { opacity: 1; pointer-events: auto; }
+.bb__card:focus-within .bb__idx__grip { opacity: 1; visibility: visible; transition: opacity 0.15s ease, visibility 0s; }
+/* A bridge over the gap between the card's edge and the grip. The grip only
+   takes the pointer while the card is hovered, and the 8px between them is not
+   the card — so a pointer moved there at an ordinary speed left the card, the
+   grip went inert, and it could not be reached. The bridge belongs to the grip
+   (so to the card), and takes the pointer only while the grip is visible. */
+.bb__idx__grip::before {
+  content: '';
+  position: absolute; top: -6px; bottom: -6px; right: 100%;
+  width: calc(var(--space-4) + 2px);
+}
+.bb__idx__grip { cursor: grab; }
+.bb__card.is-dragging .bb__idx__grip,
+.bb__card.is-dragging .bb__idx { cursor: grabbing; }
 /* The badge itself keeps its hit area — dragging from the number still works,
    which is what it always did and what the accessible name still promises. */
 .bb__idx:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
@@ -1064,9 +1103,17 @@
   opacity: 0; pointer-events: none;
   transition: opacity 0.15s ease;
 }
-.bb__card:hover .bb__acts, .bb__card.is-selected .bb__acts, .bb__card:focus-within .bb__acts {
+.bb__card:hover .bb__acts, .bb__card.is-selected .bb__acts, .bb__card:focus-within .bb__acts, .bb__card.is-menu .bb__acts {
   opacity: 1; pointer-events: auto;
 }
+/* The trail is the fold, the on/off switch and the ⋯ menu (21 Sep 2026). The
+   switch gets a little air either side so it does not read as one of the
+   24px marks, and the kebab is drawn at the marks' 24px rather than the kit's
+   row size, so the trail keeps one height. `.is-menu` holds the trail out
+   while that menu is open: it portals, so the pointer in it has left the card. */
+.bb__acts { align-items: center; }
+.bb__acts > .bx-toggle { margin: 0 var(--space-2); }
+.bb__acts > .bx-rowmenu { width: 24px; height: 24px; border-radius: var(--radius-sm); }
 .bb__act {
   display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-sm);
   border: none; background: none; color: var(--text-muted); cursor: pointer;
@@ -1292,7 +1339,6 @@
 
    The dock is the positioned element and carries no chrome of its own; inside
    it sits one `.bb__dockbar` pill (plus the skin switch when SHOWCASE is off).
-   Its `transform` transition is for the zoom fold-out — see `.bb__zoomgrp`.
 
    Centred on the stage, which is now the only thing it CAN be centred on: the
    dock is drawn inside `.bb__stage`, and the stage is a grid track that already
@@ -1319,7 +1365,6 @@
 /* `.bb__density`, the two-segment Collapse cards / Expand cards pill, stood here.
    It is one labelled button in the dock now — see `.bb__densitybtn`. */
 .bb__float__sep { width: 1px; height: 18px; background: var(--border-subtle); margin: 0 2px; }
-.bb__zoom { text-align: center; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 
 /* The two pips + the rehearsal button. Each reads as one finding. */
 .bb__pip {
@@ -1371,7 +1416,15 @@
    it is plainly a second thing, and closing it plainly gives the space back. */
 .bb__insp {
   display: flex; flex-direction: column; min-height: 0; min-width: 0;
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
+  /* FLOATING over the canvas's ground, the product's own configure panel
+     (owner, 22 Sep 2026): inset from the region's top, right and bottom, a
+     rounded card with its own edge and a lifted shadow. It was docked behind a
+     single hairline for an hour, and before that a card in a gutter on the page
+     grey. Still a grid track, so the canvas centres in what is left of it. */
+  margin: var(--space-5) var(--space-5) var(--space-5) 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--el-mid);
   background: var(--surface-raised);
   overflow: hidden;
   animation: bb-insp-in var(--dur-normal) var(--ease-standard);
@@ -1434,6 +1487,20 @@
   color: var(--text-tertiary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* A rule's bar is its heading (22 Sep 2026): number, name, switch, then the
+   panel's narrow and close past a hairline, so the rule's controls and the
+   panel's read as two groups on one line. */
+/* A little more room above and below, and between its parts (owner, 22 Sep
+   2026: "increase the height of the top heading a little — make it
+   breathable"): 6px of padding held a 36px field, so the bar sat tight on it. */
+.bb__inspbar.is-rule { gap: var(--space-4); padding: var(--space-5) var(--space-3) var(--space-5) var(--space-5); }
+.bb__inspnum {
+  flex: none; display: grid; place-items: center;
+  min-width: 26px; height: 26px; padding: 0 6px; border-radius: var(--radius-sm);
+  background: var(--surface-sunken); color: var(--text-secondary);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums;
+}
+.bb__inspbar__sep { flex: none; width: 1px; height: 20px; margin: 0 var(--space-1); background: var(--border-subtle); }
 
 /* --- The whole-rule room ------------------------------------------------------
 
@@ -1842,12 +1909,9 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
   .bb__link__add:focus-visible::before { animation: none; }
   /* The fold still folds — it just arrives. */
   .bb__fold { transition: none; }
-  /* The condition row's silencer is NOT here — it sits beside the declaration
-     it has to beat, at the foot of this file. A media query adds no
-     specificity, so `.bb__cond.is-new { animation: none }` here (0,2,0) and
-     `.bb__cond.is-new { animation: bb-in … }` there (0,2,0) are decided by
-     source order, and there comes later. The `.bb__ifrow` silencer below works
-     only because its declaration happens to sit above it. */
+  /* The `.bb__ifrow` silencer below works only because its declaration happens
+     to sit above it: a media query adds no specificity, so source order
+     decides. */
 }
 
 /* --- The conditional block ---------------------------------------------------
@@ -1912,9 +1976,10 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
      four controls do not fit across a narrow panel — and that had to be
      measured against the BLOCK, since the panel is draggable from 320 to 720
      against a window that never moves. The row is one pill now and fits at
-     every width, so there is nothing left to fold. Kept because it costs
-     nothing and the next thing that needs to respond to the panel's width will
-     want it. */
+     every width, so there is nothing left to fold. It is what the row's
+     columns are measured in now: the attribute and operator widths are `cqi`
+     of this block (condition-popover.css, 22 Sep 2026), so they grow with the
+     panel and match on every row inside it. */
   container-type: inline-size;
   container-name: ifblock;
 }
@@ -2140,6 +2205,9 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 /* In the panel it is a caption under the row, in words — it was a bare "·2"
    that fell below the three-part row and read as a stray character. */
 .bb__insp .bb__ifdupe { display: block; padding: var(--space-2) var(--space-5) 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
+/* A value this row shares with another condition in its branch — a conflict to
+   resolve, so it is said in the notice ink rather than as a quiet aside. */
+.bb__insp .bb__ifdupe.is-clash { color: var(--fb-notice-fg); }
 
 .bb__ifjourney { display: inline-flex; align-items: center; gap: 4px; color: var(--if-muted); font-size: 12px; min-width: 0; flex-wrap: wrap; }
 .bb__ifjourney svg { opacity: 0.6; }
@@ -2587,11 +2655,8 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    as off, and it reads as the one in hand. */
 .bb__card.is-off.is-selected { opacity: 0.85; }
 
-/* --- The zoom readout ------------------------------------------------------
-   The level at rest, with its steps folded out on hover — see the 21 Sep
-   `.bb__zoomgrp` block near the end of this file, which keeps the level from
-   moving under the pointer as the dock widens. */
-.bb__zoom { border-radius: var(--radius-sm); padding: 2px 4px; }
+/* `.bb__zoom`, the zoom level readout, stood here. The dock shows no level now
+   (22 Sep 2026) — see `.bb__zoomgrp`. */
 
 /* A group that holds nothing yet.
 
@@ -2638,32 +2703,30 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__ifblank > p { margin: 0; max-width: 38ch; font-size: var(--fs-md); color: var(--text-tertiary); line-height: 1.6; }
 .bb__ifblank__acts { display: flex; gap: var(--space-3); margin-top: var(--space-2); }
 
-/* The catalogue, at the pane's width rather than at its own.
-
-   `.bb__ifblank` centres its children, so the list came out 250px wide under a
-   sentence a third wider than it — which reads as something that failed to
-   load rather than as a list. Stretching it is the whole fix; nothing about the
-   list was wrong except how much of the pane it was using.
-
-   `text-align: left` because the empty state centres its text and the list is
-   not text. */
-/* Out past the empty state's own padding, so "full width" means the pane's
-   width rather than what is left of it.
-
-   `.bb__ifblank` pads itself generously — it is a centred column of a mark, a
-   heading and a sentence, and that air is most of what makes it read as an
-   empty state rather than as a broken one. The list is not part of that column.
-   Negative margins on exactly the horizontal padding, so the two can disagree
-   without either being wrong. */
-.bb__ifblank__pick {
-  width: auto;
-  align-self: stretch;
-  margin: var(--space-2) calc(var(--space-6) * -1) 0;
-  text-align: left;
-}
+/* `.bb__ifblank__pick` stood here — the catalogue stretched to the pane's width
+   inside the empty state. The empty state now gives way to the empty condition
+   row itself (21 Sep 2026), so there is no list to stretch. */
 /* Inside the state the adders are the point, so they lose the `align-self` the
-   footer version carries. */
-.bb__ifblank__acts .bb__ifaddgroup { margin-top: 0; }
+   footer version carries.
+
+   And they are drawn as BUTTONS there — outlined, the console's neutral button
+   (owner, 22 Sep 2026: "this doesn't feel like a button — add a background or
+   make it an outline button"). Bare text read as a caption under the sentence.
+   The same pair in the Who and If empty states. */
+.bb__ifblank__acts { gap: var(--space-4); margin-top: var(--space-4); }
+.bb__ifblank__acts .bb__ifadd,
+.bb__ifblank__acts .bb__ifaddgroup {
+  margin-top: 0;
+  height: var(--ctl-height-sm); padding: 0 var(--space-5); gap: 6px;
+  border: 1px solid var(--int-neutral-border);
+  background: var(--int-neutral-bg);
+  color: var(--int-neutral-text);
+  font-size: var(--fs-sm);
+}
+.bb__ifblank__acts .bb__ifadd:hover,
+.bb__ifblank__acts .bb__ifaddgroup:hover {
+  background: var(--int-neutral-bg-hover); border-color: var(--int-neutral-border-hover); color: var(--int-neutral-text);
+}
 
 /* "Nothing in this group yet — it matches everything until you add a condition."
 
@@ -2677,7 +2740,8 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    It replaces `.bb__ifempty`, a dashed box holding the sentence "Nothing in this
    group yet — it matches everything until you add a condition". That was a
    group apologising for existing. A group is never created empty now, so the
-   box is the way in rather than a warning: pressed, it becomes the catalogue.
+   box is the way in rather than a warning: pressed, it draws the group's first
+   empty condition row.
    Dashed because on this surface dashed means exactly one thing — something is
    about to be added here. */
 .bb__ifslot {
@@ -2893,14 +2957,9 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    same information at any width, so the container query that used to fold the
    row into two lines is gone with it. */
 .bb__cond { display: block; min-width: 0; }
-.bb__cond.is-new { animation: bb-in 0.28s ease-out; }
-/* Silenced here rather than in the reduced-motion block further up the file: a
-   media query carries no specificity of its own, both selectors are (0,2,0),
-   and source order decides. That block ran first and lost, so a reader who had
-   asked for no motion got the slide-in anyway. */
-@media (prefers-reduced-motion: reduce) {
-  .bb__cond.is-new { animation: none; }
-}
+/* `.bb__cond.is-new` — a slide-in for a condition just added — stood here, with
+   its reduced-motion silencer. Every condition now arrives from the empty row,
+   which already drew it in place (21 Sep 2026). */
 
 /* The gap between two members, and the word that fills it.
 
@@ -2916,10 +2975,8 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   display: flex; align-items: center; gap: var(--space-3);
   padding: 5px 0 5px 10px;
 }
-.bb__joinrow::after {
-  content: '';
-  flex: 1; height: 1px; background: var(--border-subtle);
-}
+/* No hairline after the chip any more (owner, 22 Sep 2026: "remove the
+   divider"). The chip's own fill carries the join; the line only repeated it. */
 
 /* The joiner, drawn as the select it behaves like: press it and the level
    flips. */
@@ -2939,8 +2996,11 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   appearance: none; -webkit-appearance: none;
   display: inline-flex; align-items: center;
   height: 30px; padding: 0 22px 0 9px;
-  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
-  background-color: var(--surface-raised);
+  /* A light ground (owner, 22 Sep 2026: "add a little background to this"), so
+     the join reads as a control between the conditions rather than a white box
+     like them. The fill carries the shape, so the edge steps down a tone. */
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  background-color: var(--surface-inset, var(--surface-sunken));
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235A6775' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 6px center;
@@ -2949,6 +3009,23 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   color: var(--text-secondary); cursor: pointer;
 }
 .bb__joinsel:hover { border-color: var(--border-strong); }
+/* The caret survives hover and focus.
+
+   The kit's field rules — `.brand-root :where(input, select):hover` and its
+   `:focus-visible` twin — set the `background` SHORTHAND, and at (0,2,0) they
+   outrank `.bb__joinsel` above. A shorthand resets `background-image`, so the
+   chevron vanished the moment the pointer arrived and came back when it left,
+   and the fill jumped with it (owner, 21 Sep 2026: "a weird interaction with
+   the down chevron"). Restated here at (0,3,0), longhands only, so hover
+   changes the edge and nothing else, and focus adds the halo. */
+.bb__joinrow .bb__joinsel:hover,
+.bb__joinrow .bb__joinsel:focus-visible {
+  background-color: var(--surface-inset, var(--surface-sunken));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235A6775' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+.bb__joinrow .bb__joinsel:hover { border-color: var(--border-strong); }
 /* No tint per value.
 
    AND was drawn on the info ramp and OR on the notice ramp, which made the
@@ -2980,24 +3057,42 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    spends the feedback ramps on exactly that. A sunken track with the chosen
    answer raised out of it, which is the segmented control the rest of the
    product already uses, tinted by which answer it is. */
-.bb__outpick {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
-  padding: 3px; border-radius: var(--radius-md);
-  background: var(--surface-sunken); border: 1px solid var(--border-subtle);
+/* `.bb__outpick` and `.bb__outbtn`, the two-segment Allow / Deny control, stood
+   here. The outcome is a set of cards now — see below. */
+
+/* The outcome as CARDS, each with its one line (22 Sep 2026): two to a row and
+   the rest wrapping under them, never one per line. A card is its icon and its
+   name over what it does; the chosen one takes its answer's tone on the edge,
+   the ground and the icon. No radio mark — the tint says which (owner: "remove
+   the radio button, not needed"). */
+.bb__outcards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.bb__outcard {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: var(--space-4);
+  padding: var(--space-5); border-radius: var(--radius-md);
+  border: 1px solid var(--ctl-border); background: var(--surface-raised);
+  text-align: left; cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
 }
-.bb__outbtn {
-  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-3);
-  min-height: 30px; padding: 0 var(--space-4); border-radius: var(--radius-sm);
-  background: none; cursor: pointer;
-  font-size: var(--fs-md); color: var(--text-secondary);
-  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+.bb__outcard:hover { border-color: var(--border-strong); }
+.bb__outcard:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bb__outcard__ico { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--text-secondary); }
+.bb__outcard__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bb__outcard__text b { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bb__outcard__text em { font-style: normal; font-size: var(--fs-sm); line-height: 1.4; color: var(--text-tertiary); }
+.bb__outcard.is-allow { --out-fg: var(--fb-positive-fg); --out-bg: var(--fb-positive-bg); --out-border: var(--fb-positive-border); }
+.bb__outcard.is-deny { --out-fg: var(--fb-negative-fg); --out-bg: var(--fb-negative-bg); --out-border: var(--fb-negative-border); }
+.bb__outcard.is-on { border-color: var(--out-border); background: var(--out-bg); }
+.bb__outcard.is-on .bb__outcard__ico { background: var(--surface-raised); color: var(--out-fg); }
+/* Drawn and not choosable yet: quieter, no pointer, a "Coming soon" chip. */
+.bb__outcard.is-soon { cursor: default; background: var(--surface-sunken); border-color: var(--border-subtle); }
+.bb__outcard.is-soon:hover { border-color: var(--border-subtle); }
+.bb__outcard.is-soon .bb__outcard__text b { color: var(--text-secondary); }
+.bb__outcard__soon {
+  margin-left: 4px; padding: 1px 6px; border-radius: var(--radius-full);
+  font-style: normal; font-size: 11px; font-weight: var(--fw-medium); vertical-align: 1px;
+  background: var(--fb-neutral-bg); color: var(--fb-neutral-fg);
 }
-.bb__outbtn > svg { flex: none; }
-.bb__outbtn:hover { color: var(--text-primary); }
-.bb__outbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.bb__outbtn.is-on { font-weight: var(--fw-medium); box-shadow: inset 0 0 0 1px var(--border-default), var(--el-low); }
-.bb__outbtn.is-allow.is-on { background: var(--fb-positive-bg); color: var(--fb-positive-fg); box-shadow: inset 0 0 0 1px var(--fb-positive-border), var(--el-low); }
-.bb__outbtn.is-deny.is-on { background: var(--fb-negative-bg); color: var(--fb-negative-fg); box-shadow: inset 0 0 0 1px var(--fb-negative-border), var(--el-low); }
+@media (prefers-reduced-motion: reduce) { .bb__outcard { transition: none; } }
 
 /* --- WHO: the people a rule applies to ---------------------------------------
 
@@ -3009,49 +3104,29 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    the thing it removed. It is not a control, so no ring. */
 .bb__who:focus { outline: none; }
 
-/* What an empty who MEANS, said once and only while it is empty. Violet, which
-   this surface spends on nothing else: it is not a warning (nothing is wrong)
-   and not a finding (the linter owns the blue on this panel). */
-.bb__whonote {
-  display: flex; align-items: flex-start; gap: var(--space-4);
-  width: 100%; padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--fb-accent-border); border-radius: var(--radius-md);
-  background: var(--fb-accent-bg); color: var(--fb-accent-fg);
-}
-.bb__whonote > svg { flex: none; margin-top: 1px; }
-.bb__whonote p { margin: 0; font-size: var(--fs-sm); line-height: 1.5; }
-.bb__whonote b { font-weight: var(--fw-semibold); }
+/* An empty who: the If's empty state (`.bb__ifblank`), full width (22 Sep 2026). */
+.bb__whoblank { align-self: stretch; padding-block: var(--space-5); }
+/* Its sentence is a blue info banner across the section, read left to right
+   like every callout, between the heading and the two adders. */
+.bb__whoblank > .bx-callout { align-self: stretch; text-align: left; font-size: var(--fs-sm); line-height: 1.5; }
 
-/* One slot per kind: a field where the kind holds something, a door where it
-   does not. See WhoEditor.tsx.
-
-   The two DOORS share one row, half each (owner, 18 Sep 2026: "make this in one
-   row") — two short buttons stacked left a column of white down the panel's
-   right half and read as a list of two things to do rather than as one question
-   with two ways in. A FIELD takes the whole row, because what it holds is a
-   line of names, and it wraps to a row of its own rather than squeezing the
-   door beside it: the door keeps its shape either way. */
+/* One field per kind once either holds a name: full width, the empty one saying
+   so with its Add inside (22 Sep 2026). With nothing chosen the section is the
+   empty state above instead. See WhoEditor.tsx. */
 .bb__whorows { display: flex; flex-wrap: wrap; gap: var(--space-3); width: 100%; }
-/* A door at a field's height, so the two slots are the same object in two
-   states rather than a control and a button. */
-.bb__whorows > .bx-btn {
-  flex: 1 1 45%; min-width: 0;
-  height: var(--ctl-height-md); justify-content: center; gap: var(--space-4);
-}
 .bb__whorows > .bb__whorow { flex: 1 1 100%; }
 
 /* One entity. A field, not a list row: it is the control that answers "which
-   groups", and it looks like the other controls on this panel. */
+   groups", and it looks like the other controls on this panel. Not a button any
+   more: its actions are the buttons at its end (View and Edit, or Add), so the
+   field itself takes no hover and no pointer. */
 .bb__whorow {
   display: flex; align-items: center; gap: var(--space-4);
-  width: 100%; min-height: var(--ctl-height-md); padding: 0 var(--space-4);
+  width: 100%; min-height: var(--ctl-height-md); padding: 0 var(--space-2) 0 var(--space-4);
   background: var(--ctl-bg);
   border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
-  cursor: pointer; text-align: left; font-size: var(--fs-md);
-  transition: border-color var(--dur-fast) var(--ease-standard);
+  text-align: left; font-size: var(--fs-md);
 }
-.bb__whorow:hover { border-color: var(--border-strong); }
-.bb__whorow:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__whorow__ico { flex: none; display: grid; place-items: center; color: var(--text-tertiary); }
 .bb__whorow__label { flex: none; font-weight: var(--fw-medium); color: var(--text-body); }
 /* The value takes what is left and gives it back — a long list of names is
@@ -3062,11 +3137,13 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
   color: var(--text-muted);
 }
 .bb__whorow.is-set .bb__whorow__val { color: var(--text-primary); }
+/* The empty kind's line, quieter than a value: it reports an absence. */
+.bb__whorow.is-empty .bb__whorow__val { font-size: var(--fs-sm); color: var(--text-tertiary); }
 /* Faces now, not a line of names: laid out right-aligned, and not clipped, so the
    ring round each face survives the row's own box. */
 .bb__whorow__val:has(.bx-faces) { display: flex; justify-content: flex-end; overflow: visible; }
-.bb__whorow__go { flex: none; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-tertiary); }
-.bb__whorow:hover .bb__whorow__go { color: var(--accent-strong); }
+/* View and Edit, or Add: small ghost buttons inside the field's right edge. */
+.bb__whorow__acts { flex: none; display: flex; align-items: center; gap: 2px; }
 
 /* `.bb__whoexcept` and its label stood here. The board's Who section no longer
    builds exceptions — see the note in WhoEditor.tsx; the trail builder still
@@ -3224,8 +3301,8 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    already says "Off" beside the name when a rule is off, which is the only time
    the fact is worth reading.
 
-   It is a toggle glyph in this strip now — on takes the accent, off stays muted
-   like its neighbours; see `.bb__onoff`. */
+   It is the kit's switch in this strip now, beside the fold and the ⋯ menu
+   that holds move, duplicate and delete (owner, 21 Sep 2026). */
 .bb__acts .bb__float__sep { height: 14px; margin: 0 1px; }
 
 /* =============================================================================
@@ -3256,10 +3333,21 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    height for nothing but the line. A rule of 1px does the separating; the
    spacing does the rest. */
 .bb__insp .bb__sec {
-  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+  border-bottom: 0;
   padding: var(--space-5) var(--space-5) var(--space-6);
 }
-.bb__insp .bb__sec:last-child { border-bottom: 0; }
+/* The divider BETWEEN sections, on its own and inset from both edges (owner,
+   22 Sep 2026: "an independent divider after each section — not end to end"),
+   the way the guide rules under Who, If and Then stop short of their section.
+   It was each section's bottom border, run edge to edge, which read as the
+   panel ruled into boxes. */
+.bb__insp .bb__sec + .bb__sec::before {
+  content: '';
+  position: absolute; top: 0; left: var(--space-7); right: var(--space-7);
+  height: 1px;
+  background: var(--border-subtle);
+}
 
 /* A heading, at heading size.
 
@@ -3293,6 +3381,11 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__insp .bb__sec__head h3 { display: inline-flex; align-items: center; gap: var(--space-3); }
 .bb__insp .bb__sec__head h3 svg { flex: none; color: var(--text-tertiary); }
 .bb__insp .bb__sec.is-focused .bb__sec__head h3 svg { color: var(--text-primary); }
+/* The icons in the primary brand colour, every section, focused or not; the
+   words stay in ink (owner, 22 Sep 2026: "turn this the primary brand colour" —
+   after an hour in the console's blue). */
+.bb__insp .bb__sec__head h3 svg,
+.bb__insp .bb__sec.is-focused .bb__sec__head h3 svg { color: var(--brand); }
 
 /* What answers the heading, set in under it against a guide rule.
 
@@ -3328,9 +3421,6 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    spent, because whether a sign-in gets through is the one thing a reader wants
    from a rule before they have read a word of it. */
 
-@media (prefers-reduced-motion: reduce) {
-  .bb__outbtn { transition: none; }
-}
 
 /* The select's own affordances, since it is a real <select> now: the platform
    arrow is suppressed and the pill keeps the shape it had as a button. */
@@ -3467,10 +3557,8 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 .bb__whoback:hover { text-decoration: underline; }
 .bb__whoback:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 3px var(--focus-halo); }
 
-/* The on/off glyph in the card's trail: muted like its neighbours while off,
-   the accent while on, so the state reads at a glance without a second mark. */
-.bb__act.bb__onoff.is-on { color: var(--accent-strong); }
-.bb__act.bb__onoff.is-on:hover { color: var(--accent-strong); }
+/* `.bb__onoff` stood here — the on/off GLYPH in the card's trail. The trail
+   carries the kit's switch now (21 Sep 2026). */
 
 /* --- THE CENTRED SKIN ----------------------------------------------------------
    Classic, with its axis in the middle (see board-skin.ts). Only the pieces
@@ -3501,8 +3589,8 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
    Held at rest (as Workflow does), it truncated every resting card's title to
    make room for controls nobody was reaching for. The title gives way when
    you reach for the card, which is the moment the controls matter. */
-.bb__stage.is-centre .bb__card:not(:hover):not(.is-selected):not(:focus-within) .bb__cardhead { grid-template-columns: auto minmax(0, 1fr); }
-.bb__stage.is-centre .bb__card:not(:hover):not(.is-selected):not(:focus-within) .bb__cardhead > .bb__cardmeta { display: none; }
+.bb__stage.is-centre .bb__card:not(:hover):not(.is-selected):not(:focus-within):not(.is-menu) .bb__cardhead { grid-template-columns: auto minmax(0, 1fr); }
+.bb__stage.is-centre .bb__card:not(:hover):not(.is-selected):not(:focus-within):not(.is-menu) .bb__cardhead > .bb__cardmeta { display: none; }
 
 /* --- The empty chain's invitation --------------------------------------------
    A scratch policy's only connector, drawn in its hover state so the way to add
@@ -3536,30 +3624,10 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 .bb__dock:hover .bb__dockbar,
 .bb__dock:focus-within .bb__dockbar { box-shadow: var(--el-mid); }
 .bb__dockbar .bb__float__sep { height: 14px; margin: 0 3px; }
-/* Zoom: the level alone at rest, with its steps folded to nothing either side. */
-.bb__zoomgrp { display: flex; align-items: center; }
-.bb__zoomstep {
-  width: 0; opacity: 0; overflow: hidden; pointer-events: none;
-  transition: width 180ms var(--ease-standard), opacity 140ms var(--ease-standard);
-}
-.bb__zoomgrp:hover .bb__zoomstep,
-.bb__zoomgrp:focus-within .bb__zoomstep { width: 24px; opacity: 1; pointer-events: auto; }
-/* One step opens on the left of the level and two on the right, so the centred
-   dock would carry the level 12px left as it opens. The dock slides 12px right
-   on the same curve and time, and the level stays exactly where it was. */
-.bb__dock:has(.bb__zoomgrp:hover),
-.bb__dock:has(.bb__zoomgrp:focus-within) { transform: translateX(calc(-50% + 12px)); }
-.bb__zoombtn {
-  display: grid; place-items: center; height: 24px; padding: 0;
-  border: 0; border-radius: var(--radius-sm); background: none; cursor: pointer;
-  font-family: inherit;
-}
-.bb__zoombtn:hover { background: var(--surface-sunken); }
-.bb__zoombtn:hover .bb__zoom { color: var(--text-primary); }
-.bb__zoombtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.bb__zoombtn .bb__zoom { cursor: pointer; min-width: 40px; color: var(--text-tertiary); }
+/* Zoom: fit, then zoom out and zoom in (22 Sep 2026). Always shown, no level. */
+.bb__zoomgrp { display: flex; align-items: center; gap: 2px; }
 @media (prefers-reduced-motion: reduce) {
-  .bb__zoomstep, .bb__dockbar, .bb__dock { transition: none; }
+  .bb__dockbar, .bb__dock { transition: none; }
 }
 /* The density toggle: a verb and its fold mark, the dock's one labelled control. */
 .bb__densitybtn {

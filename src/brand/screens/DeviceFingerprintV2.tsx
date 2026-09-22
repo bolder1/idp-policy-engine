@@ -74,6 +74,7 @@ import {
   AttrStep,
   ChoiceTiles,
   ChosenList,
+  AgentBanner,
   EnrolmentFields,
   SidePanel,
 } from './device-profile-parts'
@@ -1455,14 +1456,19 @@ function BasicDetailsForm({
               </div>
             </div>
           )}
+
+          {/* The agent's prerequisites, under the answer that incurs them. Not
+              while a switch away from the agent is waiting on its confirmation:
+              that panel is the one thing to read then. */}
+          {profile.reach === 'agent' && !pendingReach && <AgentBanner />}
         </section>
       )}
 
       <section className="bfp2__basicsec">
         <header className="bfp2__sechead">
-          <h2>How devices enrol</h2>
+          <h2>Device registration</h2>
           <TipDot
-            label="How devices enrol"
+            label="Device registration"
             text="Signals decide whether a device is the same one as before. These settings decide whether a new device may be registered at all."
           />
         </header>
@@ -1472,6 +1478,7 @@ function BasicDetailsForm({
           reach={profile.reach}
           registration={profile.registration}
           autoRegister={profile.autoRegister}
+          restrictMobile={profile.restrictMobile}
           maxDevices={profile.maxDevices}
           roster={profile.roster}
           onChange={onChange}

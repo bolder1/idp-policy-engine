@@ -192,7 +192,7 @@ export function DecisionLogDialog({
         <EmptyState
           compact
           icon={ScrollText}
-          title="No sign-ins yet"
+          title="No logins yet"
           blurb={quietLine}
         />
       ) : (

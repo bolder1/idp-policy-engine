@@ -54,7 +54,7 @@ export function scenarioFromPolicy(
          Network" — and the conditions never name people. `reidRule` copies the
          who, so every build carries it. */
       const who = whoSentence(r.who, resolve)
-      const iff = who && r.when.cards.length === 0 ? 'any sign-in' : predicateSentence(r.when, resolve)
+      const iff = who && r.when.cards.length === 0 ? 'any login' : predicateSentence(r.when, resolve)
       return {
         name: r.name,
         ifText: who ? `For ${who}, ${iff}` : sentenceCase(iff),

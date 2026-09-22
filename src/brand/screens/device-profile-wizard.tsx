@@ -24,8 +24,9 @@ import {
   type FingerprintProfile,
   type ProfileMode,
 } from '../fingerprint'
-import { checkName, kindChoices, reachChoices, versionError } from './device-profile-choices'
+import { LIST_COLUMNS, checkName, kindChoices, reachChoices, versionError } from './device-profile-choices'
 import {
+  AgentBanner,
   AttrControl,
   AttrStep,
 
@@ -36,6 +37,7 @@ import {
   EnrolmentFields,
   PickBar,
   SidePanel,
+  VersionFloorNote,
 } from './device-profile-parts'
 import {
   CATEGORY_FILTER_MIN,
@@ -276,6 +278,7 @@ export function DeviceProfileWizard({
               value={s.reach}
               onPick={(reach) => update((cur) => withWizardReach(cur, reach))}
             />
+            {s.reach === 'agent' && <AgentBanner />}
           </section>
 
           {/* Only once the collector is answered: it decides whether a roster
@@ -283,9 +286,9 @@ export function DeviceProfileWizard({
           {s.reach !== null && (
             <section className="bfp2__basicsec">
               <header className="bfp2__sechead">
-                <h2>How devices enrol</h2>
+                <h2>Device registration</h2>
                 <TipDot
-                  label="How devices enrol"
+                  label="Device registration"
                   text="Signals decide whether a device is the same one as before. These settings decide whether a new device may be registered at all."
                 />
               </header>
@@ -297,6 +300,7 @@ export function DeviceProfileWizard({
                 reach={s.reach}
                 registration={s.registration}
                 autoRegister={s.autoRegister}
+                restrictMobile={s.restrictMobile}
                 maxDevices={s.maxDevices}
                 roster={s.roster}
                 onChange={(p) => update((cur) => ({ ...cur, ...p }))}
@@ -676,6 +680,16 @@ function InlineChecks({
           <ul
             className={`bfp2__checklist bdpw__list${mode === 'device' ? ' is-weights' : ''}${hasLock ? '' : ' no-lock'}`}
           >
+            {/* The columns' names, on the list's own grid: the left over the
+                tick and name, the right over the setting. */}
+            <li className="bfp2__checkrow bdpw__colhead" aria-hidden>
+              <span className="bdpw__colhead__left">{LIST_COLUMNS[mode === 'device' ? 'device' : 'os'].left}</span>
+              <span className="bdpw__colhead__right">
+                {LIST_COLUMNS[mode === 'device' ? 'device' : 'os'].right}
+                {/* Over a list that shows a version check, as the profile page's. */}
+                {mode === 'os' && shown.some((a) => a.config?.kind === 'version') && <VersionFloorNote />}
+              </span>
+            </li>
             {shown.map((a) => (
               <InlineRow
                 key={a.id}

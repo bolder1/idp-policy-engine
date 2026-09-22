@@ -112,3 +112,15 @@ export function checkName(attr: Attribute, values: Record<string, AttrConfigValu
   const op = isRuleValue(raw) ? raw.op : c.value.op
   return op === 'gte' ? c.platform : attr.name
 }
+
+/* What the two columns of a profile's list are, said once over it (owner, 22 Sep
+   2026: "add a heading — attributes on the left, priorities on the right … in all
+   the places, adding or viewing, both trusted devices and device health"). A
+   trusted device weighs attributes; a health profile sets a requirement for each
+   one. Hidden from assistive tech: every control already names its row. */
+export const LIST_COLUMNS: Record<'os' | 'device', { left: string; right: string }> = {
+  device: { left: 'Attribute', right: 'Priority' },
+  /* "Attribute" on both, as signals have it (owner, 22 Sep 2026: "Check looks
+     weird — call it something else, like signals"). */
+  os: { left: 'Attribute', right: 'Requirement' },
+}

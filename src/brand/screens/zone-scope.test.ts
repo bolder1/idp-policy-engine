@@ -108,6 +108,16 @@ describe('the evaluator grades a zone on the half the condition asked about', ()
     expect(r.detail).not.toContain('Office Network')
   })
 
+  /* Per zone (22 Sep 2026): each zone is tested on its own half, so one
+     condition can ask one zone by address and another by place. */
+  it('grades each zone on its own half', () => {
+    const c = { ...cond('zone', 'in zone', ['office', 'eu']), scopes: { office: 'location', eu: 'location' } as const }
+    expect(evalCond(c, ctx('Office Network')).state).toBe('fail')
+    const mixed = { ...c, scopes: { office: 'ip', eu: 'location' } as const }
+    expect(evalCond(mixed, ctx('Office Network')).state).toBe('pass')
+    expect(evalCond(mixed, ctx('Office Network')).detail).toContain('on the network')
+  })
+
   it('names the half in the detail, so the trace says what it tested', () => {
     expect(evalCond(cond('zone', 'in zone', ['office'], 'ip'), ctx('Office Network')).detail).toContain('on the network')
     expect(evalCond(cond('zone', 'in zone', ['office']), ctx('Office Network')).detail).not.toContain('on the network')
@@ -118,6 +128,13 @@ describe('the read-back tells the two halves apart', () => {
   it('says which half, and only when it is narrower than the zone', () => {
     expect(conditionSentence(cond('zone', 'not in zone', ['office'], 'ip'))).toBe('not in zone Office Network, on the network only')
     expect(conditionSentence(cond('zone', 'not in zone', ['office']))).toBe('not in zone Office Network')
+  })
+
+  it('says each zone its own half when they differ', () => {
+    const c = { ...cond('zone', 'in zone', ['office', 'eu']), scopes: { office: 'ip', eu: 'location' } as const }
+    expect(conditionSentence(c)).toBe('in zone Office Network (on the network) or EU Countries (by location)')
+    const half = { ...cond('zone', 'in zone', ['office', 'eu']), scopes: { eu: 'location' } as const }
+    expect(conditionSentence(half)).toBe('in zone Office Network or EU Countries (by location)')
   })
 
   /* Values are ORed by the evaluator, so a comma — which reads as a list of
@@ -139,6 +156,6 @@ describe('a scoped condition is a different condition', () => {
   it('does not collide with the same zone asked about unscoped', () => {
     const a = when(card(cond('zone', 'in zone', ['office'], 'ip')))
     const b = when(card(cond('zone', 'in zone', ['office'])))
-    expect(JSON.stringify(a.cards[0].conditions[0].scope)).not.toBe(JSON.stringify(b.cards[0].conditions[0].scope))
+    expect(JSON.stringify(a.cards[0].conditions[0].scopes)).not.toBe(JSON.stringify(b.cards[0].conditions[0].scopes))
   })
 })

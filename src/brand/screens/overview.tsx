@@ -42,11 +42,11 @@ function RuleLine({ rule, resolve }: { rule: Rule; resolve: NameLookup }) {
   const p = rule.when
   const iff = p.cards.length === 0 ? null : predicateSentence(p, resolve)
   if (!who) {
-    return <p>{iff ? <>If <em>{iff}</em></> : <em>Any sign-in that reaches this rule</em>}</p>
+    return <p>{iff ? <>If <em>{iff}</em></> : <em>Any login that reaches this rule</em>}</p>
   }
   return (
     <p>
-      For <em>{who}</em>, {iff ? <>if <em>{iff}</em></> : 'any sign-in'}
+      For <em>{who}</em>, {iff ? <>if <em>{iff}</em></> : 'any login'}
     </p>
   )
 }
@@ -103,12 +103,12 @@ export function PolicyOverview({
           </span>
           <div>
             <span className="bov__eyebrow">Trigger</span>
-            <h3>A user attempts to sign in</h3>
+            <h3>A user attempts to log in</h3>
           </div>
         </article>
 
         {policy.rules.length === 0 && (
-          <EmptyState compact icon={ListX} title="No rules yet" blurb="Every sign-in gets the default outcome." />
+          <EmptyState compact icon={ListX} title="No rules yet" blurb="Every login gets the default outcome." />
         )}
 
         {policy.rules.length > 0 && (

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { motion } from 'motion/react'
 import { useRef } from 'react'
 import {
@@ -7,14 +7,14 @@ import {
   ChevronsRightLeft,
   CornerDownRight,
   type LucideIcon,
-  Plus,
   Split,
   Users,
   X,
   XCircle,
 } from 'lucide-react'
 
-import { Toggle } from '../../kit'
+import { RowMenu, Toggle } from '../../kit'
+import { SHOWCASE } from '../../showcase'
 import { fallbackRule, type Policy, type Rule } from '../../data'
 import type { Diagnostic } from '../diagnostics'
 import { AppsPane } from './AppsPane'
@@ -23,6 +23,7 @@ import { settledName } from './parts'
 import { WhatEditor } from './WhatEditor'
 import { WhenEditor } from './WhenEditor'
 import { WhoEditor } from './WhoEditor'
+import { ruleMenu } from './rule-menu'
 
 /* -----------------------------------------------------------------------------
    The inspector — the right pane, for whatever is selected on the board.
@@ -56,6 +57,9 @@ export function Inspector({
   wide,
   onToggleWidth,
   leaving,
+  onMoveRule,
+  onDuplicateRule,
+  onDeleteRule,
 }: {
   draft: Policy
   selection: Selection
@@ -73,6 +77,10 @@ export function Inspector({
   onToggleWidth: () => void
   /** On its way out. The board keeps it mounted for the length of the slide. */
   leaving?: boolean
+  /** The card's ⋯ actions, by rule index — the header's own ⋯ runs them. */
+  onMoveRule?: (from: number, to: number) => void
+  onDuplicateRule?: (i: number) => void
+  onDeleteRule?: (i: number) => void
 }) {
   /* Resolved once. `at` is -1 when the selected rule is gone — undone, deleted,
      discarded — but the board no longer mounts this component in that case, so
@@ -82,15 +90,41 @@ export function Inspector({
   const part = selection.kind === 'rule' ? selection.part : null
   const patch = (p: Partial<Rule>) => onPatchRule(at, p)
 
-  /* The bar names the RULE, not a third of it. It used to append the open part
-     — "Rule 1 · Condition" — which was the tab strip saying its own state
-     twice. There is no tab strip. */
-  const what = rule ? `Rule ${at + 1}` : selection.kind === 'apps' ? 'Applications' : 'The default'
+  /* ONE heading for a rule (owner, 22 Sep 2026: "merge these two — I want only
+     one heading and to do everything there: the number, then an input for the
+     rule name, and the toggle"). The bar said "Rule 1" over a second row that
+     held the name and the switch; now the bar IS that row, with the panel's own
+     two buttons at its end. Applications and the default keep a plain title. */
+  const what = selection.kind === 'apps' ? 'Applications' : 'The default'
+  const editingRule = !!(rule && part)
 
   return (
     <aside className={`bb__insp ${leaving ? 'is-leaving' : ''}`} aria-label="Inspector">
-      <div className="bb__inspbar">
-        <b>{what}</b>
+      <div className={`bb__inspbar${editingRule ? ' is-rule' : ''}`}>
+        {editingRule && rule ? (
+          <>
+            {/* Keyed, so the name field starts fresh on each rule. */}
+            <RuleHead key={rule.id} rule={rule} index={at} onPatch={patch} />
+            {/* The card's ⋯, here too (owner, 22 Sep 2026: "add the three dots
+                here as well"): move, duplicate and delete, from the same menu
+                and through the same handlers as the card's. */}
+            {onMoveRule && onDuplicateRule && onDeleteRule && (
+              <RowMenu
+                label={`Actions for rule ${at + 1}`}
+                items={ruleMenu(at > 0, at < draft.rules.length - 1)}
+                onSelect={(id) => {
+                  if (id === 'up') onMoveRule(at, at - 1)
+                  else if (id === 'down') onMoveRule(at, at + 1)
+                  else if (id === 'dup') onDuplicateRule(at)
+                  else if (id === 'del') onDeleteRule(at)
+                }}
+              />
+            )}
+            <span className="bb__inspbar__sep" aria-hidden />
+          </>
+        ) : (
+          <b>{what}</b>
+        )}
         {/* Narrow, or full width. Nothing else.
 
             A `Maximize2` stood here and opened the WHOLE RULE in a 2400px
@@ -149,8 +183,10 @@ export function Inspector({
                 subject on this surface that does not fade — the behavioural
                 break the type checker cannot catch. */}
             <motion.div key={`head:${rule.id}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
-              <RuleHead rule={rule} index={at} onPatch={patch} />
-              <RuleFindings diagnostics={diagnostics} />
+              {/* Not in the showcase (owner, 22 Sep 2026: "remove all the
+                  missing or broken or conflict messages — we will showcase this
+                  later"). `diagnose` still runs; only the panel's banner is off. */}
+              {!SHOWCASE && <RuleFindings diagnostics={diagnostics} />}
             </motion.div>
             {/* ONE panel, three sections, all of them open.
 
@@ -279,13 +315,10 @@ function ConditionSection({
   onRemoved?: (what: string) => void
   focused: boolean
 }) {
-  /* The section header's add button, anchored by a nonce so the same button
-     pressed twice opens twice.
-
-     It was threaded DEAD from the old pane — declared with no setter, never
-     anything but null — so the effect in `WhenEditor` that opens the catalogue
-     could never fire from here at all. */
-  const [openAt, setOpenAt] = useState<{ nonce: number } | null>(null)
+  /* No add button in the section header (owner, 22 Sep 2026: "remove the +").
+     The If block adds from inside itself — the empty state's buttons, and
+     "+ Add" under the conditions — so the header's `+` was a second door to
+     the same room, far from where the row lands. */
   return (
     <Section
       id="if"
@@ -297,19 +330,8 @@ function ConditionSection({
          field. */
       tour="insp-when"
       focused={focused}
-      action={
-        <button
-          type="button"
-          className="bb__secact"
-          aria-label="Add a condition"
-          title="Add a condition"
-          onClick={() => setOpenAt({ nonce: Date.now() })}
-        >
-          <Plus size={15} strokeWidth={2} />
-        </button>
-      }
     >
-      <WhenEditor rule={rule} onPatch={onPatch} openAt={openAt} onRemoved={onRemoved} />
+      <WhenEditor rule={rule} onPatch={onPatch} onRemoved={onRemoved} />
     </Section>
   )
 }
@@ -343,7 +365,11 @@ function RuleHead({
      field goes back to it on blur rather than saving a rule with no name. */
   const before = useRef(rule.name)
   return (
-    <div className="bb__insphead">
+    <>
+      <span className="bb__inspnum">
+        <span className="u-sr-only">Rule </span>
+        {index + 1}
+      </span>
       <div className="bb__inspname">
         <input
           className="bb__input bb__input--title"
@@ -361,7 +387,7 @@ function RuleHead({
         />
       </div>
       <Toggle checked={rule.enabled} onChange={(enabled) => onPatch({ enabled })} label={rule.enabled ? 'On' : 'Off'} size="sm" />
-    </div>
+    </>
   )
 }
 

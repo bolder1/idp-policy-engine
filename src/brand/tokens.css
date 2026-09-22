@@ -6,14 +6,21 @@
    ============================================================================ */
 
 :root {
+  /* THE brand orange is #eb5424 (owner, 22 Sep 2026: "change the brand main
+     colour to eb5424 and the palette accordingly, globally"). Every orange in
+     the console is a step of this one scale: 500 is the colour itself and every
+     primary FILL; 600 is its hover; 700 is pressed, and the text shade for
+     orange words on white; the light steps are its tints. */
   --_orange-050: #fdeee9;
   --_orange-100: #f9cabb;
   --_orange-200: #f3a389;
+  --_orange-300: #f08a66;
   --_orange-400: #ee6f43;
   --_orange-500: #eb5424;
   --_orange-600: #d64c21;
   --_orange-700: #A73C1A;
   --_orange-800: #812E14;
+  --_orange-900: #5c210e;
   --_blue-050: #eaf1fc;
   --_blue-500: #0b5fd6;
   --_blue-600: #0a4fb0;
@@ -72,14 +79,14 @@
   --text-inverse: #ffffff;
   --text-on-brand: #ffffff;
   --text-link: #0f6ba4;
-  --brand: #eb5424;
-  --brand-hover: #d64c21;
-  --brand-active: #A73C1A;
-  --brand-subtle-bg: #fdeee9;
-  --brand-subtle-border: #f9cabb;
-  --int-brand-bg: #eb5424;
-  --int-brand-bg-hover: #A73C1A;
-  --int-brand-bg-active: #812E14;
+  --brand: var(--_orange-500);
+  --brand-hover: var(--_orange-600);
+  --brand-active: var(--_orange-700);
+  --brand-subtle-bg: var(--_orange-050);
+  --brand-subtle-border: var(--_orange-100);
+  --int-brand-bg: var(--_orange-500);
+  --int-brand-bg-hover: var(--_orange-600);
+  --int-brand-bg-active: var(--_orange-700);
   --int-brand-text: #ffffff;
   --int-neutral-bg: #ffffff;
   --int-neutral-bg-hover: #f5f7f9;

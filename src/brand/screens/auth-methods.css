@@ -382,6 +382,17 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
 /* A person's rows end in a chevron and never a switch, so nothing is reserved
    for one: the chevron takes the outer slot and the inner one collapses. */
 .bm8__list.is-person .bm8__rowend { grid-template-columns: 0 var(--bm8-mark); }
+/* A control cluster with an action beside its switch — CAC Card's Upload CA
+   chain (21 Sep 2026). The control track grows to hold it, on this row only,
+   and that does not break the rule above: the switch ends the cluster, so it
+   still sits on the column every other switch makes, and the row has no mark
+   or figure for the extra width to push. What gives way is the row's own text,
+   which would otherwise run under the button. Raising `--bm8-switch` for the
+   list instead would park every other row's chevron a button's width off its
+   switch. At 720px and under the button is an icon (`UploadCaButton`), because
+   at 375px the words left the text 0px and pushed the switch 6px off the
+   column; the track shrinks with it, since it is sized to what it holds. */
+.bm8__rowend.is-wide { grid-template-columns: var(--bm8-mark) minmax(var(--bm8-switch), max-content); }
 
 /* --- Status and reach, on the category row --------------------------------------
    The two facts the row reports: whether anything in this category is on, and
@@ -559,6 +570,37 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
    Behind the Set up button. No blurb over it: the prerequisites and the field
    tips carry what an admin needs, and the sentence above them was read past. */
 .bm8__setup { display: flex; flex-direction: column; gap: var(--space-7); }
+
+/* --- Upload CA chain ---------------------------------------------------------------
+   CAC Card's slider (ca-chain-drawer.tsx): the setup form's fields, then the
+   support note. The same gap the setup form keeps between fields. */
+.bm8__cachain { gap: var(--space-7); }
+/* The file field, drawn the way a browser draws one: a Choose file segment and
+   the file's name beside it, in the box every other field on the form has.
+   Positioned, because the real input inside is `u-sr-only` and that pins to
+   its nearest positioned ancestor. */
+.bm8__file { position: relative; }
+.bm8__filebox {
+  display: flex; align-items: stretch;
+  height: var(--ctl-height-md); overflow: hidden; cursor: pointer;
+  background: var(--ctl-bg); border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
+}
+.bm8__filebtn {
+  flex: none; display: flex; align-items: center; padding: 0 var(--space-5);
+  background: var(--surface-sunken); border-right: var(--bw-thin) solid var(--ctl-border);
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+.bm8__filebox:hover .bm8__filebtn { background: var(--surface-inset); }
+.bm8__filename {
+  flex: 1; min-width: 0; align-self: center; padding: 0 var(--space-4);
+  font-size: var(--fs-md); color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bm8__filename.is-set { color: var(--text-primary); }
+/* The hidden input is the control, so its focus is drawn on the box. */
+.bm8__file:has(input:focus-visible) .bm8__filebox { border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
+.bm8__file:has(input[aria-invalid='true']) .bm8__filebox { border-color: var(--fb-negative-border); }
 
 /* --- Prerequisites, and the grouped form -------------------------------------------
    RSA is twenty-six fields with two required. Ungrouped it is one scroll where

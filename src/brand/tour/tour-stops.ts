@@ -48,7 +48,7 @@ export const STOPS: Stop[] = [
     id: 'order',
     anchor: 'flow',
     heading: 'First match wins',
-    body: 'A sign-in falls down this list and stops at the first rule that matches it — so the order is the policy, not a detail of it.',
+    body: 'A login falls down this list and stops at the first rule that matches it — so the order is the policy, not a detail of it.',
   },
   {
     id: 'trail',
@@ -66,7 +66,7 @@ export const STOPS: Stop[] = [
     id: 'publish',
     anchor: 'gauntlet',
     heading: 'Find out before you publish',
-    body: 'Thirteen sign-in attempts are dealt at these rules and graded, and the blast radius counts what a draft moves.',
+    body: 'Thirteen login attempts are dealt at these rules and graded, and the blast radius counts what a draft moves.',
     finish: 'Run the gauntlet',
   },
 ]

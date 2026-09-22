@@ -1,4 +1,4 @@
-import { conditionType, users as seedUsers, type AccessDecision, type Condition, type Policy, type Rule } from '../data'
+import { conditionType, users as seedUsers, zoneScopeOf, type AccessDecision, type Condition, type Policy, type Rule, type ZoneScope } from '../data'
 import { blame, cardJoin, cardName, credit, leaves, predicatePasses, topJoin } from '../predicate'
 import { hasWho, normaliseWho, whoPasses } from '../rule-who'
 
@@ -96,7 +96,7 @@ export interface PlaceFacts {
 
      `eu`      no addresses, countries [Germany, France]. "Known proxy"
                geolocates to Germany, so it is inside, by location.
-     `pune-hq` no addresses, India / Maharashtra / 25km of Pune. "Office
+     `pune-hq` no addresses, within 25 km of Pune. "Office
                Network" geolocates to Pune, so it is inside, by location.
      `jio-in`  countries [India], but its network half is `asn: ['AS55836']`,
                which is CONSTRAINED — and nothing here is on Reliance Jio. It is
@@ -271,12 +271,21 @@ export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: 
     case 'zone': {
       if (env?.hasZone && vals.some((v) => !env.hasZone!(v))) return unknown('this rule names a zone that no longer exists')
       if (!place.zonesIn) return unknown('“Any location” does not fix an origin, so zone membership is undecided')
-      /* The half the condition asked about, and nothing wider. A rule scoped to
+      /* The half each zone was asked about, and nothing wider. A zone scoped to
          the network half must not be satisfied by a geographic match it did not
-         ask for — that is the whole reason the scope exists. */
-      const pool = c.scope === 'ip' ? place.zonesByIp : c.scope === 'location' ? place.zonesByLocation : place.zonesIn
-      const inside = vals.some((v) => pool.includes(v))
-      const half = c.scope === 'ip' ? ' on the network' : c.scope === 'location' ? ' by location' : ''
+         ask for — that is the whole reason the scope exists. Per zone since 22
+         Sep 2026: each named zone is tested against its own half's pool. */
+      const zonesIn = place.zonesIn
+      const poolOf = (h: 'both' | ZoneScope): readonly string[] =>
+        (h === 'ip' ? place.zonesByIp : h === 'location' ? place.zonesByLocation : zonesIn) ?? []
+      const halfWord = (h: 'both' | ZoneScope) => (h === 'ip' ? ' on the network' : h === 'location' ? ' by location' : '')
+      const hit = vals.find((v) => poolOf(zoneScopeOf(c, v)).includes(v))
+      const inside = hit !== undefined
+      const halves = [...new Set(vals.length > 0 ? vals.map((v) => zoneScopeOf(c, v)) : (['both'] as const))]
+      /* The half that decided it: the matching zone's, or — on a miss — the one
+         every zone shares. Mixed halves on a miss say none, rather than naming
+         one zone's half as though it were the condition's. */
+      const half = hit !== undefined ? halfWord(zoneScopeOf(c, hit)) : halves.length === 1 ? halfWord(halves[0]) : ''
       /* Built from the membership that was actually tested, not from the
          origin's standing generally — otherwise the sentence asserts the thing
          the verdict has just rejected. Asking about the office network by
@@ -292,10 +301,10 @@ export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: 
 
          Unscoped, the first two branches are word-for-word what they were. */
       const where = inside
-        ? `this sign-in is in ${ctx.place}`
-        : pool.length === 0
-          ? 'this sign-in is in no zone at all'
-          : 'this sign-in is in another zone'
+        ? `this login is in ${ctx.place}`
+        : halves.every((h) => poolOf(h).length === 0)
+          ? 'this login is in no zone at all'
+          : 'this login is in another zone'
       return decide(inside, `${where}${half}`)
     }
     case 'country':
@@ -355,7 +364,7 @@ export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: 
     case 'group':
       return decide(vals.includes(ctx.user.groupId), `${ctx.user.name} is in ${ctx.user.groupName}`)
     case 'user':
-      return decide(vals.includes(ctx.user.id), `this sign-in is ${ctx.user.name}`)
+      return decide(vals.includes(ctx.user.id), `this login is ${ctx.user.name}`)
 
     /* An attribute the directory holds, by name.
 

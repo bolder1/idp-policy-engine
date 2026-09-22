@@ -42,15 +42,19 @@ export const TYPE_NOTE: ProfileNote = {
 }
 
 /* The Devices step, and the Basic details tab it becomes. */
+/* The registration terms are the live console's names for them (21 Sep 2026). */
 export const DEVICES_NOTE: ProfileNote = {
-  title: 'How devices enrol',
+  title: 'Device restriction',
   terms: [
     { term: 'Agentless', note: 'Reads the browser, network and location of each sign-in. Nothing to install.' },
     { term: 'Agent-based', note: 'Adds hardware identifiers, and needs the miniOrange Device Agent on each device.' },
-    { term: 'Self registration', note: 'Each user registers their own devices, up to the limit you set.' },
-    { term: 'Pre-approved only', note: 'Only devices on the roster you upload can sign in, matched on MAC address.' },
+    { term: 'Self registration by user', note: 'Each user registers their own devices, up to the limit you set.' },
+    {
+      term: 'Pre-approved trusted devices only',
+      note: 'Only devices on the roster you upload can sign in, matched on MAC address.',
+    },
   ],
-  foot: 'A new device is challenged on its first sign-in before it is registered.',
+  foot: 'Without auto-registration, a new device is challenged on its first sign-in before it is registered.',
 }
 
 export const CHECKS_NOTE: ProfileNote = {

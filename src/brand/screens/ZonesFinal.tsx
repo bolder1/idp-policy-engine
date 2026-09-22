@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -18,19 +18,22 @@ import {
   X,
 } from 'lucide-react'
 
-import { Button, IconButton, Modal, NameField, RowMenu, SaveBar, SearchBox, type MenuItem } from '../kit'
+import { Button, IconButton, Modal, NameField, NumberStepper, RowMenu, SaveBar, SearchBox, type MenuItem } from '../kit'
 import { PageHead } from '../Shell'
 import { Picker } from '../picker'
 import {
   ASN_DIRECTORY,
+  RANGE_KM_MAX,
   emptyLocation,
   ipSectionEmpty,
   locationEmpty,
   nameTaken,
   newId,
+  rangeText,
   uniqueName,
   type Zone,
   type ZoneLocation,
+  type ZoneRange,
 } from '../data'
 import { PLACES, coveredBy, placeContext, searchPlaces, type Place } from '../places'
 import { useBrand } from '../store'
@@ -38,11 +41,14 @@ import { ChangeState, useLeaveGuard } from '../leave-guard'
 import { EmptyState, NoMatches } from '../empty'
 import { describeZone, explainBadEntry, validateZone } from './zone-validation'
 import {
+  centredOn,
   hasEntry,
   locationEntries,
   normaliseEntry,
   parseEntries,
+  rangeAt,
   takenZoneIds,
+  withRange,
   zoneChanges,
   zoneReviewRows,
 } from './zone-entries'
@@ -163,7 +169,8 @@ export function ZonesFinal() {
         /* The operator names the row shows, not only the AS numbers. */
         z.asn.some((a) => hit(a) || hit(ASN_DIRECTORY[a])) ||
         [...z.location.countries, ...z.location.states, ...z.location.cities].some(hit) ||
-        hit(z.location.radius?.label),
+        /* As the row words it, so "25 km" finds a range as well as "Pune". */
+        z.location.ranges.some((r) => hit(rangeText(r))),
     )
   }, [store.zones, q, shape])
 
@@ -208,7 +215,12 @@ export function ZonesFinal() {
       /* Copied, not aliased: the copy must not share arrays with the original. */
       ip: [...z.ip],
       asn: [...z.asn],
-      location: { ...z.location },
+      location: {
+        countries: [...z.location.countries],
+        states: [...z.location.states],
+        cities: [...z.location.cities],
+        ranges: z.location.ranges.map((r) => ({ ...r })),
+      },
       kind: 'custom',
       usedIn: 0,
     })
@@ -1041,6 +1053,10 @@ export function PlacesNote() {
           <code>Pune</code>
           <em>A city</em>
         </li>
+        <li>
+          <code>Within 25 km of Pune</code>
+          <em>A city with a range</em>
+        </li>
       </ul>
       <p className="bz7__sidep">
         A country covers its states and cities, and a state covers its cities. Adding the wider place
@@ -1477,19 +1493,35 @@ export function AddressSection({
    A place is chosen from the catalogue rather than typed, so its field is a
    search. Add location opens an empty one at the end; clicking a place's field
    turns that field into a search for the place to put in its stead. A search
-   that is left without a pick leaves the zone as it was. */
+   that is left without a pick leaves the zone as it was.
+
+   A range is a city and a distance around it, "25 km around Pune" — and it is
+   not a second kind of row any more (owner, 22 Sep 2026: "no need for two
+   buttons: whenever the user adds a location, add a dedicated range field with
+   it, set to zero by default"). Every city row carries a Range field. At 0 it
+   is the city; any distance makes it "Within N km of" the city, and 0 again
+   makes it the city once more. Countries and states have no range: a circle
+   is drawn around a point, and a country is not one. */
 
 type PlaceList = 'countries' | 'states' | 'cities'
 
-/** One row of the list. The id is the kind and the name: a state and a city can share a name (Berlin). */
-type Chosen = { id: string; kind: PlaceList | 'radius'; v: string; label: string }
+/** One row of the list. A place's id is its kind and name: a state and a city
+    can share a name (Berlin). A range's is its centre and not its distance, so
+    a new distance keeps the row, and the focus in its distance field. */
+type PlaceRow = { id: string; kind: PlaceList; v: string; label: string }
+type RangeRow = { id: string; kind: 'range'; v: string; range: ZoneRange }
+type Chosen = PlaceRow | RangeRow
 
 const LIST_OF: Record<Place['kind'], PlaceList> = { country: 'countries', state: 'states', city: 'cities' }
 
-/** The one open search row: a new place at the end, or a stand-in for a chosen one. */
+/** What a search adds. One kind now: a range is a city's distance field, not a search. */
+type SearchMode = 'place'
+
+/** The one open search row: a new place or range at the end, or a stand-in for a chosen one. */
 interface PlaceSearch {
   key: number
-  /** The id of the row this search would replace, or null for a new place. */
+  mode: SearchMode
+  /** The id of the row this search would replace, or null for a new one. */
   replacing: string | null
   q: string
 }
@@ -1499,32 +1531,53 @@ let placeSearchSeq = 0
 /** Why a place cannot go in, or null when it can. */
 type Refusal = { kind: 'added' } | { kind: 'covered'; by: string } | null
 
+const rangeId = (r: ZoneRange) => `range:${r.placeId ?? `${r.lat},${r.lon}`}`
+
 function chosenPlaces(l: ZoneLocation): Chosen[] {
-  const rows = (kind: PlaceList, label: string) => l[kind].map((v) => ({ id: `${kind}:${v}`, kind, v, label }))
-  const out: Chosen[] = [...rows('countries', 'Country'), ...rows('states', 'State'), ...rows('cities', 'City')]
-  if (l.radius) {
-    const v = l.radius.label ?? `${l.radius.lat}, ${l.radius.lon}`
-    out.push({ id: `radius:${v}`, kind: 'radius', v, label: `${l.radius.km} km radius` })
+  const rows = (kind: PlaceList, label: string) => l[kind].map((v): PlaceRow => ({ id: `${kind}:${v}`, kind, v, label }))
+  const cityRows: Chosen[] = rows('cities', 'City')
+  const seen = new Set<string>()
+  for (const r of l.ranges) {
+    /* Two ranges on one centre cannot be added here, but a zone made elsewhere may hold them. */
+    let id = rangeId(r)
+    for (let n = 2; seen.has(id); n += 1) id = `${rangeId(r)}#${n}`
+    seen.add(id)
+    cityRows.push({ id, kind: 'range', v: r.label, range: r })
   }
-  return out
+  /* A city with a distance and one without are ONE list, by name: giving a city
+     a distance moves it from `cities` to `ranges`, and a list in storage order
+     would move the row out from under the number being typed. */
+  cityRows.sort((a, b) => a.v.localeCompare(b.v))
+  return [...rows('countries', 'Country'), ...rows('states', 'State'), ...cityRows]
 }
+
+/* One city row, whichever list it is stored in — so the field being typed in
+   survives the move between them. */
+const cityKey = (c: Chosen) => (c.kind === 'range' || c.kind === 'cities' ? `city:${c.v}` : c.id)
+
+/* The catalogue city of this name, for a range drawn around it. */
+const cityNamed = (name: string) => PLACES.find((p) => p.kind === 'city' && p.name === name) ?? null
 
 /* The location without one of its rows. */
 function withoutPlace(l: ZoneLocation, c: Chosen): ZoneLocation {
-  if (c.kind === 'radius') {
-    const { radius: _gone, ...rest } = l
-    void _gone
-    return rest
-  }
+  if (c.kind === 'range') return { ...l, ranges: l.ranges.filter((r) => r !== c.range) }
   return { ...l, [c.kind]: l[c.kind].filter((x) => x !== c.v) }
 }
 
 /* A place already in the zone, or inside one that is, would change nothing. */
 function placeRefusal(p: Place, l: ZoneLocation): Refusal {
   if (l[LIST_OF[p.kind]].includes(p.name)) return { kind: 'added' }
+  /* A city with a distance is still that city. */
+  if (p.kind === 'city' && l.ranges.some((r) => centredOn(r, p))) return { kind: 'added' }
   const by = coveredBy(p, l)
   return by ? { kind: 'covered', by } : null
 }
+
+const REFUSAL: Record<SearchMode, (p: Place, l: ZoneLocation) => Refusal> = {
+  place: placeRefusal,
+}
+
+const findPlaces = (q: string, _mode: SearchMode) => searchPlaces(q, 12)
 
 /* `p` added to the location, or put in place of `replacing`. The caller has
    checked `placeRefusal` against the location without `replacing`. */
@@ -1553,11 +1606,17 @@ function withPlace(l: ZoneLocation, p: Place, replacing: Chosen | null): ZoneLoc
 }
 
 /* The first hit that can be picked, so Enter on a fresh query does not land on "Added". */
-const firstOpenHit = (hits: Place[], l: ZoneLocation) => Math.max(0, hits.findIndex((p) => !placeRefusal(p, l)))
+const firstOpenHit = (hits: Place[], l: ZoneLocation, mode: SearchMode) =>
+  Math.max(0, hits.findIndex((p) => !REFUSAL[mode](p, l)))
+
+/* What brings a search of this mode back: its add control under the list, or
+   its button in the empty state. */
+const addSel = (mode: SearchMode) => `button[data-add="${mode}"], [data-add="${mode}"] button`
 
 export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Zone) => void }) {
   const sectionRef = useRef<HTMLElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const kmUid = useId()
   const [search, setSearch] = useState<PlaceSearch | null>(null)
   const [cursor, setCursor] = useState(0)
   const l = draft.location
@@ -1567,7 +1626,9 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
   const replacing = search?.replacing ? (chosen.find((c) => c.id === search.replacing) ?? null) : null
   const open = search && (search.replacing === null || replacing) ? search : null
   const q = open?.q ?? ''
-  const hits = useMemo(() => searchPlaces(q), [q])
+  const mode: SearchMode = open?.mode ?? 'place'
+  const hits = useMemo(() => findPlaces(q, mode), [q, mode])
+  const refusal = REFUSAL[mode]
   /* Hits are checked against the zone without the row being replaced, so that
      place is offered back, and a place inside it is not refused as covered by it. */
   const base = replacing ? withoutPlace(l, replacing) : l
@@ -1588,15 +1649,15 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
     document.getElementById(`bz7-place-hits-${openKey}-${cursor}`)?.scrollIntoView({ block: 'nearest' })
   }, [cursor, openKey, q])
 
-  const put =(next: ZoneLocation) => onChange({ ...draft, location: next })
+  const put = (next: ZoneLocation) => onChange({ ...draft, location: next })
 
   /* After the render that moved things: the element a selector names in this section. */
   const focusLater = (selector: string) =>
     window.setTimeout(() => sectionRef.current?.querySelector<HTMLElement>(selector)?.focus({ preventScroll: true }), 0)
 
   /* The row now at `index`, else the one before it, else Add location, or the
-     empty state's button once the last place has gone. A row's field where it
-     has one, and its remove where it does not: the radius. */
+     empty state's button once the last place has gone. A row's field: the
+     place's button, a range's city, or the search's input. */
   const focusRow = (index: number) =>
     window.setTimeout(() => {
       const section = sectionRef.current
@@ -1604,24 +1665,26 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
       const rows = section.querySelectorAll<HTMLElement>('.bz7__fields > li')
       const row = rows[index] ?? rows[index - 1]
       const target = row
-        ? (row.querySelector<HTMLElement>('button.bz7__place, input') ?? row.querySelector<HTMLElement>('button'))
+        ? (row.querySelector<HTMLElement>('button.bz7__place, input') ??
+          row.querySelector<HTMLElement>('button'))
         : section.querySelector<HTMLElement>('.bz7__addrow, .bempty__action button')
       target?.focus({ preventScroll: true })
     }, 0)
 
-  const openNew = () => {
+  const openNew = (m: SearchMode) => {
     /* One search at a time: a second Add location goes back to the one already open. */
-    if (open && open.replacing === null) {
+    if (open && open.replacing === null && open.mode === m) {
       inputRef.current?.focus()
       return
     }
-    setSearch({ key: ++placeSearchSeq, replacing: null, q: '' })
+    setSearch({ key: ++placeSearchSeq, mode: m, replacing: null, q: '' })
     setCursor(0)
   }
 
   const openReplace = (c: Chosen) => {
-    setSearch({ key: ++placeSearchSeq, replacing: c.id, q: c.v })
-    setCursor(firstOpenHit(searchPlaces(c.v), withoutPlace(l, c)))
+    const m: SearchMode = 'place'
+    setSearch({ key: ++placeSearchSeq, mode: m, replacing: c.id, q: c.v })
+    setCursor(firstOpenHit(findPlaces(c.v, m), withoutPlace(l, c), m))
   }
 
   /* Closes the search with this key, if it is still the open one: the blur from a
@@ -1629,11 +1692,20 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
   const close = (key: number) => setSearch((s) => (s?.key === key ? null : s))
 
   const pick = (p: Place, via: 'enter' | 'click') => {
-    if (!open || placeRefusal(p, base)) return
+    if (!open || refusal(p, base)) return
+    /* A city with a distance, changed to another city, keeps its distance. */
+    if (replacing?.kind === 'range' && p.kind === 'city') {
+      const next = withRange(l, p, replacing.range)
+      /* Its own city picked again is no edit, so the draft is left as it was. */
+      if (next !== l) put(next)
+      setSearch(null)
+      focusLater(`[data-place="${CSS.escape(next === l ? replacing.id : rangeId(rangeAt(p, replacing.range.km)))}"]`)
+      return
+    }
     put(withPlace(l, p, replacing))
     if (via === 'enter' && open.replacing === null) {
       /* As Enter on the last IP row: the next row, ready, so four countries are four Returns. */
-      setSearch({ key: ++placeSearchSeq, replacing: null, q: '' })
+      setSearch({ key: ++placeSearchSeq, mode: 'place', replacing: null, q: '' })
       setCursor(0)
     } else {
       setSearch(null)
@@ -1649,6 +1721,20 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
     focusRow(at)
   }
 
+  /* A city's distance. From 0 it becomes a range around the city; back to 0 it
+     is the city again. Stored in whichever list says what it now is. */
+  const setCityKm = (c: Chosen, km: number) => {
+    if (c.kind === 'range') {
+      if (km > 0) put({ ...l, ranges: l.ranges.map((r) => (r === c.range ? { ...r, km } : r)) })
+      else put({ ...l, ranges: l.ranges.filter((r) => r !== c.range), cities: [...l.cities, c.range.label] })
+      return
+    }
+    if (c.kind !== 'cities' || km <= 0) return
+    const p = cityNamed(c.v)
+    if (!p) return
+    put({ ...l, cities: l.cities.filter((x) => x !== c.v), ranges: [...l.ranges, rangeAt(p, km)] })
+  }
+
   if (chosen.length === 0 && !open) {
     return (
       <section className="bz7__sec bz7__sec--empty" ref={sectionRef}>
@@ -1656,11 +1742,17 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
           compact
           icon={Globe}
           title="No locations yet"
-          blurb="Add countries, states or cities. Left empty, any location matches."
+          blurb="Add countries, states or cities, and give a city a range to cover the area around it. Left empty, any location matches."
           action={
-            <Button variant="brand" icon={Plus} onClick={openNew}>
-              Add location
-            </Button>
+            /* A span, because the kit's Button takes no data attributes and Escape
+               from a search comes back to the button that opened it. */
+            <span className="bz7__emptyadds">
+              <span data-add="place">
+                <Button variant="brand" icon={Plus} onClick={() => openNew('place')}>
+                  Add location
+                </Button>
+              </span>
+            </span>
           }
         />
       </section>
@@ -1706,26 +1798,24 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
               onChange={(e) => {
                 const text = e.target.value
                 setSearch((cur) => (cur?.key === s.key ? { ...cur, q: text } : cur))
-                setCursor(firstOpenHit(searchPlaces(text), base))
+                setCursor(firstOpenHit(findPlaces(text, s.mode), base, s.mode))
               }}
               /* Left without a pick, nothing is half added: a new row goes, and a
                  row being replaced shows its place again. Tab from a new row lands
                  on its own remove, which goes with the row, so focus carries on to
-                 Add location. */
+                 the add control that opened it. */
               onBlur={(e) => {
                 const to = e.relatedTarget
                 const within = to instanceof Node && !!e.currentTarget.closest('li')?.contains(to)
                 close(s.key)
-                if (within && !c) focusLater('.bz7__addrow, .bempty__action button')
+                if (within && !c) focusLater(addSel(s.mode))
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
                   e.preventDefault()
                   close(s.key)
                   /* Back to the place this stood in for, or on to what brings the search back. */
-                  focusLater(
-                    c ? `[data-place="${CSS.escape(c.id)}"]` : '.bz7__addrow, .bempty__action button',
-                  )
+                  focusLater(c ? `[data-place="${CSS.escape(c.id)}"]` : addSel(s.mode))
                   return
                 }
                 if (!hits.length) return
@@ -1754,9 +1844,13 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
                  the list's own scrollbar or padding. */
               onMouseDown={(e) => e.preventDefault()}
             >
-              {hits.length === 0 && <li className="bz7__nohit">No place matches “{s.q.trim()}”.</li>}
+              {hits.length === 0 && (
+                <li className="bz7__nohit">
+                  No place matches “{s.q.trim()}”.
+                </li>
+              )}
               {hits.map((p, i) => {
-                const no = placeRefusal(p, base)
+                const no = refusal(p, base)
                 return (
                   <li key={p.id} role="presentation">
                     <button
@@ -1792,6 +1886,8 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
             </ul>
           )}
         </div>
+        {/* The Range column's room, so a row being searched keeps its neighbours' edges. */}
+        <span className="bz7__rangecol is-empty" aria-hidden />
         {/* The mousedown would blur the field first, and a blur closes the search. */}
         <span className="bz7__rowdel" onMouseDown={(e) => e.preventDefault()}>
           <IconButton
@@ -1804,7 +1900,10 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
                 remove(c)
               } else {
                 setSearch(null)
-                focusRow(chosen.length)
+                /* The row above, or with none, the button that opened this search,
+                   as Escape and Tab from it do. */
+                if (chosen.length > 0) focusRow(chosen.length)
+                else focusLater(addSel(s.mode))
               }
             }}
           />
@@ -1813,50 +1912,85 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
     )
   }
 
+  /* Every row the same three parts (owner, 22 Sep 2026: "it's not visually
+     balanced — add the range to states and countries as well; if we don't allow
+     it, make it disabled"): the place and its kind, a Range column, the remove.
+     A city's Range is live — 0 is the city, any distance the area around it. A
+     country's or a state's is shown and disabled at 0: a circle is drawn around
+     a point, and a country is not one. Its own column beside the place, not
+     inside it, so every row's range lines up. */
+  const placeLine = (c: Chosen) => {
+    const city = c.kind === 'range' || c.kind === 'cities'
+    const key = cityKey(c)
+    const km = c.kind === 'range' ? c.range.km : 0
+    const kind = city ? 'City' : (c as PlaceRow).label
+    return (
+      <div className="bz7__fieldline">
+        <button
+          type="button"
+          className="bz7__rowin bz7__place"
+          data-place={c.id}
+          aria-label={`Change ${c.v} (${kind.toLowerCase()})`}
+          onClick={() => openReplace(c)}
+        >
+          <span className="bz7__placename">{c.v}</span>
+          <span className="bz7__placekind">{kind}</span>
+        </button>
+        <fieldset
+          className="bz7__rangecol"
+          data-km={key}
+          disabled={!city}
+          title={city ? undefined : 'A range is drawn around a city'}
+        >
+          <NumberStepper
+            id={`${kmUid}-${key}`}
+            width="fill"
+            value={km}
+            min={0}
+            max={RANGE_KM_MAX}
+            unit="km"
+            label={`Range around ${c.v}`}
+            onChange={(v) => setCityKm(c, v)}
+          />
+        </fieldset>
+        {/* The same remove as an IP network row. Its mousedown keeps an open
+            search from closing, and moving this row, before the click lands. */}
+        <span className="bz7__rowdel" onMouseDown={(e) => e.preventDefault()}>
+          <IconButton icon={Trash2} tone="danger" size="sm" label={`Remove ${c.v}`} onClick={() => remove(c)} />
+        </span>
+      </div>
+    )
+  }
+
   return (
-    <section className="bz7__sec" ref={sectionRef}>
+    <section className="bz7__sec bz7__sec--places" ref={sectionRef}>
+      {/* The columns' names, as a device profile's list has them. */}
+      <div className="bz7__fieldline bz7__colhead" aria-hidden>
+        <span className="bz7__colhead__place">Location</span>
+        <span className="bz7__rangecol">Range</span>
+        <span className="bz7__rowdel bz7__colhead__del" />
+      </div>
       <ul className="bz7__fields">
         {chosen.map((c) => (
-          <li key={c.id}>
-            {open && replacing?.id === c.id ? (
-              searchLine(open, c)
-            ) : (
-              <div className="bz7__fieldline">
-                {c.kind === 'radius' ? (
-                  /* A circle is not in the catalogue, so there is nothing to search
-                     for in its place. It only has Remove. */
-                  <div className="bz7__rowin bz7__place is-static" data-place={c.id}>
-                    <span className="bz7__placename">{c.v}</span>
-                    <span className="bz7__placekind">{c.label}</span>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="bz7__rowin bz7__place"
-                    data-place={c.id}
-                    aria-label={`Change ${c.v} (${c.label.toLowerCase()})`}
-                    onClick={() => openReplace(c)}
-                  >
-                    <span className="bz7__placename">{c.v}</span>
-                    <span className="bz7__placekind">{c.label}</span>
-                  </button>
-                )}
-                {/* The same remove as an IP network row. Its mousedown keeps an open
-                    search from closing, and moving this row, before the click lands. */}
-                <span className="bz7__rowdel" onMouseDown={(e) => e.preventDefault()}>
-                  <IconButton icon={Trash2} tone="danger" size="sm" label={`Remove ${c.v}`} onClick={() => remove(c)} />
-                </span>
-              </div>
-            )}
-          </li>
+          <li key={cityKey(c)}>{open && replacing?.id === c.id ? searchLine(open, c) : placeLine(c)}</li>
         ))}
         {open && open.replacing === null && <li key={`search-${open.key}`}>{searchLine(open, null)}</li>}
       </ul>
 
-      <button type="button" className="bz7__addrow" onMouseDown={(e) => e.preventDefault()} onClick={openNew}>
-        <CirclePlus size={16} strokeWidth={1.9} aria-hidden />
-        Add location
-      </button>
+      {/* One way in: a range is a city's own field now. The mousedown keeps an
+          open search's field focused. */}
+      <div className="bz7__addrows">
+        <button
+          type="button"
+          className="bz7__addrow"
+          data-add="place"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => openNew('place')}
+        >
+          <CirclePlus size={16} strokeWidth={1.9} aria-hidden />
+          Add location
+        </button>
+      </div>
     </section>
   )
 }

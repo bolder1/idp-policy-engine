@@ -161,6 +161,8 @@ describe('answers that undo other answers', () => {
       registration: 'pre-approved',
       maxDevices: null,
       roster,
+      autoRegister: true,
+      restrictMobile: true,
     })
     const os = withMode(s, 'os')
     expect([os.picked, os.config, os.weights, os.reach, os.registration, os.roster, os.maxDevices]).toEqual([
@@ -172,6 +174,9 @@ describe('answers that undo other answers', () => {
       null,
       3,
     ])
+    /* A health profile is never asked the two switches, so they are not
+       stored on it unseen. */
+    expect([os.autoRegister, os.restrictMobile]).toEqual([false, false])
     expect(os.name).toBe('X')
     expect(withMode(s, 'device')).toBe(s)
   })
@@ -345,9 +350,18 @@ describe('the review', () => {
     const [, devices, signals] = reviewSections(s, 'inline')
     expect(devices.facts.map((f) => [f.label, f.value])).toEqual([
       ['What it can read', 'Agent-based'],
-      ['How a device gets registered', 'Users register their own devices'],
-      ['Devices per person', '3'],
-      ['Register silently on first sign-in', 'On'],
+      ['Device registration method', 'Self registration by user'],
+      ['Allowed device registrations', '3'],
+      ['Mobile device restriction', 'Off'],
+      ['Device auto-registration', 'On'],
+    ])
+    expect(reviewSections({ ...s, restrictMobile: true }, 'inline')[1].facts[3].value).toBe('On')
+    /* Agentless has one method, so the step never asks it and Review says nothing about it. */
+    expect(reviewSections({ ...s, reach: 'agentless', picked: [] }, 'inline')[1].facts.map((f) => f.label)).toEqual([
+      'What it can read',
+      'Allowed device registrations',
+      'Mobile device restriction',
+      'Device auto-registration',
     ])
     const rostered = reviewSections({ ...s, registration: 'pre-approved', maxDevices: null, roster }, 'inline')[1]
     expect(rostered.facts[2]).toEqual({ label: 'Approved device roster', value: 'fleet.csv, 12 devices' })

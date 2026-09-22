@@ -1,4 +1,4 @@
-import { cond, emptyGroup, type Condition, type ConditionCard, type Predicate, type ZoneScope } from './data'
+import { cond, emptyGroup, pruneScopes, type Condition, type ConditionCard, type Predicate, type ZoneScope } from './data'
 import { cardJoin, ckey, drawsAsBracket, topJoin } from './predicate'
 import type { Joiner } from './data'
 
@@ -111,7 +111,8 @@ const mapConditions = (w: Predicate, f: (c: Condition) => Condition): Predicate 
   )
 
 export function patchCondition(w: Predicate, conditionId: string, next: Partial<Condition>): Predicate {
-  return mapConditions(w, (c) => (c.id === conditionId ? { ...c, ...next } : c))
+  /* Pruned, so unticking a zone takes its Match on answer with it. */
+  return mapConditions(w, (c) => (c.id === conditionId ? pruneScopes({ ...c, ...next }) : c))
 }
 
 /* Change what a condition CHECKS, which is not the same as patching it.
@@ -126,9 +127,9 @@ export function retypeCondition(w: Predicate, conditionId: string, typeId: strin
   /* Not `patchCondition`, and the difference is a field it cannot express.
 
      Three fields belong to one type each and are written as absent-when-default:
-     `scope` to a zone, `key` to the two attribute conditions, `tz` to a window.
+     `scopes` to a zone, `key` to the two attribute conditions, `tz` to a window.
      A patch merges, so retyping a scoped zone into something else left
-     `scope: 'ip'` sitting on a condition whose type has no halves — invisible
+     `scope: 'ip'` (now `scopes`) sitting on a condition whose type has no halves — invisible
      on screen, carried into `ckey`, and therefore able to split two identical
      conditions into two different rules for the linter.
 
@@ -138,21 +139,25 @@ export function retypeCondition(w: Predicate, conditionId: string, typeId: strin
   return mapConditions(w, (c) => (c.id === conditionId ? { id: c.id, typeId, operator: firstOperator, values: [] } : c))
 }
 
-/* Which half of its zones a condition tests. The one writer for `scope`.
+/* Which half of ONE of its zones a condition tests. The one writer for
+   `scopes` — one answer per zone since 22 Sep 2026 (see `Condition.scopes`).
 
-   Absent is BOTH, so choosing "both" DELETES the field rather than storing the
-   word — the same shape `renameBranch`, `setGrouped` and the two joiner flips
-   use, and for the same reason: every dirty check in this app is a
-   `JSON.stringify` comparison, so a scope set to its default and back would
-   otherwise leave the save bar lit on a rule that means exactly what it did.
-   `patchCondition` merges and cannot express a delete, which is why this is a
-   function rather than a call site. */
-export function setScope(w: Predicate, conditionId: string, scope: ZoneScope | 'both'): Predicate {
+   Absent is BOTH, so choosing "both" DELETES the entry rather than storing the
+   word, and the map goes when its last entry does — the same shape
+   `renameBranch`, `setGrouped` and the two joiner flips use, and for the same
+   reason: every dirty check in this app is a `JSON.stringify` comparison, so a
+   scope set to its default and back would otherwise leave the save bar lit on a
+   rule that means exactly what it did. A zone the condition does not name gets
+   no entry. */
+export function setScope(w: Predicate, conditionId: string, zoneId: string, scope: ZoneScope | 'both'): Predicate {
   return mapConditions(w, (c) => {
-    if (c.id !== conditionId) return c
+    if (c.id !== conditionId || !c.values.includes(zoneId)) return c
+    const scopes = { ...c.scopes }
+    if (scope === 'both') delete scopes[zoneId]
+    else scopes[zoneId] = scope
     const next = { ...c }
-    if (scope === 'both') delete next.scope
-    else next.scope = scope
+    if (Object.keys(scopes).length === 0) delete next.scopes
+    else next.scopes = scopes
     return next
   })
 }

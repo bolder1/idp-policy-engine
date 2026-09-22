@@ -114,6 +114,10 @@ const SHAPES: Record<string, EnrolShape> = {
   // --- The browser's own ceremony -------------------------------------------
   fido2: { kind: 'passkey' },
 
+  /* A reader on the desk, like CAC's card: nothing for the person to type.
+     Off for this tenant (21 Sep 2026), so no person sees it yet. */
+  'digital-persona': { kind: 'none', note: 'Nothing to set up. Scan your finger on the reader when you are asked.' },
+
   /* Nothing to fill in. The live page gives this row a toggle and no Edit at
      all — the certificate comes off the card, so there is no question to ask. */
   cac: { kind: 'none', note: 'Nothing to set up. Tap your card when you are asked for it.' },

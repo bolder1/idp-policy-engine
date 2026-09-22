@@ -129,9 +129,9 @@ export function ReviewStep({
       title: named.length > 0 ? `Protects ${named[0].name}${named.length > 1 ? ' and others' : ''}` : draft.isSystem ? 'Protects every application' : 'No applications',
       detail:
         named.length > 1 || (named.length === 0 && draft.isSystem)
-          ? 'Every sign-in to any of them is checked against these rules.'
+          ? 'Every login to any of them is checked against these rules.'
           : named.length > 0
-            ? 'Every sign-in to it is checked against these rules.'
+            ? 'Every login to it is checked against these rules.'
             : 'Assign one to turn this policy on.',
       go: draft.isSystem ? undefined : { label: 'Assign applications', run: () => store.go({ name: 'policy-details', policyId: draft.id, from: 'builder' }) },
     },

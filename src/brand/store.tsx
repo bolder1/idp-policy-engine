@@ -63,6 +63,7 @@ import type { AuthMethod } from './methods'
 import { TAB_SCREEN, personaById, type PersonaId } from './personas'
 import { featuresOf, type Edition, type Features } from './edition'
 import type { NameLookup } from './screens/predicate-prose'
+import { toastDuration, toastTone, type ToastTone } from './toast-tone'
 
 /* Who is looking. Not a permission check — the prototype has no auth — but the
    same split the real product makes: an admin decides what may exist, a person
@@ -156,6 +157,10 @@ export interface ToastMessage {
   text: string
   /** One verb beside the text — Undo after a removal. It stays up longer. */
   action?: ToastAction
+  /** What kind of news it is: its colour, its mark and its bar. See toast-tone.ts. */
+  tone: ToastTone
+  /** How long it stays, in ms — the bar along its foot runs for exactly this. */
+  duration: number
 }
 
 export interface ToastAction {
@@ -440,8 +445,11 @@ export interface BrandStore {
   /** Adds at the top. Returns the stored id. */
   addScenario: (s: Scenario) => string
 
-  /** A message, and optionally one action beside it (Undo). */
-  showToast: (m: string, action?: ToastAction) => void
+  /** A message, and optionally one action beside it (Undo). The tone is read
+      off the message unless it is given. */
+  showToast: (m: string, action?: ToastAction, opts?: { tone?: ToastTone }) => void
+  /** Close the toast now — its × button. */
+  dismissToast: () => void
 }
 
 const Ctx = createContext<BrandStore | null>(null)
@@ -698,14 +706,16 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     [requestLeave, setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setScreen],
   )
 
-  /* With an action the toast stays six seconds rather than under three: long
+  /* With an action the toast stays six seconds rather than about three: long
      enough to read "Condition removed", decide, and reach Undo. */
-  const showToast = useCallback((m: string, action?: ToastAction) => {
+  const showToast = useCallback((m: string, action?: ToastAction, opts?: { tone?: ToastTone }) => {
     toastSeq.current += 1
     const id = toastSeq.current
-    setToast({ id, text: m, action })
-    window.setTimeout(() => setToast((t) => (t?.id === id ? null : t)), action ? 6000 : 2800)
+    const duration = toastDuration(!!action)
+    setToast({ id, text: m, action, tone: opts?.tone ?? toastTone(m), duration })
+    window.setTimeout(() => setToast((t) => (t?.id === id ? null : t)), duration)
   }, [])
+  const dismissToast = useCallback(() => setToast(null), [])
 
   const value = useMemo<BrandStore>(
     () => ({
@@ -966,6 +976,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       },
 
       showToast,
+      dismissToast,
     }),
     /* `pendingNav` belongs here and its absence was a silent dead end: `go`
        held the navigation via the guard ref, but the memoised store kept
@@ -979,7 +990,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     [
       policies, scenarios, zones, fingerprints, riskProfiles, activeRiskProfileId, hooks, apps, groups, directory, edition,
       persona, setPersona, role, setRole, methodSets, methods, hardwareTokens, commitTokens, screen, visit, go,
-      registerLeaveGuard, releaseLeaveGuard, requestLeave, pendingLeave, leaveSave, leaveDiscard, leaveStay, showToast,
+      registerLeaveGuard, releaseLeaveGuard, requestLeave, pendingLeave, leaveSave, leaveDiscard, leaveStay, showToast, dismissToast,
       gauntletOverrides, recovery, mfaBehaviour, defaultMethodId, methodConfig, setupChoice, enrolment,
       setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks,
       policiesRef, zonesRef, scenariosRef, fingerprintsRef, riskProfilesRef, hooksRef,

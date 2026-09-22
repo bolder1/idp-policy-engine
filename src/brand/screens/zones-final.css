@@ -120,8 +120,13 @@
    a long way from the value it removes. Empty space to the right is fine. The
    empty state keeps the whole pane, since it centres in it. */
 .bz7__sec:not(.bz7__sec--empty) { width: 100%; max-width: max(50%, 360px); }
+/* Locations add the Range column BESIDE the place, not out of it (owner, 22 Sep
+   2026: "why reduce the space of the location picker — keep it as it was and add
+   the range"): the list is the IP list's width plus the column and its gap. */
+.bz7__sec--places:not(.bz7__sec--empty) { max-width: calc(max(50%, 360px) + 120px); }
 @media (max-width: 720px) {
-  .bz7__sec:not(.bz7__sec--empty) { max-width: none; }
+  .bz7__sec:not(.bz7__sec--empty),
+  .bz7__sec--places:not(.bz7__sec--empty) { max-width: none; }
 }
 
 /* Quick add. Chips rather than buttons in a row: they are values, and a value
@@ -194,6 +199,30 @@ button.bz7__place {
 }
 button.bz7__place:hover { border-color: var(--ctl-border-hover); }
 .bz7__placename { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The Range column (22 Sep 2026): its own field beside every place, the same
+   width on every row so the ranges line up; live on a city, disabled on a
+   country or a state. A fieldset for the native disable, stripped of its own
+   frame. */
+.bz7__rangecol {
+  flex: none; width: 112px; min-inline-size: 0;
+  margin: 0; padding: 0; border: 0;
+  display: flex; align-items: center;
+}
+.bz7__rangecol:disabled { opacity: var(--disabled-opacity); }
+.bz7__rangecol:disabled * { cursor: not-allowed; }
+.bz7__rangecol .bx-stepwrap--field,
+.bz7__rangecol .bx-step--field { width: 100%; }
+.bz7__rangecol .bx-step--field { height: var(--ctl-height-md); }
+/* The columns' names over the list. */
+.bz7__colhead {
+  padding-bottom: var(--space-3); margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary);
+}
+.bz7__colhead__place { flex: 1 1 0; min-width: 0; }
+.bz7__colhead .bz7__rangecol { padding-left: var(--space-1); }
+.bz7__colhead__del { width: var(--ctl-height-sm); }
 .bz7__placekind { margin-left: auto; flex: none; font-size: var(--fs-sm); color: var(--text-tertiary); white-space: nowrap; }
 /* The search row: the label is the field, so the magnifier sits inside it and
    the ring goes round both. The input inside is bare. */
@@ -212,6 +241,10 @@ button.bz7__place:hover { border-color: var(--ctl-border-hover); }
 .bz7 .bz7__placesearch input::placeholder { color: var(--text-muted); }
 .bz7 .bz7__placesearch input:focus,
 .bz7 .bz7__placesearch input:focus-visible { outline: none; border: 0; box-shadow: none; }
+
+/* The range row's own layout (a city button and a distance inside one field)
+   stood here. The distance is its own column now — see `.bz7__rangecol`. */
+.bz7__rangecol .bx-step__hint { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   button.bz7__place { transition: none; }
@@ -523,6 +556,10 @@ button.bz7__place:hover { border-color: var(--ctl-border-hover); }
 .bz7__addrow:hover { text-decoration: underline; text-underline-offset: 3px; }
 .bz7__addrow:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bz7__addrow svg { flex: none; }
+/* Locations has two: Add location and Add range, on one line, wrapping together. */
+.bz7__addrows { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-7); }
+/* And in its empty state, the brand button with the secondary one beside it. */
+.bz7__emptyadds { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-4); }
 
 /* `.bz7__entryopen` and `.bz7__entrypen` stood here: the IP row as one button
    that opened an editor, with a pencil revealed on hover. The row is a field now. */

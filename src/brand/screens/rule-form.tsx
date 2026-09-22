@@ -28,6 +28,7 @@ import {
   card,
   cond,
   conditionType,
+  pruneScopes,
   type AccessDecision,
   type Condition,
   type ConditionCard,
@@ -97,8 +98,8 @@ const GROUP_ICON: Record<string, LucideIcon> = {
    — and collapsing it would throw that away to tidy a form. Only the
    presentation changes. */
 export const OUTCOMES: { id: AccessDecision; label: string; sub: string; icon: LucideIcon }[] = [
-  { id: '1fa', label: 'Allow', sub: 'The sign-in goes through', icon: UserCheck },
-  { id: 'deny', label: 'Deny', sub: 'The sign-in is refused outright', icon: ShieldAlert },
+  { id: '1fa', label: 'Allow', sub: 'The login goes through', icon: UserCheck },
+  { id: 'deny', label: 'Deny', sub: 'The login is refused outright', icon: ShieldAlert },
 ]
 
 /** Allow covers both allow-flavours; the second-factor switch chooses between them. */
@@ -410,8 +411,8 @@ export function WhenSection({
           <div className="bf__whenempty">
             <p>
               {who
-                ? `This rule has no conditions, so it decides every sign-in from ${who.startsWith('Everyone') ? who.charAt(0).toLowerCase() + who.slice(1) : who} that reaches it.`
-                : 'This rule has no conditions, so it decides every sign-in that reaches it.'}
+                ? `This rule has no conditions, so it decides every login from ${who.startsWith('Everyone') ? who.charAt(0).toLowerCase() + who.slice(1) : who} that reaches it.`
+                : 'This rule has no conditions, so it decides every login that reaches it.'}
             </p>
             <CatalogueButton
               open={adding === 'first'}
@@ -529,8 +530,9 @@ function CardBlock({
   onMergeUp: () => void
 }) {
   const set = (conditions: Condition[]) => onPatch(k.id, { ...k, conditions })
+  /* Pruned, so a zone unticked takes its Match on answer with it. */
   const patchOne = (id: string, p: Partial<Condition>) =>
-    set(k.conditions.map((c) => (c.id === id ? { ...c, ...p } : c)))
+    set(k.conditions.map((c) => (c.id === id ? pruneScopes({ ...c, ...p }) : c)))
 
   /* A disabled item says why, or it reads as broken. */
   const menu: MenuItem[] = [
@@ -605,11 +607,13 @@ function CardBlock({
               autoOpen={justAdded === c.id}
               onPatch={(p) => patchOne(c.id, p)}
               onRemove={() => set(k.conditions.filter((x) => x.id !== c.id))}
-              /* `c.scope` too. Duplicate rebuilds the condition field by field,
+              /* `c.scopes` too. Duplicate rebuilds the condition field by field,
                  so anything not named here is quietly dropped — and a copy of a
-                 zone condition that lost its half is a copy that asks a wider
+                 zone condition that lost its halves is a copy that asks a wider
                  question than the one it was made from. */
-              onDuplicate={() => set([...k.conditions, cond(c.typeId, c.operator, [...c.values], c.scope)])}
+              onDuplicate={() =>
+                set([...k.conditions, { ...cond(c.typeId, c.operator, [...c.values]), ...(c.scopes ? { scopes: { ...c.scopes } } : null) }])
+              }
               onSplit={() => onSplit(c.id)}
               onMove={(to) => onMove(c.id, to)}
               canSplit={k.conditions.length > 1}
@@ -737,13 +741,18 @@ function ConditionRow({
              merges — so retyping a scoped zone into a Country left the field
              behind, invisible on screen and still reaching `ckey`. */
           const next = conditionType(typeId)
-          onPatch({ typeId, operator: next.operators[0], values: [], scope: undefined, key: undefined, tz: undefined })
+          onPatch({ typeId, operator: next.operators[0], values: [], scopes: undefined, key: undefined, tz: undefined })
         }}
         onOperator={(operator) => onPatch({ operator })}
         onValues={(values) => onPatch({ values })}
-        /* `undefined` for both, never the stored word — absent is the default
-           and every dirty check here is a `JSON.stringify` comparison. */
-        onScope={(sc) => onPatch({ scope: sc === 'both' ? undefined : sc })}
+        /* One zone's half. Nothing stored for both, never the word — absent is
+           the default and every dirty check here is a `JSON.stringify`
+           comparison — and no map once nothing is narrowed. */
+        onScope={(zoneId, sc) => {
+          const rest = Object.fromEntries(Object.entries(c.scopes ?? {}).filter(([id]) => id !== zoneId))
+          const scopes = sc === 'both' ? rest : { ...rest, [zoneId]: sc }
+          onPatch({ scopes: Object.keys(scopes).length > 0 ? scopes : undefined })
+        }}
         /* `undefined`, not `''`. Every dirty check here is a `JSON.stringify`,
            so clearing a field has to remove it — an empty string left behind is
            an edit the save bar reports and the rule does not have. */
@@ -809,7 +818,7 @@ function ConditionRow({
    implementations would be one chance for that to be false. */
 function Readback({ rule, resolve }: { rule: Rule; resolve: NameLookup }) {
   const parts = predicateParts(rule.when, resolve)
-  if (parts.length === 0) return <em className="bf__readany">any sign-in that reaches it</em>
+  if (parts.length === 0) return <em className="bf__readany">any login that reaches it</em>
 
   return (
     <span className="bf__readexpr">

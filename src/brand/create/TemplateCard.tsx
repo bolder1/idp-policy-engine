@@ -237,8 +237,9 @@ export function TemplateCard({
   const post = posture(m.rules)
 
   return (
-    /* The category rides on the card as well as on the pill, so the hover glow
-       in the thumbnail can take the pill's hue. */
+    /* The category rides on the card as well as on the pill. No style reads it
+       since the sunrise went (22 Sep 2026): the hover is depth, not the pill's
+       hue. Kept so a card-level rule can take the hue without a markup change. */
     <article className={`bgcard is-cat-${catKey(m.category ?? '')}`}>
       {/* The illustration is the live preview: the template's rules drawn as
           the builder would order them, plus the control that expands them.
@@ -442,7 +443,7 @@ export function TemplatePreview({
           ))}
 
           <p className="bprev__note">
-            Evaluated top to bottom. The first rule that matches decides the sign-in, and the rest
+            Evaluated top to bottom. The first rule that matches decides the login, and the rest
             are skipped.
           </p>
 

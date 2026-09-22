@@ -211,7 +211,7 @@ export function ImpactArenaDialog({
                 />
               </div>
               <strong>{open_}%</strong>
-              <p>Situations that sign in on one factor and are asked nothing further.</p>
+              <p>Situations that log in on one factor and are asked nothing further.</p>
             </div>
           </section>
 
@@ -259,7 +259,7 @@ export function ImpactArenaDialog({
             </div>
 
             <p className="bia__fieldnote">
-              One dot per modelled sign-in situation, in a fixed order — the same dot is the same situation in every
+              One dot per modelled login situation, in a fixed order — the same dot is the same situation in every
               view, so the field can be compared rather than just looked at.
               {/* Published view only: the Engine default row below already
                   prints the current figure. */}

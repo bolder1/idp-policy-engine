@@ -158,6 +158,15 @@ const BUILDERS: Record<string, (live: boolean) => MethodConfig> = {
       { kind: 'select', id: 'match', label: 'Match certificate to user by', options: ['Subject UPN', 'Email address', 'Serial number'], value: 'Subject UPN' },
     ],
   }),
+  /* Added with the method (21 Sep 2026). It ships configured, so this form is
+     only reached if that changes: one question, how many fingers a person
+     enrols, so a cut or a dry finger does not lock them out. */
+  'digital-persona': () => ({
+    blurb: 'Fingerprints are read on an HID DigitalPersona reader and matched against the ones each person enrolled.',
+    fields: [
+      { kind: 'number', id: 'fingers', label: 'Fingers to enrol', min: 1, max: 10, unit: 'fingers', value: 2, help: 'A second finger gets a person in when the first will not read.' },
+    ],
+  }),
   'mo-push': miniOrangeApp,
   'mo-otp': miniOrangeApp,
   'mo-qr': miniOrangeApp,

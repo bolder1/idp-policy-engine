@@ -82,9 +82,9 @@ describe('who in the rule sentence', () => {
     const eu = when(card(cond('zone', 'in zone', ['eu'])))
     const fin = { groupIds: ['finance'], userIds: [] }
     expect(ruleIfLine(ruleOf(eu, fin), resolve)).toBe('For Finance, if in zone EU Countries')
-    expect(ruleIfLine(ruleOf(anySignIn(), fin), resolve)).toBe('For Finance, any sign-in')
+    expect(ruleIfLine(ruleOf(anySignIn(), fin), resolve)).toBe('For Finance, any login')
     expect(ruleIfLine(ruleOf(eu), resolve)).toBe('If in zone EU Countries')
-    expect(ruleIfLine(ruleOf(anySignIn()), resolve)).toBe('Any sign-in that reaches this rule')
+    expect(ruleIfLine(ruleOf(anySignIn()), resolve)).toBe('Any login that reaches this rule')
   })
 
   it('does not say Always matches for a rule that names people', () => {

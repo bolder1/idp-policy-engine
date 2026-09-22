@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Braces, Plus, Split, Trash2, Ungroup } from 'lucide-react'
 
-import { cardJoin, cardLetter, ckey, drawsAsBracket, duplicatedAcrossCards, outerJoin } from '../../predicate'
+import { cardJoin, cardLetter, ckey, drawsAsBracket, duplicatedAcrossCards, outerJoin, valuesTakenElsewhere } from '../../predicate'
 import {
   conditionType,
   type Condition,
@@ -12,10 +12,12 @@ import {
   type ZoneScope,
 } from '../../data'
 import { MenuButton } from '../../kit'
+import { SHOWCASE } from '../../showcase'
 import * as ops from '../../when-ops'
 import { hasWho } from '../../rule-who'
 import { useBrand, useNameLookup } from '../../store'
-import { ConditionList, ConditionPopover, summarise, valueSource } from '../ConditionPopover'
+import { ConditionDraft, ConditionPopover, summarise, valueSource } from '../ConditionPopover'
+import { conditionTone } from './tones'
 
 /* -----------------------------------------------------------------------------
    WHEN — the conditional, editable.
@@ -39,24 +41,21 @@ import { ConditionList, ConditionPopover, summarise, valueSource } from '../Cond
    and every structural edit re-establishes the lockstep. See `predicate.ts` for
    why that costs no model change and no migration.
 
-   Adding a condition opens the same catalogue dialog the trail uses, so the
-   two builders cannot disagree about what the attributes are or how they are
-   found.
+   Adding a condition draws an EMPTY ROW where the condition will land — the
+   same frame and parts as the rows above it — with the attribute dropdown open
+   under it (`ConditionDraft`, owner, 21 Sep 2026). Nothing reaches the rule
+   until an attribute is chosen.
    -------------------------------------------------------------------------- */
 
 export function WhenEditor({
   rule,
   onPatch,
-  openAt,
   onRemoved,
 }: {
   rule: Rule
   onPatch: (p: Partial<Rule>) => void
   /** Said after a condition or group is removed — the host shows it with Undo. */
   onRemoved?: (what: string) => void
-  /* The section header's `+`, anchored. One group adds into it; several add
-     a new one — the buttons inside the block are the explicit route. */
-  openAt?: { nonce: number } | null
 }) {
   const store = useBrand()
   const resolve = useNameLookup()
@@ -64,18 +63,31 @@ export function WhenEditor({
   /* `'loose'` adds a condition at the top level, `'group'` starts a new group,
      and an id adds into that card. Three destinations, because there are three
      things a person can mean by "add". */
-  /* `open` belongs to the 'group' destination alone: a new group appears as a
-     frame holding one empty slot, and the catalogue opens when that slot is
-     pressed. Until a condition is chosen the group exists only here, on screen —
-     never in the rule, which is what keeps a group from ever being saved empty. */
-  const [adding, setAdding] = useState<{ cardId: string | 'loose' | 'group'; open?: boolean } | null>(null)
+  /* A new group appears as a frame holding the empty row of its first
+     condition. Until a condition is chosen the group exists only here, on
+     screen — never in the rule, which is what keeps a group from ever being
+     saved empty. */
+  /* `nonce` keys the empty row, so every "add" draws it afresh with its
+     dropdown open — an add pressed while an empty row is already there reopens
+     its menu rather than closing it. `join` is the operator
+     chosen above an empty row (or a new group) while the rule holds ONE member:
+     there is nothing yet for it to join, so it waits here and `addTo` applies
+     it with the new member. */
+  const [adding, setAdding] = useState<{ cardId: string | 'loose' | 'group'; nonce: number; join?: Joiner } | null>(null)
   const [fresh, setFresh] = useState<string | null>(null)
 
+  /* The section header's `+` and the `openAt` prop that carried it are gone
+     (22 Sep 2026); every add starts from a button inside this block. */
+
+  /* `fresh` is a one-shot: the row just added opens its operator dropdown when
+     it mounts. Left set, a later remount of the same condition — Ungroup moves
+     it to another parent, Undo restores it — opened that dropdown again,
+     unasked, and took the focus. */
   useEffect(() => {
-    if (!openAt) return
-    setAdding({ cardId: 'loose' })
-    // Keyed on the nonce, not the rect: the same button pressed twice opens twice.
-  }, [openAt?.nonce])
+    if (!fresh) return
+    const t = window.setTimeout(() => setFresh(null), 600)
+    return () => window.clearTimeout(t)
+  }, [fresh])
 
   /* Every edit goes through `when-ops`, which is the only writer.
 
@@ -131,13 +143,17 @@ export function WhenEditor({
   const addTo = (cardId: string | 'loose' | 'group', typeId: string) => {
     const t = conditionType(typeId)
     const c = ops.freshCondition(typeId, t.operators[0])
+    /* The operator the new member joins by: the rule's own once it has two
+       members, else the one chosen above the empty row while it waited. */
+    const joinBy = members.length >= 2 ? outer : (adding?.join ?? outer)
+    const land = (next: Predicate) => write(ops.setOuterJoin(next, joinBy))
 
     if (cardId === 'group') {
       /* A group starts empty of everything that came before it. Adding one used
          to leave the existing conditions where they were and draw a frame round
          them too, so making a NEW group visually swallowed the old ones. */
       const next = ops.addCondition(rule.when, 'new', c)
-      restructure(ops.setGrouped(next, next.cards[next.cards.length - 1].id, true))
+      land(ops.setGrouped(next, next.cards[next.cards.length - 1].id, true))
     } else if (cardId === 'loose') {
       /* Join the last card when it is loose, and start a new run when it is a
          group — so a condition added from the button below a group lands after
@@ -145,8 +161,14 @@ export function WhenEditor({
          same bracket: two loose runs on the same predicate carry the same
          joiner, which is what makes them read as one flat list with a group
          sitting in the middle of it. */
+      /* `drawsAsBracket`, not `grouped`: an older rule can hold a card that is
+         not flagged as a group and still draws as one (its own operator differs
+         from the rule's). The empty row sat OUTSIDE that bracket, under the
+         rule's operator, so the condition must land outside it too — joining
+         it silently turned a required condition into one alternative inside
+         somebody else's group. */
       const last = cards[cards.length - 1]
-      restructure(last && !last.grouped ? ops.addCondition(rule.when, last.id, c) : ops.addCondition(rule.when, 'new', c))
+      land(last && !drawsAsBracket(rule.when, last) ? ops.addCondition(rule.when, last.id, c) : ops.addCondition(rule.when, 'new', c))
     } else {
       restructure(ops.addCondition(rule.when, cardId, c))
     }
@@ -195,20 +217,18 @@ export function WhenEditor({
      an empty group matches every sign-in — the pane then had to apologise for
      it in a sentence while the linter flagged it. The group is pending instead,
      and the first condition chosen for it is what creates it. */
-  const addGroup = () => setAdding({ cardId: 'group', open: false })
+  const addGroup = () => setAdding({ cardId: 'group', nonce: Date.now() })
   const pendingGroup =
     adding?.cardId === 'group' ? (
-      <PendingGroup
-        letter={cardLetter(cards.length)}
-        open={!!adding.open}
-        onOpen={() => setAdding({ cardId: 'group', open: true })}
-        onPick={add}
-        onCancel={() => setAdding(null)}
-      />
+      <PendingGroup key={adding.nonce} letter={cardLetter(cards.length)} onPick={add} onCancel={() => setAdding(null)} />
     ) : null
 
   const dupes = duplicatedAcrossCards(rule.when)
-  const openCatalogue = (cardId: string | 'new') => () => setAdding({ cardId })
+
+  /* A value another condition on the same attribute already names in the
+     same branch is not offered again — see `valuesTakenElsewhere`. */
+  const takenFor = (c: Condition): string[] => valuesTakenElsewhere(rule.when, c.id)
+  const openCatalogue = (cardId: string | 'new') => () => setAdding({ cardId, nonce: Date.now() })
 
   /* Drawn the way the model is read, not the way it is stored.
 
@@ -236,12 +256,25 @@ export function WhenEditor({
      nothing yet and is still the thing on the screen, so the empty state must
      not take the pane back off them. */
   const empty = members.length === 0
+  /* The empty row, or a new group, is a member about to exist: it takes the
+     bracket's place under the empty state rather than sitting inside it. */
+  const drafting = adding?.cardId === 'loose' || adding?.cardId === 'group'
+  /* The operator above a member about to exist. With two or more members it
+     IS the rule's operator, like every other gap, and writes through. With one,
+     setting the rule's operator is a no-op — there is nothing to join yet — so
+     the choice is held with the pending member until it lands. */
+  const pendingJoinRow =
+    members.length >= 2 ? (
+      <JoinRow join={outer} scope="rule" onSet={(j) => write(ops.setOuterJoin(rule.when, j))} />
+    ) : (
+      <JoinRow join={adding?.join ?? outer} scope="rule" onSet={(j) => setAdding((a) => (a ? { ...a, join: j } : a))} />
+    )
 
 
   return (
     <div>
       <div className="bb__if is-editable">
-        {empty ? (
+        {empty && !drafting ? (
           /* A proper empty state, and it fires on NO CONDITIONS rather than on
              no cards.
 
@@ -260,38 +293,25 @@ export function WhenEditor({
                 sign-in that matches — only those people's. */}
             <p>
               {hasWho(rule.who)
-                ? 'Any sign-in by the people in Who matches. Add a condition to narrow that.'
-                : 'Every sign-in that reaches this rule matches it. Add a condition to narrow that.'}
+                ? 'Any login by the people in Who matches. Add a condition to narrow that.'
+                : 'Every login that reaches this rule matches it. Add a condition to narrow that.'}
             </p>
-            {/* The same list the foot opens, at the pane's full width.
-
-                A native select stood here for one commit and was the wrong
-                answer to the right complaint. The complaint was that the list
-                was 250px wide and centred under a wider sentence, which looks
-                like something that failed to load. The answer to that is the
-                width, not a different control — a select drops the marks, and
-                the marks are what tell nine rows apart at a glance.
-
-                So: a button, then the list, exactly as the foot does it. One
-                catalogue, one component, two places that open it. */}
-            {pendingGroup ? (
-              <div className="bb__ifblank__pick">{pendingGroup}</div>
-            ) : adding ? (
-              <div className="bb__ifblank__pick">
-                <ConditionList label="Add a condition" onPick={add} onCancel={() => setAdding(null)} />
-              </div>
-            ) : (
-              <div className="bb__ifblank__acts">
-                <button type="button" className="bb__ifadd" onClick={openCatalogue('loose')}>
-                  <Plus size={11} strokeWidth={2.4} aria-hidden />
-                  Add condition
-                </button>
-                <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
-                  <Plus size={11} strokeWidth={2.4} aria-hidden />
-                  Add group
-                </button>
-              </div>
-            )}
+            {/* Either button replaces this whole state with the bracket and the
+                member being added in it — the empty condition row, or a new
+                group holding one — so the first condition is drawn exactly
+                where, and exactly as, every later one will be. */}
+            <div className="bb__ifblank__acts">
+              <button type="button" className="bb__ifadd" onClick={openCatalogue('loose')}>
+                <Plus size={11} strokeWidth={2.4} aria-hidden />
+                Add condition
+              </button>
+              <button type="button" className="bb__ifaddgroup" onClick={addGroup}>
+                <Plus size={11} strokeWidth={2.4} aria-hidden />
+                {/* "Conditional group" (owner, 22 Sep 2026), so it is not read as
+                    the user groups Who adds just above. */}
+                Add conditional group
+              </button>
+            </div>
           </div>
         ) : (
           /* ONE bracket, drawn as one.
@@ -323,6 +343,7 @@ export function WhenEditor({
                      about `c.id` compared two string spaces that never meet, so
                      the ·2 badge and its tooltip were unreachable. */
                   dupe={dupes.includes(ckey(m.c))}
+                  taken={takenFor(m.c)}
                   store={store}
                   resolve={resolve}
                   onChange={(nextC) => patchCondition(m.c.id, nextC)}
@@ -332,7 +353,7 @@ export function WhenEditor({
                      patch merges and cannot express that, and a scope
                      materialised at its default lights the save bar on a rule
                      that means exactly what it did. */
-                  onScope={(s) => write(ops.setScope(rule.when, m.c.id, s))}
+                  onScope={(zoneId, s) => write(ops.setScope(rule.when, m.c.id, zoneId, s))}
                   onKey={(k) => write(ops.setKey(rule.when, m.c.id, k))}
                   onTz={(tz) => write(ops.setTz(rule.when, m.c.id, tz))}
                   onRemove={() => removeCondition(m.c.id)}
@@ -348,10 +369,11 @@ export function WhenEditor({
                   rows={m.card.conditions}
                   fresh={fresh}
                   dupes={dupes}
+                  takenFor={takenFor}
                   store={store}
                   resolve={resolve}
                   onAdd={openCatalogue(m.card.id)}
-                  picking={adding?.cardId === m.card.id}
+                  picking={adding?.cardId === m.card.id ? adding.nonce : null}
                   onPick={add}
                   onCancelPick={() => setAdding(null)}
                   onUngroup={() => ungroup(m.card.id)}
@@ -363,7 +385,7 @@ export function WhenEditor({
                   patchCondition={patchCondition}
                   removeCondition={removeCondition}
                   retype={(id, typeId) => write(ops.retypeCondition(rule.when, id, typeId, conditionType(typeId).operators[0]))}
-                  setScope={(id, s) => write(ops.setScope(rule.when, id, s))}
+                  setScope={(id, zoneId, s) => write(ops.setScope(rule.when, id, zoneId, s))}
                   setKey={(id, k) => write(ops.setKey(rule.when, id, k))}
                   setTz={(id, tz) => write(ops.setTz(rule.when, id, tz))}
                 />
@@ -385,13 +407,15 @@ export function WhenEditor({
               <>
                 {/* A pending group is a pending MEMBER, so it takes the
                     bracket's operator in the gap above it like any other. */}
-                <JoinRow join={outer} scope="rule" onSet={(j) => write(ops.setOuterJoin(rule.when, j))} />
+                {!empty && pendingJoinRow}
                 {pendingGroup}
               </>
             ) : adding?.cardId === 'loose' ? (
-              <div className="bb__ifpick">
-                <ConditionList label="Add a condition" onPick={add} onCancel={() => setAdding(null)} />
-              </div>
+              <>
+                {/* The empty row is a member too, joined like the rest. */}
+                {!empty && pendingJoinRow}
+                <ConditionDraft key={adding.nonce} label="New condition" onPick={add} onCancel={() => setAdding(null)} />
+              </>
             ) : (
               /* One control, two things it can add.
 
@@ -411,7 +435,7 @@ export function WhenEditor({
                      of the menu to restate them. */
                   items={[
                     { id: 'cond', label: 'Add condition', icon: Plus },
-                    { id: 'group', label: 'Add condition group', icon: Braces },
+                    { id: 'group', label: 'Add conditional group', icon: Braces },
                   ]}
                   onSelect={(id) => (id === 'group' ? addGroup() : openCatalogue('loose')())}
                 />
@@ -427,24 +451,20 @@ export function WhenEditor({
 /* --- A group that does not exist yet ---------------------------------------------
 
    What "Add condition group" draws: the frame a group will have, its name, and
-   one empty slot where its first condition goes. Pressing the slot opens the
-   catalogue in its place; choosing from it is what writes the group into the
-   rule, with that condition already inside. Discarding it, or cancelling the
-   catalogue, simply stops drawing it — nothing was ever written, so there is
-   nothing to undo.
+   the empty row of its first condition with the attribute dropdown open under
+   it — the same row "Add condition" draws. Choosing an attribute is what writes
+   the group into the rule, with that condition already inside. Discarding it
+   simply stops drawing it — nothing was ever written, so there is nothing to
+   undo.
 
    A group is never empty in the rule, because an empty group matches every
    sign-in and no sentence makes that safe to leave lying around. */
 function PendingGroup({
   letter,
-  open,
-  onOpen,
   onPick,
   onCancel,
 }: {
   letter: string
-  open: boolean
-  onOpen: () => void
   onPick: (typeId: string) => void
   onCancel: () => void
 }) {
@@ -462,16 +482,7 @@ function PendingGroup({
           </button>
         </span>
       </div>
-      {open ? (
-        <div className="bb__ifpick">
-          <ConditionList label={`First condition in ${name}`} onPick={onPick} onCancel={onCancel} />
-        </div>
-      ) : (
-        <button type="button" className="bb__ifslot" onClick={onOpen}>
-          <Plus size={12} strokeWidth={2.4} aria-hidden />
-          Choose a condition
-        </button>
-      )}
+      <ConditionDraft label={`First condition in ${name}`} onPick={onPick} onCancel={onCancel} />
     </div>
   )
 }
@@ -493,6 +504,7 @@ function GroupMember({
   rows,
   fresh,
   dupes,
+  takenFor,
   store,
   resolve,
   onAdd,
@@ -514,11 +526,13 @@ function GroupMember({
   rows: Condition[]
   fresh: string | null
   dupes: string[]
+  /** What another condition in this branch already names — see `takenFor`. */
+  takenFor: (c: Condition) => string[]
   store: ReturnType<typeof useBrand>
   resolve: ReturnType<typeof useNameLookup>
   onAdd: () => void
-  /** This group is the one the catalogue is open for. */
-  picking: boolean
+  /** The empty row's key when this group is the one being added to, else null. */
+  picking: number | null
   onPick: (typeId: string) => void
   onCancelPick: () => void
   onUngroup: () => void
@@ -527,7 +541,7 @@ function GroupMember({
   patchCondition: (id: string, next: Partial<Condition>) => void
   removeCondition: (id: string) => void
   retype: (id: string, typeId: string) => void
-  setScope: (id: string, s: 'both' | ZoneScope) => void
+  setScope: (id: string, zoneId: string, s: 'both' | ZoneScope) => void
   setKey: (id: string, k: string) => void
   setTz: (id: string, tz: string) => void
 }) {
@@ -564,11 +578,12 @@ function GroupMember({
             c={c}
             fresh={fresh === c.id}
             dupe={dupes.includes(ckey(c))}
+            taken={takenFor(c)}
             store={store}
             resolve={resolve}
             onChange={(nextC) => patchCondition(c.id, nextC)}
             onRetype={(typeId) => retype(c.id, typeId)}
-            onScope={(s) => setScope(c.id, s)}
+            onScope={(zoneId, s) => setScope(c.id, zoneId, s)}
             onKey={(k) => setKey(c.id, k)}
             onTz={(tz) => setTz(c.id, tz)}
             onRemove={() => removeCondition(c.id)}
@@ -581,21 +596,21 @@ function GroupMember({
             that it is empty. The builder no longer creates empty groups, so
             this only ever meets one left over in older data, and pressing the
             box is the whole fix. */}
-        {rows.length === 0 && !picking && (
+        {rows.length === 0 && picking === null && (
           <button type="button" className="bb__ifslot" onClick={onAdd}>
             <Plus size={12} strokeWidth={2.4} aria-hidden />
             Choose a condition
           </button>
         )}
 
-        {/* Inside the frame, above the foot. A group is a bracket, and what you
-            are adding is going inside it — opening the list anywhere else would
-            leave the destination to be inferred from which button was last
-            pressed. */}
-        {picking && (
-          <div className="bb__ifpick">
-            <ConditionList label={`Add to ${name}`} onPick={onPick} onCancel={onCancelPick} />
-          </div>
+        {/* Inside the frame, above the foot, as the group's next row: a group
+            is a bracket, and what you are adding is going inside it. Joined
+            by the group's own operator like the rows above it. */}
+        {picking !== null && (
+          <>
+            {rows.length > 0 && <JoinRow join={join} scope="group" onSet={onSetJoin} />}
+            <ConditionDraft key={picking} label={`New condition in ${name}`} onPick={onPick} onCancel={onCancelPick} />
+          </>
         )}
 
         <div className="bb__ifgroupfoot">
@@ -612,7 +627,7 @@ function GroupMember({
           {/* Only once the group holds something. Empty, the slot above is the
               way in, and a second "Add condition" beside it would be two doors
               to one room. */}
-          {rows.length > 0 && (
+          {rows.length > 0 && picking === null && (
             <button type="button" className="bb__ifadd" onClick={onAdd}>
               <Plus size={12} strokeWidth={2.4} aria-hidden />
               Add condition
@@ -773,6 +788,7 @@ function ConditionRow({
   c,
   fresh,
   dupe,
+  taken,
   store,
   resolve,
   onChange,
@@ -785,12 +801,14 @@ function ConditionRow({
   c: Condition
   fresh: boolean
   dupe: boolean
+  /** Values another condition in this branch already names: not offered here. */
+  taken: string[]
   store: ReturnType<typeof useBrand>
   resolve: ReturnType<typeof useNameLookup>
   onChange: (c: Condition) => void
   onRetype: (typeId: string) => void
   /** Zone conditions only — the one writer for `scope` runs through here. */
-  onScope: (s: 'both' | ZoneScope) => void
+  onScope: (zoneId: string, s: 'both' | ZoneScope) => void
   /** Attribute conditions only: which attribute. */
   onKey: (k: string) => void
   /** Time conditions only: which timezone the window is read in. */
@@ -812,7 +830,32 @@ function ConditionRow({
      moment all of them have broken. The question is whether this condition
      names something that is not there, and a condition with no values does not
      name anything. */
-  const stale = values.length > 0 && values.some((id) => !options.some((o) => o.value === id))
+  /* Chosen from a list only: two time windows, two scores or two typed values
+     that happen to match are not the same choice made twice. A value this row
+     already holds stays pickable, so it can be taken off; one another row holds
+     is shown and refused, with the reason on the row. */
+  const listed = t.valueKind !== 'time' && t.valueKind !== 'range' && t.valueKind !== 'text'
+  /* Only a value chosen FROM a list can name something that is gone. A typed
+     one — "12:00", a score of 70, "FTE" — is on no list, so it always read as
+     missing: every time window and risk threshold drew the red "unset" frame
+     with its values filled in (owner, 22 Sep 2026: "the time of day condition
+     box looks bad"). */
+  const stale = listed && values.length > 0 && values.some((id) => !options.some((o) => o.value === id))
+  /* Each value's mark in the condition's own family colour — the colour its
+     attribute already wears in the field and on the card. */
+  const tone = conditionTone(t.id, t.group)
+  const offered = listed
+    ? options.map((o) =>
+        taken.includes(o.value) && !values.includes(o.value)
+          ? { ...o, tone, disabled: true, note: 'In another condition' }
+          : { ...o, tone },
+      )
+    : options
+  /* Already both here and in another condition — a rule written before this
+     rule existed, or one that became so by moving a condition. Said under the
+     row, naming the value, so it can be taken off one of them. */
+  const clash = listed ? values.filter((v) => taken.includes(v)) : []
+  const clashNames = clash.map((v) => options.find((o) => o.value === v)?.label ?? v)
 
   const summary =
     t.valueKind === 'time'
@@ -824,13 +867,17 @@ function ConditionRow({
         : summarise(names.length ? names : values, 'Choose…')
 
   return (
-    <div className={`bb__cond ${fresh ? 'is-new' : ''}`}>
+    /* No slide-in: every condition arrives from the empty row, which already
+       drew this frame in this place — animating it in again made the row being
+       filled in vanish and blink back, and the dropdown it opens was measured
+       mid-slide, 4px high. */
+    <div className="bb__cond">
       <span className="bb__cond__body">
         <ConditionPopover
           stacked
           c={c}
           summary={summary}
-          options={options}
+          options={offered}
           names={names}
           single={single}
           unset={values.length === 0 || stale}
@@ -845,10 +892,19 @@ function ConditionRow({
           footer={footer}
           onFooter={onFooter}
         />
-        {dupe && (
-          <span className="bb__ifdupe" title="This exact condition is also in another branch">
-            Also in another branch of this rule
+        {/* Conflict and duplicate captions are off in the showcase, with the
+            panel's other findings (owner, 22 Sep 2026). The dropdown still
+            refuses a value another condition holds. */}
+        {SHOWCASE ? null : clash.length > 0 ? (
+          <span className="bb__ifdupe is-clash">
+            {clashNames.join(', ')} {clashNames.length === 1 ? 'is' : 'are'} also in another condition. Keep {clashNames.length === 1 ? 'it' : 'them'} in one.
           </span>
+        ) : (
+          dupe && (
+            <span className="bb__ifdupe" title="This exact condition is also in another branch">
+              Also in another branch of this rule
+            </span>
+          )
         )}
       </span>
 

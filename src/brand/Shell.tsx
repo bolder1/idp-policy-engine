@@ -1,14 +1,17 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
 import {
   Activity,
+  AlertTriangle,
   AppWindow,
   BookOpen,
+  CheckCircle2,
   ChevronRight,
   ClipboardCheck,
   CreditCard,
   FileText,
   IdCard,
+  Info,
   KeyRound,
   LayoutGrid,
   type LucideIcon,
@@ -19,8 +22,11 @@ import {
   Settings,
   ShieldCheck,
   Sun,
+  Trash2,
   UserRound,
   Users,
+  X,
+  XCircle,
   Zap,
 } from 'lucide-react'
 
@@ -32,6 +38,7 @@ import { BrandSwitch } from './BrandSwitch'
 import { SHOWCASE } from './showcase'
 import { Tip } from './kit'
 import { useBrand, useToast, type BrandScreen } from './store'
+import type { ToastTone } from './toast-tone'
 import { useTheme } from './theme-mode'
 
 /* -----------------------------------------------------------------------------
@@ -575,15 +582,31 @@ export function Shell({ children }: { children: ReactNode }) {
   )
 }
 
+/* The mark for each kind of news (22 Sep 2026). */
+const TOAST_ICON: Record<ToastTone, LucideIcon> = {
+  success: CheckCircle2,
+  removed: Trash2,
+  warning: AlertTriangle,
+  error: XCircle,
+  info: Info,
+}
+
 /* Its own component, so subscribing to the toast re-renders this node rather
    than the whole shell around it.
 
    Two parts. The live region is always in the page and only its text changes,
    because a region inserted together with its text is often not announced; the
    text node is keyed by the toast id so the same message twice is read twice.
-   The pill is only visual, keyed the same way so a repeat animates in again. */
+   The card is keyed the same way so a repeat animates in again.
+
+   A white card now, not a dark pill (owner, 22 Sep 2026: "colour based on the
+   task performed, with an icon, and a timeline at the end of the card"): the
+   kind of news as a coloured mark, the message, Undo when there is one, a
+   close, and a bar along the foot in the same colour that runs out as the
+   toast's time does. */
 export function Toast() {
   const toast = useToast()
+  const { dismissToast } = useBrand()
   return (
     <>
       <div className="u-sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -591,26 +614,38 @@ export function Toast() {
       </div>
       {/* Top right, under the bar (owner, 21 Sep 2026: "a toaster in the top
           right with an undo option"). One place for every toast, so a removal
-          and a save confirm in the same spot. The pill is hidden from assistive
-          tech when it only repeats the live region; with an action it is a
-          real control and stays in the tree. */}
+          and a save confirm in the same spot. The message is hidden from
+          assistive tech because the live region above says it; the buttons are
+          real controls and stay in the tree. */}
       <AnimatePresence>
         {toast && (
           <motion.div
             key={toast.id}
-            className={`bshell__toast ${toast.action ? 'has-action' : ''}`}
+            className={`bshell__toast is-${toast.tone}`}
+            style={{ '--toast-ms': `${toast.duration}ms` } as CSSProperties}
             initial={{ opacity: 0, y: -10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.99 }}
             transition={{ type: 'spring', stiffness: 500, damping: 38 }}
-            aria-hidden={toast.action ? undefined : true}
           >
-            <span className="bshell__toasttext">{toast.text}</span>
+            <span className="bshell__toastico" aria-hidden>
+              {(() => {
+                const Ico = TOAST_ICON[toast.tone]
+                return <Ico size={18} strokeWidth={2} />
+              })()}
+            </span>
+            <span className="bshell__toasttext" aria-hidden>
+              {toast.text}
+            </span>
             {toast.action && (
               <button type="button" className="bshell__toastact" onClick={toast.action.run}>
                 {toast.action.label}
               </button>
             )}
+            <button type="button" className="bshell__toastx" aria-label="Dismiss" onClick={dismissToast}>
+              <X size={14} strokeWidth={2} />
+            </button>
+            <span className="bshell__toastbar" aria-hidden />
           </motion.div>
         )}
       </AnimatePresence>

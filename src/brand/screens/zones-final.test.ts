@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { card, cond, emptyLocation, newId, when, type Policy, type Zone } from '../data'
+import { DEFAULT_RANGE_KM, card, cond, emptyLocation, newId, when, type Policy, type Zone, type ZoneRange } from '../data'
+import { PLACES } from '../places'
 import {
   REVIEW_LIST_MAX,
+  centredOn,
   hasEntry,
   locationEntries,
   normaliseEntry,
   parseEntries,
+  rangeAt,
   takenZoneIds,
+  withRange,
   zoneChanges,
   zoneReviewRows,
 } from './zone-entries'
@@ -221,11 +225,122 @@ describe('what changed, for the save bar', () => {
     ])
   })
 
-  it('lists a radius as a location', () => {
-    const l = { ...emptyLocation(), radius: { km: 25, lat: 18.52, lon: 73.85, label: 'Pune HQ' } }
-    expect(locationEntries(l)).toEqual(['25 km of Pune HQ'])
-    expect(zoneReviewRows(zone({ location: l }), zone())).toEqual([
-      { label: 'Locations: removed', before: '25 km of Pune HQ', after: '', group: 'Locations', kind: 'removed' },
+})
+
+/* A range is a centre and a distance: "25 km around Pune". A zone holds as many
+   as it needs, and each is one location entry, worded as the list and the
+   review word it. */
+describe('ranges', () => {
+  const pune: ZoneRange = { km: 25, lat: 18.5204, lon: 73.8567, label: 'Pune', placeId: 'in-maharashtra-pune' }
+  const mumbai: ZoneRange = { km: 10, lat: 19.1, lon: 72.9, label: 'Mumbai', placeId: 'in-maharashtra-mumbai' }
+  const at = (...ranges: ZoneRange[]) => zone({ location: { ...emptyLocation(), ranges } })
+
+  it('words a range as a distance from its city', () => {
+    expect(locationEntries({ ...emptyLocation(), ranges: [pune] })).toEqual(['Within 25 km of Pune'])
+  })
+
+  it('holds several ranges in one zone, after the places', () => {
+    const l = { ...emptyLocation(), countries: ['Japan'], ranges: [pune, mumbai] }
+    expect(locationEntries(l)).toEqual(['Japan', 'Within 25 km of Pune', 'Within 10 km of Mumbai'])
+  })
+
+  it('lists a range added, and one removed', () => {
+    expect(zoneChanges(at(pune), at(pune, mumbai))).toEqual(['Locations'])
+    expect(zoneReviewRows(at(pune), at(pune, mumbai))).toEqual([
+      { label: 'Locations: added', before: '', after: 'Within 10 km of Mumbai', group: 'Locations', kind: 'added' },
     ])
+    expect(zoneReviewRows(at(pune, mumbai), at(mumbai))).toEqual([
+      { label: 'Locations: removed', before: 'Within 25 km of Pune', after: '', group: 'Locations', kind: 'removed' },
+    ])
+    expect(zoneReviewRows(at(), at(pune, mumbai))).toEqual([
+      {
+        label: 'Locations: added',
+        before: '',
+        after: 'Within 25 km of Pune, Within 10 km of Mumbai',
+        group: 'Locations',
+        kind: 'added',
+        count: 2,
+      },
+    ])
+  })
+
+  it('reads a new distance as the old range removed and the new one added', () => {
+    const wider = { ...pune, km: 50 }
+    expect(zoneChanges(at(pune), at(wider))).toEqual(['Locations'])
+    expect(zoneReviewRows(at(pune), at(wider))).toEqual([
+      { label: 'Locations: added', before: '', after: 'Within 50 km of Pune', group: 'Locations', kind: 'added' },
+      { label: 'Locations: removed', before: 'Within 25 km of Pune', after: '', group: 'Locations', kind: 'removed' },
+    ])
+  })
+
+  it('reads a new centre as a change', () => {
+    const moved = { ...pune, lat: 19.1, lon: 72.9, label: 'Mumbai', placeId: 'in-maharashtra-mumbai' }
+    expect(zoneChanges(at(pune), at(moved))).toEqual(['Locations'])
+    expect(zoneReviewRows(at(pune), at(moved))).toEqual([
+      { label: 'Locations: added', before: '', after: 'Within 25 km of Mumbai', group: 'Locations', kind: 'added' },
+      { label: 'Locations: removed', before: 'Within 25 km of Pune', after: '', group: 'Locations', kind: 'removed' },
+    ])
+  })
+
+  /* Keyed by centre and distance, not by its words: a centre moved under the
+     same name still changes what the zone matches, and says where each one is. */
+  it('reads a centre moved under the same name as a change', () => {
+    const moved = { ...pune, lat: 18.5, lon: 73.9 }
+    expect(zoneChanges(at(pune), at(moved))).toEqual(['Locations'])
+    expect(zoneReviewRows(at(pune), at(moved))).toEqual([
+      { label: 'Locations: added', before: '', after: 'Within 25 km of Pune (18.5, 73.9)', group: 'Locations', kind: 'added' },
+      {
+        label: 'Locations: removed',
+        before: 'Within 25 km of Pune (18.5204, 73.8567)',
+        after: '',
+        group: 'Locations',
+        kind: 'removed',
+      },
+    ])
+  })
+
+  it('is no change when nothing moved', () => {
+    expect(zoneChanges(at(pune, mumbai), at({ ...pune }, { ...mumbai }))).toEqual([])
+    expect(zoneReviewRows(at(pune, mumbai), at({ ...pune }, { ...mumbai }))).toEqual([])
+  })
+})
+
+/* What Add range and a range's change-centre search put in the zone. */
+describe('withRange', () => {
+  const city = (id: string) => {
+    const p = PLACES.find((x) => x.id === id)
+    if (!p) throw new Error(`no catalogue place ${id}`)
+    return p
+  }
+  const pune = city('in-maharashtra-pune')
+  const mumbai = city('in-maharashtra-mumbai')
+  /* Pune HQ's centre, finer than the catalogue's one-decimal centroid. */
+  const seed: ZoneRange = { km: 50, lat: 18.5204, lon: 73.8567, label: 'Pune', placeId: pune.id }
+
+  it('adds a new range at the default distance, after the ones there', () => {
+    const l = withRange({ ...emptyLocation(), ranges: [seed] }, mumbai, null)
+    expect(l.ranges).toEqual([seed, rangeAt(mumbai, DEFAULT_RANGE_KM)])
+  })
+
+  it('moves a range to a new centre where it stood, keeping its distance', () => {
+    const other = rangeAt(city('in-maharashtra-nagpur'), 10)
+    const l = withRange({ ...emptyLocation(), ranges: [seed, other] }, mumbai, seed)
+    expect(l.ranges).toEqual([rangeAt(mumbai, 50), other])
+  })
+
+  /* Re-picking the city it is drawn around must not swap the stored centre for
+     the catalogue's: that opened the save bar on a change no one made. */
+  it('leaves a range alone when its own city is picked again', () => {
+    const before = { ...emptyLocation(), ranges: [seed] }
+    const after = withRange(before, pune, seed)
+    expect(after).toBe(before)
+    expect(zoneChanges(zone({ location: before }), zone({ location: after }))).toEqual([])
+  })
+
+  it('knows a range with no catalogue id by its city name', () => {
+    const named: ZoneRange = { km: 25, lat: 18.52, lon: 73.86, label: 'Pune' }
+    const before = { ...emptyLocation(), ranges: [named] }
+    expect(centredOn(named, pune)).toBe(true)
+    expect(withRange(before, pune, named)).toBe(before)
   })
 })

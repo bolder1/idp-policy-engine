@@ -90,7 +90,7 @@ export function CheckTab({
 
   return (
     <>
-      <Section title="Try a sign-in" note="Pick a person and a situation, then watch it fall through the rules on the board.">
+      <Section title="Try a login" note="Pick a person and a situation, then watch it fall through the rules on the board.">
         <div className="bb__ctx">
           <Row label="Who">
             {SIM_USERS.map((u) => (
@@ -202,7 +202,7 @@ export function CheckTab({
         </AnimatePresence>
       </Section>
 
-      <Section title="Break-in test" note={`${test.rounds.length} sign-in attempts are dealt at these rules — ${test.rounds.filter((x) => x.challenge.kind === 'threat').length} hostile, the rest ordinary — and graded on what came back.${skipped ? ` ${skipped} skipped: this policy does not govern those people.` : ''}`}>
+      <Section title="Break-in test" note={`${test.rounds.length} login attempts are dealt at these rules — ${test.rounds.filter((x) => x.challenge.kind === 'threat').length} hostile, the rest ordinary — and graded on what came back.${skipped ? ` ${skipped} skipped: this policy does not govern those people.` : ''}`}>
         <div className="bb__gradehead">
           <span className={`bb__gradebig is-${test.grade}`} aria-label={`Grade ${test.grade}`}>
             {test.grade}
@@ -279,9 +279,9 @@ export function CheckTab({
                is the sentence that stops being true first. */
             detail={
               named.length > 1
-                ? 'The rules are evaluated on every sign-in to any of them.'
+                ? 'The rules are evaluated on every login to any of them.'
                 : named.length > 0 || draft.isSystem
-                  ? 'The rules are evaluated on every sign-in to it.'
+                  ? 'The rules are evaluated on every login to it.'
                   : 'These rules are saved but never evaluated.'
             }
           />

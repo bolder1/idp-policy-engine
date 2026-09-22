@@ -73,6 +73,36 @@ export const outerJoin = (p: Predicate): Joiner =>
 export const drawsAsBracket = (p: Predicate, k: ConditionCard): boolean =>
   k.grouped || (k.conditions.length > 1 && cardJoin(k) !== outerJoin(p))
 
+/* The values a condition may NOT also name, because another condition on the
+   same attribute already names them in the same branch (owner, 22 Sep 2026: "if
+   I picked one zone in any condition I can't pick that in the other condition —
+   this may cause conflict"). Twice in one branch, a value is a contradiction
+   ("in Office" and "not in Office") or a repeat that changes nothing.
+
+   A branch is a group — a card drawn as a bracket — or the rule's loose run.
+   Two different groups are alternatives, and the same zone in each is an
+   ordinary rule: (Office and a laptop) or (Office in business hours). A loose
+   condition holds alongside every group, so a group repeating its value is
+   either absorbed by it or fights it, and that pair counts. */
+export function valuesTakenElsewhere(p: Predicate, conditionId: string): string[] {
+  const branch = new Map<string, string>()
+  for (const k of p.cards) {
+    const b = drawsAsBracket(p, k) ? k.id : 'loose'
+    for (const c of k.conditions) branch.set(c.id, b)
+  }
+  const all = p.cards.flatMap((k) => k.conditions)
+  const me = all.find((c) => c.id === conditionId)
+  if (!me) return []
+  const mine = branch.get(me.id)
+  return all
+    .filter((x) => {
+      if (x.id === me.id || x.typeId !== me.typeId) return false
+      const theirs = branch.get(x.id)
+      return mine === 'loose' || theirs === 'loose' || theirs === mine
+    })
+    .flatMap((x) => x.values)
+}
+
 /** Does this card hold, given a test for one condition? */
 export const cardPasses = (k: ConditionCard, passed: (c: Condition) => boolean) =>
   cardJoin(k) === 'or' ? k.conditions.some(passed) : k.conditions.every(passed)
@@ -83,7 +113,7 @@ export const predicatePasses = (p: Predicate, passed: (c: Condition) => boolean)
 
 /* Identity of one condition, order-insensitive across its values.
 
-   The `scope` segment is what keeps "in zone Office, on the network" and "in
+   The scope segment is what keeps "in zone Office, on the network" and "in
    zone Office, on the map" from being the same condition. They are two
    different questions with two different answers, and nine separate readers get
    that right for free by keying through here: PE101's duplicate-rule blocker,
@@ -91,11 +121,24 @@ export const predicatePasses = (p: Predicate, passed: (c: Condition) => boolean)
    `mergeUp` (both of which DROP a condition they consider a twin), the
    gauntlet's twin matching, `changes.ts`, and the stale-estimate test.
 
-   `?? ''` rather than `?? 'both'`: a condition with no scope has to key to the
+   Per zone since 22 Sep 2026: the segment lists `zone:half` for each named zone
+   that is narrowed, sorted, so the same answers given in another order key the
+   same. Only for zones the condition still names, so a stale entry cannot
+   split two identical conditions.
+
+   Empty rather than `both`: a condition with no scope has to key to the
    byte-identical string it keyed to before this field existed, or every
    signature in the seeded estate moves and the stale-estimate check reports the
    whole tenant as edited. */
-export const ckey = (c: Condition) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}|${c.scope ?? ''}`
+const scopeSegment = (c: Condition) =>
+  c.scopes
+    ? c.values
+        .filter((v) => c.scopes![v])
+        .map((v) => `${v}:${c.scopes![v]}`)
+        .sort()
+        .join(',')
+    : ''
+export const ckey = (c: Condition) => `${c.typeId}|${c.operator}|${[...c.values].sort().join(',')}|${scopeSegment(c)}`
 
 /* The canonical identity of a whole predicate, and the product's single audit
    primitive. Conditions inside a card sort; cards sort among themselves. So it

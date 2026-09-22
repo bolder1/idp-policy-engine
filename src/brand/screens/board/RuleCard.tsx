@@ -1,23 +1,19 @@
 import { motion } from 'motion/react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import { useState, type PointerEvent as ReactPointerEvent } from 'react'
 import {
-  ArrowDown,
   ArrowRight,
-  ArrowUp,
   Asterisk,
   ChevronsDownUp,
   ChevronsUpDown,
-  CopyPlus,
   GripVertical,
   Lock,
   Split,
-  ToggleLeft,
-  ToggleRight,
-  Trash2,
   Users,
 } from 'lucide-react'
 
 import { type Rule } from '../../data'
+import { RowMenu, Toggle } from '../../kit'
+import { ruleMenu } from './rule-menu'
 import { leafCount } from '../../predicate'
 import { hasWho, whoSummary } from '../../rule-who'
 import type { NameLookup } from '../predicate-prose'
@@ -130,7 +126,7 @@ function CardSummary({ rule, resolve, terminal }: { rule: Rule; resolve?: NameLo
         <span className="bb__ifbranch" aria-hidden>
           <Split size={11} strokeWidth={2} />
         </span>
-        <span className="bb__cardsum__n">Every sign-in</span>
+        <span className="bb__cardsum__n">Every login</span>
         <ArrowRight size={11} strokeWidth={2} aria-hidden />
         <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>
       </div>
@@ -225,6 +221,8 @@ export function RuleCard({
   const tone = TONE[rule.decision]
   const titleId = `bb-rule-${rule.id}-title`
   const selected = openPart !== null
+  /* The ⋯ menu is open: holds the trail out while the pointer is in the menu. */
+  const [menuOpen, setMenuOpen] = useState(false)
   const kindClass = traceKind === 'hit' ? 'is-hit' : traceKind === 'miss' ? 'is-miss' : traceKind === 'unreached' || traceKind === 'off' ? 'is-unreached' : ''
 
   return (
@@ -235,7 +233,7 @@ export function RuleCard({
          the first — each measured a position the other was mid-way through
          changing, which is the small shiver a reorder used to end on. One
          element animates the move, and it is the one that moves. */
-      className={`bb__card is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${rule.enabled ? '' : 'is-off'} ${shadowed ? 'is-shadowed' : ''} ${dragging ? 'is-dragging' : ''} ${kindClass}`}
+      className={`bb__card is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${rule.enabled ? '' : 'is-off'} ${shadowed ? 'is-shadowed' : ''} ${dragging ? 'is-dragging' : ''} ${menuOpen ? 'is-menu' : ''} ${kindClass}`}
       /* No style prop while dragging, deliberately. Board writes this element's
          transform directly on every pointer move; a `style` React manages would
          be reset to a stale offset on the next re-render, which is the classic
@@ -379,49 +377,35 @@ export function RuleCard({
             >
               {expanded ? <ChevronsDownUp size={13} strokeWidth={2.2} /> : <ChevronsUpDown size={13} strokeWidth={2.2} />}
             </button>
-            <span className="bb__float__sep" />
-            {/* On/off, with the other things you do TO a rule.
+            {/* Two actions out, the rest behind one ⋯ (owner, 21 Sep 2026:
+                "only keep these two as a primary action and move all the other
+                into 3 dot, and add a real toggle as we have").
 
-                It was a switch pinned to the right of every card head, on at
-                rest — so a chain of nine rules carried nine green switches, all
-                saying the same thing, in the widest position on the card. The
-                state was never the switch's to tell: the label beside the name
-                already reads "Off" when a rule is off, which is the only time
-                the fact is worth reading.
-
-                Here it is what it always was: an action, beside duplicate and
-                delete, arriving when you reach for the card. */}
-            {/* On/off as a glyph of a switch, the trail's own size (owner, 21 Sep
-                2026). The power glyph "didn't make sense"; a full switch was a
-                heavier control than every icon beside it. The toggle glyph
-                reads as on/off without a tooltip, is still a real switch to a
-                screen reader, and takes the accent while the rule is on. */}
-            <button
-              type="button"
-              className={`bb__act bb__onoff ${rule.enabled ? 'is-on' : ''}`}
-              role="switch"
-              aria-checked={rule.enabled}
-              aria-label={`Rule ${index + 1} is ${rule.enabled ? 'on' : 'off'}`}
-              title={rule.enabled ? 'Switch this rule off' : 'Switch this rule on'}
-              onClick={() => onToggle(!rule.enabled)}
-            >
-              {rule.enabled ? <ToggleRight size={15} strokeWidth={2} /> : <ToggleLeft size={15} strokeWidth={2} />}
-            </button>
-            <span className="bb__float__sep" />
-            <button type="button" className="bb__act" aria-label="Move up" disabled={!canUp} onClick={() => onMove(-1)}>
-              <ArrowUp size={13} strokeWidth={2} />
-            </button>
-            <button type="button" className="bb__act" aria-label="Move down" disabled={!canDown} onClick={() => onMove(1)}>
-              <ArrowDown size={13} strokeWidth={2} />
-            </button>
-            {/* Copy-plus, not Copy: two sheets alone read as "copy to the
-                clipboard"; the plus says a second rule is made. */}
-            <button type="button" className="bb__act" aria-label="Duplicate rule" title="Duplicate" onClick={onDuplicate}>
-              <CopyPlus size={13} strokeWidth={2} />
-            </button>
-            <button type="button" className="bb__act is-danger" aria-label="Delete rule" onClick={onDelete}>
-              <Trash2 size={13} strokeWidth={2} />
-            </button>
+                On/off is the kit's switch — the one the panel's rule head
+                carries — rather than the toggle GLYPH that stood here, so the
+                card and the panel show the same control for the same fact. */}
+            <Toggle
+              size="sm"
+              checked={rule.enabled}
+              onChange={onToggle}
+              label={`Rule ${index + 1} ${rule.enabled ? 'on' : 'off'}`}
+            />
+            {/* Move, duplicate and delete: the things done to a rule less
+                often, in the kit's row menu. It portals, so the trail is held
+                open by `is-menu` on the card while it is up — the pointer
+                leaving the card for the menu would otherwise fold the trail
+                away under it. */}
+            <RowMenu
+              label={`Actions for rule ${index + 1}`}
+              items={ruleMenu(canUp, canDown)}
+              onOpenChange={setMenuOpen}
+              onSelect={(id) => {
+                if (id === 'up') onMove(-1)
+                else if (id === 'down') onMove(1)
+                else if (id === 'dup') onDuplicate()
+                else if (id === 'del') onDelete()
+              }}
+            />
           </span>
         </div>
       </div>
@@ -591,7 +575,7 @@ export function TerminalCard({
               </span>
             </div>
           </div>
-          <em>Every sign-in that no rule above caught</em>
+          <em>Every login that no rule above caught</em>
         </div>
 
         {/* One mark, in the same trail and at the same x as every other card's.

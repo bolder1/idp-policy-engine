@@ -3,6 +3,7 @@ import {
   groups as seedGroups,
   users as seedUsers,
   zones as seedZones,
+  zoneScopeOf,
   type Condition,
   type ConditionCard,
   type Predicate,
@@ -118,7 +119,20 @@ export function conditionSentence(c: Condition, resolve?: NameLookup): string {
 
      Only when it is narrower than the zone as written — the default is the
      zone's own meaning, and a clause restating a default is noise. */
-  if (t.valueKind === 'zone') return `${c.operator} ${value}${c.scope ? (c.scope === 'ip' ? ', on the network only' : ', by location only') : ''}`
+  if (t.valueKind === 'zone') {
+    /* Per zone since 22 Sep 2026. One half shared by every zone is said once
+       at the end, as it always was; different halves are said zone by zone. */
+    const halves = raw.map((v) => zoneScopeOf(c, v))
+    if (halves.every((h) => h === halves[0])) {
+      const h = halves[0]
+      return `${c.operator} ${value}${h === 'ip' ? ', on the network only' : h === 'location' ? ', by location only' : ''}`
+    }
+    const each = raw.map((v, i) => {
+      const h = halves[i]
+      return `${refName('zone', v, resolve)}${h === 'ip' ? ' (on the network)' : h === 'location' ? ' (by location)' : ''}`
+    })
+    return `${c.operator} ${each.join(' or ')}`
+  }
   if (t.valueKind === 'fingerprint') return `${c.operator} ${value}`
   return `${t.label} ${c.operator} ${value}`
 }
@@ -148,7 +162,7 @@ const joinOf = (k: ConditionCard) => k.join ?? 'and'
    tells the reader what the author thought the alternative WAS, which is the
    one thing the predicate itself cannot say. */
 export function predicateSentence(p: Predicate, resolve?: NameLookup): string {
-  if (p.cards.length === 0) return 'any sign-in that reaches this rule'
+  if (p.cards.length === 0) return 'any login that reaches this rule'
 
   const parts = p.cards.map((k) => {
     const body = cardSentence(k.conditions, resolve, joinOf(k))
@@ -257,8 +271,8 @@ export function ruleIfLine(rule: Rule, resolve?: NameLookup): string {
   /* Mid-sentence: "For everyone except Contractors", not "For Everyone …". */
   const who = whoSentence(rule.who, resolve)?.replace(/^Everyone\b/, 'everyone')
   const empty = rule.when.cards.length === 0
-  if (!who) return empty ? 'Any sign-in that reaches this rule' : `If ${predicateSentence(rule.when, resolve)}`
-  return empty ? `For ${who}, any sign-in` : `For ${who}, if ${predicateSentence(rule.when, resolve)}`
+  if (!who) return empty ? 'Any login that reaches this rule' : `If ${predicateSentence(rule.when, resolve)}`
+  return empty ? `For ${who}, any login` : `For ${who}, if ${predicateSentence(rule.when, resolve)}`
 }
 
 /* A short rule for a list row: who in a few words, then the conditions.

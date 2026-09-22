@@ -5,6 +5,7 @@ import {
   Check,
   CirclePlus,
   Cpu,
+  Download,
   FileSpreadsheet,
   Info,
   Lock,
@@ -20,7 +21,8 @@ import {
   Upload,
 } from 'lucide-react'
 
-import { Badge, Button, IconButton, MenuButton, NumberStepper, SearchBox, Tip, TipDot, TipMark, Toggle } from '../kit'
+import { Badge, Button, Callout, IconButton, MenuButton, NumberStepper, SearchBox, Tip, TipDot, TipMark, Toggle } from '../kit'
+import { useBrand } from '../store'
 import { TierPick } from '../tier-pick'
 import { Picker } from '../picker'
 import {
@@ -52,7 +54,7 @@ import { EmptyState, NoMatches } from '../empty'
 import { BrandMark } from '../logos/BrandMark'
 import { CHECK_BRAND } from '../logos/check-brands'
 import type { ProfileNote } from './profile-notes'
-import { checkName, versionError, type Choice } from './device-profile-choices'
+import { LIST_COLUMNS, checkName, versionError, type Choice } from './device-profile-choices'
 import {
   CATEGORY_FILTER_MIN,
   agentNote,
@@ -744,18 +746,24 @@ export function ChosenList({
     onRemove(id)
   }
 
+  const floors = draft.mode === 'os' && ordered.some((a) => a.config?.kind === 'version')
+
+  const head = (
+    <header className="bfp2__checkshead">
+      <h2>{heading}</h2>
+      {tip && <TipDot label={`About ${heading.toLowerCase()}`} text={tip} />}
+      {/* The count, once, and not at zero: the empty state below says that. */}
+      {ordered.length > 0 && <span className="bfp2__checkscount">{countLabel(draft.mode, chosen.length)}</span>}
+      {/* No button here. The door to the catalogue is the link under the
+          list, where zones put Add IP (owner, 15 Sep 2026) — it had moved up
+          to an "Edit checks" button at this line's end, and the owner's
+          reference put it back. */}
+    </header>
+  )
+
   return (
     <section className="bfp2__checks" ref={card}>
-      <header className="bfp2__checkshead">
-        <h2>{heading}</h2>
-        {tip && <TipDot label={`About ${heading.toLowerCase()}`} text={tip} />}
-        {/* The count, once, and not at zero: the empty state below says that. */}
-        {ordered.length > 0 && <span className="bfp2__checkscount">{countLabel(draft.mode, chosen.length)}</span>}
-        {/* No button here. The door to the catalogue is the link under the
-            list, where zones put Add IP (owner, 15 Sep 2026) — it had moved up
-            to an "Edit checks" button at this line's end, and the owner's
-            reference put it back. */}
-      </header>
+      {head}
 
       {ordered.length === 0 && fullEmpty ? (
         /* A new profile's first thing to do, so the primary button and a
@@ -796,6 +804,18 @@ export function ChosenList({
            trusted device carries the same three-word picker, and the width an
            answer needs would come out of the names. */
         <div className={`bfp2__chosen${draft.mode === 'device' ? ' is-weights' : ''}`}>
+          {/* The columns' names, on the row's own frame so each sits over its
+              column: the name's side, the setting's width, and the remove's slot. */}
+          <div className="bz7__fieldline bfp2__colhead" aria-hidden>
+            <div className="bfp2__chosenbox">
+              <span className="bfp2__colhead__left">{LIST_COLUMNS[draft.mode === 'device' ? 'device' : 'os'].left}</span>
+              <span className="bfp2__chosenctl">
+                {LIST_COLUMNS[draft.mode === 'device' ? 'device' : 'os'].right}
+                {floors && <VersionFloorNote />}
+              </span>
+            </div>
+            <span className="bz7__rowdel bfp2__colhead__del" />
+          </div>
           <ul className="bz7__fields">
             {ordered.map((a) => {
               const error = versionError(a, draft.config)
@@ -999,6 +1019,22 @@ export function SidePanel({ note }: { note: ProfileNote }) {
   )
 }
 
+/* Every version is a floor, said once, in brackets on the Requirement column's
+   own heading (director, 22 Sep 2026: "add some indication that this is a
+   minimum version and not a specific version"). It was "or later" inside every
+   version field first, and down a column of eight that was the same two words
+   eight times (owner: "very repetitive, add it in one place"); then a caption
+   line under the list's heading, a sentence away from the values it was about
+   (owner, same day: "move this beside the requirement, perhaps in brackets").
+   On the heading it sits over the very column it qualifies. "Versions" names
+   its reach: the column also holds a device type and an integrity answer,
+   which are not floors. Only over a list that holds a version check. The
+   heading row is hidden from assistive tech, so the fields' accessible names
+   still say Minimum, for a reader who meets them one at a time. */
+export function VersionFloorNote() {
+  return <span className="bfp2__colnote">(versions are minimums)</span>
+}
+
 export function AttrControl({
   attr,
   values,
@@ -1132,7 +1168,7 @@ export function AttrControl({
             what it is rather than passed off as a current release. */}
         {c.versions ? (
           <Picker
-            label={c.label}
+            label={atLeast ? `Minimum ${c.label}` : c.label}
             value={v.value}
             options={[
               ...(c.versions.some((o) => o.value === v.value)
@@ -1151,7 +1187,7 @@ export function AttrControl({
             type="text"
             inputMode="decimal"
             className="bfp2__exprval"
-            aria-label={c.label}
+            aria-label={atLeast ? `Minimum ${c.label}` : c.label}
             aria-invalid={!isVersionText(v.value)}
             value={v.value}
             placeholder={c.placeholder}
@@ -1219,25 +1255,76 @@ function EnrolField({
    form. Deleted rather than left for a future caller: the row shape still
    exists where it belongs, on the signals list. */
 
-/* --- Enrolment: one definition, two places -------------------------------------
+/* --- What an agent-based profile asks of every device -------------------------------
 
-   How a device gets onto a person's list, and how many they may keep. The
-   attributes decide whether a machine is the SAME one; these decide whether it
-   is allowed to become a known one at all.
+   The live console's prerequisites banner, in its words (owner, 21 Sep 2026:
+   "add the download agent banner as well"). Shown under the reach tiles once
+   Agent-based is the answer, on the create wizard's Devices step and on the
+   Basic details tab alike: it is the cost of the answer just given, so it sits
+   under the answer rather than further down beside the registration questions.
 
-   It is asked in the create form now, on the step where the collector is
-   chosen, and it is edited from one place afterwards. It used to be editable
-   only — a panel of defaults on the detail page that a new profile arrived
-   holding without anybody having answered them, which is what `restrictionSet`
-   exists to admit. A question worth asking is worth asking while the thing is
-   being made.
+   The download is the prototype's: there is no installer to hand over, so the
+   press is acknowledged the way the console acknowledges any other act. */
+export function AgentBanner() {
+  const store = useBrand()
+  return (
+    <div className="bfp2__agent">
+      <Callout tone="info" title="Prerequisites for enabling agent-based device restriction">
+        <ul className="bfp2__agentlist">
+          <li>All end users must install the Device Agent on their devices before accessing the application.</li>
+          <li>
+            Users without the Device Agent will be unable to log in and will see the following message: “Please
+            install the miniOrange Device Agent on your device and try again.”
+          </li>
+          <li>
+            The Device Agent is currently supported on Windows devices only. Use the link below to download the agent.
+          </li>
+        </ul>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={Download}
+          onClick={() => store.showToast('Device Agent download started')}
+        >
+          Download agent
+        </Button>
+      </Callout>
+    </div>
+  )
+}
 
-   One component because the two surfaces must not drift: the same rows, the
-   same dependency order, the same refusals. That order is real and it is why a
-   roster question can disappear rather than grey out — a roster is matched on
-   MAC address, MAC is one of the eighteen things only an agent can read, and it
-   is in the device catalogue only. So an OS-and-version profile cannot use one
-   at any reach, and an agentless device profile cannot either. */
+/* --- Registration: one definition, two places -------------------------------------
+
+   How a device gets onto a person's list, how many they may keep, and the two
+   switches the live console asks beside them. The attributes decide whether a
+   machine is the SAME one; these decide whether it is allowed to become a known
+   one at all.
+
+   The live console's order and words (owner, 21 Sep 2026): Device registration
+   method, then Allowed device registrations — or the roster that replaces it —
+   then Enable mobile device restriction and Enable device auto-registration.
+   The console's Title Case is set in the console's sentence case. The controls
+   stay this console's own — a dropdown and switches, not the live console's
+   radios and checkboxes (owner, same day) — and the live console's line under
+   each answer is the `?` on it.
+
+   It is asked in the create form, on the step where the collector is chosen,
+   and it is edited from one place afterwards. One component because the two
+   surfaces must not drift: the same rows, the same dependency order, the same
+   refusals. That order is real and it is why a roster question can disappear
+   rather than grey out — a roster is matched on MAC address, MAC is one of the
+   eighteen things only an agent can read, and it is in the device catalogue
+   only. So an OS-and-version profile cannot use one at any reach, and an
+   agentless device profile cannot either. */
+
+/* What the chosen method means, on the question's `?`. The first is the live
+   console's own line; it shows none for the second in the screenshot this was
+   built from, so that one says what the branch does in the same shape. */
+const REGISTRATION_HELP: Record<Registration, string> = {
+  self: 'Allow users to register their own devices up to the configured limit.',
+  'pre-approved': 'Allow only the devices on the roster you upload to access the application.',
+}
+
 export function EnrolmentFields({
   enabled,
   checkMac = true,
@@ -1245,6 +1332,7 @@ export function EnrolmentFields({
   reach,
   registration,
   autoRegister,
+  restrictMobile,
   maxDevices,
   roster,
   onChange,
@@ -1260,11 +1348,13 @@ export function EnrolmentFields({
   reach: ProfileReach | null
   registration: Registration
   autoRegister: boolean
+  restrictMobile: boolean
   maxDevices: number | null
   roster: Roster | null
   onChange: (p: {
     registration?: Registration
     autoRegister?: boolean
+    restrictMobile?: boolean
     maxDevices?: number | null
     roster?: Roster | null
   }) => void
@@ -1286,73 +1376,42 @@ export function EnrolmentFields({
     onChange({ roster: next })
   }
 
+  /* The console's own branch: a roster REPLACES the allowance rather than
+     sitting beside it. */
+  const pickMethod = (next: Registration) =>
+    onChange({
+      registration: next,
+      maxDevices: next === 'pre-approved' ? null : (maxDevices ?? DEFAULT_MAX_DEVICES),
+    })
+
   return (
     <div className="bfp2__rows bfp2__rows--form">
-      <EnrolField
-        label="How a device gets registered"
-        /* The refusal is on the row that carries the disabled option, rather
-           than in a paragraph above the whole section. */
-        tip={
-          (registration === 'self'
-            ? 'Users register their own devices, up to a limit. '
-            : 'Only devices on the uploaded roster can sign in. ') +
-          (rosterPossible
-            ? ''
-            : mode === 'os'
-              ? 'A roster is not available: it is matched on MAC address, which a device health profile does not read.'
-              : 'A roster is not available: it is matched on MAC address, which only the Device Agent can read.')
-        }
-      >
-        {/* The same dropdown either way, DISABLED where a roster is impossible
-            (owner, 16 Sep 2026). It used to become a line of plain text there,
-            which read as an unstyled field in a column of real ones — the
-            question looked broken rather than settled. Greyed, it still shows
-            its answer, still says what kind of control it is, and the `?`
-            above says why it cannot be changed. */}
-        <Picker
-          label="How a device gets registered"
-          width="fill"
-          disabled={!rosterPossible}
-          value={registration}
-          options={(Object.keys(REGISTRATION_LABEL) as Registration[]).map((r) => ({
-            value: r,
-            label: REGISTRATION_LABEL[r],
-          }))}
-          onChange={(v) => {
-            const next = v as Registration
-            /* The console's own branch: a roster REPLACES the allowance
-               rather than sitting beside it. */
-            onChange({
-              registration: next,
-              maxDevices: next === 'pre-approved' ? null : (maxDevices ?? DEFAULT_MAX_DEVICES),
-            })
-          }}
-        />
-      </EnrolField>
-
-      <EnrolField
-        label="Register silently on first sign-in"
-        tip="Convenient, but a device an attacker signs in from registers itself too."
-        inline
-      >
-        {/* The form size, not `sm`. An 18px switch beside a 40px dropdown and
-            a 40px number field read as a different class of control. */}
-        <Toggle
-          checked={autoRegister}
-          onChange={(next) => onChange({ autoRegister: next })}
-          label="Register silently on first sign-in"
-        />
-      </EnrolField>
+      {/* Asked only where it has two answers. Agentless can't match a roster,
+          so self registration is the only method there and the question is
+          not rendered at all (owner, 21 Sep 2026: "remove this from agentless,
+          no need") — it used to be the same dropdown, disabled. `withReach`
+          already holds an agentless profile to self registration. */}
+      {rosterPossible && (
+        <EnrolField label="Device registration method" tip={REGISTRATION_HELP[registration]}>
+          <Picker
+            label="Device registration method"
+            width="fill"
+            value={registration}
+            options={(Object.keys(REGISTRATION_LABEL) as Registration[]).map((r) => ({
+              value: r,
+              label: REGISTRATION_LABEL[r],
+            }))}
+            onChange={(v) => pickMethod(v as Registration)}
+          />
+        </EnrolField>
+      )}
 
       {/* One or the other, never both. A question that no longer applies is
           not disabled or greyed — it is not rendered. */}
       {registration === 'self' ? (
-        <EnrolField
-          label="Devices per person"
-          tip="How many devices a user can register before the next one is refused."
-        >
+        <EnrolField label="Allowed device registrations" tip="How many devices each user can register.">
           <NumberStepper
-            label="Devices per person"
+            label="Allowed device registrations"
             value={maxDevices ?? DEFAULT_MAX_DEVICES}
             min={1}
             max={20}
@@ -1404,8 +1463,9 @@ export function EnrolmentFields({
         </EnrolField>
       )}
 
-      {/* The two ways a pre-approved profile can be inert, said beside the
-          control that makes it so. Both block saving until fixed. */}
+      {/* The two ways a pre-approved profile can be inert, said under the
+          roster that makes it so — before the two switches, not after them.
+          Both block saving until fixed. */}
       {registration === 'pre-approved' && fileProblem && (
         <p className="bfp2__enrolwarn" role="status">
           <AlertTriangle size={13} strokeWidth={2} aria-hidden />
@@ -1426,6 +1486,24 @@ export function EnrolmentFields({
           </span>
         </p>
       )}
+
+      {/* The form size, not `sm`. An 18px switch beside a 40px dropdown and
+          a 40px number field read as a different class of control. */}
+      <EnrolField label="Enable mobile device restriction" tip="Restrict users from logging in on mobile devices." inline>
+        <Toggle
+          checked={restrictMobile}
+          onChange={(next) => onChange({ restrictMobile: next })}
+          label="Enable mobile device restriction"
+        />
+      </EnrolField>
+
+      <EnrolField label="Enable device auto-registration" tip="Silently register browser during login." inline>
+        <Toggle
+          checked={autoRegister}
+          onChange={(next) => onChange({ autoRegister: next })}
+          label="Enable device auto-registration"
+        />
+      </EnrolField>
     </div>
   )
 }

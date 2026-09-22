@@ -699,7 +699,7 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
                 <EmptyState
                   icon={ListX}
                   title="No rules yet"
-                  blurb="Sign-ins with no matching rule get the default outcome."
+                  blurb="Logins with no matching rule get the default outcome."
                   action={
                     <>
                       <Button variant="primary" icon={Plus} onClick={() => addRule()}>
@@ -950,7 +950,7 @@ function TerminalCard({ rule, onPatch }: { rule: Rule; onPatch: (p: Partial<Rule
         <div className="bf__ruleinner">
           <p className="bf__terminalwhen">
             <span className="u-label">When it applies</span>
-            Every sign-in that reached the bottom of the list without matching a rule above it.
+            Every login that reached the bottom of the list without matching a rule above it.
           </p>
 
           {/* `bare`, like the rule card's — the numbered pip belongs to a

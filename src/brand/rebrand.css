@@ -90,19 +90,22 @@
   --text-disabled: #adb5bd;
   --card-dot: rgba(33, 37, 41, 0.13);
 
-  /* One orange: every primary fill reads the rebrand's action colour, so a
-     bespoke primary button cannot drift from the kit's. The rail edge keeps the
-     console's own #eb5424. */
+  /* One orange, #eb5424, and its scale (tokens.css `--_orange-*`). Every
+     primary fill is the brand itself (owner, 22 Sep 2026: "change the brand
+     main colour to eb5424 … globally"): it was one step deeper here, #cc4b1d,
+     so a white label cleared 4.5:1, and the console's two most repeated oranges
+     were two different colours. Orange WORDS on white keep the deeper text
+     shade, which is only ever text. */
   --brand: #eb5424;
   --brand-hover: #d64c21;
   --brand-active: #a73c1a;
-  --brand-on-fill: #cc4b1d;
+  --brand-on-fill: #eb5424;
   --brand-text: #c2431c;
   --brand-subtle-bg: #fdeee9;
   --brand-subtle-border: #f9cabb;
-  --int-brand-bg: #cc4b1d;
-  --int-brand-bg-hover: #b8411a;
-  --int-brand-bg-active: #9e3715;
+  --int-brand-bg: #eb5424;
+  --int-brand-bg-hover: #d64c21;
+  --int-brand-bg-active: #a73c1a;
   --int-brand-text: #ffffff;
   --int-danger-text: #ffffff;
 
@@ -139,12 +142,12 @@
   --ctl-height-lg: 46px;
 
   /* --- Actions ----------------------------------------------------------------
-     The primary keeps the console's orange hue, one step deeper than #eb5424 so
-     its white label clears 4.5:1. The secondary is the console's light button:
-     a grey fill and no edge. */
-  --rb-cta: #cc4b1d;
-  --rb-cta-hover: #b8411a;
-  --rb-cta-active: #9e3715;
+     The primary is the brand orange itself, #eb5424, as the live console's
+     "+ Create Policy" is; hover and pressed are the next two steps of its scale
+     (22 Sep 2026). The secondary is the console's light button. */
+  --rb-cta: #eb5424;
+  --rb-cta-hover: #d64c21;
+  --rb-cta-active: #a73c1a;
   /* `--int-neutral-*` was restated here as a grey FILL with no edge (#f1f3f5,
      border transparent) — the live console's secondary button. Deleted, so the
      console's own values come through: a white ground and a #dde1e6 edge, which
@@ -305,6 +308,38 @@
 [data-brand='rebrand'] .bx-rowmenu__pop { border-color: var(--border-subtle); border-radius: 8px; }
 [data-brand='rebrand'] .bx-menu__item.is-divided { border-top-color: var(--border-subtle); }
 
+/* The row's ⋯ action menu, as the live console draws it (owner, 21 Sep 2026:
+   "change the action menu like we have in our product"). Measured off the
+   console's row menu (Edit / Show associated entities / Delete / App access
+   configuration): a borderless sheet on a soft shadow with 8px above and below
+   the list; full-width rows ~41px tall with no inset highlight; a grey 18px
+   icon 20px in; the label in regular 16px body ink 26px after the icon; no
+   rule between items, Delete included. Row menus only — the toolbar menus
+   (`MenuButton`: "+ Add", the board's commands) carry hints and shortcuts
+   and keep the kit's compact rows. */
+[data-brand='rebrand'] .bx-menu__pop.bx-rowmenu__pop {
+  min-width: 220px;
+  padding: 8px 0;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(33, 37, 41, 0.06), 0 6px 20px rgba(33, 37, 41, 0.14);
+}
+[data-brand='rebrand'] .bx-rowmenu__pop .bx-menu__item {
+  align-items: center;
+  gap: 26px;
+  padding: 9px 24px 9px 20px;
+  border-radius: 0;
+  color: var(--text-tertiary);
+}
+[data-brand='rebrand'] .bx-rowmenu__pop .bx-menu__item svg { width: 18px; height: 18px; margin-top: 0; }
+[data-brand='rebrand'] .bx-rowmenu__pop .bx-menu__item strong {
+  font-size: 16px;
+  font-weight: var(--fw-regular);
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+[data-brand='rebrand'] .bx-rowmenu__pop .bx-menu__item.is-divided { margin-top: 0; border-top: 0; padding-top: 9px; }
+
 /* --- Tooltips: one dark tip, one mark -------------------------------------------- */
 [data-brand='rebrand'] .bx-tip__pop {
   width: auto;
@@ -315,15 +350,16 @@
   font-size: 13px;
   line-height: 1.45;
 }
+/* The info icon on its own, as in the kit: no disc. Hover turns it the console's
+   blue rather than filling a disc behind it. */
 [data-brand='rebrand'] .bx-tipdot {
   width: 16px;
   height: 16px;
   border: 0;
-  background: var(--surface-inset);
-  font-size: 12px;
-  color: var(--text-secondary);
+  background: none;
+  color: var(--text-tertiary);
 }
-[data-brand='rebrand'] .bx-tipdot:hover { background: var(--blue-soft); color: var(--blue-strong); }
+[data-brand='rebrand'] .bx-tipdot:hover { color: var(--blue-strong); }
 
 /* --- Search ------------------------------------------------------------------------ */
 [data-brand='rebrand'] .bx-search:hover { border-color: var(--ctl-border-hover); }
@@ -409,8 +445,16 @@
 /* --- Dialogs and drawers ------------------------------------------------------------------------------ */
 [data-brand='rebrand'] .bx-scrim { background: rgba(33, 37, 41, 0.4); }
 [data-brand='rebrand'] .bx-drawer { border-left: 0; }
-[data-brand='rebrand'] .bx-drawer__head,
 [data-brand='rebrand'] .bx-modal__head { border-bottom: 0; padding-bottom: var(--space-4); }
+/* A drawer's head is the footer's mirror (owner, 22 Sep 2026: "add a border and
+   fix the header part like we have in the footer"): the same hairline, below it
+   instead of above, and the same padding top and bottom. The body scrolls
+   between the two lines. */
+[data-brand='rebrand'] .bx-drawer__head {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-6) var(--space-7);
+  align-items: center;
+}
 /* The one line a dialog keeps: its body scrolls under the footer. */
 [data-brand='rebrand'] .bx-drawer__foot,
 [data-brand='rebrand'] .bx-modal__foot { background: var(--surface-raised); border-top-color: var(--border-subtle); }

@@ -97,6 +97,10 @@ export interface CanvasViewOpts {
      was already shipping `--bb-x/y/z` in its stylesheet, so this is how it
      keeps them rather than renaming a working background. */
   cssPrefix?: string
+  /* Write those three properties on the stage's PARENT as well, so a ground
+     drawn on the region around the stage — the board's, behind its floating
+     panel — follows the pan and zoom in step with the stage's own. */
+  varsOnParent?: boolean
   /** Padding kept around the world when fitting. */
   pad?: number
   /* Vertical only, and horizontally centred.
@@ -160,9 +164,11 @@ export function useCanvasView(
        layer, so a pan is a layer move rather than a repaint of every node. */
     w.style.transform = `translate3d(${v.x}px, ${v.y}px, 0) scale(${v.z})`
     const p = o.current.cssPrefix ?? cssPrefix
-    s.style.setProperty(`--${p}-x`, `${v.x}px`)
-    s.style.setProperty(`--${p}-y`, `${v.y}px`)
-    s.style.setProperty(`--${p}-z`, `${v.z}`)
+    for (const el of o.current.varsOnParent && s.parentElement ? [s, s.parentElement] : [s]) {
+      el.style.setProperty(`--${p}-x`, `${v.x}px`)
+      el.style.setProperty(`--${p}-y`, `${v.y}px`)
+      el.style.setProperty(`--${p}-z`, `${v.z}`)
+    }
     if (zoomLabel.current) zoomLabel.current.textContent = `${Math.round(v.z * 100)}%`
   }, [cssPrefix, stage, world])
 

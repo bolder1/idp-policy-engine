@@ -214,7 +214,7 @@ export function journeyOf(rule: Rule): JourneyStep[] {
     }
   }
 
-  out.push({ id: 'end', label: 'Signed in', kind: 'end' })
+  out.push({ id: 'end', label: 'Logged in', kind: 'end' })
   return out
 }
 

@@ -252,29 +252,61 @@
   top: calc(var(--nav-topbar-h) + 48px + var(--space-5));
   right: var(--space-7);
   width: fit-content;
-  max-width: min(440px, calc(100vw - var(--space-7) * 2));
-  display: flex; align-items: center; gap: var(--space-6);
-  padding: var(--space-4) var(--space-7);
-  background: var(--surface-inverse);
-  color: var(--text-inverse);
-  border-radius: var(--radius-lg);
-  font-size: var(--fs-sm);
+  min-width: 280px;
+  max-width: min(420px, calc(100vw - var(--space-7) * 2));
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  padding: var(--space-5) var(--space-3) var(--space-6) var(--space-5);
+  overflow: hidden;
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-md);
+  line-height: 1.45;
   box-shadow: var(--el-overlay);
   z-index: var(--z-toast);
+  /* The kind of news: the mark and the bar. Info unless a tone says otherwise. */
+  --toast-tone: var(--fb-info-fg);
 }
-/* With an action, the verb sits at the end, and the pill leaves it a little less
-   right padding so the button's own padding does the spacing. */
-.bshell__toast.has-action { padding-right: var(--space-4); }
+/* A white card with a coloured mark and a timeline along its foot (owner, 22 Sep
+   2026). One colour per kind of news, from the console's feedback ramps. */
+.bshell__toast.is-success { --toast-tone: var(--fb-positive-fg); }
+.bshell__toast.is-removed { --toast-tone: var(--fb-negative-fg); }
+.bshell__toast.is-warning { --toast-tone: var(--fb-notice-fg); }
+.bshell__toast.is-error { --toast-tone: var(--fb-negative-fg); }
+.bshell__toastico { flex: none; display: grid; place-items: center; height: 21px; color: var(--toast-tone); }
+.bshell__toasttext { flex: 1; min-width: 0; color: var(--text-secondary); }
 .bshell__toastact {
   flex: none;
-  padding: var(--space-2) var(--space-4);
+  margin: -3px 0;
+  padding: var(--space-2) var(--space-3);
   border: 0; border-radius: var(--radius-sm);
   background: none; cursor: pointer;
   font-family: inherit; font-size: var(--fs-sm); font-weight: var(--fw-semibold);
-  color: var(--text-inverse); text-decoration: underline; text-underline-offset: 3px;
+  color: var(--text-link);
 }
-.bshell__toastact:hover { background: color-mix(in srgb, var(--text-inverse) 12%, transparent); }
-.bshell__toastact:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--text-inverse); }
+.bshell__toastact:hover { background: var(--surface-sunken); }
+.bshell__toastact:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bshell__toastx {
+  flex: none; display: grid; place-items: center;
+  width: 22px; height: 22px; margin: -1px 0;
+  border: 0; border-radius: var(--radius-sm); background: none; cursor: pointer;
+  color: var(--text-tertiary);
+}
+.bshell__toastx:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.bshell__toastx:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+/* The timeline: full at the start and empty when the toast leaves, in the
+   toast's own colour. Scaled, not resized, so it costs no layout. */
+.bshell__toastbar {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 4px;
+  background: var(--toast-tone);
+  transform-origin: left center;
+  animation: bshell-toast-time var(--toast-ms, 3200ms) linear forwards;
+}
+@keyframes bshell-toast-time { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .bshell__toastbar { animation: none; }
+}
 
 /* --- Page chrome ---------------------------------------------------------- */
 

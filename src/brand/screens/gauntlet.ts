@@ -132,7 +132,7 @@ export const DECK: Challenge[] = [
     id: 'tor-exec',
     kind: 'threat',
     name: 'Executive account from a Tor exit',
-    story: 'Someone signs in as an executive from an anonymising network on a device nobody has seen before.',
+    story: 'Someone logs in as an executive from an anonymising network on a device nobody has seen before.',
     userId: 'mehak', place: 'Tor exit node', device: 'New / unknown', authState: 'Normal returning user', risk: 'High', at: '02:40',
     want: 'deny',
     why: 'An anonymised origin on an unknown device is the shape of a credential-stuffing success. There is no legitimate reading of it.',
@@ -160,7 +160,7 @@ export const DECK: Challenge[] = [
     id: 'no-mfa',
     kind: 'threat',
     name: 'Account with no second factor enrolled',
-    story: 'A contractor with no MFA configured signs in from outside every known zone.',
+    story: 'A contractor with no MFA configured logs in from outside every known zone.',
     userId: 'devon', place: 'Outside all zones', device: 'New / unknown', authState: 'No MFA configured', risk: 'High',  at: '23:05',
     want: 'deny',
     why: 'Asking for a second factor the account cannot produce is the same as asking for nothing. Enrolment has to happen before access, not instead of it.',
@@ -222,7 +222,7 @@ export const DECK: Challenge[] = [
     id: 'unmanaged-contractor',
     kind: 'threat',
     name: 'Contractor on an unmanaged device',
-    story: 'A contractor signs in from their own laptop, never enrolled in MDM.',
+    story: 'A contractor logs in from their own laptop, never enrolled in MDM.',
     userId: 'devon', place: 'Outside all zones', device: 'New / unknown', authState: 'Normal returning user', risk: 'Medium', at: '10:05',
     want: '2fa',
     why: 'Non-employees on their own hardware are the standard step-up case. Blocking them outright usually just moves the work somewhere unmanaged.',
@@ -236,7 +236,7 @@ export const DECK: Challenge[] = [
   {
     id: 'office-regular',
     kind: 'legit',
-    name: 'Ordinary morning sign-in',
+    name: 'Ordinary morning login',
     story: 'An engineer opens their laptop at the office on a managed device.',
     userId: 'arun', place: 'Office Network', device: 'Managed (MDM)', authState: 'Normal returning user', risk: 'Low', at: '09:30',
     want: '1fa',
@@ -246,7 +246,7 @@ export const DECK: Challenge[] = [
     id: 'exec-office',
     kind: 'legit',
     name: 'Executive at their desk',
-    story: 'An executive signs in from the office on a corporate-managed machine.',
+    story: 'An executive logs in from the office on a corporate-managed machine.',
     userId: 'mehak', place: 'Office Network', device: 'Managed (MDM)', authState: 'Normal returning user', risk: 'Low', at: '08:55',
     want: '1fa',
     why: 'Seniority is not risk. If executives are challenged for being executives, they are the people who will ask for an exemption.',
@@ -255,7 +255,7 @@ export const DECK: Challenge[] = [
     id: 'finance-home',
     kind: 'legit',
     name: 'Finance working from home',
-    story: 'A finance user signs in from home on their usual, recently verified laptop.',
+    story: 'A finance user logs in from home on their usual, recently verified laptop.',
     userId: 'priya', place: 'Outside all zones', device: 'Known < 90 days', authState: 'Normal returning user', risk: 'Low', at: '19:20',
     want: '2fa',
     why: 'Off-network access to regulated data is worth one extra step. It is not worth a denial — that is how shadow IT starts.',
@@ -273,7 +273,7 @@ export const DECK: Challenge[] = [
     id: 'first-login',
     kind: 'legit',
     name: 'Brand new joiner',
-    story: 'A new starter signs in for the first time, at the office, on a machine with no history.',
+    story: 'A new starter logs in for the first time, at the office, on a machine with no history.',
     userId: 'priya', place: 'Office Network', device: 'New / unknown', authState: 'First time login', risk: 'Low', at: '09:05',
     want: '2fa',
     why: 'First login is the one moment an account is worth binding to a person. Skipping it means the first real verification never happens.',
@@ -283,7 +283,7 @@ export const DECK: Challenge[] = [
     id: 'after-reset',
     kind: 'legit',
     name: 'Straight after an MFA reset',
-    story: 'Someone who just had their second factor reset by the help desk signs back in.',
+    story: 'Someone who just had their second factor reset by the help desk logs back in.',
     userId: 'arun', place: 'Office Network', device: 'Known < 90 days', authState: 'MFA recently reset', risk: 'Low', at: '13:40',
     want: '2fa',
     why: 'A help-desk reset is the most impersonated event in identity. Re-verifying here is what stops a phone call from becoming an account takeover.',
@@ -296,7 +296,7 @@ export const DECK: Challenge[] = [
     story: 'A long-trusted device appears from a network the platform cannot place in any zone.',
     userId: 'arun', place: 'Any location', device: 'Known > 90 days', authState: 'Normal returning user', risk: 'Low', at: '17:15',
     want: '2fa',
-    why: 'When the origin cannot be established, zone rules decide nothing. Something else has to, or the sign-in falls through to the default unexamined.',
+    why: 'When the origin cannot be established, zone rules decide nothing. Something else has to, or the login falls through to the default unexamined.',
     /* No fix, and that IS this card's lesson now.
 
        It used to propose an enrolment rule, on the grounds that when the origin
@@ -376,10 +376,10 @@ function gradeOf(breaches: number, lockouts: number, friction: number): { grade:
   if (lockouts > 0)
     return {
       grade: 'C',
-      reason: `Nothing got through, but ${lockouts} ordinary sign-in${lockouts === 1 ? '' : 's'} ${lockouts === 1 ? 'was' : 'were'} denied outright.`,
+      reason: `Nothing got through, but ${lockouts} ordinary login${lockouts === 1 ? '' : 's'} ${lockouts === 1 ? 'was' : 'were'} denied outright.`,
     }
   if (friction > 2)
-    return { grade: 'B', reason: `Nothing got through and nobody was locked out, but ${friction} ordinary sign-ins were challenged more than the deck asks for.` }
+    return { grade: 'B', reason: `Nothing got through and nobody was locked out, but ${friction} ordinary logins were challenged more than the deck asks for.` }
   if (friction > 0)
     return { grade: 'A', reason: `Every card landed as expected, bar ${friction} extra challenge${friction === 1 ? '' : 's'}.` }
   return { grade: 'A', reason: 'Every card in the deck landed exactly as expected.' }
@@ -553,10 +553,10 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
       why: spec.why,
       placement:
         tooWeak && tooLate
-          ? `Rule ${twinIndex + 1} · ${twin.name} already checks this, but it is weaker than the card asks for and sits below rule ${at + 1}, which decides the sign-in first. Re-aimed and moved above it.`
+          ? `Rule ${twinIndex + 1} · ${twin.name} already checks this, but it is weaker than the card asks for and sits below rule ${at + 1}, which decides the login first. Re-aimed and moved above it.`
           : tooWeak
             ? `Rule ${twinIndex + 1} · ${twin.name} already checks this and answers ${EXPECT_LABEL[twin.decision]}. A second rule with the same conditions would make one of the two unreachable, so this changes the answer instead of adding one.`
-            : `Rule ${twinIndex + 1} · ${twin.name} already says this, but sits below rule ${at + 1}, which decides the sign-in first. Moved above it.`,
+            : `Rule ${twinIndex + 1} · ${twin.name} already says this, but sits below rule ${at + 1}, which decides the login first. Moved above it.`,
       headline:
         tooLate && !tooWeak
           ? `Move rule ${twinIndex + 1} above rule ${at + 1}`
@@ -582,7 +582,7 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
     at,
     why: spec.why,
     placement: decider
-      ? `Inserted above rule ${at + 1} · ${decider.name}, which is what decides this sign-in today. Below it, the new rule would never run.`
+      ? `Inserted above rule ${at + 1} · ${decider.name}, which is what decides this login today. Below it, the new rule would never run.`
       : null,
     headline: `Insert as rule ${at + 1}`,
   }

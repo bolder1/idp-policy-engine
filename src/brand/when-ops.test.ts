@@ -11,6 +11,7 @@ import {
   mergeBranches,
   moveBranch,
   moveCondition,
+  patchCondition,
   removeBranch,
   removeCondition,
   renameBranch,
@@ -181,7 +182,7 @@ describe('a setting returned to its default leaves no trace', () => {
   it('round-trips a zone scope narrowed and widened again', () => {
     const z = cond('zone', 'in zone', ['office'])
     const w = when(card(z))
-    const back = setScope(setScope(w, z.id, 'ip'), z.id, 'both')
+    const back = setScope(setScope(w, z.id, 'office', 'ip'), z.id, 'office', 'both')
     expect(JSON.stringify(back)).toBe(JSON.stringify(w))
   })
 })
@@ -190,8 +191,31 @@ describe('a zone condition can name the half of the zone it means', () => {
   it('stores the narrowed half and drops the field for both', () => {
     const z = cond('zone', 'in zone', ['office'])
     const w = when(card(z))
-    expect(setScope(w, z.id, 'location').cards[0].conditions[0].scope).toBe('location')
-    expect('scope' in setScope(setScope(w, z.id, 'location'), z.id, 'both').cards[0].conditions[0]).toBe(false)
+    expect(setScope(w, z.id, 'office', 'location').cards[0].conditions[0].scopes).toEqual({ office: 'location' })
+    expect('scopes' in setScope(setScope(w, z.id, 'office', 'location'), z.id, 'office', 'both').cards[0].conditions[0]).toBe(false)
+  })
+
+  /* One answer per zone (owner, 22 Sep 2026). */
+  it('keeps a separate half for each zone the condition names', () => {
+    const z = cond('zone', 'in zone', ['office', 'jio'])
+    const w = setScope(setScope(when(card(z)), z.id, 'office', 'ip'), z.id, 'jio', 'location')
+    expect(w.cards[0].conditions[0].scopes).toEqual({ office: 'ip', jio: 'location' })
+    expect(setScope(w, z.id, 'office', 'both').cards[0].conditions[0].scopes).toEqual({ jio: 'location' })
+  })
+
+  it('gives no half to a zone the condition does not name', () => {
+    const z = cond('zone', 'in zone', ['office'])
+    const w = when(card(z))
+    expect(JSON.stringify(setScope(w, z.id, 'eu', 'ip'))).toBe(JSON.stringify(w))
+  })
+
+  /* A zone unticked takes its answer with it, so ticking it again starts at
+     Both and an unticked-then-reticked condition is byte-identical. */
+  it('drops the half of a zone that is no longer named', () => {
+    const z = cond('zone', 'in zone', ['office', 'jio'])
+    const w = setScope(when(card(z)), z.id, 'jio', 'location')
+    const unticked = patchCondition(w, z.id, { values: ['office'] }).cards[0].conditions[0]
+    expect('scopes' in unticked).toBe(false)
   })
 
   /* The two are different questions with different answers — on the network, or
@@ -201,8 +225,8 @@ describe('a zone condition can name the half of the zone it means', () => {
   it('keys two halves of one zone as two different conditions', () => {
     const w = when(card(cond('zone', 'in zone', ['office'])))
     const id = w.cards[0].conditions[0].id
-    const byIp = setScope(w, id, 'ip').cards[0].conditions[0]
-    const byPlace = setScope(w, id, 'location').cards[0].conditions[0]
+    const byIp = setScope(w, id, 'office', 'ip').cards[0].conditions[0]
+    const byPlace = setScope(w, id, 'office', 'location').cards[0].conditions[0]
     expect(ckey(byIp)).not.toBe(ckey(byPlace))
     expect(ckey(byIp)).not.toBe(ckey(w.cards[0].conditions[0]))
   })
@@ -212,6 +236,12 @@ describe('a zone condition can name the half of the zone it means', () => {
      the stale-estimate check reports the whole tenant as edited. */
   it('leaves an unscoped condition keying exactly as it always did', () => {
     expect(ckey(cond('group', 'in', ['b', 'a']))).toBe('group|in|a,b|')
+  })
+
+  it('keys the same answers given in a different order the same', () => {
+    const a = { ...cond('zone', 'in zone', ['office', 'jio']), scopes: { office: 'ip', jio: 'location' } as const }
+    const b = { ...cond('zone', 'in zone', ['jio', 'office']), scopes: { jio: 'location', office: 'ip' } as const }
+    expect(ckey(a)).toBe(ckey(b))
   })
 })
 
@@ -235,8 +265,8 @@ describe('changing what a condition checks', () => {
      linter. */
   it('drops a zone scope when the condition becomes something else', () => {
     const z = cond('zone', 'in zone', ['office'])
-    const w = setScope(when(card(z)), z.id, 'ip')
-    expect('scope' in retypeCondition(w, z.id, 'country', 'is').cards[0].conditions[0]).toBe(false)
+    const w = setScope(when(card(z)), z.id, 'office', 'ip')
+    expect('scopes' in retypeCondition(w, z.id, 'country', 'is').cards[0].conditions[0]).toBe(false)
   })
 })
 

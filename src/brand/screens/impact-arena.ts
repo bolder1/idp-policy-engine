@@ -80,7 +80,7 @@ export type Lane = AccessDecision
 export const LANES: { id: Lane; label: string; caption: string }[] = [
   { id: '1fa', label: 'Straight in', caption: 'One factor, no further prompt' },
   { id: '2fa', label: 'Verified', caption: 'A second factor is required' },
-  { id: 'deny', label: 'Blocked', caption: 'The sign-in is refused' },
+  { id: 'deny', label: 'Blocked', caption: 'The login is refused' },
 ]
 
 /* Four steps, not three, and `warn` sits ABOVE a bare allow.
@@ -248,11 +248,11 @@ export function badges(
   out.push({
     id: 'anon-gated',
     label: 'Anonymised traffic is gated',
-    claim: 'No sign-in from Tor or a known proxy gets in on one factor.',
+    claim: 'No login from Tor or a known proxy gets in on one factor.',
     earned: anonLeak.length === 0,
     detail:
       anonLeak.length > 0
-        ? `${anonLeak.length} of ${ANON_SITUATIONS.length} anonymised situations sign in on a single factor.`
+        ? `${anonLeak.length} of ${ANON_SITUATIONS.length} anonymised situations log in on a single factor.`
         : undefined,
   })
 
@@ -264,7 +264,7 @@ export function badges(
     earned: deviceLeak.length === 0,
     detail:
       deviceLeak.length > 0
-        ? `${deviceLeak.length} of ${UNRECOGNISED_SITUATIONS.length} situations on an unrecognised device sign in on a single factor.`
+        ? `${deviceLeak.length} of ${UNRECOGNISED_SITUATIONS.length} situations on an unrecognised device log in on a single factor.`
         : undefined,
   })
 

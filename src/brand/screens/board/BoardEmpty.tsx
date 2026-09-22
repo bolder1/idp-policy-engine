@@ -52,7 +52,7 @@ export function BoardEmpty({
             this line carries both. */}
         {fallback && (
           <div className="bb__empty__now">
-            <p>Every sign-in gets the default: {DECISION_NAME[fallback]}.</p>
+            <p>Every login gets the default: {DECISION_NAME[fallback]}.</p>
             {onEditDefault && (
               <Button variant="ghost" size="sm" onClick={onEditDefault}>
                 Edit default

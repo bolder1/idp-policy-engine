@@ -62,7 +62,7 @@ const OUTCOME_ORDER: Outcome[] = ['breach', 'lockout', 'friction', 'held']
 
 const OUTCOME_BLURB: Record<Outcome, string> = {
   breach: 'Weaker treatment than the card asks for. This is the direction that matters.',
-  lockout: 'An ordinary sign-in was refused outright.',
+  lockout: 'An ordinary login was refused outright.',
   friction: 'Stricter than asked — a cost, not a hole.',
   held: 'Exactly the treatment the card expects.',
 }

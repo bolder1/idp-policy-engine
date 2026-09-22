@@ -74,6 +74,17 @@ describe('search ranks rather than just filters', () => {
   it('respects the limit', () => {
     expect(searchPlaces('a', 5).length).toBeLessThanOrEqual(5)
   })
+
+  /* A range's centre is a city: narrowed before the limit, so the cities are not
+     what is left after the countries and states took the first places. */
+  it('narrows to one kind before taking the limit', () => {
+    const cities = searchPlaces('a', 12, 'city')
+    expect(cities).toHaveLength(12)
+    expect(cities.every((p) => p.kind === 'city')).toBe(true)
+    expect(searchPlaces('pune', 12, 'city')[0]).toMatchObject({ id: 'in-maharashtra-pune', name: 'Pune' })
+    // "Maharashtra" is a state, and as a city search it offers the cities in it.
+    expect(searchPlaces('maharashtra', 12, 'city').map((p) => p.name)).toContain('Mumbai')
+  })
 })
 
 describe('context reads like an address', () => {

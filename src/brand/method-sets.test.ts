@@ -48,10 +48,12 @@ describe('the catalogue itself is coherent', () => {
   })
 
   /* Both numbers, because the catalogue holds two kinds now and either one
-     drifting is a different mistake: 21 is the console's own list of second
-     factors, and 3 is how many ways a session can start. */
-  it('carries all 21 second factors the console lists, plus the three primaries', () => {
-    expect(AUTH_METHODS.filter((m) => m.use === 'second')).toHaveLength(21)
+     drifting is a different mistake: 22 is the console's own list of second
+     factors — 21 until DigitalPersona joined Biometrics (21 Sep 2026), the
+     count the MFA sheet already had — and 3 is how many ways a session can
+     start. */
+  it('carries all 22 second factors the console lists, plus the three primaries', () => {
+    expect(AUTH_METHODS.filter((m) => m.use === 'second')).toHaveLength(22)
     expect(AUTH_METHODS.filter((m) => m.use === 'primary')).toHaveLength(3)
   })
 

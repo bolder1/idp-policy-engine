@@ -48,7 +48,8 @@ export const FAMILY_OF_CHANNEL: Record<string, string> = {
   'Grid Pattern': 'grid',
   'Smart Cards': 'smartcard',
   'RSA Authenticator': 'rsa',
-  Biometric: 'biometric',
+  /* "Biometrics" on the page (21 Sep 2026); the sheet's family is still "biometric". */
+  Biometrics: 'biometric',
 }
 
 /* Method ids agree fifteen times out of twenty-one. The six that disagree are

@@ -49,7 +49,7 @@ const TONE = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' } as const
 
 /** Said as a consequence, not as a setting — this row is read far more than set. */
 export const FALLBACK_SUB: Record<AccessDecision, string> = {
-  '1fa': 'signs in on one factor',
+  '1fa': 'logs in on one factor',
   '2fa': 'is asked for a second factor',
   deny: 'is refused',
 }
@@ -139,7 +139,7 @@ export function FlowRail({
               node's subline. */}
           <p className="bf__flowstart">
             <LogIn size={13} strokeWidth={1.9} aria-hidden />
-            A user attempts to sign in
+            A user attempts to log in
           </p>
 
           <LayoutGroup>

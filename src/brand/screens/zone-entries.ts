@@ -1,4 +1,5 @@
-import type { Policy, Zone, ZoneLocation } from '../data'
+import { DEFAULT_RANGE_KM, rangeText, type Policy, type Zone, type ZoneLocation, type ZoneRange } from '../data'
+import type { Place } from '../places'
 import { leaves } from '../predicate'
 import type { ReviewLine } from '../review-rows'
 import { classifyIp, isValidAsn } from './zone-validation'
@@ -70,13 +71,34 @@ export function parseEntries(
   return { ip, asn, bad }
 }
 
+/* --- Ranges ------------------------------------------------------------------- */
+
+/** A range around a catalogue city, at `km`. */
+export const rangeAt = (p: Place, km: number): ZoneRange => ({ km, lat: p.lat, lon: p.lon, label: p.name, placeId: p.id })
+
+/** Whether `p` is the city this range is drawn around: by catalogue id, or by
+    name for a range that has none. */
+export const centredOn = (r: ZoneRange, p: Place) => (r.placeId ? r.placeId === p.id : r.label === p.name)
+
+/** A range around `p`: a new one at the default distance, or `moving` moved to
+    `p` where it stood, with its distance kept. The city it already centres on,
+    picked again, moves nothing: the stored centre can be finer than the
+    catalogue's, and swapping one for the other would be a change no one made.
+    No sweep either way: a circle can cross a border, so a country does not make
+    one redundant. */
+export function withRange(l: ZoneLocation, p: Place, moving: ZoneRange | null): ZoneLocation {
+  if (moving) {
+    if (centredOn(moving, p)) return l
+    return { ...l, ranges: l.ranges.map((r) => (r === moving ? rangeAt(p, r.km) : r)) }
+  }
+  return { ...l, ranges: [...l.ranges, rangeAt(p, DEFAULT_RANGE_KM)] }
+}
+
 /* --- What changed, for the save bar ------------------------------------------ */
 
-/** A location entry as one string: "India", "Maharashtra", "25 km of Pune HQ". */
+/** A location entry as one string: "India", "Maharashtra", "Within 25 km of Pune". */
 export function locationEntries(l: ZoneLocation): string[] {
-  const out = [...l.countries, ...l.states, ...l.cities]
-  if (l.radius) out.push(`${l.radius.km} km of ${l.radius.label ?? `${l.radius.lat}, ${l.radius.lon}`}`)
-  return out
+  return [...l.countries, ...l.states, ...l.cities, ...l.ranges.map(rangeText)]
 }
 
 const netEntries = (z: Zone) => [...z.ip, ...z.asn]
@@ -98,29 +120,48 @@ export function zoneChanges(before: Zone, after: Zone): string[] {
   return parts
 }
 
+/* One location entry for the diff: what makes it a different entry (`key`),
+   what it is called (`text`), and what tells two of one name apart (`aside`). */
+interface LocEntry {
+  key: string
+  text: string
+  aside: string
+}
+
+/* A range is keyed by its centre and its distance, not by its words: a centre
+   moved under the same label, or the same centre at another distance, changes
+   what the zone matches, and the save bar has to open for it. */
+const rangeEntry = (r: ZoneRange): LocEntry => ({
+  key: `range:${r.lat},${r.lon}:${r.km}`,
+  text: rangeText(r),
+  aside: `${r.lat}, ${r.lon}`,
+})
+
 /* The two locations compared entry by entry, with each entry's kind in its key.
 
    By name alone, a state swapped for the city of the same name — Berlin,
    Hamburg, Singapore — compared equal: the draft had changed what the zone
    matches, and the save bar never opened to commit it. A name that is both
-   added and removed is labelled with its kind, or the review would read
-   "added Berlin, removed Berlin". */
+   added and removed is labelled with its kind (a range with its centre), or
+   the review would read "added Berlin, removed Berlin". */
 function locationDiff(before: ZoneLocation, after: ZoneLocation): { added: string[]; removed: string[] } {
-  const keys = (l: ZoneLocation) => [
-    ...l.countries.map((v) => `country:${v}`),
-    ...l.states.map((v) => `state:${v}`),
-    ...l.cities.map((v) => `city:${v}`),
-    ...locationEntries({ countries: [], states: [], cities: [], radius: l.radius }).map((v) => `radius:${v}`),
+  const entries = (l: ZoneLocation): LocEntry[] => [
+    ...l.countries.map((v) => ({ key: `country:${v}`, text: v, aside: 'country' })),
+    ...l.states.map((v) => ({ key: `state:${v}`, text: v, aside: 'state' })),
+    ...l.cities.map((v) => ({ key: `city:${v}`, text: v, aside: 'city' })),
+    ...l.ranges.map(rangeEntry),
   ]
-  const kb = keys(before)
-  const ka = keys(after)
-  const added = minus(ka, kb)
-  const removed = minus(kb, ka)
-  const kind = (k: string) => k.slice(0, k.indexOf(':'))
-  const name = (k: string) => k.slice(k.indexOf(':') + 1)
-  const shown = (list: string[], other: string[]) => {
-    const clash = new Set(other.map(name))
-    return list.map((k) => (clash.has(name(k)) ? `${name(k)} (${kind(k)})` : name(k)))
+  const eb = entries(before)
+  const ea = entries(after)
+  const missing = (a: LocEntry[], b: LocEntry[]) => {
+    const drop = new Set(b.map((e) => e.key))
+    return a.filter((e) => !drop.has(e.key))
+  }
+  const added = missing(ea, eb)
+  const removed = missing(eb, ea)
+  const shown = (list: LocEntry[], other: LocEntry[]) => {
+    const clash = new Set(other.map((e) => e.text))
+    return list.map((e) => (clash.has(e.text) ? `${e.text} (${e.aside})` : e.text))
   }
   return { added: shown(added, removed), removed: shown(removed, added) }
 }

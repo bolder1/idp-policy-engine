@@ -686,6 +686,30 @@
   .bfp2__chosen:not(.is-weights) .bfp2__chosenctl { --bfp2-chosen-ctl: 160px; }
 }
 
+/* The columns' names over a profile's list (22 Sep 2026): small, quiet, and
+   on a hairline, so the rows under them read as a table without a box round it. */
+.bfp2__colhead {
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary);
+}
+/* Top-aligned, so a column name whose bracket has wrapped keeps its first line
+   on the other column's line. */
+.bfp2__colhead .bfp2__chosenbox { min-height: 0; align-items: flex-start; }
+.bfp2__colhead__left { flex: 1 1 0; min-width: 0; }
+.bfp2__colhead .bfp2__chosenctl { padding-left: var(--space-1); column-gap: var(--space-2); }
+/* "(versions are minimums)" beside a column's name (22 Sep 2026): the heading's
+   size and colour at regular weight, so the name stays the heading and the
+   bracket reads as its footnote. One line, running on over the remove's slot —
+   empty on this row — when the column is narrower than the two (233px at
+   200). Where even that is too little, the bracket drops under the name whole
+   rather than past the row's end. */
+.bfp2__colnote { font-weight: var(--fw-regular); white-space: nowrap; }
+@container bfp2-chosen (max-width: 399px) {
+  .bfp2__colhead .bfp2__chosenctl { flex-wrap: wrap; }
+}
+.bfp2__colhead__del { width: var(--ctl-height-sm); }
+
 /* The row: a flex line, 40px tall, no edge and no fill. */
 .bfp2__chosenbox {
   flex: 1; min-width: 0; min-height: 40px;
@@ -1413,6 +1437,18 @@
    number field, fill it. */
 .bfp2__enrolctl { display: flex; align-items: center; min-width: 0; }
 .bfp2__enrolctl > .bx-picker { width: 100%; }
+
+/* The agent's prerequisites (`AgentBanner`), as the live console draws them:
+   the info tint, a dark title, the points in body grey, and the download
+   under them. The kit's info callout sets all of its text in the info ink,
+   which over three sentences reads as one blue block. */
+.bfp2__agent .bx-callout { color: var(--text-secondary); }
+.bfp2__agent .bx-callout strong { color: var(--text-primary); font-weight: var(--fw-semibold); }
+.bfp2__agent .bx-callout__mark { color: var(--fb-info-dot); }
+.bfp2__agentlist {
+  margin: var(--space-3) 0 var(--space-5); padding-left: 18px;
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
 
 /* The section's own rhythm: four questions, each a block, with air between them
    rather than the 4px a list of rows uses. */

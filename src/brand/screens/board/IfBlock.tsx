@@ -3,7 +3,7 @@ import { ArrowRight, Braces, Split, Users } from 'lucide-react'
 
 import { hasWho as ruleHasWho, normaliseWho, whoSummary } from '../../rule-who'
 import { FaceStack, type FaceItem } from '../../faces'
-import { conditionType, type Condition, type Rule } from '../../data'
+import { conditionType, zoneScopeOf, type Condition, type Rule } from '../../data'
 import { cardJoin, cardLetter, topJoin } from '../../predicate'
 import type { NameLookup } from '../predicate-prose'
 import { DECISION_NAME, TONE, journeyOf } from './model'
@@ -211,12 +211,23 @@ export function CondReadout({ c, resolve }: { c: Condition; resolve: NameLookup 
   const t = conditionType(c.typeId)
   const Ico = conditionIcon(t.id, t.group)
   const tone = conditionTone(t.id, t.group)
-  const chips = valueChips(c, resolve)
+  /* Which half of each zone (per zone since 22 Sep 2026). One half shared by
+     every zone is said once after the names, as before; different halves go on
+     each zone's own chip. */
+  const zoneVals = t.valueKind === 'zone' ? c.values.filter(Boolean) : []
+  const halves = zoneVals.map((v) => zoneScopeOf(c, v))
+  const uniform = halves.every((h) => h === halves[0])
+  const chips = valueChips(c, resolve).map((chip, i) =>
+    uniform || chip.unset || !halves[i] || halves[i] === 'both'
+      ? chip
+      : { ...chip, text: `${chip.text} · ${halves[i] === 'ip' ? 'IP' : 'location'}` },
+  )
   /* What the rest of the row has already claimed, before a single value is
      drawn. The attribute and the operator never shrink — the CSS says so — and
      a zone asking about one of its two halves adds a third phrase on the same
      line, which is the one most likely to push the values off it. */
-  const scope = c.scope ? (c.scope === 'ip' ? 'on the network only' : 'by location only') : ''
+  const shared = uniform ? halves[0] : undefined
+  const scope = shared === 'ip' ? 'on the network only' : shared === 'location' ? 'by location only' : ''
   const head = t.label.length + ATTR + c.operator.length + OP + (scope ? scope.length + OP : 0)
   const n = valuesShown(chips, head)
   const shown = chips.slice(0, n)
@@ -275,7 +286,7 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
       <IfSub className="bb__ifaction">
         {token}
         {control ?? <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>}
-        <span className="bb__ifjourney" aria-label="The sign-in journey this produces">
+        <span className="bb__ifjourney" aria-label="The login journey this produces">
           {journey.map((s, i) => (
             <Fragment key={s.id}>
               {i > 0 && <ArrowRight size={10} strokeWidth={2} aria-hidden />}
@@ -408,7 +419,7 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
             <Split size={12} strokeWidth={2} />
           </span>
           <IfKw>if</IfKw>
-          <span className="bb__ifjourney">Every sign-in</span>
+          <span className="bb__ifjourney">Every login</span>
         </div>
       )}
       {hasWho && (

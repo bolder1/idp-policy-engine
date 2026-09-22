@@ -148,45 +148,41 @@
    fourth group. */
 .cp__pickmark { display: grid; place-items: center; width: 15px; flex: none; color: var(--accent); }
 
-/* Under the list now, and only once a zone is chosen (21 Sep 2026). A rule
-   ABOVE it rather than below: it is the answer to a second question, asked
-   after the first — which zones — has been answered. */
-.cp__scope {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-top: 1px solid var(--border-subtle);
+/* A chosen zone's Match on, on its own line under the zone (22 Sep 2026). It
+   was one switch under the whole list, answering for every zone at once.
+
+   Indented to the zone's name, so it reads as that zone's setting rather than
+   as a row of its own. A segmented control on a sunken track, the chosen half
+   raised on it in the info blue — small, because a list can hold several. */
+.cp__zscope {
+  display: flex; align-items: center; gap: var(--space-3);
+  /* Room above and below (owner, 22 Sep 2026: "add some space, it feels like
+     it's overlapping the other"): the zone row's hover ground ended on the
+     switch's top edge, and the next zone started on its bottom one. */
+  margin: var(--space-3) 0 var(--space-5);
+  padding: 0 var(--space-4) 0 var(--zscope-indent, 50px);
 }
-.cp__scopelabel { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
-.cp__scopeopts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-}
-.cp__scopeopts > button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-width: 0;
-  height: 30px;
-  padding: 0 6px;
-  border: 1px solid var(--border-default);
+.cp__zscope__label { flex: none; font-size: 12px; color: var(--text-tertiary); }
+.cp__zscope__opts {
+  display: inline-flex; gap: 2px; padding: 2px;
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: var(--fw-medium);
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  cursor: pointer;
+  background: var(--surface-inset, var(--surface-sunken));
 }
-.cp__scopeopts > button:hover { border-color: var(--border-strong); color: var(--text-primary); }
-.cp__scopeopts > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.cp__scopeopts > button.is-on { background: var(--fb-info-bg); border-color: var(--fb-info-border); color: var(--fb-info-fg); }
-.cp__scopeopts > button svg { flex: none; }
+.cp__zscope__opts > button {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 24px; padding: 0 8px;
+  border: 0; border-radius: calc(var(--radius-sm) - 1px);
+  background: none; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+}
+.cp__zscope__opts > button svg { flex: none; margin: 0; }
+.cp__zscope__opts > button:hover { color: var(--text-primary); }
+.cp__zscope__opts > button.is-on {
+  background: var(--surface-raised); color: var(--fb-info-fg);
+  box-shadow: 0 0 0 1px var(--border-subtle), 0 1px 2px rgb(33 37 41 / 0.08);
+}
+.cp__zscope__opts > button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
 
 .cp__search {
   display: flex;
@@ -502,18 +498,27 @@
   display: flex; align-items: stretch;
   min-width: 0;
 }
-/* FIXED widths for the first two, not proportions (owner, 21 Sep 2026: "matches,
-   in zone and between have three different widths — they don't want that; if
-   needed truncate the content"). The operator sized to its own words made
-   every row's columns start somewhere different, so a list of conditions read
-   as a ragged edge instead of three columns. Now the attribute and the
-   operator are the same width on every row and truncate; the value takes the
-   rest. They shrink together only when the panel is narrower than the three
-   can fit. */
-.cp__stackrow > .cp__fld.is-what { flex: 0 1 152px; min-width: 0; }
+/* The SAME widths on every row, and they grow with the panel (owner, 22 Sep
+   2026: "when I extend the form there is a lot of extra space — utilise it so
+   the truncated part shows; small is fine, but wider it should adapt").
+
+   Same on every row, because the owner's earlier ruling still holds (21 Sep:
+   "matches, in zone and between have three different widths — they don't want
+   that"): an operator sized to its own words made every row's columns start
+   somewhere different. So the widths are not the content's; they are a share
+   of the If block, in `cqi` of its `ifblock` container — every row in it, loose
+   or inside a group, measures the same container and gets the same columns.
+
+   About 152px and 129px at the default panel — enough for "returns true" and
+   "not between", which 104px cut off by a letter. Wider, they grow to 180px
+   and 152px, which is what the longest attribute ("Custom attribute") and the
+   longest operator ("does not match") need to show in full; past that the
+   value takes the rest. They shrink together only when the panel is narrower
+   than the three can fit. */
+.cp__stackrow > .cp__fld.is-what { flex: 0 1 clamp(152px, 32cqi, 180px); min-width: 0; }
 /* The operator has no ground of its own in the row (owner, 21 Sep 2026): it
    takes the same hover and open ground as its neighbours. */
-.cp__stackrow > .cp__fld.is-op { flex: 0 1 104px; min-width: 0; white-space: nowrap; background: none; }
+.cp__stackrow > .cp__fld.is-op { flex: 0 1 clamp(104px, 28cqi, 152px); min-width: 0; white-space: nowrap; background: none; }
 .cp__stackrow > .cp__fld.is-val { flex: 1 1 96px; min-width: 0; }
 .cp__stackrow > .cp__inline { flex: 1 1 96px; min-width: 0; padding: 0 var(--space-4); }
 
@@ -558,13 +563,23 @@
 .cp__stack > .cp__fld:hover { background: var(--surface-sunken); }
 .cp__stack > .cp__inline { padding: var(--space-4) var(--space-5); }
 
-/* The delete, at the end of the row rather than beside the attribute. It is a
-   quiet icon until the condition is hovered, because a bin on every row of a
-   list is a list that looks like it is mostly about deleting. */
-.cp__stackrow > .cp__del { flex: none; align-self: center; width: 28px; height: 28px; margin: 0 var(--space-3); opacity: 0; }
-.cp__stack:hover .cp__del,
-.cp__stack:focus-within .cp__del { opacity: 1; }
-.cp__del:focus-visible { opacity: 1; }
+/* The frame and its remove, side by side (22 Sep 2026). The remove is its own
+   button at the frame's height, always shown — it was a hover-only × inside the
+   frame, and the frame gave up that room on every row to hold it. Top-aligned,
+   so it stays level with the first line when a condition grows a key or a
+   timezone row under it. */
+.cp__stackline { display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; }
+.cp__stackline > .cp__stack { flex: 1; min-width: 0; }
+/* A bare glyph, no edge and no ground (owner, 22 Sep 2026: "make the icon a
+   little bigger and remove the border and the background — no need for so much
+   space"): 28px wide beside the frame, at the frame's height so it stays level
+   with the row. It reddens on hover, which is the one thing it has to say. */
+.cp__del.is-solo {
+  width: 28px; height: 44px;
+  border: 0; border-radius: var(--radius-sm);
+  background: none; color: var(--text-tertiary);
+}
+.cp__stackline > .cp__del.is-solo:hover { background: none; color: var(--fb-negative-fg); }
 .cp__del {
   display: grid; place-items: center; width: 28px; height: 28px; flex: none;
   border: 0; border-radius: var(--radius-sm); background: none;
@@ -745,18 +760,134 @@
 .cp__stackrow > .cp__inline .cp__fldinput[type='time'] { min-width: 0; }
 .cp__stackrow > .cp__inline .cp__fldinput[type='time']::-webkit-calendar-picker-indicator { display: none; }
 
-/* --- The inspector's menus, as inline cards ---------------------------------------
-   Every menu in the panel is the "Add a condition" card: under the row, full
-   width, a titled head with a close, then the rows (see `Holder` in
-   ConditionPopover.tsx). The option rows take the catalogue's row shape — flat,
-   hairline between, 10px inset — so choosing an attribute, an operator or a
-   value looks like one list, not three kinds of menu. */
-.cp__inline-card { margin-top: var(--space-2); }
-.cp__inline-card .cp__list { padding: 0; max-height: 280px; }
-.cp__inline-card .cp__opt {
-  min-height: 0; padding: 9px 10px; gap: var(--space-3);
-  border-radius: 0; border-top: 1px solid var(--border-subtle);
+/* Typed values sit IN the row, as text, not as boxes within the box (owner,
+   22 Sep 2026: "the time of day condition box looks bad"). A window was two
+   bordered inputs inside the frame's own border — three edges in 200px. They
+   take the row's type and a ground only under the pointer or the keyboard,
+   like every other part of the row. */
+.cp__stackrow > .cp__inline .cp__fldinput,
+.cp__stackrow > .cp__inline .cp__fldinput:hover {
+  min-height: 30px; padding: 0 6px;
+  border: 0; border-radius: var(--radius-sm);
+  background: none;
+  font-size: var(--fs-md); color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
-.cp__inline-card .cp__list > :first-child .cp__opt,
-.cp__inline-card .cp__list > .cp__opt:first-child { border-top: 0; }
-.cp__inline-card .cp__text b { font-weight: var(--fw-medium); }
+.cp__stackrow > .cp__inline .cp__fldinput:hover { background: var(--surface-sunken); }
+.cp__stackrow > .cp__inline .cp__fldinput:focus-visible { background: var(--surface-sunken); box-shadow: 0 0 0 2px var(--focus-ring); }
+.cp__stackrow > .cp__inline .cp__fldinput[type='time'] { flex: 0 1 auto; width: 76px; }
+
+/* A second line of the frame, not a field inside it: a window's timezone, and
+   which attribute an attribute-condition is about. Under a hairline, the full
+   width of the frame, with no edge of its own; its muted prefix says what it
+   is ("Timezone  Asia/Tokyo"). It was a bordered dropdown whose edge ran along
+   the inside of the frame's. */
+.cp__stack > .bx-picker { display: block; width: 100%; border-top: 1px solid var(--border-subtle); }
+.cp__stack > .bx-picker .bx-picker__trigger,
+.cp__stack > .bx-picker .bx-picker__trigger:hover {
+  width: 100%; min-height: 40px;
+  padding: 0 var(--space-4) 0 var(--space-5);
+  border: 0; border-radius: 0; background: none; box-shadow: none;
+}
+.cp__stack > .bx-picker .bx-picker__trigger:hover { background: var(--surface-sunken); }
+.cp__stack > .bx-picker .bx-picker__trigger:focus-visible { box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.cp__stack > .bx-picker .bx-picker__prefix { font-weight: var(--fw-regular); }
+.cp__stack > .bx-picker .bx-picker__trigger:has(.bx-picker__prefix) .bx-picker__value { font-weight: var(--fw-regular); }
+.cp__stack > .cp__fldinput.is-text,
+.cp__stack > .cp__fldinput.is-text:hover {
+  width: 100%; min-height: 40px;
+  padding: 0 var(--space-5);
+  border: 0; border-top: 1px solid var(--border-subtle); border-radius: 0;
+  background: none;
+}
+.cp__stack > .cp__fldinput.is-text:focus-visible { box-shadow: inset 0 0 0 2px var(--focus-ring); }
+
+/* --- The inspector's dropdowns -------------------------------------------------------
+   Every part of a condition, and the empty row "Add condition" draws, opens a
+   dropdown under the part pressed: the kit's menu frame (`.bx-menu__pop`, so
+   the rebrand's edge and corner reach it too) and the kit's menu rows
+   (`.bx-menu__item`) — the "+ Add ▾" menu's own look, owner, 21 Sep 2026. See
+   `Holder` in ConditionPopover.tsx.
+
+   Two classes so it outranks both sheets whichever loads first: this panel is
+   placed with fixed coordinates, not under a relative wrapper. The frame's
+   padding moves onto the list, so a search field, the zone halves and the
+   footer still run edge to edge. */
+.cp__pop.bx-menu__pop {
+  position: fixed;
+  z-index: var(--z-popover);
+  min-width: 232px;
+  /* Its own content's width, not what is left of the window beside it. A fixed
+     box with only `left` set shrinks to the room on its right, so each time the
+     menu was re-placed — a zone ticked, a Match on changed — it measured a new
+     width, moved, and measured again: it crept left under the pointer and a
+     click could land where a button had just been (22 Sep 2026). */
+  width: max-content;
+  max-width: min(440px, calc(100vw - 16px));
+  padding: 0;
+}
+.cp__menu .cp__list { padding: var(--space-3); max-height: 360px; }
+/* A row with a description line (the attribute menu's one-liners) breathes more
+   and says its line more quietly (owner, 22 Sep 2026: "it feels a little
+   congested — add some space to each section and make the subheading lighter
+   grey"). The lightest grey that still clears 4.5:1 on white. */
+.cp__mrow:has(> span > em) { padding-block: 10px; }
+.cp__mrow:has(> span > em) + .cp__mrow { margin-top: 2px; }
+.cp__mrow > span > em { margin-top: 1px; font-size: 12px; line-height: 1.4; color: var(--text-placeholder, var(--text-muted)); }
+/* Each row's mark sits level with the middle of its title line (owner, 22 Sep
+   2026: "the icons don't align properly"). It was a flat 2px nudge, which put a
+   14px mark 1.5px above a 21px line and further off as the type grew. `1lh` is
+   the row's own line, which the title shares. */
+.cp__mrow { line-height: 1.5; }
+.cp__mrow > svg:not(.cp__mcheck) { margin-top: calc((1lh - 14px) / 2); }
+.cp__menu .cp__search { padding: var(--space-3) var(--space-4); }
+/* Every mark in colour (owner, 22 Sep 2026): an attribute in its family's
+   tone, a value in its attribute's, an operator by what it does. `--cond-fg`
+   comes from the row's `.is-tone-*` class (board.css, and `negative` below).
+   A row that cannot be chosen keeps a plain grey mark. */
+.cp__mrow[class*='is-tone-'] > svg:not(.cp__mcheck) { color: var(--cond-fg); }
+.cp__mrow:disabled > svg:not(.cp__mcheck) { color: var(--text-tertiary); }
+.is-tone-negative { --cond-bg: var(--fb-negative-bg); --cond-fg: var(--fb-negative-fg); --cond-border: var(--fb-negative-border); }
+
+/* The chosen row in a pick-one list says so at its end, as a select does. */
+.cp__mcheck { flex: none; align-self: center; margin-left: var(--space-3); color: var(--accent-strong); }
+/* The kit row grows every direct span child (`.bx-menu__item > span`), which
+   is its label column — the tick box is a span too, and stretched into a bar. */
+/* Level with the title line, as the marks are (22 Sep 2026). */
+.cp__mrow > .bx-tick { flex: none; display: grid; margin-top: calc((1lh - 16px) / 2); }
+/* The kit nudges every svg in a menu row down 2px to sit on its label's first
+   line; the tick's check and the end check are centred in their own boxes. */
+.cp__mrow .bx-tick svg,
+.cp__mrow > .cp__mcheck { margin-top: 0; }
+/* The search sits on the frame's own line. Inside the app root the kit's field
+   rules reach it — an edge, a fill and a focus halo — so they are taken back
+   off: the line under it is the field. */
+.cp__menu .cp__search input,
+.cp__menu .cp__search input:hover,
+.cp__menu .cp__search input:focus-visible {
+  height: 28px; padding: 0;
+  border: 0; border-radius: 0; background: none; box-shadow: none;
+}
+.cp__msoon {
+  flex: none; align-self: center;
+  font-style: normal; font-size: 12px; font-weight: var(--fw-medium);
+  line-height: 1; padding: 3px 6px; border-radius: var(--radius-full);
+  background: var(--fb-neutral-bg); color: var(--fb-neutral-fg);
+}
+
+/* --- The empty row "Add condition" draws -------------------------------------------
+   The frame and the three parts every condition has, before any of them is
+   answered: the attribute as a placeholder, the two parts that depend on it
+   shown and not pressable (see `ConditionDraft`). */
+.cp__fldph { color: var(--text-tertiary); font-weight: var(--fw-regular); }
+/* Faded, not merely grey (owner, 22 Sep 2026: "in this state the operator and
+   value should be faded out — they are only there so the user knows there is
+   more to add"). At the muted grey they read as two more fields waiting for an
+   answer, level with the one that is actually asked first. The chevrons fade
+   with the words; the hairlines between the parts stay, so the frame still
+   says three parts. */
+.cp__stackrow > .cp__fld.is-idle { cursor: default; color: var(--text-muted); }
+.cp__stackrow > .cp__fld.is-idle > * { opacity: 0.4; }
+.cp__stackrow > .cp__fld.is-idle:hover { background: none; }
+.cp__fld.is-idle .cp__fldtext,
+.bb__insp .cp__fld.is-idle .cp__fldtext { font-weight: var(--fw-regular); color: var(--text-muted); }

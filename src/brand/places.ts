@@ -14,7 +14,8 @@
    nothing.
 
    Coordinates are approximate centroids, to one decimal place. They are here for
-   the radius option in ZoneLocation and for ordering, not for cartography.
+   a zone's ranges (the centre of "25 km around Pune") and for ordering, not for
+   cartography.
 
    It is a prototype catalogue: broad enough that typing almost anything finds
    something, small enough to read. A real console would query this server-side.
@@ -410,13 +411,17 @@ const norm = (s: string) =>
    let the admin pick whichever came first. Rank is: exact name, then name
    prefix, then alias hit, then substring — and within a tie, the broader place
    first, because someone typing three letters is far more often after a country
-   than a city inside one. */
-export function searchPlaces(query: string, limit = 12): Place[] {
+   than a city inside one.
+
+   `only` narrows it to one kind before the limit is taken, so a search for a
+   range's centre gets twelve cities rather than what is left of twelve places. */
+export function searchPlaces(query: string, limit = 12, only?: PlaceKind): Place[] {
   const q = norm(query)
   if (!q) return []
 
   const scored: { p: Place; score: number }[] = []
   for (const p of PLACES) {
+    if (only && p.kind !== only) continue
     const name = norm(p.name)
     let score = -1
     if (name === q) score = 0

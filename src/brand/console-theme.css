@@ -88,7 +88,7 @@
      This is the one shade of brand that carries white type at 5.1:1 while still
      reading as the same orange from across a page. It is for filled brand
      surfaces with words on them, and nothing else. */
-  --brand-on-fill: #c2431c;
+  --brand-on-fill: #eb5424;
   /* Orange as TEXT: the chosen line tab's label and icon. #eb5424 is 3.4:1 on
      white, under the 4.5:1 a 14px label needs; this shade clears it. */
   --brand-text: #c2431c;
@@ -470,8 +470,11 @@
    #C2431C is the same orange half a step deeper — indistinguishable from the
    locked value beside the nav edge at a glance, 5.11:1 under white. */
 .bx-btn--brand { background: var(--brand-on-fill); border-color: var(--brand-on-fill); font-weight: 400; padding: 0 16px; }
-.bx-btn--brand:not(:disabled):hover { background: var(--brand-active); border-color: var(--brand-active); }
-.bx-btn--brand:not(:disabled):active { background: #92330f; border-color: #92330f; }
+/* The brand itself since 22 Sep 2026 (owner: "brand main colour eb5424,
+   globally") — the note above is the argument that lost. Hover and pressed are
+   the next two steps of the one scale. */
+.bx-btn--brand:not(:disabled):hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+.bx-btn--brand:not(:disabled):active { background: var(--brand-active); border-color: var(--brand-active); }
 
 /* --- One heading scale, every page -------------------------------------------
    The console's page title is an H5 at 20px/700, not a 24px display size — and

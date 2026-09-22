@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import {
   AlertTriangle,
   BellRing,
+  ChevronsDown,
   Fingerprint,
   HelpCircle,
   KeyRound,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react'
 
 import { Toggle } from '../../kit'
+import { SHOWCASE } from '../../showcase'
 import { Picker } from '../../picker'
 import { DEFAULT_DENY_MESSAGE, DENY_MESSAGE_MAX, type AccessDecision, type Rule } from '../../data'
 import { METHODS } from '../rule-form'
@@ -70,10 +72,22 @@ import { Prop } from './Section'
 
    `AccessDecision` still holds three values and this pane still writes all
    three. What changed is that one control no longer writes two decisions. */
+/* Each is a card with its one line (owner, 22 Sep 2026: "stackable cards with
+   a one-liner — two in a row, and after that they stack"). The line says what
+   the answer DOES, so the choice is made on its consequence rather than on a
+   word. */
 const TILES: { id: AccessDecision; label: string; tone: string; icon: typeof UserCheck; hint: string }[] = [
-  { id: '1fa', label: 'Allow', tone: 'allow', icon: UserCheck, hint: 'Sign-in proceeds through the factors below.' },
-  { id: 'deny', label: 'Deny', tone: 'deny', icon: ShieldAlert, hint: 'Refused outright. No factor is ever asked for.' },
+  { id: '1fa', label: 'Allow', tone: 'allow', icon: UserCheck, hint: 'Let the login in, after the factors below.' },
+  { id: 'deny', label: 'Deny', tone: 'deny', icon: ShieldAlert, hint: 'Block the login and show a message.' },
 ]
+/* The third answer, drawn and not yet choosable (owner, 22 Sep 2026: "the third
+   option, that goes to the next rule — as of now work on the content"). A rule
+   that matched and handed the login on would need an outcome the model does not
+   have, so the card shows the shape the choice is going to take. Not offered on
+   the default at the foot of the chain, which has no rule after it. */
+/* It does not SKIP the rule (owner, 22 Sep 2026): the rule's conditions match,
+   and on that match the login carries on to the next rule. */
+const NEXT_TILE = { label: 'Next rule', hint: 'When this matches, go on to the next rule.', icon: ChevronsDown }
 
 
 /* How the second factor is proved — four modes, NAMED rather than described.
@@ -254,7 +268,6 @@ export function WhatEditor({
   /* The default at the foot of the chain always has an outcome; it is never "new". */
   const [answered, setAnswered] = useState(() => !!terminal || !isPristine(rule))
 
-  const chosen = answered ? TILES.find((t) => t.id === active) : undefined
 
   return (
     <div className="bb__thenparts">
@@ -279,7 +292,9 @@ export function WhatEditor({
           The accessible name moves onto the group, where it was doing the only
           job it had left. */}
       <div className="bb__thenfield">
-        <div className="bb__outpick" role="radiogroup" aria-label="What happens when this rule matches">
+        {/* Two cards to a row, and the rest wrap under them — never one card
+            per line down the panel. */}
+        <div className="bb__outcards" role="radiogroup" aria-label="What happens when this rule matches">
           {TILES.map((t) => {
             const on = answered && active === t.id
             return (
@@ -288,28 +303,50 @@ export function WhatEditor({
                 type="button"
                 role="radio"
                 aria-checked={on}
-                className={`bb__outbtn is-${t.tone}${on ? ' is-on' : ''}`}
+                className={`bb__outcard is-${t.tone}${on ? ' is-on' : ''}`}
                 onClick={() => {
                   pick(t.id)
                   setAnswered(true)
                 }}
               >
-                <t.icon size={14} strokeWidth={2} aria-hidden />
-                {t.label}
+                <span className="bb__outcard__ico" aria-hidden>
+                  <t.icon size={16} strokeWidth={2} />
+                </span>
+                <span className="bb__outcard__text">
+                  <b>{t.label}</b>
+                  <em>{t.hint}</em>
+                </span>
               </button>
             )
           })}
+          {!terminal && (
+            <div className="bb__outcard is-soon" aria-disabled="true">
+              <span className="bb__outcard__ico" aria-hidden>
+                <NEXT_TILE.icon size={16} strokeWidth={2} />
+              </span>
+              <span className="bb__outcard__text">
+                <b>
+                  {NEXT_TILE.label} <i className="bb__outcard__soon">Coming soon</i>
+                </b>
+                <em>{NEXT_TILE.hint}</em>
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Deny is complete the moment it is chosen: there is nothing to ask and
+      {/* Nothing under the tiles until one is pressed (owner, 22 Sep 2026: "don't
+          show the first factor and second factor until the user chooses Allow or
+          Deny"). The factors are Allow's questions; showing them first answered
+          Allow on the user's behalf.
+
+          Deny is complete the moment it is chosen: there is nothing to ask and
           nothing to prove, so the panel says so in a line instead of showing
           controls that cannot run. */}
-      {!walksFactors ? (
-        <>
-          <p className="bb__addnote">{chosen?.hint ?? 'Refused outright. No factor is ever asked for.'}</p>
-          <DenyMessage rule={rule} onPatch={onPatch} />
-        </>
+      {!answered ? null : !walksFactors ? (
+        /* The card above already says what Deny does; the message is what is
+           left to set. */
+        <DenyMessage rule={rule} onPatch={onPatch} />
       ) : (
         <>
           <div className="bb__thenfield">
@@ -334,7 +371,7 @@ export function WhatEditor({
             />
             {/* Only reachable by a rule saved before the merge: no choice in the
                 picker above can leave Specific without a method. */}
-            {rule.firstFactor === 'Specific' && !rule.firstFactorMethod && (
+            {!SHOWCASE && rule.firstFactor === 'Specific' && !rule.firstFactorMethod && (
               <p className="bb__diag is-error" role="alert">
                 <XCircle size={13} strokeWidth={2} aria-hidden />
                 <span>
@@ -365,32 +402,39 @@ export function WhatEditor({
               }
             />
 
-            {twoStep && rule.secondFactor === 'specific' && (
-              <>
-                <Picker
-                  multiple
-                  label="Methods accepted"
-                  width="fill"
-                  placeholder="Choose methods"
-                  value={methods}
-                  options={METHODS.map(methodOption)}
-                  onChange={(m) =>
-                    onPatch({
-                      secondFactorMethods: methods.includes(m) ? methods.filter((x) => x !== m) : [...methods, m],
-                    })
-                  }
-                />
-                {unsatisfiable && (
-                  <p className="bb__diag is-error" role="alert">
-                    <XCircle size={13} strokeWidth={2} aria-hidden />
-                    <span>
-                      <b>No method selected.</b> Nobody can satisfy this rule.
-                    </span>
-                  </p>
-                )}
-              </>
-            )}
           </div>
+
+          {/* Its own field with its own label (owner, 22 Sep 2026: "dedicated
+              label for this — Methods"). It hung under the Second factor
+              picker with only a placeholder to say what it was, so the two
+              dropdowns read as one control twice. */}
+          {twoStep && rule.secondFactor === 'specific' && (
+            <div className="bb__thenfield">
+              <span className="bb__thenlabel">Methods</span>
+              <Picker
+                multiple
+                label="Methods accepted"
+                width="fill"
+                placeholder="Choose methods"
+                value={methods}
+                options={METHODS.map(methodOption)}
+                onChange={(m) =>
+                  onPatch({
+                    secondFactorMethods: methods.includes(m) ? methods.filter((x) => x !== m) : [...methods, m],
+                  })
+                }
+              />
+              {/* Hidden in the showcase, with the panel's other findings. */}
+              {!SHOWCASE && unsatisfiable && (
+                <p className="bb__diag is-error" role="alert">
+                  <XCircle size={13} strokeWidth={2} aria-hidden />
+                  <span>
+                    <b>No method selected.</b> Nobody can satisfy this rule.
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Only with a second factor, because that is all they are about: a
               single-factor rule has nothing to remember. */}

@@ -129,8 +129,8 @@ export function useStatusChange(options: StatusChangeOptions = {}): {
     } else {
       const copy =
         target === 'active'
-          ? { title: `Turn on ${name}?`, body: `It starts deciding sign-ins${to}.`, verb: 'Turn on', toast: `${name} is on` }
-          : { title: `Turn off ${name}?`, body: `It stops deciding sign-ins${to}.`, verb: 'Turn off', toast: `${name} is off` }
+          ? { title: `Turn on ${name}?`, body: `It starts deciding logins${to}.`, verb: 'Turn on', toast: `${name} is on` }
+          : { title: `Turn off ${name}?`, body: `It stops deciding logins${to}.`, verb: 'Turn off', toast: `${name} is off` }
 
       dialog = (
         <Modal

@@ -1,4 +1,4 @@
-import { ipSectionEmpty, locationEmpty, nameTaken, type Zone } from '../data'
+import { ipSectionEmpty, locationEmpty, nameTaken, rangeText, type Zone } from '../data'
 
 /* -----------------------------------------------------------------------------
    Network zone validation.
@@ -206,7 +206,8 @@ export function describeZone(z: Zone): string {
   if (l.countries.length) geo.push(l.countries.join(', '))
   if (l.states.length) geo.push(l.states.join(', '))
   if (l.cities.length) geo.push(l.cities.join(', '))
-  if (l.radius) geo.push(`${l.radius.km} km of ${l.radius.label ?? `${l.radius.lat}, ${l.radius.lon}`}`)
+  /* One part each: "Within 25 km of Pune" is a phrase, and a comma list of them reads as one. */
+  for (const r of l.ranges) geo.push(rangeText(r))
   parts.push(geo.length ? geo.join(' · ') : 'Any location')
 
   /* Joined as a list, not a conjunction.

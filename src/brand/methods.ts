@@ -123,7 +123,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     name: 'Passkeys',
     tier: 'Phishing-resistant',
     /* Same reasoning as the magic link: the ceremony is biometric, the job is
-       starting a session. FIDO2 / Passkey stays in Biometric, because that one
+       starting a session. FIDO2 / Passkey stays in Biometrics, because that one
        IS a second factor — the two are the same technology doing two jobs, and
        the family says which job. */
     channel: 'Password',
@@ -158,7 +158,7 @@ export const AUTH_METHODS: AuthMethod[] = [
     use: 'second',
     name: 'FIDO2 / Passkey',
     tier: 'Phishing-resistant',
-    channel: 'Biometric',
+    channel: 'Biometrics',
     description:
       'Device password, PIN, Face ID, fingerprint, or Touch ID. Bound to the origin, so a lookalike site cannot use it.',
     summary: 'Device password, PIN, Face ID, fingerprint or Touch ID.',
@@ -166,6 +166,21 @@ export const AUTH_METHODS: AuthMethod[] = [
     active: true,
     allowed: true,
     enrolled: 1203,
+  },
+  /* The Biometrics family's second method (owner, 21 Sep 2026), and the one the
+     MFA sheet always had: its Biometric family lists FIDO2 and Digital Persona,
+     which is twenty-two methods to this catalogue's twenty-one until now. Off
+     until an admin turns it on. The tier is the sheet's. */
+  {
+    id: 'digital-persona',
+    use: 'second',
+    name: 'DigitalPersona',
+    tier: 'Phishing-resistant',
+    channel: 'Biometrics',
+    description: 'Fingerprint sign-in on an HID DigitalPersona reader.',
+    configured: true,
+    active: false,
+    allowed: false,
   },
   {
     id: 'cac',

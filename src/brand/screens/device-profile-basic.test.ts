@@ -68,12 +68,23 @@ describe('setting up basic details, as a change', () => {
   /* Review changes files every setup answer under Basic details, and an answer
      going from none to a number is a setting that changed, not an addition. */
   it('files every setup answer under Basic details as a change', () => {
-    const applied = { ...unmanaged, restrictionSet: true, maxDevices: null, autoRegister: !unmanaged.autoRegister }
+    const applied = {
+      ...unmanaged,
+      restrictionSet: true,
+      maxDevices: null,
+      autoRegister: !unmanaged.autoRegister,
+      restrictMobile: !unmanaged.restrictMobile,
+    }
     const rows = profileReview(unmanaged, applied)
-    expect(rows.map((r) => r.label)).toEqual(['Basic details', 'Register silently on first sign-in', 'Devices per person'])
+    expect(rows.map((r) => r.label)).toEqual([
+      'Basic details',
+      'Allowed device registrations',
+      'Mobile device restriction',
+      'Device auto-registration',
+    ])
     for (const r of rows) expect(r).toMatchObject({ group: 'Basic details', kind: 'changed' })
     expect(rows.every((r) => r.item === undefined && r.effect === undefined)).toBe(true)
-    expect(profileReview(applied, unmanaged).find((r) => r.label === 'Devices per person')).toMatchObject({
+    expect(profileReview(applied, unmanaged).find((r) => r.label === 'Allowed device registrations')).toMatchObject({
       before: '',
       kind: 'changed',
     })

@@ -24,8 +24,8 @@ import {
 const inside = (channel: string) =>
   AUTH_METHODS.filter((m) => m.use === 'second' && m.channel === channel)
 
-const WITH_VARIANTS = ['SMS', 'Email', 'Authenticator App', 'miniOrange Authenticator', 'Hardware Token']
-const OF_ONE = ['RSA Authenticator', 'Call Verification', 'Security Questions', 'Grid Pattern', 'Smart Cards', 'Biometric']
+const WITH_VARIANTS = ['SMS', 'Email', 'Authenticator App', 'miniOrange Authenticator', 'Hardware Token', 'Biometrics']
+const OF_ONE = ['RSA Authenticator', 'Call Verification', 'Security Questions', 'Grid Pattern', 'Smart Cards']
 
 describe('familyRow', () => {
   test('a family with variants opens the slider', () => {
@@ -62,6 +62,41 @@ describe('familyRow', () => {
   })
 })
 
+/* Biometrics became a family of two (owner, 21 Sep 2026): FIDO2 / Passkey,
+   unchanged, and DigitalPersona. The family CONTAINS the old method rather than
+   renaming it, because policies, the board and the person's own enrolment all
+   name it by its id or its name. */
+describe('Biometrics', () => {
+  test('holds FIDO2 / Passkey and DigitalPersona, and opens like the other families of several', () => {
+    expect(inside('Biometrics').map((m) => m.id)).toEqual(['fido2', 'digital-persona'])
+    expect(rowTarget(familyRow('Biometrics', inside('Biometrics')))).toEqual({ kind: 'family' })
+  })
+
+  test('FIDO2 / Passkey keeps its id, name, state and settings', () => {
+    const fido = AUTH_METHODS.find((m) => m.id === 'fido2')!
+    expect(fido).toMatchObject({
+      name: 'FIDO2 / Passkey',
+      channel: 'Biometrics',
+      tier: 'Phishing-resistant',
+      configured: true,
+      active: true,
+      allowed: true,
+    })
+    /* Rules name methods by name, so a rule written for it still counts it. */
+    expect(rulesUsingMethod(fido.name, [{ rules: [{ secondFactorMethods: ['FIDO2 / Passkey'] } as never] }])).toBe(1)
+  })
+
+  test('DigitalPersona ships off, with a switch rather than a Configure link', () => {
+    const dp = AUTH_METHODS.find((m) => m.id === 'digital-persona')!
+    expect(dp).toMatchObject({ name: 'DigitalPersona', use: 'second', configured: true, active: false, allowed: false })
+  })
+
+  test('a filter that leaves one of the two turns the row back into that method', () => {
+    const [fido] = inside('Biometrics')
+    expect(familyRow('Biometrics', [fido])).toMatchObject({ opens: false, settings: false, method: { id: 'fido2' } })
+  })
+})
+
 describe('rowTarget', () => {
   const target = (channel: string) => rowTarget(familyRow(channel, inside(channel)))
 
@@ -76,7 +111,7 @@ describe('rowTarget', () => {
   })
 
   test('a family of one with nothing behind it goes nowhere, and ends in its switch', () => {
-    for (const channel of ['Call Verification', 'Smart Cards', 'Biometric']) {
+    for (const channel of ['Call Verification', 'Smart Cards']) {
       expect(target(channel), channel).toBeNull()
     }
   })

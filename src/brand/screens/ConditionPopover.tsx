@@ -1,39 +1,82 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import {
+  ArrowDown,
   ArrowLeftRight,
+  ArrowUp,
   Ban,
   Check,
   ChevronDown,
   CircleCheck,
+  CircleX,
+  Equal,
+  EqualNot,
   Fingerprint,
   Globe,
   Layers,
   ListX,
   type LucideIcon,
   MapPin,
+  MapPinCheck,
+  MapPinX,
   MonitorSmartphone,
   Network,
   Search,
+  ShieldCheck,
+  ShieldX,
+  TextSearch,
+  UnfoldHorizontal,
   UserRound,
   Users,
   Webhook,
   X,
 } from 'lucide-react'
 
-/* What an operator IS, as a glyph.
+/* What an operator does, as its own glyph (owner, 22 Sep 2026: "add different
+   icons for different use cases" — it was three marks for nine operators, a
+   tick for every assertion and a ban for every negation, so "is", "contains"
+   and "above" looked like one choice). Each operator has a mark of its own,
+   and a negation is its assertion's mark crossed out where the set has one
+   (= and ≠, pin and crossed pin, shield and crossed shield), so the pair still
+   reads as a pair.
 
-   Every operator in the catalogue is one of three things: it asserts, it
-   negates, or it spans. Drawing the distinction is worth a mark; drawing nine
-   different marks for nine spellings of those three would be decoration.
-
-   Read with `includes('not')`, which is the same substring test the evaluator
-   uses — so the glyph and the decision cannot disagree about which operator is
-   a negation. */
+   An operator missing from the map falls back to the old three-way reading,
+   with `includes('not')` — the same substring test the evaluator uses, so the
+   glyph and the decision cannot disagree about which operator is a negation. */
+const OPERATOR_ICON: Record<string, LucideIcon> = {
+  is: Equal,
+  'is not': EqualNot,
+  contains: TextSearch,
+  above: ArrowUp,
+  below: ArrowDown,
+  between: ArrowLeftRight,
+  'not between': UnfoldHorizontal,
+  'in zone': MapPinCheck,
+  'not in zone': MapPinX,
+  matches: ShieldCheck,
+  'does not match': ShieldX,
+  'returns true': CircleCheck,
+  'returns false': CircleX,
+  in: Equal,
+  'not in': EqualNot,
+}
 const operatorIcon = (o: string): LucideIcon =>
-  o.includes('not') ? Ban : o === 'between' ? ArrowLeftRight : CircleCheck
+  OPERATOR_ICON[o] ?? (o.includes('not') ? Ban : o === 'between' ? ArrowLeftRight : CircleCheck)
+
+/* A colour for the glyph in the inspector's operator dropdown (owner, 22 Sep
+   2026: "I need color in each icon"): a negation red, a comparison against a
+   number or a window blue, every other assertion green. "returns false" is the
+   hook's negative answer without the word "not" in it, so it is named (owner,
+   the same day: "why are both the same colour?"). */
+const operatorTone = (o: string): string =>
+  o.includes('not') || o === 'returns false'
+    ? 'negative'
+    : o === 'between' || o === 'above' || o === 'below'
+      ? 'info'
+      : 'positive'
 
 import { Button } from '../kit'
+import { FOCUSABLE, appRoot } from '../dialog-chrome'
 import { EmptyState, NoMatches } from '../empty'
 import { modeLabel } from '../fingerprint'
 import { conditionIcon, conditionTone } from './board/tones'
@@ -43,6 +86,7 @@ import type { NameLookup } from './predicate-prose'
 import {
   TIMEZONES,
   ZONE_SCOPE_LABEL,
+  zoneScopeOf,
   WHEN_CONDITIONS,
   conditionType,
   ipSectionEmpty,
@@ -90,6 +134,8 @@ import './condition-popover.css'
 
 const GAP = 6
 const MARGIN = 8
+/** The least room under a field a dropdown will open into before it flips. */
+const MENU_MIN = 200
 
 export interface ValueOption {
   value: string
@@ -302,7 +348,7 @@ export function ConditionPopover({
   onRetype: (typeId: string) => void
   onOperator: (op: string) => void
   onValues: (v: string[]) => void
-  onScope: (s: 'both' | ZoneScope) => void
+  onScope: (zoneId: string, s: 'both' | ZoneScope) => void
   /** Which attribute — `user-attr` and `custom-attr` only. */
   onKey: (k: string) => void
   /** Which timezone the window is read in — `time` only. `''` is the tenant's. */
@@ -344,6 +390,7 @@ export function ConditionPopover({
      this is the one moment the next step is certain. */
   const [open, setOpen] = useState<Part | null>(autoOpen ? 'op' : null)
   const values = c.values.filter(Boolean)
+  const rowRef = useRef<HTMLDivElement | null>(null)
 
   const whatRef = useRef<HTMLButtonElement | null>(null)
   const opRef = useRef<HTMLButtonElement | null>(null)
@@ -353,7 +400,13 @@ export function ConditionPopover({
   const toggle = (v: string) =>
     onValues(single ? [v] : values.includes(v) ? values.filter((x) => x !== v) : [...values, v])
 
-  const close = useCallback(() => setOpen(null), [])
+  /* A pick that finishes the value (a one-value kind) closes the dropdown and
+     puts focus back on the value field, as Escape does — a bare close left it
+     on the page. */
+  const close = useCallback(() => {
+    setOpen(null)
+    valRef.current?.focus()
+  }, [])
 
   /* Every value, joined the way the evaluator reads them.
 
@@ -380,7 +433,12 @@ export function ConditionPopover({
   /* Only when narrowed: "Both" is the zone as written, and says nothing a chip
      needs to repeat. "IP only" rather than the menu's bare "IP" — on a chip it
      stands alone, and "only" is what says it is a narrowing. */
-  const scopeTag = c.scope ? <i className="cp__scopetag">{c.scope === 'ip' ? 'IP only' : 'Location only'}</i> : null
+  /* Per zone since 22 Sep 2026: a tag only when every named zone asks the same
+     narrowed half. Different halves are said in the menu, zone by zone, and on
+     the card beside each name. */
+  const halves = t.valueKind === 'zone' ? values.filter(Boolean).map((v) => zoneScopeOf(c, v)) : []
+  const shared = halves.length > 0 && halves.every((h) => h === halves[0]) ? halves[0] : 'both'
+  const scopeTag = shared !== 'both' ? <i className="cp__scopetag">{shared === 'ip' ? 'IP only' : 'Location only'}</i> : null
 
   /* A window and a threshold are TYPED, not chosen from a list, and stacked
      there is room to type them where they belong. The pill has to send them to
@@ -440,6 +498,7 @@ export function ConditionPopover({
       <Picker
         label="Which attribute"
         width="fill"
+        prefix="Attribute"
         value={c.key ?? ''}
         placeholder="Choose an attribute…"
         options={t.keys.map((k) => ({ value: k, label: k }))}
@@ -466,6 +525,7 @@ export function ConditionPopover({
       <Picker
         label="Timezone"
         width="fill"
+        prefix="Timezone"
         value={c.tz ?? ''}
         summary={c.tz || 'Tenant timezone'}
         options={[{ value: '', label: 'Tenant timezone' }, ...TIMEZONES.map((z) => ({ value: z, label: z }))]}
@@ -473,10 +533,27 @@ export function ConditionPopover({
       />
     )
 
+  /* A typed value has no menu to open, so the forward step from the operator
+     lands IN it: the first input of the row takes the focus the operator
+     menu had. Without this, picking an operator for a time window closed the
+     menu and dropped focus on the page. */
+  const typedNext = stacked && open === 'val' && typedValue !== null
+  useEffect(() => {
+    if (!typedNext) return
+    setOpen(null)
+    rowRef.current?.querySelector<HTMLInputElement>('.cp__stackrow input')?.focus()
+  }, [typedNext])
+
   const triggers = stacked ? (
-    /* Three rows, top to bottom, in the order they depend on each other:
-       what is checked, how it is compared, what it is compared against. */
-    <div className={`cp__stack ${unset ? 'is-unset' : ''}`}>
+    /* The frame, and its remove BESIDE it rather than inside it (owner, 22 Sep
+       2026: "the cross should always be visible — a dedicated button, not merged
+       inside the condition container; that fixes the space issue as well"). It
+       was a hover-only × in the frame's last 44px, which the value field had to
+       give up on every row whether the × was showing or not. */
+    <div className="cp__stackline">
+    {/* Three rows, top to bottom, in the order they depend on each other:
+       what is checked, how it is compared, what it is compared against. */}
+    <div ref={rowRef} className={`cp__stack ${unset ? 'is-unset' : ''}`}>
       {/* All three on ONE line: what is checked, how, and against what.
 
           This has been two shapes and both were wrong for the panel. Three
@@ -530,9 +607,6 @@ export function ConditionPopover({
           </Field>
         )}
 
-        <button type="button" className="cp__del" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
-          <X size={14} strokeWidth={1.9} />
-        </button>
       </div>
 
       {/* The two conditions that need a second line get one: an attribute's key
@@ -540,6 +614,10 @@ export function ConditionPopover({
           than parts of the sentence, so they sit under it at full width. */}
       {keyRow}
       {tzRow}
+    </div>
+    <button type="button" className="cp__del is-solo" aria-label={`Remove ${t.label}`} title="Remove" onClick={onRemove}>
+      <X size={18} strokeWidth={1.9} />
+    </button>
     </div>
   ) : (
     <span className="cp__pill">
@@ -609,58 +687,33 @@ export function ConditionPopover({
             anchorFor[open].current?.focus()
           }}
           /* Re-measure whenever what is inside can change size — a retype swaps
-             the whole body, an operator change can swap it too. */
-          watch={`${open}:${c.typeId}:${c.operator}`}
+             the whole body, an operator change can swap it too — or the field
+             can move: ticking the first value clears the panel's "no value"
+             banner above, and the row moves up with it. */
+          watch={`${open}:${c.typeId}:${c.operator}:${values.join(',')}:${JSON.stringify(c.scopes ?? {})}`}
         >
           {open === 'what' && (
             <OptionList
-              /* No search, and the sort is gone with it.
-
-                 Both existed for a twenty-four row list scattered across nine
-                 components: you searched because you could not see the row you
-                 wanted, and `conditionRank` floated seven rows above the
-                 taxonomy because the taxonomy had put them five components
-                 apart. Four rows are all on screen. A search field over four
-                 rows can only ever hide three of them, and a lead order over
-                 four is an order nobody can perceive.
-
-                 `WHEN_CONDITIONS` and not the catalogue: `group` and `user`
-                 stay in the catalogue only to label leftover conditions. People
-                 are the rule's `who`, chosen in the Who section, so they are
-                 never offered as a condition. */
-              items={WHEN_CONDITIONS
-                /* The family's own glyph, the same one the card and the editor
-                   draw. Four rows do not need finding, but the mark is what
-                   tells you at a glance that two of them are about the same
-                   thing. */
-                /* No `meta`. It carried the component name — "Time" under
-                   "Time of day", "Attributes" under "User attribute" — which is
-                   a second line restating the first word of the row above it.
-                   Nine rows, nine echoes. The mark already groups them. */
-                .map((x) => ({
-                  value: x.id,
-                  label: x.label,
-                  note: x.soon ? 'Coming soon' : undefined,
-                  icon: conditionIcon(x.id, x.group),
-                  /* The tint, from `tones.ts`, keyed by attribute rather than
-                     by group.
-
-                     It was `x.group`, which paints `Network zone`, `Device
-                     profile` and `External hook` one blue — they are all
-                     `Library`, and they are the three most different things in
-                     the catalogue. A tint whose job is to say "these two are
-                     the same kind of thing" must not say it about those. */
-                  tone: conditionTone(x.id, x.group),
-                  disabled: x.soon,
-                }))}
+              /* No search: nine rows are all on screen, and a search over them
+                 can only ever hide eight. See `attributeOptions`. */
+              items={attributeOptions()}
               picked={[c.typeId]}
               single
+              menu={stacked}
               /* Progressive, and only forwards. Choosing an attribute opens the
                  operators; choosing an operator opens the values. It does not
                  run backwards: re-opening the operator menu on a finished
                  condition to change `in` to `not in` should leave you where you
                  were, not drag you into a list of groups you did not ask about. */
               onPick={(id) => {
+                /* The attribute it already is: keep it, as a select does. A
+                   retype rebuilds the condition from nothing, so re-choosing the
+                   same row wiped its operator and every value. */
+                if (id === c.typeId) {
+                  setOpen(null)
+                  whatRef.current?.focus()
+                  return
+                }
                 onRetype(id)
                 setOpen('op')
               }}
@@ -674,9 +727,10 @@ export function ConditionPopover({
                  the affirmative or the negation, so that is what the glyph
                  says. `between` is the one worth drawing separately: it is
                  neither, it is a range. */
-              items={t.operators.map((o) => ({ value: o, label: o, icon: operatorIcon(o) }))}
+              items={t.operators.map((o) => ({ value: o, label: o, icon: operatorIcon(o), tone: stacked ? operatorTone(o) : undefined }))}
               picked={[c.operator]}
               single
+              menu={stacked}
               /* No search over two to four words. */
               onPick={(o) => {
                 onOperator(o)
@@ -697,6 +751,7 @@ export function ConditionPopover({
               footer={footer}
               onFooter={onFooter}
               close={close}
+              menu={stacked}
             />
           )}
         </Holder>
@@ -707,21 +762,21 @@ export function ConditionPopover({
 
 /* --- Where a menu opens ----------------------------------------------------------
 
-   In the inspector (`stacked`), every menu opens the SAME way and in the SAME
-   place: a card directly under the condition, in the flow, with a titled head
-   and a close — the shape "Add a condition" already had (owner, 21 Sep 2026:
-   "when I add a condition it's a different position, a different view, and
-   three different positions — that breaks the experience").
+   In the inspector (`stacked`), every part of a condition opens a DROPDOWN
+   under the part you pressed: the "+ Add ▾" menu's own frame and rows, anchored
+   to the segment's left edge (owner, 21 Sep 2026: "for each section make it
+   like the Add dropdown — the kind of dropdowns they expect"; and, on adding,
+   "the empty condition row, and under that open the condition dropdown").
 
-   It used to be three answers to one gesture. Adding opened that inline card;
-   the attribute, operator and value menus opened as floating panels to the
-   LEFT of the inspector, over the canvas, each lined up with its own segment —
-   so they started at three different x positions, at three widths, one with a
-   head and two without. The argument for "beside" was that a menu under a row
-   in a 340px pane hides the rows below it. In the flow it hides nothing: the
-   rows below move down, and come back when it closes.
+   It was a card in the flow — a titled head, a close, and hairline rows, the
+   width of the panel — which pushed every row below it down by a screen and
+   read as a second panel inside the first rather than as the choices of the
+   field above it. A dropdown sits OVER what is below, is the width of what it
+   lists, and goes away without moving anything. The earlier floating version
+   was rejected for opening to the LEFT of the panel, at three different x
+   positions; this one opens under its own segment, like every select.
 
-   The pill (the card on the canvas) keeps the anchored `Pop`. */
+   The pill (the card on the canvas) keeps its plain `Pop`. */
 function Holder({
   stacked,
   title,
@@ -737,67 +792,114 @@ function Holder({
   watch: string
   children: ReactNode
 }) {
-  if (!stacked) {
-    return (
-      <Pop anchor={anchor} onClose={onClose} watch={watch}>
-        {children}
-      </Pop>
-    )
-  }
   return (
-    <InlineCard title={title} anchor={anchor} onClose={onClose}>
+    <Pop anchor={anchor} onClose={onClose} watch={watch} menu={stacked} label={title}>
       {children}
-    </InlineCard>
+    </Pop>
   )
 }
 
-function InlineCard({
-  title,
-  anchor,
-  onClose,
-  children,
+/* `InlineCard` stood here — every inspector menu as a titled card in the flow
+   under the row. Replaced by the dropdown above (21 Sep 2026). */
+
+/* The attribute menu's rows: every condition a rule can ask, with the family's
+   glyph. `WHEN_CONDITIONS` and not the catalogue: `group` and `user` stay in
+   the catalogue only to label leftover conditions — people are the rule's
+   `who`. No `meta` line: it restated the first word of the row above it. The
+   tone is per attribute (`tones.ts`), not per group, so the three Library rows
+   do not share one colour. */
+function attributeOptions(): ValueOption[] {
+  return WHEN_CONDITIONS.map((x) => ({
+    value: x.id,
+    label: x.label,
+    /* What the attribute is, in a line (owner, 22 Sep 2026: "the user should
+       understand what these attributes are"). Under the name rather than on a
+       hover tip, so the list can be read and compared at a glance. */
+    meta: x.hint,
+    note: x.soon ? 'Coming soon' : undefined,
+    icon: conditionIcon(x.id, x.group),
+    tone: conditionTone(x.id, x.group),
+    disabled: x.soon,
+  }))
+}
+
+/* --- A condition that is about to exist ---------------------------------------------
+
+   What "Add condition" draws in the inspector: an EMPTY ROW, the same frame and
+   the same three parts as every condition above it, with the attribute
+   dropdown open under its first part (owner, 21 Sep 2026: "it should feel like
+   it's a part of the other added conditions … the empty condition row, and
+   under that open the condition dropdown").
+
+   Nothing is written to the rule until an attribute is chosen — a condition
+   with no attribute is not one the model can hold — so this row lives on the
+   screen only, like a pending group. Choosing writes the real condition in its
+   place, and that row opens its operator dropdown, so the three choices are
+   made in one place, in order. Closing the dropdown leaves the empty row where
+   it is, to be pressed again; its × discards it. */
+export function ConditionDraft({
+  label,
+  onPick,
+  onCancel,
 }: {
-  title: string
-  anchor: RefObject<HTMLButtonElement | null>
-  onClose: () => void
-  children: ReactNode
+  /** What is being added, and to where — the row's accessible name. */
+  label: string
+  onPick: (typeId: string) => void
+  onCancel: () => void
 }) {
-  const box = useRef<HTMLDivElement | null>(null)
-  /* Brought into view inside the panel's own scroller — the only thing that
-     moves is the panel you are already in. */
+  const [open, setOpen] = useState(true)
+  const whatRef = useRef<HTMLButtonElement | null>(null)
+  const rowRef = useRef<HTMLDivElement | null>(null)
+  /* Into view inside the panel's own scroller before the dropdown measures
+     where it can open: "Add condition" is pressed at the foot of a long rule. */
   useLayoutEffect(() => {
-    box.current?.scrollIntoView({ block: 'nearest' })
+    rowRef.current?.scrollIntoView({ block: 'nearest' })
   }, [])
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      const n = e.target as Node
-      if (anchor.current?.contains(n) || box.current?.contains(n)) return
-      onClose()
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [anchor, onClose])
   return (
-    <div
-      ref={box}
-      className="cp__cat cp__inline-card"
-      role="dialog"
-      aria-label={title}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          e.stopPropagation()
-          onClose()
-        }
-      }}
-    >
-      <p className="cp__cathead">
-        <span>{title}</span>
-        <button type="button" className="cp__catx" onClick={onClose} aria-label="Close">
-          <X size={13} strokeWidth={2.2} />
-        </button>
-      </p>
-      {children}
-    </div>
+    <>
+      <div className="cp__stackline">
+      <div ref={rowRef} className="cp__stack is-draft" role="group" aria-label={label}>
+        <div className="cp__stackrow">
+          <Field
+            ref={whatRef}
+            kind="what"
+            open={open}
+            label="Choose what is checked"
+            onOpen={() => setOpen((o) => !o)}
+          >
+            <span className="cp__fldph">Choose attribute</span>
+          </Field>
+          {/* The two parts that depend on the first, shown and not yet
+              pressable — so the row has the shape it is about to have. */}
+          <span className="cp__fld is-op is-idle" aria-hidden>
+            <span className="cp__fldtext">Operator</span>
+            <ChevronDown size={13} strokeWidth={2} />
+          </span>
+          <span className="cp__fld is-val is-idle" aria-hidden>
+            <span className="cp__fldtext">Value</span>
+            <ChevronDown size={13} strokeWidth={2} />
+          </span>
+        </div>
+      </div>
+      <button type="button" className="cp__del is-solo" aria-label="Discard this condition" title="Discard" onClick={onCancel}>
+        <X size={18} strokeWidth={1.9} />
+      </button>
+      </div>
+      {open && (
+        <Pop
+          anchor={whatRef}
+          menu
+          label="Choose what is checked"
+          watch="draft"
+          onClose={() => {
+            setOpen(false)
+            whatRef.current?.focus()
+          }}
+        >
+          <OptionList items={attributeOptions()} picked={[]} single menu onPick={onPick} />
+        </Pop>
+      )}
+    </>
   )
 }
 
@@ -854,6 +956,8 @@ function Pop({
   anchor,
   onClose,
   watch,
+  menu,
+  label,
   children,
 }: {
   anchor: RefObject<HTMLButtonElement | null>
@@ -861,18 +965,41 @@ function Pop({
   /** Anything that changes the panel's size, so it re-measures. */
   watch: string
   /* `beside` stood here — open to the LEFT of the anchor, for the inspector.
-     The inspector's menus are inline cards now (see `Holder`), so this panel
-     only ever opens under or over the pill it belongs to. */
+     This panel only ever opens under or over the part it belongs to. */
+  /** The inspector's dropdown: the kit menu's frame and rows, focus moved into
+      it, arrow keys between its rows. See `Holder`. */
+  menu?: boolean
+  /** The dropdown's accessible name. */
+  label?: string
   children: ReactNode
 }) {
   const pop = useRef<HTMLDivElement | null>(null)
   const [pos, setPos] = useState<{ top: number; left: number; width: number; maxH: number } | null>(null)
+  /* A dropdown makes room under its field once, before it would flip: it
+     scrolls the panel the field is in up by what it lacks, as far as the field
+     itself stays in view. Flipping above covered the conditions the new one
+     was being added under — the row you are filling in should keep its menu
+     below it wherever the panel can move to allow it. */
+  const roomMade = useRef(false)
 
   const place = useCallback(() => {
-    const a = anchor.current?.getBoundingClientRect()
+    let a = anchor.current?.getBoundingClientRect()
     if (!a) return
     const p = pop.current?.getBoundingClientRect()
     const h = p?.height ?? 0
+    if (menu && !roomMade.current && h > 0) {
+      roomMade.current = true
+      const lack = a.bottom + GAP + h + MARGIN - window.innerHeight
+      const sc = lack > 0 ? scrollerOf(anchor.current) : null
+      if (sc) {
+        const top = sc.getBoundingClientRect().top
+        const by = Math.min(lack, sc.scrollHeight - sc.clientHeight - sc.scrollTop, Math.max(0, a.top - top - MARGIN))
+        if (by > 0) {
+          sc.scrollTop += by
+          a = anchor.current?.getBoundingClientRect() ?? a
+        }
+      }
+    }
     /* Anchor-derived, never self-derived. Feeding the panel's own measured
        border-box width back as a content-box `minWidth` widened it by its
        border on every placement, and placement runs on every scroll event —
@@ -884,7 +1011,13 @@ function Pop({
     const above = a.top
     /* Flip only when below genuinely lacks room AND above has more — the rule
        that stops a panel jumping sides as its own list is filtered. */
-    const up = below < h + GAP + MARGIN && above > below
+    /* A dropdown stays under its field whenever a useful amount of it fits
+       there — its list scrolls inside the cap below — and flips only when
+       under the field is too tight to choose from at all. Opening above
+       covered the very conditions a new one was being added beneath. */
+    const up = menu
+      ? below < MENU_MIN + GAP + MARGIN && above > below
+      : below < h + GAP + MARGIN && above > below
     /* Cap to the room on the side it opened and let the LIST scroll. Without
        this a tall panel from a segment low in the inspector had nowhere to fit
        and clamped to the viewport edge, covering the console header to show six
@@ -898,10 +1031,18 @@ function Pop({
       width: w,
       maxH,
     })
-  }, [anchor])
+  }, [anchor, menu])
 
   // Before paint, so the panel is never seen at its unplaced position.
   useLayoutEffect(place, [place, watch])
+  /* Once more after the first placement, with the width it has now. Unplaced,
+     it was measured before its min-width applied — wider than it ends up — and
+     the right-edge clamp used that width, so a dropdown opened well to the
+     left of its field until the next scroll re-placed it. */
+  const isPlaced = pos !== null
+  useLayoutEffect(() => {
+    if (isPlaced) place()
+  }, [isPlaced, place])
 
   useEffect(() => {
     // A scroll of the panel's own list does not move the panel.
@@ -924,24 +1065,83 @@ function Pop({
     }
   }, [place, anchor, onClose])
 
+  /* A dropdown takes the focus once it is placed, the way the kit's menus do:
+     the chosen row if there is one, else the first. A value list with a search
+     field has already focused that field, and keeps it. */
+  /* Again whenever the content changes in place — attribute to operator,
+     operator to value — which keeps this panel mounted and unmounts the row that
+     had the focus. With no rows to land on (an empty library), the first thing
+     that takes focus does. */
+  const placed = pos !== null
+  useEffect(() => {
+    if (!menu || !placed) return
+    const box = pop.current
+    if (!box || box.contains(document.activeElement)) return
+    const rows = menuRows(box)
+    const target = rows.find((r) => r.classList.contains('is-on')) ?? rows[0] ?? box.querySelector<HTMLElement>(FOCUSABLE)
+    target?.focus({ preventScroll: true })
+  }, [menu, placed, watch])
+
   return createPortal(
     <div
       ref={pop}
-      className="cp__pop"
+      className={`cp__pop${menu ? ' bx-menu__pop cp__menu' : ''}`}
       role="dialog"
+      aria-label={label}
       style={pos ? { top: pos.top, left: pos.left, minWidth: pos.width, maxHeight: pos.maxH } : { opacity: 0, pointerEvents: 'none' }}
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.stopPropagation()
           onClose()
+          return
         }
+        if (!menu || e.defaultPrevented) return
+        /* Tab walks what is in the dropdown — the search, the rows, a zone's
+           "Match on" and the footer — and only closes it on the way OUT, past
+           either end. The anchor takes focus back and Tab carries on from it. */
+        if (e.key === 'Tab') {
+          const all = pop.current ? [...pop.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.tabIndex !== -1) : []
+          const edge = e.shiftKey ? all[0] : all[all.length - 1]
+          if (!all.length || document.activeElement === edge) onClose()
+          return
+        }
+        /* The zone halves are a radio group with arrow keys of their own. */
+        if ((e.target as HTMLElement).closest?.('[role="radiogroup"]')) return
+        /* The arrows walk the rows. Prevented, so the board's own arrow keys
+           (which select the next rule) stay out of it. Not from the search
+           field's caret keys — only up, down, Home and End. */
+        const step = { ArrowDown: 1, ArrowUp: -1 }[e.key as 'ArrowDown']
+        const edge = e.key === 'Home' ? 'first' : e.key === 'End' ? 'last' : null
+        if (!step && !edge) return
+        if (edge && (e.target as HTMLElement).tagName === 'INPUT') return
+        const rows = pop.current ? menuRows(pop.current) : []
+        if (!rows.length) return
+        e.preventDefault()
+        const at = rows.indexOf(document.activeElement as HTMLButtonElement)
+        const next = edge === 'first' ? 0 : edge === 'last' ? rows.length - 1 : at < 0 ? (step === 1 ? 0 : rows.length - 1) : (at + step! + rows.length) % rows.length
+        rows[next]?.focus({ preventScroll: false })
       }}
     >
       {children}
     </div>,
-    document.body,
+    /* The dropdown goes where the kit's menus go — the app root — so the kit's
+       button reset and the rebrand reach its rows. The pill's panel keeps
+       `document.body`, which its own box-sizing rules are written for. */
+    menu ? appRoot() : document.body,
   )
 }
+
+/** The nearest ancestor that scrolls vertically: the inspector body, here. */
+function scrollerOf(el: HTMLElement | null): HTMLElement | null {
+  for (let n = el?.parentElement; n; n = n.parentElement) {
+    const y = getComputedStyle(n).overflowY
+    if ((y === 'auto' || y === 'scroll') && n.scrollHeight > n.clientHeight) return n
+  }
+  return null
+}
+
+/** The pressable rows of a dropdown, in order. */
+const menuRows = (box: HTMLElement) => [...box.querySelectorAll<HTMLButtonElement>('.bx-menu__item:not(:disabled)')]
 
 /* --- A list of options ---------------------------------------------------------
    The attribute menu and the operator menu are the same shape; only the
@@ -951,6 +1151,7 @@ function OptionList({
   picked,
   single,
   searchLabel,
+  menu,
   onPick,
 }: {
   items: ValueOption[]
@@ -958,6 +1159,8 @@ function OptionList({
   single?: boolean
   /** Present when the list is long enough to want searching. */
   searchLabel?: string
+  /** Drawn as the kit menu's rows — see `List`. */
+  menu?: boolean
   onPick: (v: string) => void
 }) {
   const [q, setQ] = useState('')
@@ -979,6 +1182,7 @@ function OptionList({
         onPick={onPick}
         q={q}
         noun="options"
+        menu={menu}
         onClear={() => {
           setQ('')
           search.current?.focus()
@@ -1090,29 +1294,77 @@ function List({
   onPick,
   q,
   noun,
+  menu,
   onClear,
+  rowExtra,
 }: {
   items: ValueOption[]
   picked: string[]
   single?: boolean
   onPick: (v: string) => void
+  /** Drawn under a row, as its own line of the list — a chosen zone's Match on. */
+  rowExtra?: (o: ValueOption, on: boolean) => ReactNode
   q: string
   /** Plural, lower case, for the no-match state: 'zones', 'groups'. */
   noun: string
+  /* The inspector's dropdown: each row is the kit's menu row (`.bx-menu__item`)
+     — the "+ Add ▾" menu's icon, label, padding and highlight — with a check at
+     the end of the chosen one in a pick-one list and the kit's tick box at the
+     start of each row in a pick-many one. */
+  menu?: boolean
   onClear: () => void
 }) {
   return (
-    <div className="cp__list" role={single ? 'listbox' : 'group'}>
+    <div className={`cp__list${menu ? ' is-menu' : ''}`} role={single ? 'listbox' : 'group'}>
       {items.length === 0 ? (
         /* The full no-match state, with the way back, rather than a bare line. */
         <NoMatches compact noun={noun} query={q} onClear={onClear} />
+      ) : menu ? (
+        items.map((o) => {
+          const on = picked.includes(o.value)
+          const Ico = o.icon
+          const extra = rowExtra?.(o, on)
+          return (
+            <Fragment key={o.value}>
+            <button
+              type="button"
+              className={`bx-menu__item cp__mrow ${on ? 'is-on' : ''} ${o.tone ? `is-tone-${o.tone}` : ''}`}
+              role={single ? 'option' : 'checkbox'}
+              aria-selected={single ? on : undefined}
+              aria-checked={single ? undefined : on}
+              disabled={o.disabled}
+              onClick={() => onPick(o.value)}
+              /* The kit menu's contract: the pointer moves the focus, so the
+                 highlight is on one row — never a focused row and a hovered one. */
+              onMouseEnter={(e) => {
+                if (!o.disabled) e.currentTarget.focus({ preventScroll: true })
+              }}
+            >
+              {!single && (
+                <span className="bx-tick" aria-hidden>
+                  <Check size={11} strokeWidth={3} />
+                </span>
+              )}
+              {Ico && <Ico size={14} strokeWidth={1.9} aria-hidden />}
+              <span>
+                <strong>{o.label}</strong>
+                {o.meta && <em>{o.meta}</em>}
+              </span>
+              {o.note && <i className="cp__msoon">{o.note}</i>}
+              {single && on && <Check className="cp__mcheck" size={14} strokeWidth={2.4} aria-hidden />}
+            </button>
+            {extra}
+            </Fragment>
+          )
+        })
       ) : (
         items.map((o) => {
           const on = picked.includes(o.value)
           const Ico = o.icon
+          const extra = rowExtra?.(o, on)
           return (
+            <Fragment key={o.value}>
             <button
-              key={o.value}
               type="button"
               className={`cp__opt ${on ? 'is-on' : ''} ${single ? 'is-single' : ''} ${o.disabled ? 'is-soon' : ''} ${o.tone ? `is-tone-${o.tone}` : ''}`}
               role={single ? 'option' : 'checkbox'}
@@ -1158,9 +1410,62 @@ function List({
                 {o.note && <small>{o.note}</small>}
               </span>
             </button>
+            {extra}
+            </Fragment>
           )
         })
       )}
+    </div>
+  )
+}
+
+/* One chosen zone's Match on: Both, IP or Location, as a compact switch on its
+   own line under the zone (22 Sep 2026). It was one switch under the whole list
+   that answered for every zone at once. Arrows move within it, as a radio group
+   does; the list's own arrows skip it. */
+function ZoneScopePick({
+  zone,
+  value,
+  onChange,
+}: {
+  zone: string
+  value: 'both' | ZoneScope
+  onChange: (h: 'both' | ZoneScope) => void
+}) {
+  return (
+    <div className="cp__zscope">
+      <span className="cp__zscope__label" aria-hidden>
+        Match on
+      </span>
+      <div className="cp__zscope__opts" role="radiogroup" aria-label={`Match ${zone} on`}>
+        {SCOPES.map((sc, i) => {
+          const on = sc.id === value
+          const Ico = sc.icon
+          return (
+            <button
+              key={sc.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              tabIndex={on ? 0 : -1}
+              className={on ? 'is-on' : ''}
+              title={sc.hint}
+              onClick={() => onChange(sc.id)}
+              onKeyDown={(e) => {
+                const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
+                if (!d) return
+                e.preventDefault()
+                onChange(SCOPES[(i + d + SCOPES.length) % SCOPES.length].id)
+                const group = e.currentTarget.parentElement
+                requestAnimationFrame(() => group?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus())
+              }}
+            >
+              <Ico size={12} strokeWidth={2} aria-hidden />
+              {ZONE_SCOPE_LABEL[sc.id]}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -1180,6 +1485,7 @@ function ValueBody({
   footer,
   onFooter,
   close,
+  menu,
 }: {
   c: Condition
   options: ValueOption[]
@@ -1187,17 +1493,19 @@ function ValueBody({
   values: string[]
   toggle: (v: string) => void
   onValues: (v: string[]) => void
-  onScope: (s: 'both' | ZoneScope) => void
+  onScope: (zoneId: string, s: 'both' | ZoneScope) => void
   footer?: string
   onFooter?: () => void
   close: () => void
+  /** Rows as the kit menu's — see `List`. */
+  menu?: boolean
 }) {
   const t = conditionType(c.typeId)
   /* Every hook, not only the ones offered: a library of attribute-sync hooks is
      not an empty library, and "No hooks yet" would be wrong about it. */
-  const hookCount = useBrand().hooks.length
+  const { hooks, zones } = useBrand()
+  const hookCount = hooks.length
   const [q, setQ] = useState('')
-  const scopeLabelId = useId()
   const search = useRef<HTMLInputElement | null>(null)
   const armed = useRef(false)
   const take = (el: HTMLInputElement | null) => {
@@ -1283,6 +1591,7 @@ function ValueBody({
         single={single}
         q={q}
         noun={NOUN[t.valueKind] ?? 'values'}
+        menu={menu}
         onClear={() => {
           setQ('')
           search.current?.focus()
@@ -1294,49 +1603,24 @@ function ValueBody({
              second group is the whole reason a multi-select stays open. */
           if (single) close()
         }}
+        rowExtra={
+          t.valueKind === 'zone'
+            ? (o, on) => {
+                /* Under each CHOSEN zone that has both halves to choose between
+                   (owner, 22 Sep 2026: "an individual Match on for each one").
+                   A zone that holds only addresses or only places has nothing
+                   to choose — its line already says "IP networks only" — so it
+                   gets none, unless a stored answer needs a way back to Both. */
+                if (!on) return null
+                const z = zones.find((x) => x.id === o.value)
+                const both = !!z && !ipSectionEmpty(z) && !locationEmpty(z.location)
+                const now = zoneScopeOf(c, o.value)
+                if (!both && now === 'both') return null
+                return <ZoneScopePick zone={o.label} value={now} onChange={(h) => onScope(o.value, h)} />
+              }
+            : undefined
+        }
       />
-
-      {/* Which half of the chosen zones to test — after the choosing, and only
-          once something is chosen: until then there is no zone to take the IP
-          or the location FROM. One answer for the condition, not one per zone,
-          because the same "Reliance Jio · India" is asked about as a network by
-          one rule and as a place by another (see `Condition.scope`). Both is
-          the default and is stored as nothing, so opening a rule never marks it
-          changed. */}
-      {t.valueKind === 'zone' && values.length > 0 && (
-        <div className="cp__scope">
-          <span className="cp__scopelabel" id={scopeLabelId}>
-            Match on
-          </span>
-          <div className="cp__scopeopts" role="radiogroup" aria-labelledby={scopeLabelId}>
-            {SCOPES.map((s, i) => {
-              const on = s.id === (c.scope ?? 'both')
-              const Ico = s.icon
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  tabIndex={on ? 0 : -1}
-                  className={on ? 'is-on' : ''}
-                  title={s.hint}
-                  onClick={() => onScope(s.id)}
-                  onKeyDown={(e) => {
-                    const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
-                    if (!d) return
-                    e.preventDefault()
-                    onScope(SCOPES[(i + d + SCOPES.length) % SCOPES.length].id)
-                  }}
-                >
-                  <Ico size={13} strokeWidth={2} aria-hidden />
-                  {ZONE_SCOPE_LABEL[s.id]}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       {/* The footer only. No "3 of 24" beside it: the rows are the count. */}
       {footer && (

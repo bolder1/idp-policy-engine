@@ -1383,12 +1383,15 @@ export function Tip({
   )
 }
 
-/** The `?` that carries a demoted sentence. Trigger for {@link Tip}. */
+/** The info mark that carries a demoted sentence. Trigger for {@link Tip}.
+
+    An `Info` icon, not a `?` on a disc (owner, 21 Sep 2026: "use info icon in
+    the tooltip"). The icon is its own circle, so the mark has no disc behind it. */
 export function TipDot({ text, label = 'Why this matters' }: { text: ReactNode; label?: string }) {
   return (
     <Tip text={text}>
       <button type="button" className="bx-tipdot" aria-label={label}>
-        ?
+        <Info size={14} strokeWidth={2} aria-hidden />
       </button>
     </Tip>
   )
@@ -1412,7 +1415,7 @@ export function TipMark({ text }: { text: ReactNode }) {
           bubbled to the row and ticked or unticked it while you were only asking
           what it was. */}
       <span className="bx-tipdot" aria-hidden onClick={(e) => e.stopPropagation()}>
-        ?
+        <Info size={14} strokeWidth={2} />
       </span>
     </Tip>
   )

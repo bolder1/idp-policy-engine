@@ -81,7 +81,7 @@ describe('review rows', () => {
     expect(reviewItemName({ label: 'IP networks: added', group: 'IP networks' })).toBe('IP networks')
     expect(reviewItemName({ label: 'Locations: Removed', group: 'Locations' })).toBe('Locations')
     expect(reviewItemName({ label: 'Signals: tor exit node', group: 'Signals' })).toBe('Tor exit node')
-    expect(reviewItemName({ label: 'Devices per person', group: 'Basic details' })).toBe('Devices per person')
+    expect(reviewItemName({ label: 'Allowed device registrations', group: 'Basic details' })).toBe('Allowed device registrations')
     // A consequence keeps its whole label, item or not.
     expect(reviewItemName({ label: 'High risk score', item: 'High', effect: true })).toBe('High risk score')
 

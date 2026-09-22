@@ -8,6 +8,7 @@ import {
   type Rule,
   type User,
   type Zone,
+  zoneScopeOf,
 } from '../data'
 import { cardJoin, ckey, isSingleAndRun, leaves, matchesEverything, topJoin } from '../predicate'
 import { outsideAudienceOf } from '../audience-ops'
@@ -328,7 +329,7 @@ export function diagnose(
            where loose conditions live — the same two words the editor uses, so
            a finding names the thing you can see. */
         title: k.grouped ? 'A group has no conditions' : 'A branch has no conditions',
-        detail: `An empty ${k.grouped ? 'group' : 'branch'} matches every sign-in, which silently turns this rule into a catch-all. Delete it, or give it a condition.`,
+        detail: `An empty ${k.grouped ? 'group' : 'branch'} matches every login, which silently turns this rule into a catch-all. Delete it, or give it a condition.`,
       })
     }
 
@@ -479,7 +480,7 @@ export function diagnose(
           severity: 'error',
           ruleIndex: i,
           title: 'This rule calls a hook that cannot answer it',
-          detail: `${hook.name} syncs attributes and is not called during sign-in. Choose a hook that answers a sign-in.`,
+          detail: `${hook.name} syncs attributes and is not called during login. Choose a hook that answers a login.`,
         })
         continue
       }
@@ -492,7 +493,7 @@ export function diagnose(
           severity: 'warning',
           ruleIndex: i,
           title: 'This rule stops denying when the hook is unavailable',
-          detail: `${hook.name} is set to treat a failure as “not matched”. Because this rule denies, an outage or a timeout at the endpoint lets the sign-in through to the rules below instead of refusing it.`,
+          detail: `${hook.name} is set to treat a failure as “not matched”. Because this rule denies, an outage or a timeout at the endpoint lets the login through to the rules below instead of refusing it.`,
         })
       }
 
@@ -515,8 +516,8 @@ export function diagnose(
         scope: 'rule',
           severity: 'warning',
           ruleIndex: i,
-          title: 'This rule can add most of a second to a sign-in',
-          detail: `${hook.name} waits up to ${hook.timeoutMs}ms before giving up, and every sign-in that reaches this rule pays it. Worth checking against the endpoint's measured p99.`,
+          title: 'This rule can add most of a second to a login',
+          detail: `${hook.name} waits up to ${hook.timeoutMs}ms before giving up, and every login that reaches this rule pays it. Worth checking against the endpoint's measured p99.`,
         })
       }
     }
@@ -597,8 +598,11 @@ export function diagnose(
              network by geography" hold together whenever the addresses and the
              map disagree, which is exactly the case somebody writes a scoped
              rule to catch. Comparing them on values alone reports that rule as
-             cancelling out and refuses to publish it. */
-          if (ca.scope !== cb.scope) continue
+             cancelling out and refuses to publish it.
+
+             Per zone since 22 Sep 2026, so the test is inside `covered` below:
+             a zone only counts as covered when the negation asks the SAME half
+             of it that the affirmative does. */
 
           const opposed = NEGATIONS[cb.operator] === ca.operator || NEGATIONS[ca.operator] === cb.operator
 
@@ -640,7 +644,7 @@ export function diagnose(
           const covered =
             conditionType(ca.typeId).valueKind === 'time'
               ? windowInside(aff.values, neg.values)
-              : aff.values.length > 0 && aff.values.every((v) => neg.values.includes(v))
+              : aff.values.length > 0 && aff.values.every((v) => neg.values.includes(v) && zoneScopeOf(neg, v) === zoneScopeOf(aff, v))
 
           if (requiresBoth && opposed && covered) {
             out.push({
@@ -713,7 +717,7 @@ export function diagnose(
         severity: 'info',
         ruleIndex: i,
         title: 'Switched off',
-        detail: 'This rule is skipped entirely. Sign-ins fall through to the rules below it.',
+        detail: 'This rule is skipped entirely. Logins fall through to the rules below it.',
       })
     }
 

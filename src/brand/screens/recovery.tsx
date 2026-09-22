@@ -83,7 +83,7 @@ const VENDOR_LOGO: { match: RegExp; src: string; name: string }[] = [
 ]
 
 const CHANNEL_ICON: { match: RegExp; icon: LucideIcon }[] = [
-  { match: /passkey|fido|webauthn|biometric/i, icon: Fingerprint },
+  { match: /passkey|fido|webauthn|biometric|persona/i, icon: Fingerprint },
   { match: /smart ?card|cac|piv/i, icon: CreditCard },
   { match: /sms|text/i, icon: MessageSquare },
   { match: /email|mail/i, icon: Mail },

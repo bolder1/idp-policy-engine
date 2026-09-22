@@ -40,7 +40,7 @@ export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a 
       <div className="bb__insphead">
         <div style={{ minWidth: 0, flex: 1 }}>
           <h2>Every application</h2>
-          <p>The system policy covers every application. It decides sign-ins no other policy matches.</p>
+          <p>The system policy covers every application. It decides logins no other policy matches.</p>
         </div>
       </div>
     )
@@ -72,7 +72,7 @@ export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a 
   return (
     <div className="bb__apps">
       {/* No heading: the panel's bar already says Applications. */}
-      <p className="bb__apps__lede">Sign-ins to these applications are decided by this policy’s rules.</p>
+      <p className="bb__apps__lede">Logins to these applications are decided by this policy’s rules.</p>
 
       <div className="bb__apps__body">
         <SearchBox block value={q} onChange={setQ} placeholder="Search applications" label="Search applications" />
@@ -107,7 +107,7 @@ export function AppsPane({ policyId, onSaved }: { policyId: string; /** After a 
         {dirty && diff.becomesDraft && (
           <p className="bb__apps__note">
             {evaluates(saved)
-              ? 'With no applications this policy becomes a draft and stops deciding sign-ins.'
+              ? 'With no applications this policy becomes a draft and stops deciding logins.'
               : 'With no applications this policy becomes a draft.'}
             {diff.takesSavedDraft && ' Its saved draft replaces the published rules.'}
           </p>

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
-import { AppWindow, ChevronRight, Minus, Plus, RotateCcw } from 'lucide-react'
+import { AppWindow, ChevronRight, Maximize, Plus, ZoomIn, ZoomOut } from 'lucide-react'
 
 import { fallbackRule, type Policy } from '../../data'
 import { AppLogo } from '../../logos/AppLogo'
@@ -102,7 +102,19 @@ export function Board({
 }) {
   const stage = useRef<HTMLDivElement | null>(null)
   const world = useRef<HTMLDivElement | null>(null)
-  const cards = useRef<(HTMLDivElement | null)[]>([])
+  /* Each card's element, by RULE ID — not by index.
+
+     It was an array indexed by the rule's position, filled by a ref callback
+     that closed over that position. The card is a `motion.div`, and Motion
+     calls an external callback ref only when the element mounts (it memoises
+     its merged ref and reads the newest callback only then), so every card
+     stayed filed under the index it was MOUNTED at. After one reorder, index 0
+     named another rule's card, or none, and the next drag moved the wrong card
+     or nothing at all (owner, 22 Sep 2026: "can't drag and drop the card
+     properly"). A card's id is fixed for as long as the card exists, so the
+     mount-time callback is right forever. */
+  const cards = useRef(new Map<string, HTMLDivElement>())
+  const cardAt = (i: number) => cards.current.get(policy.rules[i]?.id ?? '') ?? null
 
   /* The viewport, which is no longer this file's business.
 
@@ -130,10 +142,10 @@ export function Board({
 
   const {
     viewRef,
-    zoomLabel,
     panning,
+    apply,
     zoomBy,
-    resetZoom,
+    fit,
     onPointerDown,
     onPointerMove,
     onPointerUp,
@@ -142,6 +154,9 @@ export function Board({
     axis: 'width',
     /* A column, read top to bottom: no sideways pan, and always centred. */
     lockX: true,
+    /* The dot ground is drawn on the whole region now, behind the floating
+       panel too (22 Sep 2026), so it has to follow the pan from there. */
+    varsOnParent: true,
     /* Only the stage and the world's own padding pan. A card, a button, an
        input — anything interactive — keeps the gesture for itself. */
     isPannableTarget: (t: HTMLElement) => t === stage.current || t === world.current || t.classList.contains('bb__chain'),
@@ -162,66 +177,235 @@ export function Board({
      slot changes a handful of times in a whole drag; the offset changes every
      frame; so they are now kept in the two places that suit them. */
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null)
-  const dragRef = useRef<{ from: number; startY: number; mids: number[]; over: number } | null>(null)
+  /* Everything a drag measures and holds, in WORLD units — the chain's own
+     coordinates, before the view's pan and zoom.
+
+     It was kept in screen pixels: the pointer's start and every card's midpoint
+     taken from `getBoundingClientRect` at the grab, and never again. So a wheel
+     turn mid-drag moved the world and the card under the pointer while the
+     numbers stayed put — the card rode off the cursor by the scroll, a zoom
+     made it jump, and a slot that was off screen when you grabbed could not be
+     reached at all (found by the drag review, 22 Sep 2026). World units do not
+     move with the view, so the same pointer means the same place in the chain
+     however far it has been scrolled. */
+  const dragRef = useRef<{
+    /** The held rule, by id, so a change to the list under the drag is noticed. */
+    id: string
+    from: number
+    over: number
+    /** Every card's midpoint, from LAYOUT (not from boxes still springing). */
+    mids: number[]
+    /** The pointer at the grab, and now. */
+    startWorldY: number
+    lastClientY: number
+    /** Where the held card LOOKED at the grab — mid-settle included. */
+    startVisual: number
+    /** The offset last written to the card. */
+    inner: number
+    moved: boolean
+    el: HTMLDivElement | null
+    frame: number
+    cancel: () => void
+  } | null>(null)
+  /* The latest `onMove`, not the one the pointerdown closed over. */
+  const onMoveRef = useRef(onMove)
+  onMoveRef.current = onMove
+
+  /* Where a card's box sits in the world, before any transform — `offsetTop`
+     up to the world, which neither the card's own drag offset nor a layout
+     animation on its wrapper moves. */
+  const worldTop = (el: HTMLElement) => {
+    let t = 0
+    let n: HTMLElement | null = el
+    while (n && n !== world.current) {
+      t += n.offsetTop
+      n = n.offsetParent as HTMLElement | null
+    }
+    return t
+  }
+
+  /* A screen y as a world y, through the view AS PAINTED — the three custom
+     properties the canvas writes when it paints — so it always agrees with the
+     boxes the browser reports. `viewRef` runs a frame ahead of the paint while
+     a wheel or an auto-scroll is in flight. */
+  const toWorldY = (clientY: number) => {
+    const st = stage.current
+    if (!st) return clientY
+    const y = parseFloat(st.style.getPropertyValue('--bb-y')) || 0
+    const z = parseFloat(st.style.getPropertyValue('--bb-z')) || viewRef.current.z || 1
+    return (clientY - st.getBoundingClientRect().top - y) / z
+  }
+
+  /* The held card, under the pointer — and ONLY under the pointer.
+
+     While it is dragged the card is also re-slotted, so the others open a gap
+     where it would land. It used to be offset by the whole pointer distance ON
+     TOP of that re-slot, so once its wrapper had moved one slot down the card
+     sat one slot below the cursor (owner, 22 Sep 2026: "I can't drag and drop
+     the card properly"). Now the offset is solved each time from where the card
+     actually is: its box without our offset — the slot, plus whatever its
+     wrapper is still springing through — against where the pointer says it
+     should be. Its wrapper does not animate while held (`layout` off below). */
+  const placeHeld = () => {
+    const d = dragRef.current
+    const el = d?.el
+    if (!d || !el) return
+    const target = d.startVisual + (toWorldY(d.lastClientY) - d.startWorldY)
+    const base = toWorldY(el.getBoundingClientRect().top) - d.inner
+    d.inner = target - base
+    el.style.transform = `translate3d(0, ${d.inner}px, 0)`
+  }
+  /* After the render that re-slotted it, before paint. Through a ref so the
+     effect keys on the slot alone, not on helpers remade every render. */
+  const placeHeldRef = useRef(placeHeld)
+  placeHeldRef.current = placeHeld
+  useLayoutEffect(() => placeHeldRef.current(), [drag?.over])
+
+  /* The slot the pointer is over: its world y against the OTHER cards'
+     midpoints as they were laid out when the drag began. Stable while the cards
+     shift under the pointer, which is the moment a live measurement lies. */
+  const reslot = () => {
+    const d = dragRef.current
+    if (!d) return
+    const y = toWorldY(d.lastClientY)
+    let over = 0
+    for (let i = 0; i < d.mids.length; i++) {
+      if (i === d.from) continue
+      if (y > d.mids[i]) over = i < d.from ? i + 1 : i
+    }
+    const next = Math.min(Math.max(over, 0), d.mids.length - 1)
+    // Only when the answer actually changes. This is the whole saving.
+    if (next !== d.over) {
+      d.over = next
+      setDrag({ from: d.from, over: next })
+    }
+  }
+
+  /* A drag whose rule is no longer where it was — deleted, moved by a key, or
+     undone while held — is dropped where it started rather than committed
+     against a list that has changed under it. */
+  useEffect(() => {
+    const d = dragRef.current
+    if (d && policy.rules[d.from]?.id !== d.id) d.cancel()
+  }, [policy.rules])
 
   const onGrip = (index: number) => (e: ReactPointerEvent<HTMLElement>) => {
     if (e.button !== 0) return
     e.preventDefault()
-    const mids = cards.current.slice(0, policy.rules.length).map((el) => {
-      if (!el) return 0
-      const r = el.getBoundingClientRect()
-      return r.top + r.height / 2
+    /* The release and the click that follows it belong to the grip, so letting
+       go over the card's body does not also open the panel. */
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      /* A synthetic event has no pointer to capture. */
+    }
+    const held = cardAt(index)
+    const mids = policy.rules.map((_, i) => {
+      const el = cardAt(i)
+      return el ? worldTop(el) + el.offsetHeight / 2 : 0
     })
-    dragRef.current = { from: index, startY: e.clientY, mids, over: index }
-    setDrag({ from: index, over: index })
-
-    const held = cards.current[index]
-    if (held) held.style.willChange = 'transform'
+    /* Read before the transition is cut, so a card grabbed while it is still
+       settling from the last drop starts from where it looked. */
+    const startVisual = held ? toWorldY(held.getBoundingClientRect().top) : 0
+    if (held) {
+      held.style.transition = 'none'
+      held.style.willChange = 'transform'
+      held.style.transform = ''
+    }
 
     const move = (ev: PointerEvent) => {
       const d = dragRef.current
       if (!d) return
-      /* Divided by the zoom, because the card lives inside a scaled world and
-         the pointer does not. At 77% the card used to travel 77% of the way
-         the cursor did, so it fell behind the grip you were holding it by —
-         the further you dragged, the further it lagged. */
-      const dy = (ev.clientY - d.startY) / viewRef.current.z
-      const el = cards.current[d.from]
-      if (el) el.style.transform = `translate3d(0, ${dy}px, 0)`
-
-      /* The slot the pointer is over, measured against the OTHER cards'
-         midpoints as they were when the drag began. Stable while the cards
-         shift under the pointer, which is the moment a live measurement lies. */
-      let over = 0
-      for (let i = 0; i < d.mids.length; i++) {
-        if (i === d.from) continue
-        if (ev.clientY > d.mids[i]) over = i < d.from ? i + 1 : i
-      }
-      if (ev.clientY < d.mids[d.from === 0 ? 1 : 0] && d.mids.length > 1 && d.from !== 0) over = 0
-      const next = Math.min(Math.max(over, 0), d.mids.length - 1)
-      // Only when the answer actually changes. This is the whole saving.
-      if (next !== d.over) {
-        d.over = next
-        setDrag({ from: d.from, over: next })
-      }
+      if (Math.abs(ev.clientY - d.lastClientY) > 0) d.moved = true
+      d.lastClientY = ev.clientY
+      placeHeld()
+      reslot()
     }
 
-    const up = () => {
+    /* Held near the top or bottom edge, the canvas scrolls — faster the nearer
+       the edge — so a slot off screen can be reached without letting go. Runs
+       every frame while held, which also keeps the card on the pointer through
+       a wheel turn: the view moves, the pointer does not, and this re-solves
+       both. */
+    const EDGE = 56
+    const tick = () => {
+      const d = dragRef.current
+      if (!d) return
+      placeHeld()
+      reslot()
+      const st = stage.current
+      if (st) {
+        const r = st.getBoundingClientRect()
+        const upBy = r.top + EDGE - d.lastClientY
+        const downBy = d.lastClientY - (r.bottom - EDGE)
+        if (upBy > 0 || downBy > 0) {
+          const speed = Math.min(16, 2 + Math.max(upBy, downBy) / 3)
+          apply((v) => ({ ...v, y: v.y + (upBy > 0 ? speed : -speed) }))
+        }
+      }
+      d.frame = requestAnimationFrame(tick)
+    }
+
+    const finish = (commit: boolean) => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', cancel)
       const d = dragRef.current
       dragRef.current = null
-      const el = d ? cards.current[d.from] : null
+      if (d) cancelAnimationFrame(d.frame)
+      const el = d?.el ?? null
       if (el) {
+        /* Settles into its slot rather than snapping from wherever the pointer
+           let go of it — the slot it is already in, so the distance is only
+           the pointer's offset from it. */
+        const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        el.style.transition = still ? 'none' : 'transform 160ms ease-out'
         el.style.transform = ''
         el.style.willChange = ''
+        /* Cleared only if THIS card is not the one being held again. */
+        window.setTimeout(() => {
+          if (dragRef.current?.el !== el) el.style.transition = ''
+        }, 200)
+      }
+      /* A drag that went anywhere swallows the click it ends in, so it cannot
+         select the card (or clear the selection) under the release. */
+      if (d?.moved) {
+        const swallow = (ev: MouseEvent) => {
+          ev.stopPropagation()
+          ev.preventDefault()
+        }
+        window.addEventListener('click', swallow, { capture: true, once: true })
+        window.setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 0)
       }
       setDrag(null)
-      if (d && d.over !== d.from) onMove(d.from, d.over)
+      if (commit && d && d.over !== d.from) onMoveRef.current(d.from, d.over)
     }
+    const up = () => finish(true)
+    /* A touch the browser takes over, or a pointer lost to the OS, ends the
+       drag where it started instead of leaving the card stuck to nothing. */
+    const cancel = () => finish(false)
+
+    dragRef.current = {
+      id: policy.rules[index]?.id ?? '',
+      from: index,
+      over: index,
+      mids,
+      startWorldY: toWorldY(e.clientY),
+      lastClientY: e.clientY,
+      startVisual,
+      inner: 0,
+      moved: false,
+      el: held,
+      frame: 0,
+      cancel,
+    }
+    setDrag({ from: index, over: index })
+    placeHeld()
 
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', cancel)
+    dragRef.current.frame = requestAnimationFrame(tick)
   }
 
   /* Render order during a drag: the dragged card is shown at its target slot
@@ -422,7 +606,7 @@ export function Board({
                 </span>
               ) : (
                 <span>
-                  A sign-in arrives at <b className="bb__start__at">{destination}</b>
+                  A login arrives at <b className="bb__start__at">{destination}</b>
                   {destinationMore > 0 && (
                     <>
                       {' '}and <b className="bb__start__at">{destinationMore} more</b>
@@ -462,7 +646,8 @@ export function Board({
                 return (
                   <motion.div
                     key={r.id}
-                    layout
+                    /* Not the held card's: it follows the pointer, see `placeHeld`. */
+                    layout={!isDragged}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -510,7 +695,8 @@ export function Board({
                       onGrip={onGrip(ri)}
                       onHover={(on) => onHover(on ? ri : null)}
                       cardRef={(el) => {
-                        cards.current[ri] = el
+                        if (el) cards.current.set(r.id, el)
+                        else cards.current.delete(r.id)
                       }}
                     />
                   </motion.div>
@@ -606,40 +792,27 @@ export function Board({
           {aside && <span className="bb__float__sep" />}
           {tools}
           {tools && <span className="bb__float__sep" />}
-          {/* Zoom is the level alone at rest; reaching for it (hover, or
-              keyboard focus) slides zoom out in on its left and zoom in and
-              Reset on its right (owner, 21 Sep 2026: "I like the old — while
-              hover it appears — and add the Reset button").
-
-              A centred bar that changes width moves what you are aiming at, so
-              the level has to stay put. With one control left of it and two
-              right, the bar would push it 12px left; the dock slides 12px right
-              in step (see `.bb__dock:has(...)`), and the two cancel exactly. The
-              level itself also resets on click. */}
+          {/* Three buttons and no level (owner, 22 Sep 2026: "the % value is no
+              use — use three options, fit, − and +, simple and to the point").
+              It was the level alone at rest, with zoom out, zoom in and Reset
+              sliding out of it on hover and the dock nudged 12px to keep the
+              level still. Fit is the width fit the canvas opens at, so it is
+              also the way back after zooming; there is no separate Reset. */}
           <div className="bb__zoomgrp">
-            <Tip text="Zoom out" placement="top">
-              <button type="button" className="bb__act bb__zoomstep" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.15)}>
-                <Minus size={14} strokeWidth={2} />
+            <Tip text="Fit to width" placement="top">
+              <button type="button" className="bb__act" aria-label="Fit to width" onClick={fit}>
+                <Maximize size={14} strokeWidth={2} />
               </button>
             </Tip>
-            <Tip text="Reset to 100%" placement="top">
-              <button type="button" className="bb__zoombtn" aria-label="Zoom level. Reset to 100%" onClick={resetZoom}>
-                {/* Written by `paint`, not by a render. `aria-live` is deliberately
-                    absent: the value changes on every frame of a zoom, and a live
-                    region that announces sixty times a second announces nothing. */}
-                <span className="bb__zoom" ref={zoomLabel}>
-                  {Math.round(viewRef.current.z * 100)}%
-                </span>
+            <span className="bb__float__sep" />
+            <Tip text="Zoom out" placement="top">
+              <button type="button" className="bb__act" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.15)}>
+                <ZoomOut size={15} strokeWidth={2} />
               </button>
             </Tip>
             <Tip text="Zoom in" placement="top">
-              <button type="button" className="bb__act bb__zoomstep" aria-label="Zoom in" onClick={() => zoomBy(1.15)}>
-                <Plus size={14} strokeWidth={2} />
-              </button>
-            </Tip>
-            <Tip text="Reset to 100%" placement="top">
-              <button type="button" className="bb__act bb__zoomstep" aria-label="Reset zoom to 100%" onClick={resetZoom}>
-                <RotateCcw size={13} strokeWidth={2} />
+              <button type="button" className="bb__act" aria-label="Zoom in" onClick={() => zoomBy(1.15)}>
+                <ZoomIn size={15} strokeWidth={2} />
               </button>
             </Tip>
           </div>

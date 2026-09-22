@@ -167,7 +167,7 @@ export function ReviewDialog({
                 {isDraft
                   ? 'No applications. Assign one to turn this policy on.'
                   : evaluates(saved)
-                    ? 'No applications, so this policy becomes a draft and stops deciding sign-ins.'
+                    ? 'No applications, so this policy becomes a draft and stops deciding logins.'
                     : 'No applications, so this policy becomes a draft.'}{' '}
                 {/* Straight to the page that owns it. This used to open a
                     dialog behind this dialog, or — with no handler — just

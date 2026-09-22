@@ -59,6 +59,7 @@ const profile = (over: Partial<FingerprintProfile> = {}): FingerprintProfile => 
   maxDevices: 3,
   roster: null,
   autoRegister: false,
+  restrictMobile: false,
   restrictionSet: true,
   usedIn: 0,
   ...over,
@@ -557,11 +558,12 @@ describe('a blank profile', () => {
     const p = blankProfile('Laptops', 'device')
     expect(p.id).toBe('')
     expect(p.enabled).toEqual(alwaysOn('device').map((a) => a.id))
-    expect([p.reach, p.registration, p.maxDevices, p.roster, p.autoRegister, p.restrictionSet]).toEqual([
+    expect([p.reach, p.registration, p.maxDevices, p.roster, p.autoRegister, p.restrictMobile, p.restrictionSet]).toEqual([
       'agentless',
       'self',
       3,
       null,
+      false,
       false,
       false,
     ])
@@ -638,17 +640,25 @@ describe('what changed, for the save bar and Review changes', () => {
     expect(profileReview(corp, { ...corp, config: { ...corp.config, 'os-windows': { value: '10', op: 'gte' } } })).toEqual([])
   })
 
-  it('reviews a trusted device by priority and enrolment', () => {
+  it('reviews a trusted device by priority and registration, in the form’s order', () => {
     const kiosk = seedProfiles.find((p) => p.id === 'fp-kiosk') as FingerprintProfile
-    const next: FingerprintProfile = { ...kiosk, weights: { mac: 10 }, autoRegister: true, roster: null }
+    const next: FingerprintProfile = { ...kiosk, weights: { mac: 10 }, autoRegister: true, restrictMobile: true, roster: null }
     expect(profileReview(kiosk, next)).toEqual([
-      { label: 'Register silently on first sign-in', before: 'Off', after: 'On', group: 'Basic details', kind: 'changed' },
       /* Changed, not removed: the roster setting moves to none, which the
          empty after would otherwise read as a removal. */
       { label: 'Approved device roster', before: 'kiosks-floor-3.csv, 24 devices', after: '', group: 'Basic details', kind: 'changed' },
+      { label: 'Mobile device restriction', before: 'Off', after: 'On', group: 'Basic details', kind: 'changed' },
+      { label: 'Device auto-registration', before: 'Off', after: 'On', group: 'Basic details', kind: 'changed' },
       { label: 'MAC address priority', before: 'High', after: 'Low', group: 'Signals', kind: 'changed', item: 'MAC address priority' },
     ])
-    expect(profileChangeParts(kiosk, next)).toEqual(['How devices enrol', 'Priorities changed'])
+    expect(profileChangeParts(kiosk, next)).toEqual(['Device registration', 'Priorities changed'])
+  })
+
+  it('counts the mobile device restriction alone as a registration change', () => {
+    const kiosk = seedProfiles.find((p) => p.id === 'fp-kiosk') as FingerprintProfile
+    const next: FingerprintProfile = { ...kiosk, restrictMobile: !kiosk.restrictMobile }
+    expect(profileReview(kiosk, next).map((r) => r.label)).toEqual(['Mobile device restriction'])
+    expect(profileChangeParts(kiosk, next)).toEqual(['Device registration'])
   })
 
   it('files a signal a trusted device adds or drops under Signals', () => {

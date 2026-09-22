@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Check, Plus, UserRound, Users, X } from 'lucide-react'
+import { ArrowLeft, Check, Eye, Pencil, Plus, UserRound, Users, X } from 'lucide-react'
 
-import { Badge, Button, IconButton, Modal, SearchBox } from '../../kit'
+import { Badge, Button, Callout, IconButton, Modal, SearchBox } from '../../kit'
 import { NoMatches } from '../../empty'
 import { Face, FaceStack, type FaceItem } from '../../faces'
 import type { Audience, Rule, RuleWho } from '../../data'
@@ -77,7 +77,9 @@ export function WhoEditor({
 }) {
   const store = useBrand()
   const resolve = useNameLookup()
-  const [picking, setPicking] = useState<WhoKind | null>(null)
+  /* Which list the dialog is open on, and which of its two views it opens in:
+     View opens on the chosen names, Edit and Add on the whole list. */
+  const [picking, setPicking] = useState<{ kind: WhoKind; view: DialogView } | null>(null)
   const box = useRef<HTMLDivElement>(null)
 
   const base: RuleWho = normaliseWho(rule.who) ?? { groupIds: [], userIds: [] }
@@ -104,74 +106,71 @@ export function WhoEditor({
       kind={kind}
       faces={ids(kind).map((id) => ({ kind, key: id, name: resolve(kind, id) ?? `deleted · ${id}` }))}
       outside={kind === 'group' ? outside.groups.length : outside.users.length}
-      onOpen={() => setPicking(kind)}
+      onOpen={(view) => setPicking({ kind, view })}
     />
   )
 
-  /* ONE SLOT PER KIND, and each answers for itself.
+  /* Nothing chosen: the If section's empty state, in the same shape (owner,
+     22 Sep 2026: "change the empty state of the Who part similar to the If
+     part"). A mark, what is
+     missing, the one fact that matters — an empty who covers everyone the
+     policy does — and the two ways in as the If's text adders.
 
-     A kind with nothing in it is a full-width `Add groups` / `Add people`
-     button: the note above already says an empty who covers everyone, so a
-     field row reading "Groups · Any group · Add" would be that sentence
-     re-typed once per kind. With nothing to report, the slot has no reading
-     left in it — only a door — so it is drawn as one.
+     It replaces a violet note of two sentences over two half-width doors.
 
-     The two do NOT change together (owner, 18 Sep 2026: "when I add one, don't
-     change the next button — just adjust"). Naming a group turns the groups
-     slot into a field and leaves the people slot exactly where it was, at the
-     size it was. They shipped switching as a pair, on the argument that half
-     a pair of buttons beside half a pair of fields is two shapes answering one
-     question; in the hand it meant answering one question rewrote the control
-     for the other, under the pointer.
-
-     Stacked and full width, not side by side: a slot has to be able to become
-     a field without the one beside it moving, and a field is full width. */
-  const pair = (
-    <div className="bb__whorows">
-      {(['group', 'user'] as WhoKind[]).map((kind) =>
-        ids(kind).length > 0 ? (
-          row(kind)
-        ) : (
-          <Button
-            key={kind}
-            block
-            variant="secondary"
-            size="sm"
-            icon={kind === 'group' ? Users : UserRound}
-            onClick={() => setPicking(kind)}
-          >
-            {KIND_WORD[kind].add}
-          </Button>
-        ),
-      )}
-    </div>
-  )
+     Once either kind holds a name, BOTH are rows (owner, 22 Sep 2026: "if we
+     add groups, don't show the people as a button — add an empty state with a
+     one-liner, nothing added yet, with an add button inside"). The empty kind
+     says so in the row, at the row's height, with its Add inside it, so the
+     section reads as two fields of one form, one filled and one not. */
+  const pair =
+    named === 0 ? (
+      <div className="bb__ifblank bb__whoblank">
+        <span className="bb__ifblank__mark" aria-hidden>
+          <Users size={18} strokeWidth={1.8} />
+        </span>
+        <h4>No groups or people yet</h4>
+        {/* The kit's info callout (owner, 22 Sep 2026: "make it an info banner in
+            blue"). It was a blue line, then a grey one; it is the one fact about
+            an empty who worth a banner — nothing chosen means everyone. */}
+        <Callout tone="info">By default this rule covers everyone in the policy. Add groups or people to narrow it.</Callout>
+        <div className="bb__ifblank__acts">
+          {(['group', 'user'] as WhoKind[]).map((kind) => (
+            <button key={kind} type="button" className="bb__ifadd" onClick={() => setPicking({ kind, view: 'all' })}>
+              <Plus size={11} strokeWidth={2.4} aria-hidden />
+              {KIND_WORD[kind].add}
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : (
+      <div className="bb__whorows">
+        {(['group', 'user'] as WhoKind[]).map((kind) =>
+          ids(kind).length > 0 ? (
+            row(kind)
+          ) : (
+            <EmptyWhoRow key={kind} kind={kind} onAdd={() => setPicking({ kind, view: 'all' })} />
+          ),
+        )}
+      </div>
+    )
 
   return (
     <div className="bb__who" ref={box} tabIndex={-1} onClickCapture={keepFocus}>
-      {named === 0 && (
-        <div className="bb__whonote">
-          <Users size={15} strokeWidth={1.9} aria-hidden />
-          <p>
-            <b>This rule covers everyone the policy governs.</b> Leave it that way, or narrow it to particular groups
-            and people so the rule only matches some of them.
-          </p>
-        </div>
-      )}
-
       {pair}
 
       <WhoDialog
-        kind={picking ?? 'group'}
+        kind={picking?.kind ?? 'group'}
         open={picking !== null}
-        chosen={picking ? ids(picking) : []}
+        startView={picking?.view ?? 'all'}
+        chosen={picking ? ids(picking.kind) : []}
         /* What the rule would cover if this list were emptied — the footer says
            "Apply to everyone" only when that is what saving would do. */
-        otherCount={picking ? named - ids(picking).length : 0}
+        otherCount={picking ? named - ids(picking.kind).length : 0}
         audience={audience}
         onClose={() => setPicking(null)}
         onSave={(next) => {
-          if (picking) write(picking, next)
+          if (picking) write(picking.kind, next)
           setPicking(null)
         }}
       />
@@ -181,11 +180,19 @@ export function WhoEditor({
 
 /* --- One entity, one row -------------------------------------------------------
 
-   A row says its kind, what it holds, and opens the list. Faces, each named on
-   hover, rather than a line of names (owner, 21 Sep 2026: "no need to show the
-   full name — add the avatar, and on hover the user can see the full name").
-   Names truncated to "Finance, Executives and 2 more" at this width; a stack
-   holds five and a count, and the dialog behind "View" names every one. */
+   A row says its kind and what it holds, and ends in its two actions: View
+   opens the dialog on the chosen names, Edit on the whole list with them
+   ticked (owner, 22 Sep 2026: "for the groups add a View and an Edit button
+   both"). Icon only, each named on hover (owner, the same day: "add icon only
+   button") — the eye and the pencil, and the empty row's +. It was one button
+   that always opened on View, with adding and removing a step inside.
+
+   Faces, each named on hover, rather than a line of names (owner, 21 Sep 2026:
+   "no need to show the full name — add the avatar, and on hover the user can
+   see the full name"). A stack holds five and a count, and View names every
+   one. */
+type DialogView = 'chosen' | 'all'
+
 function WhoRow({
   kind,
   faces,
@@ -196,14 +203,12 @@ function WhoRow({
   faces: FaceItem[]
   /** How many of these the POLICY does not govern. Included lists only. */
   outside: number
-  onOpen: () => void
+  onOpen: (view: DialogView) => void
 }) {
   const Ico = kind === 'group' ? Users : UserRound
   const word = KIND_WORD[kind]
-  /* A row is only drawn for a kind that HAS something; an empty kind is a
-     button. So there is no empty case to draw. */
   return (
-    <button type="button" className="bb__whorow is-set" onClick={onOpen}>
+    <div className="bb__whorow is-set">
       <span className="bb__whorow__ico" aria-hidden>
         <Ico size={14} strokeWidth={1.9} />
       </span>
@@ -212,14 +217,34 @@ function WhoRow({
         <FaceStack faces={faces} />
       </span>
       {outside > 0 && (
-        <span title="This policy does not govern them, so this rule can never decide one of their sign-ins.">
+        <span title="This policy does not govern them, so this rule can never decide one of their logins.">
           <Badge tone="notice">{outside} outside</Badge>
         </span>
       )}
-      {/* View, not Edit: the row opens the chosen list first, and adding more
-          is a step inside it (owner, 21 Sep 2026). */}
-      <span className="bb__whorow__go">View</span>
-    </button>
+      <span className="bb__whorow__acts">
+        <IconButton size="sm" tone="ghost" icon={Eye} label={`View ${word.noun}`} onClick={() => onOpen('chosen')} />
+        <IconButton size="sm" tone="ghost" icon={Pencil} label={`Edit ${word.noun}`} onClick={() => onOpen('all')} />
+      </span>
+    </div>
+  )
+}
+
+/* The other kind, while this one holds names: the same row, empty, with its
+   Add inside it. */
+function EmptyWhoRow({ kind, onAdd }: { kind: WhoKind; onAdd: () => void }) {
+  const Ico = kind === 'group' ? Users : UserRound
+  const word = KIND_WORD[kind]
+  return (
+    <div className="bb__whorow is-empty">
+      <span className="bb__whorow__ico" aria-hidden>
+        <Ico size={14} strokeWidth={1.9} />
+      </span>
+      <span className="bb__whorow__label">{word.many}</span>
+      <span className="bb__whorow__val">None added yet</span>
+      <span className="bb__whorow__acts">
+        <IconButton size="sm" tone="ghost" icon={Plus} label={word.add} onClick={onAdd} />
+      </span>
+    </div>
   )
 }
 
@@ -243,6 +268,7 @@ function WhoRow({
 function WhoDialog({
   open,
   kind,
+  startView,
   chosen,
   otherCount,
   audience,
@@ -251,6 +277,8 @@ function WhoDialog({
 }: {
   open: boolean
   kind: WhoKind
+  /** Where it opens when there is something chosen: View's list, or Edit's. */
+  startView: DialogView
   chosen: string[]
   /** How many are named in the OTHER included list, for what the footer offers. */
   otherCount: number
@@ -261,7 +289,7 @@ function WhoDialog({
   const store = useBrand()
   const [q, setQ] = useState('')
   const [draft, setDraft] = useState<string[]>(chosen)
-  const [view, setView] = useState<'chosen' | 'all'>(chosen.length > 0 ? 'chosen' : 'all')
+  const [view, setView] = useState<DialogView>(chosen.length > 0 ? startView : 'all')
 
   /* The seed as a string: `chosen` is a fresh array on every render of the
      panel behind this dialog, so depending on it directly would discard the
@@ -270,9 +298,9 @@ function WhoDialog({
   useEffect(() => {
     if (!open) return
     setDraft(seed === '' ? [] : seed.split(','))
-    setView(seed === '' ? 'all' : 'chosen')
+    setView(seed === '' ? 'all' : startView)
     setQ('')
-  }, [open, seed])
+  }, [open, seed, startView])
 
   const word = KIND_WORD[kind]
   const query = q.trim().toLowerCase()
@@ -322,7 +350,7 @@ function WhoDialog({
         </span>
       )}
       {isOutside(r.id) && (
-        <span title="This policy does not govern them, so this rule can never decide one of their sign-ins.">
+        <span title="This policy does not govern them, so this rule can never decide one of their logins.">
           <Badge tone="notice">Outside</Badge>
         </span>
       )}

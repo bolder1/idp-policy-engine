@@ -100,16 +100,16 @@
   box-shadow: 0 1px 2px rgba(33, 37, 41, 0.04);
   transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
 }
-.bgcard:is(:hover, :has(:focus-visible)) { border-color: var(--border-default); box-shadow: 0 8px 22px rgba(33, 37, 41, 0.1); }
+/* The card's hover is the lift at the end of this file. */
 
 /* The canvas. Sunken and dotted, because that is what the builder's canvas is,
    so the thumbnail reads as a scaled-down artboard.
 
-   Three bands: 36px for the pill and the eye, the stack, and at least 20px of
-   open sky above the readout, where the hover sunrise shows. Every row in front
-   of the light is solid, so the light needs room of its own. */
+   Three bands: 36px for the pill and the eye, the stack, and a band of open
+   canvas above the readout (--sky, set with the hover lift at the end of this
+   file) so a lifted row never touches the readout or the eye. */
 .bgcard__canvas {
-  --horizon: 30px; /* the readout's height, and the line the sun rises from */
+  --horizon: 30px; /* the readout's height */
   --sky: 20px;
   position: relative;
   flex: none;
@@ -136,7 +136,7 @@
 /* The fall-through belongs to the policy, not the template: 6px off the rules. */
 .bgcard__stack > li:last-child:not(:first-child) { margin-top: 2px; }
 /* The spine, from the centre of the first badge to the centre of the last.
-   Every row is opaque, so it shows only in the gaps and never crosses the light. */
+   Every row is opaque, so it shows only in the gaps. */
 .bgcard__stack::before {
   content: '';
   position: absolute;
@@ -207,7 +207,8 @@
 
 /* Everyone else: what the engine does when nothing above matched, which is
    the policy's own default. A grey slab with no edge, a step shorter than a
-   rule. It is solid, so neither the grid nor the hover light shows through.
+   rule. It is solid, so the grid does not show through, and it stays down when
+   the template's rules lift on hover.
    Dashed outlines are out of the design system. The decision chip stays at
    full strength, because its colour is what the row means. */
 .bgcard__mrow--default {
@@ -222,8 +223,7 @@
 .bgcard__mrow--rest .bgcard__mn,
 .bgcard__mrow--default .bgcard__mn { background: transparent; border-color: transparent; }
 
-/* Fixed height and pinned to the canvas floor, so nothing reflows. Its top edge
-   is the horizon the hover sun rises from. */
+/* Fixed height and pinned to the canvas floor, so nothing reflows. */
 .bgcard__readout {
   position: absolute;
   left: 0; right: 0; bottom: 0;
@@ -971,91 +971,211 @@ html[data-theme='dark'] .bguided__sheen {
 .bgcard__signals,
 .bgcard__tags { display: none; }
 
-/* --- The hover sunrise ----------------------------------------------------------
-   Light in the category pill's hue, rising from the bottom of the thumbnail on
-   hover (owner, 21 Sep 2026). It has two parts.
-   The horizon: a 1px line on the readout's top edge, drawn out from the centre.
-   The sun: a wide half-circle centred on that edge, rising from behind the readout.
-   Every row is solid, so the light shows only where the canvas does: the sky
-   band, the side margins and the gaps. The rows stand in silhouette against it.
-   Nothing on the thumbnail moves except the light.
+/* --- The hover lift ------------------------------------------------------------------
+   Replaces the sunrise (owner, 22 Sep 2026: "forget the sunrise"). The hover makes no
+   light of its own and adds no hue. It is depth, lit from straight above, in three
+   planes.
 
-   Each card takes one hue, the strongest shade of its pill's colour family,
-   mixed toward transparent. The same percentages give a tint in light mode and
-   a glow in dark. */
+   1. The frame. The card rises 2px and a tight shadow gathers under it. The two wide
+      layers have a negative spread, so the shadow grounds this card and all but dies
+      out across the 18px gap before it reaches the cards beside it.
+   2. The paper. The template's own rules rise a further 2px off the canvas, one after
+      another in the order the engine reads them. Each casts a small shadow, its
+      hairline firms one step, and its number goes from grey to ink.
+   3. The floor. What is not the template's stays down: the Everyone else slab (the
+      policy's own default), the spare sheet under the +N more row, and the readout.
+      The dot grid recedes to half strength, so the rows come forward against a
+      quieter canvas.
+
+   Use turning orange (the .bgcard__cta rules above) is the only colour change. Every
+   shadow is the elevation scale's ink, so the card, the rows and the eye read as one
+   material under one light.
+
+   Lifted on hover, or while a control in the card has keyboard focus. :focus-visible
+   rather than :focus-within, because :focus-within kept the card lifted after the
+   preview was closed with the mouse (focus returns to the eye). The :has() sits
+   inside :is(), so a browser without :has() still lifts on hover. */
 .bgcard {
-  --sun: var(--fb-neutral-dot);
-  --sun-core: color-mix(in oklab, var(--sun) 34%, transparent);
-  --sun-halo: color-mix(in oklab, var(--sun) 10%, transparent);
-  --sun-line: color-mix(in oklab, var(--sun) 70%, transparent);
-  --sun-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* The ink every --el-* token is drawn in, and it stays dark in every look and
+     theme. Not --text-primary: that turns near-white on the dark theme, and the
+     shadow would become a glow. */
+  --lift-ink: rgb(33 37 41);
+  --lift-contact: color-mix(in srgb, var(--lift-ink) 5%, transparent);
+  --lift-key: color-mix(in srgb, var(--lift-ink) 8%, transparent);
+  --lift-ambient: color-mix(in srgb, var(--lift-ink) 12%, transparent);
+  --lift-row: color-mix(in srgb, var(--lift-ink) 12%, transparent);
+  /* Unclipped, so the hit strip under a lifted card (see the motion block) can take
+     the pointer. The canvas rounds its own corners instead. */
+  overflow: visible;
 }
-.bgcard.is-cat-quick { --sun: var(--fb-lime-dot); }
-.bgcard.is-cat-device { --sun: var(--fb-accent-dot); }
-.bgcard.is-cat-risk { --sun: var(--fb-info-dot); }
-.bgcard.is-cat-compliance { --sun: var(--fb-magenta-dot); }
-/* Uncategorized: a grey sun looks like a smudge, so only the horizon lights. */
-.bgcard.is-cat-neutral { --sun-core: transparent; --sun-halo: transparent; }
+/* The canvas rounds its own top corners now that the card does not clip: the card's
+   16px corner, less its 1px edge.
+   The band above the readout was 20px, room for the sunrise. At 16px every stack sits
+   2px lower, nearer the middle of the free canvas, and the top rule of a three-rule
+   stack still clears the eye by 1.6px once it has lifted. At 20px the lifted row ran
+   0.4px into the eye. */
+.bgcard__canvas {
+  --sky: 16px;
+  border-radius: 15px 15px 0 0;
+}
 
-.bgcard__canvas::before,
+/* The dot grid: the builder's canvas at thumbnail scale, over the sunken fill and
+   under every row. It lived in the sunrise block. It keeps a layer of its own so it
+   can recede without touching the fill. */
 .bgcard__canvas::after {
-  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-}
-/* The sun. Its box ends at the horizon, so each layer centred on its bottom
-   edge is a half-circle, and anything the rise pushes below the line hides
-   behind the opaque readout. The core is wide and low enough to sit in the sky
-   band. The halo reaches halfway up behind the stack. */
-.bgcard__canvas::before {
-  bottom: var(--horizon);
-  background:
-    radial-gradient(ellipse 38% 52px at 50% 100%, var(--sun-core), var(--sun-halo) 45%, transparent),
-    radial-gradient(ellipse 72% 104px at 50% 100%, var(--sun-halo), transparent);
-  opacity: 0;
-  transform-origin: 50% 100%;
-  transition: opacity var(--dur-normal) var(--ease-standard);
-}
-/* The dot grid sits over the light, so the light tints it instead of washing it out. */
-.bgcard__canvas::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background: radial-gradient(circle at 1px 1px, var(--card-dot) 1px, transparent 0) 0 0 / 12px 12px;
 }
-/* The horizon: the readout's own top hairline, brightest under the sun. */
-.bgcard__readout::before {
-  content: '';
-  position: absolute; left: 0; right: 0; top: -1px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 6%, var(--sun-line) 50%, transparent 94%);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--dur-normal) var(--ease-standard);
+
+/* The deck's spare sheet, restated with an empty first layer so the resting list is
+   as long as the lifted one and each layer eases into its own counterpart. Without
+   it, the sheet's fill would morph into the row's shadow on the way up. */
+.bgcard__mrow--rest {
+  box-shadow:
+    0 0 0 0 transparent,
+    0 5px 0 -3px var(--surface-raised),
+    0 5px 0 -2px var(--border-subtle);
 }
 
-/* Lit on hover, or while a control in the card has keyboard focus.
-   :focus-visible rather than :focus-within, because :focus-within kept the card
-   lit after the preview was closed with the mouse (focus returns to the eye).
-   The :has() sits inside :is(), so a browser without :has() still lights on hover. */
-.bgcard:is(:hover, :has(:focus-visible)) .bgcard__canvas::before,
-.bgcard:is(:hover, :has(:focus-visible)) .bgcard__readout::before { opacity: 1; }
+/* --- Lifted ----------------------------------------------------------------------- */
+.bgcard:is(:hover, :has(:focus-visible)) {
+  z-index: 1; /* its shadow over the neighbours' edges, and below every --z-* layer */
+  border-color: var(--border-default);
+  box-shadow:
+    0 1px 2px var(--lift-contact),
+    0 4px 8px -4px var(--lift-key),
+    0 16px 32px -12px var(--lift-ambient);
+}
+/* Every row the template owns: the numbered rules and the +N more deck. */
+.bgcard:is(:hover, :has(:focus-visible)) .bgcard__mrow:not(.bgcard__mrow--default) {
+  border-color: var(--border-default);
+  box-shadow:
+    0 1px 1px var(--lift-contact),
+    0 4px 10px -4px var(--lift-row);
+}
+/* The deck keeps its spare sheet under the row's own shadow. Same weight as the rule
+   above, so it must stay after it or the sheet vanishes on hover. */
+.bgcard:is(:hover, :has(:focus-visible)) .bgcard__mrow.bgcard__mrow--rest {
+  box-shadow:
+    0 4px 10px -4px var(--lift-row),
+    0 5px 0 -3px var(--surface-raised),
+    0 5px 0 -2px var(--border-default);
+}
+/* The order comes into focus with the rows: the number tile firms its edge and the
+   numeral goes to ink. Ink, not the pill's hue. The + and the chevron sit on no
+   tile and stay as they are. */
+.bgcard:is(:hover, :has(:focus-visible)) .bgcard__mrow:not(.bgcard__mrow--rest, .bgcard__mrow--default) .bgcard__mn {
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+.bgcard:is(:hover, :has(:focus-visible)) .bgcard__canvas::after { opacity: 0.5; }
 
-/* The motion. With reduced motion, only the opacity above applies, at
-   --dur-normal, which tokens.css sets to 0ms. */
+/* The eye goes from glass to solid: the one control on the thumbnail comes forward
+   with the rows. */
+.bgcard:is(:hover, :has(:focus-visible)) .bgcard__peek {
+  background: var(--surface-raised);
+  border-color: var(--border-default);
+}
+/* Not while it has keyboard focus. The kit's focus halo is a box-shadow too, and
+   this rule outranks it. */
+.bgcard:is(:hover, :has(:focus-visible)) .bgcard__peek:not(:focus-visible) {
+  box-shadow:
+    0 1px 2px var(--lift-contact),
+    0 2px 6px -2px var(--lift-key);
+}
+/* Its own hover stays one step past the card's. Same weight as the rule two above,
+   and after it. */
+.bgcard .bgcard__peek:hover { border-color: var(--border-strong); color: var(--text-primary); }
+
+/* --- The motion -------------------------------------------------------------------
+   With reduced motion none of this block applies. Nothing moves, the edges, shadows
+   and numerals above change at once, and the reduced-motion rule beside .bgcard__cta
+   still stops the card, the eye and the button transitioning. */
 @media (prefers-reduced-motion: no-preference) {
-  /* Setting: quick and all at once. The sun sinks behind the readout and narrows. */
-  .bgcard__canvas::before {
-    transform: translateY(52px) scaleX(0.8);
-    transition: opacity 180ms var(--ease-standard), transform 240ms var(--ease-standard);
+  /* Settling: quick and all at once, so a pointer swept across the grid leaves no
+     trail of cards still coming down. */
+  .bgcard {
+    transition:
+      translate 140ms var(--ease-standard),
+      box-shadow 140ms var(--ease-standard),
+      border-color 140ms var(--ease-standard);
   }
-  .bgcard__readout::before {
-    transform: scaleX(0.3);
-    transition: opacity 160ms var(--ease-standard), transform 200ms var(--ease-standard);
+  .bgcard__mrow {
+    transition:
+      translate 140ms var(--ease-standard),
+      box-shadow 140ms var(--ease-standard),
+      border-color 140ms var(--ease-standard);
   }
-  /* Rising: slower and in order. The horizon draws out from the centre, then
-     the sun follows it up and spreads along it. */
-  .bgcard:is(:hover, :has(:focus-visible)) .bgcard__readout::before {
-    transform: none;
-    transition: opacity 200ms var(--ease-standard), transform 560ms var(--sun-ease);
+  .bgcard__mn {
+    transition:
+      border-color 140ms var(--ease-standard),
+      color 140ms var(--ease-standard);
   }
-  .bgcard:is(:hover, :has(:focus-visible)) .bgcard__canvas::before {
-    transform: none;
-    transition: opacity 320ms var(--ease-standard) 60ms, transform 700ms var(--sun-ease) 60ms;
+  .bgcard__canvas::after { transition: opacity 140ms var(--ease-standard); }
+  .bgcard__peek {
+    transition:
+      background-color 140ms var(--ease-standard),
+      color 140ms var(--ease-standard),
+      border-color 140ms var(--ease-standard),
+      box-shadow 140ms var(--ease-standard);
+  }
+
+  /* Rising: the frame first, then the rules top to bottom, 30ms apart. The first rule
+     takes the 40ms default below. The stack holds four rows at most, and the last is
+     always the fall-through, which does not rise. The tile inherits its row's delay. */
+  .bgcard__stack > li:nth-child(2) > .bgcard__mrow { --lift-delay: 70ms; }
+  .bgcard__stack > li:nth-child(3) > .bgcard__mrow { --lift-delay: 100ms; }
+
+  .bgcard:is(:hover, :has(:focus-visible)) {
+    translate: 0 -2px;
+    transition:
+      translate 220ms var(--ease-standard),
+      box-shadow 220ms var(--ease-standard),
+      border-color var(--dur-fast) var(--ease-standard);
+  }
+  /* The hit strip. A lifted card has left its own bottom 2px, and a pointer resting
+     there would drop it, lift it and drop it again. This keeps that band inside the
+     card while it is up. Hover only, so a resting card's target is exactly its box. */
+  .bgcard:hover::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 4px;
+  }
+  .bgcard:is(:hover, :has(:focus-visible)) .bgcard__mrow:not(.bgcard__mrow--default) {
+    translate: 0 -2px;
+    transition:
+      translate 240ms var(--ease-standard) var(--lift-delay, 40ms),
+      box-shadow 240ms var(--ease-standard) var(--lift-delay, 40ms),
+      border-color var(--dur-fast) var(--ease-standard) var(--lift-delay, 40ms);
+  }
+  /* The spare sheet stays on the floor while the top sheet rises: 2px more offset
+     for the 2px the row moved, on the same curve, so the deck fans open. */
+  .bgcard:is(:hover, :has(:focus-visible)) .bgcard__mrow.bgcard__mrow--rest {
+    box-shadow:
+      0 4px 10px -4px var(--lift-row),
+      0 7px 0 -3px var(--surface-raised),
+      0 7px 0 -2px var(--border-default);
+  }
+  .bgcard:is(:hover, :has(:focus-visible)) .bgcard__mrow:not(.bgcard__mrow--rest, .bgcard__mrow--default) .bgcard__mn {
+    transition:
+      border-color var(--dur-normal) var(--ease-standard) var(--lift-delay, 40ms),
+      color var(--dur-normal) var(--ease-standard) var(--lift-delay, 40ms);
+  }
+  .bgcard:is(:hover, :has(:focus-visible)) .bgcard__canvas::after {
+    transition: opacity 240ms var(--ease-standard) 40ms;
+  }
+  .bgcard:is(:hover, :has(:focus-visible)) .bgcard__peek {
+    transition:
+      background-color 200ms var(--ease-standard),
+      color var(--dur-fast) var(--ease-standard),
+      border-color 200ms var(--ease-standard),
+      box-shadow 200ms var(--ease-standard);
   }
 }

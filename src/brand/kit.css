@@ -324,14 +324,18 @@ html[data-theme='dark'] {
 }
 .bx-tip__pop strong { color: inherit; font-weight: var(--fw-semibold); }
 
+/* An `Info` icon on its own (21 Sep 2026). It was a `?` on a bordered disc; the
+   icon draws its own circle, so the disc, its edge and the glyph's type
+   settings went. The 16px box stays, so nothing beside a mark moves. The
+   radius is kept for the focus ring, which is drawn around the box. */
 .bx-tipdot {
   display: grid; place-items: center; flex: none;
-  width: 16px; height: 16px; border-radius: var(--radius-full);
-  border: 1px solid var(--border-default); background: var(--surface-raised);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold); line-height: 1;
-  color: var(--text-muted); cursor: help;
+  width: 16px; height: 16px; padding: 0; border-radius: var(--radius-full);
+  border: 0; background: none;
+  color: var(--text-tertiary); cursor: help;
 }
-.bx-tipdot:hover { border-color: var(--border-strong); color: var(--text-secondary); }
+.bx-tipdot > svg { display: block; }
+.bx-tipdot:hover { color: var(--text-secondary); }
 
 /* --- A person's mark -----------------------------------------------------------
 

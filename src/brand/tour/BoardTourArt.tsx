@@ -366,7 +366,7 @@ function ThenFig({ reduce }: Fig) {
         <Bar x={118} y={89} w={54} h={4.5} o={0.22} />
         <rect x="110" y="106" width="100" height="17" rx="5" fill={INK} opacity="0.82" />
         <text x="160" y="118" fontSize="8.5" textAnchor="middle" fill="var(--surface-raised)" fontWeight="700">
-          Sign in
+          Log in
         </text>
         <motion.circle
           cx="160"
@@ -392,7 +392,7 @@ function ThenFig({ reduce }: Fig) {
         <circle cx="160" cy="60" r="19" fill="var(--fb-positive-dot)" opacity="0.12" />
         <path d="M151 60 l6.5 6.5 l13 -14" fill="none" stroke="var(--fb-positive-dot)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         <text x="160" y="98" fontSize="10" textAnchor="middle" fill="var(--fb-positive-fg)" fontWeight="700">
-          Signed in
+          Logged in
         </text>
       </motion.g>
 

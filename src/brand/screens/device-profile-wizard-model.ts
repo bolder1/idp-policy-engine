@@ -87,6 +87,7 @@ export interface WizardState {
   weights: Record<string, number>
   registration: Registration
   autoRegister: boolean
+  restrictMobile: boolean
   maxDevices: number | null
   roster: Roster | null
 }
@@ -103,6 +104,7 @@ export const initialWizard = (): WizardState => ({
   weights: {},
   registration: 'self',
   autoRegister: false,
+  restrictMobile: false,
   maxDevices: DEFAULT_MAX_DEVICES,
   roster: null,
 })
@@ -112,7 +114,9 @@ export const wizardStarted = (s: WizardState): boolean => JSON.stringify(s) !== 
 
 /* The two kinds do not share a catalogue, so a ticked row cannot survive the
    switch, and neither can a value set against it. A health profile has no
-   agent, so it has no roster either. */
+   agent, so it has no roster either — and it is never asked the registration
+   questions, so the two switches go back to off rather than being stored
+   unseen. */
 export function withMode(s: WizardState, mode: ProfileMode): WizardState {
   if (mode === s.mode) return s
   return {
@@ -123,7 +127,13 @@ export function withMode(s: WizardState, mode: ProfileMode): WizardState {
     weights: {},
     reach: null,
     ...(mode === 'os'
-      ? { registration: 'self' as const, roster: null, maxDevices: s.maxDevices ?? DEFAULT_MAX_DEVICES }
+      ? {
+          registration: 'self' as const,
+          roster: null,
+          maxDevices: s.maxDevices ?? DEFAULT_MAX_DEVICES,
+          autoRegister: false,
+          restrictMobile: false,
+        }
       : {}),
   }
 }
@@ -174,6 +184,7 @@ export function draftOf(s: WizardState): FingerprintProfile {
     maxDevices: s.maxDevices,
     roster: s.registration === 'pre-approved' ? s.roster : null,
     autoRegister: s.autoRegister,
+    restrictMobile: s.restrictMobile,
     restrictionSet: asksReach(s.mode),
     usedIn: 0,
   })
@@ -398,7 +409,11 @@ export function reviewSections(s: WizardState, step3: Step3Shape): ReviewSection
       summary: reachLabel(d.reach),
       facts: [
         { label: 'What it can read', value: reachLabel(d.reach), pill: true },
-        { label: 'How a device gets registered', value: REGISTRATION_LABEL[d.registration], pill: true },
+        /* Asked only with the agent — agentless has one method, so the step
+           never showed the question and Review does not report an answer to it. */
+        ...(d.reach === 'agent'
+          ? [{ label: 'Device registration method', value: REGISTRATION_LABEL[d.registration], pill: true as const }]
+          : []),
         d.registration === 'pre-approved'
           ? {
               label: 'Approved device roster',
@@ -406,8 +421,9 @@ export function reviewSections(s: WizardState, step3: Step3Shape): ReviewSection
                 ? `${d.roster.fileName}, ${d.roster.rows} ${d.roster.rows === 1 ? 'device' : 'devices'}`
                 : 'None',
             }
-          : { label: 'Devices per person', value: String(d.maxDevices ?? DEFAULT_MAX_DEVICES), pill: true },
-        { label: 'Register silently on first sign-in', value: d.autoRegister ? 'On' : 'Off', pill: true },
+          : { label: 'Allowed device registrations', value: String(d.maxDevices ?? DEFAULT_MAX_DEVICES), pill: true },
+        { label: 'Mobile device restriction', value: d.restrictMobile ? 'On' : 'Off', pill: true },
+        { label: 'Device auto-registration', value: d.autoRegister ? 'On' : 'Off', pill: true },
       ],
     })
   }

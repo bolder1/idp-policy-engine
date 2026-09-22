@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { emptyLocation, zones, type Zone, type ZoneLocation } from '../data'
+import { emptyLocation, locationEmpty, zones, type Zone, type ZoneLocation, type ZoneRange } from '../data'
+import { PLACES } from '../places'
 import {
   canSaveZone,
   classifyIp,
@@ -29,6 +30,8 @@ function zone(over: Partial<Zone> = {}): Zone {
   }
 }
 const loc = (over: Partial<ZoneLocation> = {}): ZoneLocation => ({ ...emptyLocation(), ...over })
+const pune: ZoneRange = { km: 25, lat: 18.5204, lon: 73.8567, label: 'Pune' }
+const mumbai: ZoneRange = { km: 10, lat: 19.1, lon: 72.9, label: 'Mumbai' }
 const idsOf = (z: Zone) => validateZone(z).map((i) => i.id)
 
 describe('address classification', () => {
@@ -136,20 +139,24 @@ describe('the exact-address warning is precise', () => {
     expect(idsOf(z)).toContain('exact-vs-location')
   })
 
-  it('fires when the location is only a radius', () => {
-    const z = zone({
-      ip: ['203.0.113.45'],
-      location: loc({ radius: { km: 25, lat: 18.5204, lon: 73.8567 } }),
-    })
+  it('fires when the location is only a range', () => {
+    const z = zone({ ip: ['203.0.113.45'], location: loc({ ranges: [pune] }) })
     expect(idsOf(z)).toContain('exact-vs-location')
   })
 })
 
-describe('a radius alone is a real boundary', () => {
+describe('a range alone is a real boundary', () => {
   it('does not count as an empty zone', () => {
-    const z = zone({ location: loc({ radius: { km: 25, lat: 18.5204, lon: 73.8567 } }) })
+    const l = loc({ ranges: [pune] })
+    expect(locationEmpty(l)).toBe(false)
+    const z = zone({ location: l })
     expect(canSaveZone(z)).toBe(true)
     expect(idsOf(z)).not.toContain('empty')
+    expect(idsOf(z)).toContain('any-address')
+  })
+
+  it('an empty list of ranges is still an empty location', () => {
+    expect(locationEmpty(loc({ ranges: [] }))).toBe(true)
   })
 })
 
@@ -191,6 +198,19 @@ describe('every seeded zone is valid', () => {
       expect(errors, `${z.name}: ${JSON.stringify(errors.map((e) => e.title))}`).toHaveLength(0)
     }
   })
+
+  /* It carried India and Maharashtra beside the range, and the location half is
+     ORed, so it matched all of India — not what "Pune HQ · 25km" says. */
+  it('Pune HQ is the range around Pune and nothing wider', () => {
+    const hq = zones.find((z) => z.id === 'pune-hq')!
+    expect(hq.location.countries).toEqual([])
+    expect(hq.location.states).toEqual([])
+    expect(hq.location.cities).toEqual([])
+    expect(hq.location.ranges).toHaveLength(1)
+    expect(hq.location.ranges[0]).toMatchObject({ km: 25, label: 'Pune' })
+    const place = PLACES.find((p) => p.id === hq.location.ranges[0].placeId)
+    expect(place).toMatchObject({ kind: 'city', name: 'Pune' })
+  })
 })
 
 describe('describeZone', () => {
@@ -198,6 +218,13 @@ describe('describeZone', () => {
     expect(describeZone(zone({ ip: ['203.0.113.0/24'] }))).toBe('1 network · Any location')
     expect(describeZone(zone({ location: loc({ countries: ['India'] }) }))).toBe(
       'Any network · India',
+    )
+  })
+
+  it('words each range as a distance from its city, one part each', () => {
+    expect(describeZone(zone({ location: loc({ ranges: [pune] }) }))).toBe('Any network · Within 25 km of Pune')
+    expect(describeZone(zone({ location: loc({ countries: ['Japan'], ranges: [pune, mumbai] }) }))).toBe(
+      'Any network · Japan · Within 25 km of Pune · Within 10 km of Mumbai',
     )
   })
 

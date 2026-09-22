@@ -1014,9 +1014,11 @@ export const asksReach = (mode: ProfileMode) => blockedAttributes(mode, 'agentle
    device allowance entirely and replaces it with an upload. */
 export type Registration = 'self' | 'pre-approved'
 
+/* The live console's own words for the two, in the console's sentence case
+   (owner, 21 Sep 2026: "rename it based on our product"). */
 export const REGISTRATION_LABEL: Record<Registration, string> = {
-  self: 'Users register their own devices',
-  'pre-approved': 'Pre-approved devices only',
+  self: 'Self registration by user',
+  'pre-approved': 'Pre-approved trusted devices only',
 }
 
 /** An uploaded roster of approved devices. Keyed on MAC, so it needs an agent. */
@@ -1056,6 +1058,9 @@ export interface FingerprintProfile {
   roster: Roster | null
   /** First sight of a device enrols it silently rather than challenging. */
   autoRegister: boolean
+  /** Sign-in from a mobile device is refused. The console's "Enable mobile
+      device restriction". */
+  restrictMobile: boolean
   /* Whether anybody has answered these questions yet.
 
      Not derivable from the values: every field above has a working default, so
@@ -1236,6 +1241,7 @@ export function blankProfile(name: string, mode: ProfileMode): FingerprintProfil
     maxDevices: DEFAULT_MAX_DEVICES,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: false,
     usedIn: 0,
   }
@@ -1305,11 +1311,15 @@ export function profileReview(before: FingerprintProfile, after: FingerprintProf
     push('Basic details', setUp(before), setUp(after), setup)
     push('What it can read', reachLabel(before.reach), reachLabel(after.reach), setup)
   }
-  push('How a device gets registered', REGISTRATION_LABEL[before.registration], REGISTRATION_LABEL[after.registration], setup)
-  push('Register silently on first sign-in', before.autoRegister ? 'On' : 'Off', after.autoRegister ? 'On' : 'Off', setup)
-  push('Devices per person', before.maxDevices === null ? '' : String(before.maxDevices), after.maxDevices === null ? '' : String(after.maxDevices), setup)
+  /* In the form's order: method, then the allowance or the roster that
+     replaces it, then the two switches. */
+  const onOff = (v: boolean) => (v ? 'On' : 'Off')
+  push('Device registration method', REGISTRATION_LABEL[before.registration], REGISTRATION_LABEL[after.registration], setup)
+  push('Allowed device registrations', before.maxDevices === null ? '' : String(before.maxDevices), after.maxDevices === null ? '' : String(after.maxDevices), setup)
   const rosterText = (r: Roster | null) => (r ? `${r.fileName}, ${r.rows} devices` : '')
   push('Approved device roster', rosterText(before.roster), rosterText(after.roster), setup)
+  push('Mobile device restriction', onOff(before.restrictMobile), onOff(after.restrictMobile), setup)
+  push('Device auto-registration', onOff(before.autoRegister), onOff(after.autoRegister), setup)
 
   /* The section is the same noun the label leads with, so "Signals: added TPM
      ID" files as "TPM ID" under Signals. */
@@ -1339,11 +1349,11 @@ export function profileChangeParts(before: FingerprintProfile, after: Fingerprin
   const parts: string[] = []
   if (before.name !== after.name) parts.push('Name')
   if (before.reach !== after.reach) parts.push('What it can read')
-  const enrol = ['registration', 'autoRegister', 'maxDevices', 'roster'] as const
-  if (enrol.some((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]))) parts.push('How devices enrol')
+  const enrol = ['registration', 'maxDevices', 'roster', 'restrictMobile', 'autoRegister'] as const
+  if (enrol.some((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]))) parts.push('Device registration')
   /* Named only when nothing it covers is already named: "What it can read"
      beside "Basic details" says one change twice in a two-item footer. */
-  const basicNamed = parts.includes('What it can read') || parts.includes('How devices enrol')
+  const basicNamed = parts.includes('What it can read') || parts.includes('Device registration')
   if (asksReach(after.mode) && before.restrictionSet !== after.restrictionSet && !basicNamed) parts.push('Basic details')
   const was = chosenAttributes(before).map((a) => a.id)
   const now = chosenAttributes(after)
@@ -1461,6 +1471,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: 3,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 3,
   },
@@ -1490,6 +1501,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: 5,
     roster: null,
     autoRegister: true,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 5,
   },
@@ -1516,6 +1528,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: null,
     roster: { fileName: 'kiosks-floor-3.csv', rows: 24, uploadedAt: '12 Aug 2026' },
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 1,
   },
@@ -1545,6 +1558,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: DEFAULT_MAX_DEVICES,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: false,
     usedIn: 0,
   },
@@ -1601,6 +1615,9 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: 3,
     roster: null,
     autoRegister: false,
+    /* A corporate laptop profile: the agent is Windows-only, so a phone is
+       refused rather than challenged. */
+    restrictMobile: true,
     restrictionSet: true,
     usedIn: 0,
   },
@@ -1619,6 +1636,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: 3,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 0,
   },
@@ -1637,6 +1655,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: 3,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 0,
   },
@@ -1658,6 +1677,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: null,
     roster: { fileName: 'floor-terminals.csv', rows: 3, uploadedAt: '12 Aug 2026' },
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 0,
   },
@@ -1681,6 +1701,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: 3,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 0,
   },
@@ -1721,6 +1742,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: DEFAULT_MAX_DEVICES,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 0,
   },
@@ -1747,6 +1769,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: DEFAULT_MAX_DEVICES,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 0,
   },
@@ -1768,6 +1791,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: DEFAULT_MAX_DEVICES,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 0,
   },
@@ -1789,6 +1813,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: DEFAULT_MAX_DEVICES,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 0,
   },
@@ -1812,6 +1837,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: DEFAULT_MAX_DEVICES,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 0,
   },
@@ -1838,6 +1864,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: DEFAULT_MAX_DEVICES,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 0,
   },
@@ -1874,6 +1901,7 @@ export const seedProfiles: FingerprintProfile[] = [
     maxDevices: DEFAULT_MAX_DEVICES,
     roster: null,
     autoRegister: false,
+    restrictMobile: false,
     restrictionSet: true,
     usedIn: 0,
   },

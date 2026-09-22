@@ -55,12 +55,12 @@ describe('every method knows what to ask a person for', () => {
   })
 
   it('gives each method in the catalogue an enrolment shape', () => {
-    /* Falling through to 'none' is a legitimate answer for CAC and the grid,
-       and a bug for anything that genuinely needs a form — so the assertion is
-       that the fall-through set is exactly the two we decided on, not that
-       every method has an entry. */
+    /* Falling through to 'none' is a legitimate answer for CAC, DigitalPersona
+       and the grid, and a bug for anything that genuinely needs a form — so the
+       assertion is that the fall-through set is exactly the three we decided
+       on, not that every method has an entry. */
     const fellThrough = FACTORS.filter((m) => enrolShapeFor(m.id).kind === 'none').map((m) => m.id)
-    expect(fellThrough.sort()).toEqual(['cac', 'grid'])
+    expect(fellThrough.sort()).toEqual(['cac', 'digital-persona', 'grid'])
   })
 
   it('asks for a field wherever it says it will', () => {

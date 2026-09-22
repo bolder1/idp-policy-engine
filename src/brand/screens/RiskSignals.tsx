@@ -1076,11 +1076,22 @@ function SignalList({
             gets one useful place per view. */}
       </header>
 
-      <ul className="brs__rows">
-        {items.map((s) => (
-          <SignalRow key={s.id} signal={s} on={isOn(profile, s.id)} tier={tierFor(profile, s)} onToggle={onToggle} onTier={onTier} />
-        ))}
-      </ul>
+      <div className="brs__listbody">
+        {/* The columns' names, as a device profile's list has them (owner,
+            22 Sep 2026: "add the headings in the risk profile as well — the
+            attributes and priority"). The left over the tick and the name, the
+            right over the priority. Hidden from assistive tech: every row's
+            checkbox and picker already names itself. */}
+        <div className="brs__row2 brs__colhead" aria-hidden>
+          <span className="brs__colhead__left">Attribute</span>
+          <span className="brs__rowctl">Priority</span>
+        </div>
+        <ul className="brs__rows">
+          {items.map((s) => (
+            <SignalRow key={s.id} signal={s} on={isOn(profile, s.id)} tier={tierFor(profile, s)} onToggle={onToggle} onTier={onTier} />
+          ))}
+        </ul>
+      </div>
     </section>
   )
 }

@@ -194,7 +194,7 @@ function Order({ reduce }: P) {
       >
         <rect x="20" y="128" width="280" height="30" rx="8" fill="var(--fb-negative-bg)" stroke="var(--fb-negative-border)" />
         <text x="34" y="147" fontSize="10" fill="var(--fb-negative-fg)">
-          An unmanaged laptop in the office signs in on one factor
+          An unmanaged laptop in the office logs in on one factor
         </text>
       </motion.g>
       <motion.g
@@ -271,7 +271,7 @@ function Test({ reduce }: P) {
   return (
     <>
       <text x="18" y="20" fontSize="9" fill="var(--text-muted)" letterSpacing="0.8">
-        13 SIGN-IN ATTEMPTS
+        13 LOGIN ATTEMPTS
       </text>
 
       {cards.map((i) => {

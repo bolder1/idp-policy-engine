@@ -157,6 +157,8 @@ export interface ConditionType {
   id: string
   label: string
   group: string
+  /** What the attribute is, in one plain line — under its name in the
+      attribute dropdown. */
   hint: string
   operators: string[]
   /** Where the value comes from: a library object, a fixed list, a clock, typed. */
@@ -269,7 +271,7 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      by country" are the same attribute asked two ways, rather than an IP
      condition and a Country condition that can contradict each other. See
      `ZoneScope`. */
-  { id: 'zone', label: 'Network zone', group: 'Library', hint: 'Match a zone from your Zones library — addresses, ASNs and places, named once', operators: ['in zone', 'not in zone'], valueKind: 'zone' },
+  { id: 'zone', label: 'Network zone', group: 'Library', hint: 'The IP, network or place a login comes from', operators: ['in zone', 'not in zone'], valueKind: 'zone' },
   /* The only way to say anything about the device.
 
      "Matches", not "recognised by", and the word had to change with the scope.
@@ -279,7 +281,7 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      conditions no longer exist on their own. So the question is whether the
      device matches the profile as written, which is wider than recognition and
      is what the word now says. */
-  { id: 'fingerprint', label: 'Device profile', group: 'Library', hint: 'Match a profile from your Device profiles library — OS, browser, MDM and posture, configured once', operators: ['matches', 'does not match'], valueKind: 'fingerprint' },
+  { id: 'fingerprint', label: 'Device profile', group: 'Library', hint: 'The device’s OS, browser and health checks', operators: ['matches', 'does not match'], valueKind: 'fingerprint' },
   /* Third of the three library references, and the reason the Hooks screen is
      wired to anything at all.
 
@@ -294,14 +296,14 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      `single` in `valueSource`, and that is deliberate: `diagnostics` reads
      `values[0]` to check the endpoint still exists, and a rule consulting two
      services would have to say what happens when they disagree. */
-  { id: 'webhook', label: 'External hook', group: 'Library', hint: 'Ask an endpoint from your Hooks library, and use its answer', operators: ['returns true', 'returns false'], valueKind: 'hook' },
-  { id: 'time', label: 'Time of day', group: 'Time', hint: 'A window, read in a timezone you name', operators: ['between', 'not between'], valueKind: 'time' },
+  { id: 'webhook', label: 'External hook', group: 'Library', hint: 'A yes or no from your own endpoint', operators: ['returns true', 'returns false'], valueKind: 'hook' },
+  { id: 'time', label: 'Time of day', group: 'Time', hint: 'The time of the login, in a set timezone', operators: ['between', 'not between'], valueKind: 'time' },
   /* Separate from the window, because they answer different questions and get
      asked separately: "office hours" is a time, "not at the weekend" is a day,
      and a rule usually wants one or the other rather than a single control that
      means both. The parameter sheet lists them as two rows for the same
      reason. */
-  { id: 'day', label: 'Day of week', group: 'Time', hint: 'Match particular days', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
+  { id: 'day', label: 'Day of week', group: 'Time', hint: 'The weekday the login happens on', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
   /* --- The two attribute conditions, and why there are two -------------------
 
      The sheet lists both: "Custom user attributes", with the comparison types
@@ -317,8 +319,8 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
 
      Both carry `key`, which is the field this model did not have and the reason
      the seeded scenarios were writing `employment_type=FTE` into the VALUE. */
-  { id: 'user-attr', label: 'User attribute', group: 'Attributes', hint: 'A field the directory holds on every user', operators: ['is', 'is not', 'contains', 'above', 'below'], valueKind: 'text', keys: [...USER_ATTR_KEYS] },
-  { id: 'custom-attr', label: 'Custom attribute', group: 'Attributes', hint: 'An attribute your tenant defines, by name', operators: ['is', 'is not', 'contains', 'above', 'below'], valueKind: 'text' },
+  { id: 'user-attr', label: 'User attribute', group: 'Attributes', hint: 'A directory field, like department or team', operators: ['is', 'is not', 'contains', 'above', 'below'], valueKind: 'text', keys: [...USER_ATTR_KEYS] },
+  { id: 'custom-attr', label: 'Custom attribute', group: 'Attributes', hint: 'A user field your organization defines', operators: ['is', 'is not', 'contains', 'above', 'below'], valueKind: 'text' },
   /* One risk attribute, and it is the one this console actually computes.
 
      The id is historical and the label is not: `device-risk` is the score the
@@ -326,14 +328,14 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      weighs them, handed to the evaluator on the env as `riskScale`. Keeping it
      is what keeps that screen reachable — a weighting page no condition can
      read is configuration nothing consults. */
-  { id: 'device-risk', label: 'Risk score', group: 'Risk', hint: 'The score from your Risk signals profile, as a threshold', operators: ['above', 'below'], valueKind: 'range' },
+  { id: 'device-risk', label: 'Device risk score', group: 'Risk', hint: 'How risky the device looks, from its signals', operators: ['above', 'below'], valueKind: 'range' },
   /* Not built. Listed because the risk section is going to have two rows and
      saying so now is cheaper than explaining a new one later.
 
      `evalCond` still has a working case for it, deliberately. If this becomes
      real it is a flag flip, not a re-implementation — and a coming-soon row
      that would return "undecided" the day it shipped is worse than no row. */
-  { id: 'ml-risk', label: 'ML risk score', group: 'Risk', hint: 'An AI-derived verdict across every signal. Not available yet.', operators: ['is', 'is not'], valueKind: 'list', options: ['Low', 'Medium', 'High'], soon: true },
+  { id: 'ml-risk', label: 'ML risk score', group: 'Risk', hint: 'A risk level predicted by machine learning', operators: ['is', 'is not'], valueKind: 'list', options: ['Low', 'Medium', 'High'], soon: true },
   /* Legacy only: never offered, never written. See `who` above and `Rule.who`. */
   { id: 'group', label: 'Group Membership', group: 'Group', hint: "Match by the user's group", operators: ['in', 'not in'], valueKind: 'group', who: true },
   { id: 'user', label: 'Specific people', group: 'User', hint: 'Match named individuals from the directory', operators: ['is', 'is not'], valueKind: 'user', who: true },
@@ -385,8 +387,8 @@ export function conditionType(id: string): ConditionType {
 /* Which half of a zone a condition tests.
 
    A zone has two sections and they are ANDed — the network half (addresses,
-   CIDR blocks, ASNs) and the geographic half (countries, states, cities, a
-   radius). "Reliance Jio · India" is inside neither alone. So a rule that says
+   CIDR blocks, ASNs) and the geographic half (countries, states, cities,
+   ranges around a city). "Reliance Jio · India" is inside neither alone. So a rule that says
    "in zone X" has always had a third thing to say that it could not: whether it
    means the whole zone, or only where the request came from on the network, or
    only where it came from on the map.
@@ -408,20 +410,47 @@ export const ZONE_SCOPE_LABEL: Record<'both' | ZoneScope, string> = {
   location: 'Location',
 }
 
+/** Which half of one named zone a condition tests. No entry is both. */
+export const zoneScopeOf = (c: Pick<Condition, 'scopes'>, zoneId: string): 'both' | ZoneScope => c.scopes?.[zoneId] ?? 'both'
+
+/* The condition without scope entries for zones it no longer names, and
+   without the map at all once it is empty — so a zone unticked and re-ticked,
+   or narrowed and widened again, leaves the condition byte-identical to one
+   that was never touched (every dirty check here is a `JSON.stringify`). */
+export function pruneScopes<C extends Condition>(c: C): C {
+  if (!c.scopes) return c
+  const kept = Object.entries(c.scopes).filter(([id]) => c.values.includes(id))
+  const next = { ...c }
+  if (kept.length === 0) delete next.scopes
+  else next.scopes = Object.fromEntries(kept)
+  return next
+}
+
 /** A single predicate. `values: []` means UNSET — a first-class, diagnosable state. */
 export interface Condition {
   id: string
   typeId: string
   operator: string
   values: string[]
-  /* Which half of the named zones to test. Zone conditions only; absent = both.
+  /* Which half of EACH named zone to test, by zone id. Zone conditions only; a
+     zone with no entry is tested whole (both halves), and so is a condition
+     with no map at all.
+
+     Per zone since 22 Sep 2026 (owner: "we select multiple network zones and
+     have only one Match on option — I want an individual Match on for each
+     one"). It was one `scope` for the whole condition, so "Office Network or
+     Reliance Jio · India, by location" had to ask the same half of both — and
+     most zones only HAVE one half, so a location answer on a condition that
+     also named an IP-only zone quietly made that zone unmatchable.
 
      It lives on the CONDITION rather than on the zone because it is a property
      of this rule's question, not of the zone: the same "Reliance Jio · India"
      is asked about as a network by one rule and as a place by another, and
      storing the answer on the zone would make one rule's narrowing silently
-     rewrite the other's. */
-  scope?: ZoneScope
+     rewrite the other's. Read it through `zoneScopeOf`; write it through
+     `when-ops.setScope`. An entry for a zone the condition no longer names is
+     dead and is pruned on write (`pruneScopes`). */
+  scopes?: Record<string, ZoneScope>
   /* WHICH attribute this condition is about.
 
      `user-attr` and `custom-attr` are the only conditions whose subject is not
@@ -771,9 +800,36 @@ export interface ZoneLocation {
   countries: string[]
   states: string[]
   cities: string[]
-  /** A circle on the map, for sites without a clean administrative boundary. */
-  radius?: { km: number; lat: number; lon: number; label?: string }
+  /** Circles on the map — "25 km around Pune" — for sites without a clean
+      administrative boundary. Several, ORed like everything else in this half:
+      a Pune office and a Mumbai office are one zone. */
+  ranges: ZoneRange[]
 }
+
+/* A range: a centre and a distance around it.
+
+   The centre is a catalogue city, picked by name. `label` is that name, kept
+   so the zone reads the same if the catalogue changes; `placeId` points back at
+   the catalogue entry where there is one. The coordinates are stored rather
+   than looked up because they are what the engine measures from, and a seed
+   may carry a finer centre than the catalogue's one-decimal centroid. */
+export interface ZoneRange {
+  km: number
+  lat: number
+  lon: number
+  label: string
+  placeId?: string
+}
+
+/** The distance a range can take, in whole km. Typed, not picked from a list
+    (owner, 21 Sep 2026). Past the ceiling a state or a country says it better. */
+export const RANGE_KM_MIN = 1
+export const RANGE_KM_MAX = 1000
+/** What a new range starts at: a metro area, not a building. */
+export const DEFAULT_RANGE_KM = 25
+
+/** A range in words: "Within 25 km of Pune". */
+export const rangeText = (r: ZoneRange) => `Within ${r.km} km of ${r.label}`
 
 /* What a zone is *for*. A zone is only a boundary — it says where a request
    came from, not what to do about it — but in practice every one is written
@@ -804,12 +860,12 @@ export interface Zone {
   locked?: boolean
 }
 
-export const emptyLocation = (): ZoneLocation => ({ countries: [], states: [], cities: [] })
+export const emptyLocation = (): ZoneLocation => ({ countries: [], states: [], cities: [], ranges: [] })
 
 /** True when the section places no constraint, i.e. it matches anything. */
 export const ipSectionEmpty = (z: Zone) => z.ip.length === 0 && z.asn.length === 0
 export const locationEmpty = (l: ZoneLocation) =>
-  l.countries.length === 0 && l.states.length === 0 && l.cities.length === 0 && !l.radius
+  l.countries.length === 0 && l.states.length === 0 && l.cities.length === 0 && l.ranges.length === 0
 
 export interface MethodSet {
   id: string
@@ -1180,7 +1236,7 @@ export const zones: Zone[] = [
     name: 'EU Countries',
     ip: [],
     asn: [],
-    location: { countries: ['Germany', 'France'], states: [], cities: [] },
+    location: { countries: ['Germany', 'France'], states: [], cities: [], ranges: [] },
     usedIn: 2,
   },
   {
@@ -1201,7 +1257,7 @@ export const zones: Zone[] = [
     name: 'Reliance Jio · India',
     ip: [],
     asn: ['AS55836'],
-    location: { countries: ['India'], states: [], cities: [] },
+    location: { countries: ['India'], states: [], cities: [], ranges: [] },
     usedIn: 0,
   },
   {
@@ -1210,11 +1266,14 @@ export const zones: Zone[] = [
     kind: 'custom',
     ip: [],
     asn: [],
+    /* The range alone. It carried India and Maharashtra beside it, and the
+       location half is ORed, so the zone matched all of India — not what its
+       name says. The centre is finer than the catalogue's Pune (18.5, 73.9). */
     location: {
-      countries: ['India'],
-      states: ['Maharashtra'],
+      countries: [],
+      states: [],
       cities: [],
-      radius: { km: 25, lat: 18.5204, lon: 73.8567, label: 'Pune HQ' },
+      ranges: [{ km: 25, lat: 18.5204, lon: 73.8567, label: 'Pune', placeId: 'in-maharashtra-pune' }],
     },
     usedIn: 0,
   },
@@ -1275,6 +1334,7 @@ export const zones: Zone[] = [
       countries: ['Iran', 'North Korea', 'Syria', 'Cuba'],
       states: [],
       cities: [],
+      ranges: [],
     },
     usedIn: 1,
   },
@@ -1314,7 +1374,7 @@ export const zones: Zone[] = [
     name: 'Japan',
     ip: [],
     asn: [],
-    location: { countries: ['Japan'], states: [], cities: [] },
+    location: { countries: ['Japan'], states: [], cities: [], ranges: [] },
     usedIn: 1,
   },
   {
@@ -1323,7 +1383,7 @@ export const zones: Zone[] = [
     name: 'India',
     ip: [],
     asn: [],
-    location: { countries: ['India'], states: [], cities: [] },
+    location: { countries: ['India'], states: [], cities: [], ranges: [] },
     usedIn: 2,
   },
   {
@@ -1332,7 +1392,7 @@ export const zones: Zone[] = [
     name: 'Home countries · India and United States',
     ip: [],
     asn: [],
-    location: { countries: ['India', 'United States'], states: [], cities: [] },
+    location: { countries: ['India', 'United States'], states: [], cities: [], ranges: [] },
     usedIn: 2,
   },
   {
@@ -1341,7 +1401,7 @@ export const zones: Zone[] = [
     name: 'Integration countries · India and Germany',
     ip: [],
     asn: [],
-    location: { countries: ['India', 'Germany'], states: [], cities: [] },
+    location: { countries: ['India', 'Germany'], states: [], cities: [], ranges: [] },
     usedIn: 2,
   },
   /* Split out of `office-vpn` so the hybrid-work rule keeps its shape. That
@@ -1389,7 +1449,7 @@ export const zones: Zone[] = [
     name: 'India office · 203.0.113.0/24',
     ip: ['203.0.113.0/24'],
     asn: [],
-    location: { countries: ['India'], states: [], cities: [] },
+    location: { countries: ['India'], states: [], cities: [], ranges: [] },
     usedIn: 1,
   },
   {
@@ -1398,7 +1458,7 @@ export const zones: Zone[] = [
     name: 'Germany office · 198.51.100.0/24',
     ip: ['198.51.100.0/24'],
     asn: [],
-    location: { countries: ['Germany'], states: [], cities: [] },
+    location: { countries: ['Germany'], states: [], cities: [], ranges: [] },
     usedIn: 1,
   },
   {
@@ -1407,7 +1467,7 @@ export const zones: Zone[] = [
     name: 'US office · 192.0.2.0/24',
     ip: ['192.0.2.0/24'],
     asn: [],
-    location: { countries: ['United States'], states: [], cities: [] },
+    location: { countries: ['United States'], states: [], cities: [], ranges: [] },
     usedIn: 1,
   },
 ]
@@ -1500,7 +1560,9 @@ export function cond(
     typeId,
     operator,
     values,
-    ...(scope ? { scope } : null),
+    /* One half for every zone named, which is what a seed or a spec saying
+       `'ip'` has always meant. */
+    ...(scope && values.length > 0 ? { scopes: Object.fromEntries(values.map((v) => [v, scope])) } : null),
     ...(extra?.key ? { key: extra.key } : null),
     ...(extra?.tz ? { tz: extra.tz } : null),
   }
@@ -1884,7 +1946,7 @@ export const policies: Policy[] = [
        third state worth naming rather than folding into the deny. */
     rules: [
       rule({
-        name: 'Compliant, but the sign-in looks risky',
+        name: 'Compliant, but the login looks risky',
         when: when(
           card(
             cond('fingerprint', 'matches', ['fp-compliant']),
@@ -3648,10 +3710,10 @@ export const scenarios: Scenario[] = [
   },
   {
     id: 's-passwordless', provided: true, name: 'Passwordless for executives', category: 'Quick Protection', tag: 'Identity',
-    description: 'Executives with miniOrange App can sign in with a push notification.',
+    description: 'Executives with miniOrange App can log in with a push notification.',
     audience: audienceOf(['executives']),
     rules: [{
-      name: 'Executive passwordless', ifText: 'For Executives, any sign-in', decision: '1fa',
+      name: 'Executive passwordless', ifText: 'For Executives, any login', decision: '1fa',
       build: () => rule({ name: 'Executive passwordless', who: { groupIds: ['executives'], userIds: [] }, when: anySignIn(), decision: '1fa', firstFactor: 'Any', matchEstimate: 12 }),
     }],
   },
@@ -3693,7 +3755,7 @@ export const scenarios: Scenario[] = [
     description: 'Challenge users when behavioral signals indicate elevated risk.',
     audience: EVERYONE,
     rules: [{
-      name: 'Elevated risk', ifText: 'Risk score above 69', decision: '2fa',
+      name: 'Elevated risk', ifText: 'Device risk score above 69', decision: '2fa',
       build: () => rule({ name: 'Elevated risk',when: when(card(cond('device-risk', 'above', ['69']))), decision: '2fa', matchEstimate: 64 }),
     }],
   },
@@ -3741,7 +3803,7 @@ export const scenarios: Scenario[] = [
         build: () => rule({ name: 'Trusted office device',when: when(card(cond('zone', 'in zone', ['office']))), decision: '1fa', matchEstimate: 820 }) },
       { name: 'Off-network step-up', ifText: 'Outside Office Network', decision: '2fa',
         build: () => rule({ name: 'Off-network step-up',when: when(card(cond('zone', 'not in zone', ['office']))), decision: '2fa', matchEstimate: 340 }) },
-      { name: 'Elevated risk', ifText: 'Risk score above 69', decision: '2fa',
+      { name: 'Elevated risk', ifText: 'Device risk score above 69', decision: '2fa',
         build: () => rule({ name: 'Elevated risk',when: when(card(cond('device-risk', 'above', ['69']))), decision: '2fa', matchEstimate: 64 }) },
     ],
   },

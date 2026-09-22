@@ -1045,6 +1045,9 @@ export function BoardBuilder({
           }}
           wide={wide}
           onToggleWidth={() => setInspW(setW(wide ? NARROW : 560))}
+          onMoveRule={move}
+          onDuplicateRule={duplicate}
+          onDeleteRule={remove}
         />
       )}
 

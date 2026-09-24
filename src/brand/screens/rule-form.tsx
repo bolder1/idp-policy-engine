@@ -106,14 +106,23 @@ export const OUTCOMES: { id: AccessDecision; label: string; sub: string; icon: L
 export const allows = (d: AccessDecision) => d !== 'deny'
 export const DEC_KEY: Record<AccessDecision, string> = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' }
 
-/** The console's first-factor catalogue, in its order. */
+/* The methods a rule can name, by the names the Authentication methods page
+   gives them (AUTH_METHODS in methods.ts).
+
+   It was seven generic names — "TOTP Authenticator", "SMS / OTP" — while every
+   seeded rule and the Authentication methods page said "Google Authenticator"
+   and "OTP over SMS". A stored name the picker did not offer showed as ticked
+   in the card and unticked in the list, and could not be cleared (24 Sep 2026,
+   for the showcase's "password, then Google Authenticator"). One vocabulary. */
 export const METHODS = [
   'miniOrange Push',
-  'TOTP Authenticator',
-  'WebAuthn / FIDO2',
-  'SMS / OTP',
-  'Email OTP',
-  'Hardware Token',
+  'miniOrange OTP',
+  'Google Authenticator',
+  'Microsoft Authenticator',
+  'OTP over SMS',
+  'OTP over Email',
+  'FIDO2 / Passkey',
+  'Yubikey Token',
   'Security Questions',
 ]
 
@@ -923,7 +932,7 @@ export function ThenSection({
   bare?: boolean
   n?: number
 }) {
-  const chain = rule.methodChain ?? ['TOTP Authenticator']
+  const chain = rule.methodChain ?? ['Google Authenticator']
 
   /* Which allow-flavour this rule was last on, so Deny -> Allow restores "second
      factor required" instead of silently downgrading the rule to one factor. */

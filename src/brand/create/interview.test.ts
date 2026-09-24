@@ -121,7 +121,7 @@ describe('the interview', () => {
   it('asks for a phishing-resistant factor when that is what was chosen', () => {
     const [guard] = compose({ audience: 'all', threat: 'unmanaged', response: 'strong' })
     expect(guard.secondFactor).toBe('specific')
-    expect(guard.secondFactorMethods).toEqual(['WebAuthn / FIDO2'])
+    expect(guard.secondFactorMethods).toEqual(['FIDO2 / Passkey'])
   })
 
   it('narrates one line per rule, in evaluation order', () => {

@@ -23,6 +23,15 @@ import { seedHooks, type Hook } from './hooks'
 import { AUTH_METHODS, type AuthMethod } from './methods'
 import { type RiskProfile } from './risk-signals'
 import { leaves } from './predicate'
+import {
+  showcaseApps,
+  showcaseGroups,
+  showcasePolicies,
+  showcaseProfiles,
+  showcaseScenarios,
+  showcaseUsers,
+  showcaseZones,
+} from './showcase-seed'
 import { withWho } from './rule-who'
 
 /* -----------------------------------------------------------------------------
@@ -484,4 +493,65 @@ export function tokensAt(depth: Depth): HardwareToken[] {
       .map((t) => (t.userId && !listed.has(t.userId) ? { ...t, userId: null, assignedAt: undefined } : t))
   }
   return seedTokens
+}
+
+// --- A whole tenant ----------------------------------------------------------
+
+/* Everything tenant-shaped the store holds, loaded in one go, so the store
+   chooses a tenant in one place rather than calling a dozen `*At`s twice (on
+   first render and on a persona switch). */
+export interface Tenant {
+  policies: Policy[]
+  zones: Zone[]
+  scenarios: Scenario[]
+  methodSets: MethodSet[]
+  tokens: HardwareToken[]
+  methods: AuthMethod[]
+  fingerprints: FingerprintProfile[]
+  riskProfiles: RiskProfile[]
+  activeRiskProfileId: string
+  hooks: Hook[]
+  apps: App[]
+  groups: Group[]
+  directory: { people: User[]; unlisted: number }
+}
+
+export function tenantAt(depth: Depth): Tenant {
+  return {
+    policies: policiesAt(depth),
+    zones: zonesAt(depth),
+    scenarios: scenariosAt(depth),
+    methodSets: methodSetsAt(depth),
+    tokens: tokensAt(depth),
+    methods: methodsAt(depth),
+    fingerprints: fingerprintsAt(depth),
+    riskProfiles: riskProfilesAt(depth),
+    activeRiskProfileId: 'rp-shipped',
+    hooks: hooksAt(depth),
+    apps: appsAt(depth),
+    groups: groupsAt(depth),
+    directory: usersAt(depth),
+  }
+}
+
+/* The presentation tenant (showcase-seed.ts): four scenario policies and the
+   zones, device profiles, apps, groups and templates they need, and nothing
+   else. What is not scenario-shaped comes from the medium tenant unchanged —
+   the Authentication methods and the display-token drawer, whose holders
+   (priya, u-it-1, u-fin-2) the showcase directory keeps. The risk library is
+   the shipped profile alone and there are no hooks: no scenario uses either. */
+export function showcaseTenant(): Tenant {
+  const medium = tenantAt('medium')
+  return {
+    ...medium,
+    policies: showcasePolicies.map(settled),
+    zones: showcaseZones,
+    scenarios: showcaseScenarios,
+    fingerprints: showcaseProfiles,
+    riskProfiles: riskProfilesAt('none'),
+    hooks: [],
+    apps: showcaseApps,
+    groups: showcaseGroups,
+    directory: { people: showcaseUsers, unlisted: Math.max(0, HEADCOUNT_ALL - showcaseUsers.length) },
+  }
 }

@@ -91,7 +91,7 @@ export const QUESTIONS: Question[] = [
     options: [
       { id: 'deny', label: 'Refuse the sign-in', caption: 'Nothing gets through' },
       { id: 'mfa', label: 'Ask for a second factor', caption: 'Any enabled method' },
-      { id: 'strong', label: 'Ask for a phishing-resistant factor', caption: 'WebAuthn or a security key' },
+      { id: 'strong', label: 'Ask for a phishing-resistant factor', caption: 'A passkey or a security key' },
     ],
   },
   {
@@ -222,7 +222,7 @@ export function compose(answers: Answers): Rule[] {
         when: when(card(THREAT_CONDITION[threat]())),
         decision: response === 'deny' ? 'deny' : '2fa',
         ...(response === 'strong'
-          ? { secondFactor: 'specific' as const, secondFactorMethods: ['WebAuthn / FIDO2'] }
+          ? { secondFactor: 'specific' as const, secondFactorMethods: ['FIDO2 / Passkey'] }
           : {}),
         matchEstimate: 180,
       }),

@@ -31,21 +31,8 @@ import { type FingerprintProfile } from './fingerprint'
 import { asStored, changedBeyondStamp, lastSaved, openForEditing, withSavedDraft } from './policy-draft'
 import { EMPTY_RISK_PROFILE, riskScale, type RiskProfile } from './risk-signals'
 import { normaliseHook, type Hook } from './hooks'
-import {
-  appsAt,
-  fingerprintsAt,
-  groupsAt,
-  hooksAt,
-  methodSetsAt,
-  methodsAt,
-  policiesAt,
-  riskProfilesAt,
-  scenariosAt,
-  settled,
-  tokensAt,
-  usersAt,
-  zonesAt,
-} from './fixtures'
+import { settled, showcaseTenant, tenantAt, type Tenant } from './fixtures'
+import { SHOWCASE } from './showcase'
 import type { ConfigField } from './method-config'
 import type { MfaValues } from './mfa-join'
 import { SEED_ENROLMENT, type UserEnrolment } from './user-methods'
@@ -496,11 +483,16 @@ function freeId<T extends { id: string }>(all: readonly T[], item: T, prefix: st
 const MISSING_TINT = '#94a3b8'
 
 export function BrandProvider({ children }: { children: ReactNode }) {
-  const [policies, setPolicies, policiesRef] = useCollection<Policy>(() => policiesAt('medium'))
+  /* The tenant the console opens on. The showcase build loads the presentation
+     tenant (showcase-seed.ts); every other build loads the Security IT
+     Manager's, which is the default persona below. Chosen once, lazily, and
+     read by every initialiser that follows. */
+  const [seed] = useState<Tenant>(() => (SHOWCASE ? showcaseTenant() : tenantAt('medium')))
+  const [policies, setPolicies, policiesRef] = useCollection<Policy>(() => seed.policies)
   /* Zones are edited in place now that they carry two sections, so they need
      the same draft/commit treatment policies already had. */
-  const [zones, setZones, zonesRef] = useCollection<Zone>(() => zonesAt('medium'))
-  const [scenarios, setScenarios, scenariosRef] = useCollection<Scenario>(() => scenariosAt('medium'))
+  const [zones, setZones, zonesRef] = useCollection<Zone>(() => seed.zones)
+  const [scenarios, setScenarios, scenariosRef] = useCollection<Scenario>(() => seed.scenarios)
   const [screen, setScreenState] = useState<BrandScreen>({ name: 'policies' })
   /* The screen as of the last navigation, for `go` to compare against without
      waiting for a render. */
@@ -594,19 +586,19 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<ToastMessage | null>(null)
   const toastSeq = useRef(0)
   const [gauntletOverrides, setOverrides] = useState<Record<string, Record<string, AccessDecision>>>({})
-  const [methodSets, setMethodSets] = useState<MethodSet[]>(() => methodSetsAt('medium'))
+  const [methodSets, setMethodSets] = useState<MethodSet[]>(() => seed.methodSets)
   /* Fingerprint profiles live here rather than on the screen: policy rules
      name them, so the linter and the simulator have to be able to resolve
      one without the Device Fingerprint page being mounted. */
-  const [fingerprints, setFingerprints, fingerprintsRef] = useCollection<FingerprintProfile>(() => fingerprintsAt('medium'))
-  const [riskProfiles, setRiskProfiles, riskProfilesRef] = useCollection<RiskProfile>(() => riskProfilesAt('medium'))
-  const [activeRiskProfileId, setActiveRiskProfileId] = useState('rp-shipped')
-  const [hooks, setHooks, hooksRef] = useCollection<Hook>(() => hooksAt('medium'))
-  const [hardwareTokens, setHardwareTokens] = useState<HardwareToken[]>(() => tokensAt('medium'))
+  const [fingerprints, setFingerprints, fingerprintsRef] = useCollection<FingerprintProfile>(() => seed.fingerprints)
+  const [riskProfiles, setRiskProfiles, riskProfilesRef] = useCollection<RiskProfile>(() => seed.riskProfiles)
+  const [activeRiskProfileId, setActiveRiskProfileId] = useState(seed.activeRiskProfileId)
+  const [hooks, setHooks, hooksRef] = useCollection<Hook>(() => seed.hooks)
+  const [hardwareTokens, setHardwareTokens] = useState<HardwareToken[]>(() => seed.tokens)
   /* The seeded catalogue ships Display Token unconfigured; the seeded drawer
      has fobs issued. `withTokenState` reconciles the two from the first
      render, so the method row never disagrees with the inventory. */
-  const [methods, setMethods] = useState<AuthMethod[]>(() => withTokenState(methodsAt('medium'), tokensAt('medium')))
+  const [methods, setMethods] = useState<AuthMethod[]>(() => withTokenState(seed.methods, seed.tokens))
   /* The latest tokens, ahead of the next render. The actions return results
      synchronously, so they compute from here rather than from `hardwareTokens`
      — otherwise two calls in one handler (a CSV assigning to three people is
@@ -626,9 +618,9 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [methodConfig, setMethodConfig] = useState<Record<string, ConfigField[]>>({})
   const [setupChoice, setSetupChoice] = useState<Record<string, string>>({})
   const [enrolment, setEnrolment] = useState<UserEnrolment>(SEED_ENROLMENT)
-  const [apps, setApps] = useState<App[]>(() => appsAt('medium'))
-  const [groups, setGroups] = useState<Group[]>(() => groupsAt('medium'))
-  const [directory, setDirectory] = useState(() => usersAt('medium'))
+  const [apps, setApps] = useState<App[]>(() => seed.apps)
+  const [groups, setGroups] = useState<Group[]>(() => seed.groups)
+  const [directory, setDirectory] = useState(() => seed.directory)
   /* `lite`, and nothing on screen changes it.
 
      It was `'full'` — everything this prototype argues for, switchable from a
@@ -673,23 +665,23 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       requestLeave(
         () => {
           const { depth, landing } = personaById(id)
+          const t = tenantAt(depth)
           personaRef.current = id
           setPersonaId(id)
-          setPolicies(policiesAt(depth))
-          setZones(zonesAt(depth))
-          setScenarios(scenariosAt(depth))
-          setMethodSets(methodSetsAt(depth))
-          const tokens = tokensAt(depth)
-          tokensRef.current = tokens
-          setHardwareTokens(tokens)
-          setMethods(withTokenState(methodsAt(depth), tokens))
-          setFingerprints(fingerprintsAt(depth))
-          setRiskProfiles(riskProfilesAt(depth))
-          setActiveRiskProfileId('rp-shipped')
-          setHooks(hooksAt(depth))
-          setApps(appsAt(depth))
-          setGroups(groupsAt(depth))
-          setDirectory(usersAt(depth))
+          setPolicies(t.policies)
+          setZones(t.zones)
+          setScenarios(t.scenarios)
+          setMethodSets(t.methodSets)
+          tokensRef.current = t.tokens
+          setHardwareTokens(t.tokens)
+          setMethods(withTokenState(t.methods, t.tokens))
+          setFingerprints(t.fingerprints)
+          setRiskProfiles(t.riskProfiles)
+          setActiveRiskProfileId(t.activeRiskProfileId)
+          setHooks(t.hooks)
+          setApps(t.apps)
+          setGroups(t.groups)
+          setDirectory(t.directory)
           setOverrides({})
           setRecovery(RECOVERY_DEFAULTS)
           setMfaBehaviour({})

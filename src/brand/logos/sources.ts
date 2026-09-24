@@ -43,7 +43,7 @@ export const LOGO_SOURCES: LogoSource[] = [
   { id: 'salesforce', name: 'Salesforce', domain: 'salesforce.com' },
   { id: 'workday', name: 'Workday', domain: 'workday.com' },
   { id: 'github', name: 'GitHub Enterprise', domain: 'github.com' },
-  { id: 'm365', name: 'Microsoft 365', domain: 'microsoft.com' },
+  { id: 'm365', name: 'Microsoft 365', domain: 'microsoft.com', aliases: ['outlook'] },
   { id: 'jira', name: 'Jira', domain: 'atlassian.com' },
   { id: 'slack', name: 'Slack', domain: 'slack.com' },
   { id: 'aws', name: 'AWS Console', domain: 'aws.amazon.com' },

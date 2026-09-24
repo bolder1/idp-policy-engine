@@ -124,11 +124,13 @@ const SECOND: { value: Rule['secondFactor']; label: string; meta: string; icon: 
    as a message. */
 const METHOD_ICON: Record<string, LucideIcon> = {
   'miniOrange Push': BellRing,
-  'TOTP Authenticator': Timer,
-  'WebAuthn / FIDO2': Fingerprint,
-  'SMS / OTP': MessageSquare,
-  'Email OTP': Mail,
-  'Hardware Token': Usb,
+  'miniOrange OTP': Timer,
+  'Google Authenticator': Timer,
+  'Microsoft Authenticator': Timer,
+  'OTP over SMS': MessageSquare,
+  'OTP over Email': Mail,
+  'FIDO2 / Passkey': Fingerprint,
+  'Yubikey Token': Usb,
   'Security Questions': HelpCircle,
 }
 const methodOption = (m: string) => ({ value: m, label: m, icon: METHOD_ICON[m] ?? KeyRound })

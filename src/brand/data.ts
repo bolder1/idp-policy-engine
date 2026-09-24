@@ -1529,7 +1529,9 @@ export const methodSets: MethodSet[] = [
 // --- Rule helpers ------------------------------------------------------------
 
 let ruleSeq = 0
-function rule(over: Partial<Rule> & Pick<Rule, 'name'>): Rule {
+/* Exported for the showcase tenant (showcase-seed.ts), which builds its rules
+   from the same counter so no two rules anywhere share an id. */
+export function rule(over: Partial<Rule> & Pick<Rule, 'name'>): Rule {
   ruleSeq += 1
   /* A who sits immediately before `when`, the one place `withWho` in
      rule-who.ts also puts it, so a seeded rule whose people are cleared and

@@ -259,7 +259,7 @@ export const showcasePolicies: Policy[] = [
         decision: '2fa',
         firstFactor: 'Password',
         secondFactor: 'specific',
-        secondFactorMethods: ['OTP over SMS'],
+        secondFactorMethods: ['OTP over Email'],
         matchEstimate: 38,
       }),
       rule({
@@ -390,7 +390,7 @@ export const showcaseScenarios: Scenario[] = [
       },
       {
         name: 'Medium risk', ifText: 'Device risk score above 39', decision: '2fa',
-        build: () => rule({ name: 'Medium risk', when: when(card(cond('device-risk', 'above', ['39']))), decision: '2fa', firstFactor: 'Password', secondFactor: 'specific', secondFactorMethods: ['OTP over SMS'], matchEstimate: 180 }),
+        build: () => rule({ name: 'Medium risk', when: when(card(cond('device-risk', 'above', ['39']))), decision: '2fa', firstFactor: 'Password', secondFactor: 'specific', secondFactorMethods: ['OTP over Email'], matchEstimate: 180 }),
       },
     ],
   },

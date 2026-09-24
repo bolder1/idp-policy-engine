@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronsDownUp, ChevronsUpDown, Copy, Keyboard, ListOrdered, PanelRightClose, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Check, ChevronsDownUp, ChevronsUpDown, CopyPlus, Keyboard, ListOrdered, PanelRightClose, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
 import { Button, Modal, Tip } from '../../kit'
 import { appsOf, fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
@@ -9,6 +9,7 @@ import { TemplateSheet } from '../../create/TemplateSheet'
 import { ReviewDialog } from '../builder-dialogs'
 import { CommandBar, type Cmd } from '../command-bar'
 import { BoardBar, BoardBarActions } from './BoardBar'
+import { SHOWCASE } from '../../showcase'
 import { BoardEmpty } from './BoardEmpty'
 import { BoardSheet } from './BoardSheet'
 import { buildTemplate, templateBlocker } from './apply-template'
@@ -213,7 +214,8 @@ export function BoardBuilder({
   const [density, setDensity] = useState<'outline' | 'detailed'>('outline')
   const [folds, setFolds] = useState<Record<string, boolean>>({})
   const expandedOf = (ruleId: string) => folds[ruleId] ?? density === 'detailed'
-  const toggleExpand = (ruleId: string) => setFolds((f) => ({ ...f, [ruleId]: !expandedOf(ruleId) }))
+  /* `openOnly` and `toggleExpand` are below, where `draft` exists: closing the
+     others means naming them. */
   const setChainDensity = (d: 'outline' | 'detailed') => {
     setDensity(d)
     setFolds({})
@@ -300,6 +302,39 @@ export function BoardBuilder({
   const present = hist.present
   const facts = useMemo(() => (saved ? { name: saved.name, appIds: saved.appIds, audience: saved.audience } : null), [saved])
   const draft = useMemo(() => (facts ? { ...present, ...facts } : present), [present, facts])
+  /* ONE CARD OPEN AT A TIME, and selecting a card opens it (owner, 23 Sep 2026:
+     "when I select any rule card it should expand, and one card can expand at a
+     time — so if I want to expand another card, the current expanded one should
+     collapse. Expand all and collapse all is perfect, no need to change
+     anything").
+
+     Two things follow from the chain being a chain. Reading a policy is reading
+     an ORDER, and a card open at its full height is most of a screen — three of
+     them open at once and the order is something you scroll for. And the card
+     you are editing is the one the panel is already showing, so a second card
+     standing open is a rule nobody is looking at taking the room.
+
+     `openOnly` writes an explicit entry for EVERY card, not just the one it
+     opens, because `expandedOf` falls back to the chain-wide density — after
+     "Expand all" an absent entry still means open, so the others have to be
+     told. Which is also why "Expand all" and "Collapse all" are untouched: they
+     set the density and clear the overrides, so they still reach the whole
+     chain in one press. The accordion is what a card's OWN click does.
+
+     The fallback at the foot of the chain is a card like any other here. */
+  const cardIds = () => [...draft.rules.map((r) => r.id), 'fallback']
+  /* `[id]: true` LAST, and outside the sweep. A rule that was just inserted is
+     selected in the same tick it is committed (see `insert`), so `draft` here
+     is still the list without it: sweeping `cardIds()` alone would close every
+     card and never open the new one, which is how a rule you had just added
+     arrived folded (owner, 23 Sep 2026: "when I add a new rule, or add my
+     first, the card is still collapsed — fix that"). Written this way the id
+     asked for is opened whether or not the chain has caught up with it. */
+  const openOnly = (id: string) =>
+    setFolds({ ...Object.fromEntries(cardIds().map((k) => [k, false])), [id]: true })
+  /* Closing is only ever about the card you pressed; opening closes the rest. */
+  const toggleExpand = (ruleId: string) =>
+    expandedOf(ruleId) ? setFolds((f) => ({ ...f, [ruleId]: false })) : openOnly(ruleId)
   /* "Start from scratch" is a step Undo can take back (review, 21 Sep 2026). It
      commits nothing — the chain is simply empty — so with no history to walk
      the toolbar Undo used to sit disabled and the template catalogue was gone
@@ -451,11 +486,12 @@ export function BoardBuilder({
       setCmd((v) => !v)
       return
     }
-    /* ⌘↵ — straight to the gate, which is where a finished edit is going. */
+    /* ⌘↵ — saves, the same as the button it stands in for. */
     if (cmd && e.key === 'Enter') {
       e.preventDefault()
-      if (toPublish) setReview(true)
-      else store.showToast('No changes to review')
+      if (!toPublish) store.showToast('Nothing to save')
+      else if (saveBlocked) store.showToast(`${blockers} error${blockers === 1 ? '' : 's'} to fix first`)
+      else saveNow()
       return
     }
     /* ⌘ — the panel is a lot of the screen, and reading the chain is a
@@ -577,6 +613,30 @@ export function BoardBuilder({
     [live, saved, draft, env],
   )
   const blockers = diagnostics.filter((d) => d.severity === 'error' && (d.ruleIndex === -1 || draft.rules[d.ruleIndex]?.enabled)).length
+  /* The gate the review dialog's footer used to hold, now that the bar saves
+     without it. A policy with no applications saves as a draft whatever else is
+     true (`committed`), and an unfinished draft is allowed its errors.
+
+     NOT IN THE SHOWCASE. The dialog could block on an error because the dialog
+     LISTED the errors — you could read what was wrong and go and fix it. This
+     build shows them nowhere: the panel's findings banner is behind `!SHOWCASE`
+     (owner, 22 Sep 2026: "remove all the missing or broken or conflict
+     messages") and lite withholds the Check sheet, so a blocked button here was
+     a dead end — "1 error to fix first" on a screen with no errors on it
+     (owner, 23 Sep 2026: "why is this save always disabled?"). It happens
+     easily: take the one condition off a rule and the rule can never run.
+
+     A gate whose fault cannot be seen is worse than no gate, so the rule is
+     "block only where the reason is readable". Put the findings back and this
+     goes back with them. */
+  const saveBlocked = !SHOWCASE && blockers > 0 && (draft.appIds.length > 0 || draft.isSystem === true)
+  /* Straight to the store. The read-back dialog is still mounted below and is
+     still what the walkthrough opens; the bar no longer goes through it.
+     `keep-off` because turning a draft on was the dialog's other button, and
+     that lives on the status pill beside the name. */
+  const saveNow = () => {
+    if (toPublish && !saveBlocked) publish('keep-off')
+  }
 
   const selAt = selection.kind === 'rule' ? draft.rules.findIndex((r) => r.id === selection.id) : -1
   const selName = selAt >= 0 ? draft.rules[selAt].name : ''
@@ -606,6 +666,11 @@ export function BoardBuilder({
   const select = (s: Selection) => {
     setSelection(s)
     if (s.kind !== 'none') setInspOpen(true)
+    /* Selecting a card unfolds it, and folds whatever was unfolded. The start
+       node and a click on the background select no card, so they leave the
+       chain as it is — nothing was chosen over the open card. */
+    if (s.kind === 'rule') openOnly(s.id)
+    else if (s.kind === 'fallback') openOnly('fallback')
   }
   /* The panel is on screen only when it has something to say AND has not been
      collapsed. One class for both, because the layout must not be able to tell
@@ -646,7 +711,7 @@ export function BoardBuilder({
     { id: 'add', label: 'Add a rule', icon: Plus },
     ...(selAt >= 0
       ? ([
-          { id: 'dup', label: `Duplicate rule ${selAt + 1} · ${selName}`, kbd: chord(['mod'], 'D', MAC), icon: Copy },
+          { id: 'dup', label: `Duplicate rule ${selAt + 1} · ${selName}`, kbd: chord(['mod'], 'D', MAC), icon: CopyPlus },
           { id: 'del', label: `Delete rule ${selAt + 1} · ${selName}`, kbd: 'Del', icon: Trash2, danger: true },
         ] as Cmd[])
       : []),
@@ -853,7 +918,8 @@ export function BoardBuilder({
             onSheet={setSheet}
             onSaveDraft={saveDraft}
             onDiscard={discard}
-            onReview={() => setReview(true)}
+            saveBlocked={saveBlocked}
+            onSave={saveNow}
           />
         }
       />
@@ -1024,6 +1090,18 @@ export function BoardBuilder({
           onPatchRule={patchRule}
           onPatchFallback={patchFallback}
           onRemoved={offerUndo}
+          /* The panel's own save — the bar's act, at the foot of the form,
+             in the bar's other words and a quieter weight. */
+          canSave={toPublish && !saveBlocked}
+          saveLabel="Save rule"
+          saveTitle={
+            !toPublish
+              ? 'Nothing to save'
+              : saveBlocked
+                ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first`
+                : undefined
+          }
+          onSave={saveNow}
           onAppsSaved={() => {
             setInspOpen(false)
             setSelection({ kind: 'none' })
@@ -1067,7 +1145,7 @@ export function BoardBuilder({
             if (id === 'add') insert(blankRule(), draft.rules.length)
             else if (id === 'undo') undoStep()
             else if (id === 'redo') setHist(redo)
-            else if (id === 'publish') setReview(true)
+            else if (id === 'publish') saveNow()
             else if (id === 'panel') setInspOpen((v) => !v)
             else if (id === 'keys') setKeys(true)
             else if (id === 'dup' && selAt >= 0) duplicate(selAt)

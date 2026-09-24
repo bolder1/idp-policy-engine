@@ -943,11 +943,11 @@ export interface ReachMeta {
   /** One line under the name, where the choice is made. The blurb is the `?`. */
   summary: string
   blurb: string
-  /* The console puts "Windows only" in a callout that appears AFTER agent-based
-     has been chosen, which is one screen too late to be a decision input. A
-     platform limit is a property of the choice, so it travels on the row — as a
-     pill short enough to read before choosing, with the full consequence in
-     `note` behind the row's `?`. */
+  /* A short pill beside the name. "Windows only" rode here on the agent-based
+     choice until 23 Sep 2026, when the owner took it off ("remove this tag"):
+     the prerequisites callout under the choice says it in full, and the pill
+     was the same fact twice on one tile. Nothing carries a tag now; the field
+     stays for the next one that earns it. */
   tag?: string
   note?: string
 }
@@ -966,7 +966,6 @@ export const REACHES: ReachMeta[] = [
     summary: 'Adds hardware identifiers: TPM, motherboard, disk',
     blurb:
       'An installed agent adds hardware identifiers — TPM, motherboard, disk — for high-assurance access.',
-    tag: 'Windows only',
     note: 'Users without the agent cannot sign in.',
   },
 ]
@@ -1309,7 +1308,7 @@ export function profileReview(before: FingerprintProfile, after: FingerprintProf
   if (asksReach(after.mode)) {
     const setUp = (p: FingerprintProfile) => (p.restrictionSet ? 'Set up' : 'Not set up')
     push('Basic details', setUp(before), setUp(after), setup)
-    push('What it can read', reachLabel(before.reach), reachLabel(after.reach), setup)
+    push('Device restriction type', reachLabel(before.reach), reachLabel(after.reach), setup)
   }
   /* In the form's order: method, then the allowance or the roster that
      replaces it, then the two switches. */
@@ -1348,12 +1347,12 @@ export function profileReview(before: FingerprintProfile, after: FingerprintProf
 export function profileChangeParts(before: FingerprintProfile, after: FingerprintProfile): string[] {
   const parts: string[] = []
   if (before.name !== after.name) parts.push('Name')
-  if (before.reach !== after.reach) parts.push('What it can read')
+  if (before.reach !== after.reach) parts.push('Device restriction type')
   const enrol = ['registration', 'maxDevices', 'roster', 'restrictMobile', 'autoRegister'] as const
   if (enrol.some((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]))) parts.push('Device registration')
-  /* Named only when nothing it covers is already named: "What it can read"
+  /* Named only when nothing it covers is already named: "Device restriction type"
      beside "Basic details" says one change twice in a two-item footer. */
-  const basicNamed = parts.includes('What it can read') || parts.includes('Device registration')
+  const basicNamed = parts.includes('Device restriction type') || parts.includes('Device registration')
   if (asksReach(after.mode) && before.restrictionSet !== after.restrictionSet && !basicNamed) parts.push('Basic details')
   const was = chosenAttributes(before).map((a) => a.id)
   const now = chosenAttributes(after)

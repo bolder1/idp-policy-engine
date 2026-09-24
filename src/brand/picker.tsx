@@ -85,6 +85,7 @@ export function Picker({
   autoOpen = false,
   summary: summaryText,
   prefix,
+  icon: Ico,
   noun = 'options',
 }: {
   value: string | string[] | null
@@ -120,6 +121,10 @@ export function Picker({
       "Type  Device health". What the dropdown filters, said once, so the value
       does not have to carry it ("All types"). */
   prefix?: string
+  /** A mark before the prefix, for a control whose JOB needs naming — the
+      library filters wear a funnel so the row reads as "search, then filter"
+      without a word for it (owner, 23 Sep 2026: "just add a filter icon"). */
+  icon?: LucideIcon
   /** Plural, lower case, for the empty states: 'applications', 'zones'. */
   noun?: string
 }) {
@@ -362,6 +367,7 @@ export function Picker({
             {sole.art}
           </span>
         )}
+        {Ico && <Ico className="bx-picker__icon" size={size === 'sm' ? 13 : 14} strokeWidth={2} aria-hidden />}
         {prefix && <span className="bx-picker__prefix">{prefix}</span>}
         <span className="bx-picker__value">{summary}</span>
         <ChevronDown size={size === 'sm' ? 12 : 13} strokeWidth={2.1} aria-hidden />

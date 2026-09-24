@@ -688,9 +688,11 @@
 
 /* The columns' names over a profile's list (22 Sep 2026): small, quiet, and
    on a hairline, so the rows under them read as a table without a box round it. */
+/* No rule under a column heading (owner, 23 Sep 2026: "remove the divider
+   after each line, not needed"): the names are small and quiet and the rows
+   under them are spaced, so a line as well drew a form where there is a list. */
 .bfp2__colhead {
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: var(--space-2);
   font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary);
 }
 /* Top-aligned, so a column name whose bracket has wrapped keeps its first line
@@ -1448,6 +1450,10 @@
 .bfp2__agentlist {
   margin: var(--space-3) 0 var(--space-5); padding-left: 18px;
   display: flex; flex-direction: column; gap: var(--space-2);
+  /* A step down from the callout's own size (owner, 23 Sep 2026): three
+     sentences of prerequisites at body size read as loudly as the form they
+     are about. */
+  font-size: var(--fs-sm); line-height: 1.5;
 }
 
 /* The section's own rhythm: four questions, each a block, with air between them

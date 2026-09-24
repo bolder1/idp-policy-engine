@@ -1506,14 +1506,37 @@ html[data-theme='dark'] {
    pair of columns runs through the review and a value in Signals starts where
    a value in Profile does.
 
-   `auto`, not `max-content`: an auto track shrinks when the room runs out, so
-   a long name wraps instead of squeezing its value to nothing. Every block
-   carries the same padding, so the fills offset their tracks by the same
-   amount and the columns still agree. */
+   `fit-content(320px)`, not `minmax(auto, 260px)`: the name track sizes to the
+   LONGEST NAME IN THE REVIEW and stops there, instead of holding a fixed 260px
+   whatever is in it. The old track took its full 260px even when the only row
+   said "macOS version" — 95px of text, then 210px of nothing, then the value
+   (owner, 23 Sep 2026: "why so much space here"). `fit-content` keeps the two
+   things the shared column was for — every value in the review starts on one
+   x, and a name is never cut — while spending no width on names nobody wrote.
+   The 320px ceiling is where a name stops growing and starts wrapping, so one
+   long attribute cannot push the values off the right of the panel.
+
+   24px between a name and its value. It was 40px, set when the column was a
+   fixed 260px and every value looked detached from its name; with the track
+   hugging the text, 40px put the hole back. Every block carries the same
+   padding, so the fills offset their tracks by the same amount and the columns
+   still agree. */
 .bx-cl.is-list {
-  display: grid; grid-template-columns: auto minmax(0, 1fr);
-  column-gap: var(--space-7); row-gap: var(--space-6);
+  display: grid; grid-template-columns: fit-content(320px) minmax(0, 1fr);
+  column-gap: var(--space-8); row-gap: var(--space-6);
 }
+/* A SUBGRID DOES NOT INHERIT THE PARENT'S GAP, and that is what made the
+   review look broken however the tracks were written.
+
+   `grid-template-columns: subgrid` lines a child up with the parent's tracks,
+   but the child's own `column-gap` decides the space between them — and these
+   levels had one: `.bx-cl__body` carries `gap: var(--space-4)` from its flex
+   layout, which survives into the grid as an 8px column gap. So the outer 40px
+   was never drawn; the value sat 8px off its name while the NAME TRACK held a
+   fixed 260px, which is the hole the owner saw ("why so much space here").
+   Measured in the browser: every value of the outer gap, from 16 to 40px, came
+   out as 8px on screen. Set it on every level and the declared gap is the one
+   you get — 24px, verified. */
 .bx-cl.is-list .bx-cl__sec,
 .bx-cl.is-list .bx-cl__body,
 .bx-cl.is-list .bx-cl__block,
@@ -1521,10 +1544,11 @@ html[data-theme='dark'] {
 .bx-cl.is-list .bx-cl__row {
   grid-column: 1 / -1;
   display: grid; grid-template-columns: subgrid;
+  column-gap: var(--space-8);
 }
 .bx-cl.is-list .bx-cl__sec { row-gap: var(--space-4); }
 .bx-cl.is-list .bx-cl__body { row-gap: var(--space-4); padding-top: 0; }
-.bx-cl.is-list .bx-cl__row { align-items: baseline; }
+.bx-cl.is-list .bx-cl__row { align-items: baseline; padding-block: var(--space-3); }
 /* The header, the chip, the note and the link span both tracks. */
 .bx-cl.is-list .bx-cl__head,
 .bx-cl.is-list .bx-cl__kindrow,
@@ -1532,16 +1556,11 @@ html[data-theme='dark'] {
 .bx-cl.is-list .bx-cl__more { grid-column: 1 / -1; }
 /* A row with no name of its own: the value takes the line. */
 .bx-cl.is-list .bx-cl__row.is-bare .bx-cl__value { grid-column: 1 / -1; }
-/* The value says what the change does, so it carries the kind's ink — the one
-   other coloured thing besides the chip. */
-.bx-cl__block.is-added .bx-cl__value,
-.bx-cl__block.is-added .bx-cl__after { color: var(--fb-positive-fg); }
-.bx-cl__block.is-changed .bx-cl__value,
-.bx-cl__block.is-changed .bx-cl__after { color: var(--fb-info-fg); }
-.bx-cl__block.is-removed .bx-cl__value,
-.bx-cl__block.is-removed .bx-cl__before { color: var(--fb-negative-fg); }
-.bx-cl__block.is-effect .bx-cl__value,
-.bx-cl__block.is-effect .bx-cl__after { color: var(--fb-notice-fg); }
+/* The values are ink (owner, 23 Sep 2026: "only black for the list, the colour
+   in the pills on the headings is enough"). The kind chip over the block says
+   added, changed, removed or effect once; repeating it in every value below it
+   tinted whole paragraphs of the dialog. In Before & after the old value keeps
+   its quieter ink and its strike, which is what tells the two columns apart. */
 /* On its way out: struck, and never the dark ink of a value that stays. */
 .bx-cl__value.is-leaving {
   font-weight: var(--fw-regular);

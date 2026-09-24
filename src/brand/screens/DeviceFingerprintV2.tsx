@@ -3,7 +3,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type 
 import {
   AlertTriangle,
   ArrowLeft,
-  Copy,
+  CopyPlus,
   Eye,
   Fingerprint,
   Link2,
@@ -410,7 +410,10 @@ interface ListFocus {
 
 const ROW_ITEMS: MenuItem[] = [
   { id: 'open', label: 'View details', icon: Eye },
-  { id: 'duplicate', label: 'Duplicate', icon: Copy },
+    /* CopyPlus, the glyph the policy builder's rule menu uses (owner, 23 Sep
+       2026: "use the one we use inside the policy builder"). Two sheets alone
+       read as "copy to the clipboard"; the plus says a second one is made. */
+  { id: 'duplicate', label: 'Duplicate', icon: CopyPlus },
   { id: 'uses', label: 'Used by', icon: Link2 },
   { id: 'delete', label: 'Delete', icon: Trash2, danger: true, divide: true },
 ]
@@ -468,7 +471,13 @@ function ProfileList({
   })
 
   /* As many rows as fit the window, and a pager for the rest. */
-  const [view, setView] = useLibView('device-profiles')
+  /* The showcase presents ONE view (owner, 23 Sep 2026: "keep list view only,
+     remove the view selection — make it the default and hide the three").
+     Pinned here, at the call site, so a view saved by an earlier visit cannot
+     bring a hidden one back; `useLibView` still describes storage, and flipping
+     SHOWCASE gives the switch and the saved preference back. */
+  const [savedView, setView] = useLibView('device-profiles')
+  const view = SHOWCASE ? 'list' : savedView
   const paged = usePagedList(shown, {
     rowHeight: libRowHeight(view),
     grid: view === 'card',
@@ -603,7 +612,7 @@ function ProfileList({
           }
           right={
             <>
-              <ViewSwitch value={view} onChange={setView} label="Device profile view" />
+              {!SHOWCASE && <ViewSwitch value={view} onChange={setView} label="Device profile view" />}
               {/* The span is what focus finds on the way back from a create
                   flow — the kit's Button takes no ref. */}
               <span className="bfp2__create">
@@ -1095,9 +1104,9 @@ function ProfilePage({
                   {needsReach && (
                     <section className="bfp2__basicsec bfp2__reachask">
                       <header className="bfp2__sechead">
-                        <h2 id={reachAskId}>What it can read</h2>
+                        <h2 id={reachAskId}>Device restriction type</h2>
                         <TipDot
-                          label="What it can read"
+                          label="Device restriction type"
                           text="Decides which signals are available. Hardware identifiers need the Device Agent."
                         />
                       </header>
@@ -1403,9 +1412,9 @@ function BasicDetailsForm({
       {asksReach(profile.mode) && (
         <section className="bfp2__basicsec" ref={reachSection}>
           <header className="bfp2__sechead">
-            <h2 id={reachId}>What it can read</h2>
+            <h2 id={reachId}>Device restriction type</h2>
             <TipDot
-              label="What it can read"
+              label="Device restriction type"
               text="Decides which signals are available. Hardware identifiers need the Device Agent."
             />
           </header>

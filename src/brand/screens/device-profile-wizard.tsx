@@ -2,7 +2,7 @@ import { createPortal } from 'react-dom'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { ArrowLeft, Check, Lock } from 'lucide-react'
 
-import { Badge, Button, Drawer, Tip, TipDot, TipMark } from '../kit'
+import { Button, Drawer, TipDot, TipMark } from '../kit'
 import { ChangeList, ChangeSection } from '../change-list'
 import { DEVICES_NOTE, TYPE_NOTE, itemsNote } from './profile-notes'
 import { TierPick } from '../tier-pick'
@@ -199,9 +199,9 @@ export function DeviceProfileWizard({
   const nameProblem = nameIssue(s.name, names)
   const nameShown = nameProblem !== null && (touched || s.name.trim() !== '')
   const footReason = step.id === 'profile' && nameShown ? null : issue
-  /* "Next: Checks" only when Next can be pressed. Beside a disabled Next, with
-     the reason under the field, it read as ready to go on (15 Sep 2026). */
-  const footNext = issue === null && here < last ? steps[here + 1].label : null
+  /* `footNext` stood here — "Next: Checks" beside the button. The footer is
+     buttons and a blocked reason now (23 Sep 2026), and the stepper above the
+     form is where the next step is named. */
 
   const nameId = useId()
   const reachId = useId()
@@ -266,9 +266,9 @@ export function DeviceProfileWizard({
         <div className="bfp2__basic">
           <section className="bfp2__basicsec">
             <header className="bfp2__sechead">
-              <h2 id={reachId}>What it can read</h2>
+              <h2 id={reachId}>Device restriction type</h2>
               <TipDot
-                label="What it can read"
+                label="Device restriction type"
                 text="Decides which signals are available. Hardware identifiers need the Device Agent."
               />
             </header>
@@ -404,16 +404,21 @@ export function DeviceProfileWizard({
     setHost(document.querySelector<HTMLElement>('.bshell__main'))
   }, [])
 
-  /* The save footer's strip, in the same place and the same voice: where you
-     are on the left, the one thing to press on the right. Always shown — a
-     wizard always has a next thing to press — and never animated in. */
-  /* Back or Cancel, and Next or Create — the same pair in the page's footer and
-     in the slide-over's actions. */
-  const navButtons = (
+  /* The footer is buttons only (owner, 23 Sep 2026): leaving is on the left,
+     moving is on the right, and the step line is gone — the stepper above the
+     form already says which step this is and what comes next.
+
+     So: Cancel on the left, then Back beside the one main button, which is
+     Next until the last step and Create profile on it. Back is drawn from the
+     second step on and never replaces Cancel, so the way out does not move
+     under the hand. */
+  const backAndMain = (
     <>
-      <Button variant="ghost" onClick={here === 0 ? cancel : () => go(here - 1)}>
-        {here === 0 ? 'Cancel' : 'Back'}
-      </Button>
+      {here > 0 && (
+        <Button variant="ghost" onClick={() => go(here - 1)}>
+          Back
+        </Button>
+      )}
       {here === last ? (
         <Button variant="brand" icon={Check} disabled={finalIssue !== null} title={finalIssue ?? undefined} onClick={create}>
           Create profile
@@ -425,24 +430,31 @@ export function DeviceProfileWizard({
       )}
     </>
   )
+  const navButtons = (
+    <>
+      <Button variant="ghost" onClick={cancel}>
+        Cancel
+      </Button>
+      {backAndMain}
+    </>
+  )
 
   const footer = (
     <div className="bx-savebar bdpw__foot">
-      <span className="bx-savebar__text" role="status">
-        <strong>
-          Step {here + 1} of {steps.length}: {step.label}
-        </strong>
-        {footReason ? (
-          <span className="is-blocked">{footReason}</span>
-        ) : footNext ? (
-          <span>Next: {footNext}</span>
-        ) : here === last ? (
-          <span>Ready to create</span>
-        ) : null}
-      </span>
+      <Button variant="ghost" onClick={cancel}>
+        Cancel
+      </Button>
+      {/* Why the step cannot be left yet, where the step line used to be: it is
+          the one thing the footer still has to say, and it says it beside the
+          button it is about. */}
+      {footReason && (
+        <span className="bdpw__blocked" role="status">
+          {footReason}
+        </span>
+      )}
       {/* In a group, so the kit's 148px floor for the footer's one button does
           not land on Back. */}
-      <div className="bdpw__acts">{navButtons}</div>
+      <div className="bdpw__acts">{backAndMain}</div>
     </div>
   )
 
@@ -770,11 +782,7 @@ function InlineRow({
         </span>
         {attr.always ? <TipDot label={`About ${attr.name}`} text={attr.purpose} /> : <TipMark text={attr.purpose} />}
       </span>
-      {attr.phase === 2 && (
-        <span className="bfp2__pickstate">
-          <Badge tone="notice">Not collected yet</Badge>
-        </span>
-      )}
+
     </>
   )
 
@@ -818,15 +826,8 @@ function InlineRow({
         </fieldset>
       )}
 
-      {attr.always && (
-        <span className="bfp2__checkdel">
-          <Tip text="Always on — can't be removed">
-            <button type="button" className="bfp2__checklock" aria-label={`${attr.name} is always on`}>
-              <Lock size={14} strokeWidth={2} aria-hidden />
-            </button>
-          </Tip>
-        </span>
-      )}
+      {/* The always-on lock stood here (owner, 23 Sep 2026: "remove lock icon,
+          not needed"): the row's tick is already on and refuses to turn off. */}
       {error && <span className="bfp2__checkerror">{error}</span>}
     </li>
   )

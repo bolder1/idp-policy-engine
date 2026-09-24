@@ -23,25 +23,13 @@ export type SetupCard =
     }
   | { kind: 'nps' }
 
+/* Only Microsoft Push (owner, 23 Sep 2026: "remove the setup from these and
+   only keep it for Microsoft Push"). The three `app` cards said the same thing
+   — install this app on a phone and scan a code — which is the end user's job,
+   not a tenant setting; Push is different, because the admin has to name the
+   NPS server it talks to. The `app` kind stays in the type for the next method
+   that genuinely walks an admin through something. */
 const CARDS: Record<string, SetupCard> = {
-  'google-auth': {
-    kind: 'app',
-    app: 'Google Authenticator',
-    android: 'https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2',
-    ios: 'https://apps.apple.com/app/google-authenticator/id388497605',
-  },
-  'ms-auth': {
-    kind: 'app',
-    app: 'Microsoft Authenticator',
-    android: 'https://play.google.com/store/apps/details?id=com.azure.authenticator',
-    ios: 'https://apps.apple.com/app/microsoft-authenticator/id983156458',
-  },
-  authy: {
-    kind: 'app',
-    app: 'Authy',
-    android: 'https://play.google.com/store/apps/details?id=com.authy.authy',
-    ios: 'https://apps.apple.com/app/twilio-authy/id494168017',
-  },
   'ms-push': { kind: 'nps' },
 }
 

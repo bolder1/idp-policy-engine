@@ -5,6 +5,7 @@ import {
   Check,
   CirclePlus,
   Copy,
+  CopyPlus,
   Globe,
   Info,
   Layers,
@@ -18,12 +19,15 @@ import {
   X,
 } from 'lucide-react'
 
-import { Button, IconButton, Modal, NameField, NumberStepper, RowMenu, SaveBar, SearchBox, type MenuItem } from '../kit'
+import { Button, IconButton, Modal, NameField, RowMenu, SaveBar, SearchBox, type MenuItem } from '../kit'
 import { PageHead } from '../Shell'
 import { Picker } from '../picker'
 import {
   ASN_DIRECTORY,
-  RANGE_KM_MAX,
+  DISTANCE_UNITS,
+  RANGE_MAX,
+  unitOf,
+  type DistanceUnit,
   emptyLocation,
   ipSectionEmpty,
   locationEmpty,
@@ -115,7 +119,10 @@ const NAME_IN_USE = 'A zone with this name already exists.'
 
 const ZONE_MENU: MenuItem[] = [
   { id: 'open', label: 'Edit', icon: Pencil },
-  { id: 'duplicate', label: 'Duplicate', icon: Copy },
+    /* CopyPlus, the glyph the policy builder's rule menu uses (owner, 23 Sep
+       2026: "use the one we use inside the policy builder"). Two sheets alone
+       read as "copy to the clipboard"; the plus says a second one is made. */
+  { id: 'duplicate', label: 'Duplicate', icon: CopyPlus },
   { id: 'uses', label: 'Used by', icon: Link2 },
   { id: 'delete', label: 'Delete', icon: Trash2, danger: true, divide: true },
 ]
@@ -174,7 +181,13 @@ export function ZonesFinal() {
     )
   }, [store.zones, q, shape])
 
-  const [view, setView] = useLibView('zones')
+  /* The showcase presents ONE view (owner, 23 Sep 2026: "keep list view only,
+     remove the view selection — make it the default and hide the three").
+     Pinned here, at the call site, so a view saved by an earlier visit cannot
+     bring a hidden one back; `useLibView` still describes storage, and flipping
+     SHOWCASE gives the switch and the saved preference back. */
+  const [savedView, setView] = useLibView('zones')
+  const view = SHOWCASE ? 'list' : savedView
   const paged = usePagedList(shown, {
     rowHeight: libRowHeight(view),
     grid: view === 'card',
@@ -332,7 +345,7 @@ export function ZonesFinal() {
                 }
                 right={
                   <>
-                    <ViewSwitch value={view} onChange={setView} label="Zone view" />
+                    {!SHOWCASE && <ViewSwitch value={view} onChange={setView} label="Zone view" />}
                     <Button variant="brand" icon={Plus} onClick={() => setNaming(true)}>
                       New zone
                     </Button>
@@ -1026,9 +1039,10 @@ export function AcceptsNote() {
           <em>An ASN</em>
         </li>
       </ul>
-      <p className="bz7__sidep">
-        Paste a list to add several at once. Entries that can't be read stay in the row.
-      </p>
+      {/* The paste line stood here — "Paste a list to add several at once…"
+          (owner, 23 Sep 2026: "remove"). The examples are what the note is
+          for; pasting is something the field does whether or not it is
+          announced. */}
     </div>
   )
 }
@@ -1059,8 +1073,8 @@ export function PlacesNote() {
         </li>
       </ul>
       <p className="bz7__sidep">
-        A country covers its states and cities, and a state covers its cities. Adding the wider place
-        removes the narrower ones.
+        A country covers its states and cities, and a state covers its cities. The narrower ones stay
+        in the list, marked as covered.
       </p>
       <p className="bz7__sidep">Matched on the sign-in's IP address. A VPN shows where it exits.</p>
     </div>
@@ -1591,17 +1605,12 @@ function withPlace(l: ZoneLocation, p: Place, replacing: Chosen | null): ZoneLoc
     const base = replacing ? withoutPlace(l, replacing) : l
     next = { ...base, [list]: [...base[list], p.name] }
   }
-  /* The reverse sweep: a wider place makes the narrower ones inside it redundant. */
-  if (p.kind === 'country') {
-    next = {
-      ...next,
-      states: next.states.filter((s) => !inCountry(s, p.name, 'state')),
-      cities: next.cities.filter((c) => !inCountry(c, p.name, 'city')),
-    }
-  }
-  if (p.kind === 'state') {
-    next = { ...next, cities: next.cities.filter((c) => !inState(c, p.name, p.country)) }
-  }
+  /* Nothing is swept away. Adding India used to delete every Indian city and
+     state in the list (owner, 23 Sep 2026: "don't remove the things I added —
+     twelve cities and then India, and undoing it means adding twelve cities
+     again"). They stay, each marked as covered by the wider place, so removing
+     the country leaves them exactly as they were. A covered row changes
+     nothing about what the zone matches: the country already matches it. */
   return next
 }
 
@@ -1723,16 +1732,20 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
 
   /* A city's distance. From 0 it becomes a range around the city; back to 0 it
      is the city again. Stored in whichever list says what it now is. */
-  const setCityKm = (c: Chosen, km: number) => {
+  /* The distance and its unit are one answer, so both arrive together: the
+     number box sends the unit it is showing, the unit dropdown sends the
+     number already there. Zero still means "the city itself", whichever unit
+     is on screen, and the row goes back to being a plain city. */
+  const setCityKm = (c: Chosen, km: number, unit: DistanceUnit = 'km') => {
     if (c.kind === 'range') {
-      if (km > 0) put({ ...l, ranges: l.ranges.map((r) => (r === c.range ? { ...r, km } : r)) })
+      if (km > 0) put({ ...l, ranges: l.ranges.map((r) => (r === c.range ? { ...r, km, unit } : r)) })
       else put({ ...l, ranges: l.ranges.filter((r) => r !== c.range), cities: [...l.cities, c.range.label] })
       return
     }
     if (c.kind !== 'cities' || km <= 0) return
     const p = cityNamed(c.v)
     if (!p) return
-    put({ ...l, cities: l.cities.filter((x) => x !== c.v), ranges: [...l.ranges, rangeAt(p, km)] })
+    put({ ...l, cities: l.cities.filter((x) => x !== c.v), ranges: [...l.ranges, { ...rangeAt(p, km), unit }] })
   }
 
   if (chosen.length === 0 && !open) {
@@ -1919,11 +1932,23 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
      country's or a state's is shown and disabled at 0: a circle is drawn around
      a point, and a country is not one. Its own column beside the place, not
      inside it, so every row's range lines up. */
+  /* "In India", where a wider place in the same list already covers this one.
+     Read from the location as it stands, so it appears and goes as the country
+     is added and removed. */
+  const coverNote = (c: Chosen): string | null => {
+    const kind: Place['kind'] = c.kind === 'range' || c.kind === 'cities' ? 'city' : c.kind === 'states' ? 'state' : 'country'
+    if (kind === 'country') return null
+    const p = PLACES.find((x) => x.kind === kind && x.name === c.v)
+    return p ? coveredBy(p, l) : null
+  }
+
   const placeLine = (c: Chosen) => {
     const city = c.kind === 'range' || c.kind === 'cities'
     const key = cityKey(c)
     const km = c.kind === 'range' ? c.range.km : 0
+    const unit: DistanceUnit = c.kind === 'range' ? unitOf(c.range) : 'km'
     const kind = city ? 'City' : (c as PlaceRow).label
+    const covered = coverNote(c)
     return (
       <div className="bz7__fieldline">
         <button
@@ -1934,6 +1959,8 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
           onClick={() => openReplace(c)}
         >
           <span className="bz7__placename">{c.v}</span>
+          {/* Not a warning: the zone still matches exactly what it says. */}
+          {covered && <span className="bz7__covered">In {covered}</span>}
           <span className="bz7__placekind">{kind}</span>
         </button>
         <fieldset
@@ -1942,15 +1969,27 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
           disabled={!city}
           title={city ? undefined : 'A range is drawn around a city'}
         >
-          <NumberStepper
+          {/* The product's control (owner, 23 Sep 2026): the number typed in a
+              plain box, the unit chosen beside it. It was a stepper with "km"
+              printed inside, which offered no other unit and spent two arrows
+              on a number nobody nudges one at a time. */}
+          <input
             id={`${kmUid}-${key}`}
-            width="fill"
-            value={km}
-            min={0}
-            max={RANGE_KM_MAX}
-            unit="km"
-            label={`Range around ${c.v}`}
-            onChange={(v) => setCityKm(c, v)}
+            className="bz7__rangenum"
+            inputMode="numeric"
+            aria-label={`Range around ${c.v}`}
+            value={String(km)}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 4)
+              setCityKm(c, Math.min(Number(digits || 0), RANGE_MAX[unit]), unit)
+            }}
+          />
+          <Picker
+            size="md"
+            label={`Range unit for ${c.v}`}
+            value={unit}
+            options={DISTANCE_UNITS}
+            onChange={(v) => setCityKm(c, km, v as DistanceUnit)}
           />
         </fieldset>
         {/* The same remove as an IP network row. Its mousedown keeps an open
@@ -1997,14 +2036,7 @@ export function PlaceSection({ draft, onChange }: { draft: Zone; onChange: (z: Z
 
 /* --- Helpers --------------------------------------------------------------------- */
 
-/* Whether a state or city of this name sits inside a country, asked of the
-   catalogue directly. It was a ranked search capped at forty hits, which only
-   held because an exact name happens to rank first. */
-function inCountry(name: string, country: string, kind: 'state' | 'city'): boolean {
-  return PLACES.some((p) => p.kind === kind && p.name === name && p.country === country)
-}
-
-/* Whether a city of this name sits inside a state of that country. */
-function inState(city: string, state: string, country: string): boolean {
-  return PLACES.some((p) => p.kind === 'city' && p.name === city && p.state === state && p.country === country)
-}
+/* `inCountry` and `inState` stood here: the tests a wider place used to sweep
+   the narrower ones out of the list with. Nothing sweeps any more (23 Sep
+   2026) — a covered row stays and says "In India" — and `coveredBy` in
+   places.ts answers the same question for the note. */

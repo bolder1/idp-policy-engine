@@ -277,15 +277,11 @@
 
    Nothing is added back. Three things already say what it is, and none of them
    is a colour: the badge reads "System", the row is PINNED to the top whatever
-   the sort is doing (see `rows` in Policies.tsx), and its cells carry a heavier
-   rule underneath than the hairline between the tenant's own policies. That
-   last one is the whole drawing — the same separation a totals row gets, which
-   is the right idiom: it is not one of the ten below it, it is what is left
-   when none of them matches.
-
-   The hover comes back with the fill going, so the row behaves like every other
-   row in a table where it is just as clickable. */
-.btable tbody tr.is-system td { border-bottom: var(--bw-thin) solid var(--border-strong); }
+   the sort is doing (see `rows` in Policies.tsx). It used to carry a heavier
+   rule underneath as well, the separation a totals row gets; the owner took
+   that off on 23 Sep 2026 — "no need for this harsh border, the pill alone is
+   enough to distinguish it" — so the row is drawn like every other row and the
+   System badge does the telling. */
 
 .btable__primary { display: flex; align-items: center; gap: var(--space-4); min-width: 230px; }
 .btable__link {

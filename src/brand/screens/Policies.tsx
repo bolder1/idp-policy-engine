@@ -3,9 +3,10 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import {
   AppWindow,
   Check,
-  Copy,
+  CopyPlus,
   Grid3x3,
   LayoutTemplate,
+  ListFilter,
   Pencil,
   Plus,
   Power,
@@ -24,13 +25,15 @@ import { AppLogo } from '../logos/AppLogo'
 import { Badge, Button, Modal, RowMenu, SearchBox, StatusPill, TipMark, type MenuItem } from '../kit'
 import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
 import type { LibView, ViewOption } from './library-view-state'
-import { FilterTabs, PageBar } from './page-bar'
+import { PageBar } from './page-bar'
+import { Picker } from '../picker'
 import { appsOf, blankPolicy, enforces, type Policy } from '../data'
 import { NewPolicyDialog } from '../create/NewPolicyDialog'
 import { useBrand, useNameLookup } from '../store'
 import { ChangeState } from '../leave-guard'
 import { EmptyState, NoMatches } from '../empty'
 import { openForEditing } from '../policy-draft'
+import { freeName } from '../policy-name'
 import { scenarioFromPolicy } from '../template-from-policy'
 import { SaveTemplateDialog } from './builder-dialogs'
 import { ConfirmDelete } from './confirm-delete'
@@ -73,7 +76,10 @@ function exposureOf(r: GauntletResult) {
   return { tone: 'ok' as const, label: 'Nothing got through', rank: 0 }
 }
 
-/* Out as segments, in the order they are used: what decides sign-ins first. */
+/* In the order they are used: what decides sign-ins first. They were out as
+   segments across the bar until 23 Sep 2026 — owner: "remove the open filter
+   from Policies, just add a filter icon" — so status now answers in the same
+   one-line dropdown every other library page uses. */
 const STATUS_TABS: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'active', label: 'Active' },
@@ -105,8 +111,7 @@ export function Policies() {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'modified', dir: 1 })
-  /* Creating a policy is a form, opened here; it lands in the builder, where
-     templates are offered from the empty board. */
+  /* The naming form. Only the guided build opens it now — see `newPolicy`. */
   const [naming, setNaming] = useState(false)
   const [interview, setInterview] = useState(false)
   /** The application the form had already collected, carried into the guided build. */
@@ -121,6 +126,40 @@ export function Policies() {
     setDialogOpen(true)
   }
   const closeDialog = () => setDialogOpen(false)
+
+  /* New policy, the way a design tool makes a new file (owner, 23 Sep 2026:
+     "by default it should open in draft mode with an untitled name — how Figma
+     works, no need to ask questions").
+
+     One click, and you are in the builder looking at a draft called "Untitled
+     policy". Nothing is asked first, because nothing had to be: the name sits
+     at the top of the builder under a pencil, and the applications are the
+     start node at the head of the chain. The dialog asked for both, then showed
+     you both again a frame later — and it asked before you had seen anything,
+     which is the worst moment to name a thing.
+
+     Numbered by `freeName` ("Untitled policy", "Untitled policy 2", …), because
+     policies are told apart by name across the list, the status dialogs and the
+     toasts, and two drafts called the same thing would be a rename nobody asked
+     for. The builder already knows the name — applying a template to a policy
+     still called "Untitled policy" renames it to the template's.
+
+     No toast. It named a thing you are looking at.
+
+     The draft is real from this moment: `blankPolicy` is `status: 'draft'`, it
+     lands in the list, and it cannot go live until it has an application. An
+     empty Untitled draft left behind is the same thing an empty Untitled file
+     is — the owner's reference, and the row menu deletes it. */
+  const startDraft = () => {
+    const name = freeName('Untitled policy', store.policies.map((p) => p.name))
+    const id = store.addPolicy(blankPolicy(name, []))
+    store.go({ name: 'board', policyId: id })
+  }
+  /* The one edition that still asks: the guided build is offered FROM the
+     naming form, so where that feature exists the form has something the
+     builder does not. Lite withholds the guided build (`featuresOf('lite')`),
+     and with it the only reason to stop for a dialog. Gated, not forked. */
+  const newPolicy = () => (store.features.guidedSetup ? setNaming(true) : startDraft())
 
   /* The rows' container in whichever view is showing, for the focus pass. */
   const bodyRef = useRef<HTMLElement | null>(null)
@@ -294,7 +333,7 @@ export function Policies() {
           title="No policies yet"
           blurb={`Sign-ins use the ${systemPolicy?.name ?? 'default policy'} until you add a policy.`}
           action={
-            <Button variant="secondary" icon={Plus} onClick={() => setNaming(true)}>
+            <Button variant="secondary" icon={Plus} onClick={newPolicy}>
               New policy
             </Button>
           }
@@ -330,8 +369,8 @@ export function Policies() {
       />
 
       {/* The row every list page has — see `PageBar`: the search box, then the
-          filter; the view and New on the right. Status is switched often, so it
-          is out as segments. Coverage has no rows to search or filter. */}
+          filter; the view and New on the right. Coverage has no rows to search
+          or filter. */}
       <PageBar
         left={
           !isCoverage && (
@@ -343,7 +382,17 @@ export function Policies() {
                 placeholder="Search policies…"
                 label="Search policies"
               />
-              <FilterTabs label="Filter by status" value={status} options={STATUS_TABS} onChange={setStatus} />
+              <span className={`btoolbar__filter bbar__filter ${status !== 'all' ? 'is-set' : ''}`}>
+                <Picker
+                  label="Filter by status"
+                  size="md"
+                  icon={ListFilter}
+                  prefix="Status"
+                  value={status}
+                  options={STATUS_TABS}
+                  onChange={(v) => setStatus(v as StatusFilter)}
+                />
+              </span>
             </>
           )
         }
@@ -359,18 +408,23 @@ export function Policies() {
                 onChange={(v) => setCoverageOn(v === 'coverage')}
               />
             )}
-            <Button variant="brand" icon={Plus} onClick={() => setNaming(true)}>
+            <Button variant="brand" icon={Plus} onClick={newPolicy}>
               New policy
             </Button>
           </>
         }
       />
 
-      {isCoverage && <Coverage onNew={() => setNaming(true)} />}
+      {isCoverage && <Coverage onNew={newPolicy} />}
 
       {/* `NewPolicyDialog` hands back a rules-empty policy; from here the errand
           ends in the builder. The store may give it a different id, so the
-          builder opens the id `addPolicy` returns. */}
+          builder opens the id `addPolicy` returns.
+
+          Reached only where the guided build exists — `newPolicy` above. It is
+          still the Applications screen's own way in, from an application row,
+          where the errand ends without ever opening a builder and the name has
+          nowhere else to be asked. */}
       <NewPolicyDialog
         open={naming}
         onClose={() => setNaming(false)}
@@ -530,7 +584,10 @@ function policyMenu(policy: Policy): MenuItem[] {
     ...(policy.isSystem
       ? []
       : [
-          { id: 'duplicate', label: 'Duplicate', icon: Copy },
+          /* CopyPlus, the glyph the policy builder's rule menu uses (owner, 23 Sep
+       2026: "use the one we use inside the policy builder"). Two sheets alone
+       read as "copy to the clipboard"; the plus says a second one is made. */
+    { id: 'duplicate', label: 'Duplicate', icon: CopyPlus },
           { id: 'delete', label: 'Delete policy', icon: Trash2, danger: true, divide: true },
         ]),
   ]

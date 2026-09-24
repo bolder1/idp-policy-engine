@@ -201,8 +201,7 @@ button.bdpw__stepbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--
      slot to run on over, so at the 200px column the bracket wraps — and the
      first lines should still share a line. */
   align-items: start;
-  padding-bottom: var(--space-3); margin-bottom: var(--space-2);
-  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: var(--space-2); margin-bottom: var(--space-2);
   font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary);
 }
 .bdpw__colhead__left { grid-column: 1 / 3; }
@@ -270,7 +269,13 @@ button.bdpw__stepbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--
    `.bx-savebar` from the kit, with two buttons instead of one. They sit in a
    group, so the kit's 148px floor for its one button lands on the primary
    only. On a phone the words take the line and the buttons the next. */
+/* Buttons only (23 Sep 2026): Cancel at the left edge, Back and the main
+   button at the right, and the blocked reason between them when there is one. */
 .bdpw__foot { flex-wrap: wrap; row-gap: var(--space-4); }
+.bdpw__blocked {
+  min-width: 0; margin-left: var(--space-6);
+  font-size: var(--fs-sm); line-height: 1.4; color: var(--fb-negative-fg);
+}
 .bdpw__acts { flex: none; display: flex; align-items: center; gap: var(--space-4); margin-left: auto; }
 .bdpw__acts > .bx-btn--brand { min-width: 148px; }
 

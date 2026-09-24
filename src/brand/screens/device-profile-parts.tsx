@@ -21,7 +21,7 @@ import {
   Upload,
 } from 'lucide-react'
 
-import { Badge, Button, Callout, IconButton, MenuButton, NumberStepper, SearchBox, Tip, TipDot, TipMark, Toggle } from '../kit'
+import { Badge, Button, Callout, IconButton, MenuButton, NumberStepper, SearchBox, TipDot, TipMark, Toggle } from '../kit'
 import { useBrand } from '../store'
 import { TierPick } from '../tier-pick'
 import { Picker } from '../picker'
@@ -550,18 +550,15 @@ function AttrPickRow({
      second column either — see the list in `AttrStep` — so the pill sits right
      after the name, the way it does on the profile page's own check list.
 
-     `Not collected yet` stays on the row rather than only on the inner page:
-     whether a signal is collected at all is part of deciding to include it, and
-     learning it afterwards is learning it too late. */
+     `Not collected yet` came off the rows on 23 Sep 2026 (owner: "remove this
+     tag"). The catalogue still marks those attributes `phase: 2`, and the
+     profile's own page still says what a profile reads; the pill repeated it on
+     every list a signal appeared in. */
   /* "Always on" is not a pill here any more. The check list swapped it for a
      lock at the end of the line (owner, 15 Sep 2026), and the create flows put
      this list and that one on consecutive steps, where one row wore two marks
      for one fact (15 Sep 2026). The lock is below, on the always-on row. */
-  const state = attr.phase === 2 && (
-    <span className="bfp2__pickstate">
-      <Badge tone="notice">Not collected yet</Badge>
-    </span>
-  )
+  const state = null
 
   /* An always-collected row is not a disabled button. It is not a button.
 
@@ -587,13 +584,9 @@ function AttrPickRow({
           <TipDot label={attr.name} text={attr.purpose} />
         </span>
         {state}
-        <span className="bfp2__picklock">
-          <Tip text="Always on — can't be removed">
-            <button type="button" className="bfp2__checklock" aria-label={`${attr.name} is always on`}>
-              <Lock size={14} strokeWidth={2} aria-hidden />
-            </button>
-          </Tip>
-        </span>
+        {/* The lock stood here — a button whose only job was to say "always on"
+            (owner, 23 Sep 2026: "remove lock icon, not needed"). A row that is
+            always collected already shows a tick that will not turn off. */}
       </div>
     )
   }
@@ -922,7 +915,6 @@ function ChosenRow({
               {name}
             </span>
             <TipDot text={attr.purpose} label={`About ${attr.name}`} />
-            {attr.phase === 2 && <Badge tone="notice">Not collected yet</Badge>}
           </span>
           {/* The whole answer on hover too. The list narrows the setting to
               200px when it is narrow (the page at 1100 wide), which cuts
@@ -935,17 +927,10 @@ function ChosenRow({
             </div>
           )}
         </div>
-        {!onRemove && (
-          /* A button, as the kit's `TipDot` is, so a keyboard reaches the words
-             the pointer gets on hover. Pressing it does nothing. */
-          <span className="bz7__rowdel">
-            <Tip text="Always on — can't be removed">
-              <button type="button" className="bfp2__checklock" aria-label={`${attr.name} is always on`}>
-                <Lock size={14} strokeWidth={2} aria-hidden />
-              </button>
-            </Tip>
-          </span>
-        )}
+        {/* An always-on row keeps the remove's slot empty (23 Sep 2026): the
+            lock that used to sit in it said only what the missing trash can
+            already says. */}
+        {!onRemove && <span className="bz7__rowdel" />}
         {onRemove && (
           /* Only the first click of a double-click removes. The rows below move
              up one line and focus goes to the next Remove, which is then under
@@ -1026,13 +1011,19 @@ export function SidePanel({ note }: { note: ProfileNote }) {
    eight times (owner: "very repetitive, add it in one place"); then a caption
    line under the list's heading, a sentence away from the values it was about
    (owner, same day: "move this beside the requirement, perhaps in brackets").
-   On the heading it sits over the very column it qualifies. "Versions" names
-   its reach: the column also holds a device type and an integrity answer,
-   which are not floors. Only over a list that holds a version check. The
-   heading row is hidden from assistive tech, so the fields' accessible names
-   still say Minimum, for a reader who meets them one at a time. */
+   On the heading it sits over the very column it qualifies. Only over a list
+   that holds a version check. The heading row is hidden from assistive tech, so
+   the fields' accessible names still say Minimum, for a reader who meets them
+   one at a time.
+
+   The words say what PASSES (owner, 23 Sep 2026: "versions are minimums doesn't
+   make sense — make it direct and easy to understand"). "Minimums" described
+   the stored value; an admin reading a row wants to know whether a newer
+   Windows gets in, and "that version or newer" answers it. "That version"
+   rather than "this version" keeps the reach on the version rows: the column
+   also holds a device type and an integrity answer, which are not versions. */
 export function VersionFloorNote() {
-  return <span className="bfp2__colnote">(versions are minimums)</span>
+  return <span className="bfp2__colnote">(that version or newer)</span>
 }
 
 export function AttrControl({

@@ -308,37 +308,17 @@
 [data-brand='rebrand'] .bx-rowmenu__pop { border-color: var(--border-subtle); border-radius: 8px; }
 [data-brand='rebrand'] .bx-menu__item.is-divided { border-top-color: var(--border-subtle); }
 
-/* The row's ⋯ action menu, as the live console draws it (owner, 21 Sep 2026:
-   "change the action menu like we have in our product"). Measured off the
-   console's row menu (Edit / Show associated entities / Delete / App access
-   configuration): a borderless sheet on a soft shadow with 8px above and below
-   the list; full-width rows ~41px tall with no inset highlight; a grey 18px
-   icon 20px in; the label in regular 16px body ink 26px after the icon; no
-   rule between items, Delete included. Row menus only — the toolbar menus
-   (`MenuButton`: "+ Add", the board's commands) carry hints and shortcuts
-   and keep the kit's compact rows. */
-[data-brand='rebrand'] .bx-menu__pop.bx-rowmenu__pop {
-  min-width: 220px;
-  padding: 8px 0;
-  border: 0;
-  border-radius: 6px;
-  box-shadow: 0 2px 4px rgba(33, 37, 41, 0.06), 0 6px 20px rgba(33, 37, 41, 0.14);
-}
-[data-brand='rebrand'] .bx-rowmenu__pop .bx-menu__item {
-  align-items: center;
-  gap: 26px;
-  padding: 9px 24px 9px 20px;
-  border-radius: 0;
-  color: var(--text-tertiary);
-}
-[data-brand='rebrand'] .bx-rowmenu__pop .bx-menu__item svg { width: 18px; height: 18px; margin-top: 0; }
-[data-brand='rebrand'] .bx-rowmenu__pop .bx-menu__item strong {
-  font-size: 16px;
-  font-weight: var(--fw-regular);
-  line-height: 1.45;
-  color: var(--text-primary);
-}
-[data-brand='rebrand'] .bx-rowmenu__pop .bx-menu__item.is-divided { margin-top: 0; border-top: 0; padding-top: 9px; }
+/* The row's ⋯ action menu is the KIT's menu again (owner, 23 Sep 2026: "give me
+   the old design for this, the one we used to have before this").
+
+   It wore the live console's own row menu for two days (21 Sep: "change the
+   action menu like we have in our product") — a borderless sheet, full-width
+   41px rows, an 18px grey icon 20px in and a regular 16px label 26px after it.
+   That is gone: a row menu now draws like every other menu in this kit —
+   232px-ish sheet on a hairline, 6px inset rows that highlight on hover, the
+   14px medium label beside a 14px icon, and a rule above a divided item. The
+   general rebrand menu tweaks above still apply to it (subtle edge, 8px radius,
+   the console's hover ground, and the blue open state on the kebab). */
 
 /* --- Tooltips: one dark tip, one mark -------------------------------------------- */
 [data-brand='rebrand'] .bx-tip__pop {

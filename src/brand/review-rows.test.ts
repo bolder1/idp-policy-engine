@@ -48,7 +48,7 @@ describe('review rows', () => {
       { label: 'Signals: removed Machine SID', before: 'High', after: '', group: 'Signals', kind: 'removed', item: 'Machine SID' },
       { label: 'Name', before: 'A', after: 'B', kind: 'changed' },
       { label: 'Signals: added TPM ID', before: '', after: 'High', group: 'Signals', kind: 'added', item: 'TPM ID' },
-      { label: 'What it can read', before: 'Agentless', after: 'Agent-based', group: 'Basic details', kind: 'changed' },
+      { label: 'Device restriction type', before: 'Agentless', after: 'Agent-based', group: 'Basic details', kind: 'changed' },
     ]
     const sections = groupSections(rows)
     // The page's order, general first and the consequences last.

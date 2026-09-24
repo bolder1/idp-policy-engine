@@ -3,7 +3,6 @@ import { useEffect } from 'react'
 import {
   AlertTriangle,
   BellRing,
-  ChevronsDown,
   Fingerprint,
   HelpCircle,
   KeyRound,
@@ -80,14 +79,13 @@ const TILES: { id: AccessDecision; label: string; tone: string; icon: typeof Use
   { id: '1fa', label: 'Allow', tone: 'allow', icon: UserCheck, hint: 'Let the login in, after the factors below.' },
   { id: 'deny', label: 'Deny', tone: 'deny', icon: ShieldAlert, hint: 'Block the login and show a message.' },
 ]
-/* The third answer, drawn and not yet choosable (owner, 22 Sep 2026: "the third
-   option, that goes to the next rule — as of now work on the content"). A rule
-   that matched and handed the login on would need an outcome the model does not
-   have, so the card shows the shape the choice is going to take. Not offered on
-   the default at the foot of the chain, which has no rule after it. */
-/* It does not SKIP the rule (owner, 22 Sep 2026): the rule's conditions match,
-   and on that match the login carries on to the next rule. */
-const NEXT_TILE = { label: 'Next rule', hint: 'When this matches, go on to the next rule.', icon: ChevronsDown }
+/* A third card, "Next rule · Coming soon", stood beside Allow and Deny: a rule
+   that matched and handed the login on, drawn as the shape the choice was going
+   to take (owner, 22 Sep 2026). Removed on 23 Sep — "remove this". A disabled
+   card is a third of this row spent on something you cannot pick, on the pane
+   where the rule's one real decision is made, and the two that work now sit
+   side by side with nothing between them. The outcome model never gained the
+   answer, so nothing else goes with it.  */
 
 
 /* How the second factor is proved — four modes, NAMED rather than described.
@@ -319,19 +317,6 @@ export function WhatEditor({
               </button>
             )
           })}
-          {!terminal && (
-            <div className="bb__outcard is-soon" aria-disabled="true">
-              <span className="bb__outcard__ico" aria-hidden>
-                <NEXT_TILE.icon size={16} strokeWidth={2} />
-              </span>
-              <span className="bb__outcard__text">
-                <b>
-                  {NEXT_TILE.label} <i className="bb__outcard__soon">Coming soon</i>
-                </b>
-                <em>{NEXT_TILE.hint}</em>
-              </span>
-            </div>
-          )}
         </div>
       </div>
 

@@ -283,6 +283,22 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
       <div className="bb__ifrow">
         <IfKw>then</IfKw>
       </div>
+      {/* An outcome nobody has chosen is not printed as one. A rule is born
+          with `decision: '2fa'` — allow after a second factor is the DEFAULT —
+          and until the owner presses a tile the card was saying "Second factor
+          · Password → Any enabled method" in the same chip as a real answer.
+          Seen on 23 Sep 2026 in the demo film: two conditions added, no outcome
+          picked, and the card already promising a second factor. The panel
+          lights no tile in this state (`answered` is false); the card now
+          agrees with it. `pristine` is cleared by the first `decision` patch,
+          so this line goes the moment a tile is pressed. The default at the
+          foot of the chain never carries the flag, and `control` is its editor. */}
+      {rule.pristine === true && !control ? (
+        <IfSub className="bb__ifaction">
+          {token}
+          <span className="bb__ifkw is-blank">Outcome not chosen yet</span>
+        </IfSub>
+      ) : (
       <IfSub className="bb__ifaction">
         {token}
         {control ?? <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>}
@@ -313,6 +329,7 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
           ))}
           </span>
       </IfSub>
+      )}
     </>
   )
 }

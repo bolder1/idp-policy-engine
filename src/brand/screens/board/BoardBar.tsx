@@ -250,10 +250,11 @@ export function BoardBarActions({
   unsaved,
   canDiscard,
   blockers,
+  saveBlocked,
   onSheet,
   onSaveDraft,
   onDiscard,
-  onReview,
+  onSave,
 }: {
   test: { grade: string; gradeReason: string; breaches: number } | null
   movement: { changed: number; stricter: number; looser: number } | null
@@ -265,10 +266,12 @@ export function BoardBarActions({
   /** Unsaved edits or a saved draft to throw away. */
   canDiscard: boolean
   blockers: number
+  /** An error on a rule that runs, on a policy that has an application. */
+  saveBlocked: boolean
   onSheet: (t: 'check' | 'impact') => void
   onSaveDraft: () => void
   onDiscard: () => void
-  onReview: () => void
+  onSave: () => void
 }) {
   const features = useBrand().features
   return (
@@ -327,9 +330,22 @@ export function BoardBarActions({
       <Button variant="secondary" size="sm" disabled={!unsaved} title={unsaved ? undefined : 'No changes to save'} onClick={onSaveDraft}>
         Save draft
       </Button>
-      {/* The same two labels the trail uses, chosen the same way. Lite has no
-          publish gate, so the button says what it actually does there rather
-          than promising a review step that does not exist.
+      {/* One word, and it does that word (owner, 23 Sep 2026: "make it save
+          only — hide the review part as of now, only show the save directly;
+          will think about the review part later").
+
+          It said "Review & save" and opened the read-back dialog, which then
+          held the actual save behind a second press. The dialog is still in the
+          tree and is still where the walkthrough takes you; nothing on this bar
+          opens it. The one thing it alone offered — "Save and turn on" for a
+          draft — is on the status pill beside the policy's name, which is where
+          a draft is switched on from anyway.
+
+          It keeps the dialog's GATE. An error on a rule that runs blocked the
+          dialog's footer buttons, and bypassing the dialog would have quietly
+          removed that; `saveBlocked` is the same test. Without applications the
+          save produces a draft, and a draft is allowed to be unfinished, so
+          errors do not block it — same rule as `committed`.
 
           The anchor is on a WRAPPER rather than on the button, because `Button`
           takes a fixed set of props and does not spread the rest — a
@@ -341,11 +357,26 @@ export function BoardBarActions({
         <Button
           variant="brand"
           size="sm"
-          disabled={!toPublish}
-          title={!toPublish ? 'No changes to review' : blockers > 0 ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first` : undefined}
-          onClick={onReview}
+          disabled={!toPublish || saveBlocked}
+          title={
+            !toPublish
+              ? 'Nothing to save'
+              : saveBlocked
+                ? `${blockers} error${blockers === 1 ? '' : 's'} to fix first`
+                : undefined
+          }
+          onClick={onSave}
         >
-          {features.publish ? 'Review & publish' : 'Review & save'}
+          {/* Named for its SCOPE, because the rule panel has a save of its own
+              at its foot and two buttons reading "Save" on one screen is two
+              questions (owner, 23 Sep 2026: "I see two save buttons that look
+              awkward at a glance — give them different names and a different
+              button style"). This one is the policy's, it is the brand button,
+              and it sits with Discard and Save draft, which are the policy's
+              too. The panel's is a secondary "Save changes" — same act, said
+              from where the work is, and drawn a weight quieter so the eye
+              picks one of the two rather than choosing between twins. */}
+          {features.publish ? 'Publish policy' : 'Save policy'}
         </Button>
       </span>
     </>

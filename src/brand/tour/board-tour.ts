@@ -181,16 +181,17 @@ export const BOARD_STOPS: BoardStop[] = [
     id: 'review',
     anchor: 'review',
     heading: 'Read it back before it is live',
-    body: 'Every rule is written out as a sentence, with the checks attached to the rule each one is about — which is the last place a rule that can never run gets caught.',
+    body: 'A press here stores it, and before that the read-back writes every rule out as a sentence, with the checks attached to the rule each one is about — the last place a rule that can never run gets caught.',
     task: {
-      /* Opening it is the whole task. Going through with it is not: this is
-         somebody's real policy, and a walkthrough that publishes it on their
-         behalf has done something they cannot undo from here. The step shows
-         the door and stops. */
-      ask: 'Open the review.',
-      didIt: 'Nothing here is live until you go through with it — closing this changes nothing.',
+      /* Opening the read-back is the whole task. Going through with it is not:
+         this is somebody's real policy, and a walkthrough that stores it on
+         their behalf has done something they cannot undo from here. The step
+         shows the door and stops — which is why it opens the read-back rather
+         than pressing the button it is pointing at. */
+      ask: 'Take a look at the read-back.',
+      didIt: 'Nothing here is stored until you go through with it — closing this changes nothing.',
       done: ({ review }) => review,
-      doLabel: 'Open it for me',
+      doLabel: 'Show me the read-back',
     },
   },
 ]

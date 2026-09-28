@@ -19,7 +19,6 @@ import {
   Plus,
   ScrollText,
   Trash2,
-  Wand2,
   XCircle,
 } from 'lucide-react'
 
@@ -29,7 +28,7 @@ import { hasOpenDialog } from '../dialog-chrome'
 import { EmptyState } from '../empty'
 import { scenarioFromPolicy } from '../template-from-policy'
 import { useLeaveGuard } from '../leave-guard'
-import { commitToast, committed, differsFromLive, hasUnsavedChanges, openForEditing, published, type CommitIntent } from '../policy-draft'
+import { commitToast, committed, differsFromLive, hasUnsavedChanges, openForEditing, published, type CommitIntent, type RuleSet } from '../policy-draft'
 import { useBrand, useNameLookup } from '../store'
 import { AudienceDrawer } from './audience-drawer'
 import { nextRuleName, ruleLabel, ruleSentence, ruleSummary } from './predicate-prose'
@@ -42,11 +41,10 @@ import { CommandBar, baseCommands } from './command-bar'
 import { diagnose, shadowedBy } from './diagnostics'
 import { tourSeen } from '../tour/tour-stops'
 
-/* Both are mounted only while they are open, and both are the whole reason the
-   builder's chunk was carrying the create flow and six animated figures it does
-   not need to render a rule. `tour-stops` stays eager — it is a data module, and
-   the first-run check has to run before the chunk is worth fetching. */
-const Interview = lazy(() => import('../create/Interview').then((m) => ({ default: m.Interview })))
+/* Both are mounted only while they are open: the builder's chunk does not need
+   the tour's animated figures to render a rule. `tour-stops` stays eager — it
+   is a data module, and the first-run check has to run before the chunk is
+   worth fetching. */
 const Tour = lazy(() => import('../tour/Tour').then((m) => ({ default: m.Tour })))
 const LearnPanel = lazy(() => import('../tour/LearnPanel').then((m) => ({ default: m.LearnPanel })))
 import { FlowRail } from './flow-rail'
@@ -154,7 +152,6 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
   const [cmd, setCmd] = useState(false)
   const [overview, setOverview] = useState(false)
   const features = store.features
-  const [interview, setInterview] = useState(false)
   const [tour, setTour] = useState(false)
   const [learn, setLearn] = useState(false)
   const [dialog, setDialog] = useState<null | 'log' | 'template' | 'gauntlet' | 'impact' | 'review' | 'copy'>(
@@ -170,8 +167,8 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
      is up, Escape and Ctrl+Z belong to it, not to the builder under it. */
   const layers = useRef(false)
   useEffect(() => {
-    layers.current = tour || cmd || interview
-  }, [tour, cmd, interview])
+    layers.current = tour || cmd
+  }, [tour, cmd])
 
   /* --- The flow's width, dragged. v1's grammar ---------------------------------
      Clamped against the room that actually exists, so the flow never claims a
@@ -258,6 +255,8 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
       hasFingerprint: (id) => !!store.fingerprintById(id),
       groupName: (id) => store.groupById(id).name,
       riskScale: store.riskScale,
+      /* The tenant's own objects: zones and device profiles are read from their own entries, not from the chip table. */
+      library: { zones: store.zones, fingerprints: store.fingerprints, people: store.users, groups: store.groups, methods: store.methods, policies: store.policies },
     }),
     [store],
   )
@@ -270,7 +269,7 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
      `unsaved` is against the last save or draft: the leave guard, Save draft
      and the pill. `changed` is against the live rules: the blast radius and,
      with a never-published policy, the publish gate. Name and audience are
-     compared on their own — guided setup writes them — never the whole object,
+     compared on their own — Edit details writes them — never the whole object,
      whose save stamps kept it dirty after every save. */
   const exists = saved !== undefined && !!draft.id
   const detailsEdited =
@@ -279,6 +278,12 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
   const changed = exists && differsFromLive(saved, draft)
   const toPublish = changed || detailsEdited || saved?.status === 'draft'
   const hasDraft = !!saved?.pendingDraft
+  /* The edits themselves, for the bar's status control; undefined when there
+     are none. Kept by identity so the bar does not see new edits on every render. */
+  const edits = useMemo<RuleSet | undefined>(
+    () => (unsaved ? { rules: draft.rules, fallback: draft.fallback } : undefined),
+    [unsaved, draft.rules, draft.fallback],
+  )
 
   /* Focus for a control that is about to disable or unmount under the cursor —
      Save draft, Discard, a rule's ⋯ — so the keyboard is not dropped on <body>.
@@ -705,11 +710,6 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
                       <Button variant="primary" icon={Plus} onClick={() => addRule()}>
                         Add the first rule
                       </Button>
-                      {features.guidedSetup && (
-                        <Button variant="secondary" icon={Wand2} onClick={() => setInterview(true)}>
-                          Answer five questions
-                        </Button>
-                      )}
                       <Button variant="ghost" icon={GraduationCap} onClick={() => setLearn(true)}>
                         Learn the builder
                       </Button>
@@ -789,8 +789,8 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
 
       <PolicyOverview open={overview} policy={draft} resolve={resolve} diagnostics={diagnostics} onClose={() => setOverview(false)} onJump={jump} />
 
-      {/* Scoped to the builder. The create flow already has guided setup; this
-          is for the screen you land on afterwards. */}
+      {/* Scoped to the builder. The empty draft has Describe it; this is for
+          the screen you land on afterwards. */}
       {learn && (
         <Suspense fallback={null}>
           <LearnPanel open={learn} onClose={() => setLearn(false)} onStartTour={() => setTour(true)} />
@@ -811,23 +811,6 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
         </Suspense>
       )}
 
-      <AnimatePresence>
-        {interview && (
-          <Suspense fallback={null}>
-          <Interview
-            open={interview}
-            onClose={() => setInterview(false)}
-            onCreate={(built, builtName, audience) => {
-              patch({ rules: built, audience, name: draft.name === 'Untitled policy' ? builtName : draft.name })
-              setInterview(false)
-              setSelected(0)
-              setOnTerminal(false)
-              store.showToast(features.publish ? 'Rules added. Review them before publishing.' : 'Rules added. Review them before saving.')
-            }}
-          />
-          </Suspense>
-        )}
-      </AnimatePresence>
 
       {/* The saved policy, not the draft: a log is what the live rules decided,
           and a rule that exists only in this tab has decided nothing. */}
@@ -892,7 +875,7 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
         )}
       </Modal>
 
-      <ReportUnsaved policyId={saved.id} unsaved={unsaved} />
+      <ReportUnsaved policyId={saved.id} edits={edits} />
 
       <ImpactArenaDialog open={features.blastRadius && dialog === 'impact'} draft={draft} saved={saved} onClose={() => setDialog(null)} onJumpToRule={jump} />
       <CopyRuleDialog open={dialog === 'copy'} rule={rule} from={draft} onClose={() => setDialog(null)} />

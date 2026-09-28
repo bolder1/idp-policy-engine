@@ -43,6 +43,10 @@ export function WhoPicker({
   directory,
   groups,
   compact,
+  label = 'Who this rule applies to',
+  emptyText = 'Everyone',
+  placeholder = 'Add groups or people',
+  exceptions = true,
 }: {
   who?: RuleWho
   /** Called with the normalised who, or `undefined` for everyone. */
@@ -52,6 +56,14 @@ export function WhoPicker({
   directory: User[]
   groups: Group[]
   compact?: boolean
+  /* The field's name and what it says when nothing is chosen. Describe it
+     asks Who and Leave out as two questions (describe spec, §3.4): the second
+     is this same field, named "Leave out", reading "Nobody" when empty, and
+     neither offers the exceptions field — Leave out IS the exceptions. */
+  label?: string
+  emptyText?: string
+  placeholder?: string
+  exceptions?: boolean
 }) {
   const w = normaliseWho(who)
   const base: RuleWho = w ?? { groupIds: [], userIds: [] }
@@ -79,12 +91,12 @@ export function WhoPicker({
         groups={groups}
         compact={compact}
         flagOutside
-        emptyText="Everyone"
-        placeholder="Add groups or people"
-        label="Who this rule applies to"
+        emptyText={emptyText}
+        placeholder={placeholder}
+        label={label}
       />
 
-      {hasExcept || exceptOpen ? (
+      {!exceptions ? null : hasExcept || exceptOpen ? (
         <div className="wp__except">
           <span className="wp__exceptlabel">Except</span>
           <WhoField

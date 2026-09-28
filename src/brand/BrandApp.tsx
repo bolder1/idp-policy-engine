@@ -6,6 +6,7 @@ import { LeaveDialog } from './leave-guard'
 import { Shell, Toast } from './Shell'
 import { UserShell } from './UserShell'
 import { Policies } from './screens/Policies'
+import { TestingSessionProvider } from './screens/testing/session'
 import { UserApps } from './screens/UserApps'
 import { BrandProvider, useBrand, type BrandScreen } from './store'
 import './theme-mode'
@@ -95,7 +96,7 @@ function ScreenBody() {
     case 'builder':
       return <BuilderPage policyId={screen.policyId} open={screen.open} />
     case 'board':
-      return <BoardPage policyId={screen.policyId} open={screen.open} />
+      return <BoardPage policyId={screen.policyId} open={screen.open} rule={screen.rule} />
     case 'policy-details':
       /* Cast to the screen's own prop type, so the route can offer a return
          target a moment before the screen handles it. */
@@ -145,13 +146,19 @@ function Chrome() {
   )
   /* The toast and the leave dialog belong to both sides, so they sit beside
      the shell rather than inside one of them. The end-user side had neither,
-     and every confirmation on Setup 2FA went nowhere. */
+     and every confirmation on Setup 2FA went nowhere.
+
+     The testing session goes round both shells, not inside one: switching
+     role swaps the shell, and a session inside it went with it, so a trip to
+     the User Dashboard came back to a fresh sign-in. It is outside the error
+     boundary too, so a screen that recovers keeps the sign-in being tried. It
+     resets itself for another persona (screens/testing/session.tsx). */
   return (
-    <>
+    <TestingSessionProvider>
       {role === 'user' ? <UserShell>{body}</UserShell> : <Shell>{body}</Shell>}
       <Toast />
       <LeaveDialog />
-    </>
+    </TestingSessionProvider>
   )
 }
 

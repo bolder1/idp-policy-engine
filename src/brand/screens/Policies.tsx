@@ -1,21 +1,25 @@
-import { AnimatePresence } from 'motion/react'
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AlignLeft,
   AppWindow,
   Check,
   CopyPlus,
+  Eye,
   Grid3x3,
   LayoutTemplate,
   ListFilter,
+  LogIn,
   Pencil,
   Plus,
   Power,
   PowerOff,
+  Radar,
   Table2,
   ShieldCheck,
   ShieldPlus,
   Trash2,
   Waypoints,
+  type LucideIcon,
 } from 'lucide-react'
 
 import { PageHead } from '../Shell'
@@ -28,7 +32,6 @@ import type { LibView, ViewOption } from './library-view-state'
 import { PageBar } from './page-bar'
 import { Picker } from '../picker'
 import { appsOf, blankPolicy, enforces, type Policy } from '../data'
-import { NewPolicyDialog } from '../create/NewPolicyDialog'
 import { useBrand, useNameLookup } from '../store'
 import { ChangeState } from '../leave-guard'
 import { EmptyState, NoMatches } from '../empty'
@@ -40,13 +43,10 @@ import { ConfirmDelete } from './confirm-delete'
 import { decidesFor, deleteDetail, protectionOf } from './app-policies'
 import { runGauntlet, type GauntletResult } from './gauntlet'
 import type { SimEnv } from './simulate'
-import { statusOptions, type StatusTarget } from './status-options'
+import { rowMenu, type RowMenuId } from './status-options'
 import { useStatusChange } from './use-status-change'
 import { SHOWCASE } from '../showcase'
-
-/* Mounted only while it is open — the list is the landing screen and does not
-   need the interview's questions, composer and figures in its chunk. */
-const Interview = lazy(() => import('../create/Interview').then((m) => ({ default: m.Interview })))
+import { ReadAsTextDrawer } from './board/ReadAsTextPanel'
 
 /* -----------------------------------------------------------------------------
    Policies — the list.
@@ -58,16 +58,19 @@ const Interview = lazy(() => import('../create/Interview').then((m) => ({ defaul
    -------------------------------------------------------------------------- */
 
 type SortKey = 'name' | 'modified' | 'exposure'
-type StatusFilter = 'all' | 'draft' | 'active' | 'inactive'
-type RowAction = 'edit' | 'trail' | 'template' | 'duplicate' | 'delete' | 'assign' | StatusTarget
-type RowDialog = { kind: 'delete' | 'assign' | 'template'; policy: Policy }
+type StatusFilter = 'all' | 'draft' | 'active' | 'monitor' | 'inactive'
+type RowAction = RowMenuId | 'assign'
+type RowDialog = { kind: 'delete' | 'assign' | 'template' | 'text'; policy: Policy }
 
 /* -----------------------------------------------------------------------------
-   Exposure (full edition only).
+   Exposure — withheld in every edition since M4.
 
-   The gauntlet runs against every row. The column shows the finding rather than
-   the letter — "5 got through" is actionable where "F" is not — and clicking it
-   opens the gauntlet for that policy.
+   The chip deck runs against every row. The column shows the finding rather
+   than the letter — "5 got through" is actionable where "F" is not — and
+   clicking it opens that policy's Break-in test, wherever the version in force
+   keeps it. The grade is retired (owner, 25 Sep 2026: counts, not a grade), so
+   `FULL.exposure` is false too; the column is kept behind its flag so the
+   comparison can be put back by flipping one value (edition.ts).
    -------------------------------------------------------------------------- */
 function exposureOf(r: GauntletResult) {
   if (r.breaches > 0) return { tone: 'bad' as const, label: `${r.breaches} got through`, rank: 3 }
@@ -83,6 +86,7 @@ function exposureOf(r: GauntletResult) {
 const STATUS_TABS: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'active', label: 'Active' },
+  { value: 'monitor', label: 'Monitoring' },
   { value: 'draft', label: 'Draft' },
   { value: 'inactive', label: 'Inactive' },
 ]
@@ -111,12 +115,6 @@ export function Policies() {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'modified', dir: 1 })
-  /* The naming form. Only the guided build opens it now — see `newPolicy`. */
-  const [naming, setNaming] = useState(false)
-  const [interview, setInterview] = useState(false)
-  /** The application the form had already collected, carried into the guided build. */
-  const [guidedApps, setGuidedApps] = useState<string[]>([])
-
   /* The row dialogs. `dialog` keeps the policy while the dialog animates out,
      including after a delete has removed it from the store. */
   const [dialog, setDialog] = useState<RowDialog | null>(null)
@@ -149,17 +147,18 @@ export function Policies() {
      The draft is real from this moment: `blankPolicy` is `status: 'draft'`, it
      lands in the list, and it cannot go live until it has an application. An
      empty Untitled draft left behind is the same thing an empty Untitled file
-     is — the owner's reference, and the row menu deletes it. */
+     is — the owner's reference, and the row menu deletes it.
+
+     Every edition, now. The full edition stopped for the naming form while the
+     five-question guided build was offered from it; that build is retired for
+     Describe it, which sits on the empty draft beside the templates (describe
+     spec, §6.2). The naming form stays with the one caller that still needs a
+     name first, the Applications screen's row. */
   const startDraft = () => {
     const name = freeName('Untitled policy', store.policies.map((p) => p.name))
     const id = store.addPolicy(blankPolicy(name, []))
     store.go({ name: 'board', policyId: id })
   }
-  /* The one edition that still asks: the guided build is offered FROM the
-     naming form, so where that feature exists the form has something the
-     builder does not. Lite withholds the guided build (`featuresOf('lite')`),
-     and with it the only reason to stop for a dialog. Gated, not forked. */
-  const newPolicy = () => (store.features.guidedSetup ? setNaming(true) : startDraft())
 
   /* The rows' container in whichever view is showing, for the focus pass. */
   const bodyRef = useRef<HTMLElement | null>(null)
@@ -175,7 +174,7 @@ export function Policies() {
 
   /* Keyed on the collections it reads, not on the store object, so the deck
      recomputes only when a zone, fingerprint or group actually changes. */
-  const { zones, fingerprints, groups, riskScale } = store
+  const { zones, fingerprints, groups, riskScale, users, methods, policies: tenantPolicies } = store
   const env = useMemo<SimEnv>(
     () => ({
       zoneName: (id) => zones.find((z) => z.id === id)?.name ?? id,
@@ -184,8 +183,10 @@ export function Policies() {
       hasFingerprint: (id) => fingerprints.some((p) => p.id === id),
       groupName: (id) => (groups.find((g) => g.id === id) ?? groups[0])?.name ?? id,
       riskScale,
+      /* The tenant's own objects: zones and device profiles are read from their own entries, not from the chip table. */
+      library: { zones, fingerprints, people: users, groups, methods, policies: tenantPolicies },
     }),
-    [zones, fingerprints, groups, riskScale],
+    [zones, fingerprints, groups, riskScale, users, methods, tenantPolicies],
   )
 
   /* Not run at all in Lite, where the Exposure column is withheld. The system
@@ -205,9 +206,10 @@ export function Policies() {
 
   const rows = useMemo(() => {
     let list = store.policies.filter((p) => {
-      /* "Active" means what decides sign-ins, so the always-on default is in it. */
+      /* "Active" means what decides sign-ins, so the always-on default is in it
+         and a monitoring policy, which decides none, is not. */
       if (status === 'active' && !enforces(p)) return false
-      if ((status === 'draft' || status === 'inactive') && p.status !== status) return false
+      if ((status === 'draft' || status === 'monitor' || status === 'inactive') && p.status !== status) return false
       if (q && !p.name.toLowerCase().includes(q)) return false
       return true
     })
@@ -270,12 +272,21 @@ export function Policies() {
       case 'edit':
         store.go({ name: 'board', policyId: policy.id })
         break
+      /* The one testing item: the board's test mode on this policy (Version 3,
+         the only version since 28 Sep 2026). */
+      case 'test':
+        store.go({ name: 'board', policyId: policy.id, open: 'try' })
+        break
       case 'trail':
         store.go({ name: 'builder', policyId: policy.id })
         break
       case 'active':
+      case 'monitor':
       case 'inactive':
         statusChange.request(policy, action)
+        break
+      case 'monitoring':
+        statusChange.viewMonitoring(policy.id)
         break
       case 'duplicate': {
         const id = store.duplicatePolicy(policy.id)
@@ -287,6 +298,7 @@ export function Policies() {
       case 'delete':
       case 'assign':
       case 'template':
+      case 'text':
         openDialog(action, policy)
         break
     }
@@ -333,7 +345,7 @@ export function Policies() {
           title="No policies yet"
           blurb={`Sign-ins use the ${systemPolicy?.name ?? 'default policy'} until you add a policy.`}
           action={
-            <Button variant="secondary" icon={Plus} onClick={newPolicy}>
+            <Button variant="secondary" icon={Plus} onClick={startDraft}>
               New policy
             </Button>
           }
@@ -408,53 +420,14 @@ export function Policies() {
                 onChange={(v) => setCoverageOn(v === 'coverage')}
               />
             )}
-            <Button variant="brand" icon={Plus} onClick={newPolicy}>
+            <Button variant="brand" icon={Plus} onClick={startDraft}>
               New policy
             </Button>
           </>
         }
       />
 
-      {isCoverage && <Coverage onNew={newPolicy} />}
-
-      {/* `NewPolicyDialog` hands back a rules-empty policy; from here the errand
-          ends in the builder. The store may give it a different id, so the
-          builder opens the id `addPolicy` returns.
-
-          Reached only where the guided build exists — `newPolicy` above. It is
-          still the Applications screen's own way in, from an application row,
-          where the errand ends without ever opening a builder and the name has
-          nowhere else to be asked. */}
-      <NewPolicyDialog
-        open={naming}
-        onClose={() => setNaming(false)}
-        onCreate={(policy) => {
-          const id = store.addPolicy(policy)
-          setNaming(false)
-          store.showToast(`${policy.name} created`)
-          store.go({ name: 'board', policyId: id })
-        }}
-        onGuided={store.features.guidedSetup ? (ids) => { setGuidedApps(ids); setNaming(false); setInterview(true) } : undefined}
-      />
-
-      <AnimatePresence>
-        {interview && store.features.guidedSetup && (
-          <Suspense fallback={null}>
-            <Interview
-              open={interview}
-              onClose={() => setInterview(false)}
-              onCreate={(rules, builtName, audience) => {
-                const policy = blankPolicy(builtName, guidedApps)
-                policy.rules = rules
-                policy.audience = audience
-                const id = store.addPolicy(policy)
-                store.showToast(`${policy.name} created with ${rules.length} rule${rules.length === 1 ? '' : 's'}`)
-                store.go({ name: 'board', policyId: id })
-              }}
-            />
-          </Suspense>
-        )}
-      </AnimatePresence>
+      {isCoverage && <Coverage onNew={startDraft} />}
 
       {!isCoverage && libView === 'table' && (
         <div className="btable-wrap">
@@ -481,6 +454,8 @@ export function Policies() {
                       policy={p}
                       gauntlet={grades.get(p.id)}
                       showExposure={showExposure}
+                      monitor={store.features.monitorMode}
+                      trySignIn={store.features.trySignIn}
                       onAction={(a) => act(p, a)}
                     />
                   ))}
@@ -519,7 +494,11 @@ export function Policies() {
                       : []),
                   ],
                   menu: (
-                    <RowMenu label={`Actions for ${p.name}`} items={policyMenu(p)} onSelect={(id) => act(p, id as RowAction)} />
+                    <RowMenu
+                      label={`Actions for ${p.name}`}
+                      items={policyMenu(p, { monitor: store.features.monitorMode, trySignIn: store.features.trySignIn })}
+                      onSelect={(id) => act(p, id as RowAction)}
+                    />
                   ),
                 }),
               )}
@@ -566,31 +545,46 @@ export function Policies() {
           }}
         />
       )}
+      {/* Read as text: the whole policy as numbered sentences, in a drawer —
+          the list has no chain to point at (describe spec, §7.2). */}
+      {dialog && current && dialog.kind === 'text' && (
+        <ReadAsTextDrawer key={current.id} open={dialogOpen} policy={current} onClose={closeDialog} />
+      )}
       {statusChange.dialog}
     </div>
   )
 }
 
-/* A policy's row menu, the same in every view. */
-function policyMenu(policy: Policy): MenuItem[] {
-  return [
-    { id: 'edit', label: 'Edit policy', icon: Pencil },
-    ...statusOptions(policy).map((s) => ({ id: s.target, label: s.label, icon: s.target === 'active' ? Power : PowerOff })),
-    /* The older trail builder: not in the showcase build, where the board is
-       the one builder (see showcase.ts). */
-    ...(SHOWCASE ? [] : [{ id: 'trail', label: 'Open in trail', icon: Waypoints }]),
-    /* A template of a policy with no rules would apply nothing. */
-    ...(openForEditing(policy).rules.length > 0 ? [{ id: 'template', label: 'Save as template', icon: LayoutTemplate }] : []),
-    ...(policy.isSystem
-      ? []
-      : [
-          /* CopyPlus, the glyph the policy builder's rule menu uses (owner, 23 Sep
-       2026: "use the one we use inside the policy builder"). Two sheets alone
-       read as "copy to the clipboard"; the plus says a second one is made. */
-    { id: 'duplicate', label: 'Duplicate', icon: CopyPlus },
-          { id: 'delete', label: 'Delete policy', icon: Trash2, danger: true, divide: true },
-        ]),
-  ]
+/* The mark for each item. Radar for Monitor (owner, 25 Sep 2026), leaving Eye
+   to mean viewing what a monitoring policy saw. AlignLeft for Read as text,
+   the board bar's own mark for it. CopyPlus for Duplicate, the
+   glyph the policy builder's rule menu uses (owner, 23 Sep 2026: "use the one
+   we use inside the policy builder"): two sheets alone read as "copy to the
+   clipboard"; the plus says a second one is made. */
+const ROW_ICON: Record<RowMenuId, LucideIcon> = {
+  edit: Pencil,
+  test: LogIn,
+  active: Power,
+  monitor: Radar,
+  inactive: PowerOff,
+  monitoring: Eye,
+  trail: Waypoints,
+  text: AlignLeft,
+  template: LayoutTemplate,
+  duplicate: CopyPlus,
+  delete: Trash2,
+}
+
+/* A policy's row menu, the same in every view: the items and their order are
+   `rowMenu`'s, where a test pins them. Try a sign-in is the one testing item,
+   directly under Edit policy (final spec, E3); the older trail builder is not
+   in the showcase build, where the board is the one builder (see showcase.ts). */
+function policyMenu(policy: Policy, { monitor, trySignIn }: { monitor: boolean; trySignIn: boolean }): MenuItem[] {
+  return rowMenu(policy, { monitor, trySignIn, trail: !SHOWCASE }).map((item) => ({
+    ...item,
+    icon: ROW_ICON[item.id],
+    ...(item.id === 'delete' ? { danger: true, divide: true } : {}),
+  }))
 }
 
 /* The applications, as marks with the full list on hover; with none, the
@@ -608,7 +602,7 @@ function PolicyApps({ policy, onAssign }: { policy: Policy; onAssign: () => void
   )
 }
 
-/* How exposed a policy is, as a grade that opens the test deck. */
+/* How exposed a policy is, as a grade that opens its Break-in test. */
 function PolicyExposure({ policy, gauntlet }: { policy: Policy; gauntlet?: GauntletResult }) {
   const store = useBrand()
   if (!gauntlet) {
@@ -627,7 +621,9 @@ function PolicyExposure({ policy, gauntlet }: { policy: Policy; gauntlet?: Gaunt
       type="button"
       className={`btable__exposure is-${e.tone}`}
       title={gauntlet.gradeReason}
-      onClick={() => store.go({ name: 'board', policyId: policy.id, open: 'gauntlet' })}
+      onClick={() => {
+        store.go({ name: 'board', policyId: policy.id, open: 'break-in' })
+      }}
     >
       {e.label}
       <b>{gauntlet.grade}</b>
@@ -650,11 +646,17 @@ function PolicyRow({
   policy,
   gauntlet,
   showExposure,
+  monitor,
+  trySignIn,
   onAction,
 }: {
   policy: Policy
   gauntlet?: GauntletResult
   showExposure: boolean
+  /** The edition has the Monitoring status, so the menu offers Monitor. */
+  monitor: boolean
+  /** The edition has Try a sign-in, so the menu offers it. */
+  trySignIn: boolean
   onAction: (action: RowAction) => void
 }) {
   return (
@@ -688,7 +690,11 @@ function PolicyRow({
         <StatusPill status={policy.status} />
       </td>
       <td className="btable__actions">
-        <RowMenu label={`Actions for ${policy.name}`} items={policyMenu(policy)} onSelect={(id) => onAction(id as RowAction)} />
+        <RowMenu
+          label={`Actions for ${policy.name}`}
+          items={policyMenu(policy, { monitor, trySignIn })}
+          onSelect={(id) => onAction(id as RowAction)}
+        />
       </td>
     </tr>
   )
@@ -758,7 +764,13 @@ function AssignAppsDialog({
     /* "Protects" only for a policy that decides sign-ins. An active policy with
        no rule turned on decides nothing either, and is not inactive. */
     const why =
-      policy.status === 'draft' ? 'It is still a draft.' : policy.status === 'inactive' ? 'It is inactive.' : 'No rule is turned on.'
+      policy.status === 'draft'
+        ? 'It is still a draft.'
+        : policy.status === 'inactive'
+          ? 'It is inactive.'
+          : policy.status === 'monitor'
+            ? 'It is monitoring.'
+            : 'No rule is turned on.'
     store.showToast(
       n === 0
         ? policy.status === 'draft'

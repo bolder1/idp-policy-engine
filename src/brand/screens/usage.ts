@@ -1,4 +1,4 @@
-import { evaluates, type Policy, type Rule } from '../data'
+import { enforces, type Policy, type Rule } from '../data'
 import { leaves } from '../predicate'
 
 /* -----------------------------------------------------------------------------
@@ -86,7 +86,7 @@ export function policiesUsingType(typeId: string, policies: Policy[]): PolicyUse
 
 /** What deleting the object would do, split by whether a policy deciding sign-ins now depends on it. */
 export interface DeleteImpact {
-  /* Policies that evaluate sign-ins today and whose live rules name it. The
+  /* Policies that decide sign-ins today and whose live rules name it. The
      delete MOVES EACH OF THEM TO DRAFT (21 Sep 2026 — this used to refuse).
 
      Draft is the only honest outcome of the three. Left live, the rule would
@@ -96,8 +96,10 @@ export interface DeleteImpact {
      "allow". So the policy stops deciding sign-ins until its rules name
      another object, and the admin is told so before they confirm. */
   live: PolicyUse[]
-  /* Everything else that names it: drafts, switched-off policies, and saved
-     drafts of live policies. Allowed, and those rules are flagged until fixed. */
+  /* Everything else that names it: drafts, switched-off and monitoring
+     policies, and saved drafts of live policies. Allowed, and those rules are
+     flagged until fixed. A monitoring policy decides nothing, so a delete moves
+     no sign-in of its to draft, and "stops deciding sign-ins" would be false. */
   later: PolicyUse[]
   /* Enforcing SYSTEM policies that name it. The one case still refused:
      `setPolicyStatus` will not change a system policy's status, because the
@@ -111,7 +113,7 @@ export function deleteImpact(typeId: string, valueId: string, policies: Policy[]
   const later: PolicyUse[] = []
   const stuck: PolicyUse[] = []
   for (const use of policiesUsing(typeId, valueId, policies)) {
-    if (use.draft || !evaluates(use.policy)) later.push(use)
+    if (use.draft || !enforces(use.policy)) later.push(use)
     else if (use.policy.isSystem) stuck.push(use)
     else live.push(use)
   }
@@ -129,3 +131,10 @@ export const DELETE_WORD = 'DELETE'
     the pause the field exists for is the same with six letters. Any case, ends
     trimmed: the word is the answer, not its capitals. */
 export const deleteConfirmed = (typed: string): boolean => typed.trim().toUpperCase() === DELETE_WORD
+
+/** Whether a delete confirmation asks for the word: when the delete changes
+    live sign-ins, or when the caller asks for it — a Protected saved sign-in,
+    which changes no sign-in but was marked as the one nobody deletes in
+    passing. Never while the delete is refused, since there is nothing to arm. */
+export const asksForDeleteWord = (impact: DeleteImpact | undefined, requireTyped = false): boolean =>
+  (impact?.stuck.length ?? 0) === 0 && (requireTyped || (impact?.live.length ?? 0) > 0)

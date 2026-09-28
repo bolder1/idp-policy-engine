@@ -274,7 +274,9 @@ export const legacyWhoConditions = (p: Predicate): Condition[] => leaves(p).filt
 
 // --- Words -------------------------------------------------------------------
 
-const listNames = (names: string[], max: number): string => {
+/* Names in a sentence: 'Finance', 'Finance and Legal', 'Sales, Finance and
+   Vikram Nair'. Past `max` the rest become a count; `Infinity` prints them all. */
+export const listNames = (names: string[], max: number): string => {
   if (names.length <= 1) return names[0] ?? ''
   if (names.length <= max) return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
   const shown = Math.max(1, max - 1)

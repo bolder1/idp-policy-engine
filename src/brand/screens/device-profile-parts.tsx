@@ -21,7 +21,7 @@ import {
   Upload,
 } from 'lucide-react'
 
-import { Badge, Button, Callout, IconButton, MenuButton, NumberStepper, SearchBox, TipDot, TipMark, Toggle } from '../kit'
+import { Badge, Button, Callout, IconButton, MenuButton, NumberStepper, SearchBox, Tip, TipDot, TipMark, Toggle } from '../kit'
 import { useBrand } from '../store'
 import { TierPick } from '../tier-pick'
 import { Picker } from '../picker'
@@ -927,10 +927,22 @@ function ChosenRow({
             </div>
           )}
         </div>
-        {/* An always-on row keeps the remove's slot empty (23 Sep 2026): the
-            lock that used to sit in it said only what the missing trash can
-            already says. */}
-        {!onRemove && <span className="bz7__rowdel" />}
+        {/* The lock is back in the remove's slot (owner, 26 Sep 2026: "add the
+            lock button here as we used to have"). With the slot empty (23 Sep)
+            it had no width, so an always-on row's setting ran on past the
+            others and the list stopped ending on one x; the lock is the size of
+            the trash can it stands in for. A button, as the kit's `TipDot` is,
+            so a keyboard reaches the words the pointer gets on hover. Pressing
+            it does nothing. */}
+        {!onRemove && (
+          <span className="bz7__rowdel">
+            <Tip text="Always on — can't be removed">
+              <button type="button" className="bfp2__checklock" aria-label={`${attr.name} is always on`}>
+                <Lock size={14} strokeWidth={2} aria-hidden />
+              </button>
+            </Tip>
+          </span>
+        )}
         {onRemove && (
           /* Only the first click of a double-click removes. The rows below move
              up one line and focus goes to the next Remove, which is then under

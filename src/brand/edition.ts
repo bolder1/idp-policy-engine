@@ -32,10 +32,8 @@ export type Edition = 'lite' | 'full'
 export interface Features {
   /** Policies list: the Coverage tab beside List. */
   coverage: boolean
-  /** Policies list: the Exposure column and its sort. */
+  /** Policies list: the Exposure column and its sort. Off in both editions: the grade it shows is retired. */
   exposure: boolean
-  /** Create and builder: the five-question guided build. */
-  guidedSetup: boolean
   /** Builder: the graded thirteen-attempt deck. */
   gauntlet: boolean
   /** Builder: the Check step, i.e. the diagnostics panel as a trail stop. */
@@ -50,12 +48,30 @@ export interface Features {
   publish: boolean
   /** The prototype's own design-version switchers. */
   designSwitcher: boolean
+  /** Builder: Try a sign-in, one sign-in walked down the chain in test mode. */
+  trySignIn: boolean
+  /** Policies: Policy testing, which policy decides a sign-in across the tenant. */
+  policyTesting: boolean
+  /** Policies: the Monitoring status, a policy that checks sign-ins and enforces nothing. */
+  monitorMode: boolean
+  /** Builder and list: the checks before saving, turning on or turning off an enforcing policy. */
+  beforeTurningOn: boolean
+  /** Saved sign-ins: the Break-in test, the scripted attempts counted without a grade. */
+  breakInTest: boolean
+  /** Builder: Describe it, the plain-English and guided start on an empty draft. */
+  describePolicy: boolean
+  /** Builder: the sign-ins a described draft is checked with, kept on the policy and rerun by the guard. */
+  draftChecks: boolean
 }
 
+/* Everything, less one: the Exposure column, which printed the deck's letter
+   grade on every row. The owner retired the grade (25 Sep 2026: counts, not a
+   grade) and the Break-in test counts what gets through without one, so the
+   column is off here too (final spec, M4). It stays behind its flag, so the
+   comparison comes back by flipping this value. */
 const FULL: Features = {
   coverage: true,
-  exposure: true,
-  guidedSetup: true,
+  exposure: false,
   gauntlet: true,
   checkStep: true,
   reviewStep: true,
@@ -63,15 +79,32 @@ const FULL: Features = {
   commands: true,
   publish: true,
   designSwitcher: true,
+  trySignIn: true,
+  policyTesting: true,
+  monitorMode: true,
+  beforeTurningOn: true,
+  breakInTest: true,
+  describePolicy: true,
+  draftChecks: true,
 }
 
 /* Everything on the brief, off. What remains is v0's scope: the flow, the
    editor, the objects rail, and the five toolbar dialogs including Review &
-   Save — which is not in this table because Lite keeps it. */
+   Save — which is not in this table because Lite keeps it.
+
+   Three of the testing capabilities are ON here, and they are the manager's
+   own asks rather than ours (25 Sep 2026): Try a sign-in is v0's Test policy
+   grown up, Monitor is scenario #6 word for word, and the checks before
+   turning on are what stop a saved sign-in someone promised would keep
+   working from breaking silently. The tenant-wide testing page and the
+   Break-in test are ours, and stay off.
+
+   Describe it is on here too: it is scenario #16 on the manager's sheet
+   (plain-English policy setup), and the checks it writes onto a draft go
+   with it. */
 const LITE: Features = {
   coverage: false,
   exposure: false,
-  guidedSetup: false,
   gauntlet: false,
   checkStep: false,
   reviewStep: false,
@@ -79,6 +112,13 @@ const LITE: Features = {
   commands: false,
   publish: false,
   designSwitcher: false,
+  trySignIn: true,
+  policyTesting: false,
+  monitorMode: true,
+  beforeTurningOn: true,
+  breakInTest: false,
+  describePolicy: true,
+  draftChecks: true,
 }
 
 export const featuresOf = (e: Edition): Features => (e === 'full' ? FULL : LITE)
@@ -113,7 +153,7 @@ export const GAPS: Gap[] = [
   {
     id: 'blastRadius',
     surface: 'Builder',
-    title: 'Blast radius',
+    title: 'Who a change moves',
     question: 'How many people does this edit move?',
     cost: 'A one-word operator change and a rewrite of every rule look identical until the tickets arrive. The only way to find out who a draft moves is to publish it and watch.',
     covered: 'The bar counts the sign-ins that would land differently against what is published, before you publish, and names them.',
@@ -122,7 +162,7 @@ export const GAPS: Gap[] = [
   {
     id: 'gauntlet',
     surface: 'Builder',
-    title: 'The gauntlet',
+    title: 'The Attempt deck',
     question: 'What gets through this policy?',
     cost: 'Testing is one sign-in at a time, and you can only test the case you thought of. The case you did not think of is the one that leaks.',
     covered: 'Thirteen attempts with declared expectations are dealt at the rules and graded, so a hole shows up without anybody having to imagine it first.',
@@ -143,16 +183,7 @@ export const GAPS: Gap[] = [
     title: 'The publish gate',
     question: 'Is this safe to ship right now?',
     cost: 'Review & Save reads the rules back, which catches a typo. It does not know whether the policy leaks, or who it moves.',
-    covered: 'The last stop gathers the checks, the blast radius and the grade in one place and puts Publish after them rather than beside them.',
-    weight: 'medium',
-  },
-  {
-    id: 'exposure',
-    surface: 'List',
-    title: 'Exposure column',
-    question: 'Which of my policies is the weakest?',
-    cost: 'The list sorts by name and date. Finding the policy that leaks means opening all of them.',
-    covered: 'Every row carries its grade, and the column sorts by it, so the weakest policy is one click from the top of the list.',
+    covered: 'The last stop gathers the checks, the people a change moves and the grade in one place and puts Publish after them rather than beside them.',
     weight: 'medium',
   },
   {
@@ -163,15 +194,6 @@ export const GAPS: Gap[] = [
     cost: 'An app nobody wrote a policy for does not appear anywhere. It is invisible precisely because it is unprotected.',
     covered: 'The Coverage tab lists apps and groups against the policies that name them, so the gaps are the point of the view rather than an absence in it.',
     weight: 'high',
-  },
-  {
-    id: 'guidedSetup',
-    surface: 'Create',
-    title: 'Guided setup',
-    question: 'How does somebody who has never written a policy write their first one?',
-    cost: 'The builder assumes you already know that a policy is an ordered list, that conditions compose, and that the first match wins. A first-time administrator knows none of the three.',
-    covered: 'Five questions write the rules, in order, and grade them — so the first policy teaches the model instead of requiring it.',
-    weight: 'medium',
   },
   {
     id: 'commands',

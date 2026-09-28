@@ -60,6 +60,8 @@ import { EmptyState, NoMatches } from '../empty'
 import { DEVICES_NOTE, itemsNote } from './profile-notes'
 import { newId, uniqueName } from '../data'
 import { deleteImpact, policiesUsing } from './usage'
+import { libraryChecked, profileGuard } from './library-guard'
+import { useLibraryReview } from './library-review'
 import { UsedByPanel } from './used-by'
 import { ConfirmDelete } from './confirm-delete'
 import { pageForRow, usePagedList } from './paged-list'
@@ -993,13 +995,22 @@ function ProfilePage({
     return true
   }
 
+  /* What saving it would do to the policies that name it and the saved
+     sign-ins they decide (spec D.6), read in Review changes. The one fix is
+     the profile as saved. A new profile is named by no rule yet. */
+  const library = useLibraryReview(profileGuard, profile, draft, {
+    on: libraryChecked({ kind: 'device-profile', isNew }),
+    onFix: setDraft,
+    restored: (p) => p === profile,
+  })
+
   /* Leaving asks first. Its Save is the bar's, and it is blocked for the same
-     reason the bar's is. */
+     reasons the review's is. */
   const confirmLeave = useLeaveGuard({
     dirty,
-    save,
+    save: () => !library.stopped() && save(),
     saveLabel: isNew ? 'Create profile' : 'Save',
-    blocked: issue,
+    blocked: () => issue ?? library.stopped(),
   })
 
   const noun = ITEM_NOUN[draft.mode]
@@ -1161,6 +1172,7 @@ function ProfilePage({
         changes={isNew ? ['New profile'] : profileChangeParts(profile, draft)}
         saveLabel={isNew ? 'Create profile' : 'Save changes'}
         review={shownReview}
+        guard={library.guard}
         blocked={issue !== null}
         blockedReason={issue ?? undefined}
         onSave={save}

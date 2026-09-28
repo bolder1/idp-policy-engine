@@ -21,6 +21,8 @@
    something, small enough to read. A real console would query this server-side.
    -------------------------------------------------------------------------- */
 
+import { unitOf, type ZoneRange } from './data'
+
 export type PlaceKind = 'country' | 'state' | 'city'
 
 export interface Place {
@@ -444,6 +446,73 @@ export function searchPlaces(query: string, limit = 12, only?: PlaceKind): Place
       a.p.name.localeCompare(b.p.name),
   )
   return scored.slice(0, limit).map((s) => s.p)
+}
+
+/* --- Distance and names, as the evaluator reads a zone's location half ------
+
+   Two questions a sign-in's place has to answer against a zone: is it one of
+   the named places, and is it within a range of one. Both live here, beside the
+   catalogue, so the zone editor and the evaluator cannot come to mean two
+   different things by "Bangalore" or by "25 miles". */
+
+/** The international mile, exactly. */
+export const KM_PER_MILE = 1.609344
+
+/** The mean Earth radius, in km (IUGG). Anything that turns a distance into
+    degrees takes it from here, so it agrees with `haversineKm` to the metre. */
+export const EARTH_RADIUS_KM = 6371.0088
+
+/* Great-circle distance, in kilometres, on a sphere of the mean Earth radius.
+
+   A sphere rather than the ellipsoid, and that is a stated limit rather than a
+   bug: the two differ by well under half a percent, and the catalogue's own
+   centroids are only good to a tenth of a degree — about eleven kilometres. */
+export function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const R = EARTH_RADIUS_KM
+  const rad = (d: number) => (d * Math.PI) / 180
+  const dLat = rad(b.lat - a.lat)
+  const dLon = rad(b.lon - a.lon)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)))
+}
+
+/* A range's reach in kilometres. `km` holds the number AS TYPED, in the unit
+   beside it (data.ts keeps "10 miles" as 10), so a mile range is converted
+   here and nowhere else. */
+export const rangeKm = (r: ZoneRange): number => (unitOf(r) === 'mi' ? r.km * KM_PER_MILE : r.km)
+
+/* Whether a point is inside a range, its edge included — the one test, for
+   the evaluator and for anything that has to agree with it.
+
+   To a millimetre rather than exactly. A point stated AT the edge ("25 km from
+   Pune", the testing ruler's) has been turned into a latitude and measured
+   back, and floating point lands it a fraction of a nanometre either side of
+   25: exactly, it was inside or outside by the rounding of its last bit. */
+const EDGE_KM = 1e-6
+
+export const withinRange = (p: { lat: number; lon: number }, r: ZoneRange): boolean => haversineKm(p, r) <= rangeKm(r) + EDGE_KM
+
+/* The catalogue places a typed name can mean, of one kind: by name or by an
+   alias. Kind-scoped, because Berlin and Singapore are each a state AND a city,
+   and "Berlin the state" answering for "Berlin the city" would be a match by
+   spelling rather than by place. */
+const placesNamed = (kind: PlaceKind, name: string): Place[] => {
+  const q = norm(name)
+  return PLACES.filter((p) => p.kind === kind && (norm(p.name) === q || (p.aliases ?? []).some((x) => norm(x) === q)))
+}
+
+/* Do two names mean the same place of this kind?
+
+   Case and accents never matter ("Île-de-France" is "ile-de-france"), and the
+   catalogue's aliases count, so a zone saying "Bangalore" holds a sign-in that
+   geolocates to "Bengaluru". Two names the catalogue does not know are equal
+   only when they are spelled alike — nothing here guesses. */
+export function sameName(kind: PlaceKind, a: string, b: string): boolean {
+  if (norm(a) === norm(b)) return true
+  const left = placesNamed(kind, a)
+  if (left.length === 0) return false
+  const right = new Set(placesNamed(kind, b).map((p) => p.id))
+  return left.some((p) => right.has(p.id))
 }
 
 /* Adding Pune to a zone that already contains India does not narrow it and does

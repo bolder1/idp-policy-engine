@@ -11,6 +11,7 @@ import { buildTemplate } from './screens/board/apply-template'
 import { diagnose } from './screens/diagnostics'
 import { METHODS } from './screens/rule-form'
 import { SIM_USERS, decide, rawEnv, type SimContext } from './screens/simulate'
+import { ADMIN_ACCOUNT } from './store'
 import { validateZone } from './screens/zone-validation'
 
 /* -----------------------------------------------------------------------------
@@ -44,9 +45,18 @@ describe('the showcase policies', () => {
     expect(t.policies.filter((p) => p.isSystem)).toHaveLength(1)
   })
 
-  it('are live, each on applications the tenant has', () => {
+  /* HRMS opens Inactive, so the pitch starts on a policy that is built and not
+     yet on (Phase 4): Try reads "Today | Stored version", and Turn on runs
+     Before turning on. The other three are live. */
+  it('are live but for HRMS, which opens off, each on applications the tenant has', () => {
+    expect(t.policies.map((p) => [p.id, p.status])).toEqual([
+      ['global-default', 'always-on'],
+      ['sc-hrms-office', 'inactive'],
+      ['sc-corporate-devices', 'active'],
+      ['sc-device-compliance', 'active'],
+      ['sc-dev-tools', 'active'],
+    ])
     for (const p of authored) {
-      expect(p.status, p.id).toBe('active')
       expect(p.appIds.length, p.id).toBeGreaterThan(0)
       for (const id of p.appIds) expect(appIds.has(id), `${p.id} → ${id}`).toBe(true)
     }
@@ -166,6 +176,23 @@ describe('the showcase library', () => {
 
   it('keeps the board tour’s demo group', () => {
     expect(groupIds.has('finance')).toBe(true)
+  })
+
+  /* The admin at the console is a directory person here, so a sign-in as
+     "you" resolves (Describe it's You check, and the guard's own sign-ins):
+     one IT Admin more, and the last person listed. */
+  it('lists the admin at the console, in IT Admins', () => {
+    const admin = t.directory.people.find((u) => u.id === ADMIN_ACCOUNT.id)
+    expect(admin).toMatchObject({ name: ADMIN_ACCOUNT.name, groupId: 'it-admins' })
+    expect(t.directory.people.at(-1)?.id).toBe(ADMIN_ACCOUNT.id)
+    expect(t.directory.people.filter((u) => u.groupId === 'it-admins').map((u) => u.name)).toEqual([
+      'Ravi Menon',
+      'Clara Boucher',
+      'Yusuf Demir',
+      'Bethany Cole',
+      'Omar Haddadi',
+      'Jaspreet Toor',
+    ])
   })
 
   it('shows a logo for every scenario app that has one', () => {

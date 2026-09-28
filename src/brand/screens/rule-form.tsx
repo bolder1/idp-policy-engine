@@ -37,6 +37,7 @@ import {
 import { ConditionList, ConditionPopover, condSummary, valueSource } from './ConditionPopover'
 import { conditionTone } from './board/tones'
 import { useBrand, useNameLookup } from '../store'
+import { RULE_METHODS } from '../methods'
 import type { Diagnostic } from './diagnostics'
 
 /* -----------------------------------------------------------------------------
@@ -98,33 +99,18 @@ const GROUP_ICON: Record<string, LucideIcon> = {
    — and collapsing it would throw that away to tidy a form. Only the
    presentation changes. */
 export const OUTCOMES: { id: AccessDecision; label: string; sub: string; icon: LucideIcon }[] = [
-  { id: '1fa', label: 'Allow', sub: 'The login goes through', icon: UserCheck },
-  { id: 'deny', label: 'Deny', sub: 'The login is refused outright', icon: ShieldAlert },
+  { id: '1fa', label: 'Allow', sub: 'The sign-in goes through', icon: UserCheck },
+  { id: 'deny', label: 'Deny', sub: 'The sign-in is refused outright', icon: ShieldAlert },
 ]
 
 /** Allow covers both allow-flavours; the second-factor switch chooses between them. */
 export const allows = (d: AccessDecision) => d !== 'deny'
 export const DEC_KEY: Record<AccessDecision, string> = { deny: 'deny', '2fa': 'mfa', '1fa': 'allow' }
 
-/* The methods a rule can name, by the names the Authentication methods page
-   gives them (AUTH_METHODS in methods.ts).
-
-   It was seven generic names — "TOTP Authenticator", "SMS / OTP" — while every
-   seeded rule and the Authentication methods page said "Google Authenticator"
-   and "OTP over SMS". A stored name the picker did not offer showed as ticked
-   in the card and unticked in the list, and could not be cleared (24 Sep 2026,
-   for the showcase's "password, then Google Authenticator"). One vocabulary. */
-export const METHODS = [
-  'miniOrange Push',
-  'miniOrange OTP',
-  'Google Authenticator',
-  'Microsoft Authenticator',
-  'OTP over SMS',
-  'OTP over Email',
-  'FIDO2 / Passkey',
-  'Yubikey Token',
-  'Security Questions',
-]
+/* The methods a rule can name. The list lives in methods.ts beside the
+   catalogue it names (`RULE_METHODS`), so a module with no React in it — the
+   Describe it reader — reads the same nine words the pickers offer. */
+export const METHODS = RULE_METHODS
 
 /* `audience` is gone: who a policy governs is a policy-level fact now, so
    there is no per-rule section to anchor. */
@@ -420,8 +406,8 @@ export function WhenSection({
           <div className="bf__whenempty">
             <p>
               {who
-                ? `This rule has no conditions, so it decides every login from ${who.startsWith('Everyone') ? who.charAt(0).toLowerCase() + who.slice(1) : who} that reaches it.`
-                : 'This rule has no conditions, so it decides every login that reaches it.'}
+                ? `This rule has no conditions, so it decides every sign-in from ${who.startsWith('Everyone') ? who.charAt(0).toLowerCase() + who.slice(1) : who} that reaches it.`
+                : 'This rule has no conditions, so it decides every sign-in that reaches it.'}
             </p>
             <CatalogueButton
               open={adding === 'first'}
@@ -827,7 +813,7 @@ function ConditionRow({
    implementations would be one chance for that to be false. */
 function Readback({ rule, resolve }: { rule: Rule; resolve: NameLookup }) {
   const parts = predicateParts(rule.when, resolve)
-  if (parts.length === 0) return <em className="bf__readany">any login that reaches it</em>
+  if (parts.length === 0) return <em className="bf__readany">any sign-in that reaches it</em>
 
   return (
     <span className="bf__readexpr">

@@ -85,6 +85,8 @@ export function whyNotDeciding(p: Policy): string | null {
      kind of small lie that costs a screen its credibility. */
   if (p.status === 'draft') return 'Draft. It decides no sign-ins.'
   if (p.status === 'inactive') return 'Inactive. It decides no sign-ins.'
+  /* Checked, not enforced: it runs on every sign-in and changes none. */
+  if (p.status === 'monitor') return 'Monitoring. It decides no sign-ins.'
   if (!p.rules.some((r) => r.enabled)) return 'No rule is turned on. Every sign-in falls through.'
   return null
 }
@@ -266,7 +268,8 @@ export function summarise(appId: string, policies: Policy[]): AppSummary {
     /* One policy: its own status word, the one the policies list shows. "Off"
        is not a status, and a draft was never on. */
     const only = own[0]
-    const word = only.status === 'draft' ? 'Draft' : only.status === 'inactive' ? 'Inactive' : 'No rule on'
+    const word =
+      only.status === 'draft' ? 'Draft' : only.status === 'inactive' ? 'Inactive' : only.status === 'monitor' ? 'Monitoring' : 'No rule on'
     return {
       own: own.length,
       decides: 0,

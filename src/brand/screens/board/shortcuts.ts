@@ -35,8 +35,8 @@ export interface ShortcutOptions {
   mac: boolean
   /** The command palette exists (Full edition). */
   commands: boolean
-  /** Rehearsals can be run, so Escape has one to clear. */
-  gauntlet: boolean
+  /** Try a sign-in is on the board (every edition that has it): T opens it, and Escape closes it first. */
+  testing: boolean
   /** There is a publish step; Lite reviews and saves. */
   publish: boolean
 }
@@ -51,11 +51,12 @@ export function boardShortcuts(o: ShortcutOptions): [string, string][] {
     [c(['mod'], 'D'), 'Duplicate the selected rule'],
     ['Del', 'Delete the selected rule'],
     ['E', 'Switch the selected rule on or off'],
+    ...(o.testing ? ([['T', 'Try a sign-in']] as [string, string][]) : []),
     ...(o.commands ? ([[c(['mod'], 'K'), 'Command palette']] as [string, string][]) : []),
     [c(['mod'], 'Enter'), o.publish ? 'Review and publish' : 'Review and save'],
     [c(['mod'], '\\'), 'Show or hide the panel'],
     [`${c(['mod'], 'Z')} ${c(['mod', 'shift'], 'Z')}`, 'Undo, redo'],
-    ['Esc', o.gauntlet ? 'Clear the rehearsal, then the selection' : 'Clear the selection'],
+    ['Esc', o.testing ? 'Close Try a sign-in, then clear the selection' : 'Clear the selection'],
     ['?', 'Keyboard shortcuts'],
   ]
 }

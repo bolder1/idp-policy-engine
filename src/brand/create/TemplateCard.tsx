@@ -6,7 +6,7 @@ import {
   ListFilter,
   type LucideIcon,
   Network,
-  Sparkles,
+  Tag,
   Users,
   Webhook,
 } from 'lucide-react'
@@ -198,7 +198,7 @@ function SignalRow({ signals }: { signals: string[] }) {
   return (
     <span className="bgcard__signals">
       {signals.map((sig) => {
-        const Ico = SIGNAL_ICON[sig] ?? Sparkles
+        const Ico = SIGNAL_ICON[sig] ?? Tag
         return (
           <span key={sig} className={`bgcard__sig is-${SIGNAL_TONE[sig] ?? 'neutral'}`} title={`Reads ${sig}`}>
             <Ico size={13} strokeWidth={1.9} aria-hidden />
@@ -443,8 +443,8 @@ export function TemplatePreview({
           ))}
 
           <p className="bprev__note">
-            Evaluated top to bottom. The first rule that matches decides the login, and the rest
-            are skipped.
+            Evaluated top to bottom. The first rule that matches decides the sign-in, and the
+            rest are skipped.
           </p>
 
           <ol className="bprev__stack">
@@ -496,7 +496,7 @@ export function TemplatePreview({
 
    It lived in CreatePolicy.tsx, which was a `lazy()` route. Anything importing
    it dragged the create page's whole chunk — the gallery, the marketplace sheet
-   and a `lazy(() => import('./Interview'))` reference — into the importing
+   and a lazy reference to the guided build since retired — into the importing
    bundle. It belongs beside `CardModel`, which is its return type and lives
    here, so the picker can have it without the page.
    -------------------------------------------------------------------------- */

@@ -1,0 +1,87 @@
+/* -----------------------------------------------------------------------------
+   The guard pages (guard-page.tsx): the checks before an enforcing policy is
+   saved, turned on, turned off or switched to monitoring.
+
+   The rows are the kit's change list (`.bx-cl`, list layout), so a check reads
+   as the same object as a Review changes row. What is here is only what the
+   list does not have: the banner that stops a change, the stale-review line,
+   the version choice, a rule named as a link inside a value, and the grey of a
+   reading that can't be told.
+
+   No rule here sets a transform. The banner and the rows' wrappers are framer
+   elements — the banner folds by height and opacity, a row fades by opacity —
+   and a stylesheet transform on either would be overwritten.
+   -------------------------------------------------------------------------- */
+
+.bgd { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+
+/* A row's wrapper takes the list's subgrid, so the row inside still lines up
+   its names and values with every other row. */
+.bx-cl.is-list > .bgd__row {
+  grid-column: 1 / -1;
+  display: grid; grid-template-columns: subgrid;
+  column-gap: var(--space-8);
+  min-width: 0;
+}
+.bgd__rowacts { display: inline-flex; align-items: center; gap: var(--space-4); }
+/* A row's summary may be a whole line of counts — What changes says what they
+   are of before them ("Of 360 modelled sign-ins: Now allowed 72 · …") — so
+   here it wraps, right-aligned under itself, where the kit keeps a count on
+   one line. The title beside it stays on one line: it is the row's name. */
+.bgd .bx-cl__toggle,
+.bgd .bx-cl__title { white-space: nowrap; }
+.bgd .bx-cl__count { white-space: normal; text-align: right; min-width: 0; }
+
+/* --- The banner that stops a change -------------------------------------------------
+   Negative, as the feedback tokens draw it; the padding is on the inner box so
+   the outer one can fold to nothing. */
+.bgd__block {
+  overflow: hidden;
+  border: var(--bw-thin) solid var(--fb-negative-border); border-radius: var(--radius-md);
+  background: var(--fb-negative-bg);
+}
+.bgd__blockin { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5) var(--space-6); }
+.bgd__blockhead { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--fb-negative-fg); }
+.bgd__blockline { margin: 0; font-size: var(--fs-md); color: var(--text-primary); }
+.bgd__acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+
+.bgd__expect { display: flex; flex-direction: column; gap: var(--space-4); max-width: 420px; }
+.bgd__expect .bgd__acts { justify-content: flex-end; }
+.bgd__said { margin: 0; font-size: var(--fs-sm); color: var(--fb-negative-fg); }
+
+/* --- Changed since it was opened ---------------------------------------------------- */
+.bgd__stale {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: var(--bw-thin) solid var(--fb-notice-border); border-radius: var(--radius-md);
+  background: var(--fb-notice-bg); color: var(--fb-notice-fg);
+  font-size: var(--fs-md);
+}
+
+/* --- Which version turns on ----------------------------------------------------------- */
+.bgd__version { display: flex; align-items: center; gap: var(--space-5); }
+.bgd__label { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary); }
+
+/* --- Inside a value ---------------------------------------------------------------------- */
+/* Can't tell, and a failure this change did not cause: grey text, never a badge. */
+.bgd__grey { color: var(--text-tertiary); font-weight: var(--fw-regular); }
+.bgd__plan { font-weight: var(--fw-regular); }
+
+/* "Rule 1": the rule, shown on the board behind the drawer. Text-sized, in the
+   link colour, inside the sentence it finishes. */
+.bgd .bgd__rule {
+  display: inline; margin: 0; padding: 0;
+  border: 0; background: none; cursor: pointer;
+  font: inherit; color: var(--text-link);
+}
+.bgd .bgd__rule:hover { text-decoration: underline; text-underline-offset: 3px; }
+.bgd .bgd__rule:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 3px var(--focus-halo); }
+
+/* --- Review changes: a saved sign-in a library save stops (library-review.tsx) ---------
+   Beside the row that fails, never in the footer: the value, then why it stops
+   the save in the negative ink, then the ready fix. The row keeps the list's
+   grid; this only stacks inside its value cell. */
+.blg { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.blg__stop { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.blg__line { font-weight: var(--fw-regular); color: var(--fb-negative-fg); }
+.blg .bgd__expect { font-weight: var(--fw-regular); }

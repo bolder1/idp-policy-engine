@@ -36,7 +36,9 @@
    -------------------------------------------------------------------------- */
 
 import { nameTaken } from './data'
+import { allOf, type CondState } from './predicate'
 import type { ReviewLine } from './review-rows'
+import type { DevicePlatform, FactKey, SignInDevice } from './screens/sign-in-facts'
 
 /* Back, and only for the device catalogue. See DEVICE_ATTRIBUTES below: the two
    kinds ask different questions and were never well served by one list. */
@@ -1905,3 +1907,389 @@ export const seedProfiles: FingerprintProfile[] = [
     usedIn: 0,
   },
 ]
+
+/* --- A device, measured against a profile ----------------------------------------
+
+   Everything above says what a profile asks for. This says what a sign-in's
+   device comes to against it, and it is what the evaluator reads: row by row
+   for a device-health profile, and "is this a machine the person has
+   registered, or may register" for a trusted-device one.
+
+   It used to be one boolean. The evaluator graded every device profile on
+   whether the chip said the device was "recognised", so an Android 12 handset
+   passed "Android ≥ 13" as long as somebody had seen it before, and no OS
+   floor, integrity rung, screen lock, browser floor, client version, agent or
+   device limit was ever read. A profile is only as good as the reading of it,
+   and that reading made every profile in the tenant the same profile.
+
+   Three values all the way up, with the evaluator's two standing rules:
+
+   · NOT STATED is not STATED ABSENT. A device that says nothing about its
+     screen lock is undecided on that row; a device that REPORTS no screen lock
+     (`null`) has failed "a screen lock is set". The Security comment above
+     says it outright — "an absent signal is a failed condition, which is the
+     whole point" — and merging the two is how "we did not ask" becomes "they
+     passed".
+   · A row that does not constrain this device is NOT APPLICABLE, and that
+     counts as a pass. An Android floor says nothing about an iPhone, and the
+     browser comment above makes the same rule for families: "a family a
+     profile says nothing about is unconstrained". It is why a profile naming
+     all four OS floors reads "whatever you are on, be current".
+
+   A profile is the AND of its rows. Not applicable passes; one failing row
+   fails the profile; otherwise one undecided row leaves it undecided, with the
+   facts that would settle it named.
+   -------------------------------------------------------------------------- */
+
+/** One row of a device profile, as a sign-in's device measured up to it. */
+export interface ProfileCheck {
+  /** The attribute id ('os-android', 'integrity'…) or 'agent' | 'registration' | 'limit' | 'mobile'. */
+  id: string
+  /** The catalogue's name ("Android OS version"), or "Device Agent", "Registration", "Device limit", "Mobile devices". */
+  label: string
+  status: CondState | 'not applicable'
+  /** What the device showed: "12", "not installed", "not stated". */
+  actual: string
+  /** What the profile asks for: "≥ 13", "at most 2". */
+  required: string
+}
+
+export interface ProfileMatch {
+  status: CondState
+  /** One per row: catalogue order for device health, check order for a trusted device. */
+  checks: ProfileCheck[]
+  /** The facts that would settle an 'unknown'; [] when decided. */
+  missing: FactKey[]
+}
+
+/* Which rows a laptop is asked, and which a phone is.
+
+   The catalogue reads integrity, screen lock and the Authenticator version off
+   the miniOrange Authenticator ON THE HANDSET — `integrity` above says so:
+   "read by the miniOrange Authenticator on the device itself … only one of
+   them exists on a phone". So there are two honest readings of a profile that
+   names them, and the product does not say which it means:
+
+     handset       those three rows are not applicable on Windows, macOS and
+                   Linux, and the desktop agent's version is not applicable on
+                   iOS and Android. This is what the showcase's own profile
+                   states ("phones and laptops both qualify"), so it is the
+                   default.
+     every-device  every row is asked of every device. A laptop reports no
+                   integrity, so it fails any profile that names integrity —
+                   the Security comment above, read literally.
+
+   Both are pinned by a test, and the choice is the owner's (spec D1). */
+export interface MatchOptions {
+  clientRows: 'handset' | 'every-device'
+}
+
+export const DEFAULT_MATCH: MatchOptions = { clientRows: 'handset' }
+
+/* Windows names its releases twice, and a floor is written in either: "11" in
+   the catalogue's list, 10.0.22631 on the device. The marketing names are read
+   as the first build that carried them, so 10.0.22631 is at least "11" and
+   10.0.19045 is not. Any other dotted string is compared as written. */
+const WINDOWS_RELEASE: Record<string, string> = { '11': '10.0.22000', '10': '10.0.0', '8.1': '6.3.9600' }
+
+/** Dotted numbers, zero-padded: -1, 0 or 1 as `a` is below, at or above `b`. Null when either is not a version. */
+export function compareVersions(a: string, b: string, platform?: DevicePlatform): -1 | 0 | 1 | null {
+  if (!isVersionText(a) || !isVersionText(b)) return null
+  const parts = (v: string) => {
+    const t = v.trim()
+    return (platform === 'windows' ? (WINDOWS_RELEASE[t] ?? t) : t).split('.').map(Number)
+  }
+  const x = parts(a)
+  const y = parts(b)
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0)
+    if (d !== 0) return d > 0 ? 1 : -1
+  }
+  return 0
+}
+
+/** Whether a comparison satisfies a stored operator. An unknown id reads as ≥, as `versionOp` does. */
+function meets(cmp: -1 | 0 | 1, op: string): boolean {
+  switch (versionOp(op).id) {
+    case 'gt':
+      return cmp > 0
+    case 'lte':
+      return cmp <= 0
+    case 'lt':
+      return cmp < 0
+    case 'eq':
+      return cmp === 0
+    case 'ne':
+      return cmp !== 0
+    default:
+      return cmp >= 0
+  }
+}
+
+type BrowserFamilyId = NonNullable<SignInDevice['browser']>['family']
+type ScreenLockId = NonNullable<SignInDevice['screenLock']>
+
+const PLATFORM_WORD: Record<DevicePlatform, string> = {
+  windows: 'Windows',
+  macos: 'macOS',
+  ios: 'iOS',
+  android: 'Android',
+  linux: 'Linux',
+  other: 'another platform',
+}
+const BROWSER_WORD: Record<BrowserFamilyId, string> = { chrome: 'Chrome', edge: 'Edge', firefox: 'Firefox', safari: 'Safari', other: 'another browser' }
+const LOCK_WORD: Record<ScreenLockId, string> = { none: 'no screen lock', pattern: 'a pattern', pin: 'a PIN or passcode', biometric: 'biometric unlock' }
+
+const OS_PLATFORM: Record<string, DevicePlatform> = { 'os-windows': 'windows', 'os-macos': 'macos', 'os-ios': 'ios', 'os-android': 'android' }
+const BROWSER_FAMILY: Record<string, BrowserFamilyId> = {
+  'browser-chrome': 'chrome',
+  'browser-edge': 'edge',
+  'browser-firefox': 'firefox',
+  'browser-safari': 'safari',
+}
+
+const DESKTOP: readonly DevicePlatform[] = ['windows', 'macos', 'linux']
+const HANDSET: readonly DevicePlatform[] = ['ios', 'android']
+
+/* The integrity ladder, rung by rung, as the facts each rung refuses. The
+   options are ordered, each one the one above plus a class of device, so the
+   stored option's POSITION is the rung. Rooted and jailbroken are one fact:
+   the second is what iOS calls the first. */
+const INTEGRITY_REFUSES: readonly (readonly ('rooted' | 'tampered' | 'emulated')[])[] = [
+  ['rooted'],
+  ['rooted', 'tampered'],
+  ['rooted', 'tampered', 'emulated'],
+]
+
+/* The screen-lock options, as the locks each accepts. Biometric unlock counts
+   as a PIN, because on iOS and Android a biometric always has a passcode
+   behind it; a pattern is a screen lock and not a PIN. Neither is documented
+   by the product (spec D3). */
+const LOCK_ACCEPTS: readonly (readonly ScreenLockId[])[] = [['pattern', 'pin', 'biometric'], ['pin', 'biometric'], ['biometric']]
+
+const NOT_STATED = 'not stated'
+
+type Graded = { check: ProfileCheck; missing: FactKey[] }
+
+const dedupe = (keys: readonly FactKey[]): FactKey[] => [...new Set(keys)]
+
+/* The rule an enabled version row must meet: the profile's own, else the
+   master's default — the same fallback `valueLabel` prints by, so the value a
+   row is graded against is the value the overview shows. */
+function versionRule(p: FingerprintProfile, a: Attribute): AttrRuleValue | null {
+  if (a.config?.kind !== 'version') return null
+  const v = p.config[a.id]
+  return isRuleValue(v) ? v : a.config.value
+}
+
+function choiceIndex(p: FingerprintProfile, a: Attribute): number {
+  if (a.config?.kind !== 'choice') return -1
+  const v = p.config[a.id]
+  return a.config.options.indexOf(typeof v === 'string' ? v : a.config.value)
+}
+
+/* One row of a device-health profile against one device. */
+function gradeHealthRow(p: FingerprintProfile, a: Attribute, d: SignInDevice, o: MatchOptions): Graded {
+  const required = valueLabel(a, p.config[a.id])
+  const row = (status: ProfileCheck['status'], actual: string, missing: FactKey[] = []): Graded => ({
+    check: { id: a.id, label: a.name, status, actual, required },
+    missing: status === 'unknown' ? missing : [],
+  })
+  const platform = d.platform
+
+  /* A version the device reported, against the row's operator and value. A
+     reported version that is not one is undecided and waits on a readable
+     one; a stored value that is not one cannot be compared at all. */
+  const versus = (have: string, key: FactKey, on?: DevicePlatform): Graded => {
+    const r = versionRule(p, a)
+    const cmp = r ? compareVersions(have, r.value, on) : null
+    if (!r || cmp === null) return row('unknown', have, isVersionText(have) ? [] : [key])
+    return row(meets(cmp, r.op) ? 'pass' : 'fail', have)
+  }
+
+  /* A row one kind of device reads (see `MatchOptions`). On the other kind it
+     is not applicable. With no platform stated a pass still passes — it would
+     on either kind — but a fail is only a fail on the kind that reads the row,
+     so it waits on the platform. */
+  const readOn = (kind: 'handset' | 'desktop', grade: () => Graded): Graded => {
+    if (o.clientRows === 'every-device') return grade()
+    const elsewhere = kind === 'handset' ? DESKTOP : HANDSET
+    if (platform !== undefined && elsewhere.includes(platform)) return row('not applicable', PLATFORM_WORD[platform])
+    const g = grade()
+    if (platform !== undefined || g.check.status === 'pass') return g
+    return { check: { ...g.check, status: 'unknown' }, missing: dedupe([...g.missing, 'device.platform']) }
+  }
+
+  /* The form factor, stated or read off a desktop platform. A phone and a
+     tablet run the same platforms, so an Android or iOS device with no stated
+     form factor cannot answer "Mobile". */
+  if (a.id === 'device-type') {
+    const want = a.config?.kind === 'choice' ? a.config.options[choiceIndex(p, a)] : undefined
+    const have = d.formFactor ?? (platform !== undefined && DESKTOP.includes(platform) ? 'Laptop' : undefined)
+    if (have === undefined) return row('unknown', NOT_STATED, ['device.formFactor'])
+    return row(want === undefined ? 'unknown' : have === want ? 'pass' : 'fail', have)
+  }
+
+  /* A floor constrains the platform it names and nothing else. */
+  const os = OS_PLATFORM[a.id]
+  if (os) {
+    if (platform === undefined) return row('unknown', NOT_STATED, ['device.platform', ...(d.osVersion === undefined ? (['device.osVersion'] as const) : [])])
+    if (platform !== os) return row('not applicable', PLATFORM_WORD[platform])
+    if (d.osVersion === undefined) return row('unknown', NOT_STATED, ['device.osVersion'])
+    return versus(d.osVersion, 'device.osVersion', platform)
+  }
+
+  const family = BROWSER_FAMILY[a.id]
+  if (family) {
+    if (d.browser === undefined) return row('unknown', NOT_STATED, ['device.browser'])
+    if (d.browser.family !== family) return row('not applicable', BROWSER_WORD[d.browser.family])
+    return versus(d.browser.version, 'device.browser')
+  }
+
+  switch (a.id) {
+    case 'integrity':
+      return readOn('handset', () => {
+        const i = d.integrity
+        if (i === undefined) return row('unknown', NOT_STATED, ['device.integrity'])
+        if (i === null) return row('fail', 'not reported')
+        const found = (['rooted', 'tampered', 'emulated'] as const).filter((k) => i[k])
+        const actual = found.length === 0 ? 'intact' : found.join(', ')
+        const refuses = INTEGRITY_REFUSES[choiceIndex(p, a)]
+        if (!refuses) return row('unknown', actual)
+        return row(refuses.some((k) => i[k]) ? 'fail' : 'pass', actual)
+      })
+    case 'screen-lock':
+      return readOn('handset', () => {
+        const l = d.screenLock
+        if (l === undefined) return row('unknown', NOT_STATED, ['device.screenLock'])
+        if (l === null) return row('fail', 'not reported')
+        const accepts = LOCK_ACCEPTS[choiceIndex(p, a)]
+        if (!accepts) return row('unknown', LOCK_WORD[l])
+        return row(accepts.includes(l) ? 'pass' : 'fail', LOCK_WORD[l])
+      })
+    case 'mo-authenticator':
+      return readOn('handset', () => {
+        const v = d.authenticatorVersion
+        if (v === null) return row('fail', 'not installed')
+        /* '' is installed with no version stated — as undecided as no fact at all. */
+        if (v === undefined || v.trim() === '') return row('unknown', NOT_STATED, ['device.authenticatorVersion'])
+        return versus(v, 'device.authenticatorVersion')
+      })
+    case 'mo-agent':
+      return readOn('desktop', () => {
+        if (d.agentInstalled === false || d.agentVersion === null) return row('fail', 'not installed')
+        if (d.agentVersion === undefined) return row('unknown', NOT_STATED, ['device.agent'])
+        return versus(d.agentVersion, 'device.agent')
+      })
+  }
+  /* A row this grader has no reading for. Nothing in a sign-in answers it, so
+     it is undecided and no fact would settle it. */
+  return row('unknown', NOT_STATED)
+}
+
+function settle(graded: Graded[]): ProfileMatch {
+  const status = allOf(graded.map((g) => (g.check.status === 'not applicable' ? 'pass' : g.check.status)))
+  return { status, checks: graded.map((g) => g.check), missing: status === 'unknown' ? dedupe(graded.flatMap((g) => g.missing)) : [] }
+}
+
+/* A device against a device-health profile: every enabled row, in catalogue
+   order, ANDed. Registration, the device limit, mobile restriction and reach
+   are never read — an OS profile has no enrolment at all. With no device
+   stated, every row is undecided. */
+export function healthMatches(p: FingerprintProfile, d: SignInDevice | undefined, o: MatchOptions = DEFAULT_MATCH): ProfileMatch {
+  const device: SignInDevice = d ?? { source: 'stated' }
+  return settle(OS_ATTRIBUTES.filter((a) => p.enabled.includes(a.id)).map((a) => gradeHealthRow(p, a, device, o)))
+}
+
+/* A device against a trusted-device profile.
+
+   Recognition is a SUPPLIED fact — `registeredToPerson` — and not a score.
+   The profile's signals carry priorities, but no threshold turns a score into
+   "recognised": the bands were deleted with the controls that set them, and
+   `scoreOf` has no caller. So what this checks is what the console's device
+   restriction panel states outright (spec D5):
+
+     agent         an agent-based profile needs the Device Agent, which runs on
+                   Windows only
+     mobile        "Enable mobile device restriction" refuses phones and tablets
+     registration  the device is registered to this person — or it is not yet,
+                   and the profile registers a new device on first sight
+     limit         a device not yet registered would be one more than the
+                   person already has; at the limit, it is refused
+
+   Registration and the limit are per person, so without one they wait on the
+   person. */
+export function trustedMatches(p: FingerprintProfile, d: SignInDevice | undefined, personKnown: boolean): ProfileMatch {
+  const dev: SignInDevice = d ?? { source: 'stated' }
+  const platform = dev.platform
+  const graded: Graded[] = []
+  const add = (id: string, label: string, status: ProfileCheck['status'], actual: string, required: string, missing: FactKey[] = []) =>
+    graded.push({ check: { id, label, status, actual, required }, missing: status === 'unknown' ? missing : [] })
+
+  if (p.reach === 'agent') {
+    const required = 'Installed, on Windows'
+    if (platform !== undefined && platform !== 'windows') add('agent', 'Device Agent', 'fail', PLATFORM_WORD[platform], required)
+    else if (dev.agentInstalled === true) add('agent', 'Device Agent', 'pass', 'installed', required)
+    else if (dev.agentInstalled === false) add('agent', 'Device Agent', 'fail', 'not installed', required)
+    else add('agent', 'Device Agent', 'unknown', NOT_STATED, required, ['device.agent'])
+  }
+
+  if (p.restrictMobile) {
+    const required = 'Not a phone or tablet'
+    const said = dev.formFactor ?? (platform !== undefined ? PLATFORM_WORD[platform] : NOT_STATED)
+    const handset = (platform !== undefined && HANDSET.includes(platform)) || dev.formFactor === 'Mobile' || dev.formFactor === 'Tablet'
+    const desktop = (platform !== undefined && DESKTOP.includes(platform)) || dev.formFactor === 'Laptop'
+    if (handset) add('mobile', 'Mobile devices', 'fail', said, required)
+    else if (desktop) add('mobile', 'Mobile devices', 'pass', said, required)
+    else add('mobile', 'Mobile devices', 'unknown', said, required, ['device.formFactor'])
+  }
+
+  const registrationRequired =
+    p.registration === 'pre-approved'
+      ? 'On the pre-approved list'
+      : p.autoRegister
+        ? 'Registered, or registered at this sign-in'
+        : 'Registered to this person'
+  if (!personKnown) add('registration', 'Registration', 'unknown', NOT_STATED, registrationRequired, ['person'])
+  else if (dev.registeredToPerson === true) add('registration', 'Registration', 'pass', 'registered to this person', registrationRequired)
+  else if (dev.registeredToPerson === false)
+    add('registration', 'Registration', p.registration === 'self' && p.autoRegister ? 'pass' : 'fail', 'not registered', registrationRequired)
+  else add('registration', 'Registration', 'unknown', NOT_STATED, registrationRequired, ['device.registration'])
+
+  if (p.maxDevices !== null && dev.registeredToPerson !== true) {
+    const required = `at most ${p.maxDevices}`
+    if (!personKnown) add('limit', 'Device limit', 'unknown', NOT_STATED, required, ['person'])
+    else if (dev.registeredCount === undefined) add('limit', 'Device limit', 'unknown', NOT_STATED, required, ['device.registeredCount'])
+    else add('limit', 'Device limit', dev.registeredCount >= p.maxDevices ? 'fail' : 'pass', `${dev.registeredCount} already registered`, required)
+  }
+
+  return settle(graded)
+}
+
+/* A device against any profile, by the profile's kind. `personKnown` matters
+   only to a trusted-device profile; absent, the device facts are taken to be
+   about a known person, which is what `registeredToPerson` already says. */
+export function profileMatches(
+  p: FingerprintProfile,
+  d: SignInDevice | undefined,
+  o: Partial<MatchOptions> & { personKnown?: boolean } = {},
+): ProfileMatch {
+  return p.mode === 'device'
+    ? trustedMatches(p, d, o.personKnown ?? true)
+    : healthMatches(p, d, { clientRows: o.clientRows ?? DEFAULT_MATCH.clientRows })
+}
+
+/* The one row a trace should name for this verdict: the first failing row, or
+   the first undecided one. A health profile names them in catalogue order. A
+   trusted-device profile names the limit before the agent, the agent before
+   registration, and registration before mobile — so a third device on a
+   two-device profile reads as the limit, which is the fact the person can act
+   on, rather than as "not registered", which every new device is. */
+const TRUSTED_BLAME = ['limit', 'agent', 'registration', 'mobile']
+
+export function decidingCheck(p: Pick<FingerprintProfile, 'mode'>, m: ProfileMatch): ProfileCheck | null {
+  if (m.status === 'pass') return null
+  const rows = m.checks.filter((c) => c.status === m.status)
+  if (p.mode === 'device') rows.sort((a, b) => TRUSTED_BLAME.indexOf(a.id) - TRUSTED_BLAME.indexOf(b.id))
+  return rows[0] ?? null
+}

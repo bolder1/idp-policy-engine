@@ -205,7 +205,10 @@ export function stepIssue(step: WizardStepId, s: WizardState, names: Iterable<st
     case 'profile':
       return nameIssue(s.name, names)
     case 'devices':
-      if (s.reach === null) return 'Choose what the collector can read.'
+      /* In the words of the question it is about — the step's heading is
+         "Device restriction type" — since it is said under that question now
+         (owner, 26 Sep 2026), not in the footer. */
+      if (s.reach === null) return 'Choose a device restriction type.'
       return s.registration === 'pre-approved' && !s.roster ? 'Upload a device roster.' : null
     case 'choose':
       return chosenAttributes(d).length === 0 ? empty : mac

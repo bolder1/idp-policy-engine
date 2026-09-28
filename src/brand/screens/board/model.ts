@@ -1,11 +1,10 @@
 import type { AccessDecision, Rule } from '../../data'
 import { normaliseWho } from '../../rule-who'
-import type { SimContext, TraceResult } from '../simulate'
 
 /* -----------------------------------------------------------------------------
    The board's own vocabulary — the few types every part of it shares.
 
-   Kept out of the components so the inspector, the stage and the tabs can all
+   Kept out of the components so the inspector, the stage and the panel can all
    agree on what "selected" means without importing each other.
    -------------------------------------------------------------------------- */
 
@@ -30,9 +29,9 @@ import type { SimContext, TraceResult } from '../simulate'
    Which third of a rule you are editing is not a fact about the panel; it is
    half of what you clicked. Pressing Condition on rule 3 names a rule AND a
    question in one gesture, and the two have to travel together or they come
-   apart in the four places that already move a selection without the panel's
-   help: ↑/↓ walks to the next rule, "Open rule 5" arrives from the sheet, the
-   palette jumps, and a delete clears. Worse, the panel is UNMOUNTED whenever
+   apart in the places that already move a selection without the panel's
+   help: ↑/↓ walks to the next rule, the palette and the tour jump, and a
+   delete clears. Worse, the panel is UNMOUNTED whenever
    it has no subject, so any state it owned about which part is open would be
    destroyed by ⌘\ and rebuilt from a default — the panel would forget where
    you were every time you hid it to read the chain.
@@ -84,8 +83,8 @@ export type Part = (typeof PARTS)[number]
 
    Navigation lands on Who — a new rule, the palette's "Go to rule 3", a click
    on the card body — because a rule is written starting from a person, which
-   is the argument the inspector already records. A FINDING names its own part
-   at its own call site; see CheckTab and ImpactTab. */
+   is the argument the inspector already records. A caller that knows which
+   part it means names it. */
 export const ruleAt = (id: string, part: Part = 'who'): Selection => ({ kind: 'rule', id, part })
 
 /* Step to the next or previous part, wrapping.
@@ -96,27 +95,6 @@ export const ruleAt = (id: string, part: Part = 'who'): Selection => ({ kind: 'r
    as a ring; ↑/↓ on the chain clamps instead, because a chain has ends and a
    rule before rule 1 does not exist. */
 export const nextPart = (p: Part, dir: -1 | 1): Part => PARTS[(PARTS.indexOf(p) + dir + PARTS.length) % PARTS.length]
-
-/* The sheet's two tabs.
-
-   `'rule'` used to be a third. It meant "show the rule pane in the sheet", from
-   before the inspector was a pane of its own — and it outlived that: five call
-   sites still asked for it, and `BoardSheet` has only ever rendered check and
-   impact, so each one flipped the sheet to Impact with NEITHER tab marked
-   selected. The panel is where a rule is read now, and jumping to one closes
-   the sheet rather than switching it. */
-export type Tab = 'check' | 'impact'
-
-/* One rehearsed sign-in, and where it landed.
-
-   `runId` changes on every run so the stage can replay the cascade for the
-   same context twice — a person who presses "Try again" to watch it a second
-   time should get a second time. */
-export interface Trace {
-  ctx: SimContext
-  result: TraceResult
-  runId: number
-}
 
 /* How a decision is named on this surface — and it is the SAME word the tile
    that wrote it carries.
@@ -130,18 +108,10 @@ export interface Trace {
    same three as `Let in`, `Deny` and `Let in, then verify`, so a rule you had
    just written came back described in words you had not chosen.
 
-   The tiles win, because they are where the answer is given. `DECISION_SHORT`
-   keeps a terser second factor for the places that have a column rather than a
-   line. */
+   The tiles win, because they are where the answer is given. */
 export const DECISION_NAME: Record<AccessDecision, string> = {
   '1fa': 'Allow',
   '2fa': 'Second factor',
-  deny: 'Deny',
-}
-
-export const DECISION_SHORT: Record<AccessDecision, string> = {
-  '1fa': 'Allow',
-  '2fa': 'Verify',
   deny: 'Deny',
 }
 
@@ -214,33 +184,9 @@ export function journeyOf(rule: Rule): JourneyStep[] {
     }
   }
 
-  out.push({ id: 'end', label: 'Logged in', kind: 'end' })
+  out.push({ id: 'end', label: 'Signed in', kind: 'end' })
   return out
 }
-
-/** The three preset clocks the sweeps and rehearsals run at. */
-export const CLOCKS = [
-  { label: '03:00', minutes: 180, caption: 'Night' },
-  { label: '09:30', minutes: 570, caption: 'Working hours' },
-  { label: '21:00', minutes: 1260, caption: 'Evening' },
-] as const
-
-/* Lower the first letter only, and only if the word is not a name.
-
-   The trace reasons are written as sentences — "Closest was card A: Network
-   Zone not in zone Office Network" — and they get spliced mid-sentence after a
-   dash. `toLowerCase()` on the whole string flattened every proper noun in
-   them, and a reason can name a group or a person. */
-export const uncapitalise = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s)
-
-/* Which part of a rule a finding is about, for the links that open one.
-
-   The who findings open Who; everything else opens the If and Then, which is
-   where the rest of the linter's findings are fixed. PE150 (people inside a
-   condition) opens the If: that is where the leftover condition sits and gets
-   deleted. */
-const WHO_FINDINGS = new Set(['PE151', 'PE152', 'PE153'])
-export const partForFinding = (code: string): Part => (WHO_FINDINGS.has(code) ? 'who' : 'when')
 
 /* One patch, applied to one rule. What every edit in the panel goes through.
 
@@ -266,13 +212,3 @@ export function patchRule(r: Rule, p: Partial<Rule>): Rule {
   if (!('who' in p)) return { ...base, ...p }
   return { ...base, ...p, who: normaliseWho(p.who) }
 }
-
-/** A stable, human short label for a situation axis value. */
-export const shortPlace = (p: string) =>
-  ({ 'Any location': 'Anywhere', 'Office Network': 'Office', 'Outside all zones': 'Off-network', 'Tor exit node': 'Tor', 'Known proxy': 'Proxy' })[p] ?? p
-
-export const shortDevice = (d: string) =>
-  ({ 'New / unknown': 'New device', 'Known < 90 days': 'Known < 90d', 'Known > 90 days': 'Known > 90d', 'Expired trust': 'Expired', 'Managed (MDM)': 'Managed', 'Changed fingerprint': 'Changed' })[d] ?? d
-
-export const shortAuth = (a: string) =>
-  ({ 'Normal returning user': 'Returning', 'First time login': 'First login', 'MFA recently reset': 'MFA reset', 'No MFA configured': 'No MFA' })[a] ?? a

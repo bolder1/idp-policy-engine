@@ -290,6 +290,7 @@
 
 [data-brand='rebrand'] .bx-btn--danger { background: transparent; color: var(--fb-negative-fg); border-color: var(--int-danger-bg); }
 [data-brand='rebrand'] .bx-btn--danger:not(:disabled):hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); border-color: var(--int-danger-bg-hover); }
+[data-brand='rebrand'] .bx-btn--danger:disabled { color: var(--int-neutral-text); border-color: var(--int-neutral-border); }
 
 /* An open trigger is an active state. */
 [data-brand='rebrand'] .bx-menu__trigger.is-open { background: var(--blue-soft); border-color: transparent; color: var(--blue-strong); }
@@ -349,6 +350,7 @@
 [data-brand='rebrand'] .bx-decision,
 [data-brand='rebrand'] .bx-status--always,
 [data-brand='rebrand'] .bx-status--active,
+[data-brand='rebrand'] .bx-status--monitor,
 [data-brand='rebrand'] .bx-status--inactive {
   border-color: transparent;
 }
@@ -596,9 +598,6 @@
 [data-brand='rebrand'] .bm8__badge,
 [data-brand='rebrand'] .bm8__txn,
 [data-brand='rebrand'] .bm8__defchip,
-[data-brand='rebrand'] .bb__decision,
-[data-brand='rebrand'] .bb__wantgot .bb__decision,
-[data-brand='rebrand'] .bb__flow .bb__decision,
 [data-brand='rebrand'] .bb__ifchip:not(.is-unset),
 [data-brand='rebrand'] button.bb__ifchip:not(.is-unset):hover,
 [data-brand='rebrand'] .bf__flowstart,
@@ -621,7 +620,3 @@
   background: var(--surface-inset);
 }
 
-/* A chosen filter chip on the board is an active state: blue, not ink. */
-[data-brand='rebrand'] .bb__chip { background: var(--surface-inset); border-color: transparent; }
-[data-brand='rebrand'] .bb__chip:hover { background: var(--int-neutral-bg-hover); border-color: transparent; }
-[data-brand='rebrand'] .bb__chip.is-on { background: var(--blue-soft); border-color: transparent; color: var(--blue-strong); }

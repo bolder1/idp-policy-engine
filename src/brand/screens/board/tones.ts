@@ -1,4 +1,5 @@
 import {
+  Activity,
   CalendarDays,
   Clock,
   Gauge,
@@ -6,7 +7,6 @@ import {
   ListFilter,
   type LucideIcon,
   MonitorSmartphone,
-  Sparkles,
   Tag,
   UserRound,
   Users,
@@ -72,7 +72,9 @@ const COND_ICON: Record<string, LucideIcon> = {
   'user-attr': Tag,
   'custom-attr': ListFilter,
   'device-risk': Gauge,
-  'ml-risk': Sparkles,
+  /* A reading over time, not sparkles: nothing on this console is dressed as
+     magic (describe spec, §8.4). */
+  'ml-risk': Activity,
   group: Users,
   user: UserRound,
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { PLACES, coveredBy, placeContext, searchPlaces } from './places'
+import { EARTH_RADIUS_KM, KM_PER_MILE, PLACES, coveredBy, haversineKm, placeContext, rangeKm, sameName, searchPlaces, withinRange } from './places'
 
 describe('the catalogue is well formed', () => {
   it('has a unique id for every place', () => {
@@ -119,5 +119,59 @@ describe('redundancy is detectable', () => {
   it('never reports a country as covered by itself', () => {
     const india = PLACES.find((p) => p.name === 'India')!
     expect(coveredBy(india, { countries: ['India'], states: [], cities: [] })).toBeNull()
+  })
+})
+
+describe('distance, as a zone range measures it', () => {
+  const at = (id: string) => PLACES.find((p) => p.id === id)!
+
+  it('puts Pune about 125 km from Mumbai, either way round', () => {
+    const d = haversineKm(at('in-maharashtra-pune'), at('in-maharashtra-mumbai'))
+    expect(d).toBeGreaterThan(124)
+    expect(d).toBeLessThan(126)
+    expect(haversineKm(at('in-maharashtra-mumbai'), at('in-maharashtra-pune'))).toBeCloseTo(d, 9)
+  })
+
+  it('is zero from a place to itself', () => {
+    expect(haversineKm(at('in-maharashtra-pune'), at('in-maharashtra-pune'))).toBe(0)
+  })
+
+  it('holds a point at the edge of a range, and not one a metre past it', () => {
+    /* Due north, where a kilometre is a fixed slice of latitude. */
+    const pune = { lat: 18.5, lon: 73.9, label: 'Pune', km: 25 }
+    const north = (km: number) => ({ lat: pune.lat + km / ((EARTH_RADIUS_KM * Math.PI) / 180), lon: pune.lon })
+    for (const km of [1, 5, 10, 20, 24, 25]) expect(withinRange(north(km), { ...pune, km })).toBe(true)
+    expect(withinRange(north(25.001), pune)).toBe(false)
+  })
+
+  it('reads a range in miles as miles, and a range with no unit as kilometres', () => {
+    const base = { lat: 18.5, lon: 73.9, label: 'Pune' }
+    expect(rangeKm({ ...base, km: 25 })).toBe(25)
+    expect(rangeKm({ ...base, km: 25, unit: 'km' })).toBe(25)
+    expect(rangeKm({ ...base, km: 10, unit: 'mi' })).toBeCloseTo(16.09344, 9)
+    expect(KM_PER_MILE).toBe(1.609344)
+  })
+})
+
+describe('two names for one place', () => {
+  it('knows a city by its alias, in either direction', () => {
+    expect(sameName('city', 'Bangalore', 'Bengaluru')).toBe(true)
+    expect(sameName('city', 'bengaluru', 'BLR')).toBe(true)
+    expect(sameName('city', 'Bombay', 'Pune')).toBe(false)
+  })
+
+  it('ignores case and accents', () => {
+    expect(sameName('state', 'ile-de-france', 'Île-de-France')).toBe(true)
+    expect(sameName('country', 'india', 'India')).toBe(true)
+  })
+
+  it('is scoped to one kind, so a state alias does not answer for a city', () => {
+    expect(sameName('state', 'UP', 'Uttar Pradesh')).toBe(true)
+    expect(sameName('city', 'UP', 'Uttar Pradesh')).toBe(false)
+  })
+
+  it('does not guess at names the catalogue does not hold', () => {
+    expect(sameName('city', 'Lonavala', 'Lonavala')).toBe(true)
+    expect(sameName('city', 'Lonavala', 'Pune')).toBe(false)
   })
 })

@@ -22,12 +22,14 @@ import { type HardwareToken } from './hardware-tokens'
 import { seedHooks, type Hook } from './hooks'
 import { AUTH_METHODS, type AuthMethod } from './methods'
 import { type RiskProfile } from './risk-signals'
+import type { SavedSignIn } from './saved-sign-ins'
 import { leaves } from './predicate'
 import {
   showcaseApps,
   showcaseGroups,
   showcasePolicies,
   showcaseProfiles,
+  showcaseSavedSignIns,
   showcaseScenarios,
   showcaseUsers,
   showcaseZones,
@@ -514,6 +516,8 @@ export interface Tenant {
   apps: App[]
   groups: Group[]
   directory: { people: User[]; unlisted: number }
+  /** Sign-ins the tenant expects a decision for. The test estate has none. */
+  savedSignIns: SavedSignIn[]
 }
 
 export function tenantAt(depth: Depth): Tenant {
@@ -531,6 +535,7 @@ export function tenantAt(depth: Depth): Tenant {
     apps: appsAt(depth),
     groups: groupsAt(depth),
     directory: usersAt(depth),
+    savedSignIns: [],
   }
 }
 
@@ -553,5 +558,16 @@ export function showcaseTenant(): Tenant {
     apps: showcaseApps,
     groups: showcaseGroups,
     directory: { people: showcaseUsers, unlisted: Math.max(0, HEADCOUNT_ALL - showcaseUsers.length) },
+    savedSignIns: showcaseSavedSignIns,
   }
+}
+
+/* The showcase tenant once "HRMS access from corporate offices" is turned on:
+   where the pitch ends, and the tenant the scenes that need HRMS enforcing are
+   pinned on — a save guarded on a live policy, a Live column, a zone save that
+   moves a live policy. The seed itself opens with HRMS Inactive (Phase 4), so
+   those scenes say this precondition out loud rather than lean on the seed. */
+export function showcaseTenantHrmsOn(): Tenant {
+  const t = showcaseTenant()
+  return { ...t, policies: t.policies.map((p) => (p.id === 'sc-hrms-office' ? { ...p, status: 'active' } : p)) }
 }

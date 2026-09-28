@@ -29,6 +29,9 @@ export function lastSaved(p: Policy): RuleSet {
 
 const same = (a: RuleSet, b: RuleSet) => JSON.stringify({ r: a.rules, f: a.fallback }) === JSON.stringify({ r: b.rules, f: b.fallback })
 
+/** The same rules and last row: by reference when it can tell, by content when it can't. */
+export const sameRules = (a: RuleSet, b: RuleSet): boolean => (a.rules === b.rules && a.fallback === b.fallback) || same(a, b)
+
 /** Edits made since the last save or draft. Drives the leave guard, Save draft and the "Unsaved changes" pill. */
 export function hasUnsavedChanges(saved: Policy, draft: RuleSet): boolean {
   return !same(lastSaved(saved), draft)
@@ -39,10 +42,13 @@ export function differsFromLive(saved: Policy, draft: RuleSet): boolean {
   return !same(ruleSet(saved), draft)
 }
 
-/** Saving a draft: into the policy while it is still a draft, into `pendingDraft` once it is published. */
-export function withSavedDraft(p: Policy, d: RuleSet, who = 'You', when = 'Just now'): Policy {
+/* Saving a draft: into the policy while it is still a draft, into
+   `pendingDraft` once it is published. A draft keeps the checks Describe it
+   tried its rules with, when they are passed; a published policy's saved
+   draft holds rules only, and its checks stay as they were stored. */
+export function withSavedDraft(p: Policy, d: RuleSet & { checks?: Policy['checks'] }, who = 'You', when = 'Just now'): Policy {
   if (p.status === 'draft') {
-    return { ...p, rules: d.rules, fallback: d.fallback, pendingDraft: undefined, lastModified: when, modifiedBy: who }
+    return { ...p, rules: d.rules, fallback: d.fallback, ...('checks' in d ? { checks: d.checks } : null), pendingDraft: undefined, lastModified: when, modifiedBy: who }
   }
   /* Saving a draft identical to what is live keeps nothing worth keeping. */
   if (same(ruleSet(p), d)) return { ...p, pendingDraft: undefined }
@@ -86,6 +92,16 @@ export function turnOnBlocker(p: Pick<Policy, 'appIds' | 'isSystem' | 'status' |
   const rules = p.pendingDraft ? 'its live rules' : 'its rules'
   if (errors > 0) return errors === 1 ? `Fix the error in ${rules} first.` : `Fix the ${errors} errors in ${rules} first.`
   return null
+}
+
+/* Why a policy cannot be switched to monitoring, or null when it can.
+
+   Only the one reason that can be read: no application means no sign-in to
+   watch. Rule errors never block it — a monitoring policy enforces nothing, so
+   a broken rule there costs nobody a sign-in, and blocking only where the
+   reason is readable is the rule every Can't dialog follows. */
+export function monitorBlocker(p: Pick<Policy, 'appIds' | 'isSystem'>): string | null {
+  return hasApps(p) ? null : 'Assign an application first.'
 }
 
 /* A draft has nothing live to keep apart, so a policy that becomes a draft (its

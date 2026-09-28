@@ -67,7 +67,13 @@ export function removeToast(policyName: string, appName: string, remaining: numb
 export function attachNote(picked: Policy, appName: string): string {
   if (decidesFor(picked)) return `Takes effect on the next sign-in to ${appName}.`
   const reason =
-    picked.status === 'draft' ? 'is a draft' : picked.status === 'inactive' ? 'is inactive' : 'has no rules turned on'
+    picked.status === 'draft'
+      ? 'is a draft'
+      : picked.status === 'inactive'
+        ? 'is inactive'
+        : picked.status === 'monitor'
+          ? 'is monitoring'
+          : 'has no rules turned on'
   return `${picked.name} ${reason}, so nothing changes for users yet.`
 }
 

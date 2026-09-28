@@ -176,8 +176,10 @@ describe('the keyboard sheet', () => {
     expect(isMacPlatform(undefined)).toBe(false)
   })
 
-  it('lists no palette and no rehearsal in Lite, and no Mac glyphs on Windows', () => {
-    const lite = boardShortcuts({ mac: false, commands: false, gauntlet: false, publish: false })
+  it('lists no palette in Lite, Try a sign-in on T, and no Mac glyphs on Windows', () => {
+    const lite = boardShortcuts({ mac: false, commands: false, testing: true, publish: false })
+    expect(lite.find(([k]) => k === 'T')?.[1]).toBe('Try a sign-in')
+    expect(lite.find(([k]) => k === 'Esc')?.[1]).toBe('Close Try a sign-in, then clear the selection')
     const text = lite.map(([k, v]) => `${k} ${v}`).join('\n')
     expect(text).not.toMatch(/Command palette/)
     expect(text).not.toMatch(/rehearsal/)
@@ -188,8 +190,14 @@ describe('the keyboard sheet', () => {
   })
 
   it('lists the palette and publish in Full', () => {
-    const full = boardShortcuts({ mac: true, commands: true, gauntlet: true, publish: true })
+    const full = boardShortcuts({ mac: true, commands: true, testing: true, publish: true })
     expect(full.some(([k, v]) => k === '⌘K' && v === 'Command palette')).toBe(true)
     expect(full.some(([, v]) => v === 'Review and publish')).toBe(true)
+  })
+
+  it('lists no T, and a plain Escape, where there is no Try a sign-in', () => {
+    const without = boardShortcuts({ mac: false, commands: false, testing: false, publish: false })
+    expect(without.some(([k]) => k === 'T')).toBe(false)
+    expect(without.find(([k]) => k === 'Esc')?.[1]).toBe('Clear the selection')
   })
 })

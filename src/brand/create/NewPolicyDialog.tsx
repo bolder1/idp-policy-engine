@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { Wand2 } from 'lucide-react'
 
 import { Button, Modal } from '../kit'
 import { blankPolicy, nameTaken, type Policy } from '../data'
@@ -35,7 +34,6 @@ export function NewPolicyDialog({
   onCreate,
   seedName = '',
   fixedAppId,
-  onGuided,
 }: {
   open: boolean
   onClose: () => void
@@ -44,9 +42,6 @@ export function NewPolicyDialog({
   seedName?: string
   /** The application, stated rather than asked. See `ApplicationFixed`. */
   fixedAppId?: string
-  /* Absent in lite, and absent from an application row: the guided build is
-     withheld there, and a button that opens nothing is worse than no button. */
-  onGuided?: (appIds: string[]) => void
 }) {
   const [name, setName] = useState(seedName)
   const [appIds, setAppIds] = useState<string[]>(fixedAppId ? [fixedAppId] : [])
@@ -120,26 +115,6 @@ export function NewPolicyDialog({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-
-          {/* Guided setup lives here rather than up on the gallery, because
-              this is the moment somebody has decided to write the rules
-              themselves and is looking at an empty form. Offering it as a fifth
-              thing to choose between made it one more decision; offering it
-              beside Create policy makes it a way out of the one you are already
-              stuck on.
-
-              It is the only animated control in the product: a slow sheen and a
-              wand that lifts on hover. Everything else here is still, so one
-              moving thing reads as an invitation instead of as noise — and it
-              stops entirely under prefers-reduced-motion. */}
-          {onGuided && (
-            <button type="button" className="bguided" onClick={() => onGuided(appIds)}>
-              <span className="bguided__sheen" aria-hidden />
-              <Wand2 size={14} strokeWidth={1.9} aria-hidden />
-              Guided setup
-            </button>
-          )}
-
           <Button variant="brand" onClick={create} disabled={!ready}>
             Create policy
           </Button>

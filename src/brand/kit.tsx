@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -18,6 +19,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  CircleHelp,
   CornerDownRight,
   Info,
   type LucideIcon,
@@ -33,7 +35,7 @@ import {
 import type { AccessDecision, PolicyStatus } from './data'
 import { appRoot, useDialogChrome } from './dialog-chrome'
 import { ChangeList, ChangeSection, type ChangeItem } from './change-list'
-import { groupSections, reviewItemName, type ReviewKind, type ReviewLine } from './review-rows'
+import { groupSections, reviewItemName, reviewSave, sectionsOpen, type KindBlock, type ReviewLine } from './review-rows'
 import { useReviewView, type ReviewView } from './review-view'
 import { SHOWCASE } from './showcase'
 
@@ -77,6 +79,9 @@ export function Button({
   icon: Icon,
   iconRight: IconRight,
   type = 'button',
+  pressed,
+  keys,
+  busy,
 }: {
   children: ReactNode
   onClick?: () => void
@@ -88,6 +93,12 @@ export function Button({
   icon?: LucideIcon
   iconRight?: LucideIcon
   type?: 'button' | 'submit'
+  /** A button that stays on until pressed again, such as Try a sign-in. Absent is an ordinary button. */
+  pressed?: boolean
+  /** The shortcut that presses it, as `aria-keyshortcuts` writes one: "T", "Meta+Enter". */
+  keys?: string
+  /** Its work is running — Save policy's checks — so it is `aria-busy` until they finish. */
+  busy?: boolean
 }) {
   const px = size === 'sm' ? 13 : 14
   return (
@@ -96,6 +107,9 @@ export function Button({
       title={title}
       disabled={disabled}
       onClick={onClick}
+      aria-pressed={pressed}
+      aria-keyshortcuts={keys}
+      aria-busy={busy || undefined}
       className={`bx-btn bx-btn--${ROLE[variant]} bx-btn--${size} ${block ? 'is-block' : ''}`}
     >
       {Icon && <Icon size={px} strokeWidth={2} aria-hidden />}
@@ -688,15 +702,22 @@ export function DecisionChip({
 }
 
 export function StatusPill({ status }: { status: PolicyStatus }) {
-  /* Four statuses, no more: Draft, Active, Inactive, and Always on for the
+  /* Five statuses: Draft, Active, Monitoring, Inactive, and Always on for the
      system policy. Each is a pill with no dot (owner, 14 Sep 2026) — Active and
-     Always on the positive tint, Inactive the neutral fill, Draft a solid
-     outline, because a draft is a state the policy has not reached yet. */
+     Always on the positive tint, Monitoring the info blue, Inactive the neutral
+     fill, Draft a solid outline, because a draft is a state the policy has not
+     reached yet. Monitoring is never green: it protects nobody. */
   if (status === 'always-on') return <span className="bx-status bx-status--always">Always on</span>
   if (status === 'draft')
     return (
       <span className="bx-status bx-status--draft" title="Not published yet.">
         Draft
+      </span>
+    )
+  if (status === 'monitor')
+    return (
+      <span className="bx-status bx-status--monitor" title="Checks sign-ins; enforces nothing">
+        Monitoring
       </span>
     )
   return (
@@ -1042,7 +1063,11 @@ export function Counter({ value, className }: { value: number; className?: strin
    The shape is the one dense settings forms converge on — steppers inside the
    field, unit as an inline suffix. Contra, Tailscale and Wellfound all land
    there. Airbnb's big centred plus/minus is right for a booking flow showing
-   one number and far too heavy for a form of twenty-six fields. */
+   one number and far too heavy for a form of twenty-six fields.
+
+   A null value is a number nobody has stated, which is not the same as the
+   least one: "Devices already registered" left unsaid is undecided, 0 is a
+   fact. It shows the placeholder, and the first step either way states `min`. */
 
 const DIGITS = /^[0-9]*$/
 
@@ -1056,10 +1081,12 @@ export function NumberStepper({
   label,
   invalid,
   width = 'auto',
+  placeholder,
   onChange,
 }: {
   id?: string
-  value: number
+  /** null: not stated — see `placeholder`. */
+  value: number | null
   min: number
   max: number
   step?: number
@@ -1071,12 +1098,14 @@ export function NumberStepper({
       right edge. `auto` is the dense form shape — minus, value, plus — sized to
       its digits. Same control, same keys, same hold-to-repeat. */
   width?: 'auto' | 'fill'
+  /** What a null value shows, e.g. "Not stated". */
+  placeholder?: string
   onChange: (n: number) => void
 }) {
   const [draft, setDraft] = useState<string | null>(null)
   const [focused, setFocused] = useState(false)
   const [corrected, setCorrected] = useState(false)
-  const latest = useRef(value)
+  const latest = useRef<number | null>(value)
   const hold = useRef(0)
   const flash = useRef(0)
 
@@ -1104,7 +1133,7 @@ export function NumberStepper({
   const nudge = (delta: number) => {
     const typed = draft !== null && draft.trim() !== '' ? Number(draft) : NaN
     const from = Number.isFinite(typed) ? typed : latest.current
-    const next = clamp(from + delta)
+    const next = from === null ? min : clamp(from + delta)
     setDraft(null)
     if (next !== latest.current) onChange(next)
   }
@@ -1131,9 +1160,9 @@ export function NumberStepper({
     if (next !== value) onChange(next)
   }
 
-  const atMin = value <= min
-  const atMax = value >= max
-  const shown = draft ?? String(value)
+  const atMin = value !== null && value <= min
+  const atMax = value !== null && value >= max
+  const shown = draft ?? (value === null ? '' : String(value))
   const fill = width === 'fill'
 
   return (
@@ -1174,11 +1203,12 @@ export function NumberStepper({
             inputMode="numeric"
             role="spinbutton"
             aria-label={label}
-            aria-valuenow={value}
+            aria-valuenow={value ?? undefined}
             aria-valuemin={min}
             aria-valuemax={max}
-            aria-valuetext={unit ? `${value} ${unit}` : undefined}
+            aria-valuetext={value === null ? placeholder : unit ? `${value} ${unit}` : undefined}
             aria-invalid={invalid}
+            placeholder={placeholder}
             value={shown}
             style={{ '--bx-digits': String(max).length } as CSSProperties}
             onChange={(e) => DIGITS.test(e.target.value) && setDraft(e.target.value)}
@@ -1758,6 +1788,14 @@ export interface ReviewRow extends Omit<ReviewLine, 'before' | 'after'> {
   after: ReactNode
 }
 
+/** What a page's checks add to its review: consequences, filed under Also
+    changes, and whether they stop the save. */
+export interface ReviewGuard {
+  rows: ReviewRow[]
+  /** Set when a check stops the save: the word the review's Save carries ("Can't save"). The row that failed says why. */
+  stop: string | null
+}
+
 /* Review changes: the draft against what is saved, before committing it.
 
    Settled on 18 Sep 2026, after a carded version (filled green / blue / red
@@ -1776,7 +1814,13 @@ export interface ReviewRow extends Omit<ReviewLine, 'before' | 'after'> {
        wizard's Review.
 
    Keep editing goes back to the page with the draft intact. No Discard:
-   leaving the page already asks Save, Discard or Keep editing. */
+   leaving the page already asks Save, Discard or Keep editing.
+
+   Two ways to hold the save, said in two places. `blocked` is the page's own
+   validity, and its reason leads the body. `stop` is a check the page ran on
+   what the save would do — a saved sign-in it breaks (spec D.6): the row that
+   failed says why, beside it, and the button carries only the short word.
+   Neither is ever said in the footer, which holds buttons. */
 export function ReviewChanges({
   open,
   rows,
@@ -1785,32 +1829,30 @@ export function ReviewChanges({
   saveLabel = 'Save changes',
   blocked = false,
   blockedReason,
+  stop = null,
+  cancelLabel = 'Keep editing',
 }: {
   open: boolean
   rows: ReviewRow[]
   onClose: () => void
   onSave: () => void
   saveLabel?: string
+  /** "Keep editing" over a page's draft; "Cancel" where nothing was being edited (putting a risk profile in use). */
+  cancelLabel?: string
   blocked?: boolean
   blockedReason?: string
+  /** Set when a check in the body stops the save: the Save button's title ("Can't save"). */
+  stop?: string | null
 }) {
   /* The showcase build is always the List — the chosen layout — and hides the
      comparison switch (see showcase.ts). */
   const [storedView, setView] = useReviewView()
   const view = SHOWCASE ? 'list' : storedView
   const sections = groupSections(rows)
-  /* Sections open, because a review that hides what it is reviewing is not a
-     review. Past this many ROWS one section starts open and the rest shut —
-     rows, not counted changes, because it is rows that make the dialog long: a
-     zone's single "10.0.0.2, 10.0.0.3 and 12 more" row counts fifteen changes
-     and takes one line.
-
-     The one left open is the biggest, not the first. The first is General — the
-     Name row — on every rename and every create, so "open the first" opened a
-     one-row section and shut everything worth reading. */
-  const rowsIn = (x: (typeof sections)[number]) => x.blocks.reduce((n, b) => n + b.rows.length, 0)
-  const many = sections.reduce((n, x) => n + rowsIn(x), 0) > REVIEW_OPEN_ALL
-  const openAt = sections.reduce((best, x, i) => (rowsIn(x) > rowsIn(sections[best]) ? i : best), 0)
+  /* All open in a short review; in a long one the biggest, and any holding a
+     failed check (see sectionsOpen). */
+  const opens = sectionsOpen(sections)
+  const save = reviewSave(blocked, blockedReason, stop)
   return (
     <Modal
       open={open}
@@ -1824,12 +1866,12 @@ export function ReviewChanges({
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            Keep editing
+            {cancelLabel}
           </Button>
           <Button
             variant="brand"
-            disabled={blocked}
-            title={blocked ? blockedReason : undefined}
+            disabled={save.disabled}
+            title={save.title}
             onClick={() => {
               onSave()
               onClose()
@@ -1853,7 +1895,7 @@ export function ReviewChanges({
                   key={section.effect ? 'effect' : section.title}
                   layout={view}
                   collapsible
-                  defaultOpen={!many || i === openAt}
+                  defaultOpen={opens[i]}
                   title={title}
                   summary={changeCount(section.count)}
                   blocks={section.blocks.map((block) => ({
@@ -1875,21 +1917,28 @@ export function ReviewChanges({
 }
 
 /* The chip over a block of rows. A consequence is not something the admin did,
-   so it says so. */
-const REVIEW_KIND_WORD: Record<ReviewKind | 'effect', string> = {
+   so it says so; a check's finding says what it found, in the guard pages'
+   words. */
+type ReviewBlockKind = KindBlock<unknown>['kind']
+const REVIEW_KIND_WORD: Record<ReviewBlockKind, string> = {
   added: 'Added',
   changed: 'Changed',
   removed: 'Removed',
   effect: 'Happens for you',
+  fail: 'Fails',
+  neutral: "Can't tell",
+  pass: 'Passes',
 }
 /* The consequences section, whatever the rows called it. */
 const EFFECT_TITLE = 'Also changes'
-const REVIEW_OPEN_ALL = 12
-const REVIEW_MARK: Record<ReviewKind | 'effect', LucideIcon> = {
+const REVIEW_MARK: Record<ReviewBlockKind, LucideIcon> = {
   added: Plus,
   changed: PenLine,
   removed: Minus,
   effect: CornerDownRight,
+  fail: X,
+  neutral: CircleHelp,
+  pass: Check,
 }
 
 /* A row as the list draws it. An added row has nothing before and a removed one
@@ -1899,7 +1948,7 @@ const REVIEW_MARK: Record<ReviewKind | 'effect', LucideIcon> = {
    list rows are "IP networks: added", which under the IP networks section with
    an Added chip over it would say the phrase three times. The value takes the
    line instead. */
-function reviewItem(r: ReviewRow, kind: ReviewKind | 'effect', section: string, id: string): ChangeItem {
+function reviewItem(r: ReviewRow, kind: ReviewBlockKind, section: string, id: string): ChangeItem {
   const name = reviewItemName(r)
   return {
     id,
@@ -1978,7 +2027,13 @@ function footerHost(): HTMLElement | null {
    - One button. Given review rows it says "Review & save" and opens Review
      changes, whose primary commits; without rows it saves directly.
    - No Discard. Every way off the page asks first (the leave dialog offers
-     Discard), so a red button beside Save was a second, easier way to lose work. */
+     Discard), so a red button beside Save was a second, easier way to lose work.
+   - `guard`: what the save would do beyond the page — the policies that read a
+     zone, the saved sign-ins it moves (spec D.6). Read while the review is
+     open, and again whenever the page hands over a new one (a fix made, an
+     expectation changed), and appended under Also changes. A check that stops
+     the save holds the review's Save, never this footer's: the footer only
+     opens the review, where the reason can be read. */
 export function SaveBar({
   open,
   changes,
@@ -1988,6 +2043,7 @@ export function SaveBar({
   blocked = false,
   blockedReason,
   review,
+  guard,
 }: {
   open: boolean
   /** Short names for what changed: "Name", "IP networks". The first two are shown. */
@@ -2000,6 +2056,8 @@ export function SaveBar({
   blockedReason?: string
   /** The draft against what is saved. Given and not empty, the one button reviews before saving. */
   review?: ReviewRow[]
+  /** The checks on what the save would do, read while the review is open. A new function is a new reading. */
+  guard?: () => ReviewGuard | null
 }) {
   const [reviewing, setReviewing] = useState(false)
   const bar = useRef<HTMLDivElement | null>(null)
@@ -2037,6 +2095,12 @@ export function SaveBar({
   useEffect(() => {
     if (!reviews) setReviewing(false)
   }, [reviews])
+
+  /* Read in render, while the review is up: the checks are quick (a few tens
+     of milliseconds on the showcase), and reading them here means the dialog
+     never shows a frame of the last draft's findings. */
+  const live = reviewing && open && reviews
+  const checked = useMemo(() => (live && guard ? guard() : null), [live, guard])
 
   const footer = (
     <AnimatePresence>
@@ -2087,13 +2151,14 @@ export function SaveBar({
     <>
       {review && (
         <ReviewChanges
-          open={reviewing && open && reviews}
-          rows={review}
+          open={live}
+          rows={checked ? [...review, ...checked.rows] : review}
           onClose={() => setReviewing(false)}
           onSave={onSave}
           saveLabel={saveLabel}
           blocked={blocked}
           blockedReason={blockedReason}
+          stop={checked?.stop ?? null}
         />
       )}
       {host ? createPortal(footer, host) : footer}

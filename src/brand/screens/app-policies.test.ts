@@ -423,10 +423,30 @@ describe('summarise', () => {
     expect(s.tone).toBe('off')
   })
 
-  it('finds no monitor status in any tenant', () => {
-    for (const d of DEPTHS) {
-      for (const p of policiesAt(d)) expect(['draft', 'active', 'inactive', 'always-on']).toContain(p.status)
-    }
+  it('names a monitoring policy by its status word, and counts it as not deciding', () => {
+    const s = summarise('workday', [policy({ appIds: ['workday'], status: 'monitor' })])
+    expect(s).toMatchObject({ own: 1, decides: 0, tag: 'Monitoring', tone: 'off' })
+    expect(s.title).toBe('Monitoring. It decides no sign-ins.')
+  })
+})
+
+describe('a monitoring policy', () => {
+  /* It checks every sign-in and enforces nothing, so on this screen it is in
+     the race exactly as much as a switched-off one: not at all. Numbering it,
+     or calling it protection, is the trap a report-only flag on an Active
+     policy would set. */
+  const watching = policy({ appIds: ['workday'], status: 'monitor', rules: [ruleOf(true)] })
+
+  it('decides nothing, however many enabled rules it has', () => {
+    expect(decidesFor(watching)).toBe(false)
+  })
+
+  it('takes no precedence number', () => {
+    expect(orderOf([policy(), watching, policy()])).toEqual([1, null, 2])
+  })
+
+  it('says it is monitoring, not that it is off', () => {
+    expect(whyNotDeciding(watching)).toBe('Monitoring. It decides no sign-ins.')
   })
 })
 

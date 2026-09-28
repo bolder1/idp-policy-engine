@@ -41,6 +41,7 @@ import {
   IconButton,
   Modal,
   NameField,
+  ReviewChanges,
   RowMenu,
   SaveBar,
   SearchBox,
@@ -49,6 +50,7 @@ import {
   TipMark,
   Toggle,
   type MenuItem,
+  type ReviewRow,
 } from '../kit'
 import { EmptyState, NoMatches } from '../empty'
 import { Picker } from '../picker'
@@ -57,14 +59,15 @@ import { PlatformMark } from '../logos/PlatformMark'
 import { useBrand } from '../store'
 import { newId, uniqueName } from '../data'
 import { ChangeState, useLeaveGuard } from '../leave-guard'
-import { ConfirmDelete, UseList } from './confirm-delete'
+import { ConfirmDelete } from './confirm-delete'
 import { ListPager } from './list-pager'
 import { pageForRow, usePagedList } from './paged-list'
 import { LibraryRows, ViewSwitch, type LibRow } from './library-view'
 import { PageBar, WidthSwitch } from './page-bar'
 import { compactClass, usePageWidth } from '../page-width'
 import { libRowHeight, useLibView } from './library-view-state'
-import { policiesUsingType, type PolicyUse } from './usage'
+import { USE_STOP, libraryChecked, riskGuard, switchLines } from './library-guard'
+import { useLibraryReview } from './library-review'
 import {
   CATEGORY_TONE,
   EMPTY_RISK_PROFILE,
@@ -206,7 +209,7 @@ export function RiskSignals() {
      profile, and `remove` refuses it anyway. */
   const [deleting, setDeleting] = useState<RiskProfile | null>(null)
   /* The profile a switch is pending on. Switching re-grades every Risk score
-     condition in the tenant, so it asks first and shows what moves. */
+     condition in the tenant, so it goes through Review changes first. */
   const [switching, setSwitching] = useState<RiskProfile | null>(null)
 
   const remove = (p: RiskProfile) => {
@@ -277,10 +280,9 @@ export function RiskSignals() {
         onCancel={() => setDeleting(null)}
         onConfirm={() => deleting && remove(deleting)}
       />
-      <SwitchProfileModal
+      <UseProfileReview
         profile={switching}
         current={active ?? null}
-        uses={switching ? policiesUsingType('device-risk', store.policies) : []}
         onCancel={() => setSwitching(null)}
         onConfirm={() => switching && switchTo(switching)}
       />
@@ -642,12 +644,23 @@ function RiskProfileDetail({
     return true
   }
 
-  /* Leaving asks first. Its Save is the footer's, blocked for the same reason. */
+  /* The profile in use sets every Risk score condition's scale, so saving it
+     reads like saving a zone (spec D.6): what moves in each enforcing policy
+     with a Risk score condition, and the saved sign-ins it moves, under Also
+     changes. A profile not in use changes nothing until it is. */
+  const library = useLibraryReview(riskGuard, profile, draft, {
+    on: libraryChecked({ kind: 'risk-profile', inUse }),
+    onFix: setDraft,
+    restored: (p) => p === profile,
+  })
+
+  /* Leaving asks first. Its Save is the footer's, blocked for the same reasons
+     the review's is. */
   const confirmLeave = useLeaveGuard({
     dirty,
-    save: commit,
+    save: () => !library.stopped() && commit(),
     saveLabel: 'Save',
-    blocked: problem,
+    blocked: () => problem ?? library.stopped(),
   })
 
   const shown = useMemo(() => {
@@ -880,6 +893,7 @@ function RiskProfileDetail({
         open={dirty}
         changes={riskChangeNames(profile, draft)}
         review={riskReviewRows(profile, draft)}
+        guard={library.guard}
         onSave={() => {
           commit()
         }}
@@ -892,76 +906,48 @@ function RiskProfileDetail({
 
 /* --- Putting a profile in use ------------------------------------------------
 
-   Switching re-grades every Risk score condition in the tenant, so it asks
-   first and shows how the bands move and which rules compare against them. Not
-   a danger action — nothing is lost, and switching back is the same dialog. */
-function SwitchProfileModal({
+   Switching re-grades every Risk score condition in the tenant, so it goes
+   through Review changes (final spec, assumption 23), like saving the profile
+   in use: the profile in use, how its bands move, and under Also changes what
+   moves in each enforcing policy with a Risk score condition, and the saved
+   sign-ins it moves. A Must pass or Protected sign-in that would newly fail
+   stops the switch, said beside its row under the stop "Can't use this
+   profile" — though under today's evaluator none can, since a saved sign-in
+   states its own score (see riskGuard). There is no fix to offer — the fix is
+   not to switch, which Cancel already is. Not a danger action: nothing is
+   lost, and switching back is the same review.
+
+   It was a centred confirm of its own until 27 Sep 2026, with the bands in a
+   table and the rules that read them; the review says both, in the words every
+   other save uses. */
+const NO_PROFILE: RiskProfile = { id: '', name: '', ...EMPTY_RISK_PROFILE }
+
+function UseProfileReview({
   profile,
   current,
-  uses,
   onCancel,
   onConfirm,
 }: {
   profile: RiskProfile | null
   current: RiskProfile | null
-  uses: PolicyUse[]
   onCancel: () => void
   onConfirm: () => void
 }) {
-  const from = riskScale(current ?? EMPTY_RISK_PROFILE)
-  const to = profile ? riskScale(profile) : from
-
+  const from = current ?? NO_PROFILE
+  const to = profile ?? from
+  const { guard } = useLibraryReview(riskGuard, from, to, { on: !!profile && !!current, stop: USE_STOP })
+  const checked = useMemo(() => (profile ? (guard?.() ?? null) : null), [profile, guard])
+  const rows: ReviewRow[] = profile ? [...switchLines(from, profile), ...(checked?.rows ?? [])] : []
   return (
-    <Modal
+    <ReviewChanges
       open={!!profile}
+      rows={rows}
       onClose={onCancel}
-      title={`Use ${profile?.name ?? 'this profile'}?`}
-      width={480}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={onConfirm}>
-            Use this profile
-          </Button>
-        </>
-      }
-    >
-      <div className="brs__switch">
-        <table className="brs__switchscale">
-          <thead>
-            <tr>
-              <th scope="col">
-                <span className="u-sr">Band</span>
-              </th>
-              <th scope="col">{current?.name ?? 'Current'}</th>
-              <th scope="col">{profile?.name}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(['Low', 'Medium', 'High'] as const).map((b) => (
-              <tr key={b} className={from[b] !== to[b] ? 'is-moved' : ''}>
-                <th scope="row">{b}</th>
-                <td>{from[b]}</td>
-                <td>{to[b]}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {uses.length === 0 ? (
-          <p>No policy rule uses Risk score.</p>
-        ) : (
-          <>
-            <p>These rules use Risk score.</p>
-            {/* The delete dialog's own list, so a row here is a row there: the
-                name opens the policy, and the press covers the whole row. */}
-            <UseList uses={uses} onOpen={onCancel} />
-          </>
-        )}
-      </div>
-    </Modal>
+      onSave={onConfirm}
+      saveLabel="Use this profile"
+      cancelLabel="Cancel"
+      stop={checked?.stop ?? null}
+    />
   )
 }
 

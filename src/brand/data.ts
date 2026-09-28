@@ -8,13 +8,20 @@
    match wins, and a pinned default rule catches the rest.
    --------------------------------------------------------------------------- */
 
+/* Type only, as saved-sign-ins.ts imports from here: no module cycle at run time. */
+import type { DraftCheck } from './draft-checks'
+
 export type PolicyType = 'App Access' | 'Session' | 'Account Management'
 
-/* Four statuses and no more: Draft, Active, Inactive, and Always on for the
+/* Five statuses: Draft, Active, Monitoring, Inactive, and Always on for the
    system policy.
 
-   Monitor (report-only) was a fifth and it is gone, by the owner's call on
-   14 Sep 2026: the product has no such state. Seeds that sat in it are Active. */
+   Monitoring (report-only) is manager's scenario #6: the policy checks every
+   sign-in and enforces nothing. It is a status rather than a setting on an
+   Active policy, so every reader of `enforces` counts it as protecting nobody
+   without having to learn a flag — the trap a `reportOnly` on 'active' would
+   set for the list's Active filter, the footer count and Coverage. It was
+   removed on 14 Sep 2026 and restored by the owner on 25 Sep 2026. */
 /* `draft` is not `inactive`, and the difference is the whole reason it exists.
 
    Inactive is a DECISION: this policy was published and somebody has since
@@ -27,18 +34,18 @@ export type PolicyType = 'App Access' | 'Session' | 'Account Management'
    It enforces nothing, and it gets that for free from `enforces` below rather
    than from a rule of its own — the predicate names the statuses that DO act,
    so a status that does not act needs no entry. */
-export type PolicyStatus = 'draft' | 'active' | 'inactive' | 'always-on'
+export type PolicyStatus = 'draft' | 'active' | 'monitor' | 'inactive' | 'always-on'
 
 /** Every status, in the order the console lists them. */
-export const POLICY_STATUSES: readonly PolicyStatus[] = ['draft', 'active', 'inactive', 'always-on']
+export const POLICY_STATUSES: readonly PolicyStatus[] = ['draft', 'active', 'monitor', 'inactive', 'always-on']
 
 /** Decides real sign-ins. The question Coverage, conflicts and cover-counts ask. */
 export const enforces = (p: { status: PolicyStatus }) =>
   p.status === 'active' || p.status === 'always-on'
 
-/** Runs against real sign-ins. With Monitor gone this is exactly `enforces`;
-    kept as a name so callers that ask "does it run" still read that way. */
-export const evaluates = enforces
+/** Runs against real sign-ins: everything that enforces, and a monitoring
+    policy, which checks every sign-in and decides none. */
+export const evaluates = (p: { status: PolicyStatus }) => enforces(p) || p.status === 'monitor'
 
 /* --- Ids and names -----------------------------------------------------------
 
@@ -271,7 +278,7 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      by country" are the same attribute asked two ways, rather than an IP
      condition and a Country condition that can contradict each other. See
      `ZoneScope`. */
-  { id: 'zone', label: 'Network zone', group: 'Library', hint: 'The IP, network or place a login comes from', operators: ['in zone', 'not in zone'], valueKind: 'zone' },
+  { id: 'zone', label: 'Network zone', group: 'Library', hint: 'The IP, network or place a sign-in comes from', operators: ['in zone', 'not in zone'], valueKind: 'zone' },
   /* The only way to say anything about the device.
 
      "Matches", not "recognised by", and the word had to change with the scope.
@@ -297,13 +304,13 @@ export const CONDITION_CATALOGUE: ConditionType[] = [
      `values[0]` to check the endpoint still exists, and a rule consulting two
      services would have to say what happens when they disagree. */
   { id: 'webhook', label: 'External hook', group: 'Library', hint: 'A yes or no from your own endpoint', operators: ['returns true', 'returns false'], valueKind: 'hook' },
-  { id: 'time', label: 'Time of day', group: 'Time', hint: 'The time of the login, in a set timezone', operators: ['between', 'not between'], valueKind: 'time' },
+  { id: 'time', label: 'Time of day', group: 'Time', hint: 'The time of the sign-in, in a set timezone', operators: ['between', 'not between'], valueKind: 'time' },
   /* Separate from the window, because they answer different questions and get
      asked separately: "office hours" is a time, "not at the weekend" is a day,
      and a rule usually wants one or the other rather than a single control that
      means both. The parameter sheet lists them as two rows for the same
      reason. */
-  { id: 'day', label: 'Day of week', group: 'Time', hint: 'The weekday the login happens on', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
+  { id: 'day', label: 'Day of week', group: 'Time', hint: 'The weekday of the sign-in', operators: ['is', 'is not'], valueKind: 'list', options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] },
   /* --- The two attribute conditions, and why there are two -------------------
 
      The sheet lists both: "Custom user attributes", with the comparison types
@@ -780,6 +787,12 @@ export interface Policy {
      A policy whose status is `draft` never carries one — it has nothing live to
      protect, so saving a draft writes straight into it. */
   pendingDraft?: PolicyDraft
+  /* The sign-ins Describe it tried this policy with, kept when it was saved,
+     so the checks before turning it on read them again (draft-checks.ts). A
+     policy nobody described has none. Not rules: `same` in policy-draft.ts
+     compares the rules and the last row only, so these never make a board
+     "unsaved" on their own. */
+  checks?: DraftCheck[]
 }
 
 /** Unpublished edits to a published policy — see `Policy.pendingDraft`. */
@@ -1971,7 +1984,7 @@ export const policies: Policy[] = [
        third state worth naming rather than folding into the deny. */
     rules: [
       rule({
-        name: 'Compliant, but the login looks risky',
+        name: 'Compliant, but the sign-in looks risky',
         when: when(
           card(
             cond('fingerprint', 'matches', ['fp-compliant']),
@@ -2005,7 +2018,7 @@ export const policies: Policy[] = [
     name: 'Outdated browser enforcement',
     type: 'App Access',
     appIds: ['wiki'],
-    /* Active. It sat in Monitor, which is gone (owner, 14 Sep 2026). */
+    /* Active. Seeded Active, not Monitoring: Monitoring is reached by switching (owner, 25 Sep 2026). */
     status: 'active',
     lastModified: '2 days ago',
     modifiedBy: 'Jaspreet T.',
@@ -3638,9 +3651,9 @@ export const policies: Policy[] = [
 export const templates: Template[] = [
   {
     id: 't-mfa', name: 'Require MFA for all users', category: 'Quick Protection',
-    description: 'Org-wide second factor on every login.', ruleCount: 1,
+    description: 'Org-wide second factor on every sign-in.', ruleCount: 1,
     author: 'Mehak Garg', when: '2 days ago',
-    rules: [{ name: 'Require MFA', ifText: 'All users, every login', decision: '2fa' }],
+    rules: [{ name: 'Require MFA', ifText: 'All users, every sign-in', decision: '2fa' }],
   },
   {
     id: 't-device', name: 'Adaptive device trust', category: 'Device-based',
@@ -3661,7 +3674,7 @@ export const templates: Template[] = [
     id: 't-baseline', name: 'Baseline MFA', category: 'Quick Protection',
     description: 'Second factor for every user. A safe org-wide default.', ruleCount: 1,
     author: 'Xecurify', when: '—', provided: true, reviewed: { by: 'miniOrange Security', on: '2026-01' },
-    rules: [{ name: 'Require MFA', ifText: 'All users, every login', decision: '2fa' }],
+    rules: [{ name: 'Require MFA', ifText: 'All users, every sign-in', decision: '2fa' }],
   },
   {
     id: 't-zerotrust', name: 'Zero-Trust starter', category: 'Device-based',
@@ -3708,16 +3721,16 @@ export interface Scenario {
 export const scenarios: Scenario[] = [
   {
     id: 's-mfa', provided: true, reviewed: { by: 'miniOrange Security', on: '2025-09' }, name: 'Require MFA for all users', category: 'Quick Protection', tag: 'Identity',
-    description: 'Every user must verify with a second factor on every login.',
+    description: 'Every user must verify with a second factor on every sign-in.',
     audience: EVERYONE,
     rules: [{
-      name: 'Require MFA', ifText: 'All users, every login', decision: '2fa',
+      name: 'Require MFA', ifText: 'All users, every sign-in', decision: '2fa',
       build: () => rule({ name: 'Require MFA',decision: '2fa', matchEstimate: 1240 }),
     }],
   },
   {
     id: 's-office', provided: true, name: 'Block access outside office network', category: 'Quick Protection', tag: 'Network',
-    description: 'Deny login attempts from IPs outside your network zones.',
+    description: 'Deny sign-ins from IPs outside your network zones.',
     audience: EVERYONE,
     rules: [{
       name: 'Outside office network', ifText: 'Not in Office Network', decision: 'deny',
@@ -3735,10 +3748,10 @@ export const scenarios: Scenario[] = [
   },
   {
     id: 's-passwordless', provided: true, name: 'Passwordless for executives', category: 'Quick Protection', tag: 'Identity',
-    description: 'Executives with miniOrange App can log in with a push notification.',
+    description: 'Executives with miniOrange App can sign in with a push notification.',
     audience: audienceOf(['executives']),
     rules: [{
-      name: 'Executive passwordless', ifText: 'For Executives, any login', decision: '1fa',
+      name: 'Executive passwordless', ifText: 'For Executives, any sign-in', decision: '1fa',
       build: () => rule({ name: 'Executive passwordless', who: { groupIds: ['executives'], userIds: [] }, when: anySignIn(), decision: '1fa', firstFactor: 'Any', matchEstimate: 12 }),
     }],
   },
@@ -3851,7 +3864,7 @@ export const scenarios: Scenario[] = [
   },
   {
     id: 's-contractor-life', author: 'Jaspreet T.', when: '2 weeks ago', name: 'Contractor lifecycle', category: 'Compliance', tag: 'Identity',
-    description: 'Tighter treatment for non-employees across first login, device state, hours and session length.',
+    description: 'Tighter treatment for non-employees across first sign-in, device state, hours and session length.',
     audience: audienceOf(['contractors']),
     rules: [
       { name: 'Unregistered device', ifText: 'Device Registration is Unregistered', decision: 'deny',

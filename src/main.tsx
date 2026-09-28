@@ -66,7 +66,12 @@ import './brand/screens/device-profile-wizard.css'
 import './brand/screens/used-by.css'
 import './brand/screens/applications.css'
 import './brand/create/create.css'
-import './brand/create/interview.css'
+import './brand/screens/board/describe.css'
+/* Here and not in ReadAsTextPanel.tsx, for picker.css's reason: Policies.tsx
+   is eager and imports the drawer, so the sheet landed before kit.css and the
+   button reset won the tie with `.brat__line` — the rule lines lost their
+   padding and size and sat 4 px left of the lines above them. */
+import './brand/screens/board/read-as-text.css'
 import './brand/tour/tour.css'
 // After tour.css, which owns the card, scrim, ring and beak this one extends.
 import './brand/tour/board-tour.css'

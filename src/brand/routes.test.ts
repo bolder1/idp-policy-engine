@@ -77,6 +77,14 @@ describe('the route union', () => {
     for (const spec of lazySpecs) expect(`${spec}: ${warmBody.includes(`import('${spec}')`)}`).toBe(`${spec}: true`)
   })
 
+  /* Policy testing lives in the board's test panel only (Version 3, 28 Sep
+     2026): no page, no slider, no rail item. */
+  it('has no Policy testing page or slider', () => {
+    expect(ROUTES).not.toContain('policy-testing')
+    expect(appSrc).toContain('<Policies />')
+    expect(shellSrc).not.toContain("label: 'Policy testing'")
+  })
+
   it('wraps the screen in an error boundary, inside the provider', () => {
     expect(appSrc).toContain('<ScreenErrorBoundary')
     expect(appSrc.indexOf('<ScreenErrorBoundary')).toBeGreaterThan(appSrc.indexOf('function Chrome()'))

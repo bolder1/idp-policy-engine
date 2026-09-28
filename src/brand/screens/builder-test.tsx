@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { Download, ScrollText } from 'lucide-react'
 
 import { Button, Chip, DecisionChip, Modal } from '../kit'
-import { FALLBACK_NAME, appsOf, type AccessDecision, type Policy, type Rule } from '../data'
+import { FALLBACK_NAME, appsOf, enforces, type AccessDecision, type Policy, type Rule } from '../data'
 import { EmptyState, NoMatches } from '../empty'
 import { ruleLabel } from './predicate-prose'
 import { whoPasses } from '../rule-who'
@@ -139,17 +139,21 @@ export function DecisionLogDialog({
     return named.length > 0 ? named : store.apps.slice(0, 3)
   }, [policy, store])
 
-  /* A draft has never been published, and an inactive policy decides nothing,
-     so neither has evaluated a sign-in. The log says so rather than inventing
-     a day of them. A tenant with no applications has had no sign-ins either,
-     and there is no app to put on a row. */
-  const quiet = policy.status === 'draft' || policy.status === 'inactive' || appPool.length === 0
+  /* A draft has never been published, an inactive policy decides nothing, and
+     a monitoring one checks sign-ins but decides none of them — so none has a
+     decision to log. The log says so rather than inventing a day of Allow and
+     Deny rows, which for a monitoring policy would read as protection it never
+     gave. A tenant with no applications has had no sign-ins either, and there
+     is no app to put on a row. */
+  const quiet = !enforces(policy) || appPool.length === 0
   const quietLine =
     policy.status === 'draft'
       ? 'This policy is a draft.'
       : policy.status === 'inactive'
         ? 'This policy is turned off.'
-        : 'No applications use this policy yet.'
+        : policy.status === 'monitor'
+          ? 'This policy is monitoring.'
+          : 'No applications use this policy yet.'
 
   const all = useMemo(() => (quiet ? [] : buildLog(policy, appPool)), [quiet, policy, appPool])
 
@@ -192,7 +196,7 @@ export function DecisionLogDialog({
         <EmptyState
           compact
           icon={ScrollText}
-          title="No logins yet"
+          title="No sign-ins yet"
           blurb={quietLine}
         />
       ) : (

@@ -294,6 +294,7 @@ export function Shell({ children }: { children: ReactNode }) {
     row?.focus()
   }, [collapsed])
 
+  /* A new screen starts at its top. */
   useEffect(() => {
     main.current?.scrollTo({ top: 0 })
   }, [screen])

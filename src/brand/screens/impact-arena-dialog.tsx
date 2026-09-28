@@ -70,6 +70,8 @@ export function ImpactArenaDialog({
       hasFingerprint: (id) => !!store.fingerprintById(id),
       groupName: (id) => store.groupById(id).name,
       riskScale: store.riskScale,
+      /* The tenant's own objects: zones and device profiles are read from their own entries, not from the chip table. */
+      library: { zones: store.zones, fingerprints: store.fingerprints, people: store.users, groups: store.groups, methods: store.methods, policies: store.policies },
     }),
     [store],
   )
@@ -106,7 +108,7 @@ export function ImpactArenaDialog({
     <Modal
       open={open}
       onClose={onClose}
-      title="Blast radius"
+      title="What changes"
       width={980}
       padded={false}
       footer={
@@ -211,7 +213,7 @@ export function ImpactArenaDialog({
                 />
               </div>
               <strong>{open_}%</strong>
-              <p>Situations that log in on one factor and are asked nothing further.</p>
+              <p>Situations let in on one factor and asked nothing further.</p>
             </div>
           </section>
 
@@ -259,7 +261,7 @@ export function ImpactArenaDialog({
             </div>
 
             <p className="bia__fieldnote">
-              One dot per modelled login situation, in a fixed order — the same dot is the same situation in every
+              One dot per modelled sign-in situation, in a fixed order — the same dot is the same situation in every
               view, so the field can be compared rather than just looked at.
               {/* Published view only: the Engine default row below already
                   prints the current figure. */}
@@ -282,22 +284,28 @@ export function ImpactArenaDialog({
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: reduce ? 'auto' : 0 }}
               >
-                <h4 className="u-label">Where the movement went</h4>
-                <ul>
-                  {movement.flows.map((f) => (
-                    <li key={`${f.from}-${f.to}`}>
-                      <span className={`bia__lane is-${LANE_KEY[f.from]}`}>{LANES.find((l) => l.id === f.from)!.label}</span>
-                      <ArrowRight size={13} strokeWidth={2} aria-hidden />
-                      <span className={`bia__lane is-${LANE_KEY[f.to]}`}>{LANES.find((l) => l.id === f.to)!.label}</span>
-                      <b>{f.n.toLocaleString()}</b>
-                    </li>
-                  ))}
-                </ul>
+                {/* A change of second factor alone moves situations without
+                    changing a lane, so it can leave no flow to list. */}
+                {movement.flows.length > 0 && (
+                  <>
+                    <h4 className="u-label">Where the movement went</h4>
+                    <ul>
+                      {movement.flows.map((f) => (
+                        <li key={`${f.from}-${f.to}`}>
+                          <span className={`bia__lane is-${LANE_KEY[f.from]}`}>{LANES.find((l) => l.id === f.from)!.label}</span>
+                          <ArrowRight size={13} strokeWidth={2} aria-hidden />
+                          <span className={`bia__lane is-${LANE_KEY[f.to]}`}>{LANES.find((l) => l.id === f.to)!.label}</span>
+                          <b>{f.n.toLocaleString()}</b>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
 
                 <h4 className="u-label">Who moves most</h4>
                 <ul className="bia__cohorts">
                   {movement.cohorts.map((c) => (
-                    <li key={c.label}>
+                    <li key={`${c.label}|${c.move}`}>
                       <span>{c.label}</span>
                       <b className={`is-${c.move}`}>
                         {c.move === 'stricter' ? '↑' : '↓'} {c.n}
@@ -389,6 +397,8 @@ export function ImpactPip({ draft, saved, onOpen }: { draft: Policy; saved: Poli
       hasFingerprint: (id) => !!store.fingerprintById(id),
       groupName: (id) => store.groupById(id).name,
       riskScale: store.riskScale,
+      /* The tenant's own objects: zones and device profiles are read from their own entries, not from the chip table. */
+      library: { zones: store.zones, fingerprints: store.fingerprints, people: store.users, groups: store.groups, methods: store.methods, policies: store.policies },
     }),
     [store],
   )

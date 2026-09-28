@@ -4,7 +4,7 @@ import { ArrowLeft, FileX } from 'lucide-react'
 
 import { Button, SaveBar, TipDot } from '../kit'
 import { EmptyState } from '../empty'
-import { EVERYONE, evaluates, type Audience } from '../data'
+import { EVERYONE, enforces, type Audience } from '../data'
 import { ChangeState, useLeaveGuard } from '../leave-guard'
 import { POLICY_NAME_MAX, policyNameIssue } from '../policy-name'
 import { useBrand, type PolicyDetailsFrom } from '../store'
@@ -165,7 +165,7 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
                  drew that app's logo beside "Every application" in the board. */
               <div className="bname2__fixed">
                 <strong>Every application</strong>
-                <TipDot label="About the system policy" text="The system policy covers every application. It decides logins no other policy matches." />
+                <TipDot label="About the system policy" text="The system policy covers every application. It decides sign-ins no other policy matches." />
               </div>
             ) : (
               <ApplicationField appIds={appIds} onChange={setAppIds} />
@@ -174,9 +174,11 @@ export function PolicyDetails({ policyId, from = 'builder' }: { policyId: string
                 Review & save: an inactive policy decides nothing already. */}
             {becomesDraft && dirty && (
               <p className="bpd__note">
-                {evaluates(saved)
-                  ? 'With no applications this policy becomes a draft and stops deciding logins.'
-                  : 'With no applications this policy becomes a draft.'}
+                {enforces(saved)
+                  ? 'With no applications this policy becomes a draft and stops deciding sign-ins.'
+                  : saved.status === 'monitor'
+                    ? 'With no applications this policy becomes a draft and stops monitoring.'
+                    : 'With no applications this policy becomes a draft.'}
                 {diff?.takesSavedDraft && ' Its saved draft replaces the published rules.'}
               </p>
             )}

@@ -60,6 +60,155 @@ export function lockedView(
   return { x, y: Math.min(0, Math.max(minY, v.y)), z }
 }
 
+/* The y that shows one band of the world — its top and bottom in unscaled
+   world pixels — inside the stage, above a floor the stage keeps for its own
+   controls, moving the chain as little as it can. Null when the band is in
+   view already, so a caller moves nothing at all.
+
+   Below the floor, the band rises until its bottom sits on the floor; but
+   never so far that its own top leaves the stage, because a band taller than
+   the room is read from its top. Above the stage's top, it comes down until
+   its top is in. The caller's clamp (`lockedView`) still has the last word:
+   no y here scrolls the chain past either of its ends.
+
+   `keep` is the world top of a control somebody has just pressed, above the
+   band — the board's Which policy row, whose list pushes the band down. It
+   outranks the band: the lift stops where that top reaches `FOCUS_EDGE`
+   under the stage's top (or where it already is, when it sits higher), and a
+   control that is above the stage comes back down to the edge. Without it a
+   turn of the list glided the row, and the focus on it, out of the stage
+   (28 Sep 2026); where the band and the control cannot both be shown, the
+   band waits for the next reveal that has no `keep`. */
+export function revealY(v: View, band: { top: number; bottom: number }, stageH: number, floor: number, keep?: number): number | null {
+  const room = stageH - floor
+  const top = v.y + band.top * v.z
+  const bottom = v.y + band.bottom * v.z
+  let y: number | null
+  if (top >= 0 && bottom <= room) y = null
+  else if (top < 0) y = -band.top * v.z
+  else y = Math.max(room - band.bottom * v.z, -band.top * v.z)
+  if (keep === undefined) return y
+  const edge = FOCUS_EDGE - keep * v.z
+  if (v.y + keep * v.z < 0) return edge
+  if (y === null) return null
+  const kept = Math.max(y, Math.min(v.y, edge))
+  return kept === v.y ? null : kept
+}
+
+/* How far inside the stage's edges a focused control is kept — by the focus
+   rule in `useCanvasView`, and by a reveal that keeps a pressed control. */
+export const FOCUS_EDGE = 24
+
+/* --- The view's motion, without React or the DOM ------------------------------
+
+   A jump (`apply`) is painted on the next frame; a glide eases there over a
+   few hundred milliseconds and paints every frame; a resize of the world
+   re-clamps the view. The ORDER of those three is where the bugs were, so it
+   lives here, where a fake clock can drive it:
+
+   · A jump stops a glide in flight — a wheel or a drag outranks an animation.
+   · A world resize during a glide is left to the glide. It was measured
+     against the world as it is (a host glides after the commit that resized
+     it) and it clamps again where it lands. Re-clamping through `apply`
+     cancelled it after its first frame, and the growth is often the glide's
+     own cause: opening Which policy's list in test mode grows the chain in
+     the very frame the board glides to show the Decision gate under it, which
+     then never moved (28 Sep 2026).
+   · Under reduced motion, or at 0 ms, a glide is a jump painted at once.
+
+   The hook hands in how to clamp, how to paint and the frame clock. */
+export interface Frames {
+  request: (cb: (t: number) => void) => number
+  cancel: (id: number) => void
+  now: () => number
+}
+
+const BROWSER_FRAMES: Frames = {
+  request: (cb) => requestAnimationFrame(cb),
+  cancel: (id) => cancelAnimationFrame(id),
+  now: () => performance.now(),
+}
+
+export interface ViewMover {
+  /** The view, current to the last jump or glide frame; the host reads it, never writes it. */
+  view: { current: View }
+  paint: () => void
+  apply: (next: (v: View) => View) => void
+  glide: (to: Partial<View>, ms?: number) => void
+  /** The world's content box changed size. */
+  worldResized: () => void
+  gliding: () => boolean
+  dispose: () => void
+}
+
+export function createViewMover(
+  start: View,
+  d: { clamp: (v: View) => View; paint: (v: View) => void; reduced: () => boolean; frames?: Frames },
+): ViewMover {
+  const f = d.frames ?? BROWSER_FRAMES
+  const view = { current: start }
+  let frame = 0
+  /* A glide in flight is the one whose frame is booked here; 0 when none is. */
+  let glideFrame = 0
+  const paint = () => {
+    frame = 0
+    d.paint(view.current)
+  }
+  const stop = () => {
+    f.cancel(glideFrame)
+    glideFrame = 0
+  }
+  const apply = (next: (v: View) => View) => {
+    stop()
+    view.current = d.clamp(next(view.current))
+    if (!frame) frame = f.request(paint)
+  }
+  const glide = (to: Partial<View>, ms = 240) => {
+    stop()
+    const from = { ...view.current }
+    const target = d.clamp({ ...from, ...to })
+    if (d.reduced() || ms === 0) {
+      view.current = target
+      paint()
+      return
+    }
+    const t0 = f.now()
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - t0) / ms)
+      const e = 1 - Math.pow(1 - p, 3)
+      view.current = {
+        x: from.x + (target.x - from.x) * e,
+        y: from.y + (target.y - from.y) * e,
+        z: from.z + (target.z - from.z) * e,
+      }
+      if (p < 1) glideFrame = f.request(tick)
+      else {
+        /* The world may have changed size while the view moved: land inside
+           it as it is now. */
+        glideFrame = 0
+        view.current = d.clamp(view.current)
+      }
+      paint()
+    }
+    glideFrame = f.request(tick)
+  }
+  return {
+    view,
+    paint,
+    apply,
+    glide,
+    worldResized: () => {
+      if (!glideFrame) apply((v) => v)
+    },
+    gliding: () => glideFrame !== 0,
+    dispose: () => {
+      f.cancel(frame)
+      frame = 0
+      stop()
+    },
+  }
+}
+
 /* Read once, at module load. Every glide checks it, and a canvas that animates
    when somebody has asked it not to is worse than one that never animated. */
 const REDUCED =
@@ -132,10 +281,7 @@ export function useCanvasView(
   const o = useRef(opts)
   o.current = opts
 
-  const viewRef = useRef<View>({ x: 80, y: 24, z: 1 })
   const zoomLabel = useRef<HTMLSpanElement | null>(null)
-  const frame = useRef(0)
-  const glideFrame = useRef(0)
   const [panning, setPanning] = useState(false)
   const pan = useRef<{ px: number; py: number; x: number; y: number } | null>(null)
 
@@ -154,67 +300,39 @@ export function useCanvasView(
     [stage, zMax, zMin],
   )
 
-  const paint = useCallback(() => {
-    frame.current = 0
-    const w = world.current
-    const s = stage.current
-    if (!w || !s) return
-    const v = viewRef.current
-    /* translate3d, not translate: it keeps the world on its own compositor
-       layer, so a pan is a layer move rather than a repaint of every node. */
-    w.style.transform = `translate3d(${v.x}px, ${v.y}px, 0) scale(${v.z})`
-    const p = o.current.cssPrefix ?? cssPrefix
-    for (const el of o.current.varsOnParent && s.parentElement ? [s, s.parentElement] : [s]) {
-      el.style.setProperty(`--${p}-x`, `${v.x}px`)
-      el.style.setProperty(`--${p}-y`, `${v.y}px`)
-      el.style.setProperty(`--${p}-z`, `${v.z}`)
-    }
-    if (zoomLabel.current) zoomLabel.current.textContent = `${Math.round(v.z * 100)}%`
-  }, [cssPrefix, stage, world])
-
-  const apply = useCallback(
-    (next: (v: View) => View) => {
-      cancelAnimationFrame(glideFrame.current)
-      viewRef.current = clampView(next(viewRef.current))
-      if (!frame.current) frame.current = requestAnimationFrame(paint)
-    },
-    [clampView, paint],
-  )
-
-  const glide = useCallback(
-    (to: Partial<View>, ms = 240) => {
-      cancelAnimationFrame(glideFrame.current)
-      const from = { ...viewRef.current }
-      const target = clampView({ ...from, ...to })
-      if (REDUCED.matches || ms === 0) {
-        viewRef.current = target
-        paint()
-        return
+  const draw = useCallback(
+    (v: View) => {
+      const w = world.current
+      const s = stage.current
+      if (!w || !s) return
+      /* translate3d, not translate: it keeps the world on its own compositor
+         layer, so a pan is a layer move rather than a repaint of every node. */
+      w.style.transform = `translate3d(${v.x}px, ${v.y}px, 0) scale(${v.z})`
+      const p = o.current.cssPrefix ?? cssPrefix
+      for (const el of o.current.varsOnParent && s.parentElement ? [s, s.parentElement] : [s]) {
+        el.style.setProperty(`--${p}-x`, `${v.x}px`)
+        el.style.setProperty(`--${p}-y`, `${v.y}px`)
+        el.style.setProperty(`--${p}-z`, `${v.z}`)
       }
-      const t0 = performance.now()
-      const tick = (t: number) => {
-        const p = Math.min(1, (t - t0) / ms)
-        const e = 1 - Math.pow(1 - p, 3)
-        viewRef.current = {
-          x: from.x + (target.x - from.x) * e,
-          y: from.y + (target.y - from.y) * e,
-          z: from.z + (target.z - from.z) * e,
-        }
-        paint()
-        if (p < 1) glideFrame.current = requestAnimationFrame(tick)
-      }
-      glideFrame.current = requestAnimationFrame(tick)
+      if (zoomLabel.current) zoomLabel.current.textContent = `${Math.round(v.z * 100)}%`
     },
-    [clampView, paint],
+    [cssPrefix, stage, world],
   )
 
-  useEffect(
-    () => () => {
-      cancelAnimationFrame(frame.current)
-      cancelAnimationFrame(glideFrame.current)
-    },
-    [],
+  /* The motion (`createViewMover`), made once. It reaches the clamp and the
+     paint through refs, so it is never re-made, and `apply` and `glide` keep
+     one identity for the life of the canvas — the wheel listener and the pan
+     handlers memoised on them are registered once. */
+  const clampRef = useRef(clampView)
+  clampRef.current = clampView
+  const drawRef = useRef(draw)
+  drawRef.current = draw
+  const [mover] = useState(() =>
+    createViewMover({ x: 80, y: 24, z: 1 }, { clamp: (v) => clampRef.current(v), paint: (v) => drawRef.current(v), reduced: () => REDUCED.matches }),
   )
+  const { view: viewRef, paint, apply, glide } = mover
+
+  useEffect(() => () => mover.dispose(), [mover])
 
   /* --- Fit ----------------------------------------------------------------- */
   const fitTo = useCallback(
@@ -298,15 +416,16 @@ export function useCanvasView(
     /* The WORLD changes height too — a rule added, every card expanded — and a
        view clamped against the old height can leave the chain scrolled past its
        own end into empty canvas. Re-clamping on the world's resize is what keeps
-       `y` honest without the host having to remember to ask. */
+       `y` honest without the host having to remember to ask. Except under a
+       glide, which is left to land (`createViewMover`, above). */
     const w = world.current
-    const wro = o.current.lockX && w ? new ResizeObserver(() => apply((v) => v)) : null
+    const wro = o.current.lockX && w ? new ResizeObserver(() => mover.worldResized()) : null
     if (w && wro) wro.observe(w)
     return () => {
       ro.disconnect()
       wro?.disconnect()
     }
-  }, [apply, stage, world])
+  }, [apply, mover, stage, world])
 
   /* --- Keeping focus inside the stage ---------------------------------------
 
@@ -327,7 +446,7 @@ export function useCanvasView(
       if (!el || !s.contains(el)) return
       const r = el.getBoundingClientRect()
       const box = s.getBoundingClientRect()
-      const edge = 24
+      const edge = FOCUS_EDGE
       let dx = 0
       let dy = 0
       if (r.top < box.top + edge) dy = box.top + edge - r.top
@@ -340,7 +459,7 @@ export function useCanvasView(
     }
     s.addEventListener('focusin', onFocusIn)
     return () => s.removeEventListener('focusin', onFocusIn)
-  }, [glide, stage])
+  }, [glide, stage, viewRef])
 
   /* --- Pan ----------------------------------------------------------------- */
   const onPointerDown = useCallback(
@@ -352,7 +471,7 @@ export function useCanvasView(
       setPanning(true)
       ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
     },
-    [],
+    [viewRef],
   )
 
   const onPointerMove = useCallback(
@@ -427,7 +546,7 @@ export function useCanvasView(
       const kk = z / v.z
       glide({ x: px - (px - v.x) * kk, y: py - (py - v.y) * kk, z }, 200)
     },
-    [glide, stage, zMax, zMin],
+    [glide, stage, viewRef, zMax, zMin],
   )
 
   /* Back to the zoom the canvas opened at — the width fit, capped at 100% —
@@ -444,7 +563,7 @@ export function useCanvasView(
     const py = s.clientHeight / 2
     const v = viewRef.current
     glide({ y: py - (py - v.y) * (z / v.z), z }, 240)
-  }, [glide, pad, stage, zMin])
+  }, [glide, pad, stage, viewRef, zMin])
 
   return { viewRef, zoomLabel, panning, paint, apply, glide, fit, fitTo, zoomBy, resetZoom, onPointerDown, onPointerMove, onPointerUp }
 }

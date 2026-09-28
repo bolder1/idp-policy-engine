@@ -29,7 +29,9 @@ import {
 } from './data'
 import { type FingerprintProfile } from './fingerprint'
 import { asStored, changedBeyondStamp, lastSaved, openForEditing, withSavedDraft } from './policy-draft'
+import { isRevisit } from './revisit'
 import { EMPTY_RISK_PROFILE, riskScale, type RiskProfile } from './risk-signals'
+import type { SavedSignIn } from './saved-sign-ins'
 import { normaliseHook, type Hook } from './hooks'
 import { settled, showcaseTenant, tenantAt, type Tenant } from './fixtures'
 import { SHOWCASE } from './showcase'
@@ -49,6 +51,7 @@ import {
 import type { AuthMethod } from './methods'
 import { TAB_SCREEN, personaById, type PersonaId } from './personas'
 import { featuresOf, type Edition, type Features } from './edition'
+import type { BreakInAcceptance } from './screens/break-in-model'
 import type { NameLookup } from './screens/predicate-prose'
 import { toastDuration, toastTone, type ToastTone } from './toast-tone'
 
@@ -68,13 +71,15 @@ export type BrandScreen =
      store and evaluator under a different shape: a chain of cards on a stage,
      an inspector beside it. See docs/builder-board.md.
 
-     `open` is back, and it is not the field the trail has. On the trail it
-     named an INSPECTOR TAB; here it names a SHEET — the check and impact
-     panels that slide up over the stage. Same word, same two values, same
-     purpose: a caller that knows why you are coming can land you on the
-     answer rather than near it. The policy list says "this one has four
-     holes"; it should not then make you go and find the gauntlet. */
-  | { name: 'board'; policyId: string; open?: 'gauntlet' | 'impact' }
+     `open` is not the field the trail has, though it has the same purpose: a
+     caller that knows why you are coming can land you on the answer rather
+     than near it. Each opens the board in test mode (Policy testing): `try`,
+     `person` and `saved` on that tab of the panel, `break-in` on the
+     Break-in test pushed over Saved sign-ins. It
+     named two sheets over the stage as well, Check and What changes, until
+     M4 retired them. `rule` selects a rule on arrival — its id, or
+     'fallback' for the last row. */
+  | { name: 'board'; policyId: string; open?: 'try' | 'person' | 'saved' | 'break-in'; rule?: string }
   /* The policy's own three facts — name, applications, audience — on one page.
 
      They used to be scattered across a top-bar input, a dialog and a card at
@@ -133,6 +138,9 @@ export type BrandScreen =
 
 /** The two halves of the Display tokens page. */
 export type DisplayTokenTab = 'assignments' | 'tokens'
+
+/** The four Policy testing views. Tabs, and a route parameter, so a caller can land on one. */
+export type TestingView = 'try' | 'person' | 'saved' | 'samples'
 
 /** Where Policy details returns to. `policies` is the list: "Assign applications" from a turn-on it refused. */
 export type PolicyDetailsFrom = 'builder' | 'board' | 'policies'
@@ -392,13 +400,34 @@ export interface BrandStore {
   gauntletOverrides: Record<string, Record<string, AccessDecision>>
   setGauntletOverride: (policyId: string, cardId: string, want: AccessDecision | null) => void
 
+  /* Break-in results the tenant has accepted, per policy and then per card
+     (break-in-model.ts): the decision it now expects, and who accepted it,
+     when and why. Per policy for the reason the overrides above are — the
+     same scripted sign-in can deserve a different answer on another
+     application. Reset per persona. */
+  breakInAccepted: Record<string, Record<string, BreakInAcceptance>>
+  /** Records an acceptance, or with null restores the card's own expectation. */
+  acceptBreakIn: (policyId: string, cardId: string, a: BreakInAcceptance | null) => void
+
+  /* Sign-ins the tenant expects a decision for (saved-sign-ins.ts). Tenant
+     data, on the store for the reason zones are: the checks before a policy is
+     saved or turned on read them with no testing screen mounted. Reset per
+     persona, like every other tenant collection. */
+  savedSignIns: SavedSignIn[]
+  /** Adds at the end. Returns the stored id. */
+  addSavedSignIn: (s: SavedSignIn) => string
+  /** Merges `patch` into the saved sign-in with this id; an unknown id changes nothing. */
+  updateSavedSignIn: (id: string, patch: Partial<Omit<SavedSignIn, 'id'>>) => void
+  removeSavedSignIn: (id: string) => void
+
   savePolicy: (p: Policy) => void
   /* Save as draft. On a policy still in draft the edits land in the policy
      itself; on a published one they are kept in `pendingDraft` and the live
      rules go on deciding sign-ins. Publishing clears it — callers pass
-     `pendingDraft: undefined` to `savePolicy`. */
-  saveDraft: (policyId: string, d: { rules: Rule[]; fallback?: Rule }) => void
-  /** Switches a published policy on or off. Leaves its rules and any saved draft alone. Ignored for the system policy, and for any status but draft on a policy with no applications. */
+     `pendingDraft: undefined` to `savePolicy`. `checks` (Describe it's) are
+     kept on a policy still in draft, beside the rules they were tried on. */
+  saveDraft: (policyId: string, d: { rules: Rule[]; fallback?: Rule; checks?: Policy['checks'] }) => void
+  /** Switches a published policy on, off or to monitoring. Leaves its rules and any saved draft alone. Ignored for the system policy, and for any status but draft on a policy with no applications. */
   setPolicyStatus: (id: string, status: PolicyStatus) => void
   discardDraft: (policyId: string) => void
   /** Adds at the top of the list; a policy with no applications is stored as a draft. Returns the stored id. */
@@ -493,6 +522,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
      the same draft/commit treatment policies already had. */
   const [zones, setZones, zonesRef] = useCollection<Zone>(() => seed.zones)
   const [scenarios, setScenarios, scenariosRef] = useCollection<Scenario>(() => seed.scenarios)
+  const [savedSignIns, setSavedSignIns, savedSignInsRef] = useCollection<SavedSignIn>(() => seed.savedSignIns)
   const [screen, setScreenState] = useState<BrandScreen>({ name: 'policies' })
   /* The screen as of the last navigation, for `go` to compare against without
      waiting for a render. */
@@ -537,12 +567,10 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const go = useCallback(
     (s: BrandScreen) =>
       requestLeave(() => {
-        /* The rail item for the screen already open reopens it at its list.
-           Only for screens with no policy: a builder asked to open a sheet on
-           its own policy must keep its draft. Nor for a tab named on the same
-           screen — that is the page's own tab bar, and remounting under it
-           would throw away the search and drop focus off the tab. */
-        const again = screenRef.current.name === s.name && !('policyId' in s) && !('tab' in s)
+        /* The rail item for the screen already open reopens it at its list;
+           a tab, a testing view or the testing slider on the same screen does
+           not (revisit.ts). */
+        const again = isRevisit(screenRef.current, s)
         setScreen(s)
         if (leaving.current || again) setVisit((v) => v + 1)
       }),
@@ -586,6 +614,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<ToastMessage | null>(null)
   const toastSeq = useRef(0)
   const [gauntletOverrides, setOverrides] = useState<Record<string, Record<string, AccessDecision>>>({})
+  const [breakInAccepted, setBreakInAccepted] = useState<Record<string, Record<string, BreakInAcceptance>>>({})
   const [methodSets, setMethodSets] = useState<MethodSet[]>(() => seed.methodSets)
   /* Fingerprint profiles live here rather than on the screen: policy rules
      name them, so the linter and the simulator have to be able to resolve
@@ -593,6 +622,16 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [fingerprints, setFingerprints, fingerprintsRef] = useCollection<FingerprintProfile>(() => seed.fingerprints)
   const [riskProfiles, setRiskProfiles, riskProfilesRef] = useCollection<RiskProfile>(() => seed.riskProfiles)
   const [activeRiskProfileId, setActiveRiskProfileId] = useState(seed.activeRiskProfileId)
+  /* The scale comes from the profile in use, and falls back to the shipped
+     weighting rather than to `undefined` if the id ever points at nothing —
+     a tenant with a broken pointer should grade as they did on day one, not
+     crash the evaluator. Kept out of the store's memo so it is the same object
+     until the profiles change: `useSimEnv` rebuilds on it, and a new scale on
+     every navigation rebuilt every env and every result memoised on one. */
+  const scale = useMemo(
+    () => riskScale(riskProfiles.find((p) => p.id === activeRiskProfileId) ?? EMPTY_RISK_PROFILE),
+    [riskProfiles, activeRiskProfileId],
+  )
   const [hooks, setHooks, hooksRef] = useCollection<Hook>(() => seed.hooks)
   const [hardwareTokens, setHardwareTokens] = useState<HardwareToken[]>(() => seed.tokens)
   /* The seeded catalogue ships Display Token unconfigured; the seeded drawer
@@ -682,7 +721,9 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           setApps(t.apps)
           setGroups(t.groups)
           setDirectory(t.directory)
+          setSavedSignIns(t.savedSignIns)
           setOverrides({})
+          setBreakInAccepted({})
           setRecovery(RECOVERY_DEFAULTS)
           setMfaBehaviour({})
           setDefaultMethodId(undefined)
@@ -695,7 +736,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         { canSave: false },
       )
     },
-    [requestLeave, setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setScreen],
+    [requestLeave, setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns, setScreen],
   )
 
   /* With an action the toast stays six seconds rather than about three: long
@@ -719,7 +760,14 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       fingerprints,
       hooks,
       edition,
-      features: featuresOf(edition),
+      /* The showcase pin (showcase.ts): lite, plus the tenant-wide testing
+         page and the Break-in test the owner is comparing (25 Sep 2026). The
+         one place any feature is pinned, so the store is where to look.
+         Describe it and its checks are on in both editions already; they are
+         named here as well, so the pin says everything the showcase shows. */
+      features: SHOWCASE
+        ? { ...featuresOf(edition), policyTesting: true, breakInTest: true, describePolicy: true, draftChecks: true }
+        : featuresOf(edition),
       setEdition,
       persona,
       setPersona,
@@ -839,11 +887,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         if (id === activeRiskProfileId && left[0]) setActiveRiskProfileId(left[0].id)
       },
       useRiskProfile: setActiveRiskProfileId,
-      /* The scale comes from the profile in use, and falls back to the shipped
-         weighting rather than to `undefined` if the id ever points at nothing —
-         a tenant with a broken pointer should grade as they did on day one, not
-         crash the evaluator. */
-      riskScale: riskScale(riskProfiles.find((p) => p.id === activeRiskProfileId) ?? EMPTY_RISK_PROFILE),
+      riskScale: scale,
       addFingerprint: (p) => {
         const id = freeId(fingerprintsRef.current, p, 'fp', p.name)
         setFingerprints((all) => [...all, { ...p, id }])
@@ -869,6 +913,27 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           else forPolicy[cardId] = want
           return { ...all, [policyId]: forPolicy }
         }),
+
+      breakInAccepted,
+      /* Null removes the entry rather than storing the card's own
+         expectation, as the overrides above do: "not accepted" is one state. */
+      acceptBreakIn: (policyId, cardId, a) =>
+        setBreakInAccepted((all) => {
+          const forPolicy = { ...(all[policyId] ?? {}) }
+          if (a === null) delete forPolicy[cardId]
+          else forPolicy[cardId] = a
+          return { ...all, [policyId]: forPolicy }
+        }),
+
+      savedSignIns,
+      addSavedSignIn: (x) => {
+        const id = freeId(savedSignInsRef.current, x, 'ssi', x.name)
+        setSavedSignIns((all) => [...all, { ...x, id }])
+        return id
+      },
+      updateSavedSignIn: (id, patch) =>
+        setSavedSignIns((all) => all.map((x) => (x.id === id ? { ...x, ...patch, id } : x))),
+      removeSavedSignIn: (id) => setSavedSignIns((all) => all.filter((x) => x.id !== id)),
 
       /* Stamped only when something changed. Saving an untouched policy used to
          record an edit nobody made. A policy saved with no applications is
@@ -980,12 +1045,12 @@ export function BrandProvider({ children }: { children: ReactNode }) {
        nothing and stops the next reader wondering whether they were left out
        on purpose. */
     [
-      policies, scenarios, zones, fingerprints, riskProfiles, activeRiskProfileId, hooks, apps, groups, directory, edition,
+      policies, scenarios, zones, fingerprints, riskProfiles, activeRiskProfileId, scale, hooks, apps, groups, directory, edition,
       persona, setPersona, role, setRole, methodSets, methods, hardwareTokens, commitTokens, screen, visit, go,
       registerLeaveGuard, releaseLeaveGuard, requestLeave, pendingLeave, leaveSave, leaveDiscard, leaveStay, showToast, dismissToast,
-      gauntletOverrides, recovery, mfaBehaviour, defaultMethodId, methodConfig, setupChoice, enrolment,
-      setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks,
-      policiesRef, zonesRef, scenariosRef, fingerprintsRef, riskProfilesRef, hooksRef,
+      gauntletOverrides, breakInAccepted, recovery, mfaBehaviour, defaultMethodId, methodConfig, setupChoice, enrolment, savedSignIns,
+      setPolicies, setZones, setScenarios, setFingerprints, setRiskProfiles, setHooks, setSavedSignIns,
+      policiesRef, zonesRef, scenariosRef, fingerprintsRef, riskProfilesRef, hooksRef, savedSignInsRef,
     ],
   )
 

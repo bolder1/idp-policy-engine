@@ -76,8 +76,8 @@ import { Prop } from './Section'
    the answer DOES, so the choice is made on its consequence rather than on a
    word. */
 const TILES: { id: AccessDecision; label: string; tone: string; icon: typeof UserCheck; hint: string }[] = [
-  { id: '1fa', label: 'Allow', tone: 'allow', icon: UserCheck, hint: 'Let the login in, after the factors below.' },
-  { id: 'deny', label: 'Deny', tone: 'deny', icon: ShieldAlert, hint: 'Block the login and show a message.' },
+  { id: '1fa', label: 'Allow', tone: 'allow', icon: UserCheck, hint: 'Let the sign-in through, after the factors below.' },
+  { id: 'deny', label: 'Deny', tone: 'deny', icon: ShieldAlert, hint: 'Block the sign-in and show a message.' },
 ]
 /* A third card, "Next rule · Coming soon", stood beside Allow and Deny: a rule
    that matched and handed the login on, drawn as the shape the choice was going

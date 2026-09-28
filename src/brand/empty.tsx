@@ -35,8 +35,12 @@ export function EmptyState({
 }: {
   icon: LucideIcon
   title: string
-  /** One line. If it needs two, the second one belongs somewhere else. */
-  blurb: string
+  /* One line, or none. A title that names the state and an action that gets
+     out of it usually need nothing between them (owner, 25 Sep 2026: labels,
+     no explanatory sentences), and a blurb written to fill the slot explains
+     the title back to the reader. If it needs two lines, the second belongs
+     somewhere else. */
+  blurb?: string
   /** A Button, or a fragment of a primary Button and one secondary control. */
   action?: ReactNode
   /* For an empty SECTION rather than an empty page — the panel it sits in
@@ -53,7 +57,7 @@ export function EmptyState({
         <Icon size={26} strokeWidth={1.5} />
       </span>
       <h2 className="bempty__title">{title}</h2>
-      <p className="bempty__blurb">{blurb}</p>
+      {blurb && <p className="bempty__blurb">{blurb}</p>}
       {action && <div className="bempty__action">{action}</div>}
     </div>
   )

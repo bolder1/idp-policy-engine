@@ -1,6 +1,54 @@
-import { conditionType, users as seedUsers, zoneScopeOf, type AccessDecision, type Condition, type Policy, type Rule, type ZoneScope } from '../data'
-import { blame, cardJoin, cardName, credit, leaves, predicatePasses, topJoin } from '../predicate'
-import { hasWho, normaliseWho, whoPasses } from '../rule-who'
+import {
+  FALLBACK_NAME,
+  conditionType,
+  rangeText,
+  users as seedUsers,
+  zoneScopeOf,
+  type AccessDecision,
+  type Condition,
+  type ConditionCard,
+  type Group,
+  type Policy,
+  type Predicate,
+  type Rule,
+  type User,
+  type Zone,
+  type ZoneScope,
+} from '../data'
+import {
+  DEFAULT_MATCH,
+  decidingCheck,
+  profileMatches,
+  type FingerprintProfile,
+  type MatchOptions,
+  type ProfileCheck,
+  type ProfileMatch,
+} from '../fingerprint'
+import type { AuthMethod } from '../methods'
+import { sameName, type PlaceKind } from '../places'
+import { allOf, anyOf, blame, cardJoin, cardName, credit, leaves, notState, predicatePasses, predicateState, topJoin, type CondState } from '../predicate'
+import { hasWho, normaliseWho, whoPasses, type WhoPerson } from '../rule-who'
+import {
+  CHIP_DEVICES,
+  RISK_SCORE,
+  TENANT_TZ,
+  chipFacts,
+  clock,
+  type FactKey,
+  type FactSource,
+  type SignInDevice,
+  type SignInFacts,
+  type SignInPlace,
+} from './sign-in-facts'
+import { placeOfSignIn, zoneMember, type ZonePart } from './zone-match'
+import { isAddress } from './zone-validation'
+
+/* The sign-in facts model and the chip adapter live beside this file and are
+   re-exported from it, so every caller still imports its evaluator vocabulary
+   from one place. */
+export * from './sign-in-facts'
+export type { ZonePart }
+export type { MatchOptions, ProfileCheck } from '../fingerprint'
 
 /* -----------------------------------------------------------------------------
    The simulation core.
@@ -11,10 +59,47 @@ import { hasWho, normaliseWho, whoPasses } from '../rule-who'
    is three chances for two screens to contradict each other in front of an
    administrator, and the moment that happens none of them are believed again.
 
-   The honest limit, repeated wherever this is surfaced: the map from a context
-   option to a condition value is a fixed table, not the engine. What is real is
-   the ORDER of evaluation, the first-match-wins stop, and the decision that
-   results.
+   --- What is modelled, and what is a fixture --------------------------------
+
+   This is a model of the engine, not the engine. It is exact about the parts it
+   reads from the tenant and says so; it names the parts that are tables.
+
+   Read from the tenant (when the env carries the library — see `EvalLibrary`):
+     · zone membership, from each zone's own entries — IPv4 and IPv6 blocks and
+       ranges, ASNs, countries, states, cities, and distance ranges in km or
+       miles, each half three-valued (`zone-match.ts`)
+     · who a rule and a policy are for, from the directory and the groups
+     · the time of day and the day of week, from a real date and time zone,
+       daylight saving included (`instantOf`, `wallClock`)
+     · the device risk score, compared as a number against the threshold
+     · which policy governs a person on an app (`tenant-resolver.ts`)
+     · a device against a device profile, row by row (`profileMatches` in
+       fingerprint.ts): OS and browser floors, integrity, screen lock, the
+       Authenticator and Device Agent versions for a health profile; the
+       agent, mobile restriction, registration and device limit for a trusted
+       device. Whether a device is registered is a STATED fact — no score
+       threshold exists to derive it from — and a trace says it was stated
+
+   Still tables, and said to be:
+     · where an address is. `geo-fixture.ts` places a handful of documentation
+       address blocks; it is not geo-IP, and a trace says "looked up"
+     · what a chip means. `chipFacts` turns "Office Network" into an address
+       and a place, and "Managed (MDM)" into a device, so the chip surfaces can
+       ask the same evaluator the typed facts do
+     · the legacy chip table (`PLACE_FACTS`, `DEVICE_FACTS`), for callers with
+       no library — every test estate built on `rawEnv` reads it exactly as
+       before
+
+   Exact in either reading, within this prototype's model of a policy: the
+   ORDER of evaluation, the first-match-wins stop, the last row, and the
+   decision that results. And one rule that holds on both paths: `unknown` is
+   never a pass. Where a fact is missing, the typed trace
+   reports every decision the missing fact could produce (`tracePolicy`).
+
+   The proposed parts, said once: ordered rules with first-match-wins are this
+   prototype's model of a policy. The product's Adaptive Access Policy has four
+   restriction sections and resolves conflicts between policies by a weight it
+   does not document — `tenant-resolver.ts` implements what IS documented.
    -------------------------------------------------------------------------- */
 
 export interface SimUser {
@@ -31,7 +116,8 @@ export interface SimUser {
 
    A fixed table, and the module header already says why that is the honest
    shape here: the map from a context option to a condition value is a table,
-   not the engine. What is real is the order of evaluation and the decision.
+   not the engine. What is exact is the order of evaluation and the decision,
+   as this prototype models them.
 
    Only the keys a `SimUser` can actually answer. `designation`, `team`, `age`
    and `years_of_experience` are offered by the catalogue and are NOT here —
@@ -111,7 +197,11 @@ export interface PlaceFacts {
    the only value consistent with the old `zonesIn`, and it would have meant no
    location-scoped rule could ever match anything in a rehearsal, a sweep or a
    gauntlet round — so the new half could not be written honestly without
-   checking the old one. */
+   checking the old one.
+
+   Read only when the env carries no library. With one, a chip's zone is graded
+   from the tenant's own zone entries (see `chipZone`), because this table knows
+   the four ids of one test estate and nothing else. */
 export const PLACE_FACTS: Record<string, PlaceFacts> = {
   'Any location': { zonesIn: null, zonesByIp: [], zonesByLocation: [], country: null, state: null, city: null },
   'Office Network': { zonesIn: ['office', 'pune-hq'], zonesByIp: ['office'], zonesByLocation: ['pune-hq'], country: 'India', state: 'Maharashtra', city: 'Pune' },
@@ -141,20 +231,6 @@ export const DEVICE_FACTS: Record<string, DeviceFacts> = {
   'Changed fingerprint': { recognised: false, mdm: 'Not enrolled', registration: 'Registered', trustDays: 61 },
 }
 
-/* What a risk verdict is worth, out of the box.
-
-   Still the shipped numbers, and still the fallback — but no longer the only
-   answer. The tenant's risk-signal profile derives its own scale from which
-   signals it collects and how heavily it weighs them, and hands it to the
-   evaluator on the context. A profile nobody has edited derives exactly these
-   three numbers, which is what keeps every seeded policy grading as it did.
-
-   This is the only numeric seam in risk evaluation: `device-risk` is the one
-   condition that compares a threshold against a number rather than against a
-   band name. Which is precisely why the profile had to own it — a weighting
-   screen that could not reach this would be configuration nothing reads. */
-export const RISK_SCORE: Record<string, number> = { Low: 12, Medium: 48, High: 86 }
-
 export interface SimContext {
   user: SimUser
   place: string
@@ -163,6 +239,28 @@ export interface SimContext {
   risk: string
   /** Captured once per run so the trace cannot shift under a re-render. */
   nowMinutes: number
+  /* Typed sign-in facts, when the caller has them. Optional, and absent on
+     every chip surface, which is what keeps `contextFor()` and every context
+     literal assignable. Present, the zone, device profile, risk, time, day and
+     place conditions are graded from these facts rather than from the chips;
+     who a person is still comes from `user`. */
+  facts?: SignInFacts
+}
+
+/* The tenant objects a truthful answer needs.
+
+   Optional on `SimEnv`, and absence is the compatibility promise: with no
+   library, every legacy path behaves exactly as before — `rawEnv`, and every
+   test estate built on it, still grades a zone from the chip table. With one,
+   a chip's zone is graded from the zone's own entries, and the typed path can
+   read people, groups and policies by id. */
+export interface EvalLibrary {
+  zones: readonly Zone[]
+  fingerprints: readonly FingerprintProfile[]
+  people: readonly User[]
+  groups: readonly Group[]
+  methods: readonly AuthMethod[]
+  policies: readonly Policy[]
 }
 
 export interface SimEnv {
@@ -172,6 +270,9 @@ export interface SimEnv {
   /* A person's name, for the trace line of a rule whose who did not match.
      Optional, and absent falls back to the seeded directory, then the id. */
   userName?: (id: string) => string
+  /* An application's name, for the resolver's "Does not cover HRMS". Optional,
+     and absent names the application by its id. */
+  appName?: (id: string) => string
   /* What the three risk verdicts are worth in this tenant, from the risk-signal
      profile. Optional, and absent means the shipped scale.
 
@@ -191,11 +292,18 @@ export interface SimEnv {
      the rehearsal must not grade it as though the object were still there. */
   hasZone?: (id: string) => boolean
   hasFingerprint?: (id: string) => boolean
+  /** The tenant's own objects. See `EvalLibrary`; absent means the legacy chip table. */
+  library?: EvalLibrary
+  /* How a device-health profile's client rows are read (`MatchOptions` in
+     fingerprint.ts). Optional, and absent is the handset reading. */
+  deviceMatch?: MatchOptions
 }
 
 // --- Evaluation --------------------------------------------------------------
 
-export type CondState = 'pass' | 'fail' | 'unknown'
+/* Lives in predicate.ts now, so the predicate can be read three-valued without
+   a cycle through this file. Re-exported so nothing that imported it moves. */
+export type { CondState }
 
 /* Where the tenant's clock sits, and how far every offerable zone is from UTC.
 
@@ -205,7 +313,8 @@ export type CondState = 'pass' | 'fail' | 'unknown'
 
    STANDARD time only. There is no date in a `SimContext`, so there is nothing
    to decide DST against; a rehearsal in July against Europe/Berlin is an hour
-   out, and that is a stated limit rather than a bug to hunt. */
+   out, and that is a stated limit rather than a bug to hunt. The typed path
+   uses this table only when it is given no date either, and says so. */
 const TZ_OFFSET: Record<string, number> = {
   'Asia/Kolkata': 330,
   'Europe/Berlin': 60,
@@ -217,48 +326,97 @@ const TZ_OFFSET: Record<string, number> = {
   'Australia/Sydney': 600,
 }
 
-/** The zone an unqualified window is read in. The fixtures are an Indian tenant. */
-export const TENANT_TZ = 'Asia/Kolkata'
-
-export const clock = (mins: number) =>
-  `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
-
 const toMinutes = (hhmm: string) => {
   const [h, m] = hhmm.split(':').map((n) => Number(n))
   return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0)
 }
 
-export function condPhrase(c: Condition, env: SimEnv): string {
+/** The condition's values as the trace names them — zones and profiles by name. */
+function shownValues(c: Condition, env: SimEnv): string {
   const t = conditionType(c.typeId)
   const vals = c.values.filter((v) => v.trim() !== '')
-  const shown =
-    t.valueKind === 'zone'
-      ? vals.map((v) => (env.hasZone && !env.hasZone(v) ? '(deleted)' : env.zoneName(v))).join(', ')
-      : t.valueKind === 'fingerprint'
-        ? vals.map((v) => (env.hasFingerprint && !env.hasFingerprint(v) ? 'a deleted device profile' : env.fingerprintName(v))).join(', ')
-        : t.valueKind === 'time'
-          ? `${vals[0] ?? '—'}–${vals[1] ?? '—'}`
-          : vals.join(', ')
-  return `${t.label} ${c.operator} ${shown || '…'}`
+  return t.valueKind === 'zone'
+    ? vals.map((v) => (env.hasZone && !env.hasZone(v) ? '(deleted)' : env.zoneName(v))).join(', ')
+    : t.valueKind === 'fingerprint'
+      ? vals.map((v) => (env.hasFingerprint && !env.hasFingerprint(v) ? 'a deleted device profile' : env.fingerprintName(v))).join(', ')
+      : t.valueKind === 'time'
+        ? `${vals[0] ?? '—'}–${vals[1] ?? '—'}`
+        : vals.join(', ')
 }
+
+export function condPhrase(c: Condition, env: SimEnv): string {
+  const t = conditionType(c.typeId)
+  return `${t.label} ${c.operator} ${shownValues(c, env) || '…'}`
+}
+
+/* The condition types the typed path answers from facts when a caller hands a
+   context explicit facts. Everything else — who the person is, the legacy
+   directory conditions, the ones nothing can settle — keeps reading the chip
+   context, which carries the same person. */
+const FROM_FACTS = new Set(['zone', 'fingerprint', 'device-risk', 'time', 'day', 'country', 'state', 'city'])
+
+type CondVerdict = { state: CondState; detail: string }
 
 /* One condition against one context. `unknown` is deliberately NOT treated as a
    pass: a signal this sim cannot derive is reported as unmet, because claiming
    a match on a fact we never had is the one failure mode that would make the
-   whole trace untrustworthy. */
-export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: CondState; detail: string } {
-  const t = conditionType(c.typeId)
+   whole trace untrustworthy.
+
+   `card` is the card the condition sits in, handed on to `evalCondition` so a
+   weekday with no zone of its own reads the zone of a time window beside it —
+   the same reading `traceRule` gives, so `walk` and `tracePolicy` cannot
+   disagree about one rule on the same facts. Optional, and only the typed
+   path reads it. */
+export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv, card?: ConditionCard): CondVerdict {
   const vals = c.values.filter((v) => v.trim() !== '')
   if (vals.length === 0) return { state: 'unknown', detail: 'the condition has no value set' }
 
+  /* The bridge to the typed path, and the only place the two meet.
+
+     Explicit facts on the context: the fact-shaped conditions are answered
+     from them, word for word what `evalCondition` says.
+
+     No facts, but a library on the env: the chips are turned into facts, and
+     two conditions are graded from the tenant's own objects. A ZONE, from the
+     zone's entries — the whole fix for a tenant whose zones are not the four
+     the chip table names — in sentences that keep their chip shape ("this
+     login is in Office Network"), so the chip surfaces read as they always
+     have; "Any location" keeps its own undecided sentence, because it states
+     no origin to grade. A DEVICE PROFILE, row by row from the chip's device,
+     in the typed sentence: there is no chip-shaped sentence for "Android 12 is
+     below the floor of 13", and "the fingerprint matches" was the sentence
+     that hid it. A device does not depend on the origin chip, so this one is
+     asked whatever the place. Everything else on the chip path — risk, the
+     clock, the day, the legacy place conditions — stays on the legacy code,
+     which reads the same numbers from the same chips.
+
+     Neither: nothing here runs, and the legacy code answers exactly as it did. */
+  if (ctx.facts && FROM_FACTS.has(c.typeId)) {
+    const r = evalCondition(c, ctx.facts, env ?? rawEnv, card)
+    return { state: r.status, detail: r.detail }
+  }
+  if (!ctx.facts && env?.library && c.typeId === 'zone' && PLACE_FACTS[ctx.place]?.zonesIn != null) {
+    return chipZone(c, ctx, env, env.library.zones)
+  }
+  if (!ctx.facts && env?.library && c.typeId === 'fingerprint') {
+    return chipProfile(c, ctx, env, env.library.fingerprints)
+  }
+  return legacyCond(c, ctx, env)
+}
+
+/* The chip table's reading of one condition — what `evalCond` has always done,
+   unchanged, for every caller with no library and no facts. */
+function legacyCond(c: Condition, ctx: SimContext, env?: SimEnv): CondVerdict {
+  const t = conditionType(c.typeId)
+  const vals = c.values.filter((v) => v.trim() !== '')
   const negated = c.operator.includes('not')
   const place = PLACE_FACTS[ctx.place]
   const device = DEVICE_FACTS[ctx.device]
-  const decide = (hit: boolean, detail: string): { state: CondState; detail: string } => ({
+  const decide = (hit: boolean, detail: string): CondVerdict => ({
     state: (negated ? !hit : hit) ? 'pass' : 'fail',
     detail,
   })
-  const unknown = (detail: string): { state: CondState; detail: string } => ({ state: 'unknown', detail })
+  const unknown = (detail: string): CondVerdict => ({ state: 'unknown', detail })
 
   /* On `c.typeId`, not on `t.id`, and the difference is a wrong answer.
 
@@ -278,7 +436,6 @@ export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: 
       const zonesIn = place.zonesIn
       const poolOf = (h: 'both' | ZoneScope): readonly string[] =>
         (h === 'ip' ? place.zonesByIp : h === 'location' ? place.zonesByLocation : zonesIn) ?? []
-      const halfWord = (h: 'both' | ZoneScope) => (h === 'ip' ? ' on the network' : h === 'location' ? ' by location' : '')
       const hit = vals.find((v) => poolOf(zoneScopeOf(c, v)).includes(v))
       const inside = hit !== undefined
       const halves = [...new Set(vals.length > 0 ? vals.map((v) => zoneScopeOf(c, v)) : (['both'] as const))]
@@ -433,17 +590,120 @@ export function evalCond(c: Condition, ctx: SimContext, env?: SimEnv): { state: 
          no DST, no date, and both of those would matter in a real evaluator.
 
          Absent `tz` shifts by nothing, which is exactly what every window meant
-         before the field existed. */
+         before the field existed.
+
+         A shifted clock says it was read on standard time. With no date there
+         is no daylight saving to apply, and "05:30 in Europe/Berlin" printed
+         bare would state as fact an hour that is an hour out all summer. */
       const shift = c.tz ? (TZ_OFFSET[c.tz] ?? 0) - (TZ_OFFSET[TENANT_TZ] ?? 0) : 0
       const local = ((ctx.nowMinutes + shift) % 1440 + 1440) % 1440
       // A window that wraps midnight is an OR, not an AND.
       const inside = from <= to ? local >= from && local <= to : local >= from || local <= to
-      return decide(inside, c.tz ? `it is ${clock(local)} in ${c.tz}` : `it is ${clock(ctx.nowMinutes)} right now`)
+      const onStandard = c.tz !== undefined && c.tz !== TENANT_TZ ? ' (standard time)' : ''
+      return decide(inside, c.tz ? `it is ${clock(local)} in ${c.tz}${onStandard}` : `it is ${clock(ctx.nowMinutes)} right now`)
     }
 
     default:
       return unknown(`this simulation does not model ${t.label.toLowerCase()}`)
   }
+}
+
+const halfWord = (h: 'both' | ZoneScope) => (h === 'ip' ? ' on the network' : h === 'location' ? ' by location' : '')
+
+/* A chip context's zone, read from the tenant's zones.
+
+   The chips become facts (`chipFacts`: "Office Network" is 203.0.113.10 in
+   Pune) and each named zone is asked about those facts through its own
+   entries. The verdict is the typed path's; the SENTENCE keeps the chip
+   path's three shapes — it is in this origin, it is in no zone at all, it is
+   in another zone — so a chip surface reads the way it always has, and only
+   says something new when the answer is new. "In none of these zones" is that
+   case: a zone the facts cannot place (a location-only zone, asked about a Tor
+   exit that names no place) is not somewhere the sign-in can be said to be, or
+   not to be.
+
+   Remembered per zone object and origin, because the impact sweep asks this
+   question 1,440 times per run and the chip's address and place — the only
+   facts a zone reads — depend on the origin chip alone. A zone that is edited
+   is a new object, so the memory cannot outlive the zone it describes. */
+const CHIP_MEMBERSHIP = new WeakMap<Zone, Map<string, CondState>>()
+
+function chipMember(zone: Zone, place: string, facts: SignInFacts, scope: 'both' | ZoneScope): CondState {
+  let byOrigin = CHIP_MEMBERSHIP.get(zone)
+  if (!byOrigin) {
+    byOrigin = new Map()
+    CHIP_MEMBERSHIP.set(zone, byOrigin)
+  }
+  const key = `${place}|${scope}`
+  let state = byOrigin.get(key)
+  if (state === undefined) {
+    state = zoneMember(zone, facts, scope).status
+    byOrigin.set(key, state)
+  }
+  return state
+}
+
+function chipZone(c: Condition, ctx: SimContext, env: SimEnv, zones: readonly Zone[]): CondVerdict {
+  const vals = c.values.filter((v) => v.trim() !== '')
+  if (vals.some((v) => (env.hasZone && !env.hasZone(v)) || !zones.some((z) => z.id === v)))
+    return { state: 'unknown', detail: 'this rule names a zone that no longer exists' }
+  const facts = chipFacts(ctx, env)
+  const states = vals.map((v) => chipMember(zones.find((z) => z.id === v)!, ctx.place, facts, zoneScopeOf(c, v)))
+  const inside = anyOf(states)
+  /* Undecided: the typed sentence says which fact is missing, and there is no
+     chip-shaped sentence that would be true instead. */
+  if (inside === 'unknown') return { state: 'unknown', detail: evalCondition(c, facts, env).detail }
+
+  const hit = states.indexOf('pass')
+  const halves = [...new Set(vals.map((v) => zoneScopeOf(c, v)))]
+  const half = hit >= 0 ? halfWord(zoneScopeOf(c, vals[hit])) : halves.length === 1 ? halfWord(halves[0]) : ''
+  const elsewhere = halves.map((h) => anyOf(zones.map((z) => chipMember(z, ctx.place, facts, h))))
+  const where =
+    inside === 'pass'
+      ? `this login is in ${ctx.place}`
+      : elsewhere.every((s) => s === 'fail')
+        ? 'this login is in no zone at all'
+        : elsewhere.some((s) => s === 'pass')
+          ? 'this login is in another zone'
+          : 'this login is in none of these zones'
+  const negated = c.operator.includes('not')
+  return { state: (negated ? inside === 'fail' : inside === 'pass') ? 'pass' : 'fail', detail: `${where}${half}` }
+}
+
+/* A chip context's device profile, read from the tenant's profiles.
+
+   Word for word what `evalCondition` says of the chip's facts — the verdict
+   and the sentence are the typed path's, and a test holds the two equal for
+   every device chip. Written out here only so it can be remembered: the impact
+   sweep asks this 1,440 times a run, and the chip's device and whether the
+   person is known are the only facts a profile reads. Keyed per profile
+   object, so an edited profile — a new object — is graded afresh. */
+const CHIP_PROFILE = new WeakMap<FingerprintProfile, Map<string, { match: ProfileMatch; words: string }>>()
+
+function chipProfile(c: Condition, ctx: SimContext, env: SimEnv, profiles: readonly FingerprintProfile[]): CondVerdict {
+  const vals = c.values.filter((v) => v.trim() !== '')
+  if (vals.some((v) => (env.hasFingerprint && !env.hasFingerprint(v)) || !profiles.some((p) => p.id === v)))
+    return { state: 'unknown', detail: 'this rule names a device profile that no longer exists' }
+  const device = CHIP_DEVICES[ctx.device]
+  const personKnown = personOf(ctx.user.id, env) !== null
+  const key = `${ctx.device}|${personKnown}|${env.deviceMatch?.clientRows ?? DEFAULT_MATCH.clientRows}`
+  const graded = vals.map((v) => {
+    const p = profiles.find((x) => x.id === v)!
+    let byDevice = CHIP_PROFILE.get(p)
+    if (!byDevice) {
+      byDevice = new Map()
+      CHIP_PROFILE.set(p, byDevice)
+    }
+    let g = byDevice.get(key)
+    if (!g) {
+      const match = profileMatches(p, device, { ...env.deviceMatch, personKnown })
+      g = { match, words: profileWords(p, match, device) }
+      byDevice.set(key, g)
+    }
+    return g
+  })
+  const inside = anyOf(graded.map((g) => g.match.status))
+  return { state: c.operator.includes('not') ? notState(inside) : inside, detail: graded.map((g) => g.words).join('; ') }
 }
 
 /* What an unmatched sign-in gets. Optional on the model so every existing
@@ -481,19 +741,33 @@ export function evalRule(rule: Rule, ctx: SimContext, env: SimEnv): RuleVerdict 
   }
 
   if (p.cards.length === 0) {
-    return {
-      match: true,
-      reason: hasWho(rule.who)
-        ? 'No conditions — this step catches everyone it applies to'
-        : 'No conditions — this step catches everything that reaches it',
-      card: null,
-    }
+    return { match: true, reason: catchAllReason(rule), card: null }
   }
 
-  const results = new Map<string, { state: CondState; detail: string }>()
-  for (const c of leaves(p)) results.set(c.id, evalCond(c, ctx, env))
+  const results = new Map<string, CondVerdict>()
+  const cardOf = cardsByCondition(p)
+  for (const c of leaves(p)) results.set(c.id, evalCond(c, ctx, env, cardOf.get(c.id)))
   const passed = (c: Condition) => results.get(c.id)?.state === 'pass'
+  return predicateVerdict(p, passed, (c) => results.get(c.id)?.detail ?? '', env)
+}
 
+/* Which card each condition sits in, by condition id. Built the same way for
+   `evalRule` and `traceRule`, so both paths hand `evalCondition` the same card. */
+function cardsByCondition(p: Predicate): Map<string, ConditionCard> {
+  const cardOf = new Map<string, ConditionCard>()
+  for (const k of p.cards) for (const c of k.conditions) cardOf.set(c.id, k)
+  return cardOf
+}
+
+const catchAllReason = (rule: Pick<Rule, 'who'>) =>
+  hasWho(rule.who)
+    ? 'No conditions — this step catches everyone it applies to'
+    : 'No conditions — this step catches everything that reaches it'
+
+/* The sentence for a predicate, given which of its conditions passed. Shared by
+   `evalRule` and `traceRule`, so a rule decided on either path reads the same
+   words — the typed trace is not allowed a second opinion about phrasing. */
+function predicateVerdict(p: Predicate, passed: (c: Condition) => boolean, detailOf: (c: Condition) => string, env: SimEnv): RuleVerdict {
   /* Asked of the whole predicate. `credit` names the card that carried it,
      but with the cards joined by AND one passing card is not a match — every
      card has to hold, and returning on the first would report a match the
@@ -524,7 +798,7 @@ export function evalRule(rule: Rule, ctx: SimContext, env: SimEnv): RuleVerdict 
      is the alternative that came closest. */
   const near = blame(p, passed)
   if (!near) return { match: false, reason: 'No card could be satisfied', card: null }
-  const detail = results.get(near.condition.id)?.detail ?? ''
+  const detail = detailOf(near.condition)
   const prefix = p.cards.length > 1 ? `Closest was ${cardName(near.card, near.index)}: ` : ''
   return { match: false, reason: `${prefix}${condPhrase(near.condition, env)} — ${detail}`, card: near.index }
 }
@@ -536,15 +810,21 @@ export function evalRule(rule: Rule, ctx: SimContext, env: SimEnv): RuleVerdict 
    they were included and then taken out. Names come from the env, so a renamed
    group reads as renamed. */
 export function whoMissReason(rule: Pick<Rule, 'who'>, ctx: SimContext, env: SimEnv): string {
+  return whoMissFor(rule, ctx.user, env)
+}
+
+/* The same sentence for any person record, so the typed trace (which has a
+   person but no chip context) words a who exactly as the chip trace does. */
+function whoMissFor(rule: Pick<Rule, 'who'>, user: WhoPerson & { name: string }, env: SimEnv): string {
   const w = normaliseWho(rule.who)
   if (!w) return ''
   const person = (id: string) => env.userName?.(id) ?? seedUsers.find((u) => u.id === id)?.name ?? id
   /* In the order `whoPasses` decides: not included at all is the reason before
      any exception is, so "Finance except Priya" reads "Not Finance" to Devon
      in Contractors even when Devon is also listed as an exception. */
-  const included = w.groupIds.length + w.userIds.length === 0 || w.groupIds.includes(ctx.user.groupId) || w.userIds.includes(ctx.user.id)
-  if (included && w.exceptUserIds?.includes(ctx.user.id)) return `${ctx.user.name} is an exception`
-  if (included && w.exceptGroupIds?.includes(ctx.user.groupId)) return `${env.groupName(ctx.user.groupId)} is an exception`
+  const included = w.groupIds.length + w.userIds.length === 0 || w.groupIds.includes(user.groupId) || w.userIds.includes(user.id)
+  if (included && w.exceptUserIds?.includes(user.id)) return `${user.name} is an exception`
+  if (included && w.exceptGroupIds?.includes(user.groupId)) return `${env.groupName(user.groupId)} is an exception`
   const names = [...w.groupIds.map((id) => env.groupName(id)), ...w.userIds.map(person)]
   const list = names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`
   return `Not ${list}`
@@ -640,4 +920,761 @@ export const rawEnv: SimEnv = {
   zoneName: (id) => id,
   fingerprintName: (id) => id,
   groupName: (id) => id,
+}
+
+/* =============================================================================
+   The typed path.
+
+   Everything above answers two-valued questions about chips: did this rule
+   match, yes or no, with "cannot tell" folded into no. That is the reading the
+   chip surfaces were built on and it stays, untouched, for them.
+
+   Everything below answers from `SignInFacts` and keeps all three values all
+   the way up. A condition is pass, fail or unknown; a rule matches, does not,
+   or might; a policy has one decision when every reading agrees, and a short
+   list of the decisions it could reach when it does not. Nothing here throws a
+   condition's verdict away — every leaf of every rule is in the trace, with
+   what the sign-in showed, what the condition asked for, and which facts would
+   settle it if it could not be settled.
+
+   Three decisions and no more: 1 factor, 2 factors, deny. `unknown` is a state
+   a CONDITION can be in, never an outcome a policy can have, so "can't tell"
+   surfaces as two or three possible outcomes, each saying which undecided rules
+   it assumed matched and which it assumed did not.
+   ========================================================================== */
+
+export interface ConditionResult {
+  conditionId: string
+  typeId: string
+  /** AFTER negation: 'not in zone' and 'does not match' are already applied. */
+  status: CondState
+  /** What the sign-in showed, in words. */
+  actual: string
+  /** What the condition asks for, in words. */
+  required: string
+  /** The trace sentence. */
+  detail: string
+  /** Zone conditions only, one per named zone, before negation. */
+  zones?: ZonePart[]
+  /** Device profile conditions only, one per profile check, in catalogue order. */
+  checks?: ProfileCheck[]
+  /* Device profile conditions only, one per named profile, with that profile's
+     own verdict and checks — `checks` above is every profile's rows run
+     together, which cannot say "Compliant devices · 3 of 4 checks pass" when
+     the condition names two profiles. */
+  profiles?: ProfileResult[]
+  /** Facts that would settle an 'unknown'; [] when decided, or when no fact can. */
+  missing: FactKey[]
+  /** A true limit of the answer, e.g. a risk score stated for a platform that does not collect one. */
+  caveat?: string
+}
+
+/** One device profile a condition named, graded against the sign-in's device. Before the condition's negation. */
+export interface ProfileResult {
+  profileId: string
+  profileName: string
+  status: CondState
+  checks: ProfileCheck[]
+}
+
+export interface RuleTrace {
+  /** Position in `policy.rules`; -1 for the last row ("Nothing else matched"). */
+  index: number
+  ruleId: string
+  ruleName: string
+  /** The legacy union, unchanged. An undecided rule reports 'miss' here; `match` says 'unknown'. */
+  kind: StepKind
+  /* 'unknown' when the rule names its people and no person was given — the
+     one who that cannot be read, which is not the same as a who that missed. */
+  who: 'none' | 'in' | 'out' | 'unknown'
+  /** The `whoMissReason` sentence when who is 'out'. */
+  whoReason: string | null
+  match: 'yes' | 'no' | 'unknown'
+  /** Every leaf in `leaves()` order, evaluated even when the who is 'out'. */
+  conditions: ConditionResult[]
+  /** The card that carried the match or came closest, as in `RuleVerdict`. */
+  card: number | null
+  /** The sentence `evalRule` would produce for these results. */
+  reason: string
+}
+
+export interface PossibleOutcome {
+  decision: AccessDecision
+  /** Null when the last row decided. */
+  ruleIndex: number | null
+  ruleName: string
+  /** The undecided rules this outcome assumes, and whether each matched. */
+  assumes: { ruleIndex: number; matches: boolean }[]
+}
+
+export interface PolicyTrace {
+  policyId: string
+  outOfAudience: boolean
+  /* False only when the policy names its audience and no person was given, so
+     whether it governs this sign-in cannot be read. The rules are then traced
+     as though it did — the resolver never asks that way, because it will not
+     resolve a sign-in without a person. */
+  audienceKnown: boolean
+  /** The rules only; the last row is `lastRow`. */
+  steps: RuleTrace[]
+  /** The last row's trace, when it is reached under the definite reading. */
+  lastRow: RuleTrace | null
+  /** The DEFINITE reading: unknown counts as no match, which is what `decide` does. */
+  hitIndex: number | null
+  /** The definite reading's decision; null when the policy does not govern this person. */
+  decision: AccessDecision | null
+  /** Every possible outcome has the same decision (vacuously true out of the audience). */
+  settled: boolean
+  /** At least one unless out of the audience, in rule order, deduped by (decision, rule). */
+  possible: PossibleOutcome[]
+  /** The unknown conditions on undecided rules that were reached, deduped by condition. */
+  unknowns: ConditionResult[]
+}
+
+// --- The clock ---------------------------------------------------------------
+
+/* Wall-clock time in a named zone, from the platform's own time zone database.
+
+   `Intl` rather than a table, because a table cannot know that Berlin is an
+   hour further from Kolkata in January than in July. The formatter is made
+   once per zone and kept: building one is the expensive part. A zone the
+   platform does not know gives null, which every caller turns into `unknown`
+   — never a throw, and never a guess at an offset. */
+const FORMATS = new Map<string, Intl.DateTimeFormat | null>()
+
+function formatIn(timeZone: string): Intl.DateTimeFormat | null {
+  if (FORMATS.has(timeZone)) return FORMATS.get(timeZone) ?? null
+  let f: Intl.DateTimeFormat | null
+  try {
+    f = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      weekday: 'long',
+    })
+  } catch {
+    f = null
+  }
+  FORMATS.set(timeZone, f)
+  return f
+}
+
+function partsAt(instant: number, timeZone: string) {
+  const f = formatIn(timeZone)
+  if (!f) return null
+  const parts = f.formatToParts(instant)
+  const num = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value)
+  return {
+    year: num('year'),
+    month: num('month'),
+    day: num('day'),
+    /* `% 24` because some engines still print midnight as 24 under h23. */
+    hour: num('hour') % 24,
+    minute: num('minute'),
+    weekday: parts.find((p) => p.type === 'weekday')?.value ?? '',
+  }
+}
+
+/** How many minutes ahead of UTC this zone's clock is at this instant. */
+function offsetMin(timeZone: string, instant: number): number | null {
+  const p = partsAt(instant, timeZone)
+  if (!p) return null
+  const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute)
+  return Math.round((asUtc - (instant - (instant % 60_000))) / 60_000)
+}
+
+const DATE_TEXT = /^(\d{4})-(\d{2})-(\d{2})$/
+const TIME_TEXT = /^([01]?\d|2[0-3]):([0-5]\d)$/
+
+/* The instant a wall-clock date and time in a zone names.
+
+   Guess the instant as though the zone were UTC, correct by the zone's offset
+   at the guess, and correct once more if that moved the instant across a
+   daylight-saving change — the second offset is the one in force at the
+   answer.
+
+   Two edges, each settled on purpose:
+
+     · A date the calendar does not have — 30 February, 31 April — is not a
+       date. `Date.UTC` would roll it into the next month and the weekday
+       would come back confident and wrong, so it is refused here, and the
+       caller turns that into undecided.
+     · A time in a spring-forward gap (02:30 on the night New York skips from
+       02:00 to 03:00) names no instant. It is read an hour LATER, on the
+       offset in force before the change — 03:30 — which is what a clock that
+       skipped the hour shows, and what java.time and Temporal's default do.
+       The second correction alone lands an hour earlier (01:30), so a gap is
+       detected by reading the answer back, and the later of the two readings
+       is kept. In an autumn overlap both readings are real; the first one,
+       on the earlier offset, is kept. */
+function instantOf(date: string, time: string, timeZone: string): number | null {
+  const d = DATE_TEXT.exec(date)
+  const t = TIME_TEXT.exec(time)
+  if (!d || !t) return null
+  const [y, mo, day] = [Number(d[1]), Number(d[2]), Number(d[3])]
+  const [hh, mm] = [Number(t[1]), Number(t[2])]
+  if (mo < 1 || mo > 12 || day < 1 || day > 31) return null
+  const guess = Date.UTC(y, mo - 1, day, hh, mm)
+  const rolled = new Date(guess)
+  if (rolled.getUTCFullYear() !== y || rolled.getUTCMonth() !== mo - 1 || rolled.getUTCDate() !== day) return null
+  const off1 = offsetMin(timeZone, guess)
+  if (off1 === null) return null
+  const first = guess - off1 * 60_000
+  const off2 = offsetMin(timeZone, first)
+  if (off2 === null) return null
+  if (off2 === off1) return first
+  const second = guess - off2 * 60_000
+  const back = partsAt(second, timeZone)
+  const reads = back !== null && back.year === y && back.month === mo && back.day === day && back.hour === hh && back.minute === mm
+  return reads ? second : Math.max(first, second)
+}
+
+/** The time of day and the weekday an instant reads as in a zone. */
+function wallClock(instant: number, timeZone: string): { minutes: number; weekday: string } | null {
+  const p = partsAt(instant, timeZone)
+  if (!p || !Number.isFinite(p.hour) || !Number.isFinite(p.minute)) return null
+  return { minutes: p.hour * 60 + p.minute, weekday: p.weekday }
+}
+
+/* What a sign-in's clock reads in another zone, in minutes of the day — the
+   reading the `time` condition makes of it: with a date, the real instant read
+   again in `target`; without one, the standard-time table. Null where the
+   condition would answer undecided (a time or zone it cannot read).
+
+   For the testing surfaces' time ruler, which prints a window's edges on the
+   sign-in's own clock and so has to shift them by the same amount this does. */
+export function minutesIn(when: { date?: string; time: string; timeZone: string }, target: string): number | null {
+  if (!TIME_TEXT.test(when.time)) return null
+  if (when.date) {
+    const at = instantOf(when.date, when.time, when.timeZone)
+    return at === null ? null : (wallClock(at, target)?.minutes ?? null)
+  }
+  const a = TZ_OFFSET[target]
+  const b = TZ_OFFSET[when.timeZone]
+  if (a === undefined || b === undefined) return null
+  return (((toMinutes(when.time) + a - b) % 1440) + 1440) % 1440
+}
+
+// --- People ------------------------------------------------------------------
+
+/* A person, by id: from the tenant's directory when the env carries one, then
+   from the chip people. The group's name comes from the tenant's groups, so a
+   renamed group reads renamed. Null for an id nobody has. */
+export function personOf(id: string | undefined, env: SimEnv): SimUser | null {
+  if (!id) return null
+  const u = env.library?.people.find((p) => p.id === id)
+  if (u) {
+    const groupName = env.library?.groups.find((g) => g.id === u.groupId)?.name ?? env.groupName(u.groupId)
+    return { id: u.id, name: u.name, email: u.email, groupId: u.groupId, groupName, userType: u.userType, role: u.role }
+  }
+  return SIM_USERS.find((s) => s.id === id) ?? null
+}
+
+/* A chip context carrying nothing but a person, so the person-shaped cases of
+   the legacy reading can be asked from the typed path without a second copy of
+   their sentences. The origin is "Any location" so no zone is ever read from it. */
+const personContext = (user: SimUser): SimContext => ({ user, place: 'Any location', device: 'New / unknown', authState: '', risk: '', nowMinutes: 0 })
+const NOBODY: SimUser = { id: '', name: 'Nobody', email: '', groupId: '', groupName: '', userType: '', role: '' }
+
+// --- Words -------------------------------------------------------------------
+
+const SOURCE_WORD: Record<FactSource, string> = { typed: 'typed', 'looked-up': 'looked up', stated: 'stated', assumed: 'assumed' }
+
+/** A place in words, saying when it was looked up from an address rather than stated. */
+function placeWords(p: SignInPlace): string {
+  const name = p.city ?? p.state ?? p.country ?? 'a place with no name'
+  return p.source === 'looked-up' ? `${name} (looked up)` : name
+}
+
+function originWords(facts: SignInFacts): string {
+  const place = placeOfSignIn(facts)
+  const where = place ? placeWords(place) : place === null ? 'no place' : 'no place stated'
+  return `${facts.network?.address ?? 'no address'}, ${where}`
+}
+
+const dedupeKeys = (keys: readonly FactKey[]): FactKey[] => [...new Set(keys)]
+
+type ZoneMatch = ReturnType<typeof zoneMember>
+
+/* One zone's verdict in a sentence: each half it asked, what decided it. */
+function zoneWords(m: ZoneMatch, facts: SignInFacts): string {
+  const h = m.halves
+  const address = facts.network?.address
+  const bits: string[] = []
+  if (m.network === 'any' && m.location === 'not asked') bits.push('it lists no networks')
+  else if (m.network === 'pass') bits.push(`${address} is in ${h.networkEntry}`)
+  else if (m.network === 'fail') bits.push(`${address} is not on any of its networks`)
+  else if (m.network === 'unknown')
+    bits.push(
+      address === undefined
+        ? 'no address was given'
+        : !isAddress(address)
+          ? `${address} is not an address`
+          : `the network operator for ${address} is not known`,
+    )
+
+  if (m.location === 'any' && m.network === 'not asked') bits.push('it lists no places')
+  else if (m.location === 'pass')
+    bits.push(
+      h.locationRange
+        ? `${placeWords(h.place!)} is ${rangeText(h.locationRange).replace(/^Within/, 'within')}`
+        : `${placeWords(h.place!)} matches ${h.locationEntry}`,
+    )
+  else if (m.location === 'fail') bits.push(`${placeWords(h.place!)} is outside its places`)
+  else if (m.location === 'unknown')
+    bits.push(
+      h.place === null
+        ? `the lookup names no place for ${address}`
+        : h.place === undefined
+          ? address === undefined
+            ? 'no place was given'
+            : `${address} is not in the address fixture, so its place is not known`
+          : 'the place given is not precise enough to say',
+    )
+
+  return bits.length === 0 ? `${m.zoneName} lists no networks and no places` : `${m.zoneName}: ${bits.join(', and ')}`
+}
+
+// --- Device profiles ---------------------------------------------------------
+
+/* The device a sign-in stated, in the words a trace prints beside a verdict:
+   "Android 12 mobile (stated)", "Windows 10.0.22631 laptop (assumed)". */
+const PLATFORM_NAME: Record<NonNullable<SignInDevice['platform']>, string> = {
+  windows: 'Windows',
+  macos: 'macOS',
+  ios: 'iOS',
+  android: 'Android',
+  linux: 'Linux',
+  other: 'A device',
+}
+
+const deviceWhat = (d: SignInDevice): string =>
+  [d.platform ? PLATFORM_NAME[d.platform] : 'A device', d.osVersion, d.formFactor?.toLowerCase()].filter(Boolean).join(' ')
+
+function deviceWords(d: SignInDevice | undefined): string {
+  if (!d) return 'no device stated'
+  return `${deviceWhat(d)} (${SOURCE_WORD[d.source]})`
+}
+
+/* What would settle an undecided row, as the trace names it. */
+const FACT_WORD: Partial<Record<FactKey, string>> = {
+  person: 'who is signing in',
+  'device.platform': 'the platform',
+  'device.osVersion': 'the OS version',
+  'device.formFactor': 'the device type',
+  'device.browser': 'the browser',
+  'device.integrity': 'device integrity',
+  'device.screenLock': 'the screen lock',
+  'device.authenticatorVersion': 'the Authenticator version',
+  'device.agent': 'the Device Agent',
+  'device.registration': 'whether the device is registered',
+  'device.registeredCount': 'how many devices are registered',
+}
+
+/* One profile's verdict in a sentence, naming the row that decided it — the
+   row `decidingCheck` picks, so the limit is named before "not registered".
+
+   A device nobody stated is said to be one. The chip surfaces hand the
+   evaluator a device the chip adapter filled in (`CHIP_DEVICES`, source
+   `assumed`): "Known > 90 days" names no platform and no version, and the
+   adapter chose Windows 10.0.19045 so the chip means something a profile can
+   grade. A verdict resting on that choice has to say so where it states the
+   fact — "Windows OS version is 10.0.19045 (assumed)" — or the trace would be
+   presenting the adapter's guess as the sign-in's. A device the tester typed
+   or picked carries no mark, as a place they stated carries none; `actual`
+   names the source either way. */
+function profileWords(p: FingerprintProfile, m: ProfileMatch, device: SignInDevice | undefined): string {
+  const assumed = device !== undefined && (device.source === 'assumed' || device.source === 'looked-up')
+  const tag = assumed ? ` (${SOURCE_WORD[device.source]})` : ''
+  if (m.status === 'pass') {
+    const skipped = m.checks.some((c) => c.status === 'not applicable')
+    const the = assumed ? `the device (${deviceWhat(device)}, ${SOURCE_WORD[device.source]})` : 'the device'
+    return p.mode === 'device'
+      ? `${the} meets ${p.name}`
+      : `${the} passes every check in ${p.name}${skipped ? ' that applies to it' : ''}`
+  }
+  const c = decidingCheck(p, m)
+  if (m.status === 'unknown') {
+    if (!device) return `${p.name}: no device was stated, so this is undecided`
+    const need = m.missing.map((k) => FACT_WORD[k]).filter(Boolean)
+    const list = need.length <= 1 ? (need[0] ?? '') : `${need.slice(0, -1).join(', ')} and ${need[need.length - 1]}`
+    return need.length > 0
+      ? `${p.name}: ${list} ${need.length === 1 ? 'was' : 'were'} not stated, so this is undecided`
+      : `${p.name}: ${c ? c.label : 'a check'} could not be compared, so this is undecided`
+  }
+  if (!c) return `${p.name}: the device does not meet it`
+  switch (c.id) {
+    case 'limit':
+      return `${p.name}: ${c.actual}${tag}, and the device limit is ${p.maxDevices}`
+    case 'agent':
+      return c.actual === 'not installed'
+        ? `${p.name}: the Device Agent is not installed${tag}`
+        : `${p.name}: the Device Agent runs on Windows only, and this is ${c.actual}${tag}`
+    case 'registration':
+      return p.registration === 'pre-approved'
+        ? `${p.name}: this device is not on the pre-approved list${tag}`
+        : `${p.name}: this device is not registered to this person${tag}`
+    case 'mobile':
+      return `${p.name}: sign-in from a phone or tablet is not allowed${assumed ? `, and the device is ${deviceWords(device)}` : ''}`
+  }
+  if (c.actual === 'not installed') return `${p.name}: ${c.label.replace(/ version$/, '')} is not installed${tag}`
+  const need = /^[A-Z][a-z]/.test(c.required) ? c.required.charAt(0).toLowerCase() + c.required.slice(1) : c.required
+  return `${p.name}: ${c.label} is ${c.actual}${tag}, and it needs ${need}`
+}
+
+// --- One condition -----------------------------------------------------------
+
+/* One condition against typed sign-in facts, three-valued, with its evidence.
+
+   `card` is the card the condition sits in, and only `day` reads it: a weekday
+   with no zone of its own is read in the zone of a time window beside it, so
+   "Monday, 09:00–17:00 in New York" means Monday in New York. */
+export function evalCondition(c: Condition, facts: SignInFacts, env: SimEnv, card?: ConditionCard): ConditionResult {
+  const vals = c.values.filter((v) => v.trim() !== '')
+  const negated = c.operator.includes('not')
+  const flip = (s: CondState): CondState => (negated ? notState(s) : s)
+  const required = `${c.operator} ${shownValues(c, env) || '…'}`
+  const result = (status: CondState, actual: string, detail: string, extra: Partial<ConditionResult> = {}): ConditionResult => ({
+    conditionId: c.id,
+    typeId: c.typeId,
+    status,
+    actual,
+    required,
+    detail,
+    missing: [],
+    ...extra,
+  })
+  const unknown = (detail: string, missing: FactKey[] = [], extra: Partial<ConditionResult> = {}): ConditionResult =>
+    result('unknown', 'not stated', detail, { missing, ...extra })
+
+  if (vals.length === 0) return unknown('the condition has no value set')
+
+  switch (c.typeId) {
+    /* Membership read from each zone's own entries (`zone-match.ts`). A zone
+       the tenant no longer has is undecided with the legacy sentence, under
+       `in` and `not in` alike; so is a tenant whose zones were never handed
+       over, because a zone nobody can read cannot be passed or failed. */
+    case 'zone': {
+      const zones = env.library?.zones
+      if (vals.some((v) => (env.hasZone && !env.hasZone(v)) || (zones && !zones.some((z) => z.id === v))))
+        return unknown('this rule names a zone that no longer exists')
+      if (!zones) return unknown('the tenant’s zones were not given, so membership cannot be read')
+      const parts = vals.map((v) => zoneMember(zones.find((z) => z.id === v)!, facts, zoneScopeOf(c, v)))
+      const status = flip(anyOf(parts.map((m) => m.status)))
+      const missing = status === 'unknown' ? dedupeKeys(parts.filter((m) => m.status === 'unknown').flatMap((m) => m.missing)) : []
+      return result(status, originWords(facts), parts.map((m) => zoneWords(m, facts)).join('; '), {
+        zones: parts.map(({ zoneId, zoneName, status: s, network, location }) => ({ zoneId, zoneName, status: s, network, location })),
+        missing,
+      })
+    }
+
+    case 'fingerprint': {
+      const profiles = env.library?.fingerprints
+      if (vals.some((v) => (env.hasFingerprint && !env.hasFingerprint(v)) || (profiles && !profiles.some((p) => p.id === v))))
+        return unknown('this rule names a device profile that no longer exists')
+      if (!profiles) return unknown('the tenant’s device profiles were not given, so the device cannot be checked')
+      /* Row by row (`fingerprint.ts`): a health profile's checks, or a trusted
+         device's agent, registration and limit. A trusted device is registered
+         to a PERSON, so whether one was given is part of the reading. Several
+         profiles in one condition are alternatives, as zones are. */
+      const personKnown = personOf(facts.personId, env) !== null
+      const graded = vals.map((v) => {
+        const p = profiles.find((x) => x.id === v)!
+        return { p, m: profileMatches(p, facts.device, { ...env.deviceMatch, personKnown }) }
+      })
+      const status = flip(anyOf(graded.map((g) => g.m.status)))
+      return result(status, deviceWords(facts.device), graded.map((g) => profileWords(g.p, g.m, facts.device)).join('; '), {
+        checks: graded.flatMap((g) => g.m.checks),
+        profiles: graded.map((g) => ({ profileId: g.p.id, profileName: g.p.name, status: g.m.status, checks: g.m.checks })),
+        missing: status === 'unknown' ? dedupeKeys(graded.filter((g) => g.m.status === 'unknown').flatMap((g) => g.m.missing)) : [],
+      })
+    }
+
+    /* A number against a threshold, strictly: above is `>`, anything else is
+       `<`, which is what the showcase's bands 0–39, 40–70 and 71 up rely on.
+       The score is stated, never derived here; on a platform that collects no
+       risk signals the trace says so beside the verdict. */
+    case 'device-risk': {
+      const limit = Number(vals[0])
+      if (!Number.isFinite(limit)) return unknown('the risk threshold is not a number')
+      const risk = facts.risk
+      if (!risk) return unknown('no device risk score was given', ['risk'])
+      const hit = c.operator === 'above' ? risk.score > limit : risk.score < limit
+      const platform = facts.device?.platform
+      return result(hit ? 'pass' : 'fail', String(risk.score), `the device risk score is ${risk.score} (${SOURCE_WORD[risk.source]})`, {
+        ...(platform === 'windows' || platform === 'macos'
+          ? { caveat: 'Risk signals are collected on Android and iOS only, so this score was stated, not measured.' }
+          : null),
+      })
+    }
+
+    /* The window is read on the clock of the zone it names (`c.tz`, else the
+       tenant's). With a date, the sign-in's own wall clock becomes an instant
+       and is read again in that zone, so daylight saving on either side is
+       real. With no date there is nothing to decide daylight saving against,
+       and the standard-time table stands in — said in a caveat whenever the
+       two clocks differ, because that is exactly when it can be an hour out. */
+    case 'time': {
+      const target = c.tz ?? TENANT_TZ
+      const from = toMinutes(vals[0] ?? '00:00')
+      const to = toMinutes(vals[1] ?? '23:59')
+      const asked = `${c.operator} ${vals[0] ?? '—'} and ${vals[1] ?? '—'}${c.tz ? ` in ${c.tz}` : ''}`
+      const when = facts.when
+      if (!when) return unknown('no time was given', ['time'], { required: asked })
+      let local: number
+      let caveat: string | undefined
+      if (when.date) {
+        const at = instantOf(when.date, when.time, when.timeZone)
+        const wall = at === null ? null : wallClock(at, target)
+        if (!wall) return unknown(`${when.date} ${when.time} in ${when.timeZone} is not a time this model can read`, [], { required: asked })
+        local = wall.minutes
+      } else {
+        const a = TZ_OFFSET[target]
+        const b = TZ_OFFSET[when.timeZone]
+        if (!TIME_TEXT.test(when.time)) return unknown(`${when.time} is not a time of day`, [], { required: asked })
+        if (a === undefined || b === undefined)
+          return unknown('no date was given, and the standard-time table does not hold this time zone', ['date'], { required: asked })
+        local = (((toMinutes(when.time) + a - b) % 1440) + 1440) % 1440
+        if (target !== when.timeZone) caveat = 'No date was given, so standard time is used.'
+      }
+      // A window that wraps midnight is an OR, not an AND.
+      const inside = from <= to ? local >= from && local <= to : local >= from || local <= to
+      return result(flip(inside ? 'pass' : 'fail'), `${clock(local)} in ${target}`, `it is ${clock(local)} in ${target}`, {
+        required: asked,
+        ...(caveat ? { caveat } : null),
+      })
+    }
+
+    /* A weekday needs a date — the one thing a chip rehearsal never had, which
+       is why this was always undecided there. Read in the condition's zone,
+       else a time window's zone in the same card, else the tenant's. */
+    case 'day': {
+      const target = c.tz ?? card?.conditions.find((x) => x.typeId === 'time' && x.tz)?.tz ?? TENANT_TZ
+      const when = facts.when
+      if (!when?.date) return unknown('no date was given, so the weekday is not known', when ? ['date'] : ['date', 'time'])
+      const at = instantOf(when.date, when.time, when.timeZone)
+      const wall = at === null ? null : wallClock(at, target)
+      if (!wall) return unknown(`${when.date} ${when.time} in ${when.timeZone} is not a time this model can read`)
+      return result(flip(vals.includes(wall.weekday) ? 'pass' : 'fail'), `${wall.weekday} in ${target}`, `it is ${wall.weekday} in ${target}`)
+    }
+
+    /* The legacy place conditions, by name, aliases included — the same
+       comparison a zone's location half makes, so the two cannot disagree. */
+    case 'country':
+    case 'state':
+    case 'city': {
+      const kind = c.typeId as PlaceKind
+      const place = placeOfSignIn(facts)
+      if (place === undefined) return unknown('no place was given', ['location'])
+      if (place === null) return unknown(`the lookup names no place for ${facts.network?.address}`, ['location'])
+      const have = kind === 'country' ? place.country : kind === 'state' ? place.state : place.city
+      if (have === null || have === undefined)
+        return unknown(`the sign-in’s place does not name a ${kind}`, [kind === 'city' ? 'location.city' : 'location'])
+      const hit = vals.some((v) => sameName(kind, v, have))
+      const said = place.source === 'looked-up' ? `${have} (looked up)` : have
+      return result(flip(hit ? 'pass' : 'fail'), said, `the sign-in is in ${said}`)
+    }
+
+    /* Who the person is: the legacy sentences, asked of the person the facts
+       name. Without one, the condition waits on the person. */
+    case 'user-attr':
+    case 'group':
+    case 'user':
+    case 'user-type':
+    case 'user-role': {
+      const person = personOf(facts.personId, env)
+      if (!person) return unknown('no person was given', ['person'])
+      const r = legacyCond(c, personContext(person), env)
+      return result(r.state, `${person.name}, ${person.groupName}`, r.detail)
+    }
+    case 'custom-attr':
+    case 'webhook': {
+      const r = legacyCond(c, personContext(NOBODY), env)
+      return unknown(r.detail)
+    }
+
+    case 'ml-risk':
+      return unknown('a band name is not a sign-in fact')
+
+    case 'mdm':
+      return unknown('sign-in facts do not carry MDM enrolment')
+    case 'device-reg':
+      return unknown('sign-in facts do not carry device registration')
+    case 'trust-age':
+      return unknown('sign-in facts do not carry how long a device has been trusted')
+    case 'auth-state':
+      return unknown('sign-in facts do not carry an auth state')
+    default:
+      return unknown(`sign-in facts do not carry ${conditionType(c.typeId).label.toLowerCase()}`)
+  }
+}
+
+// --- One rule ----------------------------------------------------------------
+
+/* One rule against typed facts: every condition kept, three-valued.
+
+   The who comes first, as in `evalRule`, and the sentence is `evalRule`'s for
+   the same states — `predicateVerdict` writes both. The conditions are still
+   evaluated when the who misses, so a trace can show what the rule WOULD have
+   made of this sign-in for somebody it covers. */
+export function traceRule(rule: Rule, index: number, facts: SignInFacts, person: SimUser | null, env: SimEnv): RuleTrace {
+  const p = rule.when
+  const cardOf = cardsByCondition(p)
+  const conditions = leaves(p).map((c) => evalCondition(c, facts, env, cardOf.get(c.id)))
+  const byId = new Map(conditions.map((r) => [r.conditionId, r]))
+  const state = (c: Condition): CondState => byId.get(c.id)?.status ?? 'unknown'
+
+  const who: RuleTrace['who'] = !hasWho(rule.who) ? 'none' : !person ? 'unknown' : whoPasses(rule.who, person) ? 'in' : 'out'
+  const base = { index, ruleId: rule.id, ruleName: rule.name, who, conditions }
+  const noPerson = 'No person was given, so who this rule is for cannot be checked'
+
+  if (who === 'out') {
+    const whoReason = whoMissFor(rule, person!, env)
+    return { ...base, kind: 'miss', whoReason, match: 'no', card: null, reason: whoReason }
+  }
+  if (p.cards.length === 0) {
+    return who === 'unknown'
+      ? { ...base, kind: 'miss', whoReason: null, match: 'unknown', card: null, reason: noPerson }
+      : { ...base, kind: 'hit', whoReason: null, match: 'yes', card: null, reason: catchAllReason(rule) }
+  }
+
+  const predicate = predicateState(p, state)
+  const match = who === 'unknown' ? allOf(['unknown', predicate]) : predicate
+  const verdict = predicateVerdict(p, (c) => state(c) === 'pass', (c) => byId.get(c.id)?.detail ?? '', env)
+  return {
+    ...base,
+    kind: match === 'pass' ? 'hit' : 'miss',
+    whoReason: null,
+    match: match === 'pass' ? 'yes' : match === 'fail' ? 'no' : 'unknown',
+    card: verdict.card,
+    reason: who === 'unknown' && predicate === 'pass' ? noPerson : verdict.reason,
+  }
+}
+
+/* The last row as a rule, for a policy that has not set one: the 1 factor it
+   has always meant. Built here rather than with `fallbackRule()`, which draws
+   an id from the seed counter and would renumber every rule a test makes next. */
+const lastRowOf = (policy: Policy): Rule =>
+  policy.fallback ?? {
+    id: `${policy.id}-last-row`,
+    name: FALLBACK_NAME,
+    enabled: true,
+    when: { cards: [] },
+    decision: fallbackOf(policy),
+    firstFactor: 'Password',
+    secondFactor: 'any',
+    rememberMfa: false,
+    allowDisable2fa: false,
+    matchEstimate: 0,
+  }
+
+// --- One policy --------------------------------------------------------------
+
+/* One policy against typed facts.
+
+   The audience first: a person the policy does not govern gets nothing from it
+   — no decision, no possible outcomes — because a policy's own Deny never
+   applies to somebody it was not written for. Who DOES decide for them is the
+   resolver's question (`tenant-resolver.ts`), not this function's.
+
+   Then two readings of the same rules.
+
+   The DEFINITE reading is `decide`'s: undecided counts as no match, top to
+   bottom, first match wins, else the last row. It is what the chip surfaces
+   have always shown, and it is kept so the two paths can be compared.
+
+   The POSSIBLE reading keeps the third value. Walking down, a rule that
+   matches ends the walk; a rule that does not is passed; a rule that MIGHT
+   forks it — one outcome where it matched and decided, and the walk carries
+   on assuming it did not. Each outcome lists the forks it took. The policy is
+   settled when every outcome lands on the same decision, which is often true
+   even with undecided rules: two rules that both deny cannot disagree. */
+export function tracePolicy(policy: Policy, facts: SignInFacts, env: SimEnv): PolicyTrace {
+  const person = personOf(facts.personId, env)
+  const a = policy.audience
+  const audience: 'in' | 'out' | 'unknown' = a.everyone
+    ? 'in'
+    : !person
+      ? 'unknown'
+      : a.groupIds.includes(person.groupId) || a.userIds.includes(person.id)
+        ? 'in'
+        : 'out'
+
+  if (audience === 'out') {
+    return {
+      policyId: policy.id,
+      outOfAudience: true,
+      audienceKnown: true,
+      steps: [],
+      lastRow: null,
+      hitIndex: null,
+      decision: null,
+      settled: true,
+      possible: [],
+      unknowns: [],
+    }
+  }
+
+  const traced = policy.rules.map((r, i) => traceRule(r, i, facts, person, env))
+
+  let hitIndex: number | null = null
+  const steps: RuleTrace[] = []
+  for (let i = 0; i < traced.length; i++) {
+    const t = traced[i]
+    if (hitIndex !== null) steps.push({ ...t, kind: 'unreached' })
+    else if (!policy.rules[i].enabled) steps.push({ ...t, kind: 'off' })
+    else if (t.match === 'yes') {
+      hitIndex = i
+      steps.push({ ...t, kind: 'hit' })
+    } else steps.push({ ...t, kind: 'miss' })
+  }
+
+  const lastRow =
+    hitIndex === null
+      ? { ...traceRule(lastRowOf(policy), -1, facts, person, env), ruleName: FALLBACK_NAME, kind: 'hit' as const, reason: 'No rule above matched' }
+      : null
+
+  const possible: PossibleOutcome[] = []
+  const unknowns: ConditionResult[] = []
+  let assumes: PossibleOutcome['assumes'] = []
+  let stopped = false
+  for (let i = 0; i < policy.rules.length && !stopped; i++) {
+    const rule = policy.rules[i]
+    if (!rule.enabled) continue
+    const m = traced[i].match
+    if (m === 'yes') {
+      possible.push({ decision: rule.decision, ruleIndex: i, ruleName: rule.name, assumes })
+      stopped = true
+    } else if (m === 'unknown') {
+      possible.push({ decision: rule.decision, ruleIndex: i, ruleName: rule.name, assumes: [...assumes, { ruleIndex: i, matches: true }] })
+      assumes = [...assumes, { ruleIndex: i, matches: false }]
+      for (const r of traced[i].conditions) if (r.status === 'unknown' && !unknowns.some((u) => u.conditionId === r.conditionId)) unknowns.push(r)
+    }
+  }
+  if (!stopped) possible.push({ decision: fallbackOf(policy), ruleIndex: null, ruleName: FALLBACK_NAME, assumes })
+
+  const seen = new Set<string>()
+  const distinct = possible.filter((o) => {
+    const k = `${o.decision}|${o.ruleIndex}`
+    if (seen.has(k)) return false
+    seen.add(k)
+    return true
+  })
+
+  return {
+    policyId: policy.id,
+    outOfAudience: false,
+    audienceKnown: audience === 'in',
+    steps,
+    lastRow,
+    hitIndex,
+    decision: hitIndex === null ? fallbackOf(policy) : policy.rules[hitIndex].decision,
+    settled: new Set(distinct.map((o) => o.decision)).size === 1,
+    possible: distinct,
+    unknowns,
+  }
 }

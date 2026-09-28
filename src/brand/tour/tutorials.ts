@@ -58,17 +58,17 @@ export const TUTORIALS: Tutorial[] = [
         body: 'Picking Finance does not mean the rule is about finance apps. It means the rule is invisible to everybody who is not in that group. A rule with an empty audience applies to nobody, which is why the builder flags it as an error rather than a warning.',
       },
       {
-        heading: 'Conditions describe the login, not the person',
+        heading: 'Conditions describe the sign-in, not the person',
         body: 'Network zone, device posture, risk score, time of day — every condition is a fact about the attempt happening right now. Two conditions in one rule are joined by AND by default, so both have to hold. Change the junction to OR when either one on its own should be enough.',
         tip: 'AND narrows a rule. OR widens it. Widening a deny rule is how a policy gets stricter than anyone meant.',
       },
       {
         heading: 'The outcome is one of three things',
-        body: 'Allow lets the login through on one factor. MFA asks for a second one, and you can require a specific method rather than any enrolled method. Deny ends it — there is no alternate path once a rule denies, which is what makes deny rules worth reading twice.',
+        body: 'Allow lets the sign-in through on one factor. MFA asks for a second one, and you can require a specific method rather than any enrolled method. Deny ends it — there is no alternate path once a rule denies, which is what makes deny rules worth reading twice.',
       },
       {
         heading: 'A rule with no conditions is a catch-all',
-        body: 'It matches every login from its audience that got past the rules above it. That is not a mistake — it is how you stop the engine default deciding for people your policy was written for. Put it last.',
+        body: 'It matches every sign-in from its audience that got past the rules above it. That is not a mistake — it is how you stop the engine default deciding for people your policy was written for. Put it last.',
         tip: 'Every audience you govern should end in a catch-all. Without one, the engine decides, and the engine does not know what you meant.',
       },
     ],
@@ -82,7 +82,7 @@ export const TUTORIALS: Tutorial[] = [
     steps: [
       {
         heading: 'The list is evaluated top to bottom, once',
-        body: 'A login falls down the rules and stops at the first one that matches it. Nothing below that rule is consulted — not to refine the answer, not to add a condition, not at all. The order is not a presentation choice. It is the policy.',
+        body: 'A sign-in falls down the rules and stops at the first one that matches it. Nothing below that rule is consulted — not to refine the answer, not to add a condition, not at all. The order is not a presentation choice. It is the policy.',
         tip: 'There is no "most specific rule wins". There is only "the first one".',
       },
       {
@@ -92,7 +92,7 @@ export const TUTORIALS: Tutorial[] = [
       },
       {
         heading: 'Reordering changes behaviour immediately',
-        body: 'Drag a rule up the flow and every login that used to reach the rules below it may now stop earlier. The builder does not warn you rule by rule, because any given move can be correct — it shows you the consequence instead, in the blast radius and the gauntlet.',
+        body: 'Drag a rule up the flow and every sign-in that used to reach the rules below it may now stop earlier. The builder does not warn you rule by rule, because any given move can be correct — it shows you the consequence instead, in What changes and the Attempt deck.',
       },
       {
         heading: 'Unreachable rules are a real category',
@@ -123,7 +123,7 @@ export const TUTORIALS: Tutorial[] = [
       },
       {
         heading: 'The checks run on the draft, not the published policy',
-        body: 'They describe what you are about to ship, which means a clean panel on a draft you have not saved says nothing about what is live right now. The blast radius is the control that compares the two.',
+        body: 'They describe what you are about to ship, which means a clean panel on a draft you have not saved says nothing about what is live right now. What changes is the view that compares the two.',
       },
     ],
   },
@@ -131,26 +131,26 @@ export const TUTORIALS: Tutorial[] = [
     id: 'test',
     figure: 'test',
     title: 'Test before you publish',
-    summary: 'One login at a time, thirteen at once, and who a draft actually moves.',
+    summary: 'One sign-in at a time, thirteen at once, and who a draft actually moves.',
     minutes: 3,
     steps: [
       {
         heading: 'Preview answers one question exactly',
-        body: 'Pick a person and a situation — office network, unmanaged device, high risk — and the preview names the rule that decides it and why. It runs the same evaluator the engine runs, so a disagreement between the preview and production is a bug, not a rounding error.',
+        body: 'Pick a person and a situation — office network, unmanaged device, high risk — and the preview names the rule that decides it and why. It models the engine rather than running it, so a detail it was not given comes back as undecided, never guessed.',
         tip: 'Use the preview on the case you are least sure about, not the one you designed the rule for.',
       },
       {
-        heading: 'The gauntlet deals thirteen attempts at once',
-        body: 'A fixed deck of logins, each with an expected outcome, run against your rules and graded. The grade is not a score to beat — it is a count of how many landed where you said they would. A simple policy usually leaks, and the leak is the useful part.',
+        heading: 'The Attempt deck deals thirteen sign-ins at once',
+        body: 'A fixed deck of sign-ins, each with an expected outcome, run against your rules. What it reports is a count of how many landed where you said they would, not a score to beat. A simple policy usually leaks, and the leak is the useful part.',
       },
       {
         heading: 'A breach is an attempt that got through',
-        body: 'The gauntlet names the rule that let it in and the rule you probably meant to catch it. Most breaches resolve to one of two fixes: a condition that was narrower than intended, or an order problem.',
-        tip: 'Fix the breach, then re-run. A grade that improved for a reason you cannot name has not improved.',
+        body: 'The Attempt deck names the rule that let it in and the rule you probably meant to catch it. Most breaches resolve to one of two fixes: a condition that was narrower than intended, or an order problem.',
+        tip: 'Fix the breach, then re-run. A count that improved for a reason you cannot name has not improved.',
       },
       {
-        heading: 'Blast radius counts people, not rules',
-        body: 'It compares the draft against what is published and reports how many logins would land differently. Two rules can be rewritten entirely and move nobody; one operator can move four hundred people. The number is the one to read before publishing.',
+        heading: 'What changes counts sign-ins, not rules',
+        body: 'It compares the draft against what is published and reports how many sign-ins would land differently. Two rules can be rewritten entirely and move nobody; one operator can move four hundred people. The number is the one to read before publishing.',
       },
     ],
   },
@@ -163,11 +163,11 @@ export const TUTORIALS: Tutorial[] = [
     steps: [
       {
         heading: 'Nothing you do here is live until you publish',
-        body: 'Edits accumulate on a draft. The policy that is deciding logins right now is the last published version, and it stays that way whatever the builder looks like.',
+        body: 'Edits accumulate on a draft. The policy that is deciding sign-ins right now is the last published version, and it stays that way whatever the builder looks like.',
       },
       {
         heading: 'Review is the last stop, not a separate screen',
-        body: 'It gathers the checks, the blast radius and the gauntlet grade in one place and puts the publish button after them rather than beside them. If something there is red, it is red because publishing would make it somebody else’s problem.',
+        body: 'It gathers the checks, What changes and the Attempt deck in one place and puts the publish button after them rather than beside them. If something there is red, it is red because publishing would make it somebody else’s problem.',
       },
       {
         heading: 'Publish records who and when',

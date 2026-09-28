@@ -217,7 +217,7 @@ function WhoRow({
         <FaceStack faces={faces} />
       </span>
       {outside > 0 && (
-        <span title="This policy does not govern them, so this rule can never decide one of their logins.">
+        <span title="This policy does not govern them, so this rule can never decide one of their sign-ins.">
           <Badge tone="notice">{outside} outside</Badge>
         </span>
       )}
@@ -350,7 +350,7 @@ function WhoDialog({
         </span>
       )}
       {isOutside(r.id) && (
-        <span title="This policy does not govern them, so this rule can never decide one of their logins.">
+        <span title="This policy does not govern them, so this rule can never decide one of their sign-ins.">
           <Badge tone="notice">Outside</Badge>
         </span>
       )}

@@ -4,16 +4,21 @@ import { AppWindow, ChevronRight, Maximize, Plus, ZoomIn, ZoomOut } from 'lucide
 
 import { fallbackRule, type Policy } from '../../data'
 import { AppLogo } from '../../logos/AppLogo'
-import { useCanvasView } from '../canvas-view'
+import { revealY, useCanvasView } from '../canvas-view'
 import type { Diagnostic } from '../diagnostics'
 import type { NameLookup } from '../predicate-prose'
 import { ruleState } from '../rule-form'
-import type { Selection, Trace } from './model'
+import { LAST_ROW } from '../testing/evidence'
+import { RouteMarker } from '../testing/RouteMarker'
+import type { Selection } from './model'
 import { UNREACHABLE_CODES } from './parts'
-import { RuleCard, TerminalCard } from './RuleCard'
+import { RuleCard, TerminalCard, type CardRoute } from './RuleCard'
+import { RouteDecision, RouteEvidence, RouteGate, WhichGate } from './RouteGate'
+import { ruleStage, type RouteModel, type StageId } from './try-sign-in'
+import { revealKeepsWhich, revealKey } from './try-sign-in-run'
 import { BOARD_SKINS, readBoardSkin, writeBoardSkin, type BoardSkin } from './board-skin'
 import { SHOWCASE } from '../../showcase'
-import { Tip } from '../../kit'
+import { Tip, TipDot } from '../../kit'
 
 /* -----------------------------------------------------------------------------
    The stage, and the chain on it.
@@ -27,7 +32,46 @@ import { Tip } from '../../kit'
 
 const ZMIN = 0.5
 const ZMAX = 1.4
-const STEP = 220 // ms between rule lights in a rehearsal
+
+/* Try a sign-in's route, as the chain draws it (BoardBuilder builds it from
+   try-sign-in.ts). The chain in test mode is the same chain with three more
+   stages — Which policy and Who before the rules, the Decision after the last
+   row — a marker standing on one of them, and every card read against the
+   sign-in instead of described. */
+/* Room kept between the view dock and the Decision gate it must not cover. */
+const DOCK_GAP = 12
+
+/* An element's top inside the world, unscaled: layout offsets, which a pan,
+   a zoom or a card's layout animation (all transforms) leave alone. */
+function offsetIn(el: HTMLElement, world: HTMLElement): number {
+  let top = 0
+  let n: HTMLElement | null = el
+  while (n && n !== world) {
+    top += n.offsetTop
+    n = n.offsetParent as HTMLElement | null
+  }
+  return top
+}
+
+export interface TestChain {
+  route: RouteModel
+  /** The stage the marker is drawn in. */
+  at: number
+  /** How long its move to `at` takes: a hop while travelling or stepping, 0 for an update. */
+  ms: number
+  /** An update moved it: it fades in where it lands rather than travelling. */
+  fadeIn: boolean
+  /** While a run travels, the last stage the marker has reached; null once it has landed. */
+  reached: number | null
+  /** Content fades as it appears or changes. Off under reduced motion and mid-drag. */
+  fade: boolean
+  /** What moved the answer last — "IP address", "your edits" — or null. */
+  changed: string | null
+  /** The application the sign-in arrives at, by name, for the Which policy list's label. */
+  appName: string
+  /** Which policy's list: every policy on the application (WhichPolicy compact). */
+  which: ReactNode
+}
 
 
 export function Board({
@@ -38,7 +82,8 @@ export function Board({
   selection,
   diagnostics,
   shadowed,
-  trace,
+  test = null,
+  fitKey,
   resolve,
   onSelect,
   onInsert,
@@ -51,6 +96,10 @@ export function Board({
   onToggleExpand,
   tools,
   aside,
+  flash = null,
+  sources,
+  traced,
+  onHoverLast,
 }: {
   policy: Policy
   /* Where a sign-in is arriving, in words — the application this policy
@@ -75,7 +124,12 @@ export function Board({
   diagnostics: Diagnostic[]
   /** Rules dimmed because the hovered rule puts them out of reach. */
   shadowed: number[]
-  trace: Trace | null
+  /** Try a sign-in's route, while the board is in test mode. */
+  test?: TestChain | null
+  /* Refit when this changes — test mode narrows the chain's column and its
+     cards. After the grid's own 200 ms transition, so the fit measures the
+     column it will end at rather than one mid-animation. */
+  fitKey?: string
   resolve: NameLookup
   onSelect: (s: Selection) => void
   onInsert: (at: number) => void
@@ -99,6 +153,17 @@ export function Board({
   /* A pill of the host's own, docked to the left of that toolbar — for a
      control that is a MODE rather than a press. See the note at the dock. */
   aside?: ReactNode
+  /* A rule to show, from a guard page open over the board: its id, or
+     'fallback' for the last row, and a key that changes on every ask so the
+     same rule can be shown twice. */
+  flash?: { id: string; key: number } | null
+  /* Describe it: the words each card was written from, by rule id, and the
+     cards the answer under the pointer wrote — by rule id, or 'fallback' for
+     the last row, as `flash` names it. `onHoverLast` is the last row under
+     the pointer, so the panel can bold its answer as a rule card's does. */
+  sources?: Readonly<Record<string, string>>
+  traced?: readonly string[]
+  onHoverLast?: (on: boolean) => void
 }) {
   const stage = useRef<HTMLDivElement | null>(null)
   const world = useRef<HTMLDivElement | null>(null)
@@ -144,6 +209,7 @@ export function Board({
     viewRef,
     panning,
     apply,
+    glide,
     zoomBy,
     fit,
     onPointerDown,
@@ -165,6 +231,99 @@ export function Board({
     zMax: ZMAX,
     cssPrefix: 'bb',
   })
+
+  /* The refit, by the latest `fit`, on a change of key only — never on mount,
+     which the canvas already fits. A fit puts the chain back at its top, so in
+     test mode the Decision gate is shown again once the fit has glided there
+     (`revealRef`, below). */
+  const fitRef = useRef(fit)
+  fitRef.current = fit
+  const fitSeen = useRef(fitKey)
+  useEffect(() => {
+    if (fitSeen.current === fitKey) return
+    fitSeen.current = fitKey
+    let after = 0
+    const t = window.setTimeout(() => {
+      fitRef.current()
+      after = window.setTimeout(() => revealRef.current(), 300)
+    }, 220)
+    return () => {
+      window.clearTimeout(t)
+      window.clearTimeout(after)
+    }
+  }, [fitKey])
+
+  /* The Decision gate, never behind the view dock.
+
+     It is the answer, and it is the last thing on the chain, so at a laptop's
+     height it landed under the dock at the foot of the stage — at 1280 × 860
+     the dock covered it (owner, 26 Sep 2026). When a run lands, or its answer
+     changes, or the admin opens or closes Which policy's list (which moves the
+     gate by the list's height), and the gate (with the "Modelled result" note
+     under it) is not all in view above the dock, the chain moves up by as
+     little as shows it: `revealY`. Never past the top of the gate, and never
+     past the end of the chain; a reader who scrolls away keeps their place
+     until one of those happens (`revealKey`). A turn of the list never lifts
+     the Which policy row they pressed out of the stage (`keepWhich`): at
+     1,120 × 860 the list and the gate do not both fit, and the gate then waits
+     for the next landing or answer. While a field in the panel is being typed
+     in, the chain jumps rather than glides — nothing moves while somebody
+     types. */
+  const glideRef = useRef(glide)
+  glideRef.current = glide
+  const dock = useRef<HTMLDivElement | null>(null)
+  const revealRef = useRef<(keepWhich?: boolean) => void>(() => {})
+  revealRef.current = (keepWhich = false) => {
+    const w = world.current
+    const s = stage.current
+    if (!test || !w || !s) return
+    const gate = w.querySelector<HTMLElement>('.bb__gate.is-decision')
+    if (!gate) return
+    const note = w.querySelector<HTMLElement>('.bb__tnote')
+    const top = offsetIn(gate, w)
+    const bottom = note ? offsetIn(note, w) + note.offsetHeight : top + gate.offsetHeight
+    const floor = dock.current ? s.getBoundingClientRect().bottom - dock.current.getBoundingClientRect().top + DOCK_GAP : 0
+    /* Which policy is the one gate with a list, so its row is the one
+       disclosure row on the chain. */
+    const which = keepWhich ? w.querySelector<HTMLElement>('.bb__gate__row.is-button')?.closest<HTMLElement>('.bb__gate') : null
+    const y = revealY(viewRef.current, { top, bottom }, s.clientHeight, floor, which ? offsetIn(which, w) : undefined)
+    if (y === null) return
+    const typing = document.activeElement instanceof HTMLElement && document.activeElement.matches('input, textarea, [contenteditable="true"]')
+    glideRef.current({ y }, typing ? 0 : 240)
+  }
+  /* The admin's own turns of Which policy's list. The list opens in the same
+     commit as the count, so the effect below measures the gate where the list
+     has put it. */
+  const [whichTurns, setWhichTurns] = useState(0)
+  /* What the gate says, and the turns above it, as a key: a new landing, a new
+     answer or a turn moves the view, and a re-render that changes none of them
+     (a hover) does not. The last key is kept to tell a turn from the rest
+     (`revealKeepsWhich`). */
+  const shownKey = test ? revealKey(test.reached === null, test.changed, test.route.decision, whichTurns) : null
+  const shownBefore = useRef<string | null>(null)
+  useEffect(() => {
+    const before = shownBefore.current
+    shownBefore.current = shownKey
+    if (shownKey !== null) revealRef.current(revealKeepsWhich(before, shownKey))
+  }, [shownKey])
+
+  /* A rule shown from a guard page (spec D §6): the chain glides until the card
+     sits 96 px under the stage's top — sideways never, the column stays
+     centred — and the card's outline flashes for 1.2 s. The drawer keeps
+     focus; this only moves what is behind it. Under reduced motion the glide
+     is a jump and the outline holds still until it goes. */
+  const terminalCard = useRef<HTMLDivElement | null>(null)
+  const [flashing, setFlashing] = useState<string | null>(null)
+  const flashId = flash?.id ?? null
+  const flashKey = flash?.key ?? null
+  useEffect(() => {
+    if (flashId === null) return
+    const el = flashId === 'fallback' ? terminalCard.current : cards.current.get(flashId)
+    if (el && world.current) glideRef.current({ y: 96 - offsetIn(el, world.current) * viewRef.current.z })
+    setFlashing(flashId)
+    const t = window.setTimeout(() => setFlashing(null), 1200)
+    return () => window.clearTimeout(t)
+  }, [flashId, flashKey, viewRef])
 
   /* --- Reorder by dragging the index ------------------------------------------ */
   /* State holds only the SLOT the card would land in — the thing that changes
@@ -424,43 +583,39 @@ export function Board({
     order.splice(drag.over, 0, drag.from)
   }
 
-  /* --- The rehearsal cascade ---------------------------------------------------
-     The trace is computed at once; the stage reveals it one rule at a time. */
-  const [revealed, setRevealed] = useState(-1)
-  useEffect(() => {
-    if (!trace) {
-      setRevealed(-1)
-      return
-    }
-    setRevealed(-1)
-    const n = trace.result.steps.length
-    const timers: number[] = []
-    for (let i = 0; i <= n; i++) timers.push(window.setTimeout(() => setRevealed(i), 260 + i * STEP))
-    return () => timers.forEach((t) => window.clearTimeout(t))
-  }, [trace?.runId])
+  /* --- Try a sign-in's route ----------------------------------------------------
 
-  const hit = trace?.result.hitIndex ?? null
-  const inAudience = trace ? !trace.result.outOfAudience : true
-  /* `inAudience` in the condition, and it was missing.
-
-     Out of audience means no rule ran at all, and `hitIndex` is null for that
-     reason — but null was also the value that means "fell through to the
-     default", so the token settled on the default card while the board's own
-     message beside it said the policy does not govern this person and nothing
-     ran. The animation contradicted the sentence explaining it. */
-  const landedOn = trace && inAudience && revealed >= trace.result.steps.length ? (hit === null ? 'terminal' : hit) : null
-
-  const stepKind = (i: number) => {
-    if (!trace || !inAudience) return null
-    if (revealed < i + 1) return null
-    return trace.result.steps[i]?.kind ?? null
+     The rehearsal's cascade stood here — a token lit one rule at a time on a
+     timer of its own. The route replaces it: BoardBuilder says where the marker
+     is and what each stage says, and this draws it. Nothing here keeps time. */
+  const stageAt = (id: StageId) => (test ? test.route.stages.indexOf(id) : -1)
+  /** A stage the marker has not reached yet, on a run that travels. */
+  const waiting = (i: number) => !!test && test.reached !== null && i > test.reached
+  const markerAt = (i: number) =>
+    test && test.at === i ? (
+      <RouteMarker
+        variant="dot"
+        layoutId="bb-route"
+        unknown={i === test.route.landing && test.route.landingUnknown}
+        ms={test.ms}
+        fadeIn={test.fadeIn}
+      />
+    ) : undefined
+  /* Lit down to where the sign-in lands, dead below it. Link `slot` sits above
+     rule `slot`, and the last one above the last row. */
+  const litLink = (slot: number) => {
+    if (!test) return ''
+    const below = slot < policy.rules.length ? stageAt(ruleStage(policy.rules[slot].id)) : stageAt('last-row')
+    return below <= test.route.landing ? 'is-lit' : 'is-dead'
   }
-
-  const litLink = (i: number) => {
-    // Link i sits above rule i. Lit once the token has passed through it.
-    if (!trace || !inAudience) return ''
-    if (hit !== null && i > hit) return 'is-dead'
-    return revealed >= i ? 'is-lit' : ''
+  const cardRoute = (id: string, stage: number): CardRoute | undefined => {
+    const evidence = test?.route.cards[id]
+    if (!test || !evidence) return undefined
+    return {
+      state: evidence.state,
+      marker: markerAt(stage),
+      evidence: <RouteEvidence evidence={evidence} hidden={waiting(stage)} fade={test.fade} />,
+    }
   }
 
   const diagsFor = (i: number) => diagnostics.filter((d) => d.ruleIndex === i)
@@ -492,7 +647,7 @@ export function Board({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       tabIndex={-1}
-      aria-label="The policy's rules, in the order they are evaluated"
+      aria-label={test ? 'Route of this sign-in' : "The policy's rules, in the order they are evaluated"}
     >
       <div
         ref={world}
@@ -545,8 +700,9 @@ export function Board({
                 No mark here, for that reason. Two 16px logos in one vertical
                 column 48px apart is the stutter `BoardBar` deleted when it
                 merged the application's crumb into the policy's chip, and this
-                pill's left slot is spoken for by something that moves — the
-                token flies out of it onto a card during a rehearsal.
+                pill's left edge is spoken for by something that moves — in test
+                mode the route marker starts here, the first stage a sign-in
+                passes, and travels down the chain from it.
 
                 THREE CASES, and the third is not a missing value.
 
@@ -586,14 +742,13 @@ export function Board({
                   slot and answers a question the sentence only names: WHICH
                   application, recognisable before the words are.
 
-                  The travelling token is untouched. That one is orange because
-                  it is a single moving thing during a rehearsal, which is
-                  exactly what the accent is for. */}
-              {landedOn === null && trace && inAudience ? (
-                <motion.span layoutId="bb-token" className="bb__token" aria-hidden transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
-                  ●
-                </motion.span>
-              ) : destinationAppId ? (
+                  In test mode the route marker stands here before it travels:
+                  a blue `--accent` dot (RouteMarker), drawn in whichever stage
+                  it has reached and moved between them by motion's shared
+                  layout. Blue because it is an active state; the chain in test
+                  mode carries no orange. */}
+              {markerAt(0)}
+              {destinationAppId ? (
                 <AppLogo appId={destinationAppId} size={18} />
               ) : (
                 <span className="bb__startmark" aria-hidden>
@@ -606,29 +761,46 @@ export function Board({
                 </span>
               ) : (
                 <span>
-                  A login arrives at <b className="bb__start__at">{destination}</b>
+                  A sign-in arrives at <b className="bb__start__at">{destination}</b>
                   {destinationMore > 0 && (
                     <>
                       {' '}and <b className="bb__start__at">{destinationMore} more</b>
                     </>
-                  )}{' '}
-                  {trace ? (
-                    <em>— {trace.ctx.user.name}, {trace.ctx.place.toLowerCase()}</em>
-                  ) : policy.rules.length === 0 ? (
-                    /* An empty scratch chain has no rules to fall through. */
-                    <em>— the default decides it</em>
-                  ) : (
-                    <em>— falls through the rules below</em>
                   )}
+                  {/* In test mode, who is signing in and nothing else: the
+                      address, the time and the rest are each in their own row
+                      of the panel, and a number is said once a view.
+
+                      Out of it, nothing after the application. The pill said
+                      "— falls through the rules below" (and "— the default
+                      decides it" on an empty chain), which narrates what the
+                      chain under it already draws; the owner cut it (26 Sep
+                      2026). */}
+                  {test?.route.signIn && <em> — {test.route.signIn}</em>}
                 </span>
               )}
               <ChevronRight size={14} strokeWidth={2} className="bb__start__go" aria-hidden />
             </button>
 
-            {trace && !inAudience && (
-              <motion.p className="bb__verdict" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ margin: '12px 0 0' }}>
-                <strong>Not governed.</strong> This policy does not cover {trace.ctx.user.name}, so no rule ran.
-              </motion.p>
+            {/* The two gates a sign-in passes before any rule: which policy
+                decides it, and whether this one is for this person. */}
+            {test && (
+              <>
+                <div className="bb__link is-bare is-lit" aria-hidden />
+                <WhichGate
+                  view={test.route.policy}
+                  appName={test.appName}
+                  marked={test.at === 1}
+                  marker={markerAt(1)}
+                  hidden={waiting(1)}
+                  fade={test.fade}
+                  onToggle={() => setWhichTurns((n) => n + 1)}
+                >
+                  {test.which}
+                </WhichGate>
+                <div className={`bb__link is-bare ${test.route.landing >= 2 ? 'is-lit' : 'is-dead'}`} aria-hidden />
+                <RouteGate label="Who" view={test.route.who} marked={test.at === 2} marker={markerAt(2)} hidden={waiting(2)} fade={test.fade} />
+              </>
             )}
 
             {/* `initial={false}`, and it is the whole point of wrapping this.
@@ -646,8 +818,11 @@ export function Board({
                 return (
                   <motion.div
                     key={r.id}
-                    /* Not the held card's: it follows the pointer, see `placeHeld`. */
-                    layout={!isDragged}
+                    /* Not the held card's: it follows the pointer, see `placeHeld`.
+                       In test mode a card's evidence changes its height as the
+                       sign-in changes, and a size animation would stretch the
+                       text mid-read — so only its position moves. */
+                    layout={isDragged ? false : test ? 'position' : true}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -657,7 +832,7 @@ export function Board({
                        before you notice it. */
                     transition={{ layout: { type: 'spring', stiffness: 520, damping: 42 }, opacity: { duration: 0.16 } }}
                   >
-                    <Link lit={litLink(slot)} at={slot} onInsert={onInsert} />
+                    <Link lit={litLink(slot)} at={slot} onInsert={onInsert} bare={!!test} />
                     <RuleCard
                       rule={r}
                       index={ri}
@@ -677,9 +852,7 @@ export function Board({
                         diagsFor(ri).find((d) => d.severity === 'warning')
                       )?.title}
                       unreachable={diagsFor(ri).some((d) => UNREACHABLE_CODES.includes(d.code))}
-                      traceKind={stepKind(ri)}
-                      traceReason={trace?.result.steps[ri]?.reason ?? null}
-                      landed={landedOn === ri}
+                      route={cardRoute(r.id, stageAt(ruleStage(r.id)))}
                       shadowed={shadowed.includes(ri)}
                       dragging={isDragged}
                       expanded={expandedOf(r.id)}
@@ -693,6 +866,9 @@ export function Board({
                       onDuplicate={() => onDuplicate(ri)}
                       onDelete={() => onDelete(ri)}
                       onGrip={onGrip(ri)}
+                      flash={flashing === r.id}
+                      source={sources?.[r.id]}
+                      traced={traced?.includes(r.id)}
                       onHover={(on) => onHover(on ? ri : null)}
                       cardRef={(el) => {
                         if (el) cards.current.set(r.id, el)
@@ -706,12 +882,19 @@ export function Board({
 
             {/* With no rules this is the chain's only connector, and it is drawn
                 in its hover state — see `invite` on `Link`. */}
-            <Link lit={litLink(policy.rules.length)} at={policy.rules.length} onInsert={onInsert} last invite={policy.rules.length === 0} />
+            <Link
+              lit={litLink(policy.rules.length)}
+              at={policy.rules.length}
+              onInsert={onInsert}
+              last
+              invite={policy.rules.length === 0 && !test}
+              bare={!!test}
+            />
             <TerminalCard
               rule={terminal}
               resolve={resolve}
               selected={selection.kind === 'fallback'}
-              landed={landedOn === 'terminal'}
+              route={cardRoute(LAST_ROW, stageAt('last-row'))}
               /* Keyed on the literal, not on the rule's id.
 
                  `terminal` falls back to `fallbackRule()` when the policy has
@@ -721,10 +904,28 @@ export function Board({
                  card, so the two agree. */
               expanded={expandedOf('fallback')}
               onToggleExpand={() => onToggleExpand('fallback')}
-              reached={trace && inAudience && revealed >= trace.result.steps.length ? hit === null : trace && inAudience ? false : null}
               onSelect={() => onSelect({ kind: 'fallback' })}
-              cardRef={() => {}}
+              flash={flashing === 'fallback'}
+              traced={traced?.includes('fallback')}
+              onHover={onHoverLast}
+              cardRef={(el) => {
+                terminalCard.current = el
+              }}
             />
+
+            {/* Where the sign-in lands, said under the chain it came down. */}
+            {test && (
+              <>
+                <div className={`bb__link is-bare ${test.reached === null ? 'is-lit' : ''}`} aria-hidden />
+                <RouteDecision view={test.route.decision} changed={test.changed} hidden={test.reached !== null} fade={test.fade} />
+                <p className="bb__tnote">
+                  Modelled result
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <TipDot text="This tenant’s policies, zones and devices; addresses from a sample table" label="About the modelled result" />
+                  </span>
+                </p>
+              </>
+            )}
           </div>
         </LayoutGroup>
       </div>
@@ -748,9 +949,8 @@ export function Board({
           have words; given its own container it reads as the choice it is.
 
           Publishing is the exception that proves the gathering, and it has
-          left the canvas entirely: Check, What changes, Discard and Review &
-          publish act on the POLICY, so they are in the top row beside the
-          policy's own name. Mixing "undo" and "publish" into one strip is how
+          left the canvas entirely: Discard and Review & publish act on the
+          POLICY, so they are in the top row beside the policy's own name. Mixing "undo" and "publish" into one strip is how
           somebody reaches for the first and finds the second — and a `children`
           slot on this component, which is what put them over the stage, is gone
           with them.
@@ -758,9 +958,11 @@ export function Board({
           Two slots, `aside` and `tools`, because they are two groups — a mode
           and a row of presses. Since 21 Sep 2026 both sit in ONE pill, split by
           a hairline, rather than two pills side by side. */}
-      {/* `board-dock` is the lite edition's last tour stop: with Check and
-          What changes withheld, this strip IS the board's instrument panel. */}
-      <div className="bb__dock" data-tour="board-dock">
+      {/* `board-dock` is the board tour's "How to read the chain" stop, in
+          every edition: M4 retired the Check and What changes sheets (the
+          Break-in test is in Saved sign-ins, What changes a row of the checks
+          before saving), so this strip IS the board's instrument panel. */}
+      <div ref={dock} className="bb__dock" data-tour="board-dock">
         {/* Prototype furniture, not a setting: the two skins of this canvas,
             side by side, the way the library pages carry Width. Its own group
             rather than a button in the view toolbar — it changes how the whole
@@ -831,17 +1033,23 @@ function Link({
   onInsert,
   last,
   invite,
+  bare,
 }: {
   lit: string
   at: number
   onInsert: (at: number) => void
   last?: boolean
+  /* Test mode: the line and nothing on it. A route is being read, and a `+`
+     on every connector is an invitation to edit it mid-sentence — and the one
+     orange thing on a chain that is otherwise blue and grey. */
+  bare?: boolean
   /* The empty chain's one connector (a scratch policy): drawn as if hovered —
      the `+` coloured, the line lit, the words showing — so the way to add the
      first rule is on screen without anybody having to find it (owner, 21 Sep
      2026), ripple included — it keeps going until the first rule exists. */
   invite?: boolean
 }) {
+  if (bare) return <div className={`bb__link is-bare ${lit}`} aria-hidden />
   return (
     <div className={`bb__link ${lit} ${invite ? 'is-invite' : ''}`}>
       <button

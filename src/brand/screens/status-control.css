@@ -20,3 +20,8 @@
 .bxsc__pop .bx-menu__item { align-items: center; }
 .bxsc__pop .bx-menu__item:hover,
 .bxsc__pop .bx-menu__item:focus-visible { outline: none; background: var(--state-hover-bg, var(--surface-sunken)); }
+
+/* The rule before View monitoring: the switches above it, the page below. The
+   kit's divided item draws the same line, but on the item itself — this one
+   is its own `role="separator"`, so a screen reader hears the group end. */
+.bxsc__sep { margin: var(--space-3) 0; border-top: var(--bw-thin) solid var(--border-subtle); }

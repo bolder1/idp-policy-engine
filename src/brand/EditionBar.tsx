@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useState } from 'react'
-import { ArrowRight, Layers, Minus, Sparkles, TriangleAlert, X } from 'lucide-react'
+import { ArrowRight, Check, Layers, Minus, TriangleAlert, X } from 'lucide-react'
 
 import { Button, Tip } from './kit'
 import { gapsFor, type Gap } from './edition'
@@ -156,7 +156,7 @@ function GapRow({ gap, onSee }: { gap: Gap; onSee: () => void }) {
       <p className="bed__cost">{gap.cost}</p>
 
       <div className="bed__covered">
-        <Sparkles size={12} strokeWidth={2} aria-hidden />
+        <Check size={12} strokeWidth={2} aria-hidden />
         <span>{gap.covered}</span>
       </div>
 

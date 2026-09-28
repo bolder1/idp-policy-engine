@@ -2,7 +2,7 @@ import { AlertTriangle, CopyPlus, Info, ListX, XCircle } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useId, useMemo, useState } from 'react'
 
-import { FALLBACK_NAME, evaluates, fallbackRule, nameTaken, type Policy, type Rule } from '../data'
+import { FALLBACK_NAME, enforces, fallbackRule, nameTaken, type Policy, type Rule } from '../data'
 import { EmptyState } from '../empty'
 import { Badge, Button, DecisionChip, Field, Modal, StatusPill, TipDot, TipMark } from '../kit'
 import { lastSaved, type CommitIntent } from '../policy-draft'
@@ -166,9 +166,11 @@ export function ReviewDialog({
               <span>
                 {isDraft
                   ? 'No applications. Assign one to turn this policy on.'
-                  : evaluates(saved)
-                    ? 'No applications, so this policy becomes a draft and stops deciding logins.'
-                    : 'No applications, so this policy becomes a draft.'}{' '}
+                  : enforces(saved)
+                    ? 'No applications, so this policy becomes a draft and stops deciding sign-ins.'
+                    : saved.status === 'monitor'
+                      ? 'No applications, so this policy becomes a draft and stops monitoring.'
+                      : 'No applications, so this policy becomes a draft.'}{' '}
                 {/* Straight to the page that owns it. This used to open a
                     dialog behind this dialog, or — with no handler — just
                     close, which is a "go and do that" link that does not.

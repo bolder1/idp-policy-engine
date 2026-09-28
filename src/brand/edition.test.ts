@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest'
 
 import policiesSrc from './screens/Policies.tsx?raw'
 import mainSrc from './screens/PolicyBuilderMain.tsx?raw'
+import boardBuilderSrc from './screens/board/BoardBuilder.tsx?raw'
+import boardEmptySrc from './screens/board/BoardEmpty.tsx?raw'
+import storeSrc from './store.tsx?raw'
 import { GAPS, featuresOf, gapsFor, type Features } from './edition'
 
 /* There is one shell now. This used to run over two — a flag gating a
@@ -26,21 +29,50 @@ describe('the two editions', () => {
     expect(off).toEqual(
       [
         'blastRadius',
+        'breakInTest',
         'checkStep',
         'commands',
         'coverage',
         'designSwitcher',
         'exposure',
         'gauntlet',
-        'guidedSetup',
+        'policyTesting',
         'publish',
         'reviewStep',
       ].sort(),
     )
   })
 
-  it('grants everything in full', () => {
-    expect(Object.values(FULL).every(Boolean)).toBe(true)
+  it('keeps the testing capabilities the manager asked for in lite', () => {
+    /* Try a sign-in is v0's Test policy, Monitor is scenario #6, and the checks
+       before turning on guard the saved sign-ins. Withholding any of them would
+       make lite less than what was asked for, not the scope as asked. */
+    expect([LITE.trySignIn, LITE.monitorMode, LITE.beforeTurningOn]).toEqual([true, true, true])
+  })
+
+  it('keeps Describe it and its checks in lite: scenario #16, plain-English setup', () => {
+    expect([LITE.describePolicy, LITE.draftChecks]).toEqual([true, true])
+    expect([FULL.describePolicy, FULL.draftChecks]).toEqual([true, true])
+  })
+
+  it('pins the showcase testing capabilities once, where the store reads the edition', () => {
+    /* The showcase is lite plus the two testing surfaces the owner is
+       comparing. One pin, at the call site, as the SHOWCASE convention asks
+       (showcase.ts) — not a helper that hides which flags it moves. Describe
+       it and its checks are on in lite already and are named anyway, so the
+       pin says everything the showcase shows. */
+    expect(storeSrc.replace(/\s+/g, ' ')).toContain(
+      'features: SHOWCASE ? { ...featuresOf(edition), policyTesting: true, breakInTest: true, describePolicy: true, draftChecks: true } : featuresOf(edition),',
+    )
+    expect(storeSrc.match(/featuresOf\(/g)?.length).toBe(2)
+  })
+
+  /* Everything but the Exposure column, which printed the deck's letter grade
+     on every row. The grade is retired in both editions (owner, 25 Sep 2026:
+     counts, not a grade; final spec, M4), so neither shows it. */
+  it('grants everything in full but the retired Exposure column', () => {
+    const off = (Object.keys(FULL) as (keyof Features)[]).filter((k) => !FULL[k])
+    expect(off).toEqual(['exposure'])
   })
 
   it('gates every withheld capability at its call site', () => {
@@ -48,15 +80,19 @@ describe('the two editions', () => {
     // feature, and a render test only proves the paths it happens to walk.
     expect(policiesSrc).toContain('store.features.coverage')
     expect(policiesSrc).toContain('store.features.exposure')
-    /* The guided build is offered from the naming form, which the policy list
-       now owns — so the flag is asserted where it is actually read.
+    /* Describe it is offered from the empty draft's chooser: the board reads
+       the flag, and the chooser draws the card only when it is handed the way
+       in. The five-question guided build it replaced, and its flag, are gone
+       (describe spec, §6.2).
 
-       `templateHero` was asserted here too and has gone with the flag: the
+       `templateHero` was asserted here once and has gone with its flag: the
        template card's rule-stack face is a drawing of the template's own rules,
        not a capability, and gating it only meant lite could not see what it was
        choosing. */
-    expect(policiesSrc).toContain('store.features.guidedSetup')
-    for (const flag of ['gauntlet', 'blastRadius', 'commands', 'guidedSetup', 'publish']) {
+    expect(boardBuilderSrc).toContain('features.describePolicy')
+    expect(boardEmptySrc).toMatch(/\{onDescribe && \(/)
+    for (const src of [policiesSrc, mainSrc, boardBuilderSrc]) expect(src).not.toContain('guidedSetup')
+    for (const flag of ['gauntlet', 'blastRadius', 'commands', 'publish']) {
       for (const [shell, src] of SHELLS) {
         expect(`${shell} ${flag}: ${src.includes(`features.${flag}`)}`).toBe(`${shell} ${flag}: true`)
       }
@@ -92,7 +128,7 @@ describe('the two editions', () => {
 
 describe('the gap catalogue', () => {
   it('names a gap for every capability lite withholds', () => {
-    /* Two flags are deliberately unargued, and both need a reason on record or
+    /* Five flags are deliberately unargued, and each needs a reason on record or
        this assertion becomes a place to hide omissions:
 
        · `designSwitcher` is prototype furniture. Removing it costs the product
@@ -100,8 +136,16 @@ describe('the gap catalogue', () => {
        · `publish` gates the bar button and the launch slide, which is the same
          argument the `reviewStep` gap already makes under the title "The
          publish gate". A second entry saying it again would pad the panel and
-         weaken it. */
-    const UNARGUED: (keyof Features)[] = ['designSwitcher', 'publish']
+         weaken it.
+       · `policyTesting` asks the question Try a sign-in already answers in
+         lite, which policy decides this sign-in, from a page instead of the
+         board. Lite can still answer it; it answers it in fewer places.
+       · `breakInTest` is the gauntlet's deck counted without its grade, and
+         the `gauntlet` gap already argues "What gets through this policy?".
+       · `exposure` is withheld from full too, since the grade it printed was
+         retired (final spec, M4). A gap is what lite lacks that full has, and
+         neither has this. */
+    const UNARGUED: (keyof Features)[] = ['designSwitcher', 'publish', 'policyTesting', 'breakInTest', 'exposure']
     const withheld = (Object.keys(LITE) as (keyof Features)[]).filter((k) => !LITE[k])
     const named = new Set(GAPS.map((g) => g.id))
     const missing = withheld.filter((k) => !UNARGUED.includes(k) && !named.has(k))

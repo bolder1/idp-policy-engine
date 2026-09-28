@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react'
 import { Button, Callout, DeleteButton, Modal } from '../kit'
 import { ChangeState } from '../leave-guard'
 import { useBrand } from '../store'
-import { DELETE_WORD, deleteConfirmed, type DeleteImpact, type PolicyUse } from './usage'
+import { DELETE_WORD, asksForDeleteWord, deleteConfirmed, type DeleteImpact, type PolicyUse } from './usage'
 
 /* One delete confirmation for everything the Policies area can delete: a policy,
    a zone, a device profile, a risk profile, a hook, a display token.
@@ -16,7 +16,9 @@ import { DELETE_WORD, deleteConfirmed, type DeleteImpact, type PolicyUse } from 
 
      1. It is permanent.
      2. What it does to the policies that use it.
-     3. Type DELETE — only when (2) changes who can sign in.
+     3. Type DELETE — only when (2) changes who can sign in, or when the
+        caller says the object is one nobody deletes in passing
+        (`requireTyped`: a Protected saved sign-in).
 
    This dialog used to REFUSE while a live policy used the object: "Can't
    delete X", a list, and Close. It read as an error rather than a delete, and
@@ -34,6 +36,7 @@ export function ConfirmDelete({
   noun,
   impact,
   detail,
+  requireTyped,
   onCancel,
   onConfirm,
 }: {
@@ -46,6 +49,8 @@ export function ConfirmDelete({
   impact?: DeleteImpact
   /** One extra fact about the object itself, such as the apps a policy protects. */
   detail?: ReactNode
+  /** Ask for the typed word even though no live sign-in changes. */
+  requireTyped?: boolean
   onCancel: () => void
   onConfirm: () => void
 }) {
@@ -54,7 +59,7 @@ export function ConfirmDelete({
   const later = impact?.later ?? []
   const stuck = impact?.stuck ?? []
   const refused = stuck.length > 0
-  const typeToConfirm = !refused && live.length > 0
+  const typeToConfirm = asksForDeleteWord(impact, requireTyped)
 
   const [typed, setTyped] = useState('')
   const fieldId = useId()
@@ -195,8 +200,8 @@ export function ConfirmDelete({
 /* The policies a delete touches, each one a way out of the decision: opening a
    policy closes this dialog and goes to its rules, where the admin can point
    them at something else instead of deleting at all. */
-/** The policies using something, each row opening that policy. Shared with the risk profile switch dialog. */
-export function UseList({ uses, onOpen }: { uses: PolicyUse[]; onOpen: () => void }) {
+/** The policies using something, each row opening that policy. */
+function UseList({ uses, onOpen }: { uses: PolicyUse[]; onOpen: () => void }) {
   const store = useBrand()
   return (
     <ul className="bx-confirm__uses">

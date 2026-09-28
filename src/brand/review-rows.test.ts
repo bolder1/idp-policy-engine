@@ -5,8 +5,11 @@ import {
   GENERAL_GROUP,
   groupReview,
   groupSections,
+  REVIEW_OPEN_ALL,
   reviewItemName,
   reviewKind,
+  reviewSave,
+  sectionsOpen,
   type ReviewLine,
 } from './review-rows'
 
@@ -75,6 +78,29 @@ describe('review rows', () => {
     expect(groupSections([])).toEqual([])
   })
 
+  it("files a check's findings under their own chips inside the consequences, fails first", () => {
+    const rows: ReviewLine[] = [
+      { label: 'Aisha Khan on HRMS', before: 'Deny', after: 'Allow on 1 factor', effect: true, check: 'pass' },
+      { label: 'HRMS access from corporate offices', before: '', after: 'Now denied 18', effect: true },
+      { label: 'Name', before: 'A', after: 'B', kind: 'changed' },
+      { label: 'Kavya Menon in the office · Must pass', before: 'Allow with 2FA', after: 'Deny', effect: true, check: 'fail' },
+      { label: 'Ravi Menon on HRMS · Protected', before: 'Allow on 1 factor', after: "Can't tell", effect: true, check: 'neutral' },
+    ]
+    const sections = groupSections(rows)
+    expect(sections.map((x) => [x.title, x.effect, x.count])).toEqual([
+      [GENERAL_GROUP, false, 1],
+      [EFFECT_GROUP, true, 4],
+    ])
+    expect(sections[1].blocks.map((b) => [b.kind, b.rows.map((r) => r.label)])).toEqual([
+      ['effect', ['HRMS access from corporate offices']],
+      ['fail', ['Kavya Menon in the office · Must pass']],
+      ['neutral', ['Ravi Menon on HRMS · Protected']],
+      ['pass', ['Aisha Khan on HRMS']],
+    ])
+    // Findings alone draw no empty "Happens for you" block.
+    expect(groupSections([rows[3]])[0].blocks.map((b) => b.kind)).toEqual(['fail'])
+  })
+
   it('names a row inside its section', () => {
     expect(reviewItemName({ label: 'Signals: added TPM ID', group: 'Signals', item: 'TPM ID' })).toBe('TPM ID')
     // A label that is only its kind is named for its section.
@@ -85,5 +111,35 @@ describe('review rows', () => {
     // A consequence keeps its whole label, item or not.
     expect(reviewItemName({ label: 'High risk score', item: 'High', effect: true })).toBe('High risk score')
 
+  })
+})
+
+describe('how Review changes opens, and what holds its Save', () => {
+  const rows = (n: number, group: string, extra: Partial<ReviewLine> = {}): ReviewLine[] =>
+    Array.from({ length: n }, (_, i) => ({ label: `${group} ${i}`, before: 'a', after: 'b', group, ...extra }))
+
+  it('opens every section of a short review', () => {
+    expect(sectionsOpen(groupSections([...rows(2, 'Signals'), ...rows(1, 'Name')]))).toEqual([true, true])
+  })
+
+  it('opens only the biggest section of a long one, and always one holding a failed check', () => {
+    const long = groupSections([
+      ...rows(REVIEW_OPEN_ALL, 'Signals'),
+      ...rows(1, 'Name'),
+      { label: 'Kavya Menon in the office · Must pass', before: 'Allow with 2FA', after: 'Deny · expected Allow with 2FA', effect: true, check: 'fail' },
+    ])
+    expect(long.map((x) => x.title)).toEqual(['Signals', 'Name', 'Other settings'])
+    expect(sectionsOpen(long)).toEqual([true, false, true])
+    // A passing finding alone does not hold a section open.
+    const passing = groupSections([...rows(REVIEW_OPEN_ALL, 'Signals'), { label: 'Aisha Khan on HRMS', before: 'Deny', after: 'Deny', effect: true, check: 'pass' }])
+    expect(sectionsOpen(passing)).toEqual([true, false])
+  })
+
+  it("holds Save for the page's own reason, titled with it, or for a check, titled with its short word", () => {
+    expect(reviewSave(false, undefined, null)).toEqual({ disabled: false, title: undefined })
+    expect(reviewSave(true, 'Enter a zone name.', null)).toEqual({ disabled: true, title: 'Enter a zone name.' })
+    expect(reviewSave(false, undefined, "Can't save")).toEqual({ disabled: true, title: "Can't save" })
+    // The page's reason leads when both hold it.
+    expect(reviewSave(true, 'Enter a zone name.', "Can't save")).toEqual({ disabled: true, title: 'Enter a zone name.' })
   })
 })

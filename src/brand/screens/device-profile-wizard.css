@@ -270,12 +270,9 @@ button.bdpw__stepbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--
    group, so the kit's 148px floor for its one button lands on the primary
    only. On a phone the words take the line and the buttons the next. */
 /* Buttons only (23 Sep 2026): Cancel at the left edge, Back and the main
-   button at the right, and the blocked reason between them when there is one. */
+   button at the right. The blocked reason that sat between them moved into the
+   form, under its question (`.bdpw__said`, 26 Sep 2026). */
 .bdpw__foot { flex-wrap: wrap; row-gap: var(--space-4); }
-.bdpw__blocked {
-  min-width: 0; margin-left: var(--space-6);
-  font-size: var(--fs-sm); line-height: 1.4; color: var(--fb-negative-fg);
-}
 .bdpw__acts { flex: none; display: flex; align-items: center; gap: var(--space-4); margin-left: auto; }
 .bdpw__acts > .bx-btn--brand { min-width: 148px; }
 
@@ -294,14 +291,13 @@ button.bdpw__stepbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--
 /* The page keeps its aside in the column beside the work; in the panel it is
    not rendered at all, so nothing here has to hide it. */
 
-/* The reason a disabled Next cannot be pressed. On the page this sits in the
-   sticky footer; a Drawer's footer belongs to the Drawer, so it goes under the
-   ladder — above the step it is about, where it is read before the control it
-   is explaining rather than after. */
-.bdpw__reason {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--text-tertiary);
+/* What a step still needs, under the question it is about, once Next has been
+   pressed. The name field's own error line (`.bfp2__fielderror`) in a block of
+   its own, so the whole wizard says a missing answer one way. */
+.bdpw__said {
+  margin: var(--space-3) 0 0;
+  font-size: var(--fs-xs); font-weight: var(--fw-medium);
+  line-height: 1.45; color: var(--fb-notice-fg);
 }
 
 /* The wizard's footer keeps a heading ("Step 2 of 4: Checks") over a caption,

@@ -1,7 +1,7 @@
 /* ============================================================================
    Rebrand · Create flow and tour
 
-   The new-policy gallery, the interview and the guided tour.
+   The new-policy gallery and the guided tour.
 
    Every rule here starts with [data-brand='rebrand']. This sheet loads after
    rebrand.css, so at equal weight a rule here wins over one there. The rules

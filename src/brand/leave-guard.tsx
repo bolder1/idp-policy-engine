@@ -18,8 +18,10 @@ export interface LeaveGuardOptions {
   save?: () => boolean
   /** "Save as draft" in a builder; "Save" on library pages and details. */
   saveLabel?: string
-  /** Why saving is not possible right now ("Enter a policy name"), or null. */
-  blocked?: string | null
+  /** Why saving is not possible right now ("Enter a policy name"), or null.
+      A function is asked only when somebody tries to leave: a check that costs
+      something to run (a zone's saved sign-ins) is not run on every render. */
+  blocked?: string | null | (() => string | null)
 }
 
 export function useLeaveGuard(opts: LeaveGuardOptions): (run: () => void) => void {
@@ -34,7 +36,10 @@ export function useLeaveGuard(opts: LeaveGuardOptions): (run: () => void) => voi
       dirty: () => latest.current.dirty,
       save: () => (latest.current.save ? latest.current.save() : false),
       saveLabel: () => latest.current.saveLabel ?? 'Save',
-      blocked: () => latest.current.blocked ?? null,
+      blocked: () => {
+        const b = latest.current.blocked
+        return typeof b === 'function' ? b() : (b ?? null)
+      },
     }),
     [],
   )

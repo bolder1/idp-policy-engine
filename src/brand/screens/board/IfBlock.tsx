@@ -302,7 +302,7 @@ export function ActionRow({ rule, token, control }: { rule: Rule; token?: ReactN
       <IfSub className="bb__ifaction">
         {token}
         {control ?? <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>}
-        <span className="bb__ifjourney" aria-label="The login journey this produces">
+        <span className="bb__ifjourney" aria-label="The sign-in journey this produces">
           {journey.map((s, i) => (
             <Fragment key={s.id}>
               {i > 0 && <ArrowRight size={10} strokeWidth={2} aria-hidden />}
@@ -436,7 +436,7 @@ export function IfBlock({ rule, resolve, token, terminal }: { rule: Rule; resolv
             <Split size={12} strokeWidth={2} />
           </span>
           <IfKw>if</IfKw>
-          <span className="bb__ifjourney">Every login</span>
+          <span className="bb__ifjourney">Every sign-in</span>
         </div>
       )}
       {hasWho && (

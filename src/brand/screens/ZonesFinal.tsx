@@ -57,6 +57,8 @@ import {
   zoneReviewRows,
 } from './zone-entries'
 import { deleteImpact, policiesUsing } from './usage'
+import { libraryChecked, zoneGuard, zoneRestored } from './library-guard'
+import { useLibraryReview } from './library-review'
 import { UsedByPanel } from './used-by'
 import { ConfirmDelete } from './confirm-delete'
 import { ListPager } from './list-pager'
@@ -626,15 +628,25 @@ function ZoneDetail({
     setResetKey((k) => k + 1)
   }
 
+  /* What saving it would do to the policies that name it, and to the saved
+     sign-ins they decide (spec D.6): rows under Also changes in the review, and
+     a save stopped where a Must pass or Protected sign-in would newly fail. A
+     new zone is named by no rule yet, so it has nothing to check. */
+  const library = useLibraryReview(zoneGuard, zone, draft, {
+    on: libraryChecked({ kind: 'zone', isNew }),
+    onFix: setDraft,
+    restored: (z) => zoneRestored(zone, z),
+  })
+
   const confirmLeave = useLeaveGuard({
     dirty,
     save: () => {
-      if (blockedReason) return false
+      if (blockedReason || library.stopped()) return false
       commit()
       return true
     },
     saveLabel: isNew ? 'Create zone' : 'Save',
-    blocked: blockedReason,
+    blocked: () => blockedReason ?? library.stopped(),
   })
 
   if (pending.typed > 0 && !changes.includes('IP networks')) changes.push('IP networks')
@@ -820,6 +832,7 @@ function ZoneDetail({
         blocked={!!blockedReason}
         blockedReason={blockedReason ?? undefined}
         review={zoneReviewRows(isNew ? { ...zone, name: '' } : zone, draft)}
+        guard={library.guard}
       />
     </>
   )

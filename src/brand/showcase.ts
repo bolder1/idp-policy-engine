@@ -14,5 +14,6 @@
    Pinned at the call sites rather than inside the `read…()` helpers, so those
    still say what storage holds (their tests describe storage, not the build),
    and so each pin is visible where it is applied.
+
    -------------------------------------------------------------------------- */
 export const SHOWCASE = true

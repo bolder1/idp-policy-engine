@@ -413,9 +413,11 @@ describe('the board walkthrough', () => {
   })
 
   it('does not interrupt somebody who arrived with a question', () => {
-    // Opening the board straight into a sheet is a person who already knows
-    // what they came for.
-    expect(boardBuilder).toContain('if (openSheet || boardTourSeen()) return')
+    // Arriving in Try a sign-in's test mode — the Policies row menu (final
+    // spec, A.2) or a guard page's Break-in Open — is a person who already
+    // knows what they came for. The route used to open a sheet as well, and
+    // that arrival counted too, until M4 retired the sheets.
+    expect(boardBuilder).toContain('if (openTest || boardTourSeen()) return')
   })
 
   it('stays non-modal, and carries what a non-modal dialog owes', () => {

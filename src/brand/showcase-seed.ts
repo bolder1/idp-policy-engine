@@ -17,6 +17,9 @@ import {
   type Zone,
 } from './data'
 import { type FingerprintProfile } from './fingerprint'
+import type { SavedSignIn } from './saved-sign-ins'
+import { devicePreset } from './screens/testing/device-presets'
+import { TENANT_TZ, type SignInFacts } from './screens/sign-in-facts'
 
 /* -----------------------------------------------------------------------------
    The showcase tenant: what the presentation build loads (24 Sep 2026).
@@ -82,6 +85,11 @@ export const showcaseUsers: User[] = [
   { id: 'u-sales-1', name: 'Aisha Khan', email: 'aisha.k@mo.com', groupId: 'sales', userType: 'Employee', role: 'Manager' },
   { id: 'u-sales-2', name: 'Rahul Verma', email: 'rahul.v@mo.com', groupId: 'sales', userType: 'Employee', role: 'Member' },
   { id: 'u-sales-3', name: 'Emily Carter', email: 'emily.c@mo.com', groupId: 'sales', userType: 'Employee', role: 'Member' },
+  /* The admin at the console (store.account), so a sign-in as "you" has a
+     person to resolve: Describe it's You check, and the guard's own sign-ins,
+     read the admin's id against this directory. Last, so every person the
+     scenarios and saved sign-ins name keeps the place it had. */
+  { id: 'jaspreet', name: 'Jaspreet Toor', email: 'jaspreet.t@mo.com', groupId: 'it-admins', userType: 'Employee', role: 'Admin' },
 ]
 
 // --- Zones --------------------------------------------------------------------
@@ -206,14 +214,19 @@ export const showcasePolicies: Policy[] = [
      with a password and Google Authenticator; anywhere else is refused. The
      groups are the policy's audience as well as the rule's Who, so everyone
      else keeps falling through to the Global Default rather than being denied
-     here. */
+     here.
+
+     Seeded Inactive (Phase 4, 28 Sep 2026): the pitch opens on a policy that
+     is built and not yet on, so Try a sign-in reads "Today | Stored version"
+     — the Global Default today, this policy's rule 1 once it is turned on —
+     and Turn on runs Before turning on. The other three stay Active. */
   {
     id: 'sc-hrms-office',
     name: 'HRMS access from corporate offices',
     type: 'App Access',
     appIds: ['hrms'],
     audience: audienceOf(['hr', 'finance']),
-    status: 'active',
+    status: 'inactive',
     lastModified: '2 hours ago',
     modifiedBy: 'Jaspreet Toor',
     rules: [
@@ -402,5 +415,85 @@ export const showcaseScenarios: Scenario[] = [
       name: 'Outside India', ifText: 'Not in zone India', decision: 'deny',
       build: () => rule({ name: 'Outside India', when: when(card(cond('zone', 'not in zone', ['india']))), decision: 'deny', matchEstimate: 42 }),
     }],
+  },
+]
+
+// --- Saved sign-ins -------------------------------------------------------------
+
+/* Six sign-ins somebody on this tenant has promised will keep working, or keep
+   being refused, one per thing the four policies decide. The four on live
+   policies pass on load, so the first thing a change can do to them is break
+   one — which is what the guard is for. Kavya in the office and Neha at home
+   are promises about HRMS as it will decide, and HRMS opens Inactive, so they
+   read Fail until it is turned on (or assumed on); turning it on is what makes
+   them pass (saved-sign-ins.test.ts).
+
+   A Monday at half past nine in Pune, stated, so a rule about the hour or the
+   weekday reads the same on every day the showcase is opened. The office
+   address is in the Corporate offices block; the home one is not. */
+const MONDAY_0930: NonNullable<SignInFacts['when']> = { date: '2026-09-28', time: '09:30', timeZone: TENANT_TZ, source: 'stated' }
+const OFFICE = { address: '203.0.113.24', source: 'stated' } as const
+const HOME = { address: '192.0.2.10', source: 'stated' } as const
+const SAVED = { savedBy: 'Jaspreet Toor', savedAt: '2026-09-24T16:30:00+05:30' }
+
+export const showcaseSavedSignIns: SavedSignIn[] = [
+  {
+    id: 'ssi-kavya-office',
+    name: 'Kavya Menon in the office',
+    facts: { personId: 'u-hr-1', appId: 'hrms', network: OFFICE, when: MONDAY_0930 },
+    expected: '2fa',
+    level: 'must-pass',
+    ...SAVED,
+  },
+  {
+    id: 'ssi-neha-home',
+    name: 'Neha Kapoor at home',
+    facts: { personId: 'u-hr-2', appId: 'hrms', network: HOME, when: MONDAY_0930 },
+    expected: 'deny',
+    level: 'note',
+    ...SAVED,
+  },
+  {
+    id: 'ssi-aisha-hrms',
+    name: 'Aisha Khan on HRMS',
+    facts: { personId: 'u-sales-1', appId: 'hrms', network: OFFICE, when: MONDAY_0930 },
+    expected: '1fa',
+    level: 'note',
+    ...SAVED,
+  },
+  {
+    id: 'ssi-devon-android',
+    name: 'Devon Rao on Android 12',
+    facts: { personId: 'devon', appId: 'outlook', when: MONDAY_0930, device: devicePreset('android-12').facts },
+    expected: 'deny',
+    level: 'must-pass',
+    ...SAVED,
+  },
+  /* IT Admins are outside the HRMS policy's audience, so the Global Default
+     decides: the sign-in that proves the policy has not grown past HR and
+     Finance. */
+  {
+    id: 'ssi-ravi-hrms',
+    name: 'Ravi Menon on HRMS',
+    facts: { personId: 'u-it-1', appId: 'hrms', network: OFFICE, when: MONDAY_0930 },
+    expected: '1fa',
+    level: 'protected',
+    ...SAVED,
+  },
+  /* The registered corporate laptop, with its second device already
+     registered, at low risk: rule 1 of the corporate-devices policy. */
+  {
+    id: 'ssi-vikram-laptop',
+    name: 'Vikram Nair on a corporate laptop',
+    facts: {
+      personId: 'u-exec-2',
+      appId: 'google-workspace',
+      when: MONDAY_0930,
+      device: { ...devicePreset('win11-registered').facts, agentVersion: '4.2', registeredCount: 2 },
+      risk: { score: 12, source: 'stated' },
+    },
+    expected: '1fa',
+    level: 'protected',
+    ...SAVED,
   },
 ]

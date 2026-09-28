@@ -87,10 +87,11 @@ describe('removeToast', () => {
 })
 
 describe('attachNote', () => {
-  it('keeps draft, inactive and no-rules apart', () => {
+  it('keeps draft, inactive, monitoring and no-rules apart', () => {
     expect(attachNote(policy('P'), 'GitHub')).toBe('Takes effect on the next sign-in to GitHub.')
     expect(attachNote(policy('P', { status: 'draft' }), 'GitHub')).toBe('P is a draft, so nothing changes for users yet.')
     expect(attachNote(policy('P', { status: 'inactive' }), 'GitHub')).toBe('P is inactive, so nothing changes for users yet.')
+    expect(attachNote(policy('P', { status: 'monitor' }), 'GitHub')).toBe('P is monitoring, so nothing changes for users yet.')
     expect(attachNote(policy('P', { rules: [rule(false)] }), 'GitHub')).toBe(
       'P has no rules turned on, so nothing changes for users yet.',
     )

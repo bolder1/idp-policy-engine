@@ -1,0 +1,188 @@
+/* -----------------------------------------------------------------------------
+   Describe it's panel (DescribePanel.tsx, describe spec §3).
+
+   It borrows the inspector's shell — `.bb__insp` is the floating card, its
+   margin, radius, shadow and `bb-insp-in` entrance, in the inspector's grid
+   track — and adds only what a list of answers needs. Grey throughout: the
+   one orange on the board stays on "Save policy", and a selected option is
+   the segmented control's own grey.
+
+   Motion is CSS only, and short: an answer opens by its row growing from 0fr
+   to 1fr, a changed summary fades up, and under reduced motion both are
+   instant. Nothing here transforms anything.
+   -------------------------------------------------------------------------- */
+
+.bdsc__bar { gap: var(--space-3); min-height: 44px; padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5); }
+.bdsc__title {
+  margin: 0;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.bdsc__title:focus { outline: none; }
+.bdsc__barend { margin-left: auto; display: inline-flex; }
+
+.bdsc__body { display: flex; flex-direction: column; gap: var(--space-6); padding: var(--space-5) var(--space-5) var(--space-8); }
+
+/* --- Your text ---------------------------------------------------------------- */
+
+.bdsc__textblock { display: flex; flex-direction: column; gap: var(--space-3); }
+.bdsc__label,
+.bdsc__minilabel {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary);
+}
+.bdsc__box { position: relative; }
+/* Two lines to six, then it scrolls. `field-sizing` grows it with its own
+   words; the bounds are in lines so the box and its text agree. */
+.bdsc__box textarea {
+  display: block;
+  field-sizing: content;
+  min-height: calc(2lh + 2 * var(--space-4));
+  max-height: calc(6lh + 2 * var(--space-4));
+  padding-right: calc(var(--space-5) + 28px);
+  resize: none;
+  font-size: var(--fs-md); line-height: 1.5; color: var(--text-primary);
+}
+.bdsc__read { position: absolute; right: var(--space-2); bottom: var(--space-2); }
+
+.bdsc__examples { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.bdsc__examples .bdsc__minilabel { margin-right: var(--space-2); }
+
+/* --- Not added ------------------------------------------------------------------ */
+
+.bdsc__notadded h3 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-secondary);
+}
+.bdsc__notadded ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.bdsc__notadded li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-4); font-size: var(--fs-md); }
+.bdsc__phrase { color: var(--text-primary); }
+.bdsc__why { color: var(--text-tertiary); }
+
+/* --- The answers ----------------------------------------------------------------- */
+
+.bdsc__answers { display: flex; flex-direction: column; border-top: 1px solid var(--border-subtle); }
+.bdsc__answer { border-bottom: 1px solid var(--border-subtle); }
+.bdsc__head {
+  display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; align-items: center; gap: var(--space-4);
+  width: 100%; min-height: 40px; padding: var(--space-3) 0;
+  border: none; background: none; text-align: left; cursor: pointer;
+  font: inherit; color: inherit;
+}
+.bdsc__head:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
+.bdsc__headlabel { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bdsc__summary { display: flex; flex-direction: column; min-width: 0; }
+.bdsc__value {
+  font-size: var(--fs-md); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  animation: bdsc-said var(--dur-fast) var(--ease-standard);
+}
+.bdsc__summary.is-unset .bdsc__value { color: var(--text-tertiary); }
+.bdsc__summary.is-bold .bdsc__value { font-weight: var(--fw-semibold); }
+.bdsc__trace {
+  font-size: var(--fs-sm); color: var(--text-tertiary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bdsc__headend { display: inline-flex; align-items: center; gap: var(--space-3); }
+.bdsc__tag { font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--text-tertiary); }
+.bdsc__chev { flex: none; color: var(--text-tertiary); transition: rotate 160ms var(--ease-standard); }
+.bdsc__answer.is-open .bdsc__chev { rotate: 180deg; }
+
+/* The answer opens by its one row growing: 0fr to 1fr, in 160ms. */
+.bdsc__region {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows 160ms var(--ease-standard);
+}
+.bdsc__answer.is-open .bdsc__region { grid-template-rows: 1fr; }
+.bdsc__regioninner { min-height: 0; overflow: hidden; }
+.bdsc__controls { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-2) 0 var(--space-6); }
+
+.bdsc__pair { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--space-4); }
+.bdsc__labelled { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.bdsc__time { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.bdsc__time .bx-picker { grid-column: span 1; }
+.bdsc__aside { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* A question the text raised, with nothing picked. */
+.bdsc__q { display: flex; flex-direction: column; gap: var(--space-3); }
+.bdsc__qphrase { display: inline-flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--fs-md); color: var(--text-primary); }
+.bdsc__qdetail { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* Sign-in: one row per branch, the branch named on the left. */
+.bdsc__branches { display: flex; flex-direction: column; gap: var(--space-5); }
+.bdsc__outcome.has-label { display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: start; gap: var(--space-4); }
+.bdsc__branchlabel {
+  padding-top: var(--space-3);
+  font-size: var(--fs-md); color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bdsc__outcomectl { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+/* --- Checks ---------------------------------------------------------------------------
+
+   One sign-in a row, and what the tenant decides for it: the kind, the
+   sign-in over the policy and rule that decided it, then the decision. A row
+   is a button (it opens Try a sign-in on it), quiet until hovered: the badge
+   in its last column is the only colour it carries, and Can't tell is grey
+   text. The What changes line under them holds the panel's one number. */
+
+.bdsc__checks { display: flex; flex-direction: column; gap: var(--space-3); }
+.bdsc__checkshead {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  margin: 0;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-secondary);
+}
+.bdsc__checklist { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border-subtle); }
+.bdsc__checklist li { border-bottom: 1px solid var(--border-subtle); }
+.bdsc__check {
+  display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; align-items: center; gap: var(--space-4);
+  width: 100%; min-height: 44px; padding: var(--space-2) var(--space-2);
+  border: none; border-radius: var(--radius-sm); background: none; text-align: left;
+  font: inherit; color: inherit;
+}
+button.bdsc__check { cursor: pointer; }
+button.bdsc__check:hover { background: var(--surface-sunken); }
+button.bdsc__check:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bdsc__checkkind { font-size: var(--fs-sm); color: var(--text-secondary); }
+.bdsc__checkbody { display: flex; flex-direction: column; min-width: 0; }
+.bdsc__checkline,
+.bdsc__checkdetail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bdsc__checkline { font-size: var(--fs-md); color: var(--text-primary); }
+.bdsc__checkdetail { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bdsc__checkres {
+  display: inline-flex; align-items: center; gap: var(--space-2); justify-self: end;
+  animation: bdsc-said var(--dur-fast) var(--ease-standard);
+}
+
+.bdsc__changes { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; }
+.bdsc__changesword { font-size: var(--fs-sm); color: var(--text-secondary); }
+.bdsc__changesline { font-size: var(--fs-md); color: var(--text-primary); }
+
+/* --- Foot: buttons only ------------------------------------------------------------
+
+   The inspector's foot (`.bb__inspfoot`), at this panel's 56px. Done is a
+   grey button WITH a background (owner, 23 Sep 2026: "don't use outline —
+   use the grey button with a background"), not the inspector's warm save
+   tint: Done closes the panel, it saves nothing. */
+
+.bdsc__foot { min-height: 56px; padding: var(--space-3) var(--space-5); }
+.bb__inspfoot.bdsc__foot .bx-btn--neutral {
+  background: var(--int-neutral-bg-active);
+  border-color: var(--int-neutral-bg-active);
+  color: var(--int-neutral-text);
+}
+.bb__inspfoot.bdsc__foot .bx-btn--neutral:not(:disabled):hover {
+  background: var(--int-neutral-border);
+  border-color: var(--int-neutral-border);
+}
+
+@keyframes bdsc-said {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bdsc__region,
+  .bdsc__chev { transition: none; }
+  .bdsc__value,
+  .bdsc__checkres { animation: none; }
+}

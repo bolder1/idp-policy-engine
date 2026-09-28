@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { AlertTriangle, ArrowRight, Check, FlaskConical, Target } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Check, Swords, Target } from 'lucide-react'
 
 import { Button, DecisionChip, TipDot } from '../kit'
 import { FALLBACK_NAME, appsOf, fallbackRule, type Policy, type PolicyStatus } from '../data'
@@ -22,8 +22,13 @@ import type { SimEnv } from './simulate'
    asks, the rules as sentences, and what this draft changes about the live one.
 
    Nothing here is a second opinion. Every number comes from the module that owns
-   it — the linter, the gauntlet, the sweep — so this screen cannot disagree with
-   the one that produced it.
+   it — the linter, the chip deck, the sweep — so this screen cannot disagree with
+   the one that produced it. The sweep is What changes, the testing work's name
+   for it. The deck is the Attempt deck, not the Break-in test: it deals the
+   chip cards, and the Break-in test deals the typed deck and can count the
+   same rules differently. Its row says counts; the letter grade is retired
+   (owner, 25 Sep 2026). Each tool keeps the icon it has on the trail's pips
+   and in the command bar: Swords for the deck, Target for What changes.
    -------------------------------------------------------------------------- */
 
 export function ReviewStep({
@@ -42,8 +47,8 @@ export function ReviewStep({
   env: SimEnv
   onJump: (i: number) => void
   onOpen: (d: 'gauntlet' | 'impact') => void
-  /** The status to publish into: on (`active`) or kept off (`inactive`). */
-  onPublish: (status: Extract<PolicyStatus, 'active' | 'inactive'>) => void
+  /** The status to publish into: on (`active`), kept off (`inactive`) or kept monitoring (`monitor`). */
+  onPublish: (status: Extract<PolicyStatus, 'active' | 'inactive' | 'monitor'>) => void
 }) {
   const store = useBrand()
   const reduce = useReducedMotion()
@@ -90,9 +95,9 @@ export function ReviewStep({
     {
       id: 'gauntlet',
       ok: gauntlet.breaches === 0,
-      title: gauntlet.breaches === 0 ? `Gauntlet ${gauntlet.grade} — nothing got through` : `Gauntlet ${gauntlet.grade} — ${gauntlet.breaches} got through`,
-      detail: gauntlet.breaches === 0 ? gauntlet.gradeReason : `${gauntlet.held} of ${gauntlet.rounds.length} cards landed as expected.`,
-      go: { label: 'Run the gauntlet', run: () => onOpen('gauntlet') },
+      title: gauntlet.breaches === 0 ? 'Attempt deck: nothing got through' : `Attempt deck: ${gauntlet.breaches} got through`,
+      detail: `${gauntlet.held} of ${gauntlet.rounds.length} attempts landed as expected.`,
+      go: { label: 'Open Attempt deck', run: () => onOpen('gauntlet') },
     },
     {
       id: 'movement',
@@ -113,7 +118,7 @@ export function ReviewStep({
           : toPublish
             ? 'Every modelled situation is treated as it is now.'
             : 'The draft matches what is live.',
-      go: { label: 'Open the blast radius', run: () => onOpen('impact') },
+      go: { label: 'Open What changes', run: () => onOpen('impact') },
     },
     {
       id: 'dead',
@@ -129,9 +134,9 @@ export function ReviewStep({
       title: named.length > 0 ? `Protects ${named[0].name}${named.length > 1 ? ' and others' : ''}` : draft.isSystem ? 'Protects every application' : 'No applications',
       detail:
         named.length > 1 || (named.length === 0 && draft.isSystem)
-          ? 'Every login to any of them is checked against these rules.'
+          ? 'Every sign-in to any of them is checked against these rules.'
           : named.length > 0
-            ? 'Every login to it is checked against these rules.'
+            ? 'Every sign-in to it is checked against these rules.'
             : 'Assign one to turn this policy on.',
       go: draft.isSystem ? undefined : { label: 'Assign applications', run: () => store.go({ name: 'policy-details', policyId: draft.id, from: 'builder' }) },
     },
@@ -244,16 +249,17 @@ export function ReviewStep({
       {/* --- Ship ------------------------------------------------------------ */}
       <footer className="bf__revfoot">
         <div className="bf__revfootacts">
-          <Button variant="secondary" icon={FlaskConical} onClick={() => onOpen('gauntlet')}>
-            Gauntlet
+          <Button variant="secondary" icon={Swords} onClick={() => onOpen('gauntlet')}>
+            Attempt deck
           </Button>
           <Button variant="secondary" icon={Target} onClick={() => onOpen('impact')}>
-            Blast radius
+            What changes
           </Button>
         </div>
         {/* Which doors depends on where the policy already is. Off or never
             published: publish and keep it off, or publish and turn it on — the
-            same pair Review & save offers a draft. Already on: publish the
+            same pair Review & save offers a draft. Monitoring: publish and keep
+            monitoring, or publish and turn it on. Already on: publish the
             changes, and it stays on. */}
         {errors.length > 0 ? (
           <Button variant="primary" disabled>
@@ -271,6 +277,15 @@ export function ReviewStep({
           <Button variant="primary" onClick={() => onPublish('active')}>
             Publish changes
           </Button>
+        ) : status === 'monitor' ? (
+          <div className="bf__revship">
+            <Button variant="secondary" onClick={() => onPublish('monitor')}>
+              Publish, keep monitoring
+            </Button>
+            <Button variant="primary" onClick={() => onPublish('active')}>
+              Publish and turn on
+            </Button>
+          </div>
         ) : (
           <div className="bf__revship">
             <Button variant="secondary" onClick={() => onPublish('inactive')}>

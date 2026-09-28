@@ -111,6 +111,53 @@ export const cardPasses = (k: ConditionCard, passed: (c: Condition) => boolean) 
 export const predicatePasses = (p: Predicate, passed: (c: Condition) => boolean) =>
   p.cards.length === 0 ? true : topJoin(p) === 'or' ? p.cards.some((k) => cardPasses(k, passed)) : p.cards.every((k) => cardPasses(k, passed))
 
+// --- Three values -------------------------------------------------------------
+
+/* What one condition comes to against one sign-in: it holds, it does not, or
+   the facts given cannot say. Here rather than in the evaluator so the
+   predicate can be read three-valued without importing it.
+
+   The two readers above are two-valued on purpose — they take "passed" and
+   treat everything else as not passed, which is how an undecided condition has
+   always been graded (never a pass). The two below keep the third value, so a
+   caller can tell "this rule does not match" from "this rule might, if we knew
+   the address". Strong Kleene logic, the textbook three-valued AND and OR:
+
+     AND  fail if any part fails, pass if every part passes, else unknown
+     OR   pass if any part passes, fail if every part fails, else unknown
+
+   So a known answer is never hidden by an unknown one it does not depend on —
+   `fail AND unknown` is fail, `pass OR unknown` is pass. */
+export type CondState = 'pass' | 'fail' | 'unknown'
+
+/** Kleene AND. An empty list is `pass`, the identity. */
+export function allOf(states: readonly CondState[]): CondState {
+  if (states.includes('fail')) return 'fail'
+  return states.every((s) => s === 'pass') ? 'pass' : 'unknown'
+}
+
+/** Kleene OR. An empty list is `fail`, the identity. */
+export function anyOf(states: readonly CondState[]): CondState {
+  if (states.includes('pass')) return 'pass'
+  return states.every((s) => s === 'fail') ? 'fail' : 'unknown'
+}
+
+/** Kleene NOT: unknown stays unknown. */
+export const notState = (s: CondState): CondState => (s === 'pass' ? 'fail' : s === 'fail' ? 'pass' : 'unknown')
+
+/** One card, three-valued, over its own joiner. */
+export function cardState(k: ConditionCard, state: (c: Condition) => CondState): CondState {
+  const each = k.conditions.map(state)
+  return cardJoin(k) === 'or' ? anyOf(each) : allOf(each)
+}
+
+/** The whole predicate, three-valued. An empty predicate is `pass`, as it matches everything. */
+export function predicateState(p: Predicate, state: (c: Condition) => CondState): CondState {
+  if (p.cards.length === 0) return 'pass'
+  const each = p.cards.map((k) => cardState(k, state))
+  return topJoin(p) === 'or' ? anyOf(each) : allOf(each)
+}
+
 /* Identity of one condition, order-insensitive across its values.
 
    The scope segment is what keeps "in zone Office, on the network" and "in

@@ -29,6 +29,7 @@ export function BoardEmpty({
   onUndo,
   undoLabel = 'Undo',
   onUseTemplate,
+  onDescribe,
   onScratch,
 }: {
   /** A new draft nobody has written in yet. Otherwise the policy lost its rules, or never had any while live. */
@@ -40,11 +41,14 @@ export function BoardEmpty({
   onUndo?: () => void
   undoLabel?: string
   onUseTemplate?: () => void
+  /** Describe it: offered on a new draft only (describe spec, §2). The card renders only when passed. */
+  onDescribe?: () => void
   onScratch: () => void
 }) {
+  const three = !!onUseTemplate && !!onDescribe
   return (
     <div className="bb__empty">
-      <div className="bb__empty__inner">
+      <div className={`bb__empty__inner${three ? ' has-three' : ''}`}>
         <h2>{fresh ? 'Add the first rule' : 'No rules'}</h2>
 
         {/* What the policy does right now. The default card and the undo
@@ -52,7 +56,7 @@ export function BoardEmpty({
             this line carries both. */}
         {fallback && (
           <div className="bb__empty__now">
-            <p>Every login gets the default: {DECISION_NAME[fallback]}.</p>
+            <p>Every sign-in gets the default: {DECISION_NAME[fallback]}.</p>
             {onEditDefault && (
               <Button variant="ghost" size="sm" onClick={onEditDefault}>
                 Edit default
@@ -66,20 +70,29 @@ export function BoardEmpty({
           </div>
         )}
 
-        {/* Two ways in, side by side, sized the same.
+        {/* Three ways in on a new draft, side by side, sized the same — two
+            once the policy has been live, where Describe it is not offered.
 
-            Neither is dressed as the primary. Which one is right depends
+            None is dressed as the primary. Which one is right depends
             entirely on whether anything in the catalogue fits what you are
-            protecting, and that is not something the board knows — so the
-            choice is made on the words and the pictures rather than on which
-            button looks louder. Taking a template writes its rules into THIS
-            policy, so it is an edit like any other and undo puts it back. */}
-        <div className="bb__starts" data-tour="empty-start">
+            protecting, and whether you would rather say it than build it, and
+            the board knows neither — so the choice is made on the words and
+            the pictures rather than on which button looks louder. Taking a
+            template, or describing the policy, writes rules into THIS policy,
+            so it is an edit like any other and undo puts it back. */}
+        <div className={`bb__starts${three ? ' has-three' : ''}`} data-tour="empty-start">
           {onUseTemplate && (
             <button type="button" className="bb__start2" onClick={onUseTemplate}>
               <TemplateArt />
               <strong>Use a template</strong>
               <span>Ready-made rules, yours to edit</span>
+            </button>
+          )}
+          {onDescribe && (
+            <button type="button" className="bb__start2" onClick={onDescribe}>
+              <DescribeArt />
+              <strong>Describe it</strong>
+              <span>Type it or answer questions</span>
             </button>
           )}
           <button type="button" className="bb__start2" onClick={onScratch}>
@@ -93,7 +106,7 @@ export function BoardEmpty({
   )
 }
 
-/* --- The two illustrations ------------------------------------------------------
+/* --- The illustrations ----------------------------------------------------------
 
    Back to the reference, and back to simple.
 
@@ -144,6 +157,28 @@ function TemplateArt() {
           <rect className="bb__ill__line is-small" x="76" y="26" width="16" height="4" rx="2" />
           <rect className="bb__ill__line is-small" x="76" y="34" width="12" height="4" rx="2" />
           <rect className="bb__ill__line is-small" x="76" y="42" width="14" height="4" rx="2" />
+        </g>
+      </g>
+    </svg>
+  )
+}
+
+/* A sentence being typed, and the answers it fills in: one panel, the line of
+   text with its caret, and two short answer rows with a value at their end.
+   The caret takes the siblings' one hover colour (`is-lead`), so the three
+   cards share it and no new colour arrives. */
+function DescribeArt() {
+  return (
+    <svg className="bb__start2__art" viewBox="0 0 150 100" role="img" aria-label="A policy written from a sentence">
+      <g className="bb__ill__front">
+        <ArtPanel x={26} y={22} />
+        <g transform="translate(26 22)">
+          <rect className="bb__ill__line" x="12" y="24" width="58" height="5" rx="2.5" />
+          <rect className="bb__ill__line is-lead" x="73" y="21.5" width="1.5" height="10" rx="0.75" />
+          <rect className="bb__ill__line is-small" x="12" y="38" width="40" height="4" rx="2" />
+          <rect className="bb__ill__line is-small" x="76" y="38" width="12" height="4" rx="2" />
+          <rect className="bb__ill__line is-small" x="12" y="47" width="28" height="4" rx="2" />
+          <rect className="bb__ill__line is-small" x="76" y="47" width="12" height="4" rx="2" />
         </g>
       </g>
     </svg>

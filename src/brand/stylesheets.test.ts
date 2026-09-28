@@ -145,7 +145,8 @@ describe('the stylesheets', () => {
         '.bb__float',
         '.bb__insp',
         '.bb__insphead',
-        '.bb__sheet',
+        /* `.bb__sheet` stood here until M4 retired the Check and What changes
+           sheets; the region is gone, not emptied. */
         '.bb__grip',
         '.bb__if', // a condition row
         '.bb__rule',

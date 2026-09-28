@@ -1,3 +1,4 @@
+import type { BrandScreen } from '../../store'
 import { BoardBuilder } from './BoardBuilder'
 
 /* -----------------------------------------------------------------------------
@@ -16,12 +17,25 @@ import { BoardBuilder } from './BoardBuilder'
    straight back down.
 
    So this file is the translation of a route into a component, which is all a
-   page should be. `gauntlet` is the route's word and `check` is the sheet's;
-   translated here rather than renaming either, so one caller can hand off to
-   whichever builder is primary without knowing which it got, and the sheet keeps
-   the name its own tab strip prints.
+   page should be. The route named two sheets as well once — `gauntlet` and
+   `impact`, Check and What changes over the stage — and both went with M4:
+   the Break-in test lives in Saved sign-ins, and What changes is a row of the
+   checks before saving.
    -------------------------------------------------------------------------- */
 
-export function BoardPage({ policyId, open }: { policyId: string; open?: 'gauntlet' | 'impact' }) {
-  return <BoardBuilder policyId={policyId} openSheet={open === 'gauntlet' ? 'check' : open} />
+type BoardOpen = Extract<BrandScreen, { name: 'board' }>['open']
+
+export function BoardPage({ policyId, open, rule }: { policyId: string; open?: BoardOpen; rule?: string }) {
+  /* Every `open` opens test mode; anything but `try` also names the page the
+     panel opens on — Check a person, Saved sign-ins, or the Break-in test
+     pushed over Saved sign-ins. Where the edition has no Policy testing the
+     panel is Try a sign-in alone, and opens there. */
+  return (
+    <BoardBuilder
+      policyId={policyId}
+      openTest={open !== undefined}
+      openPage={open}
+      rule={rule}
+    />
+  )
 }

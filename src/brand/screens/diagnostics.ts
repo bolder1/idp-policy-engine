@@ -166,8 +166,8 @@ export function shadowedBy(policy: Policy, index: number): number[] {
 
 /* `hooks` is optional and falls back to the seed, the same way the prose
    resolver in builder-dialogs does. Callers with a store pass the live list so
-   a hook deleted five seconds ago is reported; callers without one (the tests,
-   the interview composer) still get sound answers about the seeded catalogue. */
+   a hook deleted five seconds ago is reported; callers without one (the
+   tests) still get sound answers about the seeded catalogue. */
 export interface DiagnoseLibrary {
   zones?: Zone[]
   fingerprints?: FingerprintProfile[]
@@ -329,7 +329,7 @@ export function diagnose(
            where loose conditions live — the same two words the editor uses, so
            a finding names the thing you can see. */
         title: k.grouped ? 'A group has no conditions' : 'A branch has no conditions',
-        detail: `An empty ${k.grouped ? 'group' : 'branch'} matches every login, which silently turns this rule into a catch-all. Delete it, or give it a condition.`,
+        detail: `An empty ${k.grouped ? 'group' : 'branch'} matches every sign-in, which silently turns this rule into a catch-all. Delete it, or give it a condition.`,
       })
     }
 
@@ -480,7 +480,7 @@ export function diagnose(
           severity: 'error',
           ruleIndex: i,
           title: 'This rule calls a hook that cannot answer it',
-          detail: `${hook.name} syncs attributes and is not called during login. Choose a hook that answers a login.`,
+          detail: `${hook.name} syncs attributes and is not called during sign-in. Choose a hook that answers a sign-in.`,
         })
         continue
       }
@@ -493,7 +493,7 @@ export function diagnose(
           severity: 'warning',
           ruleIndex: i,
           title: 'This rule stops denying when the hook is unavailable',
-          detail: `${hook.name} is set to treat a failure as “not matched”. Because this rule denies, an outage or a timeout at the endpoint lets the login through to the rules below instead of refusing it.`,
+          detail: `${hook.name} is set to treat a failure as “not matched”. Because this rule denies, an outage or a timeout at the endpoint lets the sign-in through to the rules below instead of refusing it.`,
         })
       }
 
@@ -516,8 +516,8 @@ export function diagnose(
         scope: 'rule',
           severity: 'warning',
           ruleIndex: i,
-          title: 'This rule can add most of a second to a login',
-          detail: `${hook.name} waits up to ${hook.timeoutMs}ms before giving up, and every login that reaches this rule pays it. Worth checking against the endpoint's measured p99.`,
+          title: 'This rule can add most of a second to a sign-in',
+          detail: `${hook.name} waits up to ${hook.timeoutMs}ms before giving up, and every sign-in that reaches this rule pays it. Worth checking against the endpoint's measured p99.`,
         })
       }
     }
@@ -717,7 +717,7 @@ export function diagnose(
         severity: 'info',
         ruleIndex: i,
         title: 'Switched off',
-        detail: 'This rule is skipped entirely. Logins fall through to the rules below it.',
+        detail: 'This rule is skipped entirely. Sign-ins fall through to the rules below it.',
       })
     }
 

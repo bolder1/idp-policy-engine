@@ -4,19 +4,27 @@ import { AppWindow, ArrowLeft, Pencil, Users } from 'lucide-react'
 import { appsLabel, appsOf, audienceSummary, initials, type Policy } from '../data'
 import { ChangeState } from '../leave-guard'
 import { AppLogo } from '../logos/AppLogo'
+import type { RuleSet } from '../policy-draft'
 import { useBrand } from '../store'
 import { Peek } from './peek'
 import { StatusControl } from './status-control'
 
 import './policy-bar.css'
 
-/* The trail's unsaved flag, for the pill beside the status.
+/* The trail's unsaved edits, for the pill beside the status and for the status
+   control, which says they are not included when it switches to monitoring —
+   the same as the board's (Spec C §2.1).
 
-   The bar and the builder are siblings in `BuilderPage` and the flag lives in
-   the builder's local draft, so the builder reports it through
-   `<ReportUnsaved/>` and the bar subscribes. Which policy is unsaved, not a
-   bare boolean, so a stale report cannot light another policy's bar. */
-let unsavedPolicyId: string | null = null
+   The bar and the builder are siblings in `BuilderPage` and the edits live in
+   the builder's local draft, so the builder reports them through
+   `<ReportUnsaved/>` and the bar subscribes. Which policy is unsaved, not bare
+   edits, so a stale report cannot light another policy's bar. */
+interface UnsavedReport {
+  policyId: string
+  edits: RuleSet
+}
+
+let unsavedReport: UnsavedReport | null = null
 const unsavedListeners = new Set<() => void>()
 
 const subscribeUnsaved = (l: () => void) => {
@@ -26,21 +34,24 @@ const subscribeUnsaved = (l: () => void) => {
   }
 }
 
-function setUnsaved(next: string | null) {
-  if (next === unsavedPolicyId) return
-  unsavedPolicyId = next
+function setUnsaved(next: UnsavedReport | null) {
+  if (next === unsavedReport) return
+  unsavedReport = next
   unsavedListeners.forEach((l) => l())
 }
 
-/** Renders nothing; tells the policy bar whether `policyId` has unsaved changes. */
-export function ReportUnsaved({ policyId, unsaved }: { policyId: string; unsaved: boolean }) {
+/** Renders nothing; tells the policy bar the edits `policyId` holds unsaved, or
+    undefined when it holds none. Keep `edits` by identity, so the bar hears of
+    each change once. */
+export function ReportUnsaved({ policyId, edits }: { policyId: string; edits: RuleSet | undefined }) {
   useEffect(() => {
-    if (!unsaved) return
-    setUnsaved(policyId)
+    if (!edits) return
+    const report = { policyId, edits }
+    setUnsaved(report)
     return () => {
-      if (unsavedPolicyId === policyId) setUnsaved(null)
+      if (unsavedReport === report) setUnsaved(null)
     }
-  }, [policyId, unsaved])
+  }, [policyId, edits])
   return null
 }
 
@@ -67,7 +78,12 @@ export function ReportUnsaved({ policyId, unsaved }: { policyId: string; unsaved
 
 export function PolicyBar({ policy }: { policy: Policy }) {
   const store = useBrand()
-  const unsaved = useSyncExternalStore(subscribeUnsaved, () => unsavedPolicyId === policy.id, () => false)
+  const edits = useSyncExternalStore(
+    subscribeUnsaved,
+    () => (unsavedReport?.policyId === policy.id ? unsavedReport.edits : undefined),
+    () => undefined,
+  )
+  const unsaved = edits !== undefined
 
   const { everyone, groupIds, userIds } = policy.audience
   /* One phrase for the selection, one number for its size. Two groups and a
@@ -103,7 +119,7 @@ export function PolicyBar({ policy }: { policy: Policy }) {
           <ArrowLeft size={16} strokeWidth={1.9} aria-hidden />
         </button>
         <h1>{policy.name}</h1>
-        <StatusControl policyId={policy.id} />
+        <StatusControl policyId={policy.id} edits={edits} />
         <ChangeState unsaved={unsaved} draft={!!policy.pendingDraft} />
         <span className="bpbar__type">{policy.type}</span>
       </div>

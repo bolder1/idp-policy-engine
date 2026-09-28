@@ -36,8 +36,10 @@ import { ruleMenu } from './rule-menu'
    were last on.
 
    So the tabs are gone and this is one pane. Click a card, its settings are
-   here. CheckTab.tsx and ImpactTab.tsx are untouched — those questions are
-   real, they just need a home that is not stapled to the selection.
+   here. The two questions were real and found homes that are not stapled to
+   the selection; M4 deleted CheckTab.tsx and ImpactTab.tsx once they had: the
+   Break-in test is in Saved sign-ins, and What changes is a row of the checks
+   before saving.
 
    The rule pane lost two sections with them. `Checks` restated the diagnostics
    the card already marks, and `Reach` was an estimate with three different
@@ -57,6 +59,8 @@ export function Inspector({
   wide,
   onToggleWidth,
   leaving,
+  testing = false,
+  swap = false,
   onMoveRule,
   onDuplicateRule,
   onDeleteRule,
@@ -81,6 +85,12 @@ export function Inspector({
   onToggleWidth: () => void
   /** On its way out. The board keeps it mounted for the length of the slide. */
   leaving?: boolean
+  /* Opened from the chain in Try a sign-in. The panel's width is test mode's,
+     so there is no width to toggle, and × goes back to the sign-in rather than
+     closing the column — the route is still being read beside it. */
+  testing?: boolean
+  /** Took the sign-in panel's place in the same column: a fade, not the slide. */
+  swap?: boolean
   /** The card's ⋯ actions, by rule index — the header's own ⋯ runs them. */
   onMoveRule?: (from: number, to: number) => void
   onDuplicateRule?: (i: number) => void
@@ -111,7 +121,7 @@ export function Inspector({
   const editingRule = !!(rule && part)
 
   return (
-    <aside className={`bb__insp ${leaving ? 'is-leaving' : ''}`} aria-label="Inspector">
+    <aside className={`bb__insp ${leaving ? 'is-leaving' : ''} ${swap ? 'is-swap' : ''}`} aria-label="Inspector">
       <div className={`bb__inspbar${editingRule ? ' is-rule' : ''}`}>
         {editingRule && rule ? (
           <>
@@ -155,16 +165,24 @@ export function Inspector({
 
             The grip in the gutter still sets any width between; this is the
             two ends of it without the drag. */}
+        {!testing && (
+          <button
+            type="button"
+            className="bb__act"
+            aria-label={wide ? 'Narrow the panel' : 'Widen the panel'}
+            title={wide ? 'Narrow' : 'Widen'}
+            onClick={onToggleWidth}
+          >
+            {wide ? <ChevronsRightLeft size={14} strokeWidth={2} /> : <ChevronsLeftRight size={14} strokeWidth={2} />}
+          </button>
+        )}
         <button
           type="button"
           className="bb__act"
-          aria-label={wide ? 'Narrow the panel' : 'Widen the panel'}
-          title={wide ? 'Narrow' : 'Widen'}
-          onClick={onToggleWidth}
+          aria-label={testing ? 'Back to Try a sign-in' : 'Close the panel'}
+          title={testing ? 'Back to Try a sign-in' : 'Close'}
+          onClick={onClose}
         >
-          {wide ? <ChevronsRightLeft size={14} strokeWidth={2} /> : <ChevronsLeftRight size={14} strokeWidth={2} />}
-        </button>
-        <button type="button" className="bb__act" aria-label="Close the panel" title="Close" onClick={onClose}>
           <X size={15} strokeWidth={2} />
         </button>
       </div>

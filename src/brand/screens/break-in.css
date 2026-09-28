@@ -1,0 +1,165 @@
+/* -----------------------------------------------------------------------------
+   The Break-in test (break-in-view.tsx).
+
+   Measured from its own width, not the window's: the same view sits on the
+   Policy testing page (880), in the slider (740) and, with Version 3, in the
+   board's 480 px panel (448 inside), where the name column gets 140 px and
+   narrower still under 440.
+
+   The rows are flat, a hairline under each, and their grid runs edge to edge
+   with the header's: no side padding and no side border, so the columns line
+   up and the arithmetic is the spec's — 448 − 16 − 4 × 8 − 2 × 104 − 52 = 140.
+   The open row's lines start under the name, 16 + 8 = 24 px in.
+
+   No rule here sets a transform, translate, scale or transition. A row is a
+   framer `motion.li` that framer moves by transform; a stylesheet transform
+   on it would be overwritten, and one on anything else here is not needed.
+   The change marks are outlines, faded by a keyframe on `outline-color`.
+   -------------------------------------------------------------------------- */
+
+.bbi { container-type: inline-size; display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+
+.bbi__head { display: flex; flex-direction: column; gap: var(--space-1); }
+.bbi__titleline { display: inline-flex; align-items: center; gap: var(--space-2); }
+.bbi__title { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bbi__caption { margin: 0; font-size: var(--fs-md); color: var(--text-secondary); }
+
+/* --- The four counts: toggles that filter the list ---------------------------------- */
+
+.bbi__counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); }
+.bbi__counts > .bx-tip { display: flex; min-width: 0; }
+.bbi__cell {
+  position: relative;
+  flex: 1 1 auto; min-width: 0; min-height: var(--space-12);
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--space-1);
+  padding: var(--space-4) var(--space-5);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised); color: var(--text-primary);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.bbi__cell:hover { background: var(--state-hover-bg); }
+.bbi__cell:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+/* Pressed is the accent — blue in the rebrand, slate outside it — never orange. */
+.bbi__cell.is-pressed { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.bbi__num { font-size: var(--fs-2xl); font-weight: var(--fw-semibold); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.bbi__word { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-secondary); }
+.bbi__cell.is-pressed .bbi__word { color: var(--accent); }
+
+/* --- The list: a header row, then each group under its heading ---------------------- */
+
+.bbi__cols,
+.bbi__line { display: grid; grid-template-columns: minmax(0, 1fr) 52px; column-gap: var(--space-4); align-items: center; }
+.bbi__cols { grid-template-columns: var(--icon-sm) minmax(0, 1fr) 104px 104px 52px; }
+.bbi__toggle { display: grid; grid-template-columns: var(--icon-sm) minmax(0, 1fr) 104px 104px; column-gap: var(--space-4); align-items: center; }
+
+.bbi__cols {
+  min-height: var(--space-10);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary);
+}
+.bbi__colname { grid-column: 2; }
+/* On the page the header stays in view while the list scrolls under it; in the
+   slider the views' tabs hold the top edge, so it scrolls with the rows. */
+.tst.is-page .bbi__cols { position: sticky; top: 0; z-index: 1; background: var(--surface-page); }
+
+.bbi__groups { display: flex; flex-direction: column; gap: var(--space-5); }
+.bbi__group { display: flex; flex-direction: column; gap: var(--space-2); }
+.bbi__gh { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bbi__list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+
+/* A background, so a row sliding past another covers it rather than showing through. */
+.bbi__row {
+  position: relative;
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+.bbi__line { min-height: var(--space-10); }
+.bbi__toggle {
+  min-width: 0; min-height: var(--space-10);
+  padding: var(--space-3) 0;
+  border: 0; border-radius: var(--radius-md); background: none;
+  font: inherit; text-align: left; color: var(--text-primary); cursor: pointer;
+}
+.bbi__toggle:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bbi__mark { display: inline-flex; }
+.bbi__mark.is-negative { color: var(--fb-negative-fg); }
+.bbi__mark.is-notice { color: var(--fb-notice-fg); }
+.bbi__mark.is-unknown { color: var(--text-tertiary); }
+.bbi__mark.is-positive { color: var(--fb-positive-fg); }
+.bbi__name { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-medium); }
+.bbi__clip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bbi__name > .bx-badge { flex: none; }
+.bbi__dec { min-width: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
+.bbi__dec.is-unknown { color: var(--text-tertiary); }
+.bbi__rule {
+  justify-self: start; padding: 0; border: 0; background: none;
+  font: inherit; font-size: var(--fs-sm); white-space: nowrap; color: var(--text-link); cursor: pointer;
+}
+.bbi__rule:hover { text-decoration: underline; }
+.bbi__rule:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); border-radius: var(--radius-sm); }
+.bbi__rule.is-text { color: var(--text-secondary); cursor: default; }
+.bbi__changed { flex: none; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--accent); }
+
+/* --- The open row -------------------------------------------------------------------- */
+
+.bbi__body {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: 0 0 var(--space-5) calc(var(--icon-sm) + var(--space-4));
+}
+.bbi__facts { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
+.bbi__lines { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; }
+.bbi__lr { display: grid; grid-template-columns: 104px minmax(0, 1fr); column-gap: var(--space-4); font-size: var(--fs-sm); }
+.bbi__lr dt { color: var(--text-secondary); }
+.bbi__lr dd { margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
+.bbi__grey { color: var(--text-tertiary); }
+.bbi__after { display: flex; flex-direction: column; gap: var(--space-2); }
+.bbi__moved { outline: var(--bw-thick) solid var(--accent); outline-offset: 1px; border-radius: var(--radius-sm); }
+.bbi__accepted { display: flex; flex-direction: column; gap: var(--space-1); }
+.bbi__accepted p { margin: 0; font-size: var(--fs-sm); color: var(--text-primary); }
+.bbi__acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.bbi__accept {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-5);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.bbi__accept .bbi__acts { justify-content: flex-end; }
+.bbi__said { margin: 0; font-size: var(--fs-sm); color: var(--fb-negative-fg); }
+
+.bbi__foot { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* --- What moved: an outline that fades, on a row or a count -------------------------- */
+
+.bbi__flash {
+  position: absolute; inset: 0; pointer-events: none;
+  border-radius: var(--radius-md);
+  outline: var(--bw-thick) solid var(--accent);
+  animation: bbi-flash 1200ms var(--ease-standard) forwards;
+}
+@keyframes bbi-flash {
+  from { outline-color: var(--accent); }
+  to { outline-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bbi__flash { display: none; }
+}
+
+/* --- Narrow: the board's panel --------------------------------------------------------- */
+
+/* The counts first, at the panel's whole 448 as well as under 440: four
+   cells of 105 px left "Weaker factor" and "Extra prompts" 80 px of room and
+   cut both (measured, Version 3). A count's word is said whole, so the cell
+   gives up padding and the word a size. */
+@container (max-width: 460px) {
+  .bbi__cell { padding: var(--space-3) var(--space-4); }
+  .bbi__word { font-size: var(--fs-xs); }
+}
+
+@container (max-width: 439px) {
+  .bbi__cols { grid-template-columns: var(--icon-sm) minmax(0, 1fr) 92px 92px 48px; }
+  .bbi__line { grid-template-columns: minmax(0, 1fr) 48px; }
+  .bbi__toggle { grid-template-columns: var(--icon-sm) minmax(0, 1fr) 92px 92px; }
+  /* "Last row" is wider than 48 px: it wraps inside its column, not past the row. */
+  .bbi__rule { white-space: normal; text-align: left; }
+  .bbi__counts { gap: var(--space-2); }
+}

@@ -125,8 +125,8 @@ export const PERSONAS: Persona[] = [
       {
         what: 'Be walked through the first policy',
         tab: 'templates',
-        met: false,
-        note: 'Not built in Lite. The guided build is behind the guidedSetup flag, which Lite turns off.',
+        met: true,
+        note: 'Describe it on the empty draft.',
       },
       {
         what: 'A zero state that teaches rather than an empty table',
@@ -175,7 +175,7 @@ export const PERSONAS: Persona[] = [
         what: 'Try a policy without risking a lockout',
         tab: 'policies',
         met: false,
-        note: 'Not built. There is no report-only status: a draft or inactive policy decides nothing and records nothing.',
+        note: 'Half built. Monitoring checks sign-ins and enforces nothing, and View monitoring shows what it would decide once on, over modelled sign-ins; real sign-ins need the backend.',
       },
     ],
   },
@@ -197,7 +197,7 @@ export const PERSONAS: Persona[] = [
         note: 'SIB/HRS pattern 2 — the `trust-age` condition, under/over N days.',
       },
       {
-        what: 'Treat first login and MFA reset as their own condition',
+        what: 'Treat first sign-in and MFA reset as their own condition',
         tab: 'policies',
         met: true,
         note: "SIB/HRS pattern 1 — `auth-state`, which is user enrolment state rather than group membership.",
@@ -230,7 +230,7 @@ export const PERSONAS: Persona[] = [
         what: 'Know what a policy lets through before shipping it',
         tab: 'policies',
         met: false,
-        note: 'Not built in Lite. The graded gauntlet is behind the gauntlet flag, which Lite turns off.',
+        note: 'Not built in Lite. The graded Attempt deck is part of Full, which Lite turns off.',
       },
     ],
   },
@@ -261,7 +261,7 @@ export const PERSONAS: Persona[] = [
         what: 'Audit the device-identity rules the same way as any other shared object',
         tab: 'fingerprint',
         met: true,
-        note: 'Each profile names the policies and rules referencing it, so its blast radius is readable before an attribute is changed.',
+        note: 'Each profile names the policies and rules referencing it, so who it affects is readable before an attribute is changed.',
       },
       {
         what: 'Read the estate as a matrix',

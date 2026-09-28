@@ -36,7 +36,7 @@
    drawer or a column: kit.css's `bx-cl`, device-fingerprint-v2.css's
    `bfp2-*` and device-profile-wizard.css's `bdpw-steps` already ask how wide
    THEY are. The sub-720 one-offs still in this codebase (620 in
-   setting-field.css, 560 in tour.css, 540 in interview.css, 520 in
+   setting-field.css, 560 in tour.css, 520 in
    auth-methods.css) are each a component guessing at a window width; they are
    left alone here because the fix for them is a container query, not a
    different number.

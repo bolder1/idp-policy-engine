@@ -34,6 +34,7 @@ export interface DetailsChanges {
 const STATUS_WORD: Record<PolicyStatus, string> = {
   draft: 'Draft',
   active: 'Active',
+  monitor: 'Monitoring',
   inactive: 'Inactive',
   'always-on': 'Always on',
 }

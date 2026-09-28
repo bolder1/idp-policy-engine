@@ -1,11 +1,12 @@
 import { ArrowLeft } from 'lucide-react'
-import { Activity, ChevronRight, GraduationCap, ListChecks, Pencil } from 'lucide-react'
-import { useRef, useState, type ReactNode } from 'react'
+import { AlignLeft, ChevronRight, GraduationCap, LogIn, Pencil } from 'lucide-react'
+import { useRef, useState, type ReactNode, type Ref } from 'react'
 
 import { DemoButton } from '../../tour/DemoButton'
 import { Button, IconButton, NameField } from '../../kit'
 import type { Policy } from '../../data'
 import { ChangeState } from '../../leave-guard'
+import type { RuleSet } from '../../policy-draft'
 import { POLICY_NAME_MAX, policyNameIssue } from '../../policy-name'
 import { useBrand } from '../../store'
 import { StatusControl } from '../status-control'
@@ -54,6 +55,10 @@ export function BoardBar({
   policy,
   unsaved = false,
   draftSaved = false,
+  edits,
+  onEditsFix,
+  onRevealRule,
+  onOpenBreakIn,
   actions,
   onLearn,
   onWatchDemo,
@@ -63,6 +68,16 @@ export function BoardBar({
      saved draft that is not live yet. */
   unsaved?: boolean
   draftSaved?: boolean
+  /* The unsaved rules, for the status control: a switch never takes them, and
+     its confirmation says so. Undefined when nothing is unsaved. */
+  edits?: RuleSet
+  /* Before turning on's ready fix, landed on the board's draft with Undo. */
+  onEditsFix?: (next: RuleSet, toast: string) => void
+  /* Before turning on's rule links: show the rule on the chain. */
+  onRevealRule?: (index: number | null) => void
+  /* Version 3: a guard page's Break-in row opens the test in the board's own
+     test panel, where that version keeps it. */
+  onOpenBreakIn?: () => void
   /* The publishing verbs, which belong to the builder's draft rather than to
      the policy. Passed in rather than reached for: this component knows what a
      policy IS, and the host knows what is unsaved about it. */
@@ -204,7 +219,7 @@ export function BoardBar({
 
         {/* Read from the store, not this bar's copy: the status is switched
             here, and it is not part of the draft. */}
-        <StatusControl policyId={policy.id} />
+        <StatusControl policyId={policy.id} edits={edits} onEditsFix={onEditsFix} onRevealRule={onRevealRule} onOpenBreakIn={onOpenBreakIn} />
         <ChangeState unsaved={unsaved} draft={draftSaved} />
       </nav>
 
@@ -233,32 +248,50 @@ export function BoardBar({
   )
 }
 
-/* --- The readings, and the verbs ---------------------------------------------
+/* --- Try a sign-in, and the verbs --------------------------------------------
 
-   Two pips that carry their own answer — "Check · A · 2 through" is a finding,
-   where a pip that only opens a panel is a menu item — and then the two things
-   that end a draft. Both pips are withheld in the lite edition, which is why
-   the divider before them is conditional: rendered unconditionally it became
-   the row's FIRST child, a hairline dividing nothing from Discard.
+   Two pips stood first here — "Check · A · 2 through" and "What changes · 14"
+   — the readings of a graded deck and a before/after sweep, in the full
+   edition only. They are gone with the ideas they read (final spec, A.8),
+   and M4 retired the sheets they opened and the ⌘K commands that stood in for
+   them: the Break-in test is in Saved sign-ins, and What changes is a row of
+   the checks before saving. The bar's first control is the one testing verb
+   every edition has, Try a sign-in. Pressed while test mode is on, and
+   blue then — the active state, never the brand.
+
+   Then the two things that end a draft.
    -------------------------------------------------------------------------- */
 
 export function BoardBarActions({
-  test,
-  movement,
-  sheet,
+  reading,
+  onRead,
+  readRef,
+  testing,
+  canTest,
+  onTest,
+  testRef,
   toPublish,
   unsaved,
   canDiscard,
   blockers,
   saveBlocked,
-  onSheet,
+  checking = false,
   onSaveDraft,
   onDiscard,
   onSave,
 }: {
-  test: { grade: string; gradeReason: string; breaches: number } | null
-  movement: { changed: number; stricter: number; looser: number } | null
-  sheet: 'check' | 'impact' | null
+  /** Read as text is open in the panel's slot. */
+  reading: boolean
+  onRead: () => void
+  /** The button's wrapper, so focus can come back to it when the panel closes. */
+  readRef?: Ref<HTMLSpanElement>
+  /** Test mode is on. */
+  testing: boolean
+  /** Only an app access policy decides sign-ins, so only one can be tried. */
+  canTest: boolean
+  onTest: () => void
+  /** The button's wrapper, so focus can come back to it when test mode closes. */
+  testRef?: Ref<HTMLSpanElement>
   /** Something differs from live, or the policy has never been published. */
   toPublish: boolean
   /** Edits since the last save or draft. */
@@ -268,7 +301,8 @@ export function BoardBarActions({
   blockers: number
   /** An error on a rule that runs, on a policy that has an application. */
   saveBlocked: boolean
-  onSheet: (t: 'check' | 'impact') => void
+  /** The checks before saving are running: the button says so, and cannot be pressed twice. */
+  checking?: boolean
   onSaveDraft: () => void
   onDiscard: () => void
   onSave: () => void
@@ -276,50 +310,33 @@ export function BoardBarActions({
   const features = useBrand().features
   return (
     <>
-      {/* The two readings, in one box so the demo can light them together.
-
-          A wrapper with a real box rather than `display: contents`: a contents
-          element has no rect at all, so the spotlight would measure zeros and
-          fall back to a centred card pointing at nothing. When BOTH readings
-          are withheld by the edition it collapses to an empty span, measures
-          zero, and the tour centres its last card — which is the correct
-          degradation, since there is then nothing to point at. */}
-      <span className="bbtop__pips" data-tour="board-tools">
-      {features.gauntlet && (
-        <button
-          type="button"
-          className={`bb__pip ${sheet === 'check' ? 'is-on' : ''}`}
-          title={test ? test.gradeReason : 'No rules are switched on, so there is nothing to grade'}
-          onClick={() => onSheet('check')}
-        >
-          <ListChecks size={13} strokeWidth={2} aria-hidden />
-          Check
-          {/* With the sheet open on Check, the sheet carries the reading. */}
-          {sheet !== 'check' &&
-            (test ? (
-              <>
-                <span className={`bb__grade is-${test.grade}`}>{test.grade}</span>
-                {test.breaches > 0 && <span className="bb__n">{test.breaches} through</span>}
-              </>
-            ) : (
-              <span className="bb__n">—</span>
-            ))}
-        </button>
-      )}
-      {features.blastRadius && (
-        <button
-          type="button"
-          className={`bb__pip ${sheet === 'impact' ? 'is-on' : ''} ${movement && movement.looser > 0 ? 'is-looser' : ''}`}
-          title={movement ? `${movement.stricter} stricter · ${movement.looser} looser, of 1,440 modelled situations` : 'Nothing unsaved to compare'}
-          onClick={() => onSheet('impact')}
-        >
-          <Activity size={13} strokeWidth={2} aria-hidden />
-          What changes
-          {sheet !== 'impact' && <span className="bb__n">{movement ? movement.changed.toLocaleString() : '—'}</span>}
-        </button>
-      )}
+      {/* Read as text (describe spec, §7.2): the whole policy as numbered
+          sentences, in the panel's slot. An icon, before Try a sign-in —
+          reading is quieter than testing, and a second labelled button in
+          the bar would make it louder. Every edition: it only reads. Pressed
+          while open, blue then, like Try a sign-in. */}
+      <span className="bbtop__read" ref={readRef}>
+        <IconButton icon={AlignLeft} size="sm" tone="ghost" label="Read as text" pressed={reading} onClick={onRead} />
       </span>
-      {(features.gauntlet || features.blastRadius) && <span className="bbtop__sep" />}
+      {/* On a wrapper, for the reason the review button's anchor is: `Button`
+          passes no extra props, and the walkthrough and the focus return both
+          need a real box to find. */}
+      {features.trySignIn && (
+        <span className="bbtop__try" data-tour="try-sign-in" ref={testRef}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={LogIn}
+            pressed={testing}
+            keys="T"
+            disabled={!canTest}
+            title={canTest ? 'Try a sign-in (T)' : 'Only app access policies decide sign-ins'}
+            onClick={onTest}
+          >
+            Try a sign-in
+          </Button>
+        </span>
+      )}
 
       {/* Always present, as in the trail; enabled only with something to throw away. */}
       {/* A disabled button says why. Discard is destructive, so it is the
@@ -357,7 +374,8 @@ export function BoardBarActions({
         <Button
           variant="brand"
           size="sm"
-          disabled={!toPublish || saveBlocked}
+          disabled={!toPublish || saveBlocked || checking}
+          busy={checking}
           title={
             !toPublish
               ? 'Nothing to save'
@@ -376,7 +394,9 @@ export function BoardBarActions({
               too. The panel's is a secondary "Save changes" — same act, said
               from where the work is, and drawn a weight quieter so the eye
               picks one of the two rather than choosing between twins. */}
-          {features.publish ? 'Publish policy' : 'Save policy'}
+          {/* While the checks before saving run (about 150 ms on the showcase),
+              the button says so and takes no second press. */}
+          {checking ? 'Checking…' : features.publish ? 'Publish policy' : 'Save policy'}
         </Button>
       </span>
     </>

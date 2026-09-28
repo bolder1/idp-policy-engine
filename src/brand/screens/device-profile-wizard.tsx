@@ -127,6 +127,9 @@ export function DeviceProfileWizard({
      already visited — Edit on Review, then straight back to Review. */
   const [reached, setReached] = useState(0)
   const [touched, setTouched] = useState(false)
+  /* The step whose Next was pressed while something on it was unanswered.
+     Its reason is then said under the question it is about, in the form. */
+  const [tried, setTried] = useState<WizardStepId | null>(null)
 
   const steps = wizardSteps(s.mode, step3)
   const here = Math.min(at, steps.length - 1)
@@ -160,11 +163,17 @@ export function DeviceProfileWizard({
     setS((cur) => arrive(cur, steps, here, to))
     setAt(to)
     setReached((r) => Math.max(r, to))
+    setTried(null)
     moved.current = true
   }
   const toStep = (id: WizardStepId) => go(steps.findIndex((x) => x.id === id))
+  /* Next is never disabled. Pressed with something unanswered, it stays on the
+     step and says what is missing under that question; the name's problem uses
+     the field's own line, which `touched` opens. */
   const next = () => {
-    if (issue === null) go(here + 1)
+    if (issue === null) return go(here + 1)
+    setTried(step.id)
+    if (step.id === 'profile') setTouched(true)
   }
 
   const update = (fn: (cur: WizardState) => WizardState) => setS(fn)
@@ -193,15 +202,20 @@ export function DeviceProfileWizard({
   })
   const cancel = () => confirmLeave(onCancel)
 
-  /* The name's problem is said under the field once there is something to say;
-     the footer says it until then, so Next is never disabled without a reason
-     on screen — and never with the same reason twice. */
+  /* The name's problem is said under the field once there is something to say. */
   const nameProblem = nameIssue(s.name, names)
   const nameShown = nameProblem !== null && (touched || s.name.trim() !== '')
-  const footReason = step.id === 'profile' && nameShown ? null : issue
-  /* `footNext` stood here — "Next: Checks" beside the button. The footer is
-     buttons and a blocked reason now (23 Sep 2026), and the stepper above the
-     form is where the next step is named. */
+  /* What stops this step, said inside the form under the question it is about,
+     and only after Next was pressed (owner, 26 Sep 2026: "add it inside the
+     form … don't add this in the footer"). It had been the footer's red line
+     beside a disabled Next — the one sentence left in a footer that is buttons
+     only. It goes when the answer is given, since `issue` is read live. */
+  const said = tried === step.id ? issue : null
+  const saidLine = said && (
+    <p className="bdpw__said" role="alert">
+      {said}
+    </p>
+  )
 
   const nameId = useId()
   const reachId = useId()
@@ -278,6 +292,7 @@ export function DeviceProfileWizard({
               value={s.reach}
               onPick={(reach) => update((cur) => withWizardReach(cur, reach))}
             />
+            {s.reach === null && saidLine}
             {s.reach === 'agent' && <AgentBanner />}
           </section>
 
@@ -305,6 +320,8 @@ export function DeviceProfileWizard({
                 roster={s.roster}
                 onChange={(p) => update((cur) => ({ ...cur, ...p }))}
               />
+              {/* The roster, the one thing this section can leave unanswered. */}
+              {saidLine}
             </section>
           )}
         </div>
@@ -333,6 +350,7 @@ export function DeviceProfileWizard({
             onWeight={(id, w) => update((cur) => withWeight(cur, id, w))}
             onReach={asksReach(s.mode) ? () => toStep('devices') : undefined}
           />
+          {saidLine}
         </section>
       )
       aside = <SidePanel note={itemsNote(s.mode)} />
@@ -361,6 +379,7 @@ export function DeviceProfileWizard({
             setPicked={(picked) => update((cur) => ({ ...cur, picked }))}
             onBack={asksReach(s.mode) ? () => toStep('devices') : undefined}
           />
+          {saidLine}
         </section>
       )
       aside = <SidePanel note={itemsNote(s.mode)} />
@@ -390,6 +409,14 @@ export function DeviceProfileWizard({
           onWeight={(id, w) => update((cur) => withWeight(cur, id, w))}
           onRemove={(id) => update((cur) => ({ ...cur, picked: cur.picked.filter((x) => x !== id) }))}
         />
+      )
+      /* Under the list: what the list still needs — a first check or signal,
+         or MAC address for a profile matched against a roster. */
+      if (saidLine) body = (
+        <>
+          {body}
+          {saidLine}
+        </>
       )
       aside = <SidePanel note={itemsNote(s.mode)} />
       break
@@ -424,7 +451,7 @@ export function DeviceProfileWizard({
           Create profile
         </Button>
       ) : (
-        <Button variant="brand" disabled={issue !== null} title={issue ?? undefined} onClick={next}>
+        <Button variant="brand" onClick={next}>
           Next
         </Button>
       )}
@@ -444,14 +471,8 @@ export function DeviceProfileWizard({
       <Button variant="ghost" onClick={cancel}>
         Cancel
       </Button>
-      {/* Why the step cannot be left yet, where the step line used to be: it is
-          the one thing the footer still has to say, and it says it beside the
-          button it is about. */}
-      {footReason && (
-        <span className="bdpw__blocked" role="status">
-          {footReason}
-        </span>
-      )}
+      {/* Buttons only. Why a step cannot be left yet is said in the form,
+          under its question, once Next is pressed (26 Sep 2026). */}
       {/* In a group, so the kit's 148px floor for the footer's one button does
           not land on Back. */}
       <div className="bdpw__acts">{backAndMain}</div>
@@ -489,9 +510,6 @@ export function DeviceProfileWizard({
             done={(i) => stepDone(steps, here, reached, i, issueOf)}
             onOpen={go}
           />
-          {/* The reason under a disabled Next, which on the page is in the
-              footer the drawer does not have. */}
-          {footReason && <p className="bdpw__reason">{footReason}</p>}
           <div className="bdpw__work" ref={work}>
             {body}
           </div>

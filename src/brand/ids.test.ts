@@ -23,14 +23,14 @@ import {
 describe('policy statuses', () => {
   const withStatus = (status: PolicyStatus): Policy => ({ ...policies[1], status })
 
-  it('are Draft, Active, Inactive and Always on, and nothing else', () => {
-    expect([...POLICY_STATUSES].sort()).toEqual(['active', 'always-on', 'draft', 'inactive'])
+  it('are Draft, Active, Monitoring, Inactive and Always on, and nothing else', () => {
+    expect([...POLICY_STATUSES].sort()).toEqual(['active', 'always-on', 'draft', 'inactive', 'monitor'])
   })
 
-  it('enforce only when Active or Always on', () => {
+  it('enforce only when Active or Always on, and run as well only when Monitoring', () => {
     for (const status of POLICY_STATUSES) {
       expect(enforces(withStatus(status)), status).toBe(status === 'active' || status === 'always-on')
-      expect(evaluates(withStatus(status)), status).toBe(enforces(withStatus(status)))
+      expect(evaluates(withStatus(status)), status).toBe(enforces(withStatus(status)) || status === 'monitor')
     }
   })
 

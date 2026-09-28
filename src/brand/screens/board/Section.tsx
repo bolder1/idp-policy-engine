@@ -1,6 +1,8 @@
 import { useState, type MouseEvent, type ReactNode } from 'react'
 import { ChevronDown, type LucideIcon, Plus } from 'lucide-react'
 
+import './seg.css'
+
 /* -----------------------------------------------------------------------------
    An inspector section — Figma's grammar.
 
@@ -68,6 +70,12 @@ export function Prop({ label, sub, indent, stack, children }: { label: ReactNode
 }
 
 /** A segmented control. The kit has tabs and toggles; this is the third thing. */
+/* `null` is a question nobody has answered yet: Describe it's choice rows ask
+   with nothing picked, because a guess sitting pre-selected is a guess the
+   admin has to notice before it is on the board (describe spec, §6.3). No
+   option is checked, the first takes the tab stop, and the arrows move focus
+   without choosing — Enter or Space chooses, as a click does. Every other
+   caller passes a value and gets exactly the control it had. */
 export function Seg<T extends string>({
   value,
   options,
@@ -75,12 +83,14 @@ export function Seg<T extends string>({
   label,
   block,
 }: {
-  value: T
-  options: { value: T; label: ReactNode; icon?: LucideIcon }[]
+  value: T | null
+  /** `title` is the option's one-line tooltip. */
+  options: { value: T; label: ReactNode; icon?: LucideIcon; title?: string }[]
   onChange: (v: T) => void
   label: string
   block?: boolean
 }) {
+  const unset = value === null
   return (
     /* A radiogroup, not a group of toggles.
 
@@ -100,13 +110,22 @@ export function Seg<T extends string>({
             type="button"
             role="radio"
             aria-checked={on}
-            tabIndex={on ? 0 : -1}
+            tabIndex={on || (unset && i === 0) ? 0 : -1}
             className={on ? 'is-on' : ''}
+            title={o.title}
             onKeyDown={(e) => {
               const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key as 'ArrowRight']
               if (!d) return
               e.preventDefault()
-              onChange(options[(i + d + options.length) % options.length].value)
+              const next = (i + d + options.length) % options.length
+              /* Unanswered: move, do not choose. The buttons are siblings, so
+                 the next one is found beside this one. */
+              if (unset) {
+                const row = e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+                row?.[next]?.focus()
+                return
+              }
+              onChange(options[next].value)
             }}
             onClick={() => onChange(o.value)}
           >

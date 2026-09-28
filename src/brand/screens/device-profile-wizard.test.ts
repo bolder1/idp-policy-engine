@@ -73,7 +73,7 @@ describe('what stops each step', () => {
 
   it('needs the collector answered, and a roster when only approved devices may sign in', () => {
     const device = state({ name: 'Fleet', mode: 'device' })
-    expect(stepIssue('devices', device, [])).toBe('Choose what the collector can read.')
+    expect(stepIssue('devices', device, [])).toBe('Choose a device restriction type.')
     expect(stepIssue('devices', { ...device, reach: 'agentless' }, [])).toBeNull()
     const preApproved = { ...device, reach: 'agent' as const, registration: 'pre-approved' as const, maxDevices: null }
     expect(stepIssue('devices', preApproved, [])).toBe('Upload a device roster.')
@@ -225,7 +225,7 @@ describe('moving between steps', () => {
     expect(canOpenStep(steps, 2, 2, 2, clear)).toBe(false)
     expect(canOpenStep(steps, 0, 0, 1, clear)).toBe(false)
     expect(canOpenStep(steps, 0, 3, 3, clear)).toBe(true)
-    expect(canOpenStep(steps, 0, 3, 3, (id) => (id === 'devices' ? 'Choose what the collector can read.' : null))).toBe(false)
+    expect(canOpenStep(steps, 0, 3, 3, (id) => (id === 'devices' ? 'Choose a device restriction type.' : null))).toBe(false)
   })
 
   it('ticks a step behind, or one ahead already passed, while nothing on it is wrong', () => {
@@ -410,7 +410,7 @@ describe('the live builder', () => {
     expect(sectionStatus(devices, steps, at, at, noIssue)).toBe('done')
     // On Profile: everything ahead is not yet, and a step with a problem is never done.
     expect(sectionStatus(devices, steps, 0, 0, noIssue)).toBe('upcoming')
-    const blocked = (id: string) => (id === 'devices' ? 'Choose what the collector can read.' : null)
+    const blocked = (id: string) => (id === 'devices' ? 'Choose a device restriction type.' : null)
     expect(sectionStatus(devices, steps, at, at, blocked)).toBe('upcoming')
     // On Review, all three are behind you.
     const review = steps.length - 1

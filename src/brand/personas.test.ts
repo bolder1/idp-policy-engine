@@ -103,7 +103,6 @@ describe('persona coverage of the Policy tab', () => {
   it('records exactly the needs still unbuilt', () => {
     const open = unmetNeeds().map(({ persona, need }) => `${persona.id}: ${need.what}`)
     expect(open).toEqual([
-      'first-run: Be walked through the first policy',
       'generalist: Find what is protected by nothing',
       'generalist: Try a policy without risking a lockout',
       'manager: Know what a policy lets through before shipping it',
@@ -241,9 +240,11 @@ describe('each persona lands in a tenant that shows their problem', () => {
 /* -----------------------------------------------------------------------------
    The loaded tenant has to be one the product could have produced.
 
-   Two owner rules make that checkable: Monitor is gone, so the only statuses are
-   Draft, Active, Inactive and Always on; and unfinished means draft, so a
-   policy with no applications is never live. And nothing a policy names may be
+   Two owner rules make that checkable: no tenant starts in Monitoring — it is
+   reached by switching a policy, which is the demo beat, and the seed stays as
+   the owner set it on 24 Sep — so a loaded tenant holds only Draft, Active,
+   Inactive and Always on; and unfinished means draft, so a policy with no
+   applications is never live. And nothing a policy names may be
    missing from that tenant's own libraries: a dangling reference renders as a
    broken rule in a demo nobody broke.
    -------------------------------------------------------------------------- */
@@ -259,7 +260,7 @@ describe('every tenant is one the product could have produced', () => {
       for (const p of policiesAt(d)) expect(POLICY_STATUSES, `${d}: ${p.id} is ${p.status}`).toContain(p.status)
     }
     for (const p of seedPolicies) expect(POLICY_STATUSES, `seed ${p.id}`).toContain(p.status)
-    expect(JSON.stringify(DEPTH_ORDER.map(policiesAt))).not.toMatch(/"status":"monitor"/)
+    expect(JSON.stringify([...DEPTH_ORDER.map(policiesAt), seedPolicies])).not.toMatch(/"status":"monitor"/)
   })
 
   it('never has a live policy with no applications, at any depth', () => {

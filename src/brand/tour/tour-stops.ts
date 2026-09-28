@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
    The builder tour — the six stops, as data.
 
-   Scoped to the builder and nothing else. The create flow has the guided setup;
+   Scoped to the builder and nothing else. The empty draft has Describe it;
    this exists for the screen you land on afterwards.
 
    The obvious tour points at chrome — this is the Policy menu, this is undo.
@@ -48,7 +48,7 @@ export const STOPS: Stop[] = [
     id: 'order',
     anchor: 'flow',
     heading: 'First match wins',
-    body: 'A login falls down this list and stops at the first rule that matches it — so the order is the policy, not a detail of it.',
+    body: 'A sign-in falls down this list and stops at the first rule that matches it — so the order is the policy, not a detail of it.',
   },
   {
     id: 'trail',
@@ -66,8 +66,8 @@ export const STOPS: Stop[] = [
     id: 'publish',
     anchor: 'gauntlet',
     heading: 'Find out before you publish',
-    body: 'Thirteen login attempts are dealt at these rules and graded, and the blast radius counts what a draft moves.',
-    finish: 'Run the gauntlet',
+    body: 'The Attempt deck deals thirteen sign-ins at these rules, and What changes counts what a draft moves.',
+    finish: 'Run the Attempt deck',
   },
 ]
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { anySignIn, EVERYONE, type Policy, type Rule } from '../data'
-import { canRedo, canUndo, commit, historyOf, HISTORY_LIMIT, redo, revertTo, undo } from './history'
+import { amend, canRedo, canUndo, commit, historyOf, HISTORY_LIMIT, redo, revertTo, undo } from './history'
 
 /* -----------------------------------------------------------------------------
    Undo is the one control an administrator reaches for when they have already
@@ -122,5 +122,39 @@ describe('discarding unsaved edits', () => {
     const saved = policy([rule('one')])
     const h = revertTo(historyOf(saved), JSON.parse(JSON.stringify(saved)) as Policy)
     expect(canUndo(h)).toBe(false)
+  })
+})
+
+/* Describe it's panel writes after every answer and is one edit all the same:
+   the first write commits, every later one amends, and one Undo takes the
+   whole session back. */
+describe('a grouped edit', () => {
+  it('replaces the present without a step, keeping the past and dropping the future', () => {
+    const a = policy([])
+    const b = policy([rule('one')])
+    const c = policy([rule('one'), rule('two')])
+    const withFuture = undo(commit(historyOf(a), b))
+    expect(canRedo(withFuture)).toBe(true)
+
+    const h = amend(withFuture, c)
+    expect(h.present).toBe(c)
+    expect(h.past).toBe(withFuture.past)
+    expect(canRedo(h)).toBe(false)
+  })
+
+  it('does nothing for a policy equal to the present', () => {
+    const a = policy([rule('one')])
+    const h = commit(historyOf(policy([])), a)
+    expect(amend(h, JSON.parse(JSON.stringify(a)) as Policy)).toBe(h)
+  })
+
+  it('comes back in one Undo: commit, amend, amend, undo', () => {
+    const start = policy([])
+    let h = commit(historyOf(start), policy([rule('first write')]))
+    h = amend(h, policy([rule('second write')]))
+    h = amend(h, policy([rule('third write'), rule('and another')]))
+    expect(h.past).toHaveLength(1)
+    expect(undo(h).present).toBe(start)
+    expect(canUndo(undo(h))).toBe(false)
   })
 })

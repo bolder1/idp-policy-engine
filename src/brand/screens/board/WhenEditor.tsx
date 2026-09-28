@@ -293,8 +293,8 @@ export function WhenEditor({
                 sign-in that matches — only those people's. */}
             <p>
               {hasWho(rule.who)
-                ? 'Any login by the people in Who matches. Add a condition to narrow that.'
-                : 'Every login that reaches this rule matches it. Add a condition to narrow that.'}
+                ? 'Any sign-in by the people in Who matches. Add a condition to narrow that.'
+                : 'Every sign-in that reaches this rule matches it. Add a condition to narrow that.'}
             </p>
             {/* Either button replaces this whole state with the bracket and the
                 member being added in it — the empty condition row, or a new

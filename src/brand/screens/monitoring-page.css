@@ -1,0 +1,117 @@
+/* -----------------------------------------------------------------------------
+   The Monitoring page (monitoring-page.tsx): modelled sign-ins for a monitoring
+   policy, in a 780 px slider — 740 px of content.
+
+   The table is the console's table (`.btable`) at the drawer's width: fixed
+   layout, the columns the spec sizes, and the If turned on column taking what
+   is left, so a classic scrollbar in the drawer's body narrows that column
+   rather than scrolling the table sideways. Cells are two lines — the fact,
+   and under it, smaller and grey, what places it.
+
+   No rule here sets a transform. The If turned on badge's wrapper fades by
+   opacity and a row's reasons open by height and opacity; framer animates
+   both, and a stylesheet transform on either would be overwritten. The
+   chevron that turns is a plain icon, not a framer element.
+   -------------------------------------------------------------------------- */
+
+/* --- The head: "Monitoring", its Sample badge, the policy under it --------------- */
+.bmon__head { min-width: 0; }
+.bmon__title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+
+/* --- The section ------------------------------------------------------------------ */
+.bmon { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.bmon__sechead { display: flex; align-items: center; gap: var(--space-3); }
+.bmon__sechead h3 { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bmon__plan { margin: 0; font-size: var(--fs-md); color: var(--text-primary); }
+.bmon__grey { color: var(--text-tertiary); font-weight: var(--fw-regular); }
+
+/* --- The table ----------------------------------------------------------------------
+   `.btable.bmon__table`, two classes, so these win over the console table's
+   own cell rules whichever stylesheet loads last. Widths: the spec's, retuned
+   for the decision badges, which say their whole phrase ("Allow on 1 factor",
+   "Would allow with 2FA") rather than the plain words it was drawn with. */
+.btable.bmon__table { min-width: 0; table-layout: fixed; font-size: var(--fs-sm); }
+.bmon__c-time { width: 56px; }
+.bmon__c-person { width: 128px; }
+.bmon__c-app { width: 96px; }
+.bmon__c-from { width: 112px; }
+.bmon__c-today { width: 132px; }
+.bmon__c-more { width: 36px; }
+
+.btable.bmon__table thead th,
+.btable.bmon__table tbody td,
+.btable.bmon__table tbody th { padding-left: var(--space-4); padding-right: var(--space-4); font-size: var(--fs-sm); }
+.btable.bmon__table thead th:last-child,
+.btable.bmon__table tbody td.bmon__more { padding-left: 0; padding-right: var(--space-2); text-align: center; }
+/* The person names the row, as a row header — drawn as the cells beside it. */
+.btable.bmon__table tbody th {
+  height: var(--table-row-h);
+  padding-top: var(--space-4); padding-bottom: var(--space-4);
+  border-bottom: var(--bw-thin) solid var(--table-rule);
+  text-align: left; font-weight: var(--fw-regular);
+}
+.btable.bmon__table tbody td,
+.btable.bmon__table tbody th { vertical-align: top; }
+.btable.bmon__table tbody tr.is-open > td,
+.btable.bmon__table tbody tr.is-open > th { border-bottom-color: transparent; }
+
+.bmon__l1,
+.bmon__l2 { display: block; min-width: 0; }
+.bmon__l1 { font-size: var(--fs-sm); color: var(--text-primary); line-height: 1.35; }
+.bmon__l2 { margin-top: var(--space-1); font-size: var(--fs-xs); color: var(--text-tertiary); line-height: 1.35; }
+.bmon__clip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A badge here says its whole phrase, and clips at the column, never past it. */
+.bmon__table .bx-badge { --badge-max: 100%; }
+.bmon__would { display: inline-flex; max-width: 100%; }
+.bmon__nochange { color: var(--text-secondary); }
+
+/* The disclosure: an icon button, its chevron turned while the row is open. */
+.bmon__toggle svg { transition: rotate var(--dur-fast) var(--ease-standard); }
+.bmon__toggle[aria-expanded='true'] svg { rotate: 180deg; }
+
+/* --- Show why ------------------------------------------------------------------------- */
+.btable.bmon__table tbody tr.bmon__whyrow:hover { background: none; }
+.btable.bmon__table tbody tr.bmon__whyrow > td {
+  height: auto;
+  padding: 0;
+  background: var(--surface-sunken);
+}
+/* The rule's number tile, and the lines indented past it. */
+.bmon__why { --bmon-idx: 20px; overflow: hidden; }
+.bmon__whyin { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5) var(--space-6); }
+.bmon__standing,
+.bmon__decided { margin: 0; font-size: var(--fs-sm); color: var(--text-primary); }
+.bmon__decided { display: flex; align-items: baseline; gap: var(--space-4); }
+.bmon__label { font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary); }
+
+.bmon__rules { display: flex; flex-direction: column; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.bmon__rulehead { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.bmon__idx {
+  flex: none;
+  display: inline-grid; place-items: center;
+  width: var(--bmon-idx); height: var(--bmon-idx);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary);
+}
+.bmon__idx.is-last { background: none; }
+.bmon__rulename { flex: 1; min-width: 0; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); overflow-wrap: anywhere; }
+.bmon__rule:is(.is-off, .is-not-reached) .bmon__rulename { color: var(--text-tertiary); }
+.bmon__word { flex: none; font-size: var(--fs-xs); white-space: nowrap; color: var(--text-secondary); }
+.bmon__word.is-pass { color: var(--text-primary); font-weight: var(--fw-medium); }
+.bmon__word:is(.is-unknown, .is-off, .is-not-reached) { color: var(--text-tertiary); }
+
+.bmon__lines { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-3) 0 0; padding: 0 0 0 calc(var(--bmon-idx) + var(--space-4)); list-style: none; }
+.bmon__line { display: grid; grid-template-columns: minmax(56px, auto) minmax(0, 1fr) auto; column-gap: var(--space-4); font-size: var(--fs-xs); }
+.bmon__linelabel { color: var(--text-secondary); }
+.bmon__linetext { color: var(--text-primary); overflow-wrap: anywhere; }
+.bmon__linetip { display: inline-flex; vertical-align: middle; margin-left: var(--space-2); }
+.bmon__needs { display: block; color: var(--text-tertiary); }
+.bmon__linestatus { white-space: nowrap; font-weight: var(--fw-medium); text-align: right; }
+.bmon__linestatus.is-pass { color: var(--fb-positive-fg); }
+.bmon__linestatus.is-fail { color: var(--fb-negative-fg); }
+.bmon__linestatus.is-unknown { color: var(--text-tertiary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bmon__toggle svg { transition: none; }
+}

@@ -36,6 +36,7 @@ import {
   type Round,
 } from './gauntlet'
 import type { SimEnv } from './simulate'
+import { useSimEnv } from './sim-env'
 
 /* -----------------------------------------------------------------------------
    The Gauntlet, on screen.
@@ -56,13 +57,18 @@ import type { SimEnv } from './simulate'
    · A failed card is not a taunt. It names the rule that produced the decision
      and offers to open it, because the only useful thing a failure can do is
      take you to the fix.
+
+   On screen it is the Attempt deck, not the Break-in test. It is the trail's,
+   it deals the thirteen chip cards and it grades; the Break-in test deals the
+   typed deck and counts without a grade (owner, 25 Sep 2026). One name on two
+   decks printed two different numbers for the same rules.
    -------------------------------------------------------------------------- */
 
 const OUTCOME_ORDER: Outcome[] = ['breach', 'lockout', 'friction', 'held']
 
 const OUTCOME_BLURB: Record<Outcome, string> = {
   breach: 'Weaker treatment than the card asks for. This is the direction that matters.',
-  lockout: 'An ordinary login was refused outright.',
+  lockout: 'An ordinary sign-in was refused outright.',
   friction: 'Stricter than asked — a cost, not a hole.',
   held: 'Exactly the treatment the card expects.',
 }
@@ -229,7 +235,7 @@ function TileDetail({
   const reduce = useReducedMotion()
   const resolve = useNameLookup()
   const trace = useMemo(() => traceFor(policy, c, env), [policy, c, env])
-  const fix = useMemo(() => proposeFix(round, policy), [round, policy])
+  const fix = useMemo(() => proposeFix(round, policy, env), [round, policy, env])
   const self = useRef<HTMLDivElement | null>(null)
 
   /* The board can be taller than the dialog, so a click near the top would
@@ -363,17 +369,7 @@ export function GauntletDialog({
      would be the most misleading true statement this screen could make. */
   const [previous, setPrevious] = useState<GauntletResult | null>(null)
 
-  const env = useMemo<SimEnv>(
-    () => ({
-      zoneName: (id) => store.zoneById(id)?.name ?? id,
-      fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
-      hasZone: (id) => !!store.zoneById(id),
-      hasFingerprint: (id) => !!store.fingerprintById(id),
-      groupName: (id) => store.groupById(id).name,
-      riskScale: store.riskScale,
-    }),
-    [store],
-  )
+  const env = useSimEnv()
 
   const run = useCallback(() => {
     setDealt(0)
@@ -454,7 +450,7 @@ export function GauntletDialog({
     <Modal
       open={open}
       onClose={onClose}
-      title="Policy gauntlet"
+      title="Attempt deck"
       width={980}
       padded={false}
       footer={
@@ -468,7 +464,7 @@ export function GauntletDialog({
             Close
           </Button>
           <Button variant="primary" icon={result ? RotateCcw : Swords} onClick={run}>
-            {result ? 'Run again' : 'Run the gauntlet'}
+            {result ? 'Run again' : 'Run the deck'}
           </Button>
         </>
       }
@@ -476,7 +472,7 @@ export function GauntletDialog({
       <div className="bgt">
         <p className="u-sr-only" aria-live="polite">
           {done && result
-            ? `Gauntlet complete. Grade ${result.grade}. ${result.held} of ${DECK.length} held, ${result.breaches} got through, ${result.lockouts} locked out.`
+            ? `Attempt deck complete. Grade ${result.grade}. ${result.held} of ${DECK.length} held, ${result.breaches} got through, ${result.lockouts} locked out.`
             : ''}
         </p>
 
@@ -509,7 +505,7 @@ export function GauntletDialog({
                 <h3>
                   {policy.name}
                   <TipDot
-                    label="How the gauntlet is scored"
+                    label="How the Attempt deck is scored"
                     text="Heuristic, not the engine: each card's context maps to condition values through the same fixed table the Test dialog uses. Real: the order, the first-match stop, and the decision. A card's expected treatment is an opinion — yours to overrule, and the grade follows."
                   />
                 </h3>
@@ -647,24 +643,14 @@ function Replay({ before, after }: { before: GauntletResult; after: GauntletResu
     live grade without opening the dialog. Recomputed, never cached. */
 export function GauntletPip({ policy, onOpen }: { policy: Policy; onOpen: () => void }) {
   const store = useBrand()
-  const env = useMemo<SimEnv>(
-    () => ({
-      zoneName: (id) => store.zoneById(id)?.name ?? id,
-      fingerprintName: (id) => store.fingerprintById(id)?.name ?? id,
-      hasZone: (id) => !!store.zoneById(id),
-      hasFingerprint: (id) => !!store.fingerprintById(id),
-      groupName: (id) => store.groupById(id).name,
-      riskScale: store.riskScale,
-    }),
-    [store],
-  )
+  const env = useSimEnv()
   const overrides = store.gauntletOverrides[policy.id] ?? {}
   const r = useMemo(() => runGauntlet(policy, env, overrides), [policy, env, overrides])
 
   return (
     <button type="button" className={`bgt__pip is-${GRADE_TONE[r.grade]}`} onClick={onOpen}>
       <Swords size={12} strokeWidth={2} aria-hidden />
-      Gauntlet <b>{r.grade}</b>
+      Attempt deck <b>{r.grade}</b>
       {r.breaches > 0 && <em>{r.breaches} through</em>}
     </button>
   )

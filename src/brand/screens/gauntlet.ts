@@ -3,6 +3,7 @@ import {
   blankRule,
   card,
   cond,
+  conditionType,
   when,
   type AccessDecision,
   type Condition,
@@ -14,7 +15,28 @@ import {
 } from '../data'
 import { ckey, isSingleAndRun } from '../predicate'
 import { hasWho, normaliseWho, ruleSig, whoContains, whoPasses, withWho } from '../rule-who'
-import { SIM_USERS, decide, inAudience, walk, type SimEnv, type SimUser, type TraceResult } from './simulate'
+import { AUTH_METHODS, methodBlocker, type AuthMethod } from '../methods'
+import { FACTOR_RANK, methodStrength, ruleFactor, type FactorStrength } from './factor-strength'
+import {
+  CHIP_DEVICES,
+  SIM_USERS,
+  decide,
+  evalRule,
+  inAudience,
+  personOf,
+  rawEnv,
+  tracePolicy,
+  traceRule,
+  walk,
+  type MatchOptions,
+  type PolicyTrace,
+  type SignInDevice,
+  type SignInFacts,
+  type SimEnv,
+  type SimUser,
+  type TraceResult,
+} from './simulate'
+import { audienceNames } from './tenant-resolver'
 
 /* -----------------------------------------------------------------------------
    The Gauntlet — the "check" function, played rather than read.
@@ -55,13 +77,15 @@ export const EXPECT_LABEL: Record<Expect, string> = {
 
 /** How strict a treatment is. Used to say whether a result was weaker or
     heavier than the card asked for — the two failures are not the same kind. */
-/* Four steps, not three, and `warn` sits ABOVE a bare allow.
+/* Three steps: one factor, two factors, deny. It measures how much a rule
+   DOES about a sign-in, because that is what says whether a result was weaker
+   than the card asked for. (It had a fourth, `warn`, between a bare allow and a
+   second factor; the decision is gone from the model and so is the step.)
 
-   It grants exactly the same access, so on the axis of "who gets in" it is
-   `1fa`. That is not the axis this number measures. What it measures is how
-   much a rule DOES about a sign-in, because that is what says whether a change
-   loosened something — and a rule that stops recording has loosened, even
-   though nobody's access widened. */
+   Two results can land on the same step and still differ: a second factor
+   that is an email code and one that is a passkey are both 2 factors. The
+   typed deck below reads that as a second axis (`classifyAttempt`,
+   `minFactor`); this number never does. */
 const STRICTNESS: Record<AccessDecision, number> = { '1fa': 0, '2fa': 1, deny: 2 }
 
 /* One condition of a fix spec, in the same shape `cond()` takes.
@@ -75,6 +99,16 @@ export interface SpecCondition {
   operator: string
   values: string[]
   scope?: ZoneScope
+}
+
+/* The rule that closes a card when it leaks. One shape for both decks. */
+export interface FixSpec {
+  name: string
+  /* Who the fixing rule is for, when the card's argument is about the person
+     rather than the sign-in. Absent means everyone the policy governs. */
+  who?: RuleWho
+  conditions: SpecCondition[]
+  why: string
 }
 
 export interface Challenge {
@@ -102,14 +136,7 @@ export interface Challenge {
      card and nothing else — advice narrow enough to be useless, presented with
      the authority of a suggestion. What is written here is the signal that
      makes the card hostile, which is the thing worth writing a rule about. */
-  fix?: {
-    name: string
-    /* Who the fixing rule is for, when the card's argument is about the person
-       rather than the sign-in. Absent means everyone the policy governs. */
-    who?: RuleWho
-    conditions: SpecCondition[]
-    why: string
-  }
+  fix?: FixSpec
 }
 
 /* The deck.
@@ -236,7 +263,7 @@ export const DECK: Challenge[] = [
   {
     id: 'office-regular',
     kind: 'legit',
-    name: 'Ordinary morning login',
+    name: 'Ordinary morning sign-in',
     story: 'An engineer opens their laptop at the office on a managed device.',
     userId: 'arun', place: 'Office Network', device: 'Managed (MDM)', authState: 'Normal returning user', risk: 'Low', at: '09:30',
     want: '1fa',
@@ -333,6 +360,21 @@ export function classify(want: Expect, got: AccessDecision): Outcome {
   if (STRICTNESS[got] < STRICTNESS[want]) return 'breach'
   if (want === '1fa' && got === 'deny') return 'lockout'
   return 'friction'
+}
+
+/* One card's result, knowing whose sign-in it was.
+
+   `classify` sees only the two decisions, so it called an ordinary person who
+   asked for a second factor and got a denial "over-challenged" — friction, a
+   cost worth seeing. It is not a cost. Finance working from home, refused, is
+   somebody who cannot work, and a policy that denies a whole department scored
+   B on friction while doing exactly that. An ordinary card denied where it did
+   not ask to be is a lockout, whatever it asked for. A hostile card denied
+   harder than asked is still friction here: stopping an attacker harder costs
+   nobody legitimate, and the grade's sentences are about ordinary logins. */
+function classifyRound(card: Pick<Challenge, 'kind'>, want: Expect, got: AccessDecision): Outcome {
+  if (card.kind === 'legit' && got === 'deny' && want !== 'deny') return 'lockout'
+  return classify(want, got)
 }
 
 export interface Round {
@@ -434,7 +476,9 @@ export interface ProposedFix {
   kind: 'insert' | 'retune'
   /** The rule as it should end up. */
   rule: Rule
-  /** Where it should end up. Position is most of the fix under first-match. */
+  /* The index the rule has after `applyFix`. Position is most of the fix under
+     first-match: this is the index of the rule that decided the card (it lands
+     above it and pushes it down), or the end of the list when nothing did. */
   at: number
   /** For a retune, the rule being changed — removed from here before landing. */
   fromIndex?: number
@@ -482,14 +526,77 @@ const specConds = (conditions: SpecCondition[]): Condition[] =>
 const specWhen = (conditions: SpecCondition[]): Predicate =>
   conditions.length === 0 ? anySignIn() : when(card(...specConds(conditions)))
 
-const specKey = (spec: NonNullable<Challenge['fix']>) => ruleSig({ who: spec.who, when: specWhen(spec.conditions) })
+const specKey = (spec: FixSpec) => ruleSig({ who: spec.who, when: specWhen(spec.conditions) })
 
-export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
+/** A fix spec as the rule it would add, deciding `decision`. The insert branch
+    below and the typed deck's tests build it the same way. */
+export function ruleFromFix(spec: FixSpec, decision: AccessDecision): Rule {
+  return withWho(
+    {
+      ...blankRule(spec.name),
+      /* One card: a fix spec is a set of conditions that must all hold — or no
+         card, when the spec is only about who. A rule cannot be broader than its
+         policy, so there is nothing to widen it to. */
+      when: specWhen(spec.conditions),
+      decision,
+    },
+    normaliseWho(spec.who),
+  )
+}
+
+/* Does this fix name something the tenant does not have?
+
+   The deck's specs were written against the test estate — `anon`, `office`,
+   `fp-managed` — and a tenant without those ids would be offered a rule that
+   names nothing: previewed as undecided, built as a rule the linter flags as
+   broken (PE134, PE135), and never firing. The DECK comment already says a
+   suggestion that cannot be built is worse than none, and this is where that
+   is enforced rather than hoped for.
+
+   Read from the env's own lookups, then from its library, which is also where
+   the groups and people of a who are checked. With neither — every test built
+   on `rawEnv` — every id is taken to exist, which is how this behaved before. */
+function namesMissing(spec: FixSpec, env: SimEnv): boolean {
+  const lib = env.library
+  const zoneGone = (id: string) => (env.hasZone ? !env.hasZone(id) : lib ? !lib.zones.some((z) => z.id === id) : false)
+  const profileGone = (id: string) =>
+    env.hasFingerprint ? !env.hasFingerprint(id) : lib ? !lib.fingerprints.some((p) => p.id === id) : false
+  for (const c of spec.conditions) {
+    const kind = conditionType(c.typeId).valueKind
+    if (kind === 'zone' && c.values.some(zoneGone)) return true
+    if (kind === 'fingerprint' && c.values.some(profileGone)) return true
+  }
+  if (lib && spec.who) {
+    const w = spec.who
+    if ([...w.groupIds, ...(w.exceptGroupIds ?? [])].some((id) => !lib.groups.some((g) => g.id === id))) return true
+    if ([...w.userIds, ...(w.exceptUserIds ?? [])].some((id) => !lib.people.some((u) => u.id === id))) return true
+  }
+  return false
+}
+
+export function proposeFix(round: Round, policy: Policy, env?: SimEnv): ProposedFix | null {
   const spec = round.challenge.fix
   if (!spec || round.outcome !== 'breach') return null
+  if (env && namesMissing(spec, env)) return null
 
   const at = round.hitIndex ?? policy.rules.length
-  const decider = round.hitIndex === null ? null : policy.rules[round.hitIndex]
+  const ctx = contextFor(round.challenge)
+  return proposeFrom(spec, round.want, at, round.user, policy, (r) => evalRule(r, ctx, env ?? rawEnv).match)
+}
+
+/* The body both decks share: a spec, the treatment it should give, where the
+   card was decided, whose sign-in it was, and how to ask whether a rule
+   matches it — the chip evaluator for `DECK`, the typed one for `TYPED_DECK`.
+   Everything below is the same argument for either, so it is written once. */
+function proposeFrom(
+  spec: FixSpec,
+  treatment: Expect,
+  at: number,
+  user: SimUser,
+  policy: Policy,
+  closes: (r: Rule) => boolean,
+): ProposedFix | null {
+  const decider = at < policy.rules.length ? policy.rules[at] : null
 
   /* Does the policy already say this, just too weakly or too late?
 
@@ -529,7 +636,8 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
      re-aimed. Its twin must have no conditions either. */
   const want = new Set(specConds(spec.conditions).map(ckey))
   const covers = (r: Rule) => {
-    if (!whoContains(spec.who, r.who) || !whoPasses(r.who, round.user)) return false
+    if (!r.enabled) return false
+    if (!whoContains(spec.who, r.who) || !whoPasses(r.who, user)) return false
     if (want.size === 0) return hasWho(spec.who) && r.when.cards.length === 0
     /* And an AND-run specifically: a single card whose conditions are joined
        by OR covers none of them jointly, so re-aiming it would not do what the
@@ -537,17 +645,60 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
     return isSingleAndRun(r.when) && [...want].every((k) => r.when.cards[0].conditions.some((c) => ckey(c) === k))
   }
   const key = specKey(spec)
-  const exact = policy.rules.findIndex((r) => ruleSig(r) === key)
-  const twinIndex = exact !== -1 ? exact : policy.rules.findIndex(covers)
+  const isExact = (r: Rule) => r.enabled && ruleSig(r) === key
 
+  /* Only a twin AT OR BELOW the rule that decided can be re-aimed.
+
+     Every enabled rule above `at` was reached and missed this card — first
+     match wins, and `at` is where the match was. So a twin up there has already
+     been asked about this very sign-in, and did not match: changing its answer
+     cannot close the card. This used to re-aim it anyway, and `applyFix` then
+     dropped it one place ABOVE the decider rather than at `at` — the
+     off-by-one — in a "fix" that left the card open. Now:
+
+       · an enabled EXACT twin above `at` means the spec cannot match this
+         card at all, and inserting it below would be a duplicate the linter
+         calls a contradiction (PE101). No fix.
+       · a narrower twin above `at` missed for its extra conditions; the
+         broader fix is inserted at `at`, below it, which shadows nothing.
+       · a twin at or below `at` is re-aimed and lands exactly at `at` —
+         provided it matches this card (below).
+
+     A disabled rule is never a twin. It decides nothing, so re-aiming it
+     changes nothing a sign-in meets, and the linter reads no duplicate against
+     it. With nothing matched (`hitIndex` null) every enabled twin sits above
+     the end of the list, so none is ever moved to the bottom. */
+  if (policy.rules.some((r, i) => i < at && isExact(r))) return null
+  const atOrBelow = (test: (r: Rule) => boolean) => policy.rules.findIndex((r, i) => i >= at && test(r))
+  const exact = atOrBelow(isExact)
+  const twinIndex = exact !== -1 ? exact : atOrBelow(covers)
+
+  /* A fix that is offered closes its card, and that is checked here rather
+     than hoped.
+
+     Landing at `at` puts the rule where this sign-in is first asked about it:
+     every enabled rule above missed, and first match wins. So the fix closes
+     the card exactly when the rule it lands matches the card — asked with the
+     same evaluator and env the round was played on.
+
+     A `covers` twin is where that fails in practice. It contains the spec's
+     conditions AND MORE, and the extra condition can be the very thing this
+     card fails — a "risky and off the office network" rule, re-aimed above
+     the decider for a card that is risky ON the office network, still misses,
+     and the card stays open under a button that said it was fixed. Nor can the
+     broader spec be inserted instead: above the narrower twin it would shadow
+     it, which the linter refuses to publish. So a twin that would not match
+     means no fix. The same test guards the insert, for a spec whose own
+     conditions this card does not meet. */
   if (twinIndex !== -1) {
     const twin = policy.rules[twinIndex]
-    const tooWeak = twin.decision !== round.want
+    if (!closes(twin)) return null
+    const tooWeak = twin.decision !== treatment
     const tooLate = twinIndex > at
 
     return {
       kind: 'retune',
-      rule: { ...twin, decision: round.want },
+      rule: { ...twin, decision: treatment },
       at,
       fromIndex: twinIndex,
       why: spec.why,
@@ -560,25 +711,15 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
       headline:
         tooLate && !tooWeak
           ? `Move rule ${twinIndex + 1} above rule ${at + 1}`
-          : `Change rule ${twinIndex + 1} to ${EXPECT_LABEL[round.want]}`,
+          : `Change rule ${twinIndex + 1} to ${EXPECT_LABEL[treatment]}`,
     }
   }
 
-  const rule: Rule = withWho(
-    {
-      ...blankRule(spec.name),
-      /* One card: a fix spec is a set of conditions that must all hold — or no
-         card, when the spec is only about who. A rule cannot be broader than its
-         policy, so there is nothing to widen it to. */
-      when: specWhen(spec.conditions),
-      decision: round.want,
-    },
-    normaliseWho(spec.who),
-  )
-
+  const added = ruleFromFix(spec, treatment)
+  if (!closes(added)) return null
   return {
     kind: 'insert',
-    rule,
+    rule: added,
     at,
     why: spec.why,
     placement: decider
@@ -590,6 +731,10 @@ export function proposeFix(round: Round, policy: Policy): ProposedFix | null {
 
 /** Apply a proposal to a rule list. Shared by the hosts and by the tests, so
     the thing the button does is the thing the tests prove. */
+/* Invariant: the rule ends up at index `fix.at`. `proposeFix` only re-aims a
+   twin at or below `at` (fromIndex >= at), so removing it never shifts `at`
+   and the rule lands exactly there. The `fromIndex < at` branch stays for a
+   hand-built proposal, and it is the one that lands a place higher. */
 export function applyFix(rules: Rule[], fix: ProposedFix): Rule[] {
   if (fix.kind === 'insert') return [...rules.slice(0, fix.at), fix.rule, ...rules.slice(fix.at)]
   const without = rules.filter((_, i) => i !== fix.fromIndex)
@@ -621,7 +766,7 @@ export function runGauntlet(
       user: userOf(c.userId),
       want,
       decision,
-      outcome: classify(want, decision),
+      outcome: classifyRound(c, want, decision),
       hitIndex,
       hitName: hitIndex === null ? null : policy.rules[hitIndex].name,
     }
@@ -642,4 +787,461 @@ export function runGauntlet(
   const { grade, reason } = gradeOf(breaches, lockouts, friction)
 
   return { rounds, held: count('held'), breaches, lockouts, friction, streak, grade, gradeReason: reason }
+}
+
+/* =============================================================================
+   The break-in test, on typed sign-ins.
+
+   The deck above speaks in chips and is scored on the decision alone, and two
+   things it cannot see are the two things an administrator most needs told.
+
+   1. WHOSE sign-in it was. A hostile card let through with less than it asked
+      for is a breach. An ordinary card let through with less is a real hole
+      with nobody exploiting it. An ordinary card refused is somebody who
+      cannot work. `classify` sees two decisions and cannot tell them apart.
+   2. HOW STRONG the second factor is. "2 factors" by SMS and "2 factors" by a
+      passkey are one decision and stop different attacks. Two cards here are
+      attacks a second factor exists to stop and only some second factors do:
+      repeated push prompts (MITRE ATT&CK T1621), which number matching
+      defeats, and a sign-in relayed through a phishing proxy (T1557), which
+      only a factor bound to the real site defeats.
+
+   Fifteen cards: the thirteen above, re-cast as typed sign-ins on the
+   showcase tenant's own ids — addresses from the geo fixture, the chip
+   table's devices STATED rather than assumed, a Monday in Kolkata — and the
+   two new ones. It returns counts, not a grade: a letter is a judgement, and
+   what an administrator acts on is how many of which.
+
+   On screen in the Break-in test (break-in-view.tsx), inside Saved sign-ins,
+   and in Check's counts row. `DECK` stays for the surface that still prints
+   its length and its grade — the trail's dialog — until it is retired.
+   ========================================================================== */
+
+/** The ways a typed card can come back. Named for what happened. */
+export type AttemptOutcome =
+  | 'held'
+  | 'got-through'
+  | 'weaker-factor'
+  | 'less-than-asked'
+  | 'locked-out'
+  | 'extra-prompts'
+  | 'undecided'
+
+export interface TypedChallenge {
+  id: string
+  /** Hostile attempts are the ones a miss on is a breach. */
+  kind: 'threat' | 'legit'
+  name: string
+  story: string
+  why: string
+  personId: string
+  /** The sign-in. `appId` is filled in per run, from the policy under test. */
+  facts: SignInFacts
+  want: Expect
+  /** For a 2-factor want: the weakest factor that counts as held. Absent means any second factor. */
+  minFactor?: FactorStrength
+  fix?: FixSpec
+  /** The MITRE ATT&CK technique, as code metadata. Never rendered. */
+  mitre?: string
+}
+
+export interface AttemptRound {
+  challenge: TypedChallenge
+  /** The expectation actually used — the card's, or the tenant's override. */
+  want: Expect
+  trace: PolicyTrace
+  /** The definite reading's decision: undecided rules count as no match. */
+  decision: AccessDecision | null
+  /** The deciding rule's second factor, when it decides 2 factors. */
+  factor: FactorStrength | null
+  outcome: AttemptOutcome
+  /** The distinct outcomes the possible decisions give; more than one only when 'undecided'. */
+  outcomes: AttemptOutcome[]
+}
+
+export interface BreakInCounts {
+  held: number
+  /** Hostile, and a weaker decision than asked. */
+  gotThrough: number
+  /** 2 factors as asked, with a factor below the card's minimum. */
+  weakerFactor: number
+  /** Ordinary, and a weaker decision than asked: a real hole, with no attacker. */
+  lessThanAsked: number
+  /** Ordinary, and denied where the card did not ask for a denial. */
+  lockedOut: number
+  /** Ordinary, and 2 factors where the card asked for 1. */
+  extraPrompts: number
+  undecided: number
+  /** Cards about people the policy does not govern. */
+  skipped: number
+}
+
+export interface BreakInResult {
+  rounds: AttemptRound[]
+  counts: BreakInCounts
+  /* The audience a skipped card was outside of, "Human Resources, Finance",
+     for a line that leads with the count (break-in-model.ts `skippedSaid`).
+     Null when the policy names nobody: there is no audience to be outside of,
+     only the empty one, which the Break-in test's empty state already says. */
+  skipped: { cardId: string; audience: string | null }[]
+}
+
+/* One typed card's result.
+
+   In this order, and the order is the argument:
+
+   1. The decision asked for. Held — unless the card names a weakest factor
+      and the rule's second factor is below it (or cannot be ranked), which is
+      2 factors in name and not in effect.
+   2. Weaker than asked. A breach if hostile; if ordinary, a hole with nobody
+      in it, which is still worth closing and is not the same news.
+   3. Stricter than asked. Hostile: held — stopping an attacker harder costs
+      nobody legitimate. Ordinary and denied: locked out, whatever it asked
+      for. Ordinary and prompted where it asked for one factor: extra prompts,
+      a cost rather than a failure. */
+export function classifyAttempt(
+  card: Pick<TypedChallenge, 'kind' | 'minFactor'>,
+  want: Expect,
+  got: AccessDecision,
+  factor: FactorStrength | null,
+): AttemptOutcome {
+  if (got === want) {
+    if (want === '2fa' && card.minFactor && (factor === null || FACTOR_RANK[factor] < FACTOR_RANK[card.minFactor])) return 'weaker-factor'
+    return 'held'
+  }
+  if (STRICTNESS[got] < STRICTNESS[want]) return card.kind === 'threat' ? 'got-through' : 'less-than-asked'
+  if (card.kind === 'threat') return 'held'
+  return got === 'deny' ? 'locked-out' : 'extra-prompts'
+}
+
+/* --- The typed deck --------------------------------------------------------- */
+
+/** A Monday, so a weekday rule has something to read. */
+const DECK_DATE = '2026-09-28'
+
+const clockAt = (time: string): SignInFacts['when'] => ({ date: DECK_DATE, time, timeZone: 'Asia/Kolkata', source: 'stated' })
+const fromAddress = (address: string): SignInFacts['network'] => ({ address, source: 'typed' })
+/** A chip's device, as a stated fact rather than an assumed one. */
+const chipDevice = (chip: string): SignInDevice => ({ ...CHIP_DEVICES[chip], source: 'stated' })
+const score = (n: number): SignInFacts['risk'] => ({ score: n, source: 'stated' })
+
+const chipCard = (id: string): Challenge => DECK.find((c) => c.id === id)!
+/** The legacy card's words, which a typed card keeps. */
+const told = (id: string) => {
+  const c = chipCard(id)
+  return { name: c.name, story: c.story, why: c.why }
+}
+/** The legacy card's fix, re-aimed at a showcase id. */
+const refixed = (id: string, values: string[]): FixSpec => {
+  const f = chipCard(id).fix!
+  return { ...f, conditions: f.conditions.map((c) => ({ ...c, values })) }
+}
+
+/* The machine a phishing proxy signs in from: a Windows 11 browser nobody has
+   registered, with no Device Agent. The person's own laptop is the one
+   device they already have registered. */
+const RELAY_MACHINE: SignInDevice = {
+  source: 'stated',
+  platform: 'windows',
+  osVersion: '10.0.22631',
+  formFactor: 'Laptop',
+  browser: { family: 'edge', version: '128' },
+  integrity: null,
+  screenLock: null,
+  authenticatorVersion: null,
+  agentInstalled: false,
+  agentVersion: null,
+  registeredToPerson: false,
+  registeredCount: 1,
+}
+
+export const TYPED_DECK: TypedChallenge[] = [
+  {
+    id: 'tor-exec',
+    kind: 'threat',
+    ...told('tor-exec'),
+    personId: 'mehak',
+    facts: { network: fromAddress('192.0.2.66'), device: chipDevice('New / unknown'), risk: score(86), when: clockAt('02:40') },
+    want: 'deny',
+    /* Not the legacy "Block anonymised sources": this tenant has no zone for
+       anonymising networks, and a Tor exit names no place and no network any
+       zone here lists. The score is the signal that is there. */
+    fix: {
+      name: 'Deny high device risk',
+      conditions: [{ typeId: 'device-risk', operator: 'above', values: ['70'] }],
+      why: 'A Tor exit names no place and sits on no network the tenant lists, so no zone can catch it. The risk score can, and above 70 is the band the tenant already refuses.',
+    },
+  },
+  {
+    id: 'proxy-finance',
+    kind: 'threat',
+    ...told('proxy-finance'),
+    personId: 'priya',
+    facts: { network: fromAddress('192.0.2.82'), device: chipDevice('Changed fingerprint'), risk: score(48), when: clockAt('11:20') },
+    want: 'deny',
+    fix: {
+      name: 'Deny sign-ins from outside India',
+      conditions: [{ typeId: 'zone', operator: 'not in zone', values: ['india'] }],
+      why: 'The proxy places this sign-in in Frankfurt. Keeping access inside the country closes every proxy abroad, not only this one.',
+    },
+  },
+  {
+    id: 'no-mfa',
+    kind: 'threat',
+    ...told('no-mfa'),
+    personId: 'devon',
+    facts: { network: fromAddress('192.0.2.130'), device: chipDevice('New / unknown'), risk: score(86), when: clockAt('23:05') },
+    want: 'deny',
+    /* No fix, as on the chip card: nothing in the catalogue reads enrolment. */
+  },
+  {
+    id: 'expired-trust',
+    kind: 'threat',
+    ...told('expired-trust'),
+    personId: 'arun',
+    facts: { network: fromAddress('192.0.2.130'), device: chipDevice('Expired trust'), risk: score(12), when: clockAt('14:10') },
+    want: '2fa',
+    fix: refixed('expired-trust', ['fp-corp-devices']),
+  },
+  {
+    id: 'nightshift',
+    kind: 'threat',
+    ...told('nightshift'),
+    personId: 'devon',
+    facts: { network: fromAddress('192.0.2.130'), device: chipDevice('Known < 90 days'), risk: score(12), when: clockAt('03:10') },
+    want: '2fa',
+    fix: chipCard('nightshift').fix,
+  },
+  {
+    id: 'risk-inside',
+    kind: 'threat',
+    ...told('risk-inside'),
+    personId: 'priya',
+    facts: { network: fromAddress('203.0.113.10'), device: chipDevice('Managed (MDM)'), risk: score(86), when: clockAt('15:45') },
+    want: '2fa',
+    fix: chipCard('risk-inside').fix,
+  },
+  {
+    id: 'unmanaged-contractor',
+    kind: 'threat',
+    ...told('unmanaged-contractor'),
+    personId: 'devon',
+    facts: { network: fromAddress('192.0.2.130'), device: chipDevice('New / unknown'), risk: score(48), when: clockAt('10:05') },
+    want: '2fa',
+    fix: refixed('unmanaged-contractor', ['fp-corp-devices']),
+  },
+  {
+    id: 'push-bombing',
+    kind: 'threat',
+    name: 'Repeated push prompts',
+    story: 'Someone with a stolen password signs in again and again from a phone nobody has seen, until the real person approves a prompt to make them stop.',
+    why: 'A push that one tap approves is the second factor this attack is built for. Number matching makes the person type what the sign-in screen shows, which a prompt they did not start cannot give them.',
+    personId: 'priya',
+    facts: { network: fromAddress('192.0.2.130'), device: chipDevice('New / unknown'), risk: score(48), when: clockAt('22:15') },
+    want: '2fa',
+    minFactor: 'standard',
+    /* No fix: the answer is which second factor the rule asks for, which is
+       not a condition a rule can add. */
+    mitre: 'T1621',
+  },
+  {
+    id: 'aitm-relay',
+    kind: 'threat',
+    name: 'Sign-in relayed through a phishing proxy',
+    story: 'A phishing page passes the password and the one-time code through to the real sign-in page as the person types them, from a machine nobody has registered.',
+    why: 'A code the person can read can be relayed as fast as they type it. Only a factor bound to the real site, such as a passkey or a security key, stops a relay that works in real time.',
+    personId: 'arun',
+    facts: { network: fromAddress('192.0.2.82'), device: RELAY_MACHINE, risk: score(12), when: clockAt('10:40') },
+    want: '2fa',
+    minFactor: 'phishing-resistant',
+    mitre: 'T1557',
+  },
+
+  {
+    id: 'office-regular',
+    kind: 'legit',
+    ...told('office-regular'),
+    personId: 'arun',
+    facts: { network: fromAddress('203.0.113.10'), device: chipDevice('Managed (MDM)'), risk: score(12), when: clockAt('09:30') },
+    want: '1fa',
+  },
+  {
+    id: 'exec-office',
+    kind: 'legit',
+    ...told('exec-office'),
+    personId: 'mehak',
+    facts: { network: fromAddress('198.51.100.20'), device: chipDevice('Managed (MDM)'), risk: score(12), when: clockAt('08:55') },
+    want: '1fa',
+  },
+  {
+    id: 'finance-home',
+    kind: 'legit',
+    ...told('finance-home'),
+    personId: 'priya',
+    facts: { network: fromAddress('192.0.2.10'), device: chipDevice('Known < 90 days'), risk: score(12), when: clockAt('19:20') },
+    want: '2fa',
+    fix: refixed('finance-home', ['corp-offices']),
+  },
+  {
+    id: 'first-login',
+    kind: 'legit',
+    ...told('first-login'),
+    personId: 'priya',
+    facts: { network: fromAddress('203.0.113.10'), device: chipDevice('New / unknown'), risk: score(12), when: clockAt('09:05') },
+    want: '2fa',
+  },
+  {
+    id: 'after-reset',
+    kind: 'legit',
+    ...told('after-reset'),
+    personId: 'arun',
+    facts: { network: fromAddress('203.0.113.10'), device: chipDevice('Known < 90 days'), risk: score(12), when: clockAt('13:40') },
+    want: '2fa',
+  },
+  {
+    id: 'roaming-unknown-origin',
+    kind: 'legit',
+    ...told('roaming-unknown-origin'),
+    personId: 'arun',
+    /* No address and no place: the whole point of the card. */
+    facts: { device: chipDevice('Known > 90 days'), risk: score(12), when: clockAt('17:15') },
+    want: '2fa',
+  },
+]
+
+export interface BreakInOptions {
+  /** Cards whose expectation the tenant has overridden, by card id. */
+  overrides?: Record<string, Expect>
+  deck?: TypedChallenge[]
+  /** How device-health client rows are read; see `MatchOptions`. */
+  match?: MatchOptions
+  /* Cards whose second factor the tenant has accepted as it is, by card id:
+     read as though the card named no weakest factor, so a weaker factor the
+     administrator has agreed to is held rather than counted again. */
+  factorOk?: ReadonlySet<string>
+}
+
+const COUNT_OF: Record<AttemptOutcome, Exclude<keyof BreakInCounts, 'skipped'>> = {
+  held: 'held',
+  'got-through': 'gotThrough',
+  'weaker-factor': 'weakerFactor',
+  'less-than-asked': 'lessThanAsked',
+  'locked-out': 'lockedOut',
+  'extra-prompts': 'extraPrompts',
+  undecided: 'undecided',
+}
+
+/* The typed deck against one policy, on the typed evaluator.
+
+   A card about somebody the policy does not govern is skipped, with the
+   audience named — the policy was never asked. Every other card is traced
+   three-valued, and each decision the policy COULD reach is classified with
+   the second factor of the rule that would reach it. When they all agree the
+   round has that outcome; when a missing fact would change it, the round is
+   undecided, and `outcomes` says between what. A round is never scored on a
+   guess. */
+export function runBreakIn(policy: Policy, env: SimEnv, opts: BreakInOptions = {}): BreakInResult {
+  const deck = opts.deck ?? TYPED_DECK
+  const e: SimEnv = opts.match ? { ...env, deviceMatch: opts.match } : env
+  const methods = e.library?.methods ?? AUTH_METHODS
+  /* The second factor of the rule at an index; null is the last row. */
+  const factorOf = (ruleIndex: number | null): FactorStrength | null => {
+    const r = ruleIndex === null ? policy.fallback : policy.rules[ruleIndex]
+    return r ? ruleFactor(r, methods) : null
+  }
+
+  const rounds: AttemptRound[] = []
+  const skipped: BreakInResult['skipped'] = []
+  const named = policy.audience.groupIds.length + policy.audience.userIds.length > 0
+  const outside = named ? audienceNames(policy, e) : null
+  for (const card of deck) {
+    const app = policy.appIds[0]
+    const facts: SignInFacts = { ...card.facts, ...(app ? { appId: app } : null), personId: card.personId }
+    const trace = tracePolicy(policy, facts, e)
+    if (trace.outOfAudience) {
+      skipped.push({ cardId: card.id, audience: outside })
+      continue
+    }
+    const want = opts.overrides?.[card.id] ?? card.want
+    const judged = opts.factorOk?.has(card.id) ? { ...card, minFactor: undefined } : card
+    const outcomes = [...new Set(trace.possible.map((o) => classifyAttempt(judged, want, o.decision, factorOf(o.ruleIndex))))]
+    rounds.push({
+      challenge: card,
+      want,
+      trace,
+      decision: trace.decision,
+      factor: trace.decision === '2fa' ? factorOf(trace.hitIndex) : null,
+      outcome: outcomes.length === 1 ? outcomes[0] : 'undecided',
+      outcomes,
+    })
+  }
+
+  const counts: BreakInCounts = {
+    held: 0,
+    gotThrough: 0,
+    weakerFactor: 0,
+    lessThanAsked: 0,
+    lockedOut: 0,
+    extraPrompts: 0,
+    undecided: 0,
+    skipped: skipped.length,
+  }
+  for (const r of rounds) counts[COUNT_OF[r.outcome]] += 1
+  return { rounds, counts, skipped }
+}
+
+/* --- Fixes for the typed deck ---------------------------------------------------
+
+   The same two repairs the chip deck offers, asked of a typed round.
+
+   A round let through with less than it asked for — hostile or ordinary — is
+   closed by the rule its card names, landed where the round was decided, with
+   every guard `proposeFix` has: a twin is re-aimed rather than duplicated, a
+   rule that would not match this sign-in is not offered, and a spec naming a
+   zone, profile, group or person the tenant does not have is withheld. Only
+   the question "does this rule match the card" differs: the typed evaluator,
+   on the card's own facts and the policy's first application, exactly as
+   `runBreakIn` asked it.
+
+   A round held on the decision and weak on the factor is closed by asking for
+   a stronger second factor on the rule that decided it — not by a new rule,
+   because no condition says which factor a person is offered.
+
+   A round that came back stricter than asked is never "fixed" here. Closing it
+   would mean loosening a rule, and advice to loosen does not come from a test
+   of what gets through. */
+export function proposeAttemptFix(round: AttemptRound, policy: Policy, env: SimEnv): ProposedFix | null {
+  const spec = round.challenge.fix
+  if (!spec || (round.outcome !== 'got-through' && round.outcome !== 'less-than-asked')) return null
+  if (namesMissing(spec, env)) return null
+  const card = round.challenge
+  const person = personOf(card.personId, env)
+  if (!person) return null
+  const app = policy.appIds[0]
+  const facts: SignInFacts = { ...card.facts, ...(app ? { appId: app } : null), personId: card.personId }
+  const at = round.trace.hitIndex ?? policy.rules.length
+  return proposeFrom(spec, round.want, at, person, policy, (r) => traceRule(r, at, facts, person, env).match === 'yes')
+}
+
+/** A stronger second factor for the rule that decided a round: its index (null is the last row) and the method names. */
+export interface FactorFix {
+  ruleIndex: number | null
+  methods: string[]
+}
+
+/* Every second factor the tenant can offer that is at least as strong as the
+   card asks, in catalogue order: switched on, configured and offered
+   (`methodBlocker`), and ranked at or above the card's weakest factor. None
+   means no fix — a rule asking for a method nobody can be offered cannot be
+   completed, which is a lockout, not a repair. */
+export function proposeFactorFix(round: AttemptRound, policy: Policy, methods: readonly AuthMethod[]): FactorFix | null {
+  const min = round.challenge.minFactor
+  if (round.outcome !== 'weaker-factor' || !min) return null
+  const index = round.trace.hitIndex
+  const rule = index === null ? policy.fallback : policy.rules[index]
+  if (!rule || rule.decision !== '2fa') return null
+  const names = methods
+    .filter((m) => m.use === 'second' && methodBlocker(m) === null && FACTOR_RANK[methodStrength(m)] >= FACTOR_RANK[min])
+    .map((m) => m.name)
+  return names.length === 0 ? null : { ruleIndex: index, methods: names }
 }

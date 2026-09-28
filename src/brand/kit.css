@@ -202,6 +202,9 @@ html[data-theme='dark'] {
 .bx-btn--danger:not(:disabled):hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); border-color: var(--int-danger-bg-hover); }
 .bx-btn--danger:not(:disabled):active { background: var(--fb-negative-bg); border-color: var(--int-danger-bg-hover); }
 .bx-btn--danger:focus-visible { outline-color: var(--focus-ring-danger); }
+/* Disabled, there is nothing to destroy, so it drops the red and reads as any
+   other disabled outline (a faded red edge still said "danger" on a clean load). */
+.bx-btn--danger:disabled { color: var(--int-neutral-text); border-color: var(--int-neutral-border); }
 
 /* --- Icon button -----------------------------------------------------------
    Square, icon only, and never without a label — the label is both the
@@ -465,6 +468,27 @@ html[data-theme='dark'] {
 .bx-badge--accent { background: var(--fb-accent-bg); color: var(--fb-accent-fg); border-color: var(--fb-accent-border); }
 .bx-badge--system { background: var(--surface-inset); color: var(--text-tertiary); border-color: var(--border-subtle); }
 
+/* A decision says its whole phrase. "Allow on 1 factor" is seventeen
+   characters and "Would allow with 2FA" twenty, and the 14ch cap above clips
+   exactly the part that tells the three apart (decision-badge.tsx). */
+.bx-decision-badge,
+.bx-would-badge { --badge-max: 24ch; }
+
+/* Can't tell: grey text, never a badge, so it cannot be read as a fourth
+   decision or as a pass. The decisions it could be sit beside it, or under it
+   in a narrow cell. `--text-tertiary` passes AA on white in both themes. */
+.bx-canttell {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  color: var(--text-tertiary);
+}
+.bx-canttell__or::before { content: '·'; margin-right: var(--space-2); }
+.bx-canttell.is-stacked { flex-direction: column; align-items: flex-start; }
+.bx-canttell.is-stacked .bx-canttell__or { font-size: var(--fs-xs); }
+.bx-canttell.is-stacked .bx-canttell__or::before { content: none; }
+
 /* --- Decision chip / status ----------------------------------------------
 
    No dots, anywhere (owner, 14 Sep 2026). A status is a tinted pill with its
@@ -493,9 +517,10 @@ html[data-theme='dark'] {
 .bx-decision--negative { background: var(--fb-negative-bg); color: var(--fb-negative-fg); border-color: var(--fb-negative-border); }
 .bx-decision--notice { background: var(--fb-notice-bg); color: var(--fb-notice-fg); border-color: var(--fb-notice-border); }
 
-/* Draft, Active, Inactive, and Always on for the system policy — nothing else.
-   Active and Always on take the positive tint; Inactive the neutral fill; Draft
-   a solid outline. */
+/* Draft, Active, Monitoring, Inactive, and Always on for the system policy —
+   nothing else. Active and Always on take the positive tint; Monitoring the
+   info blue, because it checks and protects nobody; Inactive the neutral fill;
+   Draft a solid outline. */
 .bx-status--active {
   padding: var(--pill-py) var(--pill-px);
   border-radius: var(--pill-radius);
@@ -523,6 +548,13 @@ html[data-theme='dark'] {
   background: var(--fb-positive-bg);
   color: var(--fb-positive-fg);
   border: var(--bw-thin) solid var(--fb-positive-border);
+}
+.bx-status--monitor {
+  padding: var(--pill-py) var(--pill-px);
+  border-radius: var(--pill-radius);
+  background: var(--fb-info-bg);
+  color: var(--fb-info-fg);
+  border: var(--bw-thin) solid var(--fb-info-border);
 }
 
 /* --- Toggle --------------------------------------------------------------- */
@@ -727,7 +759,7 @@ html[data-theme='dark'] {
    asked for a smaller control, so a condition row rendered its selects at 31px
    and its text inputs at 35px on the same line. Zero specificity keeps the
    defaults while letting a component set its own size. */
-.brand-root :where(input[type='text'], input[type='search'], input[type='number'], input[type='time'], select, textarea) {
+.brand-root :where(input[type='text'], input[type='search'], input[type='number'], input[type='time'], input[type='date'], select, textarea) {
   height: var(--ctl-height-md);
   padding: 0 var(--space-5);
   border: var(--bw-thin) solid var(--ctl-border);
@@ -742,7 +774,7 @@ html[data-theme='dark'] {
    specificity. In the rule above it was (0,2,1) and beat every component that
    asked for a narrower field — which is why a 240px search box rendered full
    width. Everything still defaults to 100%; only an explicit width now wins. */
-.brand-root :where(input[type='text'], input[type='search'], input[type='number'], input[type='time'], select, textarea) {
+.brand-root :where(input[type='text'], input[type='search'], input[type='number'], input[type='time'], input[type='date'], select, textarea) {
   width: 100%;
 }
 .brand-root textarea { height: auto; padding: var(--space-4) var(--space-5); resize: vertical; }

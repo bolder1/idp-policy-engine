@@ -1,18 +1,22 @@
 import {
   conditionType,
+  fallbackRule,
+  FALLBACK_NAME,
   groups as seedGroups,
   users as seedUsers,
   zones as seedZones,
   zoneScopeOf,
   type Condition,
   type ConditionCard,
+  type Policy,
   type Predicate,
   type Rule,
 } from '../data'
+import { DECISION_PHRASE } from '../decision-words'
 import { seedProfiles } from '../fingerprint'
 import { seedHooks } from '../hooks'
 import { cardLetter, leafCount } from '../predicate'
-import { hasWho, whoSummary } from '../rule-who'
+import { hasWho, listNames, whoSummary } from '../rule-who'
 
 /* -----------------------------------------------------------------------------
    The rule, read back as English. One implementation.
@@ -134,6 +138,20 @@ export function conditionSentence(c: Condition, resolve?: NameLookup): string {
     return `${c.operator} ${each.join(' or ')}`
   }
   if (t.valueKind === 'fingerprint') return `${c.operator} ${value}`
+  /* A window is a start and an end, said as the words say it: "between 09:00
+     and 18:00", not "between 09:00–18:00", which reads the dash as the
+     conjunction and then has none. And the zone it is read in, whenever the
+     condition names one (describe spec, §7.1): "09:00 to 18:00" in Kolkata
+     and in Berlin are different rules, and a read-back that drops the zone
+     prints both as the same sentence. */
+  if (t.valueKind === 'time') {
+    const window = raw.length === 2 ? `${raw[0]} and ${raw[1]}` : value
+    return `${t.label} ${c.operator} ${window}${c.tz ? ` (${c.tz})` : ''}`
+  }
+  /* WHICH attribute, said. "User attribute is FTE" is not a question until it
+     names the field — the same gap `key` was added to the model to close
+     (22-G1), left open in the one place an admin reads the rule back. */
+  if (c.key && (c.typeId === 'user-attr' || c.typeId === 'custom-attr')) return `${t.label} ${c.key} ${c.operator} ${value}`
   return `${t.label} ${c.operator} ${value}`
 }
 
@@ -149,7 +167,42 @@ export function cardSentence(conditions: Condition[], resolve?: NameLookup, join
      sentence read "(…) or ()" and described a narrower rule than the one that
      would actually run. */
   if (conditions.length === 0) return 'anything'
-  return conditions.map((c) => conditionSentence(c, resolve)).join(join === 'or' ? ' or ' : ' and ')
+  const band = join === 'and' ? riskBand(conditions) : null
+  const said = conditions.flatMap((c) => {
+    if (!band || (c !== band.above && c !== band.below)) return [conditionSentence(c, resolve)]
+    /* Said once, where the first of the pair stands. */
+    return c === (conditions.indexOf(band.above) < conditions.indexOf(band.below) ? band.above : band.below) ? [band.text] : []
+  })
+  return said.join(join === 'or' ? ' or ' : ' and ')
+}
+
+/* A risk band, said as one: "Device risk score 40 to 70".
+
+   A card that holds `device-risk above 39` and `device-risk below 71` is one
+   question — is the score in the medium band — and it read as two, with the
+   bounds the evaluator compares against rather than the scores that pass:
+   "Device risk score above 39 and Device risk score below 71". Both bounds are
+   strict (`above` is greater than, `below` is less than), so the scores that
+   pass are a + 1 to b − 1, and that is what the sentence says (describe spec,
+   §7.1).
+
+   Only in an AND-card, where both must hold; "above 70 or below 10" is two
+   bands. Only for one whole-number value each, and only when some score
+   passes both — "above 70 and below 40" is a card nothing matches, and
+   folding it into a band would print a range that is not there. */
+function riskBand(conditions: Condition[]): { above: Condition; below: Condition; text: string } | null {
+  const one = (op: string) => conditions.find((c) => c.typeId === 'device-risk' && c.operator === op && c.values.filter((v) => v.trim() !== '').length === 1)
+  const above = one('above')
+  const below = one('below')
+  if (!above || !below) return null
+  const a = Number(above.values.find((v) => v.trim() !== ''))
+  const b = Number(below.values.find((v) => v.trim() !== ''))
+  if (!Number.isInteger(a) || !Number.isInteger(b)) return null
+  const lo = a + 1
+  const hi = b - 1
+  if (lo > hi) return null
+  const label = conditionType('device-risk').label
+  return { above, below, text: lo === hi ? `${label} ${lo}` : `${label} ${lo} to ${hi}` }
 }
 
 const joinOf = (k: ConditionCard) => k.join ?? 'and'
@@ -162,7 +215,7 @@ const joinOf = (k: ConditionCard) => k.join ?? 'and'
    tells the reader what the author thought the alternative WAS, which is the
    one thing the predicate itself cannot say. */
 export function predicateSentence(p: Predicate, resolve?: NameLookup): string {
-  if (p.cards.length === 0) return 'any login that reaches this rule'
+  if (p.cards.length === 0) return 'any sign-in that reaches this rule'
 
   const parts = p.cards.map((k) => {
     const body = cardSentence(k.conditions, resolve, joinOf(k))
@@ -198,24 +251,35 @@ export function predicateParts(p: Predicate, resolve?: NameLookup): ProseCard[] 
 
 /** What the rule does when it matches, in one sentence. */
 export function decisionSentence(rule: Rule): string {
-  if (rule.decision === 'deny') return 'Access is blocked. No alternative path.'
+  /* The message the user is shown, when the rule has its own (the console's
+     "Deny message"). Absent, the product's default is shown, and the
+     sentence stays the one it always was. */
+  if (rule.decision === 'deny') {
+    const message = rule.denyMessage?.trim()
+    return message ? closed(`Access is blocked with the message “${message}”`) : 'Access is blocked. No alternative path.'
+  }
   if (rule.decision === '2fa') {
+    /* The first factor is said too (describe spec, §7.1). A 2FA rule is two
+       factors, and the sentence named only the second — so "the password,
+       then Google Authenticator" and "Email OTP, then Google Authenticator"
+       read back as the same rule. */
+    const after = `${firstFactorLead(rule)}, the user`
     if (rule.secondFactor === 'specific') {
       const named = rule.secondFactorMethods ?? []
       return named.length > 0
-        ? `The user completes a second factor — ${named.join(' or ')} — before access is granted.`
-        : 'The user completes a second factor before access is granted, but no method is chosen yet.'
+        ? `${after} completes a second factor — ${named.join(' or ')} — before access is granted.`
+        : `${after} completes a second factor before access is granted, but no method is chosen yet.`
     }
     if (rule.secondFactor === 'chain') {
       const steps = rule.methodChain ?? []
       return steps.length > 0
-        ? `The user completes every step in order — ${steps.join(' → ')} — before access is granted.`
-        : 'The user completes an ordered chain of factors before access is granted.'
+        ? `${after} completes every step in order — ${steps.join(' → ')} — before access is granted.`
+        : `${after} completes an ordered chain of factors before access is granted.`
     }
     if (rule.secondFactor === 'preferred') {
-      return 'The user completes their preferred second factor before access is granted.'
+      return `${after} completes their preferred second factor before access is granted.`
     }
-    return 'The user completes any enabled second factor before access is granted.'
+    return `${after} completes any enabled second factor before access is granted.`
   }
 
   if (rule.firstFactor === 'Any') return 'Access is granted after any single enabled factor. Nothing further is asked.'
@@ -225,6 +289,124 @@ export function decisionSentence(rule: Rule): string {
       : 'Access is granted after a specific first factor, but no method is chosen yet.'
   }
   return 'Access is granted after the password alone. No second factor is requested.'
+}
+
+/* What comes before the second factor, as the sentence opens: "After the
+   password", "After Email OTP". A specific first factor with no method is
+   said to be unchosen, as the 1-factor sentence says it. */
+function firstFactorLead(rule: Rule): string {
+  if (rule.firstFactor === 'Any') return 'After any enabled first factor'
+  if (rule.firstFactor === 'Specific') return rule.firstFactorMethod ? `After ${rule.firstFactorMethod}` : 'After a first factor not chosen yet'
+  return 'After the password'
+}
+
+/* The first factor as a list names it: "password", "Email OTP". */
+function firstFactorWords(rule: Rule): string {
+  if (rule.firstFactor === 'Any') return 'any enabled factor'
+  if (rule.firstFactor === 'Specific') return rule.firstFactorMethod ?? 'a method not chosen yet'
+  return 'password'
+}
+
+/* What a rule decides, as a clause: the three decisions in the words every
+   testing surface uses (`DECISION_PHRASE`), then the factors that decision
+   asks for, then how long the second one lasts.
+
+   "allow with 2FA, password then Google Authenticator" ·
+   "allow on 1 factor, password" · "deny, “Your device does not meet …”" ·
+   "allow with 2FA, password then miniOrange Push, device remembered for
+   30 days".
+
+   Lower case, because it only ever stands after a colon — the whole policy
+   read as text is "{who and if}: {this}." per rule. Nothing about the rule is
+   left to a default the reader has to know: an unchosen method says so.
+
+   And so does an unchosen outcome. A rule added with + is born holding
+   `decision: '2fa'`, the default, and keeps its `pristine` flag until a tile
+   is pressed — conditions and a who added first do not clear it. The card
+   prints "Outcome not chosen yet" over such a rule (IfBlock, the owner's
+   23 Sep ruling), and this said "allow with 2FA, password then any enabled
+   method" beside it. The flag, not `isPristine`, because the flag is what the
+   card reads. */
+export function outcomePhrase(r: Rule): string {
+  if (r.pristine === true) return 'outcome not chosen yet'
+  const decision = DECISION_PHRASE[r.decision]
+  if (r.decision === 'deny') {
+    const message = r.denyMessage?.trim()
+    return message ? `${decision}, “${message}”` : decision
+  }
+  if (r.decision === '1fa') return `${decision}, ${firstFactorWords(r)}`
+  const second =
+    r.secondFactor === 'specific'
+      ? (r.secondFactorMethods ?? []).length > 0
+        ? (r.secondFactorMethods ?? []).join(' or ')
+        : 'a method not chosen yet'
+      : r.secondFactor === 'chain'
+        ? (r.methodChain ?? []).length > 0
+          ? (r.methodChain ?? []).join(' then ')
+          : 'an ordered chain not set yet'
+        : r.secondFactor === 'preferred'
+          ? 'their preferred method'
+          : 'any enabled method'
+  /* Remember MFA carries its two settings: how long, or — forced on each
+     sign-in — never. Only on a 2FA rule, which is the only one it changes. */
+  const days = r.rememberDays ?? 30
+  const kept = r.rememberMfa ? (r.forceMfaEachLogin ? ', 2FA every sign-in' : `, device remembered for ${days} day${days === 1 ? '' : 's'}`) : ''
+  return `${decision}, ${firstFactorWords(r)} then ${second}${kept}`
+}
+
+/* One line of a policy read as text. `n` is the rule's place in the chain,
+   for the numbered lines; the lines around the rules have none. `ruleId` is
+   the card a line is about — a rule's id, the last row, or nothing. */
+export interface PolicyLine {
+  key: string
+  ruleId: string | 'fallback' | null
+  n: number | null
+  text: string
+}
+
+/* The whole policy as sentences (describe spec, §7.1): where it applies, who
+   it is for when that is not everyone, one numbered line per rule in the
+   order they are tried, and the last row.
+
+   "Applies to HRMS." · "For Human Resources and Finance." ·
+   "1. If in zone Corporate offices: allow with 2FA, password then Google
+   Authenticator." · "Nothing else matched: deny."
+
+   The same renderer as every other read-back — `ruleIfLine` for the who and
+   the if, `outcomePhrase` for the then — so this and the cards cannot say two
+   different things about one rule. A rule switched off keeps its number,
+   because the numbers are the chain's, and says it is off first. Every
+   application is named, as every audience name is: `listPhrase` made three
+   into "HRMS and 2 other applications", and this is what Copy text hands on. */
+export function policySentences(p: Policy, resolve: NameLookup | undefined, appName: (id: string) => string): PolicyLine[] {
+  const apps = p.isSystem
+    ? 'Applies to every application.'
+    : p.appIds.length > 0
+      ? `Applies to ${listNames(p.appIds.map(appName), Infinity)}.`
+      : 'Applies to no applications yet.'
+  const lines: PolicyLine[] = [{ key: 'apps', ruleId: null, n: null, text: apps }]
+  if (!p.audience.everyone) {
+    const who = whoSentence({ groupIds: p.audience.groupIds, userIds: p.audience.userIds }, resolve)
+    lines.push({ key: 'audience', ruleId: null, n: null, text: who ? `For ${who}.` : 'For nobody.' })
+  }
+  p.rules.forEach((r, i) => {
+    const line = closed(`${ruleIfLine(r, resolve)}: ${outcomePhrase(r)}`)
+    lines.push({ key: `rule:${r.id}`, ruleId: r.id, n: i + 1, text: r.enabled ? line : `Switched off. ${line}` })
+  })
+  lines.push({ key: 'fallback', ruleId: 'fallback', n: null, text: closed(`${FALLBACK_NAME}: ${outcomePhrase(p.fallback ?? fallbackRule())}`) })
+  return lines
+}
+
+/* A full stop, unless the sentence already ends on a quoted one: a deny
+   message is usually a sentence of its own, and “… contact IT.”. is two
+   stops in a row. */
+function closed(s: string): string {
+  return /[.!?]”$/.test(s) ? s : `${s}.`
+}
+
+/** The lines as plain text, one a line, the rules numbered: what Copy text puts on the clipboard. */
+export function policyText(lines: readonly PolicyLine[]): string {
+  return lines.map((l) => (l.n === null ? l.text : `${l.n}. ${l.text}`)).join('\n')
 }
 
 /* Who a rule applies to, as a phrase — or `null` for everyone.
@@ -271,8 +453,8 @@ export function ruleIfLine(rule: Rule, resolve?: NameLookup): string {
   /* Mid-sentence: "For everyone except Contractors", not "For Everyone …". */
   const who = whoSentence(rule.who, resolve)?.replace(/^Everyone\b/, 'everyone')
   const empty = rule.when.cards.length === 0
-  if (!who) return empty ? 'Any login that reaches this rule' : `If ${predicateSentence(rule.when, resolve)}`
-  return empty ? `For ${who}, any login` : `For ${who}, if ${predicateSentence(rule.when, resolve)}`
+  if (!who) return empty ? 'Any sign-in that reaches this rule' : `If ${predicateSentence(rule.when, resolve)}`
+  return empty ? `For ${who}, any sign-in` : `For ${who}, if ${predicateSentence(rule.when, resolve)}`
 }
 
 /* A short rule for a list row: who in a few words, then the conditions.

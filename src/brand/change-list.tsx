@@ -28,11 +28,16 @@ import { ArrowRight, ChevronDown, type LucideIcon } from 'lucide-react'
    column and a thin arrow, with the key drawn once above the first section.
 
    A long section shows its first `limit` rows and a "Show N more", keeping at
-   least one row of every kind it holds.
+   least one row of every kind it holds — and every row of a Fails block, since
+   a failed check can be what holds the save.
    -------------------------------------------------------------------------- */
 
 export type ChangeLayout = 'compare' | 'list'
-export type ChangeTone = 'added' | 'changed' | 'removed' | 'effect'
+/* `added`, `changed`, `removed` and `effect` are what a save does. `pass`,
+   `fail` and `neutral` are what a check found: the guard pages list saved
+   sign-ins under Passes, Fails and Can't tell with the same blocks, so a
+   check result is the same object as a change. */
+export type ChangeTone = 'added' | 'changed' | 'removed' | 'effect' | 'pass' | 'fail' | 'neutral'
 
 export interface ChangeItem {
   id: string
@@ -62,6 +67,10 @@ const BADGE_TONE: Record<ChangeTone, string> = {
   changed: 'info',
   removed: 'negative',
   effect: 'notice',
+  pass: 'positive',
+  fail: 'negative',
+  /* Can't tell is grey, never a pass. */
+  neutral: 'neutral',
 }
 
 const isNil = (v: ReactNode) => v === null || v === undefined || v === '' || v === false
@@ -122,8 +131,13 @@ export function ChangeSection({
   const [all, setAll] = useState(false)
   const id = useId()
   const total = blocks.reduce((n, b) => n + b.items.length, 0)
-  const trims = total > limit + 1
-  const shown = trims && !all ? trimBlocks(blocks, limit) : blocks
+  const cut = trimBlocks(blocks, limit)
+  /* What the trim hides, counted rather than assumed: a Fails block is never
+     cut, so it can be fewer than `total - limit`. One hidden row is shown
+     rather than put behind "Show 1 more". */
+  const hidden = total - cut.reduce((n, b) => n + b.items.length, 0)
+  const trims = total > limit + 1 && hidden > 1
+  const shown = trims && !all ? cut : blocks
   const body = (
     /* Mounted while shut, and hidden: the toggle's `aria-controls` has to
        point at something that exists. */
@@ -132,7 +146,7 @@ export function ChangeSection({
         <p className="bx-cl__none">{empty}</p>
       ) : (
         shown.map((block, i) => (
-          <div className={`bx-cl__block${block.tone ? ` is-${block.tone}` : ''}`} key={block.tone ?? i}>
+          <div className={`bx-cl__block${block.tone ? ` is-${block.tone}` : ''}`} key={`${block.tone ?? 'block'}-${i}`}>
             {block.tone && block.label && (
               <p className="bx-cl__kindrow">
                 <span className={`bx-badge bx-badge--${BADGE_TONE[block.tone]} bx-cl__kind`} id={`${id}-k${i}`}>
@@ -155,7 +169,7 @@ export function ChangeSection({
       )}
       {trims && (
         <button type="button" className="bx-cl__more" aria-expanded={all} onClick={() => setAll((v) => !v)}>
-          {all ? 'Show less' : `Show ${total - limit} more`}
+          {all ? 'Show less' : `Show ${hidden} more`}
         </button>
       )}
     </div>
@@ -194,12 +208,19 @@ export function ChangeSection({
 /* The first `limit` rows — but every block keeps at least one row, so a
    trimmed section can never lose a whole kind. Dropping the Removed block
    entirely (nine added rows spent the budget) left a review that counted a
-   deletion in its header and showed nothing of it. */
+   deletion in its header and showed nothing of it.
+
+   A Fails block is kept whole, outside the budget. A failed check can be what
+   holds the save, and the one that does says why beside its row; behind "Show
+   N more" the dialog would end on a disabled button with no reason in sight. */
 function trimBlocks(blocks: ChangeBlock[], limit: number): ChangeBlock[] {
-  let left = Math.max(limit, blocks.length)
+  const whole = (b: ChangeBlock) => b.tone === 'fail'
+  const trimmed = blocks.filter((b) => !whole(b))
+  let left = Math.max(limit - blocks.filter(whole).reduce((n, b) => n + b.items.length, 0), trimmed.length)
   return blocks.map((block) => {
+    if (whole(block)) return block
     /* One for this block, and one held back for each block after it. */
-    const others = blocks.length - blocks.indexOf(block) - 1
+    const others = trimmed.length - trimmed.indexOf(block) - 1
     const take = Math.max(1, Math.min(block.items.length, left - others))
     left -= take
     return { ...block, items: block.items.slice(0, take) }

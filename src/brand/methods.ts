@@ -489,6 +489,26 @@ export const AUTH_METHODS: AuthMethod[] = [
   },
 ]
 
+/* The methods a rule can name, by the names the Authentication methods page
+   gives them (AUTH_METHODS, above).
+
+   It was seven generic names — "TOTP Authenticator", "SMS / OTP" — while every
+   seeded rule and the Authentication methods page said "Google Authenticator"
+   and "OTP over SMS". A stored name the picker did not offer showed as ticked
+   in the card and unticked in the list, and could not be cleared (24 Sep 2026,
+   for the showcase's "password, then Google Authenticator"). One vocabulary. */
+export const RULE_METHODS: string[] = [
+  'miniOrange Push',
+  'miniOrange OTP',
+  'Google Authenticator',
+  'Microsoft Authenticator',
+  'OTP over SMS',
+  'OTP over Email',
+  'FIDO2 / Passkey',
+  'Yubikey Token',
+  'Security Questions',
+]
+
 /** The tenant-wide default applied before a user enrols in anything. */
 export const DEFAULT_METHOD_ID = 'otp-email'
 

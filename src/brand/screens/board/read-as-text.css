@@ -1,0 +1,55 @@
+/* -----------------------------------------------------------------------------
+   Read as text (ReadAsTextPanel.tsx, describe spec §7.2).
+
+   On the board it borrows the inspector's shell, as Describe it does —
+   `.bb__insp` is the floating card, its margin, radius, shadow and entrance —
+   and in the Policies list it is the body of a kit drawer. Either way it is
+   an ordered list of sentences: the rule's number in a 24 px column of its
+   own, in tabular figures so 1 and 10 line up, and the sentence beside it.
+   Grey throughout; the only state is the Version choice's own grey.
+
+   No motion of its own. A rule's line under the pointer rings its card on
+   the chain (`.bb__card.is-traced`), and the sunken hover here is a colour,
+   not a movement.
+   -------------------------------------------------------------------------- */
+
+.brat__bar { gap: var(--space-3); min-height: 44px; padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5); }
+.brat__title {
+  margin: 0;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.brat__title:focus { outline: none; }
+.brat__barend { margin-left: auto; display: inline-flex; gap: var(--space-1); }
+
+.brat__body,
+.brat__drawerbody { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-5); }
+.brat__body { padding: var(--space-5) var(--space-5) var(--space-8); }
+
+.brat__list {
+  align-self: stretch;
+  margin: 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: var(--space-1);
+}
+.brat__line {
+  display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--space-2);
+  width: 100%; margin: 0; padding: var(--space-2);
+  border: none; border-radius: var(--radius-sm); background: none; text-align: left;
+  font: inherit; font-size: var(--fs-md); line-height: 1.5; color: var(--text-primary);
+}
+/* A rule's line is a button — it selects the card — and still text a person
+   can select to quote. */
+button.brat__line { cursor: pointer; user-select: text; }
+button.brat__line:hover { background: var(--surface-sunken); }
+button.brat__line:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.brat__n { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.brat__text { min-width: 0; overflow-wrap: anywhere; }
+
+.brat__foot { margin: 0; padding: 0 var(--space-2); font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* The drawer's head: the policy's name, then Copy, then the kit's close. */
+.bx-drawer__head > .brat__drawerhead { display: flex; align-items: center; gap: var(--space-3); flex: 1; }
+.brat__drawerhead h2 { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.brat__drawerhead > .bx-tip { margin-left: auto; }
+
+/* The bar's way in: a real box, so focus has somewhere to come back to. */
+.bbtop__read { display: inline-flex; }

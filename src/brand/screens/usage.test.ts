@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Policy, PolicyStatus, Rule } from '../data'
-import { deleteConfirmed, deleteImpact, policiesUsing, policiesUsingType } from './usage'
+import { asksForDeleteWord, deleteConfirmed, deleteImpact, policiesUsing, policiesUsingType } from './usage'
 
 /* Only the fields the scan reads. */
 const rule = (id: string, typeId: string, values: string[]): Rule =>
@@ -107,6 +107,12 @@ describe('deleteImpact', () => {
     expect(impact.later.map((u) => u.policy.id)).toEqual(['draft', 'off', 'live-draft'])
     expect(impact.later.map((u) => u.policy.id)).toEqual(policiesUsing('zone', 'z1', policies).map((u) => u.policy.id))
   })
+
+  it('lists a monitoring policy as later: it decides no sign-in the delete could move', () => {
+    const impact = deleteImpact('zone', 'z1', [policy('watching', 'monitor', [rule('r1', 'zone', ['z1'])])])
+    expect(impact.live).toHaveLength(0)
+    expect(impact.later.map((u) => u.policy.id)).toEqual(['watching'])
+  })
 })
 
 describe('deleteConfirmed', () => {
@@ -121,5 +127,28 @@ describe('deleteConfirmed', () => {
     expect(deleteConfirmed('delete')).toBe(true)
     expect(deleteConfirmed('  Delete  ')).toBe(true)
     expect(deleteConfirmed('de lete')).toBe(false)
+  })
+})
+
+describe('asksForDeleteWord', () => {
+  const live = policy('live', 'active', [rule('r1', 'zone', ['z1'])])
+  const off = policy('off', 'inactive', [rule('r2', 'zone', ['z1'])])
+  const system = { ...policy('sys', 'always-on', [rule('r3', 'zone', ['z1'])]), isSystem: true } as Policy
+
+  it('asks when the delete moves a live policy to draft', () => {
+    expect(asksForDeleteWord(deleteImpact('zone', 'z1', [live]))).toBe(true)
+    expect(asksForDeleteWord(deleteImpact('zone', 'z1', [off]))).toBe(false)
+    expect(asksForDeleteWord(undefined)).toBe(false)
+  })
+
+  it('asks when the caller says so, though no sign-in changes', () => {
+    /* A Protected saved sign-in: no policy names it, and it is still not a
+       one-click delete. */
+    expect(asksForDeleteWord(undefined, true)).toBe(true)
+    expect(asksForDeleteWord(deleteImpact('zone', 'z1', [off]), true)).toBe(true)
+  })
+
+  it('never asks while the delete is refused', () => {
+    expect(asksForDeleteWord(deleteImpact('zone', 'z1', [system, live]), true)).toBe(false)
   })
 })

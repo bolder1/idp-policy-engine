@@ -38,6 +38,22 @@ export function commit(h: History, next: Policy): History {
   return { past: [...h.past, h.present].slice(-HISTORY_LIMIT), present: next, future: [] }
 }
 
+/* One edit made of several writes: Describe it's panel, which rewrites the
+   rules after every answer and is still ONE thing to take back.
+
+   The first write of the group goes through `commit`, so the present before it
+   is on the stack; every later write replaces the present in place. One Undo
+   then returns to the draft as it was before the group began, rather than
+   walking back through each answer the admin clicked on the way. A write that
+   changes nothing is not a write, as with `commit`. The future is cleared for
+   the same reason a commit clears it: a redo past this point would restore a
+   state the group has since rewritten. */
+/** Replaces the present without a new undo step: the second and later writes of one grouped edit. */
+export function amend(h: History, next: Policy): History {
+  if (JSON.stringify(h.present) === JSON.stringify(next)) return h
+  return { ...h, present: next, future: [] }
+}
+
 /* Discarding unsaved edits, as a step that can be undone.
 
    Discard used to reset the history to the saved policy, which emptied the undo

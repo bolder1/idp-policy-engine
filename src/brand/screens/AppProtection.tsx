@@ -527,6 +527,7 @@ function RemoveDialog({
 const STATUS_WORD: Record<Policy['status'], string> = {
   draft: 'Draft',
   active: 'Active',
+  monitor: 'Monitoring',
   inactive: 'Inactive',
   'always-on': 'Always on',
 }

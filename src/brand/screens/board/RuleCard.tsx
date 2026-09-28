@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import {
   ArrowRight,
   Asterisk,
@@ -17,8 +17,8 @@ import { ruleMenu } from './rule-menu'
 import { leafCount } from '../../predicate'
 import { hasWho, whoSummary } from '../../rule-who'
 import type { NameLookup } from '../predicate-prose'
-import type { StepKind } from '../simulate'
 import type { RuleState } from '../rule-form'
+import type { CardState } from '../testing/evidence'
 import { DECISION_NAME, TONE, type Part } from './model'
 import { IfBlock, IfChip, IfKw } from './IfBlock'
 import { isPristine, stateLabel } from './parts'
@@ -126,7 +126,7 @@ function CardSummary({ rule, resolve, terminal }: { rule: Rule; resolve?: NameLo
         <span className="bb__ifbranch" aria-hidden>
           <Split size={11} strokeWidth={2} />
         </span>
-        <span className="bb__cardsum__n">Every login</span>
+        <span className="bb__cardsum__n">Every sign-in</span>
         <ArrowRight size={11} strokeWidth={2} aria-hidden />
         <IfChip tone={TONE[rule.decision]}>{DECISION_NAME[rule.decision]}</IfChip>
       </div>
@@ -159,6 +159,22 @@ function CardSummary({ rule, resolve, terminal }: { rule: Rule; resolve?: NameLo
   )
 }
 
+/* Try a sign-in's reading of one card (try-sign-in.ts builds it, Board draws
+   it): the evidence under the head, the marker when it stands here, and the
+   card's standing, which dims a card the sign-in never reached. The card's
+   body stays folded in test mode — the evidence is what is being read. */
+export interface CardRoute {
+  state: CardState
+  evidence: ReactNode
+  /** The marker, when it stands on this card. */
+  marker?: ReactNode
+}
+
+/* Blue edge where the marker stands; dimmed where the sign-in never came. A
+   rule that is switched off is already drawn as one (`is-off`). */
+const routeClass = (route: CardRoute | undefined): string =>
+  !route ? '' : `is-routed${route.marker ? ' is-marked' : ''}${route.state === 'not-reached' ? ' is-unreached' : ''}`
+
 export function RuleCard({
   rule,
   index,
@@ -166,9 +182,7 @@ export function RuleCard({
   state,
   stateNote,
   unreachable = false,
-  traceKind,
-  traceReason,
-  landed,
+  route,
   shadowed,
   dragging,
   expanded,
@@ -184,6 +198,9 @@ export function RuleCard({
   onGrip,
   onHover,
   cardRef,
+  flash = false,
+  source,
+  traced = false,
 }: {
   rule: Rule
   index: number
@@ -197,10 +214,8 @@ export function RuleCard({
   stateNote?: string
   /** Another rule always matches first, so this one never runs. */
   unreachable?: boolean
-  traceKind: StepKind | null
-  traceReason: string | null
-  /** The sign-in token has landed here. */
-  landed: boolean
+  /** Try a sign-in's reading of this card, while the board is in test mode. */
+  route?: CardRoute
   shadowed: boolean
   dragging: boolean
   /** Whether the WHEN/THEN body is unfolded. Owned by the host, not the card. */
@@ -217,13 +232,20 @@ export function RuleCard({
   onGrip: (e: ReactPointerEvent<HTMLElement>) => void
   onHover: (on: boolean) => void
   cardRef: (el: HTMLDivElement | null) => void
+  /** Shown from a guard page: an outline that fades. CSS only — this is a motion element. */
+  flash?: boolean
+  /* The words this card was written from, by Describe it — shown under the
+     title until the policy is next saved (describe spec, §3.8). */
+  source?: string
+  /** An answer in Describe it that wrote this card is under the pointer: a 1px ring, border only. */
+  traced?: boolean
 }) {
   const tone = TONE[rule.decision]
   const titleId = `bb-rule-${rule.id}-title`
   const selected = openPart !== null
   /* The ⋯ menu is open: holds the trail out while the pointer is in the menu. */
   const [menuOpen, setMenuOpen] = useState(false)
-  const kindClass = traceKind === 'hit' ? 'is-hit' : traceKind === 'miss' ? 'is-miss' : traceKind === 'unreached' || traceKind === 'off' ? 'is-unreached' : ''
+  const kindClass = routeClass(route)
 
   return (
     <motion.div
@@ -233,7 +255,7 @@ export function RuleCard({
          the first — each measured a position the other was mid-way through
          changing, which is the small shiver a reorder used to end on. One
          element animates the move, and it is the one that moves. */
-      className={`bb__card is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${rule.enabled ? '' : 'is-off'} ${shadowed ? 'is-shadowed' : ''} ${dragging ? 'is-dragging' : ''} ${menuOpen ? 'is-menu' : ''} ${kindClass}`}
+      className={`bb__card is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${rule.enabled ? '' : 'is-off'} ${shadowed ? 'is-shadowed' : ''} ${dragging ? 'is-dragging' : ''} ${menuOpen ? 'is-menu' : ''} ${flash ? 'is-flash' : ''} ${traced ? 'is-traced' : ''} ${kindClass}`}
       /* No style prop while dragging, deliberately. Board writes this element's
          transform directly on every pointer move; a `style` React manages would
          be reset to a stale offset on the next re-render, which is the classic
@@ -265,6 +287,7 @@ export function RuleCard({
       onMouseLeave={() => onHover(false)}
       data-index={index}
     >
+      {route?.marker}
       <div className="bb__cardhead">
         {/* The index is the grip. It is the one thing on the card that says
             "this is a position", so it is the thing you drag to change it.
@@ -357,6 +380,11 @@ export function RuleCard({
               {stateLabel(state, rule.enabled, unreachable)}
             </span>
           </span>
+          {source && (
+            <p className="bb__card__from" title={`From your text: “${source}”`}>
+              From your text: “{source}”
+            </p>
+          )}
         </div>
 
         <div className="bb__cardmeta" onClick={(e) => e.stopPropagation()}>
@@ -446,27 +474,14 @@ export function RuleCard({
       <div className="bb__fold bb__fold--body" id={`bb-rule-${rule.id}-body`} inert={!expanded}>
         <div>
           <div className="bb__cardbody">
-            <IfBlock
-              rule={rule}
-              resolve={resolve}
-              token={
-                landed ? (
-                  <motion.span layoutId="bb-token" className="bb__token" aria-hidden transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
-                    ●
-                  </motion.span>
-                ) : undefined
-              }
-            />
+            <IfBlock rule={rule} resolve={resolve} />
           </div>
         </div>
       </div>
 
-      {traceKind && traceKind !== 'unreached' && traceReason && (
-        <motion.p className={`bb__verdict ${traceKind === 'hit' ? 'is-hit' : ''}`} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
-          <strong>{traceKind === 'hit' ? 'Matched' : traceKind === 'off' ? 'Switched off' : 'Did not match'}</strong>
-          <span>{traceReason}</span>
-        </motion.p>
-      )}
+      {/* What the sign-in being tried made of this rule, in place of the
+          rehearsal's one-sentence verdict (RouteGate.tsx). */}
+      {route?.evidence}
     </motion.div>
   )
 }
@@ -478,31 +493,40 @@ export function TerminalCard({
   rule,
   resolve,
   selected,
-  landed,
-  reached,
+  route,
   expanded,
   onSelect,
   onToggleExpand,
   cardRef,
+  flash = false,
+  traced = false,
+  onHover,
 }: {
   rule: Rule
   resolve: NameLookup
   selected: boolean
-  landed: boolean
-  /** Whether the rehearsal fell through to here. Null when nothing is running. */
-  reached: boolean | null
+  /** Try a sign-in's reading of the last row, while the board is in test mode. */
+  route?: CardRoute
   expanded: boolean
   onSelect: () => void
   onToggleExpand: () => void
   cardRef: (el: HTMLDivElement | null) => void
+  /** Shown from a guard page: an outline that fades. CSS only — this is a motion element. */
+  flash?: boolean
+  /** Describe it: the answer under the pointer wrote this row. A border colour, never a transform. */
+  traced?: boolean
+  /** Describe it: the pointer is over this row. */
+  onHover?: (on: boolean) => void
 }) {
   const tone = TONE[rule.decision]
   return (
     <motion.div
       ref={cardRef}
-      layout
+      /* Position only while a route is read: the evidence under the head
+         changes the card's height, and a size animation stretches its text. */
+      layout={route ? 'position' : true}
       transition={{ type: 'spring', stiffness: 520, damping: 40 }}
-      className={`bb__card is-terminal is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${reached === true ? 'is-hit' : reached === false ? 'is-unreached' : ''}`}
+      className={`bb__card is-terminal is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${flash ? 'is-flash' : ''} ${traced ? 'is-traced' : ''} ${routeClass(route)}`}
       /* The same shape as every other card: a group named by its title
          button. It has no inner controls to hide, so the old whole-card button
          cost nothing here — but `aria-pressed` is a toggle's attribute and
@@ -511,7 +535,10 @@ export function TerminalCard({
       role="group"
       aria-labelledby="bb-terminal-title"
       onClick={onSelect}
+      onMouseEnter={onHover && (() => onHover(true))}
+      onMouseLeave={onHover && (() => onHover(false))}
     >
+      {route?.marker}
       <div className="bb__cardhead">
         <span className="bb__idx is-home" aria-hidden>
           <span>
@@ -575,7 +602,7 @@ export function TerminalCard({
               </span>
             </div>
           </div>
-          <em>Every login that no rule above caught</em>
+          <em>Every sign-in that no rule above caught</em>
         </div>
 
         {/* One mark, in the same trail and at the same x as every other card's.
@@ -607,21 +634,11 @@ export function TerminalCard({
       <div className="bb__fold bb__fold--body" id="bb-terminal-body" inert={!expanded}>
         <div>
           <div className="bb__cardbody">
-            <IfBlock
-              terminal
-              rule={rule}
-              resolve={resolve}
-              token={
-                landed ? (
-                  <motion.span layoutId="bb-token" className="bb__token" aria-hidden transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
-                    ●
-                  </motion.span>
-                ) : undefined
-              }
-            />
+            <IfBlock terminal rule={rule} resolve={resolve} />
           </div>
         </div>
       </div>
+      {route?.evidence}
     </motion.div>
   )
 }

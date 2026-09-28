@@ -55,8 +55,8 @@ export interface Cmd {
 export function baseCommands(rules: Rule[], opts: { canUndo: boolean; canRedo: boolean; extra?: Cmd[] }): Cmd[] {
   const out: Cmd[] = [...(opts.extra ?? [])]
   out.push({ id: 'add', label: 'Add a rule', icon: Plus })
-  out.push({ id: 'gauntlet', label: 'Run the gauntlet', hint: 'Deal 13 login attempts at this policy', icon: Swords })
-  out.push({ id: 'impact', label: 'Open the blast radius', hint: 'What this change does to the modelled world', icon: Target })
+  out.push({ id: 'gauntlet', label: 'Run the Attempt deck', hint: 'Deal 13 sign-in attempts at this policy', icon: Swords })
+  out.push({ id: 'impact', label: 'Open What changes', hint: 'What this change does to the modelled world', icon: Target })
   out.push({ id: 'test', label: 'Test one person', icon: Search })
   out.push({ id: 'log', label: 'Decision log', icon: ScrollText })
   out.push({ id: 'apps', label: 'Assign applications', icon: AppWindow })

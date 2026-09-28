@@ -18,12 +18,20 @@
              its own group when the consequences share one
      count   how many changes the row stands for, when it lists several
              ("10.0.0.2, 10.0.0.3" is two added networks); 1 if absent
+     check   a consequence that is a check's finding rather than a change: a
+             saved sign-in that now fails, can't be told, or passes after the
+             edit (the library guard, spec D.6). Filed under its own Fails,
+             Can't tell or Passes chip inside the consequences, fails first
 
    All optional, and `label` still reads on its own, so a row without them is
    still a valid row. No React here: the producers are plain modules.
    -------------------------------------------------------------------------- */
 
 export type ReviewKind = 'added' | 'removed' | 'changed'
+
+/** What a check found: the guard pages' three chips, in the order they are read. */
+export type CheckFinding = 'fail' | 'neutral' | 'pass'
+export const CHECK_ORDER: readonly CheckFinding[] = ['fail', 'neutral', 'pass']
 
 export interface ReviewLine {
   /** The whole change in words, on its own: "Signals: added TPM ID". */
@@ -35,6 +43,7 @@ export interface ReviewLine {
   item?: string
   effect?: boolean
   count?: number
+  check?: CheckFinding
 }
 
 /* Nothing there: an added row's before, a removed row's after. */
@@ -59,7 +68,7 @@ export const GENERAL_GROUP = 'General'
 /** The heading for consequences that name no section of their own. */
 export const EFFECT_GROUP = 'Other settings'
 
-type Groupable = { group?: string; effect?: boolean; kind?: ReviewKind; count?: number; before: unknown; after: unknown }
+type Groupable = { group?: string; effect?: boolean; kind?: ReviewKind; count?: number; check?: CheckFinding; before: unknown; after: unknown }
 
 /* Sections in the order the page first names them, rows without one leading,
    consequences last whatever order they came in. */
@@ -103,7 +112,7 @@ export const KIND_ORDER: ReviewKind[] = ['added', 'changed', 'removed']
    from every section under one heading is what this replaced. */
 
 export interface KindBlock<R> {
-  kind: ReviewKind | 'effect'
+  kind: ReviewKind | 'effect' | CheckFinding
   rows: R[]
 }
 
@@ -122,7 +131,7 @@ export function groupSections<R extends Groupable>(rows: R[]): SectionGroup<R>[]
     effect: section.effect,
     count: tally(section.rows),
     blocks: section.effect
-      ? [{ kind: 'effect' as const, rows: section.rows }]
+      ? effectBlocks(section.rows)
       : KIND_ORDER.map((kind) => ({ kind, rows: section.rows.filter((r) => reviewKind(r) === kind) })).filter(
           (b) => b.rows.length > 0,
         ),
@@ -130,6 +139,44 @@ export function groupSections<R extends Groupable>(rows: R[]): SectionGroup<R>[]
 }
 
 const tally = (rows: { count?: number }[]) => rows.reduce((n, r) => n + (r.count ?? 1), 0)
+
+/* --- How the dialog opens, and what holds its Save ---------------------------------
+
+   Sections open, because a review that hides what it is reviewing is not a
+   review. Past this many ROWS one section starts open and the rest shut —
+   rows, not counted changes, because it is rows that make the dialog long: a
+   zone's single "10.0.0.2, 10.0.0.3 and 12 more" row counts fifteen changes
+   and takes one line.
+
+   The one left open is the biggest, not the first. The first is General — the
+   Name row — on every rename and every create, so "open the first" opened a
+   one-row section and shut everything worth reading.
+
+   A section holding something that fails is always open: what stops the save
+   is never behind a chevron. */
+export const REVIEW_OPEN_ALL = 12
+
+/** Whether each section starts open. */
+export function sectionsOpen(sections: readonly Pick<SectionGroup<unknown>, 'blocks'>[]): boolean[] {
+  const rowsIn = (x: (typeof sections)[number]) => x.blocks.reduce((n, b) => n + b.rows.length, 0)
+  const many = sections.reduce((n, x) => n + rowsIn(x), 0) > REVIEW_OPEN_ALL
+  const openAt = sections.reduce((best, x, i) => (rowsIn(x) > rowsIn(sections[best]) ? i : best), 0)
+  return sections.map((x, i) => !many || i === openAt || x.blocks.some((b) => b.kind === 'fail'))
+}
+
+/** The review's Save: held by the page's own validity, titled with its reason, or by a check, titled with the check's short word ("Can't save"). */
+export function reviewSave(blocked: boolean, blockedReason: string | undefined, stop: string | null): { disabled: boolean; title: string | undefined } {
+  return { disabled: blocked || !!stop, title: blocked ? blockedReason : (stop ?? undefined) }
+}
+
+/* The consequences: one block of what simply happens, then a check's findings
+   under their own chips, fails first — so a saved sign-in the edit breaks is
+   never filed as one more thing that "happens". */
+function effectBlocks<R extends Groupable>(rows: R[]): KindBlock<R>[] {
+  const plain: KindBlock<R> = { kind: 'effect', rows: rows.filter((r) => !r.check) }
+  const found = CHECK_ORDER.map((kind): KindBlock<R> => ({ kind, rows: rows.filter((r) => r.check === kind) }))
+  return [plain, ...found].filter((b) => b.rows.length > 0)
+}
 
 const KIND_WORDS = new Set(['added', 'removed', 'changed'])
 

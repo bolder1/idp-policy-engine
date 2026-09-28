@@ -7,7 +7,11 @@ import {
   classifyIp,
   describeZone,
   explainBadEntry,
+  ipInEntry,
+  ipv4Number,
+  isAddress,
   isValidAsn,
+  parseIpv6,
   validateZone,
 } from './zone-validation'
 
@@ -231,5 +235,91 @@ describe('describeZone', () => {
   it('counts addresses and ASNs separately', () => {
     const z = zone({ ip: ['10.0.0.0/8', '10.1.0.0/16'], asn: ['AS64512'] })
     expect(describeZone(z)).toContain('2 networks + 1 ASN')
+  })
+})
+
+/* -----------------------------------------------------------------------------
+   Is an address inside an entry — the arithmetic the evaluator reads a zone's
+   network half with. Edges first, because an off-by-one in a prefix is the
+   kind of wrong answer that reads exactly like a right one.
+   -------------------------------------------------------------------------- */
+
+describe('an address against an entry', () => {
+  it('matches an exact IPv4 address and nothing beside it', () => {
+    expect(ipInEntry('203.0.113.5', '203.0.113.5')).toBe(true)
+    expect(ipInEntry('203.0.113.6', '203.0.113.5')).toBe(false)
+  })
+
+  it('reads a /32 as one host, a /0 as every address and a /24 to its last address', () => {
+    expect(ipInEntry('192.0.2.7', '192.0.2.7/32')).toBe(true)
+    expect(ipInEntry('192.0.2.8', '192.0.2.7/32')).toBe(false)
+    expect(ipInEntry('8.8.8.8', '0.0.0.0/0')).toBe(true)
+    expect(ipInEntry('255.255.255.255', '0.0.0.0/0')).toBe(true)
+    expect(ipInEntry('203.0.113.0', '203.0.113.0/24')).toBe(true)
+    expect(ipInEntry('203.0.113.255', '203.0.113.0/24')).toBe(true)
+    expect(ipInEntry('203.0.114.0', '203.0.113.0/24')).toBe(false)
+    expect(ipInEntry('203.0.112.255', '203.0.113.0/24')).toBe(false)
+  })
+
+  it('stays unsigned above 128.0.0.0', () => {
+    expect(ipv4Number('255.255.255.255')).toBe(0xffffffff)
+    expect(ipInEntry('200.1.2.3', '200.0.0.0/8')).toBe(true)
+    expect(ipInEntry('201.1.2.3', '200.0.0.0/8')).toBe(false)
+  })
+
+  it('includes both ends of a range, typed with a hyphen or an en-dash', () => {
+    expect(ipInEntry('203.0.113.10', '203.0.113.10-203.0.113.60')).toBe(true)
+    expect(ipInEntry('203.0.113.60', '203.0.113.10 – 203.0.113.60')).toBe(true)
+    expect(ipInEntry('203.0.113.61', '203.0.113.10–203.0.113.60')).toBe(false)
+    expect(ipInEntry('203.0.113.9', '203.0.113.10-203.0.113.60')).toBe(false)
+  })
+
+  it('matches IPv6 exactly and by prefix', () => {
+    expect(ipInEntry('2001:db8::1', '2001:db8:0:0:0:0:0:1')).toBe(true)
+    expect(ipInEntry('2001:db8:1:ffff::9', '2001:db8:1::/48')).toBe(true)
+    expect(ipInEntry('2001:db8:2::9', '2001:db8:1::/48')).toBe(false)
+    expect(ipInEntry('2001:db9::1', '2001:db8::/32')).toBe(false)
+  })
+
+  it('says no, not "cannot tell", when the families differ', () => {
+    expect(ipInEntry('203.0.113.5', '2001:db8::/32')).toBe(false)
+    expect(ipInEntry('2001:db8::1', '203.0.113.0/24')).toBe(false)
+  })
+
+  it('compares an IPv4-mapped address as IPv4, and only against an IPv4 entry', () => {
+    expect(ipInEntry('::ffff:203.0.113.5', '203.0.113.0/24')).toBe(true)
+    expect(ipInEntry('::ffff:cb00:7105', '203.0.113.5')).toBe(true)
+    expect(ipInEntry('::ffff:203.0.113.5', '2001:db8::/32')).toBe(false)
+  })
+
+  it('cannot answer for an entry or an address that is not one', () => {
+    expect(ipInEntry('203.0.113.5', 'not an address')).toBeNull()
+    expect(ipInEntry('203.0.113.5', '203.0.113.0/33')).toBeNull()
+    expect(ipInEntry('203.0.113.500', '203.0.113.0/24')).toBeNull()
+    expect(ipInEntry('fe80::1%eth0', 'fe80::/10')).toBeNull()
+  })
+})
+
+describe('reading an IPv6 address', () => {
+  it.each([
+    ['::', 0n],
+    ['::1', 1n],
+    ['1::', 1n << 112n],
+    ['2001:db8::ff00:42:8329', 0x20010db8000000000000ff0000428329n],
+    ['::ffff:192.0.2.1', (0xffffn << 32n) | 0xc0000201n],
+    ['1:2:3:4:5:6:1.2.3.4', 0x0001000200030004000500060102_0304n],
+  ])('reads %s', (v, n) => {
+    expect(parseIpv6(v)).toBe(n)
+  })
+
+  it.each(['1:::2', ':1', '1:2:3:4:5:6:7:8:9', '1:2:3:4:5:6:7:8::', '12345::', 'g::1', ''])('refuses %s', (v) => {
+    expect(parseIpv6(v)).toBeNull()
+  })
+
+  it('knows an address from anything else', () => {
+    expect(isAddress('203.0.113.5')).toBe(true)
+    expect(isAddress('2001:db8::1')).toBe(true)
+    expect(isAddress('203.0.113.0/24')).toBe(false)
+    expect(isAddress('example.com')).toBe(false)
   })
 })

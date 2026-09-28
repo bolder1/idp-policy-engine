@@ -1,0 +1,21 @@
+/* A segmented control, the kit does not ship one (`Seg`, Section.tsx).
+
+   Its own sheet, imported by the component rather than kept in board.css,
+   because it is drawn off the board too: What they see uses it on the
+   Policy testing page, where board.css may never have loaded. One copy, so
+   the two cannot drift. */
+.bb__seg {
+  display: inline-flex; padding: var(--space-1); border-radius: var(--radius-md);
+  background: var(--surface-inset, #eef1f4);
+}
+.bb__seg > button {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 26px; padding: 0 9px; border-radius: var(--radius-sm); border: none; background: none;
+  font-family: inherit; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary); cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.bb__seg > button:hover { color: var(--text-primary); }
+.bb__seg > button.is-on { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--el-low); }
+.bb__seg > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.bb__seg--block { display: flex; }
+.bb__seg--block > button { flex: 1; justify-content: center; }

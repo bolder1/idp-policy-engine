@@ -686,24 +686,21 @@ function ZoneDetail({
               }}
             />
           ) : (
-            <span className="bz7__nameline">
-              <h1>{draft.name}</h1>
-              <button
-                type="button"
-                className="bz7__rename"
-                aria-label={`Rename ${draft.name}`}
-                onClick={() => {
-                  setDraftName(draft.name)
-                  setRenaming(true)
-                }}
-              >
-                <Pencil size={14} strokeWidth={1.9} aria-hidden />
-              </button>
-            </span>
+            <h1>{draft.name}</h1>
           )}
           <p>{describeZone(draft)}</p>
         </div>
         <div className="bz7__actions">
+          {/* Rename sits with the page's other actions. As a pencil beside the title it
+              left a gap between the name and whatever followed it — the type label, the
+              "In use" badge — and read as part of the heading rather than a control. */}
+          <Button variant="secondary" size="sm" onClick={() => {
+              setDraftName(draft.name)
+              setRenaming(true)
+            }}>
+            <Pencil size={14} strokeWidth={1.9} aria-hidden />
+            Rename
+          </Button>
           {/* Carries the count, so the answer to "does anything depend on this"
               is on the page without opening anything — and opening it is only
               needed for WHICH. */}
@@ -743,10 +740,9 @@ function ZoneDetail({
           ordinary state of typing one, so the page collects the edit and asks
           before committing it. */}
       <section className="bz7__build">
-            {/* Both tabs, always — including the empty one.
-
-                It is how the second facet gets added once the first exists, and
-                the count on each says which is which without opening it. */}
+            {/* Both tabs, always — including the empty one: it is how the second
+                facet gets added once the first exists. No counts on them; the
+                line under the zone's name already says how many of each. */}
             <div className="bz7__buildtabs" role="tablist" aria-label="What this zone matches on">
               <button
                 type="button"
@@ -757,7 +753,6 @@ function ZoneDetail({
               >
                 <Network size={14} strokeWidth={1.9} aria-hidden />
                 IP networks
-                <em>{netCount}</em>
               </button>
               <button
                 type="button"
@@ -768,7 +763,6 @@ function ZoneDetail({
               >
                 <Globe size={14} strokeWidth={1.9} aria-hidden />
                 Locations
-                <em>{placeCount}</em>
               </button>
             </div>
 
@@ -1330,11 +1324,8 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
       if (again) addRow()
     }
 
-    setNote(
-      [added > 0 ? added + ' added' : null, bad.length > 0 ? bad.length + ' could not be read' : null]
-        .filter(Boolean)
-        .join(' · ') || null,
-    )
+    /* Only what landed. What did not is already said by the row it stayed in. */
+    setNote(added > 0 ? `${added} added` : null)
   }
 
   /* Memoized because this list has no ceiling — a row deliberately accepts as
@@ -1428,7 +1419,7 @@ export function AddressSection({ draft, onChange }: { draft: Zone; onChange: (z:
             block
             value={filter}
             onChange={setFilter}
-            placeholder={`Filter ${all.length} entries…`}
+            placeholder="Filter entries…"
             label="Filter entries"
           />
           <button

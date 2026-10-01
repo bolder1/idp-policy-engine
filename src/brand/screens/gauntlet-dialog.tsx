@@ -99,9 +99,7 @@ function Dial({ result, running }: { result: GauntletResult | null; running: boo
         {result ? (
           <>
             <strong>{result.grade}</strong>
-            <em>
-              {held}/{total} held
-            </em>
+            <em>{total} dealt</em>
           </>
         ) : (
           <>
@@ -458,7 +456,7 @@ export function GauntletDialog({
           <span className="bgt__foot">
             {overrideCount > 0
               ? `${overrideCount} expectation${overrideCount === 1 ? '' : 's'} overruled by you.`
-              : `${DECK.length} attempts — seven hostile, six ordinary.`}
+              : 'Seven hostile, six ordinary.'}
           </span>
           <Button variant="ghost" onClick={onClose}>
             Close
@@ -509,7 +507,7 @@ export function GauntletDialog({
                     text="Heuristic, not the engine: each card's context maps to condition values through the same fixed table the Test dialog uses. Real: the order, the first-match stop, and the decision. A card's expected treatment is an opinion — yours to overrule, and the grade follows."
                   />
                 </h3>
-                <p>Thirteen sign-in attempts, dealt at these rules. Nothing accumulates — the grade is a function of the rules as they stand.</p>
+                <p>Each attempt is dealt at these rules. Nothing accumulates — the grade is a function of the rules as they stand.</p>
               </>
             )}
 

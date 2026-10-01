@@ -920,7 +920,9 @@ function OptionList({
     <>
       {searchLabel && <SearchField value={q} onChange={setQ} label={searchLabel} />}
       <List items={shown} picked={picked} single={single} onPick={onPick} q={q} />
-      {searchLabel && (
+      {/* Only while a search narrows the list: unfiltered, "24 of 24" is one
+          number said twice. */}
+      {searchLabel && q.trim() && (
         <div className="cp__foot">
           <span className="cp__count">
             {shown.length} of {items.length}
@@ -1247,19 +1249,25 @@ function ValueBody({
         }}
       />
 
-      <div className="cp__foot">
-        <span className="cp__count">
-          {shown.length} of {options.length}
-        </span>
-        {footer &&
-          (onFooter ? (
-            <button type="button" className="cp__manage" onClick={onFooter}>
-              {footer} →
-            </button>
-          ) : (
-            <span className="cp__hint">{footer}</span>
-          ))}
-      </div>
+      {/* The count only while a search narrows the list: unfiltered, it is one
+          number twice. With no count and no footer there is no foot to draw. */}
+      {(q.trim() || footer) && (
+        <div className="cp__foot">
+          {q.trim() && (
+            <span className="cp__count">
+              {shown.length} of {options.length}
+            </span>
+          )}
+          {footer &&
+            (onFooter ? (
+              <button type="button" className="cp__manage" onClick={onFooter}>
+                {footer} →
+              </button>
+            ) : (
+              <span className="cp__hint">{footer}</span>
+            ))}
+        </div>
+      )}
     </>
   )
 }

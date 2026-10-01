@@ -23,7 +23,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
-import { Button, Drawer, IconButton, MenuButton, TipMark, Toggle } from '../kit'
+import { Badge, Button, Drawer, IconButton, MenuButton, TipMark, Toggle } from '../kit'
 import { methodBlocker, type AuthMethod } from '../methods'
 import { useBrand, type Role } from '../store'
 import { NoResults } from '../empty'
@@ -728,9 +728,9 @@ function SetupForm({ draft }: { draft: SetupDraft }) {
                     it is outstanding. Without this, collapsing Connection
                     hides the only explanation for why Save is dead. */}
                 <i className={`bm8__setupcount ${gaps ? 'is-gap' : ''}`}>
-                  {gaps
-                    ? `${gaps} required`
-                    : `${own.length} field${own.length === 1 ? '' : 's'}`}
+                  {/* "Required", not a count: the head's "N required fields left"
+                      is on screen at the same time and carries the number. */}
+                  {gaps ? 'Required' : `${own.length} field${own.length === 1 ? '' : 's'}`}
                 </i>
               </button>
               {!closed && (
@@ -1336,6 +1336,34 @@ function CategoryDrawer({
     .map((m) => ({ m, settings: methodSettingsFor(m.id) }))
     .filter((x) => x.settings.length > 0)
 
+  /* The overview card's facts, and the one sentence that says what a setting
+     here reaches. The sentence was an italic tail on each section label ("changes
+     every method in this group"), where it read as a footnote to a heading; it is
+     said once, in the overview, in plain words and with the actual count. */
+  const familyFacts: OverviewFact[] = family
+    ? [
+        isUser
+          ? { label: 'Methods', value: String(inside.length) }
+          : single
+            ? { label: 'Status', value: live ? 'On' : 'Off' }
+            : { label: 'Enabled', value: `${live} of ${inside.length}` },
+        { label: 'Enrolled', value: enrolled.toLocaleString() },
+        ...(unconfigured > 0 ? [{ label: 'Needs setup', value: String(unconfigured), warn: true }] : []),
+        ...(single && single.name !== family.channel ? [{ label: 'Group', value: family.channel }] : []),
+      ]
+    : []
+  const scopeNote = family
+    ? [
+        famSettings.length > 0 &&
+          (inside.length > 1
+            ? `Shared settings change every method in ${family.channel}.`
+            : `These settings apply to everyone who uses ${single?.name ?? family.channel}.`),
+        ownSettings.length > 0 && inside.length > 1 && "A method's own settings change that method only.",
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : ''
+
   /* "Where ever needed" — only five of the eleven families have anything to
      configure. A Settings tab on the other six would be a tab onto an empty
      page, which is worse than no tab: it implies the configuration exists and
@@ -1387,54 +1415,23 @@ function CategoryDrawer({
             {setupOf ? (
               <div className="bm8__dwhead">
                 <span className="bm8__dwtile bm8__dwtile--logo" aria-hidden>
-                  <MethodIcon name={setupOf.name} size={38} />
+                  <MethodIcon name={setupOf.name} size={32} />
                 </span>
-                <div className="bm8__dwtext">
-                  <h2>{setupOf.name}</h2>
-                  {/* The family, where there is no Back already naming it — a
-                      row that said "RSA Authenticator" opens a page headed with
-                      the method's own name, and this is what joins the two. */}
-                  {!backTo && family && <p>{family.channel}</p>}
-                  <div className="bm8__dwstats">
-                    <span>{setupOf.configured ? 'Configured' : 'Not configured yet'}</span>
-                    {/* Why Save is dead, stated where it stays in view. Each
-                        section says it too, but a closed or scrolled-past
-                        section says it to nobody. */}
-                    {missing > 0 && (
-                      <span className="is-warn">
-                        <strong>{missing}</strong> required {missing === 1 ? 'field' : 'fields'} left
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <h2 className="bm8__dwtitle">{setupOf.name}</h2>
+                {/* Why Save is dead, stated where it stays in view: the head does
+                    not scroll, and a scrolled-past section says it to nobody. */}
+                {missing > 0 && (
+                  <Badge tone="notice">
+                    {missing} required {missing === 1 ? 'field' : 'fields'} left
+                  </Badge>
+                )}
               </div>
             ) : family ? (
               <div className={`bm8__dwhead is-${family.tint}`}>
                 <span className="bm8__dwtile" aria-hidden>
-                  <family.icon size={22} strokeWidth={1.7} />
+                  <family.icon size={20} strokeWidth={1.8} />
                 </span>
-                <div className="bm8__dwtext">
-                  <h2 className="bm8__dwtitle">
-                    {single ? single.name : family.channel}
-                    {single && single.name !== family.channel && (
-                      <i className="bm8__badge bm8__badge--use">{family.channel}</i>
-                    )}
-                  </h2>
-                  <p>{family.blurb}</p>
-                  <div className="bm8__dwstats">
-                    <span>
-                      {single ? <strong>{live ? 'On' : 'Off'}</strong> : <><strong>{live}</strong> of {inside.length} enabled</>}
-                    </span>
-                    <span>
-                      <strong>{enrolled.toLocaleString()}</strong> enrolled
-                    </span>
-                    {unconfigured > 0 && (
-                      <span className="is-warn">
-                        <strong>{unconfigured}</strong> need setup
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <h2 className="bm8__dwtitle">{single ? single.name : family.channel}</h2>
               </div>
             ) : null}
           </motion.div>
@@ -1466,23 +1463,42 @@ function CategoryDrawer({
     >
       <motion.div key={key} ref={pageRef} {...slide}>
         {setupOf ? (
-          card?.kind === 'app' ? (
-            <AppSetupCard method={setupOf} card={card} passcode={draft.passcode} onPasscode={draft.setPasscode} />
-          ) : card?.kind === 'nps' ? (
-            <NpsSetupCard servers={NPS_SERVERS} value={draft.server} onChange={draft.setServer} />
-          ) : (
-            <SetupForm draft={draft} />
-          )
+          <div className="bm8__dw">
+            <Overview
+              blurb={setupOf.description}
+              facts={[
+                { label: 'Status', value: setupOf.configured ? 'Configured' : 'Not configured yet' },
+                /* The family, where no Back already names it. */
+                ...(!backTo && family ? [{ label: 'Group', value: family.channel }] : []),
+              ]}
+            />
+            {card?.kind === 'app' ? (
+              <AppSetupCard method={setupOf} card={card} passcode={draft.passcode} onPasscode={draft.setPasscode} />
+            ) : card?.kind === 'nps' ? (
+              <NpsSetupCard servers={NPS_SERVERS} value={draft.server} onChange={draft.setServer} />
+            ) : (
+              <SetupForm draft={draft} />
+            )}
+          </div>
         ) : family && top?.kind === 'settings' ? (
-          <SettingsPane
-            family={family}
-            famSettings={famSettings}
-            ownSettings={ownSettings}
-            behaviour={behaviour}
-            onBehaviour={onBehaviour}
-          />
+          <div className="bm8__dw">
+            <Overview blurb={family.blurb} facts={familyFacts} note={scopeNote} />
+            <SettingsPane
+              family={family}
+              methodCount={inside.length}
+              famSettings={famSettings}
+              ownSettings={ownSettings}
+              behaviour={behaviour}
+              onBehaviour={onBehaviour}
+            />
+          </div>
         ) : family ? (
           <div className="bm8__dw">
+            <Overview
+              blurb={family.blurb}
+              facts={familyFacts}
+              note={hasSettings && pane === 'settings' ? scopeNote : undefined}
+            />
             {hasSettings && (
               <div className="bm8__dwtabs" role="tablist" aria-label={`${family.channel} panes`}>
                 <button
@@ -1492,7 +1508,7 @@ function CategoryDrawer({
                   className={`bm8__dwtab ${pane === 'methods' ? 'is-on' : ''}`}
                   onClick={() => setPane('methods')}
                 >
-                  Methods <em>{inside.length}</em>
+                  Methods
                 </button>
                 <button
                   role="tab"
@@ -1501,7 +1517,7 @@ function CategoryDrawer({
                   className={`bm8__dwtab ${pane === 'settings' ? 'is-on' : ''}`}
                   onClick={() => setPane('settings')}
                 >
-                  Settings <em>{famSettings.length + ownSettings.reduce((n, x) => n + x.settings.length, 0)}</em>
+                  Settings
                 </button>
               </div>
             )}
@@ -1545,6 +1561,7 @@ function CategoryDrawer({
             ) : (
               <SettingsPane
                 family={family}
+                methodCount={inside.length}
                 famSettings={famSettings}
                 ownSettings={ownSettings}
                 behaviour={behaviour}
@@ -1555,6 +1572,43 @@ function CategoryDrawer({
         ) : null}
       </motion.div>
     </Drawer>
+  )
+}
+
+/* --- The overview card ------------------------------------------------------------
+
+   What the panel is about, first thing in its body: the description, the few
+   numbers that say its state, and — on a settings page — what a change here
+   reaches. It used to be three small grey lines packed under the title, which
+   is exactly where nobody reads; the title is now only a name, and this is the
+   one block that explains it. */
+interface OverviewFact {
+  label: string
+  value: string
+  warn?: boolean
+}
+
+function Overview({ blurb, facts, note }: { blurb?: string; facts: OverviewFact[]; note?: string }) {
+  return (
+    <section className="bm8__overview" aria-label="Overview">
+      {/* One row: what it is on the left, where it stands on the right. The
+          sentence is short and the figures are few, so stacking them left the
+          right half of a 640px card empty. */}
+      <div className="bm8__ovmain">
+        {blurb && <p className="bm8__ovblurb">{blurb}</p>}
+        {facts.length > 0 && (
+          <dl className="bm8__ovfacts">
+            {facts.map((fact) => (
+              <div key={fact.label} className={fact.warn ? 'is-warn' : undefined}>
+                <dt>{fact.label}</dt>
+                <dd>{fact.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </div>
+      {note && <p className="bm8__ovnote">{note}</p>}
+    </section>
   )
 }
 
@@ -1569,12 +1623,15 @@ function CategoryDrawer({
    at. */
 function SettingsPane({
   family,
+  methodCount,
   famSettings,
   ownSettings,
   behaviour,
   onBehaviour,
 }: {
   family: Family
+  /** How many methods the family's shared settings reach — names the section. */
+  methodCount: number
   famSettings: MfaSetting[]
   ownSettings: { m: AuthMethod; settings: MfaSetting[] }[]
   behaviour: MfaValues
@@ -1586,10 +1643,7 @@ function SettingsPane({
     <div className="bm8__settings">
       {famSettings.length > 0 && (
         <section>
-          <p className="bm8__setlabel">
-            Shared across {family.channel}
-            <i>changes every method in this group</i>
-          </p>
+          <h3 className="bm8__setlabel">{methodCount > 1 ? 'Shared settings' : 'Settings'}</h3>
           <div className="bm8__setlist">
             {famSettings.map((s) => {
               const key = settingKey('family', family.channel, s.id)
@@ -1615,10 +1669,7 @@ function SettingsPane({
 
       {ownSettings.map(({ m, settings }) => (
         <section key={m.id}>
-          <p className="bm8__setlabel">
-            {m.name}
-            <i>this method only</i>
-          </p>
+          <h3 className="bm8__setlabel">{m.name}</h3>
           <div className="bm8__setlist">
             {settings.map((s) => {
               const key = settingKey('method', m.id, s.id)

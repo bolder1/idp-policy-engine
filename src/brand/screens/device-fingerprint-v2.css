@@ -17,30 +17,15 @@
   font-size: var(--fs-md); color: var(--text-secondary); line-height: 1.55;
 }
 .bfp2__pagehead { display: flex; align-items: center; gap: 12px; min-width: 0; }
+/* The kind chip keeps its size beside a long name; the name ellipsises first. */
+.bfp2__pagehead > .bfp2__modechip { flex: none; }
 
 /* --- The name, edited in place ---------------------------------------------
 
    A card with a heading and one text field stood below this, holding the same
    string the h1 already showed. One rendering now, and it is the heading.
 
-   The pencil is quiet until the header is hovered or it is focused. A permanent
-   button beside a title reads as part of the title; an affordance that appears
-   where you are already looking does the same job without spending weight on
-   it — and it stays reachable by keyboard, which a hover-only control would
-   not. */
-.bfp2__rename {
-  flex: none;
-  display: grid; place-items: center;
-  width: 26px; height: 26px;
-  border: 0; border-radius: var(--radius-sm);
-  background: none; color: var(--text-muted); cursor: pointer;
-  opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard);
-}
-.bfp2__head:hover .bfp2__rename,
-.bfp2__rename:focus-visible { opacity: 1; }
-.bfp2__rename:hover { background: var(--surface-inset); color: var(--text-primary); }
-.bfp2__rename:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-ring); }
-
+   Rename is a button among the page actions; this is only the field it opens. */
 /* Styled as the heading, not as a field. Same 20px/700 the `.bpage h1` rule
    sets, so swapping one for the other does not move a pixel of the page — the
    only visible change is that the text is now selectable and has a caret in
@@ -124,68 +109,112 @@
 }
 .bfp2__field input:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
 
-/* Stacked, not side by side — the same shape the zone kind picker settled on,
-   and for the same reason. Two cards across a 520px dialog leaves each about
-   230px, which wraps both sentences to four lines and turns a choice between
-   two things into a block of text you read rather than a pair you pick from.
-   Down the page each card has the full width, its sentence lands in one or two
-   lines, and the two are compared in the order they are offered.
+/* --- Pick one: a tile per answer --------------------------------------------------
 
-   No auto-fit any more: the column was there so a wider surface could put them
-   side by side, and every surface that shows this is a 520px dialog or drawer. */
-.bfp2__modes {
-  display: flex; flex-direction: column; gap: 8px;
+   See `ChoiceTiles`. A tile fills its half of the row, so a pair of answers
+   reads as a pair and neither floats in empty width. Two across wherever each
+   gets 260px, one above the other below that.
+
+   Equal height (`stretch`), content on the top edge, and one line of summary
+   under the name — never a paragraph; that is the `?`. */
+.bfp2__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  align-items: stretch;
+  gap: var(--space-4);
+  min-width: 0;
   border: 0; padding: 0; margin: 0;
 }
-.bfp2__modes legend {
-  padding: 0 0 8px; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+.bfp2__choices > legend {
+  padding: 0 0 var(--space-3);
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
 }
-.bfp2__mode-card {
-  position: relative;
-  display: flex; align-items: flex-start; gap: 11px;
-  padding: 13px 14px; text-align: left; cursor: pointer;
+
+/* A hairline edge in the current look: inside a drawer `--surface-raised` IS the
+   drawer, so a fill alone would draw nothing. Selected takes the accent pair —
+   slate in the current look, the console's blue under the rebrand, from the
+   same tokens. */
+.bfp2__answer {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  width: 100%; min-width: 0;
+  padding: var(--space-5);
   background: var(--surface-raised);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
+  border: var(--bw-thin) solid var(--border-default);
+  border-radius: var(--radius-md);
+  text-align: left; font: inherit; color: inherit; cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
 }
-.bfp2__mode-card:hover { border-color: var(--border-strong); }
-/* Brand tint, not a surface step — inside a Modal, --surface-raised is the
-   modal's own background, so a raised "selected" card is invisible. */
-.bfp2__mode-card.is-on { border-color: var(--accent); background: var(--accent-soft); }
-.bfp2__mode-card:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-/* No tile behind the icon, in either state — and that is what fixes the
-   alignment rather than a nudge.
-
-   It was a 30px rounded square filled with `--surface-inset`, and the SELECTED
-   card removed the fill. So the two cards in a pair never matched: one had a
-   grey chip with a glyph centred in it, the other had a bare glyph floating in
-   a 30px box, and the glyph's optical position moved between them even though
-   nothing about it had. Two things were being asked to say "chosen" — the
-   card's own border and tint, which already say it, and the disappearance of a
-   container — and the second one only registered as the icon jumping.
-
-   So the box goes, both states, and the icon is an icon: 18px, on the first
-   line of the title beside it, grey at rest and brand when the card is chosen.
-   One thing changes on selection and it is the colour. */
-.bfp2__mode-ico {
-  flex: none; display: grid; place-items: center;
-  width: 18px; height: 18px;
-  /* The card is `align-items: flex-start`, so the icon sits on the title's line
-     rather than in the middle of a three-line card. `--fs-md` at 1.4 makes an
-     18px line box, which is the icon's own box — so this is a single pixel of
-     optical correction, not a layout. */
-  margin-top: 1px;
-  color: var(--text-tertiary);
+.bfp2__answer:hover { border-color: var(--border-strong); }
+.bfp2__answer.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.bfp2__answer:focus-visible {
+  outline: none;
+  border-color: var(--ctl-border-focus);
+  box-shadow: 0 0 0 4px var(--focus-halo);
 }
-/* No type colour on these either. Two icons in two hues, on a card that already
-   spells out its own name in bold above a sentence explaining it, is colour
-   spent on a distinction the words have already made. Grey at rest, brand for
-   the one that is chosen. */
-.bfp2__mode-card.is-on .bfp2__mode-ico { color: var(--accent-strong); }
-.bfp2__mode-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.bfp2__mode-body strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bfp2__mode-body em { font-style: normal; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.45; }
-.bfp2__mode-tick { flex: none; margin-left: auto; color: var(--accent-strong); }
+
+/* The mark sits on the name's line, not in the middle of a two-line tile. */
+.bfp2__answer > .bfp2__radio { margin-top: 2px; }
+
+.bfp2__answerbody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.bfp2__answerhead { display: flex; align-items: center; gap: var(--space-3); min-width: 0; min-height: 20px; }
+.bfp2__answerico { flex: none; display: grid; place-items: center; width: 18px; color: var(--text-tertiary); }
+.bfp2__answer.is-on .bfp2__answerico { color: var(--accent-strong); }
+.bfp2__answername {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
+}
+/* A hard limit on the answer ("Windows only") sits at the end of the name line,
+   where it is read before choosing rather than after. */
+.bfp2__answerhead > .bfp2__fixedtag { margin-left: auto; }
+/* The size of what the answer leads to, on the name line and pushed to its end:
+   metadata about the choice, a step quieter than the description under it, and
+   never run into that sentence. */
+.bfp2__answermeta {
+  flex: none; margin-left: auto;
+  font-size: var(--fs-xs); color: var(--text-muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* One line of what the answer is, indented under the name so the icon column
+   stays clean. Allowed a second line at narrow widths; never a third. */
+.bfp2__answerline {
+  padding-left: calc(18px + var(--space-3));
+  font-size: var(--fs-sm); line-height: 1.45; color: var(--text-tertiary);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* Round, because the answer is one of these; the check list's square mark means
+   any of them. Same size, edge and ink as `.bx-tick`, so the two read as one
+   family — and filled from `--accent-strong`, so the rebrand's retokenising turns
+   both blue with no rule of its own. */
+.bfp2__radio {
+  flex: none; position: relative;
+  width: 16px; height: 16px; border-radius: 50%;
+  border: var(--bw-thin) solid var(--border-strong);
+  background: var(--surface-raised);
+  transition: border-color var(--dur-fast) var(--ease-standard);
+}
+.bfp2__radio::after {
+  content: ''; position: absolute; inset: 3px; border-radius: 50%;
+  background: var(--accent-strong);
+  transform: scale(0);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.bfp2__choice:not(.is-on):hover .bfp2__radio { border-color: var(--accent); }
+.bfp2__choice.is-on .bfp2__radio { border-color: var(--accent-strong); }
+.bfp2__choice.is-on .bfp2__radio::after { transform: scale(1); }
+
+/* The tile a pending switch is about, marked while the confirmation below waits —
+   without it the panel says "removes MAC address" with nothing on screen pointing
+   at which press caused it. `:hover` is named because the pointer is still on the
+   tile it just pressed. */
+.bfp2__answer.is-pending,
+.bfp2__answer.is-pending:hover { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.bfp2__choice.is-pending .bfp2__radio,
+.bfp2__choice.is-pending:hover .bfp2__radio { border-color: var(--fb-notice-fg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bfp2__answer, .bfp2__radio, .bfp2__radio::after { transition: none; }
+}
 
 /* The hint under the name. Two classes, so it beats `.bfp2__field > span` and
    is not styled as a second label. */
@@ -251,15 +280,6 @@
 }
 .bfp2__attrow:last-child { border-bottom: none; }
 .bfp2__attmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-/* Truncation lands on the WORDS, so the mark beside them never leaves.
-
-   A rule doing this was deleted from here as a duplicate, on the reasoning that
-   the flex rules further down already arranged it. They did not, and could not:
-   `text-overflow` has no effect on a bare text node inside a flex container,
-   because the node becomes an anonymous flex item. The name overflowed in
-   silence until the row had two controls and a narrow column, and then it
-   collided with them. It is a span now, and this is the rule. */
-.bfp2__attword { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* One line, and the tip stays on it.
 
    `flex-wrap: wrap` let the name break and then dropped the `?` onto a line of
@@ -283,22 +303,6 @@
   background: var(--fb-notice-bg); color: var(--fb-notice-fg);
   font-size: 10px; white-space: nowrap;
 }
-
-/* The remove button, always drawn.
-
-   It sat at `opacity: 0` until the row was hovered — and stayed clickable while
-   invisible, so a click in the blank space right of the dropdown removed the
-   attribute without anybody having seen a bin, and on a touch screen it never
-   appeared at all. Quiet at rest, one step darker while its row is under the
-   pointer, red only under the pointer itself. */
-.bfp2__drop {
-  flex: none; display: grid; place-items: center; width: 28px; height: 28px;
-  border-radius: var(--radius-sm); background: none; cursor: pointer; color: var(--text-muted);
-  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
-}
-.bfp2__attrow:hover .bfp2__drop { color: var(--text-tertiary); }
-.bfp2__drop:hover { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
-.bfp2__drop:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 .bfp2__num { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: var(--text-secondary); }
 .bfp2__num input {
@@ -501,18 +505,6 @@
    platform. Two copies of a three-pill radiogroup would have drifted in
    ordering, hue and accessible name within a release, so the markup and the
    styling are shared and the arguments that shaped them travelled with it. */
-
-/* --- A platform limit, on the choice it limits -------------------------------
-   The console puts "Windows only" in the third bullet of a callout that appears
-   after agent-based has been chosen — one screen too late to be a decision
-   input, so it sits on the card instead. */
-.bfp2__mode-note {
-  display: flex; align-items: flex-start; gap: 5px;
-  margin-top: 6px;
-  font-style: normal; font-size: var(--fs-xs); line-height: 1.45;
-  color: var(--fb-notice-fg);
-}
-.bfp2__mode-note svg { flex: none; margin-top: 2px; }
 
 /* Said before the switch happens, not after it. */
 .bfp2__prereq {
@@ -725,6 +717,95 @@
 /* The empty state spans whatever the grid is that day. */
 .bfp2__picklist > .bfp2__none { grid-column: 1 / -1; }
 
+/* --- The profile page's check list ------------------------------------------------
+
+   The picker's grid and the picker's row, with one addition: a value slot at the
+   end of a ticked row. The floor is wider than the drawer's 320px because a row
+   here carries a control as well as a name — "Device integrity" beside "Not
+   rooted or jailbroken" needs about 430px before either has to ellipsise. */
+.bfp2__checks {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: var(--space-5) var(--space-6) var(--space-4);
+}
+/* The bar does not stick here — the page scrolls, not a drawer body — so the
+   hairline that marked where rows slid under it has nothing to mark. */
+.bfp2__checks > .bfp2__pickbar { position: static; border-bottom: 0; padding-bottom: 0; }
+.bfp2__checklist {
+  display: grid;
+  /* `min()` so a panel narrower than one floor is one full-width column, rather
+     than a 440px track spilling out of a card that clips it. */
+  grid-template-columns: repeat(auto-fill, minmax(min(440px, 100%), 1fr));
+  column-gap: var(--space-7);
+  align-content: start;
+  /* Bled by the row's own padding, as the picker is, so the names start on the
+     search box's margin and only the hover tint reaches past it. */
+  margin: 0 calc(var(--space-5) * -1);
+}
+.bfp2__checklist > .bfp2__none { grid-column: 1 / -1; }
+
+/* The row is the tint; the toggle inside it is the press. Hovering the value
+   slot tints the row too, which is right — it is one line about one check. */
+.bfp2__checkrow {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-width: 0;
+  padding-right: var(--space-5);
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+.bfp2__checkrow:not(.is-fixed):hover { background: var(--state-hover-bg); }
+
+.bfp2__checkhit {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-5);
+  border: 0; border-radius: var(--radius-sm);
+  background: none; text-align: left;
+  font: inherit; color: inherit;
+}
+button.bfp2__checkhit { cursor: pointer; }
+button.bfp2__checkhit:active { background: var(--state-press-bg); }
+button.bfp2__checkhit:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.bfp2__checkrow:not(.is-fixed):hover .bx-tick { border-color: var(--accent); }
+
+.bfp2__checkrow.is-on .bfp2__pickname { font-weight: var(--fw-medium); color: var(--text-primary); }
+/* A fixed row is not one you chose, so it must not look like one. Always-on rows
+   keep a tick — they ARE in the profile — but a grey one under a regular name,
+   where a row you ticked gets the solid tick and the medium weight. */
+.bfp2__checkrow.is-fixed .bfp2__pickname { font-weight: var(--fw-regular); color: var(--text-secondary); }
+.bfp2__checkrow.is-fixed .bx-tick { border-color: var(--border-strong); }
+.bfp2__checkrow.is-fixed.is-on .bx-tick { background: var(--border-strong); color: var(--surface-raised); }
+.bfp2__checkrow.is-blocked .bfp2__pickname,
+.bfp2__checkrow.is-blocked .bfp2__pickico { color: var(--text-muted); }
+.bfp2__checkrow.is-blocked .bx-tick { opacity: var(--disabled-opacity); }
+
+/* One control, at the end of the line. A fixed minimum so the values line up
+   down each column, rather than every trigger being as wide as its own label. */
+.bfp2__checkslot { flex: none; display: flex; align-items: center; gap: 8px; }
+.bfp2__checkslot .bx-picker__trigger { min-width: 168px; max-width: 240px; }
+.bfp2__checkslot .bx-tierpick { width: 96px; }
+.bfp2__checkslot .bx-tierpick .bx-picker__trigger { min-width: 0; width: 100%; }
+/* A floor with no operator is just its value, so the wrapper that joined the two
+   halves has nothing to join: no edge, no fill, no halo of its own. A Picker
+   brings its own field; a typed value is given the same one, so a column of
+   values reads as one kind of control whether the version was picked or typed. */
+.bfp2__expr.is-bare { border: 0; background: none; }
+.bfp2__expr.is-bare:focus-within { box-shadow: none; }
+.bfp2__expr.is-bare .bfp2__exprval {
+  min-width: 168px; max-width: 240px;
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
+  background: var(--ctl-bg);
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.bfp2__expr.is-bare .bfp2__exprval:hover { border-color: var(--ctl-border-hover); background: var(--ctl-bg-hover); }
+.bfp2__expr.is-bare .bfp2__exprval:focus-visible {
+  border-color: var(--ctl-border-focus); background: var(--surface-raised);
+  box-shadow: 0 0 0 4px var(--focus-halo);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bfp2__checkrow { transition: none; }
+}
+
 /* `.bfp2__selectall` stood here — the per-group "Select all / Clear these"
    link. It went with the group headings that carried it. Selecting in bulk is
    not lost: shift-click writes a run, "Clear the rest" is on the bar, and the
@@ -792,15 +873,6 @@
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent-strong);
-}
-
-/* The third line on a mode card: how long this kind takes, and how much it
-   holds. Both are facts about the choice and neither is guessable from the
-   blurb — "three steps" is the honest disclosure that picking this one is
-   picking a longer path. */
-.bfp2__mode-steps {
-  font-style: normal; font-size: var(--fs-xs); color: var(--text-muted);
-  letter-spacing: 0.01em;
 }
 
 /* --- A catalogue row -----------------------------------------------------------
@@ -896,8 +968,8 @@
 }
 /* The ellipsis belongs on the text, not on the flex box holding it — a bare
    text node inside a flex container becomes an anonymous flex item, which
-   `text-overflow` cannot reach. This file has been bitten by that once already;
-   see `.bfp2__attword`. */
+   `text-overflow` cannot reach. This file has been bitten by that once already,
+   on the row the check list replaced. */
 .bfp2__pickword { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* `.bfp2__pickwhy` stood here: the whole `purpose` sentence in a third lane
@@ -1134,15 +1206,6 @@
 }
 .bfp2__confirm .bfp2__prereq { margin: 0; padding: 0; border: 0; background: none; }
 .bfp2__confirmacts { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); }
-/* The card the confirmation is about, marked while it waits — without it the
-   panel says "removes MAC address" with nothing on screen pointing at which
-   press caused it. */
-.bfp2__mode-card.is-pending {
-  border-color: var(--fb-notice-border);
-  background: var(--fb-notice-bg);
-}
-
-
 /* =============================================================================
    THE DETAIL PAGE, IN TWO TABS
    ========================================================================== */
@@ -1225,19 +1288,6 @@
 /* The facts keep their own rhythm — flush rows with rules between them — so the
    body loses its vertical padding and the first rule lands on the header. */
 .bfp2__cardbody--facts { display: block; padding: 0 var(--space-6); }
-
-/* Two across, now that there is width for two.
-
-   The stacked column was chosen for a 520px drawer, where side-by-side left
-   each card 230px and wrapped both sentences to four lines. On a full-width tab
-   each gets around 450px and the sentence lands in one or two, so the pair is
-   compared side by side as a pair rather than read as a list. Scoped to the
-   tab: the create drawer still shows these at 520px and still wants them
-   stacked. */
-@media (min-width: 860px) {
-  .bfp2__formcard .bfp2__modes { flex-direction: row; align-items: stretch; }
-  .bfp2__formcard .bfp2__modes > .bfp2__mode-card { flex: 1 1 0; min-width: 0; }
-}
 
 /* The action bar's rules moved to `.bx-savebar` in the kit.
 

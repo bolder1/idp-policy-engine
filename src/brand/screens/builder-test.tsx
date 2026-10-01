@@ -452,7 +452,6 @@ export function DecisionLogDialog({
   const rows = all.filter(
     (r) => r.hoursAgo < (range === '24h' ? 24 : 168) && (decision === 'all' || r.decision === decision),
   )
-  const inRange = all.filter((r) => r.hoursAgo < (range === '24h' ? 24 : 168))
   const count = (d: LogDecision) => rows.filter((r) => r.decision === d).length
 
   function exportCsv() {
@@ -507,7 +506,6 @@ export function DecisionLogDialog({
                 )}
                 <span className="bdl__seglabel">
                   {d === 'all' ? 'All decisions' : d}
-                  <em>{d === 'all' ? inRange.length : inRange.filter((r) => r.decision === d).length}</em>
                 </span>
               </button>
             ))}
@@ -531,8 +529,12 @@ export function DecisionLogDialog({
 
         <p className="bdl__summary">
           Showing {reduce ? rows.length : <Counter value={rows.length} />} evaluation
-          {rows.length === 1 ? '' : 's'} — {count('Allow')} allowed / {count('Deny')} denied /{' '}
-          {count('Challenge')} challenged
+          {rows.length === 1 ? '' : 's'}
+          {decision === 'all' && (
+            <>
+              {' '}— {count('Allow')} allowed / {count('Deny')} denied / {count('Challenge')} challenged
+            </>
+          )}
         </p>
 
         <div className="bdl__scroll">

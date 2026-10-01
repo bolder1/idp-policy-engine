@@ -687,13 +687,14 @@
 
 /* The same three tones, on the badge rather than on a card ancestor.
 
-   `.bb__idx` is drawn in three places: inside a rule card, in the inspector's
-   header, and in the rule library. Only the first sits inside `.bb__card`, so
-   the other two resolved `--tone-bg` and `--tone-fg` to nothing and rendered
-   transparent on inherited text — the tone-coloured pill simply never appeared
-   away from the stage. Declaring the vars on the badge's own tone class fixes
-   both call sites without touching the card, which carries no tone class here
-   and so keeps inheriting from `.bb__card.is-*` exactly as before. */
+   `.bb__idx` was drawn in three places: inside a rule card, in the inspector's
+   header (gone now: the inspector title already says which rule), and in the
+   rule library. Only the first sits inside `.bb__card`, so the others resolved
+   `--tone-bg` and `--tone-fg` to nothing and rendered transparent on inherited
+   text — the tone-coloured pill simply never appeared away from the stage.
+   Declaring the vars on the badge's own tone class fixes that without touching
+   the card, which carries no tone class here and so keeps inheriting from
+   `.bb__card.is-*` exactly as before. */
 /* The BADGE is a position; only `.bb__reach` keeps the verdict tones.
 
    `1` in a green tile and `2` in a red one made every card a different colour
@@ -1362,8 +1363,6 @@
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border-subtle);
 }
-.bb__insphead .bb__idx { width: 26px; height: 26px; font-size: var(--fs-xs); cursor: default; }
-.bb__insphead .bb__idx:hover { transform: none; }
 .bb__insphead h2 { margin: 0; min-width: 0; flex: 1; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bb__insphead p { margin: 0; font-size: var(--fs-xs); color: var(--text-muted); }
 .bb__inspbody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
@@ -3176,13 +3175,6 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 }
 .bb__whopick > button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__whopick > button svg { opacity: 0.75; }
-/* The count rides on the control, so the list you are not looking at still
-   says how much is in it. */
-.bb__whopick > button b {
-  min-width: 16px; padding: 0 4px; border-radius: var(--radius-pill);
-  background: var(--surface-inset, var(--surface-sunken)); color: var(--text-secondary);
-  font-size: 11px; font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums;
-}
 
 .bb__whorows {
   display: flex; flex-direction: column;
@@ -3820,14 +3812,6 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__whosum__faces { flex: none; display: inline-flex; align-items: center; }
 .bb__whosum__faces > * { margin-left: -5px; box-shadow: 0 0 0 2px var(--surface-raised); }
 .bb__whosum__faces > *:first-child { margin-left: 0; }
-.bb__whosum__more {
-  display: inline-grid; place-items: center;
-  height: 18px; padding: 0 5px; margin-left: -5px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-inset); color: var(--text-tertiary);
-  box-shadow: 0 0 0 2px var(--surface-raised);
-  font-style: normal; font-size: 10px; font-weight: var(--fw-semibold);
-}
 
 .bb__whosum__text {
   flex: 1; min-width: 0;

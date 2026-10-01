@@ -1,0 +1,821 @@
+/* The compositor's chrome. Colours are the console's own tokens
+   (src/brand/console-theme.css): ink and grey carry structure, the feedback
+   ramps appear only where the colour IS the meaning, and the brand orange is
+   kept to the one accent a frame can afford. */
+:root {
+  --ink: #212529;
+  --ink-2: #495057;
+  --ink-3: #646e79;
+  --line: #e4e8ec;
+  --line-2: #d3dae1;
+  --sunken: #f8f9fa;
+  --inset: #eef1f4;
+  --shell: #1e2c38;
+  --brand: #eb5424;
+  --pos-bg: #e8f7ee;
+  --pos-bd: #b6e3c6;
+  --pos-fg: #14663a;
+  --pos-dot: #128f43;
+  --neg-bg: #fdf0f2;
+  --neg-bd: #f5c6ce;
+  --neg-fg: #a5142b;
+  --neg-dot: #d01243;
+  --note-bg: #fdf6e0;
+  --note-bd: #f0dfa4;
+  --note-fg: #7d5800;
+  --note-dot: #b07a00;
+  --info-bg: #e9f2fd;
+  --info-bd: #b9d6f5;
+  --info-fg: #155e91;
+  --info-dot: #1189d4;
+  --slate: #4a5560;
+  --veil: rgba(242, 244, 247, 0.72);
+  --el-low: 0 1px 2px rgba(33, 37, 41, 0.05);
+  --el-mid: 0 2px 8px rgba(33, 37, 41, 0.07);
+  --el-high: 0 8px 24px rgba(33, 37, 41, 0.12);
+  --el-overlay: 0 16px 48px rgba(33, 37, 41, 0.22);
+  --font: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  --hand: 'Kalam', 'Segoe Print', cursive;
+
+  /* the ground and the product window's chrome (read by engine.js for the canvas) */
+  --ground: #f2f4f7;
+  --ground-dot: rgba(33, 37, 41, 0.085);
+  --ground-glow-a: rgba(74, 85, 96, 0.1);
+  --ground-glow-b: rgba(235, 84, 36, 0.06);
+  --win-bg: #ffffff;
+  --win-bar-a: #fbfcfd;
+  --win-bar-b: #f1f4f7;
+  --win-dot: #e6e9ed;
+  --win-dot-stroke: #d3dae1;
+  --win-pill: #ffffff;
+  --win-pill-border: #e4e8ec;
+  --win-pill-text: #646e79;
+  --win-lock: #8a949e;
+  --win-hairline: rgba(33, 37, 41, 0.1);
+  --win-shadow: rgba(22, 32, 44, 0.2);
+
+  /* overlays — the film is light, so the spotlight dims with ink, not with night */
+  --spot-dim: rgba(33, 37, 41, 0.35);
+  --spot-glow: rgba(255, 255, 255, 0.95);
+  --spot-halo: rgba(255, 255, 255, 0.55);
+  --spot-line: rgba(33, 37, 41, 0.35);
+  --key-bg: #ffffff;
+  --key-fg: #212529;
+  --key-bd: #d3dae1;
+  --key-side: #c5cdd5;
+  --tag-bg: #ffffff;
+  --tag-fg: #212529;
+  --tag-shadow: rgba(10, 14, 20, 0.28);
+  --call-line: #15191e;
+  --rail-bg: rgba(33, 37, 41, 0.08);
+  --rail-fill-a: #4a5560;
+  --rail-fill-b: #212529;
+  --rail-tick: #ffffff;
+
+  /* the thought cloud */
+  --cloud-bg: #ffffff;
+  --cloud-fg: #212529;
+  --cloud-dim: rgba(33, 37, 41, 0.3);
+  --cloud-line: rgba(33, 37, 41, 0.08);
+  --cloud-shadow: rgba(10, 14, 20, 0.16);
+}
+
+/* Dark: the console's own dark tokens (src/brand/tokens.css). Every colour above
+   is redefined here, so the compositor's chrome follows the product. */
+:root[data-theme='dark'] {
+  --ink: #f8fafb;
+  --ink-2: #d2dae3;
+  --ink-3: #aeb9c6;
+  --line: #262e38;
+  --line-2: #45505d;
+  --sunken: #0d1218;
+  --inset: #19212b;
+  --shell: #0b0f14;
+  --brand: #ef7650;
+  --pos-bg: #0a3319;
+  --pos-bd: #166f38;
+  --pos-fg: #4cc47c;
+  --pos-dot: #2fb463;
+  --neg-bg: #3d0a12;
+  --neg-bd: #a81f38;
+  --neg-fg: #ff7f9e;
+  --neg-dot: #f04d78;
+  --note-bg: #3a2705;
+  --note-bd: #a87b12;
+  --note-fg: #f5c452;
+  --note-dot: #e8ae2b;
+  --info-bg: #0a2739;
+  --info-bd: #1c6f9e;
+  --info-fg: #5cbdf0;
+  --info-dot: #37a7e6;
+  --slate: #93a0ae;
+  --veil: rgba(19, 25, 34, 0.72);
+
+  --ground: #131922;
+  --ground-dot: rgba(255, 255, 255, 0.075);
+  --ground-glow-a: rgba(147, 160, 174, 0.08);
+  --ground-glow-b: rgba(239, 118, 80, 0.09);
+  --win-bg: #1a212a;
+  --win-bar-a: #1f2731;
+  --win-bar-b: #171e27;
+  --win-dot: #2a333e;
+  --win-dot-stroke: #3a4552;
+  --win-pill: #131922;
+  --win-pill-border: #2a333e;
+  --win-pill-text: #aeb9c6;
+  --win-lock: #7e8b9a;
+  --win-hairline: rgba(255, 255, 255, 0.09);
+  --win-shadow: rgba(0, 0, 0, 0.6);
+
+  --spot-dim: rgba(2, 5, 9, 0.6);
+  --spot-glow: rgba(255, 255, 255, 0.85);
+  --spot-halo: rgba(255, 255, 255, 0.4);
+  --spot-line: rgba(255, 255, 255, 0.35);
+  --key-bg: #2a333e;
+  --key-fg: #f8fafb;
+  --key-bd: #3a4552;
+  --key-side: #11161c;
+  --tag-bg: #1a212a;
+  --tag-fg: #f8fafb;
+  --tag-shadow: rgba(0, 0, 0, 0.55);
+  --call-line: #f8fafb;
+  --rail-bg: rgba(255, 255, 255, 0.1);
+  --rail-fill-a: #93a0ae;
+  --rail-fill-b: #f8fafb;
+  --rail-tick: #131922;
+
+  --cloud-bg: #1a212a;
+  --cloud-fg: #f8fafb;
+  --cloud-dim: rgba(248, 250, 251, 0.32);
+  --cloud-line: rgba(255, 255, 255, 0.1);
+  --cloud-shadow: rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--ground);
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+#film {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+}
+
+/* --- ground ---------------------------------------------------------------- */
+#bg {
+  position: absolute;
+  inset: 0;
+  background-color: var(--ground);
+  background-image: radial-gradient(circle at 1px 1px, var(--ground-dot) 1.2px, transparent 1.6px),
+    radial-gradient(1200px 800px at 12% 8%, var(--ground-glow-a), transparent 60%),
+    radial-gradient(900px 700px at 92% 96%, var(--ground-glow-b), transparent 62%);
+  background-size: 26px 26px, 100% 100%, 100% 100%;
+}
+#mascot {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 44;
+}
+#kbd {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 46;
+}
+
+/* --- the thought cloud ------------------------------------------------------- */
+.cloud {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  z-index: 45;
+  pointer-events: none;
+}
+.cloud__body {
+  position: relative;
+  max-width: 640px;
+  padding: 18px 28px 19px;
+  border-radius: 34px;
+  background: var(--cloud-bg);
+  color: var(--cloud-fg);
+  border: 1px solid var(--cloud-line);
+  box-shadow: 0 18px 50px var(--cloud-shadow);
+  font: 500 30px/1.3 var(--font);
+  letter-spacing: -0.012em;
+  text-wrap: balance;
+  width: max-content;
+}
+.cloud__body .w {
+  color: var(--cloud-dim);
+  display: inline-block;
+}
+.cloud__body .w.is-on {
+  color: var(--cloud-fg);
+}
+.cloud__body .w.is-now {
+  transform: translateY(-1px);
+}
+.cloud__b1,
+.cloud__b2 {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  border-radius: 50%;
+  background: var(--cloud-bg);
+  border: 1px solid var(--cloud-line);
+  box-shadow: 0 8px 22px var(--cloud-shadow);
+}
+.cloud__b1 {
+  width: 22px;
+  height: 22px;
+}
+.cloud__b2 {
+  width: 12px;
+  height: 12px;
+}
+#stage {
+  position: absolute;
+  inset: 0;
+}
+#ov {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#slides {
+  position: absolute;
+  inset: 0;
+}
+
+/* --- cursor & click cues ----------------------------------------------------- */
+.ov-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.28));
+  z-index: 30;
+}
+.ov-cursor svg {
+  display: block;
+}
+.ov-hint {
+  position: absolute;
+  border-radius: 10px;
+  border: 2px solid rgba(235, 84, 36, 0.95);
+  box-shadow: 0 0 0 4px rgba(235, 84, 36, 0.16), 0 0 24px rgba(235, 84, 36, 0.25);
+  z-index: 12;
+}
+.ov-hint-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2.5px solid rgba(235, 84, 36, 0.9);
+  z-index: 13;
+}
+.ov-ripple {
+  position: absolute;
+  border-radius: 50%;
+  border: 3px solid rgba(235, 84, 36, 0.9);
+  background: rgba(235, 84, 36, 0.12);
+  z-index: 14;
+}
+/* --- spotlight -------------------------------------------------------------- */
+#ov-spot {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+}
+.ov-spot__dim {
+  fill: var(--spot-dim);
+}
+.ov-spot__glow {
+  stroke: var(--spot-glow);
+}
+.ov-spot__halo {
+  stroke: var(--spot-halo);
+}
+.ov-tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px 12px 16px;
+  border-radius: 14px;
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+  font: 600 24px/1.1 var(--font);
+  letter-spacing: -0.015em;
+  box-shadow: 0 14px 40px var(--tag-shadow);
+  white-space: nowrap;
+  z-index: 11;
+}
+.ov-tag__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 0 5px rgba(235, 84, 36, 0.16);
+}
+
+/* --- callouts --------------------------------------------------------------- */
+.ov-call {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 16;
+}
+.ov-call__t {
+  position: absolute;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+  font: 600 21px/1.15 var(--font);
+  box-shadow: 0 10px 28px var(--tag-shadow);
+  white-space: nowrap;
+  border: 1px solid var(--line);
+}
+.ov-call__line {
+  position: absolute;
+  left: -60px;
+  top: -60px;
+  overflow: visible;
+}
+.ov-call__line path {
+  stroke: var(--call-line);
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: round;
+}
+.ov-call[data-side='top'] .ov-call__t {
+  transform: translate(-50%, -100%);
+}
+.ov-call[data-side='bottom'] .ov-call__t {
+  transform: translate(-50%, 0);
+}
+.ov-call[data-side='left'] .ov-call__t {
+  transform: translate(-100%, -50%);
+}
+.ov-call[data-side='right'] .ov-call__t {
+  transform: translate(0, -50%);
+}
+
+/* --- keycaps ---------------------------------------------------------------- */
+.ov-keys {
+  position: absolute;
+  left: 50%;
+  bottom: 170px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 22;
+}
+.ov-keys__caps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: rgba(21, 25, 30, 0.9);
+  box-shadow: 0 16px 40px rgba(10, 14, 20, 0.3);
+}
+.ov-keys kbd {
+  min-width: 56px;
+  height: 56px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--ink);
+  font: 600 26px/1 var(--font);
+  box-shadow: 0 4px 0 #adb5bd, 0 6px 14px rgba(0, 0, 0, 0.25);
+  transform: translateY(0);
+}
+.ov-keys kbd.is-down {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #adb5bd, 0 3px 8px rgba(0, 0, 0, 0.25);
+}
+.ov-keys__plus {
+  color: #adb5bd;
+  font: 500 24px/1 var(--font);
+}
+.ov-keys__label {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+  font: 600 20px/1 var(--font);
+  box-shadow: 0 6px 18px rgba(10, 14, 20, 0.18);
+}
+
+/* --- step banner ------------------------------------------------------------ */
+.ov-lower {
+  position: absolute;
+  left: 64px;
+  top: 110px;
+  max-width: 560px;
+  padding: 22px 26px 22px 30px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 20px 60px rgba(10, 14, 20, 0.22);
+  border: 1px solid var(--line);
+  z-index: 18;
+}
+.ov-lower::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 22px;
+  bottom: 22px;
+  width: 5px;
+  border-radius: 0 4px 4px 0;
+  background: var(--brand);
+}
+.ov-lower__k {
+  font: 600 18px/1 var(--font);
+  color: var(--ink-3);
+  letter-spacing: 0.01em;
+}
+.ov-lower__t {
+  margin-top: 10px;
+  font: 700 40px/1.05 var(--font);
+  letter-spacing: -0.025em;
+}
+.ov-lower__s {
+  margin-top: 10px;
+  font: 400 22px/1.35 var(--font);
+  color: var(--ink-2);
+}
+
+/* --- HUD ---------------------------------------------------------------------- */
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+}
+.hud__chip {
+  position: absolute;
+  left: 34px;
+  top: 34px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px 9px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(10, 14, 20, 0.12);
+  font: 500 19px/1 var(--font);
+  color: var(--ink-2);
+  opacity: 0;
+}
+.hud__logo {
+  height: 22px;
+  width: auto;
+}
+.hud__sep {
+  width: 1px;
+  height: 20px;
+  background: var(--line-2);
+}
+.hud__n {
+  font: 600 17px/1 var(--mono);
+  color: var(--ink-3);
+}
+.hud__t {
+  color: var(--ink);
+  font-weight: 600;
+}
+.hud__rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: var(--rail-bg);
+}
+.hud__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--rail-fill-a);
+}
+.hud__ticks i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--rail-tick);
+}
+
+/* --- subtitles ---------------------------------------------------------------- */
+/* The subtitle lives in its own band under the window (engine.js CAP_BAND), so
+   it never covers the product. Themed like the tags; words light up as spoken. */
+.cap {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  width: max-content;
+  max-width: 1560px;
+  padding: 13px 28px 14px;
+  border-radius: 16px;
+  background: var(--tag-bg);
+  border: 1px solid var(--line);
+  box-shadow: 0 14px 40px var(--tag-shadow);
+  color: var(--tag-fg);
+  text-align: center;
+  font: 500 29px/1.3 var(--font);
+  letter-spacing: -0.01em;
+  opacity: 0;
+  z-index: 50;
+  text-wrap: balance;
+}
+.cap .w {
+  color: var(--cloud-dim);
+}
+.cap .w.is-on {
+  color: var(--tag-fg);
+}
+
+/* --- the spotlight's frame: a 2 px hairline around the hole, and nothing else --- */
+.ov-ambient {
+  display: none;
+}
+.ov-glow {
+  position: absolute;
+  z-index: 10;
+  box-sizing: border-box;
+  border: 2px solid var(--spot-line);
+}
+
+/* --- shortcut keycaps: only the keys a shortcut needs, never the typing ------- */
+/* Top centre of the window: the console's header is empty there in every
+   scene, so the caps never sit on the thing being demonstrated. */
+.ov-keys {
+  position: absolute;
+  left: 50%;
+  top: 46px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  z-index: 18;
+}
+.ov-keys__caps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ov-keys kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 66px;
+  height: 66px;
+  padding: 0 20px;
+  border-radius: 14px;
+  background: var(--key-bg);
+  color: var(--key-fg);
+  border: 1px solid var(--key-bd);
+  box-shadow: 0 6px 0 var(--key-side), 0 20px 44px var(--tag-shadow);
+  font: 600 28px/1 var(--font);
+  letter-spacing: -0.01em;
+}
+.ov-keys kbd.is-down {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 var(--key-side), 0 10px 24px var(--tag-shadow);
+}
+.ov-keys__plus {
+  font: 500 26px/1 var(--font);
+  color: var(--ink-3);
+}
+.ov-keys__label {
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+  box-shadow: 0 10px 28px var(--tag-shadow);
+  font: 500 22px/1.1 var(--font);
+}
+
+/* --- the card scene's annotation: AND / OR brackets and the truth panel -------
+   AND is only ever the console's info tint, OR only its notice tint — exactly
+   what the card's own keyword pills print. */
+.ov-anno {
+  position: absolute;
+  inset: 0;
+  z-index: 17;
+  pointer-events: none;
+}
+.ov-anno__br {
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ov-anno__br--and {
+  stroke: var(--info-dot);
+}
+.ov-anno__br--or {
+  stroke: var(--note-dot);
+}
+.ov-anno__lbl {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 17;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+  text-align: right;
+}
+.ov-anno__lbl--or {
+  align-items: flex-start;
+  text-align: left;
+}
+.ov-anno__lbl b {
+  font: 700 26px/1 var(--font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+.ov-anno__lbl--and b {
+  color: var(--info-fg);
+  background: var(--info-bg);
+  border-color: var(--info-bd);
+}
+.ov-anno__lbl--or b {
+  color: var(--note-fg);
+  background: var(--note-bg);
+  border-color: var(--note-bd);
+}
+.ov-anno__lbl span {
+  font: 500 20px/1.2 var(--font);
+  color: var(--ink-2);
+}
+.ov-truth {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 17;
+  width: 560px;
+  padding: 22px 24px 20px;
+  border-radius: 12px;
+  background: var(--tag-bg);
+  border: 1px solid var(--line);
+  box-shadow: var(--el-overlay);
+  color: var(--ink);
+}
+.ov-truth__title {
+  font: 700 24px/1.1 var(--font);
+  letter-spacing: -0.01em;
+  margin-bottom: 14px;
+}
+.ov-truth__expr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 6px;
+  font: 500 19px/1.3 var(--font);
+}
+.ov-truth__chip {
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--inset);
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+}
+.ov-truth__kw {
+  font: 700 14px/1 var(--font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.ov-truth__kw.is-and {
+  color: var(--info-fg);
+  background: var(--info-bg);
+  border-color: var(--info-bd);
+}
+.ov-truth__kw.is-or {
+  color: var(--note-fg);
+  background: var(--note-bg);
+  border-color: var(--note-bd);
+}
+/* the parenthesised pair: waits at 45 % until the OR stage, and takes a lit
+   row's result tint for a moment (the engine sets both inline) */
+.ov-truth__group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 6px;
+  padding: 3px 6px;
+  margin: -3px -6px;
+  border-radius: 8px;
+}
+.ov-truth__paren {
+  font: 600 26px/1 var(--font);
+  color: var(--ink-3);
+}
+.ov-truth__sub {
+  margin: 16px 0 10px;
+  font: 500 18px/1.35 var(--font);
+  color: var(--ink-2);
+}
+.ov-truth__table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 500 18px/1.2 var(--font);
+  font-variant-numeric: tabular-nums;
+}
+.ov-truth__table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink-3);
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid var(--line-2);
+}
+.ov-truth__table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.ov-truth__table td.is-yes {
+  color: var(--ink);
+  font-weight: 600;
+}
+.ov-truth__table td.is-no {
+  color: var(--ink-3);
+}
+.ov-truth__table td.is-true {
+  color: var(--pos-fg);
+  font-weight: 700;
+}
+.ov-truth__table td.is-false {
+  color: var(--neg-fg);
+  font-weight: 700;
+}
+/* a lit row's result cell carries its tint; unlit rows sit at 28 % (inline) with none */
+.ov-truth__table tr.is-lit td.is-true {
+  background: var(--pos-bg);
+}
+.ov-truth__table tr.is-lit td.is-false {
+  background: var(--neg-bg);
+}
+
+/* --- card lighting: the veil, its holes' hairline, and the part labels ------- */
+.ov-card-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 17;
+  pointer-events: none;
+}
+.ov-card-veil__fill {
+  fill: var(--veil);
+}
+.ov-card-veil__line {
+  stroke: var(--brand);
+  stroke-opacity: 0.9;
+  stroke-width: 1.5;
+}
+.ov-partlbl {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 18;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  box-shadow: var(--el-high);
+  color: var(--ink);
+  font: 600 26px/1 var(--font);
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  pointer-events: none;
+}

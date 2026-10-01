@@ -227,7 +227,7 @@ export function Applications() {
         )}
 
         <footer className="btable__foot bapl__foot">
-          <span>{total === 0 ? '0 of 0' : `${from}–${to} of ${total}`}</span>
+          <span>{total === 0 ? null : `${from}–${to}`}</span>
           <span className="bapl__pager">
             <button
               type="button"

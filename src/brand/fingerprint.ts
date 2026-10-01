@@ -882,24 +882,38 @@ export type ProfileMode = 'os' | 'device'
 export interface ModeMeta {
   id: ProfileMode
   label: string
+  /** One line under the name, where the choice is made. The blurb is the `?`. */
+  summary: string
   blurb: string
   /** The feedback ramp this kind wears, named for the ramp and not for itself. */
   tint: 'info' | 'accent'
 }
 
+/* Named for the question each kind answers, 13 Sep 2026.
+
+   "OS and version" named five of the thirteen checks in its own catalogue and
+   left out integrity, screen lock and the miniOrange clients. "Device
+   attributes" named the inputs of the other kind rather than its purpose, which
+   is recognising a machine it has seen before. Device health is the manager's
+   word and the IdP market's (Duo, JumpCloud); a trusted device is miniOrange's
+   own term for a device it recognises.
+
+   The blurbs are read on a `?` now, not printed under the choice. */
 export const MODES: ModeMeta[] = [
   {
     id: 'os',
-    label: 'OS and version',
+    label: 'Device health',
+    summary: 'OS, browser, integrity, screen lock and app version',
     blurb:
-      'State what a device must be running — a form factor, and a version floor per platform. Everything it reads arrives with the request, so there is nothing to install.',
+      'Checks a device must pass to sign in — OS and browser version, integrity, screen lock and miniOrange app version. Integrity and screen lock are reported by the miniOrange app; a device without it fails those checks.',
     tint: 'info',
   },
   {
     id: 'device',
-    label: 'Device attributes',
+    label: 'Trusted device',
+    summary: 'Recognises machines it has seen, by weighted signals',
     blurb:
-      'Recognise the machine itself. Each attribute carries a weight, what changed since last time adds up to a score, and the score picks the outcome.',
+      'Recognises a machine it has seen before. Each signal carries a weight, what changed since last time adds up to a score, and the score picks the outcome.',
     tint: 'accent',
   },
 ]
@@ -908,13 +922,14 @@ export const MODE_META: Record<ProfileMode, ModeMeta> = Object.fromEntries(
   MODES.map((m) => [m.id, m]),
 ) as Record<ProfileMode, ModeMeta>
 
-/* The noun for a thing this kind holds. An OS profile's rows are CONDITIONS a
-   device has to satisfy; a device profile's rows are SIGNALS it watches. Both
-   were called "attributes", which is true of the catalogue and wrong about what
-   the profile does with them. */
+/* The noun for a thing this kind holds. A health profile's rows are CHECKS a
+   device has to pass; a trusted-device profile's rows are SIGNALS it watches.
+   Both were once called "attributes", which is true of the catalogue and wrong
+   about what the profile does with them — and "check" is the word every IdP
+   peer uses for the first (Okta, Duo, Cloudflare). */
 export const ITEM_NOUN: Record<ProfileMode, { one: string; many: string; verb: string }> = {
-  os: { one: 'requirement', many: 'requirements', verb: 'requires' },
-  device: { one: 'attribute', many: 'attributes', verb: 'watches' },
+  os: { one: 'check', many: 'checks', verb: 'checks' },
+  device: { one: 'signal', many: 'signals', verb: 'watches' },
 }
 
 export const countLabel = (mode: ProfileMode, n: number) =>
@@ -942,10 +957,15 @@ export type ProfileReach = 'agentless' | 'agent'
 export interface ReachMeta {
   id: ProfileReach
   label: string
+  /** One line under the name, where the choice is made. The blurb is the `?`. */
+  summary: string
   blurb: string
   /* The console puts "Windows only" in a callout that appears AFTER agent-based
      has been chosen, which is one screen too late to be a decision input. A
-     platform limit is a property of the choice, so it travels on the card. */
+     platform limit is a property of the choice, so it travels on the row — as a
+     pill short enough to read before choosing, with the full consequence in
+     `note` behind the row's `?`. */
+  tag?: string
   note?: string
 }
 
@@ -953,15 +973,18 @@ export const REACHES: ReachMeta[] = [
   {
     id: 'agentless',
     label: 'Agentless',
+    summary: 'Browser, network and location — nothing to install',
     blurb:
-      'Browser, network and geolocation attributes establish device identity. Nothing to install.',
+      'Browser, network and geolocation signals establish device identity. Nothing to install.',
   },
   {
     id: 'agent',
     label: 'Agent-based',
+    summary: 'Adds hardware identifiers: TPM, motherboard, disk',
     blurb:
       'An installed agent adds hardware identifiers — TPM, motherboard, disk — for high-assurance access.',
-    note: 'Windows only. Users without the agent cannot sign in.',
+    tag: 'Windows only',
+    note: 'Users without the agent cannot sign in.',
   },
 ]
 
@@ -1213,10 +1236,13 @@ export function describeProfile(p: FingerprintProfile): string {
    roster needs MAC, MAC needs an agent — and an OS profile answers it from the
    detail page's one Edit instead. `restrictionSet` records the difference
    honestly: false on a new OS profile, because nobody asked. */
-export const stepsFor = (mode: ProfileMode): string[] =>
-  asksReach(mode)
-    ? ['Profile', 'Devices', 'Attributes']
-    : ['Profile', ITEM_NOUN[mode].many.replace(/^./, (c) => c.toUpperCase())]
+export const stepsFor = (mode: ProfileMode): string[] => {
+  /* The last step is named by the kind's own noun on BOTH shapes. The device
+     shape spelled "Attributes" out by hand, which was right only until the noun
+     changed. */
+  const items = ITEM_NOUN[mode].many.replace(/^./, (c) => c.toUpperCase())
+  return asksReach(mode) ? ['Profile', 'Devices', items] : ['Profile', items]
+}
 
 /* --- The three weights a risk profile can give an attribute ---------------------
    The master carries four (5, 10, 20, 30) because the sheet does. A profile

@@ -509,7 +509,8 @@ export function Tabs<T extends string>({
   className,
 }: {
   value: T
-  options: { value: T; label: string; count?: number; sub?: ReactNode; icon?: LucideIcon }[]
+  /* No `count`. A tab names a view; the number belongs in the view it opens. */
+  options: { value: T; label: string; sub?: ReactNode; icon?: LucideIcon }[]
   onChange: (v: T) => void
   name: string
   /** The `id` of the element this tablist controls, if there is one. */
@@ -570,7 +571,6 @@ export function Tabs<T extends string>({
             <span className="bx-tabs__label">
               {Ico && <Ico size={13} strokeWidth={1.9} aria-hidden />}
               {o.label}
-              {o.count !== undefined && <em>{o.count}</em>}
             </span>
             {o.sub && <span className="bx-tabs__sub">{o.sub}</span>}
           </button>
@@ -1094,7 +1094,11 @@ export function TipDot({ text, label = 'Why this matters' }: { text: ReactNode; 
 export function TipMark({ text }: { text: ReactNode }) {
   return (
     <Tip text={text}>
-      <span className="bx-tipdot" aria-hidden>
+      {/* The press stops here. The mark lives inside a row-sized button, and on
+          a touch screen the tap that opens the tip is also a click — which
+          bubbled to the row and ticked or unticked it while you were only asking
+          what it was. */}
+      <span className="bx-tipdot" aria-hidden onClick={(e) => e.stopPropagation()}>
         ?
       </span>
     </Tip>
@@ -1576,7 +1580,6 @@ export function SaveBar({
             </strong>
             <span>
               {changes.slice(0, 2).join(' · ')}
-              {changes.length > 2 ? ` · +${changes.length - 2} more` : ''}
             </span>
           </span>
           <Button variant="ghost" size="sm" onClick={onDiscard}>

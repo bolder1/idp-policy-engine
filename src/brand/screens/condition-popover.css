@@ -325,7 +325,11 @@
   padding: 6px var(--space-3);
   border-top: 1px solid var(--border-subtle);
 }
-.cp__count { margin-right: auto; font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.cp__count { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+/* Pushed right by themselves now: the count that used to push them is only drawn
+   while a search narrows the list. */
+.cp__manage,
+.cp__hint { margin-left: auto; }
 .cp__manage {
   border: 0;
   background: none;

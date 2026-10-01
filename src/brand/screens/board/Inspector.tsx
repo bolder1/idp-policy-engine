@@ -4,7 +4,7 @@ import { ChevronsLeftRight, ChevronsRightLeft, CornerDownRight, Plus, Split, Use
 
 import { Toggle } from '../../kit'
 import { fallbackRule, type Policy, type Rule } from '../../data'
-import { TONE, type Part, type Selection } from './model'
+import { type Part, type Selection } from './model'
 import { WhatEditor } from './WhatEditor'
 import { WhenEditor } from './WhenEditor'
 import { WhoEditor } from './WhoEditor'
@@ -131,7 +131,7 @@ export function Inspector({
                 subject on this surface that does not fade — the behavioural
                 break the type checker cannot catch. */}
             <motion.div key={`head:${rule.id}`} initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.13 }}>
-              <RuleHead rule={rule} index={at} onPatch={patch} />
+              <RuleHead rule={rule} onPatch={patch} />
             </motion.div>
             {/* ONE panel, three sections, all of them open.
 
@@ -307,18 +307,13 @@ function ConditionSection({
    this block is ever drawn at now, and it is the panel's. */
 function RuleHead({
   rule,
-  index,
   onPatch,
 }: {
   rule: Rule
-  index: number
   onPatch: (p: Partial<Rule>) => void
 }) {
   return (
     <div className="bb__insphead">
-      <span className={`bb__idx is-${TONE[rule.decision]}`} aria-hidden>
-        {index + 1}
-      </span>
       <div className="bb__inspname">
         <input className="bb__input bb__input--title" aria-label="Rule name" value={rule.name} placeholder="Name this rule" onChange={(e) => onPatch({ name: e.target.value })} />
       </div>

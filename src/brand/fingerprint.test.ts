@@ -363,8 +363,8 @@ describe('what a kind can collect', () => {
      step is named after what that kind actually holds, so the ladder reads
      "Requirements" on one and "Attributes" on the other. */
   it('gives the collector step to the kind that is asked one', () => {
-    expect(stepsFor('os')).toEqual(['Profile', 'Requirements'])
-    expect(stepsFor('device')).toEqual(['Profile', 'Devices', 'Attributes'])
+    expect(stepsFor('os')).toEqual(['Profile', 'Checks'])
+    expect(stepsFor('device')).toEqual(['Profile', 'Devices', 'Signals'])
     for (const m of MODES) {
       expect(stepsFor(m.id).at(-1)?.toLowerCase()).toBe(ITEM_NOUN[m.id].many)
       expect(stepsFor(m.id).includes('Devices')).toBe(asksReach(m.id))
@@ -449,20 +449,20 @@ describe('what the page says about a profile', () => {
   })
 
   it('counts in the noun the kind actually uses', () => {
-    expect(countLabel('os', 1)).toBe('1 requirement')
-    expect(countLabel('os', 2)).toBe('2 requirements')
-    expect(countLabel('device', 1)).toBe('1 attribute')
+    expect(countLabel('os', 1)).toBe('1 check')
+    expect(countLabel('os', 2)).toBe('2 checks')
+    expect(countLabel('device', 1)).toBe('1 signal')
   })
 
   it('names the reach only where it is asked, and enrolment only once answered', () => {
     const os = describeProfile(
       profile({ mode: 'os', enabled: ['os-windows'], restrictionSet: false }),
     )
-    expect(os).toBe('OS and version · 1 requirement')
+    expect(os).toBe('Device health · 1 check')
 
     const dev = describeProfile(profile({ mode: 'device', reach: 'agentless', enabled: ['browser'] }))
     expect(dev).toBe(
-      'Device attributes · Agentless · 1 attribute · Users register their own devices',
+      'Trusted device · Agentless · 1 signal · Users register their own devices',
     )
   })
 

@@ -380,12 +380,14 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
               used to sit here permanently reading "no change", which is a
               control occupying the bar to report nothing — and it made the one
               case that matters, a draft that moves people, look like more of
-              the same furniture. */}
+              the same furniture. In the review stage both pips stand down: the
+              checks there already print the same gauntlet and movement figures,
+              and the span stays mounted because the tour anchors on it. */}
           <span className="bf__pips" data-tour="gauntlet">
-            {features.gauntlet && <GauntletPip policy={draft} onOpen={() => setDialog('gauntlet')} />}
-            {features.blastRadius && dirty && <ImpactPip draft={draft} saved={saved} onOpen={() => setDialog('impact')} />}
+            {stage !== 'review' && features.gauntlet && <GauntletPip policy={draft} onOpen={() => setDialog('gauntlet')} />}
+            {stage !== 'review' && features.blastRadius && dirty && <ImpactPip draft={draft} saved={saved} onOpen={() => setDialog('impact')} />}
           </span>
-          <span className="bf__sep" aria-hidden />
+          {stage !== 'review' && <span className="bf__sep" aria-hidden />}
           {/* On the bar, not in a menu. The tour used to be reachable only from
               the Policy menu, which makes "show me that again" a search — and
               everything else explanatory had nowhere to live at all. */}
@@ -594,6 +596,7 @@ export function PolicyBuilderMain({ policyId, open }: { policyId: string; open?:
                       index={index}
                       open
                       diagnostics={mine}
+                      blockers={features.publish ? blockers : undefined}
                       features={features}
                       onOpen={() => {}}
                       onPatch={(p) => patchRuleAt(index, p)}
@@ -817,6 +820,7 @@ function RuleCard({
   index,
   open,
   diagnostics,
+  blockers,
   features,
   onOpen,
   onPatch,
@@ -827,6 +831,9 @@ function RuleCard({
   index: number
   open: boolean
   diagnostics: Diagnostic[]
+  /** Policy-wide error count when the top-bar button prints it; Lite's button
+      does not, so there it is absent and the card keeps its own count. */
+  blockers?: number
   features: { checkStep: boolean }
   onOpen: () => void
   onPatch: (p: Partial<Rule>) => void
@@ -892,7 +899,9 @@ function RuleCard({
         {/* Dot and label, never colour alone. */}
         <span className={`bf__rulestate is-${st}`}>
           <i aria-hidden />
-          {st === 'ready' ? 'Ready' : st === 'warn' ? 'Worth a look' : `${errors || 'Needs'} to fix`}
+          {/* The policy-wide count is on the top-bar button, so this one only
+              prints a number when it says something that one does not. */}
+          {st === 'ready' ? 'Ready' : st === 'warn' ? 'Worth a look' : errors !== blockers ? `${errors} to fix` : 'Needs fixing'}
         </span>
 
         <label className="bf__ruleon">
@@ -960,7 +969,6 @@ function RuleCard({
                     value: 'when' as Pane,
                     label: 'When it applies',
                     icon: Filter,
-                    sub: predicateSummary(rule.when),
                   },
                   {
                     value: 'then' as Pane,

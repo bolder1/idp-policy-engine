@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { AlertTriangle, ArrowRight, Check, ChevronDown, Play, RotateCcw, X, XCircle } from 'lucide-react'
 
 import { Button } from '../../kit'
-import { appsLabel, appsOf, type Policy, type Rule } from '../../data'
+import { appsOf, type Policy, type Rule } from '../../data'
 import { useBrand } from '../../store'
 import type { Diagnostic } from '../diagnostics'
 import { DECK, OUTCOME_LABEL, applyFix, proposeFix, runGauntlet, type Outcome, type ProposedFix, type Round } from '../gauntlet'
@@ -209,13 +209,13 @@ export function CheckTab({
         </AnimatePresence>
       </Section>
 
-      <Section title="Break-in test" count={`${test.breaches} through`} note={`${test.rounds.length} sign-in attempts are dealt at these rules — ${test.rounds.filter((x) => x.challenge.kind === 'threat').length} hostile, the rest ordinary — and graded on what came back.${skipped ? ` ${skipped} skipped: this policy does not govern those people.` : ''}`}>
+      <Section title="Break-in test" note={`${test.rounds.length} sign-in attempts are dealt at these rules — ${test.rounds.filter((x) => x.challenge.kind === 'threat').length} hostile, the rest ordinary — and graded on what came back.${skipped ? ` ${skipped} skipped: this policy does not govern those people.` : ''}`}>
         <div className="bb__gradehead">
           <span className={`bb__gradebig is-${test.grade}`} aria-label={`Grade ${test.grade}`}>
             {test.grade}
           </span>
           <span className="bb__gradetext">
-            <b>{test.breaches === 0 ? 'Nothing got through' : `${test.breaches} got through`}</b>
+            <b>{test.breaches === 0 ? 'Nothing got through' : 'Some got through'}</b>
             <em>{test.gradeReason}</em>
           </span>
         </div>
@@ -265,7 +265,7 @@ export function CheckTab({
             detail={errors.length === 0 ? 'Nothing the linter can prove wrong.' : errors[0].title}
             action={errors.length > 0 && errors[0].ruleIndex >= 0 ? { label: `Open rule ${errors[0].ruleIndex + 1}`, run: () => { onSelect(ruleAt(draft.rules[errors[0].ruleIndex].id, 'when')); onClose() } } : undefined}
           />
-          <ReadyRow ok={test.breaches === 0} warn={test.breaches === 0 && test.lockouts > 0} title={test.breaches === 0 ? 'Break-in test: nothing got through' : `Break-in test: ${test.breaches} got through`} detail={test.gradeReason} />
+          <ReadyRow ok={test.breaches === 0} warn={test.breaches === 0 && test.lockouts > 0} title={test.breaches === 0 ? 'Break-in test: nothing got through' : 'Break-in test: some got through'} detail={test.gradeReason} />
           <ReadyRow
             ok={!movement || movement.looser === 0}
             warn={!!movement && movement.looser > 0}
@@ -277,7 +277,7 @@ export function CheckTab({
             ok={named.length > 0 || !!draft.isSystem}
             title={
               named.length > 0
-                ? `Protecting ${appsLabel(named)}`
+                ? `Protecting ${named[0].name}${named.length > 1 ? ' and others' : ''}`
                 : draft.isSystem
                   ? 'The tenant default'
                   : 'No application assigned'

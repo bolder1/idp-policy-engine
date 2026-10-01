@@ -8,7 +8,7 @@ import { AppsPeek } from './apps-peek'
 import { AppLogo } from '../logos/AppLogo'
 import { Badge, Button, Modal, SearchBox, StatusPill } from '../kit'
 import { Picker } from '../picker'
-import { appsLabel, appsOf, blankPolicy, enforces, type Policy, type PolicyType } from '../data'
+import { appsOf, blankPolicy, enforces, type Policy, type PolicyType } from '../data'
 import { NewPolicyDialog } from '../create/NewPolicyDialog'
 import { useBrand } from '../store'
 import { NoResults } from '../empty'
@@ -451,7 +451,7 @@ export function Policies() {
 
         <footer className="btable__foot">
           <span>
-            Showing {rows.length} of {counts.total} policies · {counts.active} enforcing
+            {counts.active} enforcing
             {counts.monitoring > 0 && ` · ${counts.monitoring} in monitor`}
             {leaking > 0 && (
               <>
@@ -780,12 +780,12 @@ function AssignAppsDialog({
           {shown.length === 0 && <p className="bassign__none">No application matches “{q}”.</p>}
         </div>
 
-        {/* Says what the save will do, in the terms the row will read back.
-            A count that only appears once something is ticked, because "0
+        {/* The count and nothing else: the ticked rows above already name the
+            apps. It only appears once something is ticked, because "0
             selected" under an empty list is a restatement of the list. */}
         {picked.length > 0 && (
           <p className="bassign__foot">
-            {picked.length} selected — {appsLabel(store.apps.filter((a) => picked.includes(a.id)))}
+            {picked.length} selected
           </p>
         )}
       </div>

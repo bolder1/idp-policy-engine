@@ -724,13 +724,9 @@ html[data-theme='dark'] .bguided__sheen {
   font-size: var(--fs-md); color: var(--text-secondary);
 }
 .bmarket__cat:hover { background: var(--surface-sunken); color: var(--text-primary); }
-.bmarket__cat em {
-  font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums;
-}
 /* The selected shelf. A tint and a weight, not a fill — this is where you are,
    not something to press. */
 .bmarket__cat.is-on { background: var(--surface-inset); color: var(--text-primary); font-weight: var(--fw-medium); }
-.bmarket__cat.is-on em { color: var(--text-secondary); }
 .bmarket__cat:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
 .bmarket__body { grid-column: 2; min-width: 0; }

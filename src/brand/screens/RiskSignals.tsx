@@ -286,7 +286,6 @@ function RiskProfileList({
                 <span className="blist__meta">
                   <span>
                     Listening to {on} of {RISK_SIGNALS.length} signals
-                    {p.off.length > 0 && <i className="brs__listoff"> · {p.off.length} off</i>}
                   </span>
                 </span>
               </span>
@@ -419,6 +418,7 @@ function RiskProfileDetail({
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<string>(ALL)
   const [deleting, setDeleting] = useState(false)
+  const [renaming, setRenaming] = useState(false)
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(profile)
 
@@ -455,7 +455,12 @@ function RiskProfileDetail({
 
       <header className="bfp2__head">
         <div className="bfp2__pagehead">
-          <EditableProfileName value={draft.name} onChange={(name) => setDraft((d) => ({ ...d, name }))} />
+          <EditableProfileName
+            value={draft.name}
+            onChange={(name) => setDraft((d) => ({ ...d, name }))}
+            editing={renaming}
+            setEditing={setRenaming}
+          />
           {inUse && <Badge tone="system">In use</Badge>}
         </div>
 
@@ -472,6 +477,13 @@ function RiskProfileDetail({
               Restore shipped weights
             </Button>
           )}
+          {/* Rename sits with the page's other actions. As a pencil beside the title it
+              left a gap between the name and whatever followed it — the type label, the
+              "In use" badge — and read as part of the heading rather than a control. */}
+          <Button variant="secondary" size="sm" onClick={() => setRenaming(true)}>
+            <Pencil size={14} strokeWidth={1.9} aria-hidden />
+            Rename
+          </Button>
           <Button variant="secondary" size="sm" onClick={() => onDuplicate(draft)}>
             <Copy size={14} strokeWidth={1.9} aria-hidden />
             Duplicate
@@ -546,7 +558,7 @@ function RiskProfileDetail({
             label="Filter by category"
             value={cat}
             options={[
-              { value: ALL, label: 'All categories', meta: `${RISK_SIGNALS.length} signals` },
+              { value: ALL, label: 'All categories' },
               ...SIGNAL_CATEGORIES.map((c) => {
                 const n = RISK_SIGNALS.filter((s) => s.category === c).length
                 return { value: c, label: c, meta: `${n} signal${n === 1 ? '' : 's'}` }
@@ -645,8 +657,17 @@ function riskChanges(before: RiskProfile, after: RiskProfile): string[] {
 /* The name, edited where it is read — the same control the device profile page
    uses, and for the same reason: a card holding one text field below a heading
    that already shows the string is two renderings of one value. */
-function EditableProfileName({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [editing, setEditing] = useState(false)
+function EditableProfileName({
+  value,
+  onChange,
+  editing,
+  setEditing,
+}: {
+  value: string
+  onChange: (v: string) => void
+  editing: boolean
+  setEditing: (on: boolean) => void
+}) {
   const input = useRef<HTMLInputElement>(null)
   const before = useRef(value)
 
@@ -658,22 +679,7 @@ function EditableProfileName({ value, onChange }: { value: string; onChange: (v:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing])
 
-  if (!editing) {
-    return (
-      <>
-        <h1>{value}</h1>
-        <button
-          type="button"
-          className="bfp2__rename"
-          aria-label={`Rename ${value}`}
-          title="Rename"
-          onClick={() => setEditing(true)}
-        >
-          <Pencil size={14} strokeWidth={1.9} aria-hidden />
-        </button>
-      </>
-    )
-  }
+  if (!editing) return <h1>{value}</h1>
 
   return (
     <input

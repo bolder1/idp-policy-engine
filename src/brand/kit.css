@@ -549,11 +549,6 @@ html[data-theme='dark'] {
   box-shadow: var(--el-low);
 }
 .bx-tabs__label { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: var(--space-3); }
-.bx-tabs__label em {
-  font-style: normal;
-  font-size: var(--fs-xs);
-  color: var(--text-tertiary);
-}
 
 /* The underline flavour.
 

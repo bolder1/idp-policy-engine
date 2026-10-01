@@ -468,7 +468,7 @@ export function CopyRuleDialog({
                     <span className="bdlg-copy__meta">
                       {t.policy.rules.length === 0
                         ? 'No rules yet — the copy becomes rule 1'
-                        : `${t.policy.rules.length} rule${t.policy.rules.length === 1 ? '' : 's'} — the copy lands last, as rule ${t.at + 1}`}
+                        : `The copy lands last, as rule ${t.at + 1}`}
                     </span>
                     {t.blocking && (
                       <span className="bdlg-copy__warn">

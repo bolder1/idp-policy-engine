@@ -135,7 +135,7 @@ export function validateHook(h: Hook): HookIssue[] {
       out.push({
         level: 'warning',
         title: 'Slow enough to be felt',
-        detail: `${h.timeoutMs}ms is charged to every sign-in that reaches a rule naming this hook, on top of the engine's own work. Worth confirming against the endpoint's measured p99 rather than its hopeful one.`,
+        detail: `This timeout is charged to every sign-in that reaches a rule naming this hook, on top of the engine's own work. Worth confirming against the endpoint's measured p99 rather than its hopeful one.`,
       })
 
     if (h.timeoutMs <= 0)
@@ -158,8 +158,8 @@ export const canSaveHook = (h: Hook) => !validateHook(h).some((i) => i.level ===
 /** One sentence describing what the hook does, for the list and the condition row. */
 export function describeHook(h: Hook): string {
   if (h.mode === 'attribute-sync')
-    return `Pulls attributes from ${host(h.url)}${h.maxAgeHours ? `, trusted for ${h.maxAgeHours}h` : ''}.`
-  return `${h.method} ${host(h.url)}, reads ${h.responsePath || '—'}, gives up after ${h.timeoutMs}ms.`
+    return `Pulls attributes from ${host(h.url)}.`
+  return `${h.method} ${host(h.url)}, reads ${h.responsePath || '—'}.`
 }
 
 function host(url: string): string {

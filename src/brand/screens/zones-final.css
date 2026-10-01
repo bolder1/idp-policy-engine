@@ -524,14 +524,6 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
   outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm);
 }
 .bz7__buildtabs svg { flex: none; }
-/* The count is the whole reason both tabs are always shown: it says which half
-   holds what without opening either. */
-.bz7__buildtabs em {
-  font-style: normal; padding: 0 6px; border-radius: var(--radius-sm);
-  background: var(--surface-inset); font-size: var(--fs-xs); color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.bz7__buildtabs button.is-on em { background: var(--accent-soft); color: var(--accent-strong); }
 
 @media (prefers-reduced-motion: reduce) {
   .bz7__buildtabs button { transition: none; }}
@@ -588,25 +580,10 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
    overflow override that followed the table here went with it. */
 
 /* --- The name, renameable in place ---------------------------------------------
-   The pencil sits beside the heading rather than in the actions on the right,
-   because it changes THIS text and not the zone — the actions over there
-   operate on the whole thing. */
+   Rename is a button among the actions, as on the device and risk profile pages:
+   a pencil beside the heading read as part of the title. The heading edits in
+   place once it is pressed. */
 .bz7__namewrap { min-width: 0; }
-.bz7__nameline { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-.bz7__nameline h1 { margin: 0; }
-
-.bz7__rename {
-  flex: none; display: grid; place-items: center;
-  width: 26px; height: 26px; border-radius: var(--radius-sm);
-  background: none; cursor: pointer; color: var(--text-muted);
-  /* Always visible, not hover-revealed. A control you cannot see is a control
-     you do not know you have, and this one answers a question people arrive
-     with — the name is wrong, can I fix it. Quiet is enough; hidden is not. */
-  transition: color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard);
-}
-.bz7__rename:hover { background: var(--surface-inset); color: var(--text-primary); }
-.bz7__rename:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-
 /* Sized to the heading it replaces, so committing does not move the page. */
 .bz7 .bz7__nameinput {
   width: 100%; max-width: 460px;
@@ -618,8 +595,6 @@ label.bz7__add > svg { margin-left: 0; margin-right: 8px; }
 }
 .bz7 .bz7__nameinput:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 
-@media (prefers-reduced-motion: reduce) {
-  .bz7__rename { transition: none; }}
 
 /* The name cell, which now carries the icon too. */
 .bz7__tname { display: flex; align-items: center; gap: 10px; min-width: 0; }

@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Check, Copy, Keyboard, ListOrdered, PanelRightClose, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
 
 import { Button, Modal } from '../../kit'
-import { appsLabel, appsOf, fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
+import { appsOf, fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
 import { useBrand, useNameLookup } from '../../store'
 import { TemplateSheet } from '../../create/TemplateSheet'
 import { ReviewDialog } from '../builder-dialogs'
@@ -715,17 +715,16 @@ export function BoardBuilder({
            is what it now is. */
         destination={
           /* The chain's first node names ONE application, so a policy on
-             several says the first and how many more — the same summary the
-             policies table and the board bar print, from `appsLabel`, so the
-             three cannot disagree about how a multi-app policy is spoken. */
+             several names only the first. How many more is the board bar's to
+             say, right above, and saying it here too would print it twice. */
           draft.appIds.length > 0
-            ? (appsLabel(appsOf(draft, store.apps)) ?? null)
+            ? (appsOf(draft, store.apps)[0]?.name ?? null)
             : draft.isSystem
               ? 'any application'
               : null
         }
-        /* The first application's id, for its logo in the start pill. The label
-           beside it already says how many more there are. */
+        /* The first application's id, for its logo in the start pill, so the
+           logo and the name beside it are the same application. */
         destinationAppId={draft.appIds.length > 0 ? (appsOf(draft, store.apps)[0]?.id ?? null) : null}
         selection={selection}
         diagnostics={diagnostics}

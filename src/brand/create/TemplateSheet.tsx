@@ -210,7 +210,6 @@ export function TemplateSheet({
                     onClick={() => pickShelf('mine')}
                   >
                     <span>Your templates</span>
-                    <em>{MINE.length}</em>
                   </button>
                   <button
                     type="button"
@@ -220,7 +219,6 @@ export function TemplateSheet({
                     onClick={() => pickShelf('xecurify')}
                   >
                     <span>Xecurify templates</span>
-                    <em>{PROVIDED.length}</em>
                   </button>
                 </div>
               </aside>
@@ -240,7 +238,7 @@ export function TemplateSheet({
                       label="Filter by category"
                       value={cat}
                       size="md"
-                      summary={cat === 'All' ? `All categories · ${counts.All}` : `${cat} · ${counts[cat]}`}
+                      summary={cat === 'All' ? 'All categories' : cat}
                       options={[
                         { value: 'All', label: 'All categories', meta: `${counts.All} templates` },
                         ...CATS.map((c) => ({

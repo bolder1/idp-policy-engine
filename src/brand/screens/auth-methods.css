@@ -483,25 +483,79 @@
    saying the same thing beside it is the tint stated twice. */
 .bm8__dwhead {
   flex: 1; min-width: 0;
-  display: flex; align-items: flex-start; gap: 13px;}
-
-.bm8__dwtile {
-  flex: none; display: grid; place-items: center;
-  width: 38px; height: 38px; border-radius: var(--radius-md);
-  background: var(--surface-inset); color: var(--text-tertiary);
+  display: flex; align-items: center; gap: var(--space-4);
 }
 
-.bm8__dwtext { flex: 1; min-width: 0; }
-.bm8__dwtext h2 { margin: 0; font-size: var(--fs-lg); }
-/* A family of one is headed by its method, with the family as a chip — the
-   same way its row is named on the list. */
-.bm8__dwtitle { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.bm8__dwtext p { margin: 3px 0 0; font-size: var(--fs-sm); color: var(--text-tertiary); line-height: 1.45; }
+/* The head is a name and nothing else, so it is set to be seen: the page-title
+   size, bold, beside a 36px tile. What it used to carry under the name — the
+   blurb and the numbers, in 13px and 12px grey — is the overview card now. */
+.bm8__dwtile {
+  flex: none; display: grid; place-items: center;
+  width: 36px; height: 36px; border-radius: var(--radius-md);
+  background: var(--surface-inset); color: var(--text-secondary);
+}
+/* Scoped through the drawer and the head so it outranks `.bpage h2` in
+   console-theme.css and its `[data-brand=rebrand]` twin (0,2,1), which set every
+   h2 on a page to 16px/600 and would quietly take the title back down. */
+.bx-drawer .bm8__dwhead > h2.bm8__dwtitle {
+  margin: 0; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-xl); font-weight: var(--fw-bold); line-height: 1.3;
+  color: var(--text-primary);
+}
+.bm8__dwhead > .bx-badge { flex: none; }
 
-.bm8__dwstats { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
-.bm8__dwstats span { font-size: var(--fs-xs); color: var(--text-tertiary); }
-.bm8__dwstats strong { font-weight: var(--fw-semibold); color: var(--text-primary); }
-.bm8__dwstats .is-warn strong { color: var(--fb-notice-fg); }
+/* --- The overview card ------------------------------------------------------------
+   First thing in the body of every panel page. A quiet fill rather than an edge,
+   so it reads as the page's summary and not as one more control: the description,
+   the facts as label-over-value, and on a settings page one plain sentence on
+   what a change reaches. */
+.bm8__overview {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+}
+/* Wraps rather than squeezes: below about 480px of card the figures drop under
+   the sentence and start at its left edge. */
+.bm8__ovmain {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--space-4) var(--space-8);
+}
+.bm8__ovblurb {
+  flex: 1 1 240px; min-width: 0; margin: 0;
+  font-size: var(--fs-md); line-height: 1.5; color: var(--text-secondary);
+}
+/* Stat style: the figure is what the eye lands on, its label under it. The
+   markup keeps dt before dd (a valid description list); column-reverse only
+   changes what is drawn on top. */
+.bm8__ovfacts { flex: none; display: flex; margin: 0; }
+.bm8__ovfacts > div {
+  display: flex; flex-direction: column-reverse; gap: 1px;
+  padding: 0 var(--space-6);
+  border-left: var(--bw-thin) solid var(--border-default);
+}
+.bm8__ovfacts > div:first-child { padding-left: 0; border-left: 0; }
+.bm8__ovfacts > div:last-child { padding-right: 0; }
+.bm8__ovfacts dt { font-size: var(--fs-xs); color: var(--text-tertiary); white-space: nowrap; }
+.bm8__ovfacts dd {
+  margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); line-height: 1.3;
+  color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.bm8__ovfacts .is-warn dd { color: var(--fb-notice-fg); }
+.bm8__ovnote {
+  margin: 0; padding-top: var(--space-4);
+  border-top: var(--bw-thin) solid var(--border-default);
+  font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary);
+}
+
+/* Settings sections: a plain heading over its rows. What the section reaches is
+   said once, in the overview card, not as an italic tail on every heading. */
+.bm8__settings { display: flex; flex-direction: column; gap: var(--space-6); }
+.bm8__setlabel {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
 
 /* --- Panel tabs ------------------------------------------------------------------
    These shipped as markup with no stylesheet, which is why they rendered as
@@ -523,11 +577,6 @@
 .bm8__dwtab:hover { color: var(--text-secondary); }
 .bm8__dwtab.is-on { color: var(--text-primary); font-weight: var(--fw-semibold); border-bottom-color: var(--accent); }
 .bm8__dwtab:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
-.bm8__dwtab em {
-  font-style: normal; padding: 0 6px; border-radius: var(--radius-sm);
-  background: var(--surface-inset); font-size: var(--fs-xs); color: var(--text-muted);
-}
-.bm8__dwtab.is-on em { background: var(--accent-soft); color: var(--accent-strong); }
 
 /* The settings list. The row brings its own dividers, so this only stacks. */
 .bm8__setlist { display: flex; flex-direction: column; }
@@ -909,17 +958,3 @@
   .bmu__pair { grid-template-columns: minmax(0, 1fr); }
   .bmu__scan { flex-direction: column; }}
 
-/* --- The family's balance ------------------------------------------------------
-   The tag says what a family has left to spend. Two things have to be undone
-   for it to read in a panel header: `.bm8__dwstats span` greys every child,
-   which would flatten the empty state into the same tertiary as "612 enrolled"
-   — the colour IS the warning — and the tag hides itself under 900px, which is
-   right on a row carrying a name, two counts and a chevron and wrong in a panel
-   showing a single family. */
-.bm8__dwstats .bm8__txn { color: var(--text-tertiary); }
-.bm8__dwstats .bm8__txn.is-low { color: var(--fb-notice-fg); }
-.bm8__dwstats .bm8__txn.is-empty { color: var(--fb-negative-fg); }
-
-@media (max-width: 900px) {
-  .bm8__dwstats .bm8__txn { display: inline-flex; }
-}

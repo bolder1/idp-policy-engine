@@ -95,7 +95,8 @@ describe('validating a hook', () => {
 
   it('describes itself without leaking the full URL into a list row', () => {
     expect(describeHook(hook())).toContain('example.internal')
-    expect(describeHook(hook({ mode: 'attribute-sync', maxAgeHours: 12 }))).toContain('12h')
+    // The freshness limit has its own fact tile on the card, so the sentence leaves it out.
+    expect(describeHook(hook({ mode: 'attribute-sync', maxAgeHours: 12 }))).not.toContain('12h')
   })
 })
 

@@ -220,11 +220,6 @@
    list of them. The table itself is `.btable`, shared with Policies — a third
    table style for a third library is a third thing to learn for no gain. */
 
-/* Muted, because it qualifies the count beside it rather than competing with
-   it: "12 of 16 signals · 4 off" is one fact said twice, and the second half is
-   the detail. */
-.brs__listoff { font-style: normal; color: var(--text-tertiary); }
-
 /* Tabular and heavier, because the whole point of this column is comparing it
    down the table — it is the number `Risk score above 60` is measured against,
    so two profiles differ HERE or nowhere that matters. */

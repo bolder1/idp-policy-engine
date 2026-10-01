@@ -110,7 +110,11 @@ export function ImpactArenaDialog({
       footer={
         <>
           <span className="bia__foot">
-            {SITUATIONS.length.toLocaleString()} modelled situations ={' '}
+            {/* With movement the headline already says the total, so the
+                footer starts at the axes. */}
+            {movement
+              ? 'Modelled over '
+              : `${SITUATIONS.length.toLocaleString()} modelled situations = `}
             {SWEEP_AXES.map((a) => `${a.values.length} ${a.name.toLowerCase()}`).join(' × ')}. Exact over that
             space, silent about the world beyond it.
           </span>
@@ -255,7 +259,9 @@ export function ImpactArenaDialog({
             <p className="bia__fieldnote">
               One dot per modelled sign-in situation, in a fixed order — the same dot is the same situation in every
               view, so the field can be compared rather than just looked at.
-              {shown.fellThrough > 0 && (
+              {/* Published view only: the Engine default row below already
+                  prints the current figure. */}
+              {view === 'before' && shown.fellThrough > 0 && (
                 <>
                   {' '}
                   <b>{shown.fellThrough.toLocaleString()}</b> of them match no rule at all and are decided by the

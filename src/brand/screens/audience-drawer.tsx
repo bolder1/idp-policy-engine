@@ -154,7 +154,7 @@ export function AudienceDrawer({
                   className={tab === 'groups' ? 'is-on' : ''}
                   onClick={() => setTab('groups')}
                 >
-                  Groups {draft.groupIds.length > 0 && <em>{draft.groupIds.length}</em>}
+                  Groups
                 </button>
                 <button
                   type="button"
@@ -163,7 +163,7 @@ export function AudienceDrawer({
                   className={tab === 'people' ? 'is-on' : ''}
                   onClick={() => setTab('people')}
                 >
-                  People {draft.userIds.length > 0 && <em>{draft.userIds.length}</em>}
+                  People
                 </button>
               </div>
 

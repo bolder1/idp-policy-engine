@@ -293,15 +293,6 @@
   box-shadow: var(--el-low);
 }
 .bdl__seglabel { position: relative; display: inline-flex; align-items: center; gap: var(--space-3); }
-.bdl__seglabel em {
-  font-style: normal;
-  font-size: var(--fs-xs);
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-pill);
-  background: var(--fb-neutral-bg);
-  color: var(--text-tertiary);
-}
-
 .bdl__summary { font-size: var(--fs-sm); color: var(--text-secondary); }
 
 .bdl__scroll {

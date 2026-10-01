@@ -1,0 +1,102 @@
+{
+ "image": "hero.png",
+ "size": [
+  673,
+  1219
+ ],
+ "sourceOffset": [
+  256,
+  17
+ ],
+ "head": {
+  "center": [
+   376,
+   258
+  ],
+  "radius": 232,
+  "top": 78,
+  "leafTop": 13
+ },
+ "neck": [
+  376,
+  453
+ ],
+ "eyes": {
+  "left": {
+   "center": [
+    309,
+    188
+   ],
+   "w": 54,
+   "h": 78,
+   "skin": "#fc8c29"
+  },
+  "right": {
+   "center": [
+    479,
+    223
+   ],
+   "w": 48,
+   "h": 66,
+   "skin": "#fca241"
+  }
+ },
+ "mouth": {
+  "center": [
+   344,
+   295
+  ],
+  "w": 118,
+  "h": 64,
+  "skin": "#fd9436",
+  "box": [
+   292,
+   265,
+   412,
+   331
+  ]
+ },
+ "nose": {
+  "center": [
+   384,
+   233
+  ]
+ },
+ "phone": {
+  "screenQuad": [
+   [
+    10,
+    233
+   ],
+   [
+    119,
+    210
+   ],
+   [
+    171,
+    388
+   ],
+   [
+    44,
+    403
+   ]
+  ],
+  "contentCenter": [
+   89,
+   293
+  ],
+  "contentSize": [
+   104,
+   150
+  ],
+  "rotateDeg": -12,
+  "glass": "#144e45",
+  "glassTop": "#17423f",
+  "text": "#dff7ee",
+  "note": "lower-left of the screen is behind the hand; content must stay inside contentCenter/contentSize"
+ },
+ "feet": [
+  344,
+  1213
+ ]
+}

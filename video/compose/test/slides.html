@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>slides v2 — test page</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&family=Kalam:wght@400;700&display=block"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../compose.css" />
+    <link rel="stylesheet" href="../slides.css" />
+    <link rel="stylesheet" href="../slides-v2.css" />
+    <style>
+      /* The harness only: a ghost where the mascot's rig will stand, so the
+         column a scene must leave free can be checked in the still. */
+      .ghost {
+        position: absolute;
+        left: 0;
+        top: 0;
+        border: 2px dashed rgba(17, 137, 212, 0.75);
+        border-radius: 40% 40% 12px 12px;
+        background: rgba(17, 137, 212, 0.08);
+        z-index: 90;
+        pointer-events: none;
+      }
+      .ghost i {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -30px;
+        text-align: center;
+        font: 600 18px var(--font);
+        color: #1189d4;
+        white-space: nowrap;
+      }
+      /* A stand-in for the product window under a banner: only its surface matters. */
+      #win {
+        position: absolute;
+        left: 240px;
+        top: 90px;
+        width: 1440px;
+        height: 900px;
+        border-radius: 14px;
+        background: var(--win-bg);
+        box-shadow: 0 30px 80px var(--win-shadow);
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="film">
+      <div id="bg"></div>
+      <div id="win"></div>
+      <div id="slides"></div>
+    </div>
+    <script src="../engine.js"></script>
+    <script src="../slides-v2.js"></script>
+    <script>
+      /* window.TEST.render({ theme, slide, t, dur, params, ghost, win }) builds the
+         slide fresh, pauses its keyframe animations at t and calls update(t). */
+      window.TEST = {
+        render({ theme = 'light', slide, t = 0, dur = 6.5, params = {}, ghost = true, win = false }) {
+          document.documentElement.dataset.theme = theme
+          const host = document.getElementById('slides')
+          host.innerHTML = ''
+          document.getElementById('win').style.display = win ? 'block' : 'none'
+          const def = window.SLIDES2[slide]
+          if (!def) throw new Error('no slide ' + slide)
+          const el = document.createElement('section')
+          el.className = `slide slide--${slide}`
+          host.appendChild(el)
+          def.build(el, params, {})
+          for (const a of el.getAnimations({ subtree: true })) {
+            a.pause()
+            a.currentTime = Math.max(0, t * 1000)
+          }
+          def.update(el, t, dur, params)
+          const keys = def.mascotKeys ? def.mascotKeys(dur, params) : []
+          let k = null
+          for (const key of keys) if (key.t <= t) k = key
+          if (ghost && k && k.pose !== 'hide') {
+            const g = document.createElement('div')
+            g.className = 'ghost'
+            const w = k.size * 0.55
+            g.style.width = `${w}px`
+            g.style.height = `${k.size}px`
+            g.style.transform = `translate(${k.x - w / 2}px, ${k.y - k.size}px)`
+            g.innerHTML = `<i>${k.pose}${k.emote ? ' ' + k.emote : ''}${k.toward ? ' → ' + Math.round(k.toward.x) + ',' + Math.round(k.toward.y) : ''}</i>`
+            host.appendChild(g)
+            if (k.toward) {
+              const d = document.createElement('div')
+              d.style.cssText = `position:absolute;left:${k.toward.x - 10}px;top:${k.toward.y - 10}px;width:20px;height:20px;border-radius:50%;border:3px solid #1189d4;z-index:90`
+              host.appendChild(d)
+            }
+          }
+          return { keys, width: el.scrollWidth, height: el.scrollHeight }
+        },
+      }
+    </script>
+  </body>
+</html>

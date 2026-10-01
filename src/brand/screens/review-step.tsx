@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { AlertTriangle, ArrowRight, Check, Swords, Target } from 'lucide-react'
 
 import { Button, DecisionChip, TipDot } from '../kit'
-import { appsLabel, appsOf, type Policy, type PolicyStatus } from '../data'
+import { appsOf, type Policy, type PolicyStatus } from '../data'
 import { useBrand, useNameLookup } from '../store'
 import { ruleSentence } from './builder-dialogs'
 import { describeChanges } from './changes'
@@ -85,7 +85,7 @@ export function ReviewStep({
         ? 'Nothing unpublished'
         : movement.looser > 0
           ? `${movement.looser} situation${movement.looser === 1 ? '' : 's'} loosened`
-          : `${movement.changed} situation${movement.changed === 1 ? '' : 's'} tightened`,
+          : 'Nothing loosened',
       detail: movement
         ? `${movement.changed} of ${SITUATIONS.length.toLocaleString()} modelled situations change treatment.`
         : 'The draft matches what is live.',
@@ -101,7 +101,7 @@ export function ReviewStep({
     {
       id: 'apps',
       ok: named.length > 0,
-      title: named.length > 0 ? `Protects ${appsLabel(named)}` : 'No application chosen',
+      title: named.length > 0 ? `Protects ${named[0].name}${named.length > 1 ? ' and others' : ''}` : 'No application chosen',
       detail:
         named.length > 1
           ? 'Every sign-in to any of them is checked against these rules.'
@@ -229,7 +229,7 @@ export function ReviewStep({
             that moves it forward is enforcement. */}
         {errors.length > 0 ? (
           <Button variant="primary" disabled>
-            {errors.length} error{errors.length === 1 ? '' : 's'} to fix
+            Fix errors to publish
           </Button>
         ) : (
           <div className="bf__revship">

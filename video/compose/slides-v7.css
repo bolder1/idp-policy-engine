@@ -1,0 +1,237 @@
+/* The seventh cut's teaching slides (slides-v7.js): `concept` and `priority`.
+   Both sections are transparent so the compositor's #bg is the only ground on
+   screen. Sizes, colours and texts are the owner's storyboard preview as
+   written into BEATS-v7 §03 and §04.5; positions are the frame's own pixels
+   (1920 x 1080, the picture above the 100 px caption band). Every opacity,
+   transform and animated colour is set per frame by the script; the colours it
+   mixes are the custom properties on .v7, read from here. */
+.slide--concept,
+.slide--priority {
+  background: transparent;
+  background-image: none;
+}
+.v7 {
+  --v7-surface: #ffffff;
+  --v7-line: var(--line);
+  --v7-line-2: var(--line-2);
+  --v7-inset: var(--inset);
+  --v7-brand: var(--brand);
+  --v7-tint: #fdeee9;
+  --v7-tint-bd: #f9cabb;
+  --v7-ink: var(--ink);
+  --v7-ink-2: var(--ink-2);
+  --v7-ink-3: var(--ink-3);
+  --v7-neg-fg: var(--neg-fg);
+  position: absolute;
+  inset: 0;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+  color: var(--v7-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- concept: a centred column in the picture, gap 22 --------------------------- */
+.v7c-col {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 980px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+
+/* the application: one chip, the frame's one solid orange */
+.v7c-app {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 26px;
+  border-radius: 12px;
+  background: var(--v7-surface);
+  border: 1px solid var(--v7-line);
+  box-shadow: 0 10px 28px rgba(22, 32, 44, 0.08);
+  font: 600 22px/26px var(--font);
+  color: var(--v7-ink);
+  white-space: nowrap;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.v7c-mark {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--v7-brand);
+}
+
+/* the rules it is made of, in order */
+.v7c-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.v7c-bar {
+  box-sizing: border-box;
+  width: 520px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-radius: 9px;
+  background-color: var(--v7-surface);
+  border: 1px solid var(--v7-line);
+  font: 500 16px/1.2 var(--font);
+  color: var(--v7-ink-2);
+  white-space: nowrap;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.v7c-bar.is-first {
+  border-color: var(--v7-tint-bd);
+}
+.v7c-num {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--v7-inset);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 12px/1 var(--font);
+  color: var(--v7-ink-3);
+}
+.v7c-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* the three parts of one rule, right-aligned on bar 1 */
+.v7c-parts {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+.v7c-parts i {
+  display: block;
+  font: 600 12px/1.2 var(--font);
+  font-style: normal;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: var(--v7-surface);
+  border: 1px solid var(--v7-line-2);
+  color: var(--v7-ink-2);
+  opacity: 0;
+}
+
+/* --- priority: two boards 640 wide, gap 56 (x 292-932, 988-1628) ---------------- */
+.v7p-board {
+  position: absolute;
+  top: 345px;
+  width: 640px;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.v7p-board.is-before {
+  left: 292px;
+}
+.v7p-board.is-after {
+  left: 988px;
+}
+.v7p-label {
+  height: 18px;
+  margin-bottom: 14px;
+  font: 700 14px/18px var(--font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--v7-ink-3);
+  white-space: nowrap;
+}
+.v7p-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.v7p-chip {
+  box-sizing: border-box;
+  height: 78px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  border-radius: 12px;
+  background: var(--v7-surface);
+  border: 1.5px solid var(--v7-line);
+  box-shadow: 0 2px 8px rgba(33, 37, 41, 0.05);
+  white-space: nowrap;
+}
+.v7p-num {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--v7-inset);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 13px/1 var(--font);
+  color: var(--v7-ink-3);
+}
+.v7p-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.v7p-name {
+  font: 600 16.5px/1.25 var(--font);
+  color: var(--v7-ink);
+}
+.v7p-desc {
+  font: 500 13.5px/1.25 var(--font);
+  color: var(--v7-ink-3);
+}
+/* the outcome of the rule that matched, in the positive tints */
+.v7p-pill {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--pos-bg);
+  border: 1px solid var(--pos-bd);
+  font: 700 12.5px/1.2 var(--font);
+  color: var(--pos-fg);
+  opacity: 0;
+  transform-origin: 100% 50%;
+  will-change: transform, opacity;
+}
+
+/* the 38 px arrow in the gap between the boards, centred on the chips */
+.v7p-arrow {
+  position: absolute;
+  left: 932px;
+  top: 377px;
+  width: 56px;
+  height: 258px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.v7p-arrow svg {
+  display: block;
+  stroke: var(--v7-ink-3);
+  overflow: visible;
+}
+.v7p-arrow span {
+  font: 600 13px/1 var(--font);
+  color: var(--v7-ink-3);
+  white-space: nowrap;
+}

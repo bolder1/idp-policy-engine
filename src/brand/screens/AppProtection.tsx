@@ -365,7 +365,7 @@ function Verdict({ app, own, decides }: { app: string; own: number; decides: num
     )
   }
   return (
-    <Callout tone="negative" title={`${own} polic${own === 1 ? 'y' : 'ies'} name${own === 1 ? 's' : ''} ${app} and none of them decides anything.`}>
+    <Callout tone="negative" title={own === 1 ? `The policy on ${app} decides nothing.` : `None of the policies on ${app} decides anything.`}>
       Sign-ins fall through to the tenant default, which asks for a password and nothing else.
     </Callout>
   )

@@ -114,7 +114,7 @@ export function PolicyOverview({
                   </span>
                   <div>
                     <span className="bov__eyebrow">
-                      Rule {i + 1}
+                      Rule
                       {!r.enabled && <b className="bov__tag">off</b>}
                       {dead.has(i) && <b className="bov__tag is-dead">never runs</b>}
                       {errors.length > 0 && (

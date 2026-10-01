@@ -1,0 +1,91 @@
+/* The bookends (slides-v4.js): type on the film's own ground. The section is
+   transparent so the compositor's #bg is the only ground on screen; nothing
+   here paints, filters or recolours. Positions are the frame's own pixels
+   (1920 x 1080); every opacity and transform is set per frame by the script. */
+.slide--hook,
+.slide--outro {
+  background: transparent;
+  background-image: none;
+}
+.v4 {
+  position: absolute;
+  inset: 0;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* the wordmark: the app's own PNG at 0.8x, unaltered */
+.v4-lockup {
+  position: absolute;
+  left: 779px;
+  top: 280px;
+  width: 362px;
+  height: 97px;
+  max-width: none;
+  display: block;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.v4--outro .v4-lockup {
+  top: 250px;
+}
+
+/* the name: display type; its tracking settles as it arrives (set per frame) */
+.v4-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 472px;
+  font: 600 128px/1 var(--font);
+  letter-spacing: -0.025em;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--ink);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.v4-name--outro {
+  top: 442px;
+  font-size: 112px;
+}
+
+/* the intro's sub-claim: the first sentence of the spoken line, word for word */
+.v4-sub {
+  position: absolute;
+  left: 160px;
+  width: 1600px;
+  top: 660px;
+  font: 400 40px/1.25 var(--font);
+  letter-spacing: -0.005em;
+  text-align: center;
+  color: var(--ink-2);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+/* the outro's claim line and the address */
+.v4-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 614px;
+  font: 400 36px/1.25 var(--font);
+  letter-spacing: -0.005em;
+  text-align: center;
+  color: var(--ink-2);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.v4-url {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 710px;
+  font: 500 30px/1.2 var(--font);
+  letter-spacing: 0;
+  text-align: center;
+  color: var(--ink-3);
+  opacity: 0;
+  will-change: transform, opacity;
+}

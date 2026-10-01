@@ -496,9 +496,6 @@
 [data-brand='rebrand'] .bz7__card:focus-within { border-color: transparent; box-shadow: 0 0 0 2px var(--blue); }
 
 /* --- Choosing one card of several: the live console's selected card --------------- */
-[data-brand='rebrand'] .bfp2__mode-card { background: var(--surface-sunken); border-color: transparent; }
-[data-brand='rebrand'] .bfp2__mode-card:hover { background: var(--surface-inset); border-color: transparent; }
-[data-brand='rebrand'] .bfp2__mode-card.is-on { background: var(--blue-soft); border-color: var(--blue); }
 
 /* --- Inner-page sections: a heading and its content, separated by space ------------- */
 [data-brand='rebrand'] .bfp2__card { background: none; border-color: transparent; border-radius: 0; overflow: visible; }

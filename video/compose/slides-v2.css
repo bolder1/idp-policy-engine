@@ -1,0 +1,412 @@
+/* The v2 scenes: hook, whiteboard, push banner, outro. Colours that belong to
+   these scenes alone live here, once for light and once for dark; everything
+   else reads the compositor's tokens from compose.css. No transitions —
+   every moving thing is set from the frame's time by slides-v2.js. */
+:root {
+  --wb-board: #ffffff;
+  --wb-frame: #d3dae1;
+  --wb-grid: rgba(33, 37, 41, 0.07);
+  --wb-ink: #212529;
+  --wb-shadow: rgba(22, 32, 44, 0.16);
+  --wb-note-bg: #edf2f9;
+  --wb-note-bd: #ccd8e6;
+  --wb-note-tape: rgba(33, 37, 41, 0.1);
+  --wb-note-shadow: rgba(22, 32, 44, 0.22);
+  --wb-marker: #2b3440;
+
+  --bn-bg: #ffffff;
+  --bn-line: rgba(33, 37, 41, 0.1);
+  --bn-n: rgba(235, 84, 36, 0.18);
+  --bn-shadow: rgba(10, 14, 20, 0.26);
+
+  --hk-card: #ffffff;
+  --hk-card-bd: #d3dae1;
+  --hk-bar: #e4e8ec;
+  --hk-hair: #c5cdd5;
+  --hk-spine: #c5cdd5;
+  --hk-big: rgba(33, 37, 41, 0.12);
+  --hk-sweep: #9aa5b1;
+  --hk-tok-glow: rgba(235, 84, 36, 0.2);
+  --hk-tile-bg: #ffffff;
+}
+:root[data-theme='dark'] {
+  --wb-board: #1a212a;
+  --wb-frame: #45505d;
+  --wb-grid: rgba(255, 255, 255, 0.055);
+  --wb-ink: #f8fafb;
+  --wb-shadow: rgba(0, 0, 0, 0.55);
+  --wb-note-bg: #263241;
+  --wb-note-bd: #3b4a5c;
+  --wb-note-tape: rgba(255, 255, 255, 0.12);
+  --wb-note-shadow: rgba(0, 0, 0, 0.55);
+  --wb-marker: #d2dae3;
+
+  --bn-bg: #1a212a;
+  --bn-line: rgba(255, 255, 255, 0.1);
+  --bn-n: rgba(239, 118, 80, 0.26);
+  --bn-shadow: rgba(0, 0, 0, 0.6);
+
+  --hk-card: #1a212a;
+  --hk-card-bd: #45505d;
+  --hk-bar: #2a333e;
+  --hk-hair: #45505d;
+  --hk-spine: #45505d;
+  --hk-big: rgba(248, 250, 251, 0.12);
+  --hk-sweep: #ffffff;
+  --hk-tok-glow: rgba(239, 118, 80, 0.28);
+  --hk-tile-bg: #1a212a;
+}
+
+/* --- hook ------------------------------------------------------------------------ */
+.hk {
+  position: absolute;
+  inset: 0;
+  transform-origin: 960px 500px;
+}
+.hk > * {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.hk-ring {
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  border-radius: 50%;
+  border: 3px solid var(--brand);
+  opacity: 0;
+}
+.hk-tok {
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 0 7px var(--hk-tok-glow), 0 6px 16px rgba(235, 84, 36, 0.4);
+  opacity: 0;
+  z-index: 8;
+}
+.slide--hook .mc {
+  background: var(--hk-card);
+  border-color: var(--hk-card-bd);
+  box-shadow: 0 14px 34px var(--wb-shadow);
+  opacity: 0;
+  z-index: 4;
+}
+.slide--hook .mc__idx {
+  background: var(--inset);
+  border: 1px dashed var(--line-2);
+}
+.hk-bar {
+  display: block;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--hk-bar);
+}
+.hk-bar--chip {
+  margin-left: auto;
+  width: 96px;
+  height: 30px;
+  border-radius: 15px;
+}
+.hk-spine {
+  width: 2px;
+  background: repeating-linear-gradient(to bottom, var(--hk-spine) 0 6px, transparent 6px 11px);
+  transform-origin: 0 0;
+  opacity: 0;
+  z-index: 2;
+}
+.hk-hair {
+  height: 1.5px;
+  background: var(--hk-hair);
+  z-index: 2;
+}
+.hk-word {
+  font: 700 150px/1 var(--font);
+  letter-spacing: -0.045em;
+  color: var(--ink);
+  white-space: nowrap;
+  opacity: 0;
+  z-index: 6;
+}
+.hk-big {
+  font: 700 820px/1 var(--font);
+  letter-spacing: -0.06em;
+  color: var(--hk-big);
+  white-space: nowrap;
+  opacity: 0;
+  z-index: 1;
+}
+.hk-tile {
+  width: 300px;
+  height: 100px;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 26px 0 30px;
+  font: 700 32px/1 var(--font);
+  letter-spacing: -0.02em;
+  border: 1.5px solid var(--line-2);
+  background: var(--hk-tile-bg);
+  color: var(--ink);
+  box-shadow: 0 14px 34px var(--wb-shadow);
+  opacity: 0;
+  z-index: 4;
+  transform-origin: 50% 50%;
+}
+.hk-tile svg {
+  flex: none;
+  color: var(--ink-3);
+}
+.hk-tile span {
+  white-space: nowrap;
+}
+.hk-tile.is-lit.is-allow {
+  background: var(--pos-bg);
+  border-color: var(--pos-bd);
+  color: var(--pos-fg);
+}
+.hk-tile.is-lit.is-allow svg {
+  color: var(--pos-dot);
+}
+.hk-tile.is-lit.is-mfa {
+  background: var(--note-bg);
+  border-color: var(--note-bd);
+  color: var(--note-fg);
+}
+.hk-tile.is-lit.is-mfa svg {
+  color: var(--note-dot);
+}
+.hk-tile.is-lit.is-deny {
+  background: var(--neg-bg);
+  border-color: var(--neg-bd);
+  color: var(--neg-fg);
+}
+.hk-tile.is-lit.is-deny svg {
+  color: var(--neg-dot);
+}
+.hk-mark {
+  position: absolute;
+  left: 960px;
+  top: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 34px;
+  opacity: 0;
+  transform-origin: 50% 50%;
+}
+.hk-logo {
+  height: 104px;
+  width: auto;
+  display: block;
+}
+.hk-title {
+  font: 700 128px/1 var(--font);
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+  color: var(--ink);
+  background-image: linear-gradient(100deg, var(--ink) 42%, var(--hk-sweep) 50%, var(--ink) 58%);
+  background-size: 260% 100%;
+  background-position: 110% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* --- whiteboard -------------------------------------------------------------------- */
+.wb-board {
+  /* centred; the caption band runs beneath it (matches WB in slides-v2.js) */
+  position: absolute;
+  left: 360px;
+  top: 60px;
+  width: 1200px;
+  height: 860px;
+  border-radius: 18px;
+  background-color: var(--wb-board);
+  background-image: linear-gradient(var(--wb-grid) 1px, transparent 1px), linear-gradient(90deg, var(--wb-grid) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px;
+  background-position: 19px 19px, 19px 19px;
+  border: 1px solid var(--wb-frame);
+  box-shadow: 0 30px 80px var(--wb-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+.wb-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  overflow: visible;
+}
+.wb-p {
+  fill: none;
+  stroke: var(--wb-ink);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.wb-t {
+  font-family: var(--hand);
+  fill: var(--wb-ink);
+}
+.wb-token {
+  fill: var(--brand);
+  filter: drop-shadow(0 4px 10px rgba(235, 84, 36, 0.4));
+}
+.wb-marker {
+  fill: var(--wb-marker);
+  opacity: 0;
+}
+.wb-marker__cap {
+  fill: var(--slate);
+}
+.wb-notes {
+  position: absolute;
+  inset: 0;
+}
+.wb-note {
+  position: absolute;
+  padding: 18px 18px 16px;
+  border-radius: 6px;
+  background: var(--wb-note-bg);
+  border: 1px solid var(--wb-note-bd);
+  box-shadow: 0 10px 26px var(--wb-note-shadow);
+  opacity: 0;
+  transform-origin: 50% 40%;
+  display: flex;
+  flex-direction: column;
+}
+.wb-tape {
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  width: 92px;
+  height: 24px;
+  margin-left: -46px;
+  background: var(--wb-note-tape);
+  border-radius: 2px;
+  transform: rotate(-1.5deg);
+}
+.wb-glyph {
+  display: block;
+  width: 100%;
+  height: 92px;
+  overflow: visible;
+}
+.wb-gt {
+  font: 700 15px var(--hand);
+  fill: var(--wb-ink);
+  letter-spacing: 0.5px;
+}
+.wb-gd {
+  fill: var(--wb-ink);
+  opacity: 0.35;
+}
+.wb-note__t {
+  margin-top: 10px;
+  font: 700 27px/1.12 var(--hand);
+  color: var(--wb-ink);
+  letter-spacing: -0.005em;
+}
+.wb-note__s {
+  margin-top: auto;
+  font: 400 19px/1.2 var(--hand);
+  color: var(--ink-3);
+}
+
+/* --- push banner ---------------------------------------------------------------------- */
+.slide--banner {
+  background: transparent;
+  background-image: none;
+}
+.bn-band {
+  position: absolute;
+  left: 0;
+  top: 390px;
+  width: 1920px;
+  height: 300px;
+  background: var(--bn-bg);
+  border-top: 1px solid var(--bn-line);
+  border-bottom: 1px solid var(--bn-line);
+  box-shadow: 0 30px 90px var(--bn-shadow);
+  overflow: hidden;
+}
+.bn-n {
+  position: absolute;
+  left: 120px;
+  top: 0;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  font: 600 320px/1 var(--mono);
+  letter-spacing: -0.06em;
+  color: var(--bn-n);
+}
+.bn-text {
+  position: absolute;
+  left: 560px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.bn-title {
+  font: 700 84px/1.02 var(--font);
+  letter-spacing: -0.035em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.bn-kicker {
+  margin-top: 16px;
+  font: 400 30px/1.3 var(--font);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* --- outro ------------------------------------------------------------------------------ */
+.ou2 {
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.ou2-words {
+  display: flex;
+  justify-content: center;
+  gap: 44px;
+  font: 700 120px/1 var(--font);
+  letter-spacing: -0.045em;
+  color: var(--ink);
+}
+.ou2-w {
+  display: inline-block;
+  opacity: 0;
+}
+.ou2-mark {
+  margin-top: 44px;
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  opacity: 0;
+}
+.ou2-logo {
+  height: 78px;
+  width: auto;
+  display: block;
+}
+.ou2-title {
+  font: 700 88px/1 var(--font);
+  letter-spacing: -0.035em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.ou2-line {
+  margin-top: 36px;
+  font: 500 28px/1.2 var(--font);
+  letter-spacing: 0.01em;
+  color: var(--ink-3);
+  opacity: 0;
+}

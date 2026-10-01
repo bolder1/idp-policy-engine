@@ -62,7 +62,7 @@ import type { Part } from './model'
    invert the meaning of its own list. */
 const AFFIRMATIVE: Record<WhoType, string> = { group: 'in', user: 'is' }
 
-/* How many faces the summary draws before the rest become a count.
+/* How many faces the summary draws. The rest are only in the total beside them.
 
    Four, and the number is set by the line rather than by taste: four 18px
    avatars, overlapped, plus a count, a label and an Edit is what fits across a
@@ -181,12 +181,10 @@ export function WhoEditor({
            conditions off the panel. The section is a summary; five rows of
            chips is not a summary of anything.
 
-           Four faces, then "+10". The faces are there because a face is
-           recognisable at a glance where a name has to be read, and four is
-           what fits beside a count and an Edit on one line. Everything past
-           four is a number, and the number is honest about being one — it does
-           not pretend the rest are unimportant, it says how many there are and
-           opens the same dialog.
+           Four faces, then the total in words. A face is recognisable at a
+           glance where a name has to be read, and four is what fits beside a
+           count and an Edit on one line; the total beside them already says how
+           many there are, so there is no "+10" on the faces as well.
 
            No per-chip remove. Removing one of fourteen is an editing gesture,
            and editing happens in the dialog where the whole set is visible;
@@ -202,7 +200,6 @@ export function WhoEditor({
             {chosen.slice(0, FACES).map((c) => (
               <Avatar key={`${c.kind}:${c.id}`} name={c.name} on />
             ))}
-            {chosen.length > FACES && <i className="bb__whosum__more">+{chosen.length - FACES}</i>}
           </span>
           <span className="bb__whosum__text">
             {chosen.length === 1 ? chosen[0].name : `${chosen.length} groups and people`}
@@ -380,7 +377,6 @@ function WhoPicker({
         <div className="bb__whopick" role="radiogroup" aria-label="What this rule is about">
           {(['group', 'user'] as WhoType[]).map((k) => {
             const on = tab === k
-            const n = k === 'group' ? groupIds.length : userIds.length
             const Ico = k === 'group' ? Users : UserRound
             return (
               <button
@@ -396,7 +392,6 @@ function WhoPicker({
               >
                 <Ico size={13} strokeWidth={2} aria-hidden />
                 {k === 'group' ? 'Groups' : 'People'}
-                {n > 0 && <b>{n}</b>}
               </button>
             )
           })}
@@ -409,7 +404,7 @@ function WhoPicker({
           block
           value={q}
           onChange={setQ}
-          placeholder={tab === 'group' ? 'Search groups' : `Search the ${store.users.length} people listed`}
+          placeholder={tab === 'group' ? 'Search groups' : 'Search people'}
           label={tab === 'group' ? 'Search groups' : 'Search people'}
         />
 
@@ -428,7 +423,9 @@ function WhoPicker({
                   ? `Select all ${rows.length} matching`
                   : `Select all ${rows.length}`}
             </button>
-            <span>{ids.length} selected</span>
+            {/* Only when it says something the Save button does not: with one
+                kind chosen the two totals are the same number. */}
+            {ids.length !== total && <span>{ids.length} selected</span>}
           </div>
         )}
 
@@ -478,8 +475,8 @@ function WhoPicker({
             can only ever reach the loaded rows. */}
         {tab === 'user' && store.unlistedUsers > 0 && (
           <p className="bb__whohint">
-            {store.users.length} of {(store.users.length + store.unlistedUsers).toLocaleString()} listed. The rest can be
-            reached by naming a group.
+            Only some of the {(store.users.length + store.unlistedUsers).toLocaleString()} people are listed. The rest can
+            be reached by naming a group.
           </p>
         )}
       </div>

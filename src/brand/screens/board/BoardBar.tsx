@@ -214,14 +214,16 @@ export function BoardBarActions({
         >
           <ListChecks size={13} strokeWidth={2} aria-hidden />
           Check
-          {test ? (
-            <>
-              <span className={`bb__grade is-${test.grade}`}>{test.grade}</span>
-              {test.breaches > 0 && <span className="bb__n">{test.breaches} through</span>}
-            </>
-          ) : (
-            <span className="bb__n">—</span>
-          )}
+          {/* With the sheet open on Check, the sheet carries the reading. */}
+          {sheet !== 'check' &&
+            (test ? (
+              <>
+                <span className={`bb__grade is-${test.grade}`}>{test.grade}</span>
+                {test.breaches > 0 && <span className="bb__n">{test.breaches} through</span>}
+              </>
+            ) : (
+              <span className="bb__n">—</span>
+            ))}
         </button>
       )}
       {features.blastRadius && (
@@ -233,7 +235,7 @@ export function BoardBarActions({
         >
           <Activity size={13} strokeWidth={2} aria-hidden />
           What changes
-          <span className="bb__n">{movement ? movement.changed.toLocaleString() : '—'}</span>
+          {sheet !== 'impact' && <span className="bb__n">{movement ? movement.changed.toLocaleString() : '—'}</span>}
         </button>
       )}
       </span>

@@ -57,6 +57,7 @@ import { Picker } from '../picker'
 import { TierPick } from '../tier-pick'
 import { PlatformMark } from '../logos/PlatformMark'
 import { useBrand } from '../store'
+import { keepName, nameRefusal } from '../rename-now'
 import { newId, uniqueName } from '../data'
 import { ChangeState, useLeaveGuard } from '../leave-guard'
 import { ConfirmDelete } from './confirm-delete'
@@ -644,6 +645,24 @@ function RiskProfileDetail({
     return true
   }
 
+  /* The name saves itself (owner, 1 Oct 2026: "we already have a save button
+     for the basic details so no need to have it in the review, or save it" —
+     see rename-now.ts). Every risk profile on this page is stored — the name
+     dialog creates it before the page opens — so a kept name goes to the store
+     at once, through the same `onSave` the footer uses and so with the same
+     "<name> saved" toast, as the stored profile with only its name replaced:
+     signals switched and priorities moved stay unsaved in the draft. The
+     draft's name follows, so a rename never opens the footer or shows in
+     Review changes, and a name another profile has is refused by the field. */
+  const renameIssue = (name: string) => riskProfileNameProblem(name, otherNames)
+  const nameProblem = (typed: string) => nameRefusal(profile, typed, renameIssue)
+  const keepTypedName = (typed: string) => {
+    const kept = keepName(profile, typed, renameIssue)
+    if (kept.kind !== 'saved') return
+    onSave(kept.stored)
+    setDraft((d) => ({ ...d, name: kept.name }))
+  }
+
   /* The profile in use sets every Risk score condition's scale, so saving it
      reads like saving a zone (spec D.6): what moves in each enforcing policy
      with a Risk score condition, and the saved sign-ins it moves, under Also
@@ -718,7 +737,8 @@ function RiskProfileDetail({
         <div className="bfp2__pagehead">
           <EditableProfileName
             value={draft.name}
-            onChange={(name) => setDraft((d) => ({ ...d, name }))}
+            problem={nameProblem}
+            onKeep={keepTypedName}
             editing={renaming}
             setEditing={setRenaming}
             onDone={() => pencil.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true })}
@@ -955,30 +975,59 @@ function UseProfileReview({
    profile page, opened by the pencil beside it. A blank name is never left
    behind: leaving the field empty puts the name back. When focus has left the
    field, and when a press elsewhere lets it close, is the kit's to decide — see
-   NameField. */
+   NameField.
+
+   Keeping a name saves it (1 Oct 2026, the page's `keepTypedName`), so what is
+   typed stays here until it is kept rather than going into the draft a
+   keystroke at a time, which made the page unsaved while a name was still
+   being typed. A name another profile has is said under the field, which stays
+   open to fix it — on ✓ or Enter at once, on a leave once the field would
+   close, as the device profile and zone pages do. */
 function EditableProfileName({
   value,
-  onChange,
+  problem,
+  onKeep,
   editing,
   setEditing,
   onDone,
 }: {
+  /** The name as it stands, which the heading shows. */
   value: string
-  onChange: (v: string) => void
+  /** Why a typed name can't be kept, or null. Blank is not refused: it puts the name back. */
+  problem: (typed: string) => string | null
+  /** Keep a typed name the page did not refuse. */
+  onKeep: (typed: string) => void
   editing: boolean
   setEditing: (on: boolean) => void
   /** Called after Enter, Escape, ✓ or ✕ has ended the edit, to put focus back on the pencil. */
   onDone?: () => void
 }) {
   const input = useRef<HTMLInputElement>(null)
-  const before = useRef(value)
+  const errorId = useId()
+  const [typed, setTyped] = useState(value)
+  const [error, setError] = useState<string | null>(null)
+  /* Each edit starts from the name as it stands, with nothing to say yet —
+     latched during render, so the field never opens on the last edit's words. */
+  const [open, setOpen] = useState(editing)
+  if (open !== editing) {
+    setOpen(editing)
+    if (editing) {
+      setTyped(value)
+      setError(null)
+    }
+  }
+  const refused = problem(typed)
   /* Enter, Escape, ✓ and ✕ take the focused field away; focus goes back to the
      pencil, which is back in the page by the time this effect runs. A leave has
      already sent focus somewhere on purpose and keeps it there. */
   const refocus = useRef(false)
 
   const finish = (revert = false) => {
-    if (revert || !value.trim()) onChange(before.current)
+    if (!revert && refused) {
+      setError(refused)
+      return
+    }
+    if (!revert) onKeep(typed)
     refocus.current = true
     setEditing(false)
   }
@@ -991,7 +1040,6 @@ function EditableProfileName({
       }
       return
     }
-    before.current = value
     refocus.current = false
     input.current?.focus()
     input.current?.select()
@@ -1008,32 +1056,48 @@ function EditableProfileName({
 
   /* ✓ is Enter and ✕ is Escape, focus back to the pencil included. The kit
      keeps the input focused through the press, so no focus leaves the field
-     before the button has settled the name. A leave keeps the typed name as it
-     stands, only putting the old one back over a blank. */
+     before the button has settled the name. A leave keeps the typed name as ✓
+     would, a blank one putting the old name back. The error line is the header
+     row's last child and wraps under it (device-fingerprint-v2.css). */
   return (
-    <NameField
-      inputRef={input}
-      value={value}
-      max={RISK_PROFILE_NAME_MAX}
-      label="Profile name"
-      placeholder="Remote workforce"
-      onChange={onChange}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault()
-          finish()
-        } else if (e.key === 'Escape') {
-          e.preventDefault()
-          finish(true)
-        }
-      }}
-      onLeave={() => {
-        if (!value.trim()) onChange(before.current)
-      }}
-      onClose={() => setEditing(false)}
-      onApply={() => finish()}
-      onCancel={() => finish(true)}
-    />
+    <>
+      <NameField
+        inputRef={input}
+        value={typed}
+        max={RISK_PROFILE_NAME_MAX}
+        label="Profile name"
+        placeholder="Remote workforce"
+        errorId={error ? errorId : undefined}
+        invalid={!!error}
+        onChange={(v) => {
+          setTyped(v)
+          setError(null)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            finish()
+          } else if (e.key === 'Escape') {
+            e.preventDefault()
+            finish(true)
+          }
+        }}
+        onLeave={() => {
+          if (!refused) onKeep(typed)
+        }}
+        onClose={() => {
+          if (refused) setError(refused)
+          else setEditing(false)
+        }}
+        onApply={() => finish()}
+        onCancel={() => finish(true)}
+      />
+      {error && (
+        <p id={errorId} className="bfp2__nameerr" role="alert">
+          {error}
+        </p>
+      )}
+    </>
   )
 }
 

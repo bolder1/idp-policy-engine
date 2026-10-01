@@ -2,16 +2,24 @@ import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_RANGE_KM, card, cond, emptyLocation, newId, when, type Policy, type Zone, type ZoneRange } from '../data'
 import { PLACES } from '../places'
+import { showcaseZones } from '../showcase-seed'
+import { lookUpAddress } from './geo-fixture'
 import {
+  CURRENT_IP,
   REVIEW_LIST_MAX,
   centredOn,
+  entryKind,
   hasEntry,
   locationEntries,
   normaliseEntry,
   parseEntries,
+  placeAtAddress,
+  placeRefusal,
   rangeAt,
   takenZoneIds,
+  withCurrentPlace,
   withRange,
+  withStoredName,
   zoneChanges,
   zoneReviewRows,
 } from './zone-entries'
@@ -183,8 +191,9 @@ describe('what changed, for the save bar', () => {
   })
 
   /* The dialog files rows under the page's sections and marks each one. The
-     name leads under General; a list row names no single item, since it holds
-     every added (or removed) entry at once; nothing here is a consequence. */
+     name leads under Basic details (GENERAL_GROUP; "General" until 1 Oct
+     2026); a list row names no single item, since it holds every added (or
+     removed) entry at once; nothing here is a consequence. */
   it('files each row under its section and marks what it does', () => {
     const before = zone({ ip: ['10.0.0.1'] })
     const after = zone({ name: 'HQ', ip: ['10.0.0.1', '10.0.0.2', '10.0.0.3'] })
@@ -328,6 +337,15 @@ describe('withRange', () => {
     expect(l.ranges).toEqual([rangeAt(mumbai, 50), other])
   })
 
+  /* 2 Oct 2026: the move kept the number and dropped the unit. */
+  it('keeps the unit with the distance, so 10 miles moved is still 10 miles', () => {
+    const miles: ZoneRange = { ...seed, km: 10, unit: 'mi' }
+    const l = withRange({ ...emptyLocation(), ranges: [miles] }, mumbai, miles)
+    expect(l.ranges).toEqual([{ ...rangeAt(mumbai, 10), unit: 'mi' }])
+    /* A range with no unit is in km, and stays without one. */
+    expect(withRange({ ...emptyLocation(), ranges: [seed] }, mumbai, seed).ranges[0]).not.toHaveProperty('unit')
+  })
+
   /* Re-picking the city it is drawn around must not swap the stored centre for
      the catalogue's: that opened the save bar on a change no one made. */
   it('leaves a range alone when its own city is picked again', () => {
@@ -342,5 +360,115 @@ describe('withRange', () => {
     const before = { ...emptyLocation(), ranges: [named] }
     expect(centredOn(named, pune)).toBe(true)
     expect(withRange(before, pune, named)).toBe(before)
+  })
+})
+
+/* --- 1 Oct 2026 ------------------------------------------------------------- */
+
+/* The kind an IP row says inside its field, read the way a commit reads the
+   text: one entry, or nothing. */
+describe('entryKind', () => {
+  it.each([
+    ['10.0.0.1', 'IPv4'],
+    ['10.0.0.0/8', 'IPv4 network'],
+    ['10.0.0.1-10.0.0.9', 'IPv4 range'],
+    ['10.0.0.1 – 10.0.0.9', 'IPv4 range'],
+    ['2001:db8::1', 'IPv6'],
+    ['2001:DB8::/32', 'IPv6 network'],
+    ['as15169', 'ASN'],
+    ['  AS64500 ', 'ASN'],
+  ])('reads %s as %s', (text, kind) => {
+    expect(entryKind(text)).toBe(kind)
+  })
+
+  /* Half typed, a typo, a list, a reversed range or an IPv6 "range" the field
+     refuses: no tag, and the page's own invalid treatment says the rest. */
+  it.each([[''], ['   '], ['10.0.0'], ['10.0.0.1/'], ['999.1.1.1'], ['10.0.0.9-10.0.0.1'], ['2001:db8::1-2001:db8::9'], ['10.0.0.1, 10.0.0.2'], ['AS'], ['nonsense']])(
+    'says nothing for %j',
+    (text) => {
+      expect(entryKind(text)).toBeNull()
+    },
+  )
+
+  it('follows the text as it is typed', () => {
+    expect(['1', '10.0.0.1', '10.0.0.1/', '10.0.0.1/2', '10.0.0.1/24'].map(entryKind)).toEqual([
+      null,
+      'IPv4',
+      null,
+      'IPv4 network',
+      'IPv4 network',
+    ])
+  })
+})
+
+/* Locations' Quick add: the same address the IP tab offers, through the same
+   lookup zone matching uses for a sign-in's place. */
+describe('my current location', () => {
+  const offices = showcaseZones.find((z) => z.id === 'corp-offices')!
+
+  it('is the place the current IP is looked up to, as zone matching looks it up', () => {
+    const here = placeAtAddress(CURRENT_IP)
+    expect(here).toMatchObject({ kind: 'city', name: 'Pune' })
+    expect(lookUpAddress(CURRENT_IP)?.location?.city).toBe(here?.name)
+  })
+
+  it('names no place for an address the lookup has no row for, or one it cannot place', () => {
+    expect(placeAtAddress('8.8.8.8')).toBeNull()
+    expect(placeAtAddress('192.0.2.70')).toBeNull()
+  })
+
+  it('adds the city at range 0, at the end of the cities, as Add location does', () => {
+    const before = { ...emptyLocation(), cities: ['Mumbai'] }
+    expect(withCurrentPlace(before)).toEqual({ ...before, cities: ['Mumbai', 'Pune'] })
+  })
+
+  it('adds nothing when it is in already — as a city or as a range round it', () => {
+    expect(withCurrentPlace({ ...emptyLocation(), cities: ['Pune'] })).toBeNull()
+    expect(placeRefusal(placeAtAddress(CURRENT_IP)!, offices.location)).toEqual({ kind: 'added' })
+    expect(withCurrentPlace(offices.location)).toBeNull()
+  })
+
+  it('adds nothing when a wider place covers it, and says which', () => {
+    const india = { ...emptyLocation(), countries: ['India'] }
+    expect(withCurrentPlace(india)).toBeNull()
+    expect(placeRefusal(placeAtAddress(CURRENT_IP)!, india)).toEqual({ kind: 'covered', by: 'India' })
+    expect(withCurrentPlace({ ...emptyLocation(), states: ['Maharashtra'] })).toBeNull()
+  })
+
+  it('adds nothing when the lookup names no place', () => {
+    expect(withCurrentPlace(emptyLocation(), null)).toBeNull()
+  })
+})
+
+/* A stored zone's rename saves at once, and only the name. */
+describe('renaming a stored zone', () => {
+  const stored = zone({ ip: ['10.0.0.1'] })
+  /* The page's draft holds an edit nobody has reviewed. */
+  const draft = zone({ ip: ['10.0.0.1', '10.9.9.9'], location: { ...emptyLocation(), countries: ['Japan'] } })
+
+  it('writes the zone as stored with the new name — never the draft', () => {
+    const next = withStoredName(stored, 'Head office')
+    expect(next).toEqual({ ...stored, name: 'Head office' })
+    expect(next?.ip).toEqual(['10.0.0.1'])
+    expect(next?.location).toEqual(emptyLocation())
+  })
+
+  it('writes nothing for the name it already has, or a zone not stored', () => {
+    expect(withStoredName(stored, 'Office')).toBeNull()
+    expect(withStoredName(undefined, 'Head office')).toBeNull()
+  })
+
+  /* After the save the draft's name follows, so the review is the draft's
+     other edits alone and never a Name row. */
+  it('leaves the name out of the review once saved', () => {
+    const saved = withStoredName(stored, 'Head office')!
+    const rows = zoneReviewRows(saved, { ...draft, name: 'Head office' })
+    expect(rows.map((r) => r.label)).toEqual(['IP networks: added', 'Locations: added'])
+    expect(zoneChanges(saved, { ...saved, name: 'Head office' })).toEqual([])
+  })
+
+  /* A new zone is not stored: its name is in the draft, and the review. */
+  it('keeps a new zone’s name in the review', () => {
+    expect(zoneReviewRows(zone({ name: '' }), zone({ name: 'Head office' }))[0]).toMatchObject({ label: 'Name', kind: 'added' })
   })
 })

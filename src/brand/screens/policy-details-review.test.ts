@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { fallbackRule, type Policy } from '../data'
-import { EFFECT_GROUP, groupReview } from '../review-rows'
+import { EFFECT_GROUP, GENERAL_GROUP, groupReview } from '../review-rows'
 import { detailsChanges } from './policy-details-review'
 
 const NAMES: Record<string, string> = { salesforce: 'Salesforce', workday: 'Workday', github: 'GitHub' }
@@ -34,9 +34,13 @@ describe('detailsChanges', () => {
     const c = detailsChanges(policy(), { name: ' Payroll — HR ', appIds: ['salesforce', 'workday'] }, appName)
     expect(c.changes).toEqual(['Name'])
     expect(c.rows).toEqual([{ label: 'Name', before: 'Payroll — Finance', after: 'Payroll — HR', kind: 'changed' }])
-    /* The name names no section, so it leads the review under General. */
+    /* The name names no section, so it leads the review under Basic details
+       (GENERAL_GROUP). Still listed here: this page's name is a form field
+       the footer saves, with no ✓ of its own to save it sooner. */
     expect(c.rows[0].group).toBeUndefined()
     expect(c.rows[0].effect).toBeUndefined()
+    expect(groupReview(c.rows).map((g) => g.title)).toEqual([GENERAL_GROUP])
+    expect(GENERAL_GROUP).toBe('Basic details')
   })
 
   it('lists each application added and removed', () => {

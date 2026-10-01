@@ -54,13 +54,16 @@ describe('review rows', () => {
       { label: 'Device restriction type', before: 'Agentless', after: 'Agent-based', group: 'Basic details', kind: 'changed' },
     ]
     const sections = groupSections(rows)
-    // The page's order, general first and the consequences last.
+    // The page's order, general first and the consequences last. The general
+    // heading is "Basic details" (1 Oct 2026), so the name joins a page's own
+    // Basic details section: one section, never two of the same name.
+    expect(GENERAL_GROUP).toBe('Basic details')
     expect(sections.map((x) => [x.title, x.count])).toEqual([
-      [GENERAL_GROUP, 1],
+      [GENERAL_GROUP, 2],
       ['Signals', 3],
-      ['Basic details', 1],
       [EFFECT_GROUP, 1],
     ])
+    expect(sections[0].blocks.flatMap((b) => b.rows.map((r) => r.label))).toEqual(['Name', 'Device restriction type'])
     // Added leads inside a section, and an empty kind draws no block.
     expect(sections[1].blocks.map((b) => [b.kind, b.rows.length])).toEqual([
       ['added', 1],

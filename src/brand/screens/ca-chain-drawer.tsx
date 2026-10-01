@@ -1,13 +1,13 @@
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { ArrowLeft, Download, FileBadge, FileText, Info, Plus, Replace, Trash2, Upload, X } from 'lucide-react'
+import { ArrowLeft, Download, FileBadge, FileText, Plus, Replace, Trash2, Upload, X } from 'lucide-react'
 
 import { EmptyState } from '../empty'
-import { Badge, Button, Drawer, IconButton, RowMenu, TipDot, type MenuItem } from '../kit'
+import { Button, Callout, Drawer, IconButton, RowMenu, TipDot, type MenuItem } from '../kit'
 import {
   ALIAS_MAX,
+  aliasIssue,
   CA_FILE_ACCEPT,
-  CA_STATUS_LABEL,
   caDate,
   canUpload,
   certsSaid,
@@ -19,33 +19,35 @@ import {
   planUpload,
   replaceChainFile,
   uploadedSaid,
-  uploadedWhen,
   type CaChain,
-  type CaChainStatus,
   type PendingCaFile,
 } from './ca-chain'
 import { useCaChains } from './ca-chains'
 
 /* CAC Card's trusted CA chains, as a slider (owner, 21 Sep 2026: "on click a
    Slider should open with this exact content"; 30 Sep: "this upload can be
-   multiple … add a list view of all uploaded files").
+   multiple … add a list view of all uploaded files"; 1 Oct: "I want just the
+   name, the date — remove the chips and other extra things"). Each row of the
+   list is the alias and its one date; the file, its subject, its count and who
+   uploaded it are the ⋯ menu's Download away.
 
    Two pages in one panel, the way the method sliders on this screen push and
    pop: the tenant's chains, and Add CA chain over them. The add page keeps the
    live dialog's words — its title, caption, Alias, the certificate file, the
    support note — and takes one file or many; each file becomes a row with its
    own alias and its own error. See ca-chain.ts for the model and ca-chains.ts
-   for the session's list. */
+   for the session's list.
+
+   It opens as the live dialog does, its two fields in its order (owner, 1 Oct
+   2026: "fix this, we have 2 options"): Alias, then Certificate file — a file
+   field, Choose file | No file chosen — and the support note in the info
+   banner. A drop zone with the alias held back until a file was in read as a
+   dialog with one field missing. The alias typed first goes to the first file
+   chosen; the files after it become rows of their own, each with its alias. */
 
 type Page = 'list' | 'add'
 
 const PAGE_EASE: [number, number, number, number] = [0.2, 0, 0, 1]
-
-const STATUS_TONE: Record<CaChainStatus, 'positive' | 'notice' | 'negative'> = {
-  enabled: 'positive',
-  waiting: 'notice',
-  expired: 'negative',
-}
 
 const MENU: MenuItem[] = [
   { id: 'replace', label: 'Replace file', icon: Replace },
@@ -118,6 +120,8 @@ export function CaChainDrawer({
      it, an alias says what is wrong only once it has been edited. */
   const [tried, setTried] = useState(false)
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set())
+  /* The Alias typed before any file is chosen: the first file takes it. */
+  const [draftAlias, setDraftAlias] = useState('')
   const [dragging, setDragging] = useState(false)
   /* Replace file's error, under the row it was for. */
   const [rowError, setRowError] = useState<{ id: string; text: string } | null>(null)
@@ -133,6 +137,7 @@ export function CaChainDrawer({
   const replacer = useRef<HTMLInputElement>(null)
   const replacing = useRef<string | null>(null)
   const drop = useRef<HTMLButtonElement>(null)
+  const aliasRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const addRef = useRef<HTMLSpanElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -163,6 +168,7 @@ export function CaChainDrawer({
       setPending([])
       setTried(false)
       setTouched(new Set())
+      setDraftAlias('')
       setRowError(null)
       setFresh(new Set())
       setSaid(null)
@@ -173,6 +179,7 @@ export function CaChainDrawer({
     setPending([])
     setTried(false)
     setTouched(new Set())
+    setDraftAlias('')
   }
   const toAdd = () => {
     setDir(1)
@@ -199,10 +206,9 @@ export function CaChainDrawer({
     if (scroller) scroller.scrollTop = 0
   }, [page])
 
-  /* The drop zone takes focus when the add page arrives: there is nothing else
-     to do there until a file is in. */
+  /* The Alias takes focus when the add page arrives: the live dialog's first field. */
   useEffect(() => {
-    if (open && page === 'add') drop.current?.focus()
+    if (open && page === 'add') (aliasRef.current ?? drop.current)?.focus()
   }, [open, page])
 
   /* The fresh mark fades on its own; the state goes once it has. */
@@ -215,14 +221,19 @@ export function CaChainDrawer({
   const addFiles = (list: FileList | null | undefined) => {
     const files = Array.from(list ?? [])
     if (files.length === 0) return
+    const typed = draftAlias.trim()
     readAll(files).then((read) => {
       setPending((was) => {
-        const taken = [...chains.map((c) => c.alias), ...was.map((p) => p.alias)]
+        const taken = [...chains.map((c) => c.alias), ...was.map((p) => p.alias), ...(was.length === 0 && typed ? [typed] : [])]
         const rows = pendingFiles(read, taken, new Date(), nextKey).map((p, i) =>
           read[i].unread ? { ...p, alias: '', certs: [], issue: 'The file could not be read.' } : p,
         )
+        /* The alias typed in the empty form is the first good file's. */
+        const first = was.length === 0 && typed ? rows.findIndex((p) => !p.issue) : -1
+        if (first >= 0) rows[first] = { ...rows[first], alias: typed }
         return [...was, ...rows]
       })
+      if (typed) setDraftAlias('')
     })
   }
 
@@ -276,9 +287,10 @@ export function CaChainDrawer({
   const upload = () => {
     setTried(true)
     if (!canUpload(plan)) {
-      /* To the first thing to fix. */
+      /* To the first thing to fix: the empty form's Alias, a row's alias, else the file. */
       const bad = plan.ready.find((p) => plan.aliasErrors[p.key])
-      if (bad) document.getElementById(`${bad.key}-alias`)?.focus()
+      if (pending.length === 0 && aliasIssue(draftAlias, existing)) aliasRef.current?.focus()
+      else if (bad) document.getElementById(`${bad.key}-alias`)?.focus()
       else drop.current?.focus()
       return
     }
@@ -420,6 +432,7 @@ export function CaChainDrawer({
           const err = rowError?.id === c.id ? rowError.text : null
           return (
             <li key={c.id} data-chain={c.id} className={`bm8__carow${fresh.has(c.id) ? ' is-fresh' : ''}`}>
+              {/* Each row's mark (owner, 1 Oct 2026: "add icons with each list"). */}
               <span className="bm8__catile" aria-hidden>
                 <FileBadge size={16} strokeWidth={1.8} />
               </span>
@@ -428,16 +441,11 @@ export function CaChainDrawer({
                   <span className="bm8__caname" title={c.alias}>
                     {c.alias}
                   </span>
-                  <Badge tone={STATUS_TONE[status]}>{CA_STATUS_LABEL[status]}</Badge>
-                </div>
-                <span className="bm8__cameta">
-                  <span className="bm8__cacn" title={c.subject}>
-                    {c.subject}
-                  </span>
-                  <span>{certsSaid(c.certCount)}</span>
-                  {/* Past tense once it has passed. The status says it in red, so the date does not again. */}
+                  {/* The one date, in the past tense once it has passed. With no
+                      status chip, an expired chain says so in red here and one
+                      expiring soon in amber. */}
                   <span
-                    className={`bm8__cadate${soon ? ' is-soon' : ''}`}
+                    className={`bm8__cadate${status === 'expired' ? ' is-expired' : soon ? ' is-soon' : ''}`}
                     title={soon ? `Valid until ${caDate(c.validUntil)}` : undefined}
                   >
                     {status === 'expired'
@@ -446,15 +454,7 @@ export function CaChainDrawer({
                         ? `Expires in ${left} ${left === 1 ? 'day' : 'days'}`
                         : `Valid until ${caDate(c.validUntil)}`}
                   </span>
-                </span>
-                <span className="bm8__cameta">
-                  <span className="bm8__cafile" title={c.fileName}>
-                    {c.fileName}
-                  </span>
-                  <span>
-                    {c.uploadedBy}, {uploadedWhen(c.uploadedAt, now)}
-                  </span>
-                </span>
+                </div>
                 {err && (
                   <p className="bmc__error" role="alert">
                     {err}
@@ -469,24 +469,77 @@ export function CaChainDrawer({
     )
 
   const blockerShown = tried && plan.blocker
+  /* The empty form's Alias says what is wrong once Upload has been pressed. */
+  const draftAliasErr = tried && pending.length === 0 ? aliasIssue(draftAlias, existing) : null
   const add = (
     <div className="bm8__caadd">
-      <button
-        ref={drop}
-        type="button"
-        className={`bm8__cadrop${dragging ? ' is-over' : ''}${pending.length ? ' is-compact' : ''}`}
-        aria-describedby={blockerShown ? `${uid}-drop-err` : undefined}
-        onClick={() => picker.current?.click()}
-      >
-        <Upload size={18} strokeWidth={1.8} aria-hidden />
-        <span className="bm8__cadroptext">{pending.length ? 'Add more files' : 'Choose files or drop them here'}</span>
-        <span className="bm8__cadrophint">.pem, .crt or .cer</span>
-      </button>
-      {blockerShown && (
-        <p id={`${uid}-drop-err`} className="bmc__error" role="alert">
-          {plan.blocker}
-        </p>
-      )}
+      {pending.length === 0 ? (
+        /* The live dialog: Alias, then Certificate file, both required. */
+        <div className="bm8__caform">
+          <div className="bmc__field is-text">
+            <div className="bmc__label">
+              <label htmlFor={`${uid}-alias`}>
+                Alias
+                <b aria-hidden title="Required">
+                  *
+                </b>
+              </label>
+            </div>
+            <div className="bmc__control">
+              <input
+                ref={aliasRef}
+                id={`${uid}-alias`}
+                type="text"
+                value={draftAlias}
+                placeholder="Enter an alias for this certificate"
+                autoComplete="off"
+                maxLength={ALIAS_MAX}
+                aria-required
+                aria-invalid={!!draftAliasErr}
+                aria-describedby={draftAliasErr ? `${uid}-alias-err` : undefined}
+                onChange={(e) => setDraftAlias(e.target.value)}
+              />
+            </div>
+            {draftAliasErr && (
+              <p id={`${uid}-alias-err`} className="bmc__error">
+                {draftAliasErr}
+              </p>
+            )}
+          </div>
+          <div className="bmc__field">
+            <div className="bmc__label">
+              <label id={`${uid}-file-label`} htmlFor={`${uid}-file`}>
+                Certificate file
+                <b aria-hidden title="Required">
+                  *
+                </b>
+              </label>
+            </div>
+            <div className="bmc__control">
+              {/* The live field's shape, Choose file | No file chosen; a file
+                  dropped anywhere on the slider still lands here. */}
+              <button
+                ref={drop}
+                id={`${uid}-file`}
+                type="button"
+                className={`bm8__cafield${dragging ? ' is-over' : ''}${blockerShown ? ' is-invalid' : ''}`}
+                aria-labelledby={`${uid}-file-label ${uid}-file`}
+                aria-describedby={blockerShown ? `${uid}-drop-err` : undefined}
+                onClick={() => picker.current?.click()}
+              >
+                <span className="bm8__cafieldbtn">Choose file</span>
+                <span className="bm8__cafieldname">No file chosen</span>
+                <span className="bm8__cadrophint">.pem, .crt or .cer</span>
+              </button>
+            </div>
+            {blockerShown && (
+              <p id={`${uid}-drop-err`} className="bmc__error" role="alert">
+                {plan.blocker}
+              </p>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {pending.length > 0 && (
         <ul className="bm8__capend" aria-label="Files to upload">
@@ -550,10 +603,30 @@ export function CaChainDrawer({
         </ul>
       )}
 
-      <p className="bm8__canote">
-        <Info size={14} strokeWidth={2} aria-hidden />
-        {supportNote(plan.ready.length > 1)}
-      </p>
+      {/* Under the files chosen: more can still be added. */}
+      {pending.length > 0 && (
+        <>
+          <button
+            ref={drop}
+            type="button"
+            className={`bm8__cadrop is-compact${dragging ? ' is-over' : ''}`}
+            aria-describedby={blockerShown ? `${uid}-drop-err` : undefined}
+            onClick={() => picker.current?.click()}
+          >
+            <Upload size={18} strokeWidth={1.8} aria-hidden />
+            <span className="bm8__cadroptext">Add more files</span>
+            <span className="bm8__cadrophint">.pem, .crt or .cer</span>
+          </button>
+          {blockerShown && (
+            <p id={`${uid}-drop-err`} className="bmc__error" role="alert">
+              {plan.blocker}
+            </p>
+          )}
+        </>
+      )}
+
+      {/* The live dialog's note, in its info banner. */}
+      <Callout tone="info">{supportNote(plan.ready.length > 1)}</Callout>
     </div>
   )
 

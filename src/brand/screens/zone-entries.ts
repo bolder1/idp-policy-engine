@@ -1,8 +1,9 @@
 import { DEFAULT_RANGE_KM, rangeText, type Policy, type Zone, type ZoneLocation, type ZoneRange } from '../data'
-import type { Place } from '../places'
+import { PLACES, coveredBy, type Place } from '../places'
 import { leaves } from '../predicate'
 import type { ReviewLine } from '../review-rows'
-import { classifyIp, isValidAsn } from './zone-validation'
+import { lookUpAddress } from './geo-fixture'
+import { classifyIp, isValidAsn, type IpKind } from './zone-validation'
 
 /** Ids a new zone must not take: every zone's, and every zone id a policy rule
     still names, live or in a saved draft. Deleting a zone does not unlink its
@@ -71,6 +72,112 @@ export function parseEntries(
   return { ip, asn, bad }
 }
 
+/* --- What a row holds, said inside it -----------------------------------------
+
+   Owner, 1 Oct 2026, on the IP networks list: "add the tag here for different
+   IP types, like IPv4 or 6 or whatever we have". So each row names its kind at
+   the right of the field, the way a Locations row says "City", and the name
+   follows the text as it is typed: "10.0.0.1" is IPv4, "10.0.0.1/24" becomes
+   an IPv4 network one keystroke later.
+
+   Only the kinds the field accepts, read the way a commit reads them (one
+   token, through `parseEntries`), so the tag can never promise an entry the
+   field would refuse. Ranges are IPv4 only because the classifier takes no
+   IPv6 range. A row that does not read as ONE entry — empty, half typed, a
+   pasted list, a typo — says nothing new: an unreadable row already has the
+   page's own red edge and reason, and a second voice there would only argue. */
+
+export type EntryKind = 'IPv4' | 'IPv4 network' | 'IPv4 range' | 'IPv6' | 'IPv6 network' | 'ASN'
+
+const KIND_OF: Record<Exclude<IpKind, 'invalid'>, EntryKind> = {
+  ipv4: 'IPv4',
+  'ipv4-cidr': 'IPv4 network',
+  'ipv4-range': 'IPv4 range',
+  ipv6: 'IPv6',
+  'ipv6-cidr': 'IPv6 network',
+}
+
+/* Remembered by text: the tag is asked for on every row at every keystroke,
+   and a 500-row paste should not re-read 500 entries to type one character.
+   Bounded, as the geo lookup's cache is. */
+const KINDS = new Map<string, EntryKind | null>()
+
+/** The kind of the one entry `text` holds, or null when it holds none, several, or one that does not read. */
+export function entryKind(text: string): EntryKind | null {
+  const known = KINDS.get(text)
+  if (known !== undefined) return known
+  const r = parseEntries(text, [], [])
+  let kind: EntryKind | null = null
+  if (r.bad.length === 0 && r.ip.length + r.asn.length === 1) {
+    if (r.asn.length === 1) kind = 'ASN'
+    else {
+      const k = classifyIp(r.ip[0])
+      kind = k === 'invalid' ? null : KIND_OF[k]
+    }
+  }
+  if (KINDS.size >= 1024) KINDS.clear()
+  KINDS.set(text, kind)
+  return kind
+}
+
+/* --- Where this session is ------------------------------------------------------
+
+   THIS IP IS MOCKED. A browser cannot see its own public address without a
+   server, so this is a documentation-range placeholder for what the real
+   console would fill from the request. Both Quick adds read it: IP networks
+   offers the address, Locations the place it is in (owner, 1 Oct 2026: "add an
+   option for add my current location"). */
+export const CURRENT_IP = '203.0.113.42'
+
+/** The catalogue place an address is looked up to — the same lookup zone
+    matching and the sign-in facts use (`geo-fixture.ts`) — or null when the
+    lookup has no row for it, or a row that names no place. */
+export function placeAtAddress(address: string): Place | null {
+  const id = lookUpAddress(address)?.row.place
+  return id ? (PLACES.find((p) => p.id === id) ?? null) : null
+}
+
+/** The location list a place of each kind is stored in. */
+export type PlaceList = 'countries' | 'states' | 'cities'
+
+export const LIST_OF: Record<Place['kind'], PlaceList> = { country: 'countries', state: 'states', city: 'cities' }
+
+/** Why a place cannot go in, or null when it can. */
+export type Refusal = { kind: 'added' } | { kind: 'covered'; by: string } | null
+
+/* A place already in the zone, or inside one that is, would change nothing.
+   Asked by the place search of every hit, and by Locations' Quick add. */
+export function placeRefusal(p: Place, l: ZoneLocation): Refusal {
+  if (l[LIST_OF[p.kind]].includes(p.name)) return { kind: 'added' }
+  /* A city with a distance is still that city. */
+  if (p.kind === 'city' && l.ranges.some((r) => centredOn(r, p))) return { kind: 'added' }
+  const by = coveredBy(p, l)
+  return by ? { kind: 'covered', by } : null
+}
+
+/** Locations' Quick add: the location with the place this session is in, put
+    in as Add location puts a place — a city at range 0, at the end of its list
+    — or null when the lookup names none, or it is in already, or covered. */
+export function withCurrentPlace(l: ZoneLocation, here: Place | null = placeAtAddress(CURRENT_IP)): ZoneLocation | null {
+  if (!here || placeRefusal(here, l)) return null
+  const list = LIST_OF[here.kind]
+  return { ...l, [list]: [...l[list], here.name] }
+}
+
+/* --- Renaming a stored zone -----------------------------------------------------
+
+   Owner, 1 Oct 2026: "we already have a save button for the basic details, so
+   no need to have it in the review". On a zone that is stored, the rename's ✓
+   saves the name at once. What it writes is the zone AS STORED with only the
+   new name — never the page's draft, which may hold edits nobody has reviewed
+   yet. A new zone is not stored, so its name stays in the draft. */
+
+/** The zone a rename writes, or null when there is nothing to write. */
+export function withStoredName(stored: Zone | undefined, name: string): Zone | null {
+  if (!stored || stored.name === name) return null
+  return { ...stored, name }
+}
+
 /* --- Ranges ------------------------------------------------------------------- */
 
 /** A range around a catalogue city, at `km`. */
@@ -85,11 +192,17 @@ export const centredOn = (r: ZoneRange, p: Place) => (r.placeId ? r.placeId === 
     picked again, moves nothing: the stored centre can be finer than the
     catalogue's, and swapping one for the other would be a change no one made.
     No sweep either way: a circle can cross a border, so a country does not make
-    one redundant. */
+    one redundant.
+
+    The distance is the number AND its unit (2 Oct 2026): the move kept the
+    number and dropped the unit, so 10 miles round Pune, moved to Chennai,
+    came out as 10 km. The row being searched shows the range it will keep,
+    so the two have to agree. */
 export function withRange(l: ZoneLocation, p: Place, moving: ZoneRange | null): ZoneLocation {
   if (moving) {
     if (centredOn(moving, p)) return l
-    return { ...l, ranges: l.ranges.map((r) => (r === moving ? rangeAt(p, r.km) : r)) }
+    const moved = (r: ZoneRange): ZoneRange => (r.unit ? { ...rangeAt(p, r.km), unit: r.unit } : rangeAt(p, r.km))
+    return { ...l, ranges: l.ranges.map((r) => (r === moving ? moved(r) : r)) }
   }
   return { ...l, ranges: [...l.ranges, rangeAt(p, DEFAULT_RANGE_KM)] }
 }
@@ -167,7 +280,8 @@ function locationDiff(before: ZoneLocation, after: ZoneLocation): { added: strin
 }
 
 /* A zone's review row is the shared review line. The sections are the page's
-   own — IP networks, Locations — and the name leads under General. Each list
+   own — IP networks, Locations — and the name leads under Basic details
+   (GENERAL_GROUP; it was "General" until 1 Oct 2026). Each list
    row holds every added (or removed) entry joined, so it names no single item,
    and says how many it holds (`count`) when that is more than one. */
 export type ZoneReviewRow = ReviewLine

@@ -60,7 +60,7 @@ import { NPS_SERVERS, setupCardFor, setupReady } from '../setup-guide'
 import { AppSetupCard, NpsSetupCard } from './setup-card'
 import { useLeaveGuard } from '../leave-guard'
 import { compactClass, usePageWidth } from '../page-width'
-import { WidthSwitch } from './page-bar'
+import { ToggleStyleSwitch, WidthSwitch } from './page-bar'
 import { SHOWCASE } from '../showcase'
 import { chainStatus, chainsSaid, takesCaChain } from './ca-chain'
 import { CaChainDrawer } from './ca-chain-drawer'
@@ -532,14 +532,18 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
 
         {/* The preview switches, together against the right edge — the same
             slot `PageHead` gives the other library pages. */}
-        {!SHOWCASE && (
-          <div className="bpage__preview">
-            {/* The gear/chevron comparison switch stood here. The gear won on
-                23 Sep 2026 and is on every row that opens, so there is nothing
-                left to compare. */}
-            <WidthSwitch />
-          </div>
-        )}
+        <div className="bpage__preview">
+          {/* The gear/chevron comparison switch stood here. The gear won on
+              23 Sep 2026 and is on every row that opens, so there is nothing
+              left to compare. */}
+          {/* Toggle style is a PENDING DECISION (owner, 1 Oct 2026), so it is
+              shown in the showcase build too; it goes once a style is picked
+              (toggle-style.ts). The width switch hides itself there. Admin
+              only: a person's Two-step verification page has no switches, and
+              this is preview furniture on the end user's site. */}
+          {!isUser && <ToggleStyleSwitch />}
+          {!SHOWCASE && <WidthSwitch />}
+        </div>
       </header>
 
       {/* Recovery is a tenant policy rather than a personal setting, so a person
@@ -1119,16 +1123,21 @@ const marksGear = (shape: FamilyRow): boolean => {
 const caChainsRow = (shape: FamilyRow, open: (() => void) | undefined): (() => void) | undefined =>
   !shape.opens && takesCaChain(shape.method) && !rowTarget(shape) ? open : undefined
 
-/* How many chains the tenant has, beside CAC Card's gear: the one place this
-   list says it. The slider lists them and does not count them again. Amber,
-   like a low balance, whenever no chain is in force — none at all, or every
-   one expired or still waiting for support: no card can be checked until one
-   is. */
+/* How many chains the tenant has, on CAC Card's name beside its heading, as
+   every other row's chip sits (owner, 1 Oct 2026: "move the chip beside the
+   heading as the others have"): the one place this list says it. The slider
+   lists them and does not count them again. Grey like a family at zero, and
+   amber whenever no chain is in force — none at all, or every one expired or
+   still waiting for support: no card can be checked until one is. */
 function CaChainCount() {
   const [chains] = useCaChains()
   const now = new Date()
   const none = !chains.some((c) => chainStatus(c, now) === 'enabled')
-  return <span className={`bm8__txn bm8__cacount${none ? ' is-low' : ''}`}>{chainsSaid(chains.length)}</span>
+  return (
+    <Badge tone={none ? 'notice' : 'neutral'} className="bm8__state bm8__cacount">
+      {chainsSaid(chains.length)}
+    </Badge>
+  )
 }
 
 /* One family on the list. A family of one is named for its method and carries
@@ -1260,6 +1269,7 @@ function FamilyListRow({
               {`${live} of ${inside.length} enabled`}
             </Badge>
           )}
+          {caChains && <CaChainCount />}
         </span>
         <span className="bm8__blurb">{single ? single.summary ?? single.description : f.blurb}</span>
       </span>
@@ -1280,7 +1290,6 @@ function FamilyListRow({
             `methods.ts` and can come back wherever they are actually the
             question. See the "numbers once" rule. */}
         {isUser && configured && <Badge tone="positive">Configured</Badge>}
-        {caChains && <CaChainCount />}
 
         {/* Both slots, always — see `RowEnd`. */}
         <RowEnd

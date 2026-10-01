@@ -1,4 +1,4 @@
-import { ipSectionEmpty, locationEmpty, nameTaken, rangeText, type Zone } from '../data'
+import { ipSectionEmpty, locationEmpty, nameTaken, type Zone } from '../data'
 
 /* -----------------------------------------------------------------------------
    Network zone validation.
@@ -303,31 +303,7 @@ export function validateZone(z: Zone, otherNames: Iterable<string> = []): ZoneIs
 export const canSaveZone = (z: Zone, otherNames: Iterable<string> = []) =>
   !validateZone(z, otherNames).some((i) => i.level === 'error')
 
-/** One line describing what the zone actually covers. */
-export function describeZone(z: Zone): string {
-  const parts: string[] = []
-  const net: string[] = []
-  /* Counted as networks, which is what the half is called on screen. One entry
-     here can be a single host, a /16 or a whole range, so "networks" is also
-     the more honest collective for a count that treats them as one unit. */
-  if (z.ip.length) net.push(`${z.ip.length} network${z.ip.length === 1 ? '' : 's'}`)
-  if (z.asn.length) net.push(`${z.asn.length} ASN${z.asn.length === 1 ? '' : 's'}`)
-  parts.push(net.length ? net.join(' + ') : 'Any network')
-
-  const l = z.location
-  const geo: string[] = []
-  if (l.countries.length) geo.push(l.countries.join(', '))
-  if (l.states.length) geo.push(l.states.join(', '))
-  if (l.cities.length) geo.push(l.cities.join(', '))
-  /* One part each: "Within 25 km of Pune" is a phrase, and a comma list of them reads as one. */
-  for (const r of l.ranges) geo.push(rangeText(r))
-  parts.push(geo.length ? geo.join(' · ') : 'Any location')
-
-  /* Joined as a list, not a conjunction.
-
-     This read "1 address AND Any location", which described the engine rather
-     than the zone: the AND is how the two halves combine internally, and
-     spelling it out made every summary look like a boolean expression an admin
-     had authored. The two facets are simply what the zone contains. */
-  return parts.join(' · ')
-}
+/* `describeZone` stood here: the one-line summary under a zone page's name,
+   "2 networks · Bengaluru, Mumbai · Within 25 km of Pune". The page shows the
+   heading alone now (owner, 1 Oct 2026: "hide this, not needed, only heading
+   is enough"), and nothing else read the line. */

@@ -107,6 +107,7 @@ import './brand/rebrand/board.css'
 import './brand/rebrand/create.css'
 import { applyBrand, readBrand } from './brand/brand-mode'
 import { SHOWCASE } from './brand/showcase'
+import { markToggleStyle, readToggleStyle } from './brand/toggle-style'
 
 /* Before the first paint, so a reload in the rebrand does not flash the current
    look for a frame. The showcase build is always the rebrand — the chosen look —
@@ -114,6 +115,11 @@ import { SHOWCASE } from './brand/showcase'
    than through `applyBrand`, so it does not overwrite that stored choice. */
 if (SHOWCASE) document.documentElement.setAttribute('data-brand', 'rebrand')
 else applyBrand(readBrand())
+
+/* Which style every switch is drawn in: a pending decision, so it is read from
+   storage in the showcase too (toggle-style.ts). Blue, today's look, until the
+   owner picks; goes with the switch once they do. */
+markToggleStyle(readToggleStyle())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

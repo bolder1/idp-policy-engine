@@ -1,0 +1,1459 @@
+/* -----------------------------------------------------------------------------
+   Try a sign-in on the Sign-in tests page: the engine run (EngineJourney.tsx,
+   PolicyStack.tsx, TESTING-V4 §8.6, §12.3–12.4). Prefix `tj`.
+
+   A dotted canvas under the page's sentence bar. The run opens level by
+   level in one centred column — the sign-in node on top, the card of
+   policies under it (the one that decides becoming the container of its
+   rules), the answer under that — joined by a spine drawn in one SVG under
+   them, and one engine line pinned at the top saying what the engine is
+   doing. (Side by side, for a policy's builder later: the three lanes.)
+
+   Colour says what happened (owner, 30 Sep: "green or red or yellow"; 1 Oct:
+   "here it's a match but Deny, so for the deny I think we should use red
+   only"). The DECIDED PATH wears the OUTCOME's colour, one hue from end to
+   end (`--tj-path-*`, set on the stage by journey.ts `pathTone`): the policy
+   that decides and its "Decides", the rule that matched — its frame, its
+   label, the ✓ of its rows that held — the spine into the answer, and the
+   answer. Allow on 1 factor GREEN (`--fb-positive-*`), Allow with 2FA YELLOW
+   (`--fb-notice-*`), Deny RED (`--fb-negative-*`); yellow while it can't be
+   told; grey when nothing decides. Never green and red on one path. The
+   accent (`--accent*`, blue in the rebrand look) is the engine at WORK and
+   nothing else: the scan, a spinner, the row or rule being read right now,
+   the progress hairline. A rule that did not match is quiet — grey words,
+   grey ✓ — its failing check's small ✕ the one red. A conflict, and what
+   can't be told, is YELLOW. Not reached is grey, and what stepped back steps
+   back in colour tokens, never in opacity on its words (≥ 4.5:1).
+
+   Motion owns every element it animates — the lanes (their layout), the
+   stack's fade (`.tj-lane__fade`), the answer's spacer
+   (`.tj-lane__pad`), a policy's body (`.tj-pol__open`, `.tj-pol__body`), a
+   check row's height (`.tj-crowwrap`) and words (`.tj-crow__say`), a word
+   arriving (`.tj-appear`), a mark (`.tj-mark`), the answer (`.tj-out`), its
+   ring pulse and its lines (`.tj-hero__pulse`, `.tj-hero__top` …), the ring
+   drawn round the policy that decides (`.tj-light__ring`, its pathLength),
+   every wire (`.tj-wire`, `.tj-route`), the engine line's pill, words, text,
+   tick and hairline — so none of them takes a transform or a transition
+   here. What moves in CSS is only what motion never touches: a row's ring,
+   edge and tint (`.tj-pol`, `.tj-r__card`, `.tj-crow`), a row's scan line (a
+   pseudo-element's clip), a wire group's colour and dimming (`.tj-fan`,
+   `.tj-lit`), the rail, the spinner's turn, the skeletons' pulse. All of it
+   stops under reduced motion.
+
+   Flat, one hue at a time (owner, 30 Sep): no gradient anywhere on the run
+   but the canvas's dot pattern and the fades that clip the scroller — the
+   search is tints, solid lines and solid rings of the accent, never the
+   accent warming into the brand's orange.
+   -------------------------------------------------------------------------- */
+
+/* --- The tab fills the page ----------------------------------------------------
+
+   As the library tabs do (library.css): while Try is open the page is a flex
+   column, head, tabs, then the canvas taking exactly what is left of the
+   window — a min-height: 0 chain, no fixed heights — so the page never
+   scrolls on this tab at any window size; the canvas scrolls itself. */
+.bshell__main > .bpage:has(.tj) { flex: 1 1 0; min-height: 0; }
+.bpage:has(> [role='tabpanel'] > .tj) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding-bottom: var(--space-8);
+}
+.bpage > [role='tabpanel']:has(> .tj) { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+
+.tj { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+/* --- The canvas ------------------------------------------------------------------
+
+   The board's dotted ground, from tokens: the dot is the default border on
+   the sunken surface. The scroller inside it is the journey's, both ways;
+   the engine line sits over it and stays put. A size container: its content
+   is the absolute scroller, so it is as tall as the page leaves it, and a
+   short canvas tightens the stage's head room (below). */
+.tj-canvas {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  container: tj / size;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background-color: var(--surface-sunken);
+}
+/* The dots on a layer of their own, drawn once: under a card that moves or
+   a stack that grows they were drawn again every frame — thousands of
+   gradients — and the run's motion waited on it. */
+.tj-canvas::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: radial-gradient(circle, var(--border-default) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+  background-position: 11px 11px;
+  pointer-events: none;
+  will-change: transform;
+}
+/* The top of the canvas fades what scrolls up under the engine line, so a
+   row passing beneath the pill reads as going under it, not as words
+   colliding with words. Clear of the scrollbar; over the dots, under the pill. */
+.tj-canvas::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: var(--space-6);
+  left: 0;
+  z-index: 4;
+  height: 64px;
+  border-top-left-radius: var(--radius-xl);
+  background: linear-gradient(to bottom, var(--surface-sunken) 40%, transparent);
+  pointer-events: none;
+}
+/* A layout root: a row growing inside it lays out the stage, not the page —
+   the wires measure the stage every frame something in it eases. */
+.tj-scroll { position: absolute; inset: 0; z-index: 1; overflow: auto; contain: strict; }
+/* Its scrollbar (owner, 30 Sep: "the scrollbar looks weird"): thin, a
+   muted thumb on no track, over the canvas's own ground rather than a grey
+   gutter beside the panel — and its room always kept (`scrollbar-gutter`),
+   so the column stays where it is when a run grows past the canvas and the
+   bar arrives. */
+.tj-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-tertiary) 40%, transparent) transparent;
+  scrollbar-gutter: stable;
+}
+.tj-scroll:hover { scrollbar-color: color-mix(in srgb, var(--text-tertiary) 65%, transparent) transparent; }
+
+/* --- The engine line ---------------------------------------------------------------
+
+   A raised pill centred at the top that hugs its words: its words box is
+   motion's width, eased to each new sentence (measured by a ruler before it
+   is painted), and the sentences cross-fade in it from one left edge. So it
+   never jumps, and Skip rides its right edge smoothly. Skip and Replay share
+   one slot as wide as Replay: the swap as a run lands moves nothing. Past
+   its widest the words are cut with an ellipsis (the title has them whole).
+   `.tj-engine` only places it, and steps back while the card is open. */
+
+.tj-engine {
+  position: absolute;
+  top: var(--space-5);
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.tj-engine__pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: calc(100% - var(--space-9));
+  height: 36px;
+  padding: 0 var(--space-2) 0 var(--space-5);
+  box-sizing: border-box;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  box-shadow: var(--el-mid);
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  pointer-events: auto;
+}
+.tj-engine__icon { display: grid; flex: none; place-items: center; width: 14px; height: 14px; }
+.tj-engine__done { display: grid; place-items: center; color: var(--text-secondary); }
+.tj-engine__words {
+  position: relative;
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(560px, calc(100cqi - 220px));
+  height: 20px;
+  overflow: hidden;
+}
+.tj-engine__ruler,
+.tj-engine__text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: min(560px, calc(100cqi - 220px));
+  overflow: hidden;
+  line-height: 20px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tj-engine__ruler { visibility: hidden; pointer-events: none; }
+.tj-engine.is-done .tj-engine__text { color: var(--text-secondary); }
+/* While it works, the words are solid ink: the spinner beside them and the
+   hairline under them say it is working. */
+.tj-engine.is-running .tj-engine__text { color: var(--text-primary); }
+/* A conflict, named as the engine decides: the notice tone, its mark where the spinner was. */
+.tj-engine__notice { display: grid; place-items: center; color: var(--fb-notice-dot); }
+.tj-engine.is-notice .tj-engine__text { color: var(--fb-notice-fg); }
+.tj-engine__act { display: inline-flex; flex: none; justify-content: flex-end; min-width: 86px; }
+.tj-engine__replay { display: inline-flex; }
+.tj-canvas.is-editing .tj-engine { opacity: 0.4; }
+/* The hairline under the words: how far through its plan the run is. The
+   bar is motion's (its scaleX), the track motion's too (it fades as the run
+   lands); the track clips the bar to the pill. */
+.tj-engine__track {
+  position: absolute;
+  right: var(--space-8);
+  bottom: -1px;
+  left: var(--space-8);
+  height: 2px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  pointer-events: none;
+}
+.tj-engine__bar { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--accent); }
+
+/* The engine at work: an arc that turns. A plain span, never motion's. */
+.tj-spin {
+  display: inline-block;
+  flex: none;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  border: var(--bw-thick) solid var(--accent-soft-border);
+  border-top-color: var(--accent);
+  border-radius: var(--radius-full);
+  animation: tj-spin 700ms linear infinite;
+}
+.tj-spin.is-small { width: 12px; height: 12px; }
+
+/* Where the engine has not been yet: a flat bar whose tone breathes toward
+   the accent and back — the search's colour, quieter than a row being asked. */
+.tj-skel {
+  display: block;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-inset);
+  animation: tj-shimmer 1600ms ease-in-out infinite;
+}
+.tj-skel.is-line { width: 72%; }
+.tj-skel.is-short { width: 40%; }
+.tj-skel.is-word { flex: none; width: 56px; }
+.tj-skel.is-idx { flex: none; width: 20px; height: 20px; }
+
+/* --- The stage --------------------------------------------------------------------
+
+   The SVG's coordinate space: it and every measured box are placed against
+   it. Three lanes — the sign-in, the policies, the answer — centred in the
+   canvas while they fit, each between its narrowest and its widest, the
+   policies taking the most. The page never scrolls.
+
+   The lanes' least is 936 px (journey.ts `LANES_MIN_W`: the tracks' minimums,
+   two gaps of 32, 24 a side); a canvas narrower than that holds them as one
+   column (`.is-vertical`, below). Near the least the gaps and then the side
+   padding give way, so the stage always leaves 16 px — a scrollbar's room —
+   and side by side never scrolls sideways: the gap is 4cqi until it would
+   leave less, then what is left, never under 32; the padding 24 until then,
+   never under 16. At 1440 × 900 (a 1141 px canvas) and 1280 × 800 (981) they
+   are 4cqi and 24, as they always were. */
+.tj-stage {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(208px, 232px) minmax(400px, 520px) minmax(216px, 264px);
+  column-gap: clamp(var(--space-9), min(4cqi, 50cqi - 444px), var(--space-14));
+  justify-content: center;
+  align-items: start;
+  min-width: min-content;
+  min-height: 100%;
+  padding: 68px clamp(var(--space-6), 50cqi - 452px, var(--space-8)) var(--space-9);
+  /* The decided path's colour (journey.ts `pathTone`): the outcome's, for
+     every part of the way — Allow on 1 factor's green unless the stage says. */
+  --tj-path-bg: var(--fb-positive-bg);
+  --tj-path-fg: var(--fb-positive-fg);
+  --tj-path-border: var(--fb-positive-border);
+  --tj-path-dot: var(--fb-positive-dot);
+}
+.tj-stage.is-path-notice { --tj-path-bg: var(--fb-notice-bg); --tj-path-fg: var(--fb-notice-fg); --tj-path-border: var(--fb-notice-border); --tj-path-dot: var(--fb-notice-dot); }
+.tj-stage.is-path-negative { --tj-path-bg: var(--fb-negative-bg); --tj-path-fg: var(--fb-negative-fg); --tj-path-border: var(--fb-negative-border); --tj-path-dot: var(--fb-negative-dot); }
+.tj-stage.is-path-neutral { --tj-path-bg: var(--fb-neutral-bg); --tj-path-fg: var(--text-secondary); --tj-path-border: var(--fb-neutral-border); --tj-path-dot: var(--border-strong); }
+/* A short canvas (1280 × 800 and less): the head room under the engine line
+   and the lanes' labels close up, so a run of three rules is not cut at the
+   foot for the sake of padding at the top. */
+@container tj (max-height: 600px) {
+  .tj-stage { padding-top: 60px; padding-bottom: var(--space-8); }
+  .tj-lane__head { margin-bottom: var(--space-4); }
+}
+
+/* Vertical (§11.1, §12.3) — the page's only layout: one centred column, at
+   most 540 wide, the start on top, the card of policies under it, the answer
+   under that, a spine down the middle joining them across the gaps
+   (journey.ts `verticalWires`). No lane labels — the card says what it holds
+   and the answer is its own heading — and no spacer holding the answer level
+   with a rule. The lanes glide to their places when the orientation changes
+   (motion's layout, on the lane: no transform here). */
+.tj-stage.is-vertical {
+  grid-template-columns: minmax(0, 540px);
+  row-gap: var(--space-10);
+  padding-inline: var(--space-6);
+}
+.tj-stage.is-vertical .tj-lane__pad { display: none; }
+/* While the lanes glide to a new orientation the wires, measured where the
+   lanes will stand, wait unseen; they come back once the lanes have landed.
+   A lane on its way stands where it was, past the stage's edge: the canvas
+   does not scroll sideways for it meanwhile. */
+.tj-wirebox { transition: opacity var(--dur-normal) var(--ease-standard); }
+.tj-stage.is-switching > .tj-wirebox { opacity: 0; transition: none; }
+.tj-scroll:has(> .tj-stage.is-switching) { overflow-x: hidden; }
+
+/* --- The wires ------------------------------------------------------------------ */
+
+/* The wires are clipped to the stage: sized from the last measure, the SVG
+   was a frame behind a stage that shrank, and propped the canvas open
+   sideways for that frame. */
+.tj-wirebox { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.tj-wires { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+/* A neutral wire of the fan is drawn in its group's colour, so hover eases
+   the colour on the group (`.tj-fan`) — the path is motion's. */
+.tj-fan { color: var(--border-default); transition: color var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard); }
+.tj-wire { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.tj-route { fill: none; stroke: var(--tj-path-dot); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tj-lit { transition: opacity var(--dur-fast) var(--ease-standard); }
+/* Hover a policy or a rule: its wire comes forward, the rest step back. */
+.tj-wires.has-hot .tj-fan:not(.is-hot) { opacity: 0.35; }
+.tj-wires.has-hot .tj-fan.is-hot { color: var(--border-strong); }
+.tj-lit.is-back { opacity: 0.35; }
+.tj-lit.is-hot > .tj-route { stroke-width: 2.5; }
+.tj-stage.is-editing > .tj-wirebox > .tj-wires { opacity: 0.3; }
+
+/* --- Lanes ------------------------------------------------------------------------- */
+
+.tj-lane { position: relative; z-index: 1; display: flex; flex-direction: column; min-width: 0; }
+/* The sign-in lane holds the card grown back over the journey: above the other lanes. */
+.tj-lane.is-signin { z-index: 3; }
+.tj-lane__head {
+  height: 16px;
+  margin: 0 0 var(--space-5);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 16px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.tj-lane__body { position: relative; display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.tj-lane__fade { display: flex; flex-direction: column; min-width: 0; }
+.tj-lane__pad { flex: none; }
+/* While the card is open over the journey, the rest steps back and is inert. */
+.tj-stage.is-editing > .tj-lane:not(.is-signin) { opacity: 0.3; }
+
+/* A word arriving where there was none — a name, "Decides", a reason — fades
+   in (motion's opacity); it keeps the layout of the word it wraps. */
+.tj-appear { display: inline; }
+
+/* A node: the raised surface a stop on the journey is drawn on. */
+.tj-node {
+  min-width: 0;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+
+/* --- 1. The sign-in ------------------------------------------------------------------ */
+
+.tj-sin { position: relative; padding: var(--space-5) var(--space-5) var(--space-6); }
+.tj-sin.is-hidden { visibility: hidden; }
+.tj-sin__in { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.tj-sin__who { display: flex; align-items: center; gap: var(--space-4); min-width: 0; padding-right: 48px; }
+.tj-sin__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+/* Every word in full: a long name or group wraps, it is never cut. */
+.tj-sin__text strong,
+.tj-sin__app > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+}
+.tj-sin__text > span { min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.tj-sin__app { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.tj-sin__app .applogo { flex: none; }
+.tj-sin__tools { position: absolute; top: var(--space-4); right: var(--space-3); display: flex; gap: 0; }
+.tj-sin__tools .bx-iconbtn:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 1px; }
+
+/* The facts it was asked for, as the sentence states them: neutral pills of
+   the one family, a mark before the words. */
+.tj-facts { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: 0; padding: var(--space-4) 0 0; border-top: var(--bw-thin) solid var(--border-subtle); list-style: none; }
+.tj-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--pill-py) var(--pill-px);
+  border: var(--bw-thin) solid var(--fb-neutral-border);
+  border-radius: var(--pill-radius);
+  background: var(--fb-neutral-bg);
+  color: var(--fb-neutral-fg);
+  font-size: var(--pill-fs);
+  font-weight: var(--pill-fw);
+  line-height: var(--pill-line);
+}
+.tj-fact > svg,
+.tj-fact > .bplat { flex: none; color: var(--text-tertiary); }
+/* A fact longer than the node wraps inside its pill rather than losing its end. */
+.tj-fact__text { min-width: 0; overflow-wrap: anywhere; }
+
+/* The card grown back over the journey, where the node stands. */
+.tj-editcard { position: absolute; top: 0; left: 0; z-index: 5; width: min(400px, calc(100cqi - var(--space-9))); }
+
+/* --- 2. The policies: one card -----------------------------------------------------------
+
+   One card titled with the application (§12.4), its rows the policies in the
+   order the engine asks them. Every row has the same box — a transparent
+   edge and an inset of 8 px from the card, 7 inside its edge — so the one that
+   decides can take its ring, and become the container of its rules, without
+   anything moving; and every row's words start 20 px in and end 20 px from
+   the card's edge:
+
+     [num 20] 8 [name ………… 1fr] 8 [result] 8 [chevron 16]
+
+   The rules inside the one that decides begin under its name, and their
+   answers and marks end on the same right edge as the chevrons. */
+.tj-which {
+  min-width: 0;
+  padding: 0 0 var(--space-4);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+.tj-which__head {
+  margin: 0;
+  padding: var(--space-5) calc(var(--space-4) + var(--space-5)) var(--space-3);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  line-height: 20px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.tj-pstack { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+
+.tj-pol {
+  /* The row's own inset inside its edge, and the lead the rules keep under its name. */
+  --tj-in: calc(var(--space-5) - var(--bw-thin));
+  --tj-lead: calc(20px + var(--space-4));
+  position: relative;
+  min-width: 0;
+  margin: 0 var(--space-4);
+  border: var(--bw-thin) solid transparent;
+  border-radius: var(--radius-lg);
+  background-color: transparent;
+  /* Being asked, found, deciding: one eased change of edge, ring and tint. */
+  transition: border-color var(--dur-normal) var(--ease-standard), box-shadow var(--dur-normal) var(--ease-standard), background-color var(--dur-normal) var(--ease-standard);
+}
+/* A hairline between rows, in the gap; none beside the ringed one. */
+.tj-pol + .tj-pol::before {
+  content: '';
+  position: absolute;
+  top: calc(var(--space-1) / -2 - var(--bw-thin));
+  right: var(--tj-in);
+  left: var(--tj-in);
+  height: var(--bw-thin);
+  background: var(--border-subtle);
+  pointer-events: none;
+}
+.tj-pol.is-found::before,
+.tj-pol.is-decides::before,
+.tj-pol.is-found + .tj-pol::before,
+.tj-pol.is-decides + .tj-pol::before { background: transparent; }
+
+.tj-pol > .bx-tip { display: flex; width: 100%; }
+.tj-pol__head {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto 16px;
+  align-items: center;
+  column-gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--space-4) var(--tj-in);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.tj-pol__head:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: -2px; }
+.tj-pol__head.is-skel { cursor: default; }
+.tj-pol__head.is-skel > .tj-skel.is-line { width: 64%; }
+.tj-pol__num {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+}
+.tj-pol__name {
+  display: block;
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.tj-pol__end { display: flex; align-items: center; justify-content: flex-end; min-height: 20px; }
+.tj-pol__word { display: block; font-size: var(--fs-sm); font-weight: var(--fw-semibold); line-height: 20px; white-space: nowrap; color: var(--tj-path-fg); }
+.tj-pol__reason { display: block; max-width: 220px; font-size: var(--fs-sm); line-height: 18px; text-align: right; color: var(--text-tertiary); }
+.tj-pol__chev { display: grid; place-items: center; width: 16px; height: 20px; color: var(--text-tertiary); }
+
+/* The row states, each ring written as the same two shadows so one eases into the next:
+     waiting   a skeleton, shimmering
+     working   being asked: a soft tint, and the scan line filling under it (below)
+     found     the one that decides: its ring drawn once around its edge, in the path's colour (below)
+     decides   the edge and ring in the path's colour, "Decides"
+     open      the container of its rules: its edge quiets, the rule carries the way
+     dim       did not decide: the words step down */
+.tj-pol.is-working { background-color: color-mix(in srgb, var(--accent-soft) 55%, transparent); }
+.tj-pol.is-found { border-color: var(--tj-path-border); background-color: color-mix(in srgb, var(--tj-path-bg) 80%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tj-path-dot) 12%, transparent), 0 0 0 0 transparent; }
+.tj-pol.is-decides { border-color: var(--tj-path-dot); background-color: var(--surface-raised); box-shadow: 0 0 0 1px var(--tj-path-dot), var(--el-low); }
+.tj-pol.is-decides.is-open { border-color: color-mix(in srgb, var(--tj-path-dot) 55%, var(--border-subtle)); box-shadow: 0 0 0 3px var(--tj-path-bg), var(--el-low); }
+.tj-pol.is-dim .tj-pol__name { color: var(--text-secondary); }
+/* Hover, drawn only once the pointer has moved since the run landed
+   (`is-pointing`): the card grows under a still pointer, and that is not
+   pointing at anything. */
+.tj-stage.is-pointing .tj-pol.is-dim:hover,
+.tj-pol.is-dim.is-hot { background-color: var(--surface-sunken); }
+.tj-pol.is-decides.is-hot { border-color: var(--tj-path-dot); }
+
+/* The scan line (§12.4): while the row is asked, a thin solid line of the
+   accent fills under it, left to right, once, as long as the row's scan
+   (`--tj-sweep`, set on the row from the step's own length). A layer of its
+   own, opened by its clip; nothing moves. */
+.tj-pol.is-working::after {
+  content: '';
+  position: absolute;
+  right: var(--tj-in);
+  bottom: 0;
+  left: var(--tj-in);
+  z-index: 0;
+  height: var(--bw-thick);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  clip-path: inset(0 100% 0 0);
+  pointer-events: none;
+  animation: tj-sweep var(--tj-sweep, 480ms) cubic-bezier(0.45, 0, 0.55, 1) forwards;
+}
+
+/* The ring (§12.4): once the scan has found the one that decides, a solid
+   ring in the path's colour is drawn once around its edge — found, no longer searching: an
+   SVG rect over the row's border, its stroke drawn by motion's pathLength
+   over the found step — and the green ring of Decides takes its place, edge
+   for edge, as it settles. */
+.tj-light {
+  position: absolute;
+  top: calc(var(--bw-thin) * -1);
+  left: calc(var(--bw-thin) * -1);
+  z-index: 2;
+  width: calc(100% + 2 * var(--bw-thin));
+  height: calc(100% + 2 * var(--bw-thin));
+  overflow: visible;
+  pointer-events: none;
+}
+.tj-light__ring {
+  x: var(--bw-thin);
+  y: var(--bw-thin);
+  width: calc(100% - 2 * var(--bw-thin));
+  height: calc(100% - 2 * var(--bw-thin));
+  rx: calc(var(--radius-lg) - var(--bw-thin));
+  fill: none;
+  stroke: var(--tj-path-dot);
+  stroke-width: var(--bw-thick);
+}
+
+/* The body, opened by motion (`.tj-pol__open` is its height): the rules
+   begin under the policy's name. */
+.tj-pol__open { overflow: clip; }
+.tj-pol__body { padding: 0 var(--tj-in) var(--space-4) calc(var(--tj-in) + var(--tj-lead)); }
+.tj-pol__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 28px;
+  margin-bottom: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: var(--bw-thin) solid var(--border-subtle);
+}
+.tj-pol__label { font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-tertiary); }
+/* Show all checks: one quiet switch in the canvas's one link style (below),
+   its words ending on the card's right edge. There, unseen, while the engine
+   works, so the bar is its full height from the start and nothing under it
+   moves as the run lands. */
+.tj-toggle { height: 24px; margin-right: calc(var(--space-2) * -1); transition: opacity var(--dur-normal) var(--ease-standard); }
+.tj-toggle.is-waiting { visibility: hidden; opacity: 0; }
+
+/* --- 3. The rules, inside the policy that decides ------------------------------------------
+
+   Rows on a rail, in the order the engine reads them: the rail joins their
+   numbers, and lights down as far as the engine walked. No rule is a box of
+   its own (§12.4): the one being read, and the one that matched, are picked
+   out by a tint that bleeds a few px past their words, and the match by the
+   accent's bar on its left edge too. Every rule's answer, and every check's
+   mark, ends on the card's one right edge. */
+.tj-rlist { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.tj-r { position: relative; min-width: 0; }
+
+/* The rail: into a rule's number from the gap above it, and out of it to the
+   bottom of the rule. */
+.tj-r__rail {
+  position: absolute;
+  left: calc(10px - 0.75px);
+  z-index: 0;
+  width: 1.5px;
+  border-radius: var(--radius-full);
+  background: var(--border-default);
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+.tj-r__rail.is-in { top: calc(var(--space-1) * -1); height: calc(var(--space-1) + var(--space-4)); }
+.tj-r__rail.is-out { top: calc(var(--space-4) + 20px); bottom: 0; }
+.tj-rlist > .tj-r:first-child > .tj-r__rail.is-in { display: none; }
+.tj-r__rail.is-lit { background: var(--border-strong); }
+
+.tj-r__card {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  margin-inline: calc(var(--space-3) * -1);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  box-shadow: inset 0 0 0 0 transparent;
+  /* A rule's tint arrives as the engine opens it and gives way to the
+     match's, or to the flat surface of one it left: one eased change. */
+  transition: box-shadow var(--dur-normal) var(--ease-standard), background-color var(--dur-normal) var(--ease-standard);
+}
+.tj-r__head {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: var(--space-4) 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.tj-r__head.is-skel { cursor: default; }
+.tj-r__head:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 2px; }
+.tj-r__idx {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+.tj-r__idx.is-last { color: var(--text-tertiary); }
+/* The name in full — it wraps, it is never cut to one line. */
+.tj-r__name {
+  display: block;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: 20px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.tj-r__word { display: block; font-size: var(--fs-xs); line-height: 20px; white-space: nowrap; color: var(--text-tertiary); }
+/* If not: the word, then the THEN unlit. */
+.tj-r__end { display: inline-flex; align-items: center; gap: var(--space-3); }
+
+/* The rule states:
+     waiting   a skeleton line
+     working   being read: the soft tint, its checks arriving
+     lit       matched: the tint, the accent's bar on its left edge
+     missed    no match for a beat, or can't tell: flat, the words step down
+     possible  the last row when the answer Depends: flat, the words step down
+     folded    no match, left behind: flat, its failing row as one line
+     ghost     not reached, switched off: its title in tertiary words */
+.tj-r.is-working > .tj-r__card { background-color: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
+.tj-r.is-lit > .tj-r__card { background-color: color-mix(in srgb, var(--tj-path-bg) 70%, transparent); box-shadow: inset var(--bw-thick) 0 0 0 var(--tj-path-dot); }
+.tj-r.is-missed .tj-r__name,
+.tj-r.is-possible .tj-r__name,
+.tj-r.is-folded .tj-r__name { color: var(--text-secondary); }
+.tj-r.is-ghost .tj-r__name,
+.tj-r.is-ghost .tj-r__idx { color: var(--text-tertiary); }
+.tj-r.is-line .tj-r__name { font-weight: var(--fw-regular); color: var(--text-secondary); }
+.tj-stage.is-pointing .tj-r:not(.is-lit):not(.is-working):not(.is-waiting):hover > .tj-r__card,
+.tj-r.is-hot:not(.is-lit):not(.is-working) > .tj-r__card { background-color: var(--surface-sunken); }
+
+/* --- A rule's checks: one row per category, under its name ---------------------------------- */
+
+.tj-checks { display: flex; flex-direction: column; margin: calc(var(--space-3) * -1) 0 0; padding: 0 0 var(--space-3) var(--tj-lead, 28px); list-style: none; }
+.tj-checks:empty { display: none; }
+/* The row's height is motion's, eased to `.tj-crowin`'s measured one (its
+   spacing is padding, so the measure holds all of it). */
+.tj-crowwrap { overflow: clip; overflow-clip-margin: 6px; }
+.tj-crowin { padding-top: 2px; }
+/* Its tint bleeds 6 px past its words each side; its mark ends on the card's right edge. */
+.tj-crow {
+  display: grid;
+  grid-template-columns: 16px 56px minmax(0, 1fr) auto 18px;
+  align-items: center;
+  column-gap: var(--space-3);
+  min-height: 38px;
+  margin-inline: calc(var(--space-3) * -1);
+  padding: var(--space-2) var(--space-3);
+  box-sizing: border-box;
+  border-radius: var(--radius-md);
+  /* Being read, then its verdict's tint, then — folded — none. */
+  transition: background-color var(--dur-normal) var(--ease-standard);
+}
+.tj-crow.is-working { background: var(--accent-soft); }
+.tj-crow.is-fail { background: var(--fb-negative-bg); }
+/* Folded to one line: the row keeps its icon, word and ✕ where they were;
+   its words are one sentence now, and the tint gives way — a folded rule is
+   left behind, flat. */
+.tj-crow.is-line { min-height: 30px; background: transparent; }
+.tj-crow__icon { color: var(--text-tertiary); }
+.tj-crow__word { font-size: var(--fs-xs); line-height: 16px; color: var(--text-tertiary); }
+.tj-crow > .bx-tip { display: flex; min-width: 0; }
+/* The words, cross-faded in place: the one leaving is lifted out of the
+   flow over the one arriving (motion's popLayout), against this box. */
+.tj-crow__text { position: relative; display: block; min-width: 0; line-height: 1.3; }
+.tj-crow__say { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tj-crow__say.is-line { display: block; font-size: var(--fs-sm); line-height: 18px; color: var(--text-secondary); overflow-wrap: anywhere; }
+/* In full: a long requirement or value wraps in its column, never cut. */
+.tj-crow__req,
+.tj-crow__val { min-width: 0; overflow-wrap: anywhere; }
+.tj-crow__req { font-size: var(--fs-sm); color: var(--text-primary); }
+.tj-crow__val { font-size: var(--fs-xs); color: var(--text-secondary); }
+.tj-crow__val.is-unset { color: var(--text-tertiary); }
+.tj-crow.is-fail .tj-crow__req { color: var(--fb-negative-fg); }
+/* Not checked: an earlier row ended the rule — the words in tertiary, no mark. */
+.tj-crow.is-skipped .tj-crow__req,
+.tj-crow.is-skipped .tj-crow__val { color: var(--text-tertiary); }
+.tj-crow__skip { font-size: var(--fs-xs); line-height: 20px; white-space: nowrap; color: var(--text-tertiary); }
+.tj-crow__tip { white-space: pre-line; }
+.tj-crow__slot { width: 20px; }
+.tj-crow__more {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.tj-crow__more:hover { background: var(--surface-inset); color: var(--text-primary); }
+.tj-crow__more svg.is-open { rotate: 180deg; }
+.tj-crow__add { line-height: 20px; }
+.tj-crow__more:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 1px; }
+.tj-crow__mark { display: grid; place-items: center; width: 18px; height: 18px; }
+.tj-mark { display: grid; place-items: center; }
+.tj-mark.is-pass { color: var(--fb-positive-fg); }
+.tj-mark.is-fail { color: var(--fb-negative-fg); }
+.tj-mark.is-unknown { color: var(--fb-notice-fg); }
+
+/* A category's own checks, opened in place under its row: the same right edge. */
+.tj-subs { display: flex; flex-direction: column; gap: 2px; margin: var(--space-2) 0; padding: 0 0 0 calc(16px + 56px + 2 * var(--space-3)); list-style: none; }
+.tj-sub { display: grid; grid-template-columns: minmax(0, 1fr) auto 18px; align-items: center; column-gap: var(--space-3); min-height: 22px; font-size: var(--fs-xs); }
+.tj-sub__label { min-width: 0; overflow-wrap: anywhere; color: var(--text-primary); }
+.tj-sub.is-fail .tj-sub__label { color: var(--fb-negative-fg); }
+.tj-sub__val { max-width: 168px; overflow-wrap: anywhere; text-align: right; color: var(--text-secondary); }
+.tj-sub__req { color: var(--text-tertiary); }
+
+/* --- 4. The outcome: the hero of the flow ---------------------------------------------------
+
+   Under the card of policies, on the spine (side by side: level with the rule
+   that matched, its spacer `.tj-lane__pad` motion's height). There, unseen
+   and inert, while the spine draws out to it; then it lands (motion's
+   opacity, scale, y on `.tj-out`), its ring pulses once (`.tj-hero__pulse`,
+   motion's opacity and scale) and its lines come up 60 ms apart (motion's
+   opacity and y on each). The decision in its tone — the feedback tokens
+   (DECISION_TONE): green on 1 factor, amber with 2FA, red on Deny, neutral
+   when it Depends or nothing decides.
+
+   The first thing read (owner, 30 Sep: "at the first glance the user should
+   see the OUTCOME"): wider than the chain above it (`.tj-chain`), in two
+   halves — the decision large with ONE line of what the person gets and
+   Open policy, and beside it What they see, the sign-in playing
+   (`.tj-hero__see`, the player compact). The stage is the whole of its
+   column; its label, steps and caption stand at the foot of the words
+   (`.tj-hero__side`, level with the stage's foot), so the card is no taller
+   than the stage and the words' column is not half empty (owner, 1 Oct: "it
+   takes a lot of space … so much white space"). On a narrow canvas the
+   stage drops under the words and its steps under it. Folded, the decision
+   and the ask in one line. */
+.tj-out { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-4); min-width: 0; }
+.tj-out > .tj-lane__head { margin: 0; }
+
+.tj-hero {
+  --tj-tone-bg: var(--fb-neutral-bg);
+  --tj-tone-fg: var(--text-primary);
+  --tj-tone-border: var(--fb-neutral-border);
+  --tj-tone-dot: var(--fb-neutral-dot);
+  position: relative;
+  min-width: 0;
+  border: var(--bw-thin) solid color-mix(in srgb, var(--tj-tone-border) 70%, var(--border-subtle));
+  border-radius: var(--radius-xl);
+  background-color: var(--surface-raised);
+  box-shadow: var(--el-mid);
+}
+.tj-hero.is-positive { --tj-tone-bg: var(--fb-positive-bg); --tj-tone-fg: var(--fb-positive-fg); --tj-tone-border: var(--fb-positive-border); --tj-tone-dot: var(--fb-positive-dot); }
+.tj-hero.is-notice { --tj-tone-bg: var(--fb-notice-bg); --tj-tone-fg: var(--fb-notice-fg); --tj-tone-border: var(--fb-notice-border); --tj-tone-dot: var(--fb-notice-dot); }
+.tj-hero.is-negative { --tj-tone-bg: var(--fb-negative-bg); --tj-tone-fg: var(--fb-negative-fg); --tj-tone-border: var(--fb-negative-border); --tj-tone-dot: var(--fb-negative-dot); }
+.tj-hero.is-foldable.is-folded { cursor: pointer; }
+/* The one ring pulse as it lands: a solid 2 px ring of the decision's own
+   tone a little outside the card (motion's opacity and scale). */
+.tj-hero__pulse {
+  position: absolute;
+  inset: calc(var(--space-2) * -1);
+  box-sizing: border-box;
+  border: var(--bw-thick) solid var(--tj-tone-dot);
+  border-radius: calc(var(--radius-xl) + var(--space-2));
+  pointer-events: none;
+}
+/* The words, and What they see beside them. */
+.tj-hero__in {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-6) var(--space-9);
+  padding: var(--space-6) var(--space-7);
+}
+/* Beside the player the words stand at the card's top, level with the stage's
+   top — the decision the first thing under the policy's line — and the
+   player's label, steps and caption at the foot of the words, level with the
+   stage's foot. */
+.tj-hero.has-see .tj-hero__in {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "main see" "side see";
+  align-items: start;
+  row-gap: var(--space-5);
+}
+.tj-hero.has-see .tj-hero__main { grid-area: main; }
+.tj-hero.has-see .tj-hero__see { grid-area: see; }
+.tj-hero.is-folded .tj-hero__in { padding-block: var(--space-5); }
+.tj-hero__main { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.tj-hero__top { display: flex; align-items: center; column-gap: var(--space-5); min-width: 0; min-height: 40px; }
+/* Open policy (folded) and the fold: the card's actions, at the end of its top row. */
+.tj-hero__open { display: inline-flex; flex: none; align-items: center; gap: var(--space-3); margin-left: auto; }
+.tj-hero__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  border: var(--bw-thin) solid var(--tj-tone-border);
+  border-radius: var(--radius-lg);
+  background: var(--tj-tone-bg);
+  color: var(--tj-tone-fg);
+}
+.tj-hero__word { flex: none; min-width: 0; font-size: var(--fs-3xl); font-weight: var(--fw-semibold); line-height: 30px; letter-spacing: -0.01em; color: var(--tj-tone-fg); }
+/* The caveat's dot, close beside the decision it is about. */
+.tj-hero__top > .bx-tip { flex: none; margin-left: calc(var(--space-3) - var(--space-5)); }
+/* Folded: the ask beside the decision, on its line. */
+.tj-hero__inline { flex: 1 1 auto; min-width: 0; overflow: hidden; font-size: var(--fs-sm); color: var(--text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+/* Changed by …: a neutral pill of the one family, once an edit moved the answer. */
+.tj-hero__changed {
+  flex: none;
+  padding: var(--pill-py) var(--pill-px);
+  border: var(--bw-thin) solid var(--fb-neutral-border);
+  border-radius: var(--pill-radius);
+  background: var(--fb-neutral-bg);
+  font-size: var(--pill-fs);
+  font-weight: var(--pill-fw);
+  line-height: var(--pill-line);
+  color: var(--fb-neutral-fg);
+}
+/* The lines under the word, on the word's own left edge. */
+.tj-hero__body { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding-left: calc(40px + var(--space-5)); }
+.tj-hero__vs,
+.tj-hero__ifs,
+.tj-hero__needs,
+.tj-hero__watch { margin: 0; min-width: 0; }
+.tj-hero__ifs { display: flex; flex-direction: column; gap: var(--space-3); padding: 0; list-style: none; }
+.tj-hero__ifs > li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
+.tj-hero__if { font-size: var(--fs-sm); color: var(--text-secondary); }
+.tj-hero__needs { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.tj-hero__watch { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); font-size: var(--fs-sm); color: var(--text-secondary); }
+.tj-hero__whybtn {
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  color: var(--text-link);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tj-hero__whybtn:hover { background: var(--int-ghost-bg-hover); }
+.tj-hero__whybtn:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 1px; }
+/* Break-in attempts, as quietly as Why? (nothing to say, nothing getting through), its chevron beside the words. Its fade is motion's. */
+.tj-hero__whybtn.tj-hero__attempts { display: inline-flex; align-items: center; gap: var(--space-1); }
+/* Inside a policy: today's version and the draft's, side by side, when they answer differently. */
+.tj-hero__vs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); font-size: var(--fs-xs); line-height: 20px; color: var(--text-secondary); }
+.tj-hero__ver { display: inline-flex; align-items: center; gap: var(--space-3); }
+.tj-hero__vsarrow { flex: none; color: var(--text-tertiary); }
+.tj-hero__vsword { font-weight: var(--fw-medium); color: var(--text-primary); }
+/* A saved sign-in that expects another answer: said once, beside the word, in the notice tone — the test fails. */
+.tj-hero__expect { display: inline-flex; flex: none; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); font-weight: var(--fw-medium); line-height: 20px; color: var(--fb-notice-fg); white-space: nowrap; }
+.tj-hero__emark { flex: none; color: var(--fb-notice-dot); }
+/* What they see, beside the words: the stage alone in its column. */
+.tj-hero__see { min-width: 0; }
+.tj-hero .tsee { gap: var(--space-3); }
+.tj-hero .tsee__body { gap: var(--space-3); }
+/* Its label, the decision switch, the steps and the caption, at the foot of
+   the words, on their left edge: a quiet label, the chips with Replay at
+   their end, the caption under them. */
+.tj-hero__side { grid-area: side; align-self: end; min-width: 0; padding-left: calc(40px + var(--space-5)); }
+.tsee__side { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); min-width: 0; }
+.tj-hero .tsee__side > .tsee__title { margin: 0; letter-spacing: normal; font-size: var(--fs-xs); font-weight: var(--fw-medium); line-height: 16px; color: var(--text-secondary); }
+.tsee__steps { align-self: stretch; min-width: 0; }
+.tsee__steps > .tplay__bar { justify-content: flex-start; }
+/* A narrow canvas (the panel open beside it): the stage under the words, its
+   steps under it, all on the words' left edge. */
+@container tj (max-width: 900px) {
+  .tj-hero.has-see .tj-hero__in { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "main" "see" "side"; }
+  .tj-hero__see { width: min(100%, 400px + 40px + var(--space-5)); box-sizing: border-box; padding-left: calc(40px + var(--space-5)); }
+  .tj-hero__side { align-self: start; }
+}
+/* The builder's fold, in the hero's top row: in place, not floating over
+   the card (as the builder's Centred skin merges its trail), and shown on
+   the card's hover and focus, as on the builder's card. */
+.tj-hero .bb__acts { position: static; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+.tj-hero:hover .bb__acts,
+.tj-hero:focus-within .bb__acts { opacity: 1; pointer-events: auto; }
+
+/* --- The chain: one column, in the policy builder's look (RunChain.tsx) ---------------------
+
+   TESTING-V4 §13.2, §14.3. The sign-in as one sentence on the builder's
+   start pill (`.bb__start`; owner, 1 Oct: "merge these two … a full
+   sentence"), then two stops — the policy, the outcome — each on the
+   builder's card (`.bb__card`, `.bb__cardhead`: board.css), joined by the
+   builder's bare connectors (`.bb__link`), centred as its Centred skin draws
+   them. Compact (owner, 30 Sep: "the cards are very big; because of that the
+   scroll is too much"): one-line heads, the rules at the builder's folded
+   density, and every card folds. The spine is grey; the way the sign-in took is drawn down it in
+   GREEN as it holds (`.tj-link__draw`, motion's scaleY) — the rules the
+   engine walked through, in ink. A stop arriving is motion's too
+   (`.tj-seg`), and so are the scan, the rules and a node's body opening
+   (`.tj-drawer`) and a title changing (`.tj-pnode__say`): none of them takes
+   a transform or a transition here. */
+.tj-stage.is-chain { display: flex; justify-content: center; }
+/* The chain's column is the answer's width (below); its stops keep the run's 640. */
+.tj-chain { display: flex; flex-direction: column; align-items: stretch; width: min(880px, 100%); min-width: 0; }
+.tj-seg { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
+.tj-chain > .tj-seg { align-self: center; width: min(640px, 100%); }
+
+/* The connector, centred, never a place to insert: no pointer, no brand on hover. */
+.tj-chain .bb__link { height: var(--space-6); margin-left: 0; pointer-events: none; }
+.tj-chain .bb__link::before { left: 50%; margin-left: calc(var(--bw-thick) / -2); width: var(--bw-thick); background: var(--border-default); }
+.tj-chain .bb__link:hover::before { background: var(--border-default); }
+.tj-chain .bb__link.is-short { height: var(--space-3); }
+.tj-link__draw {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--bw-thick);
+  margin-left: calc(var(--bw-thick) / -2);
+  border-radius: var(--radius-full);
+  background: var(--tj-path-dot);
+}
+/* Between two rules: the engine walked on, whatever the rule above said. */
+.tj-rcard > .tj-link > .tj-link__draw { background: var(--border-strong); }
+
+/* A stop is a card, not a control: it keeps its resting edge under the pointer. */
+.bb__card.tj-pnode { cursor: default; }
+.bb__card.tj-pnode:hover { border-color: var(--border-subtle); box-shadow: var(--el-low); }
+.bb__card.tj-pnode.is-foldable.is-folded { cursor: pointer; }
+.bb__card.tj-pnode.is-foldable.is-folded:hover { border-color: var(--border-default); }
+.bb__card.tj-pnode.is-decided,
+.bb__card.tj-pnode.is-decided:hover { border-color: var(--border-default); }
+.tj-pnode > .bb__cardhead { min-height: 40px; box-sizing: border-box; }
+.tj-pnode .bb__titlerow { gap: var(--space-4); }
+.tj-pnode .bb__titlerow > strong,
+.tj-pnode .bb__titlerow > .bb__titlebtn { flex: 0 1 auto; min-width: 0; }
+/* The policy folded: why, under its name, as the builder's card says its
+   description — its own line, so a long name never cuts it short. */
+.bb__card.tj-pnode .bb__title > .tj-pnode__why1 { overflow: hidden; line-height: 18px; color: var(--text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+
+/* 2. The policy: the scan runs inside it, then its rules. Its mark: the
+   engine's spinner while it searches, the path's colour once one decides. */
+.bb__card .tj-pnode__mark { width: 24px; height: 24px; background: var(--tj-path-bg); color: var(--tj-path-fg); }
+.bb__card .tj-pnode__mark.is-finding,
+.bb__card.tj-pnode.is-none .tj-pnode__mark { background: var(--surface-sunken); color: var(--text-tertiary); }
+.tj-pnode__say { display: inline; }
+/* The findings counted on the policy's line — the one place the number is
+   said — in the notice tone, a mark before it; pressed, the why. */
+.tj-pnode__count { gap: var(--space-2); border: 0; font-family: inherit; }
+.tj-pnode__count > svg { flex: none; color: var(--fb-notice-dot); }
+button.tj-pnode__count { cursor: pointer; }
+button.tj-pnode__count:hover,
+button.tj-pnode__count[aria-expanded="true"] { background: color-mix(in srgb, var(--fb-notice-dot) 22%, var(--fb-notice-bg)); }
+/* Only worth knowing — nothing answers otherwise: the neutral pill, its ⓘ grey. */
+.tj-pnode__count.is-folded > svg { color: var(--text-tertiary); }
+button.tj-pnode__count.is-folded:hover,
+button.tj-pnode__count.is-folded[aria-expanded="true"] { background: color-mix(in srgb, var(--text-tertiary) 16%, var(--fb-neutral-bg)); }
+button.tj-pnode__count:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 1px; }
+.tj-pnode .bb__title strong.is-finding { font-weight: var(--fw-medium); color: var(--text-secondary); }
+/* The scan and the rules open by height (motion's); what grows is clipped. */
+.tj-drawer { overflow: hidden; }
+.tj-pnode__scan { margin: 0 var(--space-4) var(--space-4); padding: var(--space-2) 0; border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.tj-pnode__scan > .tj-pol { margin: 0 var(--space-2); }
+.tj-pnode__scan > .tj-pol.is-dim,
+.tj-pnode__scan > .tj-pol.is-waiting,
+.tj-pnode__scan > .tj-pol.is-working { background-color: transparent; }
+.tj-pnode__scan > .tj-pol.is-working { background-color: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
+.tj-pnode__scan .tj-pol__head { min-height: 32px; padding-block: var(--space-2); }
+.tj-rcards { display: flex; flex-direction: column; list-style: none; }
+.tj-rcard { display: flex; flex-direction: column; min-width: 0; }
+
+/* A rule that would also apply (§13.2): the amber notice in its card's
+   foot — who it applies to and through which group, that it is not used and
+   why, the fix, and Open rule. An also-match: one quiet grey line. */
+.tj-conflict {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: var(--bw-thin) solid var(--fb-notice-border);
+  border-radius: var(--radius-md);
+  background: var(--fb-notice-bg);
+}
+.tj-conflict__head { display: flex; align-items: center; gap: var(--space-3); min-width: 0; margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold); line-height: 18px; color: var(--fb-notice-fg); }
+.tj-conflict__head > svg { flex: none; color: var(--fb-notice-dot); }
+.tj-conflict__who { flex: 1 1 auto; min-width: 0; }
+.tj-conflict__line { margin: 0; padding-left: calc(13px + var(--space-3)); font-size: var(--fs-xs); line-height: 17px; color: var(--text-secondary); }
+.tj-conflict__fix { color: var(--text-primary); }
+/* The fix loosens access: said under it, in the notice tone. */
+.tj-conflict__caution { margin: 0; padding-left: calc(13px + var(--space-3)); font-size: var(--fs-xs); line-height: 17px; color: var(--fb-notice-fg); }
+.tj-conflict__open {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  height: 20px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--text-link);
+  text-decoration: none;
+  cursor: pointer;
+}
+.tj-conflict__open:hover { background: var(--int-ghost-bg-hover); text-decoration: none; }
+.tj-conflict__open:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 1px; }
+.tj-also { margin: 0; font-size: var(--fs-xs); line-height: 17px; color: var(--text-tertiary); }
+
+/* 3. The outcome: the hero, the chain's whole width — wider than the stops above it. */
+.tj-chain .tj-out { width: 100%; }
+
+/* --- 5. Why: under the answer (WhyCard.tsx) ----------------------------------------------
+
+   Owner, 1 Oct: "how will the user troubleshoot from here". Under the hero,
+   at its width, a quiet card of its own — the outcome's colour stays the
+   hero's: its title the answer's line (the answer folds to its own as the why
+   opens), then As each group — a row a group, then the person's own, the
+   answer on screen, on the sunken ground — then every finding, ranked as the
+   model ranks them: a rule that also applies as its card, whole, as the
+   policy draws it; the rest one line each, its mark in its tone.
+   Yellow is a conflict and what can't be told; the rest is grey. It opens by
+   its height (`.tj-whywrap`, motion's), so nothing here moves. */
+.tj-whywrap { overflow: hidden; }
+.tj-why {
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-2);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+.tj-why__top { display: flex; align-items: center; gap: var(--space-3); min-width: 0; padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6); border-bottom: var(--bw-thin) solid var(--border-subtle); }
+.tj-why__mark { display: grid; flex: none; place-items: center; color: var(--text-tertiary); }
+.tj-why__mark.is-conflict,
+.tj-why__mark.is-depends { color: var(--fb-notice-dot); }
+.tj-why__title { flex: 1 1 auto; min-width: 0; margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-semibold); line-height: 20px; color: var(--text-primary); }
+.tj-why__title:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+.tj-why__close { flex: none; }
+.tj-why__body { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4) var(--space-6) var(--space-5); }
+.tj-why__label { margin: 0 0 var(--space-2); font-size: var(--fs-xs); font-weight: var(--fw-medium); line-height: 16px; color: var(--text-secondary); }
+.tj-why__groups { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+/* A row: the face, who, the answer, where it comes from, and — a group's —
+   the chevron that says a press runs it again as that group. */
+.tj-why__grow {
+  display: grid;
+  grid-template-columns: 24px minmax(120px, 176px) minmax(128px, auto) minmax(0, 1fr) 14px;
+  align-items: center;
+  column-gap: var(--space-4);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--text-primary);
+}
+button.tj-why__grow { cursor: pointer; }
+button.tj-why__grow:hover { background: var(--int-ghost-bg-hover); }
+button.tj-why__grow:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: -2px; }
+.tj-why__grow.is-current { background: var(--surface-sunken); }
+.tj-why__face { display: inline-grid; place-items: center; }
+.tj-why__glabel { min-width: 0; overflow: hidden; font-size: var(--fs-sm); font-weight: var(--fw-medium); text-overflow: ellipsis; white-space: nowrap; }
+.tj-why__grow.is-current .tj-why__glabel { font-weight: var(--fw-semibold); }
+.tj-why__gresult { display: inline-flex; min-width: 0; }
+.tj-why__gsource { min-width: 0; overflow: hidden; font-size: var(--fs-xs); color: var(--text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.tj-why__gend { display: grid; place-items: center; color: var(--text-tertiary); }
+.tj-why__none { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.tj-why__list { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+/* A rule that also applies: its card, as the policy draws it — no box round it. */
+.tj-why__rule { display: flex; flex-direction: column; min-width: 0; }
+/* Every other finding: ONE line — its mark, what it is, at most one action — and why under it. */
+.tj-why__item { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: start; column-gap: var(--space-3); padding: var(--space-3) var(--space-4); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg); }
+.tj-why__item.is-conflict,
+.tj-why__item.is-depends { border-color: var(--fb-notice-border); }
+.tj-why__icon { display: grid; place-items: center; height: 18px; color: var(--text-tertiary); }
+.tj-why__item.is-conflict .tj-why__icon,
+.tj-why__item.is-depends .tj-why__icon { color: var(--fb-notice-dot); }
+.tj-why__text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.tj-why__line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); margin: 0; font-size: var(--fs-xs); line-height: 18px; }
+.tj-why__head { min-width: 0; font-weight: var(--fw-semibold); color: var(--text-primary); }
+.tj-why__item.is-conflict .tj-why__head,
+.tj-why__item.is-depends .tj-why__head { color: var(--fb-notice-fg); }
+.tj-why__would { flex: none; }
+.tj-why__detail,
+.tj-why__fix,
+.tj-why__caution { margin: 0; font-size: var(--fs-xs); line-height: 17px; }
+.tj-why__detail { color: var(--text-secondary); }
+.tj-why__fix { color: var(--text-primary); }
+.tj-why__caution { color: var(--fb-notice-fg); }
+.tj-why__ifs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin: var(--space-1) 0 0; }
+.tj-why__if { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); color: var(--text-secondary); }
+.tj-why__act { align-self: start; }
+/* A policy named in a finding: a quiet link that opens it — the line's own
+   words at rest, the link's colour and the ghost tint under the pointer.
+   The finding's one action (the fix) stays the one blue thing on its line. */
+.tj-why__name {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tj-why__name:hover { background: var(--int-ghost-bg-hover); color: var(--text-link); }
+.tj-why__name:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 1px; }
+/* No policy covers them: each policy on the application, and who it covers — two columns, one line each. */
+.tj-why__covers { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-1) var(--space-4); margin: var(--space-1) 0 0; padding: 0; list-style: none; font-size: var(--fs-xs); line-height: 17px; }
+.tj-why__covers > li { display: contents; }
+.tj-why__covers .tj-why__name,
+.tj-why__cname { font-weight: var(--fw-medium); color: var(--text-primary); }
+.tj-why__covers .tj-why__name:hover { color: var(--text-link); }
+.tj-why__caud { min-width: 0; overflow: hidden; color: var(--text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+
+/* Break-in attempts on the application, the why's last section (WhyCard.tsx;
+   owner, 1 Oct 2026): its own, under a hairline where findings stand above
+   it — the findings are about this person, the attempts about the
+   application. Its label with the ⓘ, the four counts, Review attempts at
+   its end in the canvas's link style. */
+.tj-why__att { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.tj-why__att:not(:first-child) { padding-top: var(--space-4); border-top: var(--bw-thin) solid var(--border-subtle); }
+.tj-why__label.tj-why__attlabel { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
+.tj-why__attfoot { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); }
+
+/* The four counts as cells (BreakInPanel.tsx `AttemptCells`): the why's
+   section and the attempts panel's head. Each its number over its word; a
+   hole that is not 0 — Got through, Weaker factor — in the conflict tone, a 0
+   quiet, a cost plain. Read, not pressed. */
+.tj-cells { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); min-width: 0; margin: 0; padding: 0; list-style: none; }
+.tj-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+.tj-cell__num { font-size: var(--fs-md); font-weight: var(--fw-semibold); line-height: 20px; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.tj-cell__word { font-size: var(--fs-xs); line-height: 16px; color: var(--text-secondary); overflow-wrap: break-word; }
+.tj-cell.is-hole { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); }
+.tj-cell.is-hole .tj-cell__num { color: var(--fb-notice-fg); }
+.tj-cell.is-quiet .tj-cell__num,
+.tj-cell.is-quiet .tj-cell__word { color: var(--text-tertiary); }
+
+/* --- The canvas's one link style ----------------------------------------------------
+
+   Show all checks and Show less, Add, Use a saved sign-in: the link's colour
+   and nothing else at rest, and never an underline — a switch pressed keeps
+   the pointer on it, and "Show less" underlined beside a plain "Show all
+   checks" read as two different things. Hover is the ghost button's tint. */
+.tj-toggle,
+.tj-crow__add {
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--text-link);
+  text-decoration: none;
+  cursor: pointer;
+}
+.tj-toggle:hover,
+.tj-crow__add:hover,
+.tj-card0__foot > .tj-usesaved:not(:disabled):hover { background: var(--int-ghost-bg-hover); text-decoration: none; }
+.tj-toggle:focus-visible,
+.tj-crow__add:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 1px; }
+
+@keyframes tj-spin {
+  to { rotate: 360deg; }
+}
+/* A skeleton's tone, toward the accent and back. */
+@keyframes tj-shimmer {
+  0%,
+  100% { background-color: var(--surface-inset); }
+  50% { background-color: color-mix(in srgb, var(--accent) 12%, var(--surface-inset)); }
+}
+/* The scan line, from nothing to the row's width. */
+@keyframes tj-sweep {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+/* --- Reduced motion ---------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .tj-spin,
+  .tj-skel,
+  .tj-pol.is-working::after { animation: none; }
+  .tj-light,
+  .tj-pol.is-working::after { display: none; }
+  .tj-fan,
+  .tj-lit,
+  .tj-r__rail,
+  .tj-pol,
+  .tj-r__card,
+  .tj-crow { transition: none; }
+}
+
+/* --- The four stops (RunNodes.tsx; owner, 1 Oct 2026: "give me a better
+   experience for the whole thing") -------------------------------------------------------
+
+   The sign-in, a card like the others: the person's head — face, name, every
+   group a quiet pill — and under it the rest of the sentence, each value in
+   ink with its mark, the words between them quieter; a press, or its pencil,
+   opens the form. */
+.bb__card.tj-pnode.is-signin.is-pressable { cursor: pointer; }
+.bb__card.tj-pnode.is-signin.is-pressable:hover { border-color: var(--border-default); }
+.tj-pnode.is-signin .bb__titlerow { flex-wrap: wrap; row-gap: var(--space-1); }
+.tj-sin2__group {
+  flex: none;
+  padding: 0 var(--space-3);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 18px;
+  color: var(--text-secondary);
+}
+.tj-sin2__as { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.tj-sin2__line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); min-width: 0; margin-top: var(--space-1); font-size: var(--fs-xs); line-height: 18px; color: var(--text-secondary); }
+.tj-sin2__tok { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+.tj-sin2__tok > .applogo { flex: none; }
+.tj-sin2__word,
+.tj-sin2__dot { color: var(--text-tertiary); }
+.tj-sin2__app,
+.tj-sin2__val { font-weight: var(--fw-medium); color: var(--text-primary); }
+.tj-sin2__none { color: var(--text-tertiary); }
+.tj-sin2__icon { display: inline-grid; flex: none; place-items: center; color: var(--text-tertiary); }
+.tj-sin2__icon svg { display: block; }
+.tj-sin2__mark { flex: none; }
+.tj-sin2__tok.is-fail > .tj-sin2__mark { color: var(--fb-negative-fg); }
+.tj-sin2__tok.is-unknown > .tj-sin2__mark { color: var(--fb-notice-fg); }
+
+/* Which policy: the scan's rows stay as the list once it has decided; a
+   later policy that also covers the person says so in place of its reason —
+   the notice tone where it would answer otherwise, its row tinted, a pulse
+   round it as it lands (motion's opacity) — or quiet where it would not. */
+.tj-pol__flag { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); font-weight: var(--fw-medium); line-height: 18px; white-space: nowrap; }
+.tj-pol__flag.is-conflict { color: var(--fb-notice-fg); }
+.tj-pol__flag.is-conflict > svg { flex: none; color: var(--fb-notice-dot); }
+.tj-pol__flag.is-info { color: var(--text-secondary); }
+.tj-pnode__scan > .tj-pol.has-flag.is-conflict { border-color: var(--fb-notice-border); background-color: var(--fb-notice-bg); }
+.tj-pol.has-flag .tj-pol__name { color: var(--text-primary); }
+.tj-pol__pulse {
+  position: absolute;
+  inset: calc(var(--bw-thick) * -1 - var(--bw-thin));
+  border: var(--bw-thick) solid var(--fb-notice-dot);
+  border-radius: calc(var(--radius-lg) + var(--bw-thick));
+  pointer-events: none;
+}
+
+/* The policy that decided: where it stopped, then the rail of its rules —
+   a numbered mark each, in its standing: the one that decided in the decided
+   path's colour, one that did not match quiet with its ✕ the one red, one not
+   reached faint, one being read blue, one that would also apply amber — and
+   ONE rule's card under it, the builder's, on the policy's sunken ground. */
+.tj-decider { display: flex; flex-direction: column; gap: var(--space-4); margin: 0 var(--space-4) var(--space-4); padding: var(--space-4); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.tj-rail { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.tj-rail__chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 26px;
+  box-sizing: border-box;
+  padding: 0 var(--space-4);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.tj-rail__chip:hover { border-color: var(--border-default); }
+.tj-rail__chip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.tj-rail__num { min-width: 8px; text-align: center; }
+.tj-rail__mark { display: inline-grid; place-items: center; }
+.tj-rail__mark:empty { display: none; }
+.tj-rail__mark svg { display: block; }
+.tj-rail__chip.is-match { border-color: var(--tj-path-border); background: var(--tj-path-bg); color: var(--tj-path-fg); }
+.tj-rail__chip.is-miss .tj-rail__mark { color: var(--fb-negative-fg); }
+.tj-rail__chip.is-skip,
+.tj-rail__chip.is-waiting,
+.tj-rail__chip.is-off { background: transparent; color: var(--text-tertiary); }
+.tj-rail__chip.is-reading { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+.tj-rail__chip.is-unknown,
+.tj-rail__chip.is-conflict { border-color: var(--fb-notice-border); background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.tj-rail__chip.is-conflict .tj-rail__mark { color: var(--fb-notice-dot); }
+/* The rule whose card is under the rail. */
+.tj-rail__chip.is-on { border-color: var(--border-strong); box-shadow: 0 0 0 1px var(--border-strong); }
+.tj-rail__chip.is-match.is-on { border-color: var(--tj-path-dot); box-shadow: 0 0 0 1px var(--tj-path-dot); }
+.tj-rail__chip.is-conflict.is-on { border-color: var(--fb-notice-dot); box-shadow: 0 0 0 1px var(--fb-notice-dot); }
+.tj-rail__pulse {
+  position: absolute;
+  inset: -4px;
+  border: var(--bw-thick) solid var(--fb-notice-dot);
+  border-radius: var(--radius-full);
+  pointer-events: none;
+}
+.tj-decider__one,
+.tj-decider__all { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+/* The answer: who decided, ONE line that is also the way to the policy;
+   the finding, ONE strip in its tone, the whole of it the way to the why in
+   the panel, a pulse round a conflict's as it lands; then What they see's
+   label and its steps as a numbered list that fills as it plays. */
+.tj-hero__by { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: 0; min-width: 0; font-size: var(--fs-sm); line-height: 20px; color: var(--text-secondary); }
+.tj-hero__bylabel { color: var(--text-tertiary); }
+.tj-hero__bylink,
+.tj-hero__byname { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; padding: 0; border: 0; background: none; font: inherit; font-weight: var(--fw-medium); text-align: left; color: var(--text-primary); }
+.tj-hero__bylink { cursor: pointer; }
+.tj-hero__bylink:hover { color: var(--text-link); }
+.tj-hero__bylink:focus-visible { outline: none; border-radius: var(--radius-sm); box-shadow: 0 0 0 3px var(--focus-halo); }
+.tj-hero__bylink > svg { flex: none; color: var(--text-tertiary); }
+.tj-hero__stripwrap { position: relative; min-width: 0; margin-top: var(--space-2); }
+.tj-hero__strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  border: var(--bw-thin) solid var(--fb-notice-border);
+  border-radius: var(--radius-lg);
+  background: var(--fb-notice-bg);
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 18px;
+  text-align: left;
+  color: var(--fb-notice-fg);
+}
+.tj-hero__strip.is-info { border-color: var(--fb-neutral-border); background: var(--fb-neutral-bg); color: var(--text-secondary); }
+button.tj-hero__strip { cursor: pointer; }
+button.tj-hero__strip:hover { border-color: var(--fb-notice-dot); }
+button.tj-hero__strip.is-info:hover { border-color: var(--border-strong); }
+button.tj-hero__strip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.tj-hero__smark { flex: none; margin-top: 2px; color: var(--fb-notice-dot); }
+.tj-hero__strip.is-info .tj-hero__smark { color: var(--text-tertiary); }
+.tj-hero__stext { flex: 1 1 180px; min-width: 0; color: var(--text-primary); }
+.tj-hero__sgo { display: inline-flex; flex: none; align-items: center; gap: var(--space-1); margin-left: auto; font-weight: var(--fw-semibold); white-space: nowrap; }
+.tj-hero__spulse {
+  position: absolute;
+  inset: calc(var(--bw-thick) * -1 - var(--bw-thin));
+  border: var(--bw-thick) solid var(--fb-notice-dot);
+  border-radius: calc(var(--radius-lg) + var(--bw-thick));
+  pointer-events: none;
+}
+.tj-hero .tsee__side > .tsee__title { display: inline-flex; align-items: center; gap: var(--space-2); }
+.tj-hero .tsee__steps .tplay__bar { flex-direction: row; align-items: flex-start; gap: var(--space-3); }
+.tj-hero .tsee__steps .tplay__chips { flex: 1 1 auto; }
+.tj-hero .tsee__steps .tplay__chips { flex-direction: column; flex-wrap: nowrap; gap: var(--space-2); counter-reset: tj-step; }
+.tj-hero .tsee__steps .tplay__chips { gap: var(--space-1); }
+.tj-hero .tsee__steps .tplay__chip { justify-content: flex-start; width: 100%; height: 26px; padding: 0 var(--space-3) 0 var(--space-2); border-color: transparent; border-radius: var(--radius-md); background: transparent; font-size: var(--fs-sm); color: var(--text-secondary); }
+.tj-hero .tsee__steps .tplay__chip:hover { border-color: transparent; background: var(--surface-sunken); }
+.tj-hero .tsee__steps .tplay__chip.is-on { border-color: transparent; background: var(--surface-sunken); color: var(--text-primary); }
+.tj-hero .tsee__steps .tplay__chip::before {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: var(--space-3);
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  color: var(--text-tertiary);
+  counter-increment: tj-step;
+  content: counter(tj-step);
+}
+.tj-hero .tsee__steps .tplay__chip.is-on::before { background: var(--accent-soft); color: var(--accent-strong); }
+/* Over the fill that runs under a step as it plays: its number and its words. */
+.tj-hero .tsee__steps .tplay__chip::before,
+.tj-hero .tsee__steps .tplay__chiptext { z-index: 1; }
+.tj-hero .tsee__steps .tplay__chiptext { max-width: none; }
+.tj-hero .tsee__steps .tplay__replay { flex: none; align-self: flex-start; }

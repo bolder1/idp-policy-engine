@@ -1,0 +1,36 @@
+/* -----------------------------------------------------------------------------
+   Check access inside a policy (PolicyCheck.tsx): the Sign-in tests page's
+   canvas and panel, standing in the builder's own region.
+
+   The canvas is the page's — `.sit__stage` and the journey's rules on it
+   (sign-in-tests.css, journey.css) — and the panel is the page's TryPanel,
+   or a view in its chrome (`.sit-panel`). What is here is only what the
+   builder adds: the board kept under the canvas, unseen, and a view's body.
+
+   The builder's old test mode (`.bb.is-testing`, try-sign-in.css) is not
+   worn: it reshaped the chain it drew the route on, and the chain under
+   Check access must come back exactly as it was left. `.bb.is-checking`
+   only hides it.
+
+   Tokens only (console-theme.css). Nothing here is moved: the panels slide
+   by motion's props, so no rule here has a transform or a transition.
+   -------------------------------------------------------------------------- */
+
+/* The board under the canvas: there, laid out as it was left — its zoom, its
+   pan, the card that was selected — and unseen, so it takes no press, no
+   focus and no reading until Check access shuts. */
+.bb.is-checking > .bb__stage,
+.bb.is-checking > .bb__empty { visibility: hidden; }
+/* The one thing in it that says `visibility: visible` of itself: the drag
+   grip of the card that was selected (board.css), which would stand alone on
+   the canvas. */
+.bb.is-checking > .bb__stage .bb__card .bb__idx__grip { visibility: hidden; }
+
+/* The canvas over it, in the same middle track. */
+.bb > .sit__stage.bbchk { z-index: 1; }
+
+/* A view in the panel's place (Past sign-ins): its list fills the body and
+   scrolls itself, with the page's thin bar in the console's own grey. */
+.bbchk-view__body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.bbchk-view .tpanel-scroll,
+.bbchk-view .tpanel__breakin { scrollbar-width: thin; scrollbar-color: var(--border-default) transparent; }

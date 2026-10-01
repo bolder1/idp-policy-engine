@@ -4,6 +4,7 @@ import {
   Activity,
   AlertTriangle,
   AppWindow,
+  ArrowLeft,
   BookOpen,
   CheckCircle2,
   ChevronRight,
@@ -37,6 +38,7 @@ import { PersonaBar } from './PersonaBar'
 import { BrandSwitch } from './BrandSwitch'
 import { SHOWCASE } from './showcase'
 import { Tip } from './kit'
+import { screenOffered } from './edition-screens'
 import { useBrand, useToast, type BrandScreen } from './store'
 import type { ToastTone } from './toast-tone'
 import { useTheme } from './theme-mode'
@@ -97,6 +99,10 @@ const NAV: { section?: string; items: NavItem[] }[] = [
         screen: { name: 'policies' },
         children: [
           { label: 'All Policies', screen: { name: 'policies' } },
+          /* Sign-in tests is not in the rail (owner, 30 Sep 2026: "move Sign-in
+             tests inside the All Policies tab, as a button"). All Policies'
+             bar opens it, and All Policies lights while it is open — see
+             `UNDER_ITEM`. */
           /* Two of these are honestly unfinished, and the rail says so rather
              than letting somebody find out by opening them. A quiet tag, not
              the brand-filled badge "New" gets: one is an announcement and the
@@ -210,6 +216,7 @@ const POLICY_SCREENS = [
   'hooks',
   'methods',
   'display-tokens',
+  'sign-in-tests',
 ]
 
 /* The two builders, which want the rail out of the way.
@@ -220,12 +227,21 @@ const POLICY_SCREENS = [
    work, not to navigate. */
 const BUILDER_SCREENS = ['builder', 'board']
 
+/* The screens that shut the rail to its icons on arrival and hand it back on
+   the way out: the builders, and Sign-in tests, which wears the builder's
+   layout (TESTING-V4 §14.1) — "it should feel like we are using the same
+   builder for tests as well". Its own list rather than a third builder in
+   BUILDER_SCREENS: those also keep the Policies submenu shut and name what
+   All Policies lights, and Sign-in tests does neither the same way. */
+const RAIL_SHUT_SCREENS = [...BUILDER_SCREENS, 'sign-in-tests']
+
 /* Screens that light a sub-item without being its screen: a page opened from
    inside another lights the item it was opened from. Both builders and the
-   details page are a policy opened from All Policies; Display tokens is opened
-   only from Authentication methods, so that is where the rail says you are. */
+   details page are a policy opened from All Policies, and Sign-in tests is
+   opened from its bar; Display tokens is opened only from Authentication
+   methods, so that is where the rail says you are. */
 const UNDER_ITEM: Record<string, string[]> = {
-  policies: [...BUILDER_SCREENS, 'policy-details'],
+  policies: [...BUILDER_SCREENS, 'policy-details', 'sign-in-tests'],
   methods: ['display-tokens'],
 }
 
@@ -260,7 +276,7 @@ function useNarrow() {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { screen, go } = useBrand()
+  const { screen, go, features } = useBrand()
   const main = useRef<HTMLElement>(null)
   const nav = useRef<HTMLElement>(null)
   const [theme, setTheme] = useTheme()
@@ -321,7 +337,7 @@ export function Shell({ children }: { children: ReactNode }) {
        builder, so the rail came back as the 64px strip once the window widened
        again. */
     if (narrow) return
-    if (BUILDER_SCREENS.includes(screen.name)) {
+    if (RAIL_SHUT_SCREENS.includes(screen.name)) {
       setCollapsed((c) => {
         if (!c) autoCollapsed.current = true
         return true
@@ -528,7 +544,8 @@ export function Shell({ children }: { children: ReactNode }) {
                           style={{ overflow: 'hidden' }}
                         >
                           <div className="bshell__sub">
-                            {item.children.map((c) => {
+                            {/* Less any page this edition withholds (edition-screens.ts). */}
+                            {item.children.filter((c) => screenOffered(c.screen, features)).map((c) => {
                               /* Its own screen, or one opened from it — see `UNDER_ITEM`. */
                               const on =
                                 c.screen &&
@@ -654,6 +671,13 @@ export function Toast() {
   )
 }
 
+/** A page head's way back: the page this one is opened from. */
+export interface PageCrumb {
+  /** The page it goes back to, as the rail names it: "Policies". */
+  label: string
+  onClick: () => void
+}
+
 /** Page header used by every screen: the title and its caption, and at most a
     Documentation link or a page's preview switches. See `PageBar` for where a
     page's actions go. */
@@ -662,6 +686,7 @@ export function PageHead({
   caption,
   docs,
   preview,
+  crumb,
   headRef,
 }: {
   title: string
@@ -672,11 +697,27 @@ export function PageHead({
       profiles' create flow — against the right edge. Never a list action;
       those are on `PageBar`. */
   preview?: ReactNode
+  /** "← Policies" over the title, for a page opened from another page's bar
+      rather than from the rail (Sign-in tests, from All Policies). */
+  crumb?: PageCrumb
   /** For a page that puts focus back on its heading. */
   headRef?: Ref<HTMLElement>
 }) {
   return (
     <header className="bpage__head" ref={headRef}>
+      {/* The board bar's back link, on a page head: the same arrow, ink and
+          hover (board.css, `.bbtop__back` and `.bbtop__crumb`). One button
+          rather than the board's arrow-and-word pair, so it is one tab stop. */}
+      {crumb && (
+        <nav className="bpage__crumbs" aria-label="Breadcrumb">
+          <button type="button" className="bpage__crumb" onClick={crumb.onClick}>
+            <span className="bpage__crumb-arrow" aria-hidden>
+              <ArrowLeft size={16} strokeWidth={2} />
+            </span>
+            <span className="bpage__crumb-label">{crumb.label}</span>
+          </button>
+        </nav>
+      )}
       {/* Title, then caption under it, in one container on one row (owner, 16
           Sep 2026: "the heading and subheading in one container, in one row").
           Beside it: at most Documentation, or the page's preview switches.

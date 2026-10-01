@@ -1,4 +1,4 @@
-import { enforces, type AccessDecision, type Policy, type User } from '../data'
+import { enforces, memberGroupIds, type AccessDecision, type Policy, type User } from '../data'
 import { DECISION_PHRASE, strictestFirst } from '../decision-words'
 import type { Tenant } from '../fixtures'
 import { EMPTY_RISK_PROFILE, riskScale } from '../risk-signals'
@@ -149,8 +149,9 @@ export function tierOf(p: Policy): PolicyTier {
 
 const refOf = (p: Policy): PolicyRef => ({ policyId: p.id, policyName: p.name, isGlobalDefault: p.isSystem === true })
 
+/* A person in several groups is governed through any of them (TESTING-V4 §13). */
 const governs = (p: Policy, person: SimUser) =>
-  p.audience.everyone || p.audience.groupIds.includes(person.groupId) || p.audience.userIds.includes(person.id)
+  p.audience.everyone || memberGroupIds(person).some((g) => p.audience.groupIds.includes(g)) || p.audience.userIds.includes(person.id)
 
 /* "Human Resources, Finance" — the audience a person is outside of, by name.
    Exported for the break-in deck, which skips a card with the same words. */
@@ -195,9 +196,19 @@ export interface Governing {
 
    Split from `resolveSignIn` so a caller that only needs the policy (the
    impact sweep, which then asks it on the chip path) does not pay for a trace. */
+/* The policies as a resolution with `substitute` evaluates them: the
+   substitute in place of its stored twin, or at the end of the list when it has
+   none. What `governingPolicy` reads — and what anything drawing that
+   resolution must look policies up in, or it draws the stored rules against
+   the substitute's trace. */
+export function evaluatedList(policies: readonly Policy[], substitute?: Policy | null): Policy[] {
+  const sub = substitute ?? undefined
+  return sub ? (policies.some((p) => p.id === sub.id) ? policies.map((p) => (p.id === sub.id ? sub : p)) : [...policies, sub]) : [...policies]
+}
+
 export function governingPolicy(policies: readonly Policy[], facts: SignInFacts, env: SimEnv, opts: ResolveOptions = {}): Governing {
   const sub = opts.substitute
-  const list = sub ? (policies.some((p) => p.id === sub.id) ? policies.map((p) => (p.id === sub.id ? sub : p)) : [...policies, sub]) : [...policies]
+  const list = evaluatedList(policies, sub)
   const appId = facts.appId ?? null
   const person = personOf(facts.personId, env)
   const missing: FactKey[] = [...(appId ? [] : (['app'] as const)), ...(person ? [] : (['person'] as const))]

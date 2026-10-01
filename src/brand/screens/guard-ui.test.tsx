@@ -130,7 +130,9 @@ describe('Before turning on', () => {
     const plan = planOf(monitorRows(hrms, monitoring, env, monitorSamples(hrms, env, new Date(Date.UTC(2026, 8, 28)))))
     const rm = runGuard(input('turn-on', null, { ...HRMS, status: 'active' }, monitoring))
     const out = html(<GuardDrawer open kind="turn-on" policyName={HRMS.name} result={rm} run={0} primaryLabel="Turn on" onConfirm={noop} onClose={noop} onApplyFix={noop} monitoring={plan} />)
-    expect(text(out)).toContain('While monitoring Sample If turned on: 0 to allow on 1 factor, 3 to allow with 2FA, 5 to deny, 4 unchanged.')
+    /* The Global Default's baseline (30 Sep 2026) already steps up or refuses
+       some of the twelve, so fewer move (monitor-sample.test.ts). */
+    expect(text(out)).toContain('While monitoring Sample If turned on: 0 to allow on 1 factor, 2 to allow with 2FA, 4 to deny, 6 unchanged.')
     expect(text(footOf(out))).toBe('Cancel Turn on')
     /* The link back to the Monitoring page is in the row, never the footer (check 9). */
     expect(text(out)).not.toContain('View monitoring')

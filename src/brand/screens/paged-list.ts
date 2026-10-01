@@ -30,9 +30,13 @@ const PAGER_FALLBACK = 56 + 16
 /** Never page fewer rows than this, however short the window is. */
 export const MIN_ROWS = 3
 
-export function rowsThatFit(available: number, rowHeight: number): number {
-  if (!(available > 0) || !(rowHeight > 0)) return MIN_ROWS
-  return Math.max(MIN_ROWS, Math.floor(available / rowHeight))
+/* `min` lowers the floor for a list that must never push its page into a
+   scroll however short the window is — the Sign-in tests tabs (V4 §8.6),
+   where one row and the pager is better than a page that scrolls. */
+export function rowsThatFit(available: number, rowHeight: number, min: number = MIN_ROWS): number {
+  const floor = Math.max(1, Math.floor(min))
+  if (!(available > 0) || !(rowHeight > 0)) return floor
+  return Math.max(floor, Math.floor(available / rowHeight))
 }
 
 /* Cards on a page: whole lines of the grid that fit, times the cards on a line.
@@ -144,6 +148,8 @@ export function usePagedList<T>(
     /** The list is a grid of cards: a "row" holds as many items as the grid
         has columns, so a page is rows that fit × columns. */
     grid?: boolean
+    /** The fewest rows a page shows, however short the window (default MIN_ROWS). */
+    minRows?: number
   },
 ) {
   const nodeRef = useRef<HTMLElement | null>(null)
@@ -178,7 +184,7 @@ export function usePagedList<T>(
     const available = bottom - top - spaceBelowRows(list, column)
     const next = opts.grid
       ? cardsThatFit(available, opts.rowHeight, gridColumns(list))
-      : rowsThatFit(available, opts.rowHeight)
+      : rowsThatFit(available, opts.rowHeight, opts.minRows)
     const was = sizeRef.current
     if (next === was) return
     sizeRef.current = next
@@ -188,7 +194,7 @@ export function usePagedList<T>(
     const nextPage = pageForRow((pageRef.current - 1) * was, next)
     pageRef.current = nextPage
     setPage(nextPage)
-  }, [opts.rowHeight, opts.grid])
+  }, [opts.rowHeight, opts.grid, opts.minRows])
 
   useLayoutEffect(() => {
     measure()

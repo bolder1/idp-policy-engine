@@ -380,6 +380,11 @@ html[data-theme='dark'] {
 }
 .bx-faces { display: inline-flex; align-items: center; }
 .bx-faces > .bx-tip + .bx-tip { margin-left: -5px; }
+/* A group's mark is a square: stacked, its ring cut the letters of the one
+   before it (1 Oct 2026, "some icons are overlapping") — people's round
+   faces overlap, groups sit side by side, a hair apart. */
+.bx-faces > .bx-tip:has(.bx-face.is-group) + .bx-tip,
+.bx-faces > .bx-tip + .bx-tip:has(.bx-face.is-group) { margin-left: var(--space-1); }
 
 /* --- Search --------------------------------------------------------------- */
 

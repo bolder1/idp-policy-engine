@@ -46,7 +46,9 @@ import type { SimEnv } from './simulate'
 import { rowMenu, type RowMenuId } from './status-options'
 import { useStatusChange } from './use-status-change'
 import { SHOWCASE } from '../showcase'
+import { screenOffered } from '../edition-screens'
 import { ReadAsTextDrawer } from './board/ReadAsTextPanel'
+import { ACCESS_CHECK } from './sign-in-tests/names'
 
 /* -----------------------------------------------------------------------------
    Policies — the list.
@@ -419,6 +421,16 @@ export function Policies() {
                 label="Policy view"
                 onChange={(v) => setCoverageOn(v === 'coverage')}
               />
+            )}
+            {/* The tenant's Access checks page opens from here, not the rail
+                (owner, 30 Sep 2026: "move Sign-in tests inside the All Policies
+                tab, as a button"; 1 Oct: named for access, names.ts). Secondary,
+                before New policy, so the bar keeps one orange button; withheld
+                exactly as the route is. */}
+            {screenOffered({ name: 'sign-in-tests' }, store.features) && (
+              <Button variant="secondary" icon={LogIn} onClick={() => store.go({ name: 'sign-in-tests' })}>
+                {ACCESS_CHECK}
+              </Button>
             )}
             <Button variant="brand" icon={Plus} onClick={startDraft}>
               New policy

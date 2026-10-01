@@ -1,4 +1,4 @@
-import type { Condition, Predicate, Rule, RuleWho } from './data'
+import { memberGroupIds, type Condition, type Predicate, type Rule, type RuleWho } from './data'
 import { leaves, matchesEverything, sig } from './predicate'
 
 /* -----------------------------------------------------------------------------
@@ -28,6 +28,8 @@ export type WhoList = 'groupIds' | 'userIds' | 'exceptGroupIds' | 'exceptUserIds
 export interface WhoPerson {
   id: string
   groupId: string
+  /** Any other groups they are in (`User.alsoGroupIds`); read through `memberGroupIds`. */
+  alsoGroupIds?: readonly string[]
 }
 
 /** Somebody to ask which group a person is in, when a caller has a directory. */
@@ -73,13 +75,16 @@ const includesSome = (w: RuleWho) => w.groupIds.length > 0 || w.userIds.length >
 /* Is this person covered?
 
    Included when nothing is included (everyone), or by group, or by name — a
-   union. Then removed when their group or their name is an exception. */
+   union. Then removed when their group or their name is an exception. A
+   person in several groups is included by any of them and removed by any of
+   them: an exception wins. */
 export function whoPasses(who: RuleWho | undefined, user: WhoPerson): boolean {
   const w = normaliseWho(who)
   if (!w) return true
-  const included = !includesSome(w) || w.groupIds.includes(user.groupId) || w.userIds.includes(user.id)
+  const groups = memberGroupIds(user)
+  const included = !includesSome(w) || groups.some((g) => w.groupIds.includes(g)) || w.userIds.includes(user.id)
   if (!included) return false
-  if (w.exceptGroupIds?.includes(user.groupId)) return false
+  if (groups.some((g) => w.exceptGroupIds?.includes(g))) return false
   if (w.exceptUserIds?.includes(user.id)) return false
   return true
 }

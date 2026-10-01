@@ -4,6 +4,7 @@ import { showcaseTenant } from '../fixtures'
 import { leaves } from '../predicate'
 import type { Policy, Rule } from '../data'
 import { diagnose } from '../screens/diagnostics'
+import { whoKey } from '../rule-who'
 import {
   EXAMPLES,
   answerMissing,
@@ -40,6 +41,20 @@ const dict = dictionaryOf(tenant)
 const read = (text: string) => readText(text, dict)
 const policy = (id: string) => T.policies.find((p) => p.id === id) as Policy
 
+/* What an example can say of its seeded policy. A sentence has one Who, so
+   Describe gives every rule the same people. Developer tools has held a rule
+   of Finance's own since TESTING-V4 §13 (the dual-group troubleshooting case,
+   Maya Iyer), which no sentence can say — so its example reads to the rest:
+   the rules whose Who is the first rule's, and the audience those rules name.
+   Every other example is its whole policy. */
+function asDescribed(p: Policy): Policy {
+  const first = whoKey(p.rules[0]?.who)
+  const rules = p.rules.filter((r) => whoKey(r.who) === first)
+  if (rules.length === p.rules.length) return p
+  const named = new Set(rules.flatMap((r) => r.who?.groupIds ?? []))
+  return { ...p, rules, audience: { ...p.audience, groupIds: p.audience.groupIds.filter((g) => named.has(g)) } }
+}
+
 /* What the round trip compares: every id, the estimate, the name, the switch
    and the blank marker go, and a deny message unless the sentence quotes one. */
 function stripRule(r: Rule, keepMessage: boolean): unknown {
@@ -59,7 +74,7 @@ function stripRule(r: Rule, keepMessage: boolean): unknown {
 describe('the four examples', () => {
   it('each reads to exactly its seeded policy', () => {
     for (const ex of EXAMPLES) {
-      const seeded = policy(ex.policyId)
+      const seeded = asDescribed(policy(ex.policyId))
       const quoted = /[“"]/.test(ex.text)
       const r = read(ex.text)
       const c = compose(r.answers, tenant)
@@ -626,5 +641,31 @@ describe('which answer is open', () => {
     expect(openAfter(reading(a), twoFactor, 'signIn', 'signIn', tenant, true)).toBe('signIn')
     const first = set(emptyAnswers(), { apps: { value: ['outlook'], origin: 'picked', spans: [] } })
     expect(openAfter(reading(emptyAnswers()), first, 'apps', 'apps', tenant, true)).toBe('apps')
+  })
+})
+
+/* "only" limits the people named to the conditions: a refusal for them after
+   the rule they pass, never one no sign-in could reach. */
+describe('only, with nothing left to limit to', () => {
+  const BERLIN = 'Finance reach Workday only from the Berlin branch with Google Authenticator. Block anything else.'
+
+  it('says a place with no zone and what it is called as one phrase not added', () => {
+    expect(read(BERLIN).notAdded.map((n) => [n.span.phrase, n.reason, n.action])).toEqual([['only from the Berlin branch', 'No zone for Berlin', 'create-zone']])
+  })
+
+  it('writes no refusal after a rule that checks nothing, and says “only” instead', () => {
+    const c = compose(read(BERLIN).answers, tenant)
+    expect(c.rules.map((x) => [x.name, conditionsOf(x), x.decision])).toEqual([['Finance', [], '2fa']])
+    expect(c.fallback?.decision).toBe('deny')
+    expect(c.notAdded.map((n) => [n.span.phrase, n.reason])).toEqual([['only', 'No place, device or time to limit to']])
+  })
+
+  it('writes the refusal once the rule it follows checks something, and says nothing while a question is open', () => {
+    const text = 'Contractors reach GitHub and Jira only from the office on a company laptop; everyone else needs Google Authenticator.'
+    const r = read(text)
+    expect(compose(r.answers, tenant).notAdded).toEqual([])
+    const done = compose(pick(r, 'company laptop', 'fp-corp-devices').answers, tenant)
+    expect(done.rules.map((x) => x.name)).toEqual(['In Corporate offices, Corporate devices', 'Contractors elsewhere'])
+    expect(done.notAdded).toEqual([])
   })
 })

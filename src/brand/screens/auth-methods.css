@@ -397,17 +397,9 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
 /* A person's rows end in a chevron and never a switch, so nothing is reserved
    for one: the chevron takes the outer slot and the inner one collapses. */
 .bm8__list.is-person .bm8__rowend { grid-template-columns: 0 var(--bm8-mark); }
-/* A control cluster with an action beside its switch — CAC Card's Upload CA
-   chain (21 Sep 2026). The control track grows to hold it, on this row only,
-   and that does not break the rule above: the switch ends the cluster, so it
-   still sits on the column every other switch makes, and the row has no mark
-   or figure for the extra width to push. What gives way is the row's own text,
-   which would otherwise run under the button. Raising `--bm8-switch` for the
-   list instead would park every other row's chevron a button's width off its
-   switch. At 720px and under the button is an icon (`UploadCaButton`), because
-   at 375px the words left the text 0px and pushed the switch 6px off the
-   column; the track shrinks with it, since it is sized to what it holds. */
-.bm8__rowend.is-wide { grid-template-columns: var(--bm8-mark) minmax(var(--bm8-switch), max-content); }
+/* `.bm8__rowend.is-wide` stood here: the wider control track CAC Card's Upload
+   CA chain button needed beside its switch (21 Sep 2026). The row opens its CA
+   chains itself since 30 Sep, and its gear sits in the mark slot. */
 
 /* --- Status and reach, on the category row --------------------------------------
    The two facts the row reports: whether anything in this category is on, and
@@ -586,36 +578,127 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
    tips carry what an admin needs, and the sentence above them was read past. */
 .bm8__setup { display: flex; flex-direction: column; gap: var(--space-7); }
 
-/* --- Upload CA chain ---------------------------------------------------------------
-   CAC Card's slider (ca-chain-drawer.tsx): the setup form's fields, then the
-   support note. The same gap the setup form keeps between fields. */
-.bm8__cachain { gap: var(--space-7); }
-/* The file field, drawn the way a browser draws one: a Choose file segment and
-   the file's name beside it, in the box every other field on the form has.
-   Positioned, because the real input inside is `u-sr-only` and that pins to
-   its nearest positioned ancestor. */
-.bm8__file { position: relative; }
-.bm8__filebox {
-  display: flex; align-items: stretch;
-  height: var(--ctl-height-md); overflow: hidden; cursor: pointer;
-  background: var(--ctl-bg); border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
+/* --- CA chains --------------------------------------------------------------------
+   CAC Card's slider (ca-chain-drawer.tsx), 30 Sep 2026: the tenant's chains as a
+   flat list, and Add CA chain pushed over it. One row per chain — its alias,
+   what it holds, where it came from — with its status and date at the end,
+   where a column of them can be read straight down. */
+
+/* The count on CAC Card's row, in the figure slot the balances use. */
+.bm8__right .bm8__cacount { margin-bottom: 2px; }
+
+/* The list page's head: the name and its tip, then Add CA chain, beside the
+   close button. */
+.bm8__cahead { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); }
+.bm8__catitle { min-width: 0; display: flex; align-items: center; gap: 6px; }
+.bm8__catitle h2 { margin: 0; }
+.bm8__caaddbtn { flex: none; display: inline-flex; }
+.bm8__caaddhead { min-width: 0; }
+.bm8__caaddhead h2 { margin: 0; }
+
+/* The whole body takes a dropped file, so it is as tall as the panel. */
+.bm8__cabody { min-height: 100%; border-radius: var(--radius-lg); }
+.bm8__cabody.is-over { background: var(--surface-sunken); box-shadow: inset 0 0 0 2px var(--ctl-border-focus); }
+
+.bm8__catile {
+  flex: none; display: grid; place-items: center;
+  width: 32px; height: 32px; border-radius: var(--radius-md);
+  background: var(--surface-inset); color: var(--text-secondary);
 }
-.bm8__filebtn {
-  flex: none; display: flex; align-items: center; padding: 0 var(--space-5);
-  background: var(--surface-sunken); border-right: var(--bw-thin) solid var(--ctl-border);
-  font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary);
-  transition: background var(--dur-fast) var(--ease-standard);
+
+.bm8__calist, .bm8__capend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bm8__carow {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: start;
+  gap: var(--space-5);
+  margin: 0 calc(-1 * var(--space-4)); padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-md);
 }
-.bm8__filebox:hover .bm8__filebtn { background: var(--surface-inset); }
-.bm8__filename {
-  flex: 1; min-width: 0; align-self: center; padding: 0 var(--space-4);
-  font-size: var(--fs-md); color: var(--text-muted);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.bm8__carow + .bm8__carow { box-shadow: 0 -1px 0 var(--border-subtle); }
+.bm8__carow:first-child { padding-top: var(--space-2); }
+/* Just uploaded: a moment of green that fades, so the eye finds the new rows. */
+.bm8__carow.is-fresh { animation: bm8-cafresh 2.4s var(--ease-standard); }
+@keyframes bm8-cafresh {
+  0%, 40% { background: var(--fb-positive-bg); }
+  100% { background: transparent; }
 }
-.bm8__filename.is-set { color: var(--text-primary); }
-/* The hidden input is the control, so its focus is drawn on the box. */
-.bm8__file:has(input:focus-visible) .bm8__filebox { border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo); }
-.bm8__file:has(input[aria-invalid='true']) .bm8__filebox { border-color: var(--fb-negative-border); }
+
+.bm8__camain, .bm8__capfmain { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.bm8__caname {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); line-height: 1.45; color: var(--text-primary);
+}
+.bm8__cameta {
+  min-width: 0; display: flex; gap: var(--space-3);
+  font-size: var(--fs-sm); line-height: 1.45; color: var(--text-secondary);
+}
+.bm8__cameta > span { flex: none; white-space: nowrap; }
+.bm8__cameta > span + span::before { content: '·'; margin-right: var(--space-3); color: var(--text-tertiary); }
+/* The long one on each line gives way; the short fact beside it stays whole. */
+.bm8__cameta > .bm8__cacn, .bm8__cameta > .bm8__cafile { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bm8__camain > .bmc__error { margin-top: var(--space-2); }
+
+.bm8__catop { min-width: 0; display: flex; align-items: center; gap: var(--space-4); }
+.bm8__catop > .bm8__caname { flex: 0 1 auto; }
+/* The status is short words and is never clipped; the alias gives way first. */
+.bm8__catop > .bx-badge { flex: none; margin-left: auto; --badge-max: 30ch; }
+.bm8__cameta > .bm8__cadate { font-variant-numeric: tabular-nums; }
+.bm8__cadate.is-soon { color: var(--fb-notice-fg); font-weight: var(--fw-medium); }
+
+/* What the last action did, and its Undo, at the footer's start: inside the
+   panel, so Tab reaches it, and over no row. The alias gives way first. */
+.bm8__casaid {
+  flex: 1; min-width: 0; margin: 0; display: flex; align-items: center; gap: var(--space-3);
+  font-size: var(--fs-sm); line-height: 1.45; color: var(--text-secondary);
+}
+.bm8__casaidtext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bm8__casaid > .bx-btn { flex: none; }
+
+/* --- Add CA chain ---------------------------------------------------------------- */
+.bm8__caadd { display: flex; flex-direction: column; gap: var(--space-5); }
+/* Solid, like the Display tokens import's: a panel you press, not a dashed pill. */
+.bm8__cadrop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: 132px; padding: var(--space-6);
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-lg);
+  background: none; cursor: pointer; font: inherit; color: var(--text-secondary);
+  transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bm8__cadrop > svg { margin-bottom: var(--space-2); color: var(--text-tertiary); }
+.bm8__cadroptext { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bm8__cadrophint { font-size: var(--fs-sm); color: var(--text-tertiary); }
+/* Once files are in, it steps back to a line: more can still be added. */
+.bm8__cadrop.is-compact { flex-direction: row; min-height: 0; padding: var(--space-4) var(--space-5); gap: var(--space-3); }
+.bm8__cadrop.is-compact > svg { margin-bottom: 0; }
+.bm8__cadrop.is-compact .bm8__cadrophint { margin-left: auto; }
+.bm8__cadrop:hover, .bm8__cadrop.is-over { background: var(--surface-sunken); border-color: var(--ctl-border-focus); }
+.bm8__cadrop:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-color: var(--ctl-border-focus); }
+
+.bm8__capf {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: start; gap: var(--space-5);
+  padding: var(--space-5) 0;
+  animation: bm8-cain var(--dur-normal) var(--ease-standard);
+}
+.bm8__capf + .bm8__capf { border-top: var(--bw-thin) solid var(--border-subtle); }
+.bm8__capf:first-child { padding-top: var(--space-3); }
+.bm8__capf.is-bad .bm8__catile { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bm8__capfalias { margin-top: var(--space-4); gap: var(--space-3); }
+.bm8__capfalias input[aria-invalid='true'] { border-color: var(--fb-negative-border); }
+@keyframes bm8-cain {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The live dialog's support note, once, quietly, under everything it is about. */
+.bm8__canote {
+  display: flex; align-items: flex-start; gap: var(--space-3); margin: 0;
+  font-size: var(--fs-sm); line-height: 1.5; color: var(--text-secondary);
+}
+.bm8__canote > svg { flex: none; margin-top: 3px; color: var(--text-tertiary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bm8__carow.is-fresh, .bm8__capf { animation: none; }
+  .bm8__cadrop { transition: none; }
+}
 
 /* --- Prerequisites, and the grouped form -------------------------------------------
    RSA is twenty-six fields with two required. Ungrouped it is one scroll where

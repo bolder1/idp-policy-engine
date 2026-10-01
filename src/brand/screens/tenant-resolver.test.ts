@@ -4,6 +4,7 @@ import { EVERYONE, audienceOf, blankPolicy, fallbackRule, rule, type Policy } fr
 import { showcaseTenantHrmsOn } from '../fixtures'
 import type { SignInFacts } from './simulate'
 import { envOf, governingPolicy, resolveSignIn, tierOf } from './tenant-resolver'
+import { devicePreset } from './testing/device-presets'
 
 /* -----------------------------------------------------------------------------
    Which policy governs a sign-in, across the tenant.
@@ -170,7 +171,9 @@ describe('a monitoring policy', () => {
   const withMonitoring = t.policies.map((p) => (p.id === hrmsOffice.id ? monitoring : p))
 
   it('decides nothing: the Global Default decides for Kavya in the office', () => {
-    const r = resolveSignIn(withMonitoring, office('u-hr-1'), env)
+    /* On her corporate laptop, which the Global Default's rule 1 reads since
+       its baseline (30 Sep 2026): with no device it could not tell 1FA from 2FA. */
+    const r = resolveSignIn(withMonitoring, { ...office('u-hr-1'), device: devicePreset('win11-registered').facts }, env)
     expect(r.decidedBy?.policyId).toBe('global-default')
     expect(r.decision).toBe('1fa')
   })

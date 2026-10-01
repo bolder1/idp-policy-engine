@@ -4,7 +4,13 @@ import { card, cond, rule, when, type Policy } from '../../data'
 import { showcaseTenant } from '../../fixtures'
 import { DEVICE_ROWS, pageRows, policiesOn, rowsRead } from './rows-read'
 
-/* The rows each showcase policy's board asks for, and the page's. */
+/* The rows each showcase policy's board asks for, and the page's.
+
+   Since 30 Sep 2026 the Global Default reads the Operating countries zone (a
+   place, no range) and the Corporate devices profile (the trusted-device
+   rows) on every application, so every board below asks for a place and a
+   device on top of what its own policy reads. */
+const TRUSTED = ['platform', 'agent', 'registered', 'registered-count']
 
 const t = showcaseTenant()
 const lib = { zones: t.zones, fingerprints: t.fingerprints }
@@ -14,20 +20,23 @@ const list = (r: ReturnType<typeof read>) => ({ rows: [...r.rows].sort(), device
 
 describe('the rows a board asks for', () => {
   it('asks HRMS for a place and a distance, from the office zone and its range', () => {
-    expect(list(read(policy('sc-hrms-office'), 'hrms'))).toEqual({ rows: ['distance', 'place'], device: [] })
+    /* The device is the Global Default's: its rule 1 checks a corporate laptop. */
+    expect(list(read(policy('sc-hrms-office'), 'hrms'))).toEqual({ rows: ['device', 'distance', 'place'], device: TRUSTED })
   })
 
   it('asks Google Workspace for a device and a risk score, with the trusted-device rows', () => {
+    /* The place is the Global Default's operating countries. */
     expect(list(read(policy('sc-corporate-devices'), 'google-workspace'))).toEqual({
-      rows: ['device', 'risk'],
-      device: ['platform', 'agent', 'registered', 'registered-count'],
+      rows: ['device', 'place', 'risk'],
+      device: TRUSTED,
     })
   })
 
   it('asks Outlook for the health rows Compliant devices checks, in form order', () => {
+    /* Then the Global Default's trusted-device rows, and its place. */
     expect(list(read(policy('sc-device-compliance'), 'outlook'))).toEqual({
-      rows: ['device'],
-      device: ['platform', 'os-version', 'integrity', 'screen-lock', 'authenticator'],
+      rows: ['device', 'place'],
+      device: ['platform', 'os-version', 'integrity', 'screen-lock', 'authenticator', 'agent', 'registered', 'registered-count'],
     })
   })
 
@@ -37,12 +46,19 @@ describe('the rows a board asks for', () => {
     expect(list(read(policy('global-default'), 'github')).rows).toEqual(['device', 'distance', 'place'])
   })
 
-  it('asks for nothing more on an application no rule reads anything of', () => {
-    expect(list(read(null, 'salesforce'))).toEqual({ rows: [], device: [] })
+  /* No application policy covers Salesforce, so what it asks is the Global
+     Default's alone: a place and a corporate device. It asked for nothing
+     before the baseline. */
+  it('asks an application no policy of its own covers for what the Global Default reads', () => {
+    expect(list(read(null, 'salesforce'))).toEqual({ rows: ['device', 'place'], device: TRUSTED })
   })
 })
 
 describe('what a rule reads', () => {
+  /* Each against a tenant whose Global Default reads nothing, so what is
+     read is the draft's rule alone and not the baseline's place and device. */
+  const bare = t.policies.map((p) => (p.isSystem ? { ...p, rules: [] } : p))
+  const read = (draft: Policy | null, appId: string | null) => rowsRead(bare, draft, appId, lib)
   const on = (...conds: ReturnType<typeof cond>[]): Policy => ({
     ...policy('sc-hrms-office'),
     id: 'draft',

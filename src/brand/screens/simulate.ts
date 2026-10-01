@@ -1,6 +1,7 @@
 import {
   FALLBACK_NAME,
   conditionType,
+  memberGroupIds,
   rangeText,
   users as seedUsers,
   zoneScopeOf,
@@ -108,6 +109,8 @@ export interface SimUser {
   email: string
   groupId: string
   groupName: string
+  /** Any other groups they are in (`User.alsoGroupIds`); absent for a one-group person. */
+  alsoGroupIds?: string[]
   userType: string
   role: string
 }
@@ -519,7 +522,7 @@ function legacyCond(c: Condition, ctx: SimContext, env?: SimEnv): CondVerdict {
        has not been migrated is rehearsed as it would run rather than going
        quiet. */
     case 'group':
-      return decide(vals.includes(ctx.user.groupId), `${ctx.user.name} is in ${ctx.user.groupName}`)
+      return decide(memberGroupIds(ctx.user).some((g) => vals.includes(g)), `${ctx.user.name} is in ${ctx.user.groupName}`)
     case 'user':
       return decide(vals.includes(ctx.user.id), `this login is ${ctx.user.name}`)
 
@@ -822,9 +825,11 @@ function whoMissFor(rule: Pick<Rule, 'who'>, user: WhoPerson & { name: string },
   /* In the order `whoPasses` decides: not included at all is the reason before
      any exception is, so "Finance except Priya" reads "Not Finance" to Devon
      in Contractors even when Devon is also listed as an exception. */
-  const included = w.groupIds.length + w.userIds.length === 0 || w.groupIds.includes(user.groupId) || w.userIds.includes(user.id)
+  const groups = memberGroupIds(user)
+  const included = w.groupIds.length + w.userIds.length === 0 || groups.some((g) => w.groupIds.includes(g)) || w.userIds.includes(user.id)
+  const excepted = groups.find((g) => w.exceptGroupIds?.includes(g))
   if (included && w.exceptUserIds?.includes(user.id)) return `${user.name} is an exception`
-  if (included && w.exceptGroupIds?.includes(user.groupId)) return `${env.groupName(user.groupId)} is an exception`
+  if (included && excepted) return `${env.groupName(excepted)} is an exception`
   const names = [...w.groupIds.map((id) => env.groupName(id)), ...w.userIds.map(person)]
   const list = names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`
   return `Not ${list}`
@@ -833,7 +838,7 @@ function whoMissFor(rule: Pick<Rule, 'who'>, user: WhoPerson & { name: string },
 /** Does this policy govern the person signing in? Asked once, above the rules. */
 export function inAudience(policy: Policy, ctx: SimContext): boolean {
   const a = policy.audience
-  return a.everyone || a.groupIds.includes(ctx.user.groupId) || a.userIds.includes(ctx.user.id)
+  return a.everyone || memberGroupIds(ctx.user).some((g) => a.groupIds.includes(g)) || a.userIds.includes(ctx.user.id)
 }
 
 export type StepKind = 'off' | 'miss' | 'hit' | 'unreached'
@@ -1169,7 +1174,8 @@ export function personOf(id: string | undefined, env: SimEnv): SimUser | null {
   const u = env.library?.people.find((p) => p.id === id)
   if (u) {
     const groupName = env.library?.groups.find((g) => g.id === u.groupId)?.name ?? env.groupName(u.groupId)
-    return { id: u.id, name: u.name, email: u.email, groupId: u.groupId, groupName, userType: u.userType, role: u.role }
+    const also = memberGroupIds(u).slice(1)
+    return { id: u.id, name: u.name, email: u.email, groupId: u.groupId, groupName, ...(also.length > 0 ? { alsoGroupIds: also } : null), userType: u.userType, role: u.role }
   }
   return SIM_USERS.find((s) => s.id === id) ?? null
 }
@@ -1600,7 +1606,7 @@ export function tracePolicy(policy: Policy, facts: SignInFacts, env: SimEnv): Po
     ? 'in'
     : !person
       ? 'unknown'
-      : a.groupIds.includes(person.groupId) || a.userIds.includes(person.id)
+      : memberGroupIds(person).some((g) => a.groupIds.includes(g)) || a.userIds.includes(person.id)
         ? 'in'
         : 'out'
 

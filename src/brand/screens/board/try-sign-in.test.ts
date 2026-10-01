@@ -212,7 +212,7 @@ describe('somebody the policy is not for', () => {
     expect(r.route.policy).toMatchObject({ value: 'Global Default Policy', word: 'Not deciding', decides: false })
     expect(r.route.who).toMatchObject({ value: 'Aisha Khan · Sales', word: 'Not in audience', state: 'fail' })
     expect(landed(r)).toBe('who')
-    expect(r.route.decision).toMatchObject({ decision: '1fa', line: 'Global Default Policy · Baseline access' })
+    expect(r.route.decision).toMatchObject({ decision: '1fa', line: 'Global Default Policy · Corporate device, where we operate' })
   })
 
   it('reaches none of this policy’s cards', () => {
@@ -234,7 +234,7 @@ describe('versions on the board', () => {
     const policies = t.policies.map((p) => (p.id === off.id ? off : p))
     const r = run(off, board(off), off, policies)
     expect(r.views.map((v) => `${v.label} · ${v.policyName} · ${v.line} · ${v.decision}`)).toEqual([
-      'Today · Global Default Policy · Baseline access · 1fa',
+      'Today · Global Default Policy · Corporate device, where we operate · 1fa',
       'Stored version · HRMS access from corporate offices · Rule 1 · In a corporate office · 2fa',
     ])
   })
@@ -284,7 +284,7 @@ describe('a monitor watching the board’s sign-in', () => {
     const r = run(fallback, form, fallback, withMonitor)
     expect(r.views.map((v) => `${v.label} ${v.decision}`)).toEqual(['Live 1fa'])
     expect(runSentence(r.route.decision)).toBe(
-      'Allow on 1 factor. Global Default Policy, Rule 1 · Baseline access. Monitoring: HRMS access from corporate offices would allow with 2FA.',
+      'Allow on 1 factor. Global Default Policy, Rule 1 · Corporate device, where we operate. Monitoring: HRMS access from corporate offices would allow with 2FA.',
     )
   })
 })

@@ -1,26 +1,34 @@
-import { motion } from 'motion/react'
-import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { useId, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import {
   ArrowRight,
+  ArrowUpRight,
   Asterisk,
+  Braces,
+  Check,
   ChevronsDownUp,
   ChevronsUpDown,
   GripVertical,
   Lock,
+  Minus,
   Split,
   Users,
+  X,
 } from 'lucide-react'
 
 import { type Rule } from '../../data'
+import { FaceStack, type FaceItem } from '../../faces'
 import { RowMenu, Toggle } from '../../kit'
 import { ruleMenu } from './rule-menu'
-import { leafCount } from '../../predicate'
-import { hasWho, whoSummary } from '../../rule-who'
+import { cardJoin, cardLetter, leafCount, topJoin } from '../../predicate'
+import { hasWho, normaliseWho, whoSummary } from '../../rule-who'
 import type { NameLookup } from '../predicate-prose'
 import type { RuleState } from '../rule-form'
 import type { CardState } from '../testing/evidence'
+import type { CardTone } from '../testing/trace-pills'
+import { useCardHighlighted, type CardHighlight } from './card-highlight'
 import { DECISION_NAME, TONE, type Part } from './model'
-import { IfBlock, IfChip, IfKw } from './IfBlock'
+import { ActionRow, CondReadout, IfBlock, IfChip, IfKw } from './IfBlock'
 import { isPristine, stateLabel } from './parts'
 
 /* -----------------------------------------------------------------------------
@@ -160,20 +168,27 @@ function CardSummary({ rule, resolve, terminal }: { rule: Rule; resolve?: NameLo
 }
 
 /* Try a sign-in's reading of one card (try-sign-in.ts builds it, Board draws
-   it): the evidence under the head, the marker when it stands here, and the
-   card's standing, which dims a card the sign-in never reached. The card's
-   body stays folded in test mode — the evidence is what is being read. */
+   it, Policy testing V4 §2.3): a row of check pills under the head, the
+   rule's outcome and its standing word on the head's right, the marker when
+   it stands here, and the card's tone — lit where the sign-in matched, missed
+   where it was asked and did not, dim where it never came. The card's body
+   stays folded in test mode — the pills are what is being read. */
 export interface CardRoute {
   state: CardState
-  evidence: ReactNode
+  /** Null while the marker has not reached the card on a run that travels. */
+  tone: CardTone | null
+  /** The check pills, one per condition. */
+  checks: ReactNode
+  /** The outcome pill and the grey standing word, on the head's right. */
+  head: ReactNode
   /** The marker, when it stands on this card. */
   marker?: ReactNode
 }
 
-/* Blue edge where the marker stands; dimmed where the sign-in never came. A
-   rule that is switched off is already drawn as one (`is-off`). */
+/* Blue edge where the marker stands; the tone's class for trace.css. A rule
+   that is switched off is already drawn as one (`is-off`). */
 const routeClass = (route: CardRoute | undefined): string =>
-  !route ? '' : `is-routed${route.marker ? ' is-marked' : ''}${route.state === 'not-reached' ? ' is-unreached' : ''}`
+  !route ? '' : `is-routed${route.marker ? ' is-marked' : ''}${route.tone ? ` is-${route.tone}` : ''}`
 
 export function RuleCard({
   rule,
@@ -201,6 +216,7 @@ export function RuleCard({
   flash = false,
   source,
   traced = false,
+  highlight,
 }: {
   rule: Rule
   index: number
@@ -239,9 +255,12 @@ export function RuleCard({
   source?: string
   /** An answer in Describe it that wrote this card is under the pointer: a 1px ring, border only. */
   traced?: boolean
+  /** Test mode: the card a hovered row in the test panel lands on (card-highlight.ts). */
+  highlight?: CardHighlight
 }) {
   const tone = TONE[rule.decision]
   const titleId = `bb-rule-${rule.id}-title`
+  const ringed = useCardHighlighted(highlight, rule.id) || traced
   const selected = openPart !== null
   /* The ⋯ menu is open: holds the trail out while the pointer is in the menu. */
   const [menuOpen, setMenuOpen] = useState(false)
@@ -255,7 +274,7 @@ export function RuleCard({
          the first — each measured a position the other was mid-way through
          changing, which is the small shiver a reorder used to end on. One
          element animates the move, and it is the one that moves. */
-      className={`bb__card is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${rule.enabled ? '' : 'is-off'} ${shadowed ? 'is-shadowed' : ''} ${dragging ? 'is-dragging' : ''} ${menuOpen ? 'is-menu' : ''} ${flash ? 'is-flash' : ''} ${traced ? 'is-traced' : ''} ${kindClass}`}
+      className={`bb__card is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${rule.enabled ? '' : 'is-off'} ${shadowed ? 'is-shadowed' : ''} ${dragging ? 'is-dragging' : ''} ${menuOpen ? 'is-menu' : ''} ${flash ? 'is-flash' : ''} ${ringed ? 'is-traced' : ''} ${kindClass}`}
       /* No style prop while dragging, deliberately. Board writes this element's
          transform directly on every pointer move; a `style` React manages would
          be reset to a stale offset on the next re-render, which is the classic
@@ -376,9 +395,15 @@ export function RuleCard({
                 between the title and the buttons, reading as the first of them.
                 People pressed it. Beside the name it is what it is: a fact
                 about this rule, next to the thing it is a fact about. */}
-            <span className={`bb__state ${rule.enabled ? `is-${state}` : 'is-off'}`} title={rule.enabled ? stateNote : undefined}>
-              {stateLabel(state, rule.enabled, unreachable)}
-            </span>
+            {/* In test mode the head says what the rule decides instead: the
+                sign-in is being read against it, and Ready is not news. */}
+            {route ? (
+              <span className="bb__tout">{route.head}</span>
+            ) : (
+              <span className={`bb__state ${rule.enabled ? `is-${state}` : 'is-off'}`} title={rule.enabled ? stateNote : undefined}>
+                {stateLabel(state, rule.enabled, unreachable)}
+              </span>
+            )}
           </span>
           {source && (
             <p className="bb__card__from" title={`From your text: “${source}”`}>
@@ -473,15 +498,17 @@ export function RuleCard({
           somewhere invisible. */}
       <div className="bb__fold bb__fold--body" id={`bb-rule-${rule.id}-body`} inert={!expanded}>
         <div>
-          <div className="bb__cardbody">
-            <IfBlock rule={rule} resolve={resolve} />
-          </div>
+          {/* Not in test mode: every card is folded there and cannot be
+              unfolded (the chevron is hidden), so a rule's body is drawn for
+              nobody — and it was most of what a marker's hop redrew. It is
+              back, still at zero height, the moment test mode closes, so the
+              first press of the chevron after it still glides. */}
+          <div className="bb__cardbody">{!route && <IfBlock rule={rule} resolve={resolve} />}</div>
         </div>
       </div>
 
-      {/* What the sign-in being tried made of this rule, in place of the
-          rehearsal's one-sentence verdict (RouteGate.tsx). */}
-      {route?.evidence}
+      {/* What the sign-in being tried made of this rule: one pill per check. */}
+      {route?.checks}
     </motion.div>
   )
 }
@@ -500,6 +527,7 @@ export function TerminalCard({
   cardRef,
   flash = false,
   traced = false,
+  highlight,
   onHover,
 }: {
   rule: Rule
@@ -517,8 +545,11 @@ export function TerminalCard({
   traced?: boolean
   /** Describe it: the pointer is over this row. */
   onHover?: (on: boolean) => void
+  /** Test mode: the card a hovered row in the test panel lands on. */
+  highlight?: CardHighlight
 }) {
   const tone = TONE[rule.decision]
+  const ringed = useCardHighlighted(highlight, 'fallback') || traced
   return (
     <motion.div
       ref={cardRef}
@@ -526,7 +557,7 @@ export function TerminalCard({
          changes the card's height, and a size animation stretches its text. */
       layout={route ? 'position' : true}
       transition={{ type: 'spring', stiffness: 520, damping: 40 }}
-      className={`bb__card is-terminal is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${flash ? 'is-flash' : ''} ${traced ? 'is-traced' : ''} ${routeClass(route)}`}
+      className={`bb__card is-terminal is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${flash ? 'is-flash' : ''} ${ringed ? 'is-traced' : ''} ${routeClass(route)}`}
       /* The same shape as every other card: a group named by its title
          button. It has no inner controls to hide, so the old whole-card button
          cost nothing here — but `aria-pressed` is a toggle's attribute and
@@ -578,7 +609,7 @@ export function TerminalCard({
                   controls — move, duplicate, delete, the on/off switch — are absent
                   rather than disabled, because a row of greyed-out buttons invites
                   somebody to work out why. */}
-              <span className="bb__state">Always on</span>
+              {route ? <span className="bb__tout">{route.head}</span> : <span className="bb__state">Always on</span>}
               {/* A mark, not a pill with a word in it.
 
                   The row read `Always on` · `Locked` · fold: two labelled pills and a
@@ -628,17 +659,368 @@ export function TerminalCard({
       </div>
       <div className="bb__fold bb__fold--sum" aria-hidden={expanded} inert={expanded}>
         <div>
-          <CardSummary terminal rule={rule} />
+          {!route && <CardSummary terminal rule={rule} />}
         </div>
       </div>
       <div className="bb__fold bb__fold--body" id="bb-terminal-body" inert={!expanded}>
         <div>
-          <div className="bb__cardbody">
-            <IfBlock terminal rule={rule} resolve={resolve} />
-          </div>
+          <div className="bb__cardbody">{!route && <IfBlock terminal rule={rule} resolve={resolve} />}</div>
         </div>
       </div>
-      {route?.evidence}
+      {route?.checks}
     </motion.div>
+  )
+}
+
+/* --- The trace: a card read by a sign-in test --------------------------------
+
+   The same card, read-only (TESTING-V4 §13.2, §14.3): Sign-in tests draws the
+   deciding policy's rules with it, so a run reads in the builder's own
+   grammar — number, title, who / if / then with the same chips, faces, zone
+   chips and then-flow — and each card says what the sign-in made of it.
+
+     reading      the body open, a spinner on the row being read, the rows
+                  read so far marked ✓ ✕
+     matched      the green ring, ✓ on every row that held
+     missed       the rows read, the failing one ✕ — for a beat, before it folds
+     folded       ONE line under the title naming the failing row, in red
+     not-reached  its title, quiet
+     off          its title, quiet, "Switched off"
+
+   Colour says what happened (owner, 30 Sep): blue only for the engine at
+   work — the row being read, its spinner; green for what matched or held;
+   red for what failed; amber for what cannot be told, and for a rule that
+   would also apply (a conflict). Not reached is grey.
+
+   Nothing on it edits: no grip, no switch, no ⋯. It folds, as the builder's
+   card does (owner, 30 Sep: "make the cards collapsible like we have in the
+   policy builder"): given `onFold`, the head carries the builder's fold
+   control — the same button, glyph and tooltip — and a folded card opens on
+   a press anywhere on it; its title is the disclosure, and Open rule beside
+   the fold opens the rule in its policy's builder. Without `onFold` a press
+   opens the rule, as before. The body shows what its state shows unless
+   `open` says otherwise. The foot is a slot for a notice — "Also applies to
+   …" — that a conflicting rule carries; a card with one is drawn whole
+   (`full`), and its notice stays even when the card is folded.
+
+   The rows are the builder's, one line each — the keyword, then what it
+   answers, then the mark — so an open card reads at the folded card's
+   density rather than as a block of sections.
+
+   Motion owns the body's height (`.bb__tbody`) and a mark's pop
+   (`.bb__tmark`); board.css gives neither a transform nor a transition. The
+   card itself is a plain element, so its ring eases in CSS. */
+
+export type TraceState = 'waiting' | 'reading' | 'matched' | 'missed' | 'folded' | 'unknown' | 'possible' | 'off' | 'not-reached'
+
+export interface TraceRowMark {
+  status: 'pass' | 'fail' | 'unknown'
+  /** Being read: a spinner where the mark will land. */
+  working: boolean
+}
+
+export interface TraceMarks {
+  who: TraceRowMark | null
+  /** By condition id; absent while a row is not read. */
+  conds: Record<string, TraceRowMark>
+  /** Never read: an earlier row ended the rule. `who` for the who row. */
+  skipped: readonly string[]
+}
+
+const TRACE_WORD: Record<TraceState, string> = {
+  waiting: '',
+  reading: 'Checking',
+  matched: 'Matched',
+  missed: 'No match',
+  folded: 'No match',
+  unknown: 'Can’t tell',
+  possible: 'If not',
+  off: 'Switched off',
+  'not-reached': 'Not reached',
+}
+
+/** A later rule that would also apply to this person, differently: its pill. */
+const CONFLICT_WORD = 'Also applies'
+
+const NO_TRACE_MARKS: TraceMarks = { who: null, conds: {}, skipped: [] }
+
+/** Decelerating: what arrives. */
+const TRACE_OUT = [0.2, 0, 0, 1] as const
+/** A drawer opening. */
+const TRACE_OPEN = [0.32, 0.72, 0, 1] as const
+const TRACE_IN_OUT = [0.4, 0, 0.2, 1] as const
+
+/* A row's answer, at the row's right end: the spinner while it is read, then
+   the mark with the least overshoot; "Not checked" for a row never read. */
+function TraceMarkView({ mark, skipped = false, pop }: { mark: TraceRowMark | null | undefined; skipped?: boolean; pop: boolean }) {
+  if (skipped) return <span className="bb__tskip">Not checked</span>
+  if (!mark) return null
+  if (mark.working)
+    return (
+      <span className="bb__tmark is-working" aria-hidden>
+        <span className="bb__tspin" />
+      </span>
+    )
+  const glyph = mark.status === 'pass' ? <Check size={12} strokeWidth={2.6} /> : mark.status === 'fail' ? <X size={12} strokeWidth={2.6} /> : <Minus size={12} strokeWidth={2.4} />
+  const said = mark.status === 'pass' ? 'Held' : mark.status === 'fail' ? 'Did not hold' : 'Can’t tell'
+  return (
+    <>
+      <motion.span
+        className={`bb__tmark is-${mark.status}`}
+        aria-hidden
+        initial={pop ? { scale: 0.55, opacity: 0 } : false}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={pop ? { scale: { type: 'spring', stiffness: 620, damping: 26 }, opacity: { duration: 0.1 } } : { duration: 0 }}
+      >
+        {glyph}
+      </motion.span>
+      <span className="u-sr-only">{said}</span>
+    </>
+  )
+}
+
+/* The rule's who / if / then, one row each: the keyword, what answers it
+   (the builder's faces, chips and then-flow), and the row's mark at its right
+   end — `who` saying which of the person's groups let them in ("via
+   Engineering"), the first condition opening with `if` and the rest with
+   their join. */
+function TraceIf({ rule, resolve, marks, pop, via }: { rule: Rule; resolve: NameLookup; marks: TraceMarks; pop: boolean; via: string }) {
+  const cards = rule.when.cards
+  const top = topJoin(rule.when)
+  const whoName = (kind: 'group' | 'user', id: string) => resolve(kind, id)
+  const w = normaliseWho(rule.who)
+  const faces: FaceItem[] = w
+    ? [
+        ...w.groupIds.map((id) => ({ kind: 'group' as const, key: `g:${id}`, name: whoName('group', id) ?? id })),
+        ...w.userIds.map((id) => ({ kind: 'user' as const, key: `u:${id}`, name: whoName('user', id) ?? id })),
+      ]
+    : []
+  const except = w ? [...(w.exceptGroupIds ?? []).map((id) => whoName('group', id) ?? id), ...(w.exceptUserIds ?? []).map((id) => whoName('user', id) ?? id)] : []
+  const skipped = new Set(marks.skipped)
+  const showWho = hasWho(rule.who)
+  return (
+    <div className="bb__if is-trace">
+      {showWho && (
+        <div className={`bb__trow is-who${skipped.has('who') ? ' is-skipped' : ''}`}>
+          <span className="bb__trow__kw">
+            <IfKw>who</IfKw>
+          </span>
+          <span className="bb__trow__body">
+            {faces.length > 0 ? <FaceStack faces={faces} max={6} /> : <span className="bb__ifwho__text">Everyone</span>}
+            {except.length > 0 && (
+              <span className="bb__ifwho__text" title={whoSummary(rule.who, whoName, Infinity)}>
+                except {except.join(', ')}
+              </span>
+            )}
+            {via && <span className="bb__tvia">{via}</span>}
+          </span>
+          <TraceMarkView mark={marks.who} skipped={skipped.has('who')} pop={pop} />
+        </div>
+      )}
+      {cards.map((k, i) => {
+        const join = cardJoin(k)
+        return (
+          <div key={k.id} className={k.grouped ? 'bb__ifgroup bb__tgroup' : 'bb__tplain'}>
+            {k.grouped && (
+              <div className="bb__ifgrouptag">
+                <Braces size={10} strokeWidth={2.2} aria-hidden />
+                <b>{k.label?.trim() || `Group ${cardLetter(i)}`}</b>
+              </div>
+            )}
+            {k.conditions.map((c, j) => (
+              <div key={c.id} className={`bb__trow is-cond${skipped.has(c.id) ? ' is-skipped' : ''}`}>
+                <span className="bb__trow__kw">{i === 0 && j === 0 ? <IfKw>if</IfKw> : j === 0 ? <IfKw tone={top}>{top}</IfKw> : <IfKw tone={join}>{join}</IfKw>}</span>
+                <span className="bb__trow__body">
+                  <CondReadout c={c} resolve={resolve} />
+                </span>
+                <TraceMarkView mark={marks.conds[c.id]} skipped={skipped.has(c.id)} pop={pop} />
+              </div>
+            ))}
+          </div>
+        )
+      })}
+      {!showWho && cards.length === 0 && (
+        <div className="bb__trow">
+          <span className="bb__trow__kw">
+            <IfKw>if</IfKw>
+          </span>
+          <span className="bb__trow__body">
+            <span className="bb__ifjourney">Every sign-in</span>
+          </span>
+        </div>
+      )}
+      <div className="bb__trow is-then">
+        <ActionRow rule={rule} />
+      </div>
+    </div>
+  )
+}
+
+export function RuleTraceCard({
+  rule,
+  index,
+  state,
+  marks = NO_TRACE_MARKS,
+  miss = '',
+  resolve,
+  full = false,
+  notice,
+  active = false,
+  animate = false,
+  onOpen,
+  open: openProp,
+  onFold,
+  via = '',
+  conflict = false,
+}: {
+  rule: Rule
+  /** 0-based; null for the last row, "Nothing else matched". */
+  index: number | null
+  state: TraceState
+  marks?: TraceMarks
+  /** The folded line: the failing row, said — "Network · Home broadband is not in Corporate offices". */
+  miss?: string
+  resolve: NameLookup
+  /** Drawn whole whatever its state: a card carrying a notice is never folded by its state. */
+  full?: boolean
+  /** The slot at the card's foot: "Also applies to … · via Finance — not used, rule 2 matched first". */
+  notice?: ReactNode
+  /** The engine is reading it. */
+  active?: boolean
+  /** A run is playing and motion is allowed: the body opens, the marks pop. */
+  animate?: boolean
+  /** Opens the rule in its policy's builder. */
+  onOpen?: () => void
+  /** The body shown or folded away, whatever its state would show. Absent, its state's own. */
+  open?: boolean
+  /** The builder's fold control on its head: folds or opens it. A folded card opens on a press anywhere on it. */
+  onFold?: () => void
+  /** Which of the person's groups its who let them in by: "via Engineering". */
+  via?: string
+  /** It would also apply to this person, with another answer: "Also applies", in the notice tone. */
+  conflict?: boolean
+}) {
+  const titleId = useId()
+  const bodyId = useId()
+  const terminal = index === null
+  const tone = TONE[rule.decision]
+  const word = conflict ? CONFLICT_WORD : TRACE_WORD[state]
+  const own = full || state === 'reading' || state === 'matched' || state === 'missed' || state === 'unknown' || state === 'possible'
+  const open = openProp ?? own
+  const n = terminal ? null : index + 1
+  const name = terminal ? 'Nothing else matched' : rule.name.trim() || 'Untitled rule'
+  const onCard = onFold ? () => !open && onFold() : onOpen
+  return (
+    <div
+      className={`bb__card is-trace is-${tone} is-t-${state}${terminal ? ' is-terminal' : ''}${active ? ' is-active' : ''}${open ? ' is-open' : ''}${onFold ? ' is-foldable' : ''}${conflict ? ' is-conflict' : ''}`}
+      role="group"
+      aria-labelledby={titleId}
+      onClick={onCard}
+    >
+      <div className="bb__cardhead">
+        {terminal ? (
+          <span className="bb__idx is-home" aria-hidden>
+            <span>
+              <Asterisk size={13} strokeWidth={2} />
+            </span>
+          </span>
+        ) : (
+          <span className="bb__idx" aria-hidden>
+            <span className="bb__idx__n">{n}</span>
+          </span>
+        )}
+        <div className="bb__title">
+          <span className="bb__titlerow">
+            {/* A button only when a press does something: drawn with neither
+                a fold nor an Open (the why's card, whose Open rule is in its
+                notice), the title is words, and out of the Tab order. */}
+            {onFold || onOpen ? (
+              <button
+                type="button"
+                id={titleId}
+                className="bb__titlebtn"
+                {...(onFold && !terminal ? { 'aria-expanded': open, 'aria-controls': open ? bodyId : undefined } : null)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (onFold) onFold()
+                  else onOpen?.()
+                }}
+              >
+                {n !== null && <span className="u-sr-only">Rule {n}: </span>}
+                <strong>{name}</strong>
+              </button>
+            ) : (
+              <span id={titleId} className="bb__titlebtn is-static">
+                {n !== null && <span className="u-sr-only">Rule {n}: </span>}
+                <strong>{name}</strong>
+              </span>
+            )}
+            {/* The last row folded still says what it decides. */}
+            {terminal && !open && (
+              <span className="bb__tthen">
+                <ArrowRight size={11} strokeWidth={2} aria-hidden />
+                <IfChip tone={tone}>{DECISION_NAME[rule.decision]}</IfChip>
+              </span>
+            )}
+            {word && <span className={`bb__state bb__tstate is-${conflict ? 'conflict' : state}`}>{word}</span>}
+          </span>
+          {state === 'folded' && miss && !open ? (
+            <em className="bb__tmiss">
+              <X size={12} strokeWidth={2.6} aria-hidden />
+              <span>{miss}</span>
+            </em>
+          ) : terminal && open ? (
+            <em>Every sign-in that no rule above caught</em>
+          ) : null}
+        </div>
+        {onFold && (
+          <div className="bb__cardmeta" onClick={(e) => e.stopPropagation()}>
+            <span className="bb__acts">
+              <button
+                type="button"
+                className={`bb__act bb__fold__btn ${open ? 'is-open' : ''}`}
+                aria-expanded={open}
+                aria-controls={open && !terminal ? bodyId : undefined}
+                aria-label={terminal ? (open ? 'Hide what the default does' : 'Show what the default does') : open ? `Hide what rule ${n} checks` : `Show what rule ${n} checks`}
+                title={open ? 'Fold this rule' : terminal ? 'Show what it does' : 'Show what it checks'}
+                onClick={onFold}
+              >
+                {open ? <ChevronsDownUp size={13} strokeWidth={2.2} /> : <ChevronsUpDown size={13} strokeWidth={2.2} />}
+              </button>
+              {onOpen && (
+                <button type="button" className="bb__act bb__topen" aria-label={terminal ? 'Open the default in its policy' : `Open rule ${n} in its policy`} title="Open in its policy" onClick={onOpen}>
+                  <ArrowUpRight size={13} strokeWidth={2.2} />
+                </button>
+              )}
+            </span>
+          </div>
+        )}
+      </div>
+      {terminal ? (
+        open && <CardSummary terminal rule={rule} />
+      ) : (
+        <AnimatePresence initial={false}>
+          {open && (
+            <motion.div
+              key="body"
+              id={bodyId}
+              className="bb__tbody"
+              initial={animate ? { height: 0, opacity: 0 } : false}
+              animate={{ height: 'auto', opacity: 1, transition: animate ? { height: { duration: 0.26, ease: TRACE_OPEN }, opacity: { duration: 0.18, delay: 0.04, ease: TRACE_OUT } } : { duration: 0 } }}
+              exit={{ height: 0, opacity: 0, transition: animate ? { height: { duration: 0.24, ease: TRACE_IN_OUT }, opacity: { duration: 0.12 } } : { duration: 0 } }}
+            >
+              <div className="bb__cardbody">
+                <TraceIf rule={rule} resolve={resolve} marks={marks} pop={animate} via={via} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+      {notice && (
+        <div className="bb__tnotice" onClick={(e) => e.stopPropagation()}>
+          {notice}
+        </div>
+      )}
+    </div>
   )
 }

@@ -1,10 +1,10 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronsDownUp, ChevronsUpDown, CopyPlus, Keyboard, ListOrdered, LogIn, PanelRightClose, Plus, Redo2, Trash2, Undo2 } from 'lucide-react'
+import { Check, ChevronsDownUp, ChevronsUpDown, CopyPlus, History as PastIcon, Keyboard, ListOrdered, LogIn, PanelRightClose, PenLine, Plus, Redo2, ShieldAlert, Trash2, Undo2, Users, type LucideIcon } from 'lucide-react'
 
 import { Button, Modal, Tip } from '../../kit'
 import { appsOf, enforces, fallbackRule, reidRule, blankRule, type Policy, type Rule, type Scenario } from '../../data'
-import type { AnswerKey, DescribeTenant, RuleIds } from '../../create/describe-model'
+import { dictionaryOf, type AnswerKey, type DescribeTenant, type RuleIds } from '../../create/describe-model'
 import { checksView, withChecks, type CheckContext } from '../../create/describe-checks'
 import { guardSignIns } from '../../draft-checks'
 import { commitToast, committed, differsFromLive, hasUnsavedChanges, openForEditing, type CommitIntent, type RuleSet } from '../../policy-draft'
@@ -16,38 +16,49 @@ import { BoardBar, BoardBarActions } from './BoardBar'
 import { SHOWCASE } from '../../showcase'
 import { BoardEmpty } from './BoardEmpty'
 import { buildTemplate, templateBlocker } from './apply-template'
+import { arrivalKey, firstArrival, landFix, type ArriveFix } from './arrive-fix'
 import { diagnose, shadowedBy } from '../diagnostics'
 import { afterPaint, guardOpens, isStale, overridePatch, patchSignIns, tryRunGuard, type GuardInput, type GuardResult, type GuardStamp, type ReadyFix, type SignInCheck } from '../guard'
 import { GuardDrawer } from '../guard-page'
 import { offersMonitorAfterSave, portalRoot, statusToast } from '../status-options'
 import { canRedo, canUndo, commit, historyKey, historyOf, redo, revertTo, undo, type History } from '../history'
 import { useSimEnv } from '../sim-env'
-import { BoardTestViews } from '../testing/BoardTestViews'
-import { WhichPolicy } from '../testing/WhichPolicy'
-import { boardPagesAllowed, boardViewsKept, firstBoardPage, pageShown, type BoardTestPage } from '../testing/board-views'
+import { boardPagesAllowed } from '../testing/board-views'
 import { useTestingSession } from '../testing/session-state'
 import { formOf, todayIn } from '../testing/sign-in-form'
+import { DOCK_TAB_LABEL } from '../testing/test-dock'
+import { ACCESS_CHECK } from '../sign-in-tests/names'
 import type { SignInFacts } from '../sign-in-facts'
-import { Board, type TestChain } from './Board'
+import { Board } from './Board'
+import { BAR_DEMO, BAR_TOUR } from './bar-tools'
 import { DescribePanel } from './DescribePanel'
 import {
   RULES_ADDED,
+  bodyOf,
+  changedCards,
   describeOffered,
   describeSession,
   describedDraft,
   doneFacts,
   emptyDescribe,
+  factsBack,
+  factsOf,
+  revertDescribed,
+  sameFacts,
+  sendTurn,
   undoDescribed,
+  undoTurn,
   withDraftApps,
   writeDescribed,
   type DescribeSession,
   type DescribeState,
+  type PolicyFacts,
+  type ThreadMark,
 } from './describe-session'
 import { Inspector } from './Inspector'
+import { CheckBarViews, PolicyCheck, type CheckKept, type CheckPanel } from './PolicyCheck'
 import { ReadAsTextPanel } from './ReadAsTextPanel'
-import { SignInPanel } from './SignInPanel'
-import type { ChangeChip } from './try-sign-in'
-import { useTrySignIn } from './use-try-sign-in'
+import { CHECK_PANEL_NARROW, CHECK_PANEL_WIDE, PEOPLE_AND_BREAK_IN, checkViews, type BoardOpen, type CheckView } from './test-mode'
 import { nextPart, patchRule as patchOne, ruleAt, type Part, type Selection } from './model'
 import { copyName } from './parts'
 import { boardShortcuts, chord, isMacPlatform } from './shortcuts'
@@ -56,6 +67,7 @@ import { boardTourSeen } from '../../tour/board-tour'
 
 import { useLeaveGuard } from '../../leave-guard'
 import './board.css'
+import { SAVED_SIGN_INS } from '../sign-in-tests/phase'
 
 /* Lazy, the way the trail loads its own.
 
@@ -106,14 +118,22 @@ function focusSoon(find: () => HTMLElement | null, force = false) {
 }
 const byId = (id: string) => () => document.getElementById(id)
 
-/* Every card folded, while Try a sign-in reads the chain: the evidence under
-   each head is what is being read, and a card open at its full height is a
-   rule's editor standing in the route. Module-level, so it is one function. */
-const FOLDED = () => false
-
 /* Controls that take keys of their own. A rule shortcut never fires from inside
    one — Backspace in a picker is not "delete this rule". */
 const OWNS_KEYS = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="combobox"], [role="listbox"], [role="menu"], [role="dialog"]'
+/* Surfaces that are not the chain: the inspector, Check access's panels
+   (which wear the inspector's chrome: the sign-in, a view), and their
+   popovers (portalled, so not inside them). A rule shortcut pressed in any of
+   them acts on a rule nobody there is looking at. */
+const TEST_SURFACES = '.bb__insp, .sit-panel, .bx-apop'
+/* Check access's panels: T, pressed in one of them, still closes Check
+   access, as it did from the old test panel (`.tpanel`). */
+const CHECK_PANELS = '.sit-panel, .tpanel'
+/* Each Check access view's mark in the palette, as on its bar button. */
+const VIEW_ICON: Record<CheckView, LucideIcon> = { past: PastIcon, people: Users, 'break-in': ShieldAlert }
+/* Describe it's thread (V4 §4.1): its own track on the left, not the
+   inspector's, and a surface a rule shortcut never reaches either. */
+const DESCRIBE_SURFACE = '.bdsc'
 
 /* Before saving, as it last ran: what the checks said, what they read, and
    the rules they read — by reference, so an Undo pressed behind the page is
@@ -134,16 +154,20 @@ export function BoardBuilder({
   openTest,
   openPage,
   rule,
+  arriveFix,
 }: {
   policyId: string
-  /** Arrive in Try a sign-in's test mode: the Policies row menu's Try a sign-in. */
+  /** Arrive in Check access: the Policies row menu's, the page's Open policy. */
   openTest?: boolean
-  /* The page Try a sign-in's panel opens on: Check a person, Saved sign-ins
-     or the Break-in test (final spec, B V3), where the edition has Policy
-     testing; without it the panel is Try alone. */
-  openPage?: BoardTestPage
+  /* What the route named (V4 §2.4-bis): the sign-in (`try`), People, Saved
+     sign-ins or the Break-in test. Check access opens on the sign-in for
+     every one while People and the Break-in test are hidden (test-mode.ts
+     `PEOPLE_AND_BREAK_IN`); back, the two open their own view. */
+  openPage?: BoardOpen
   /** Arrive with this rule selected, or the last row ('fallback'). */
   rule?: string
+  /** Access checks' "Fix in policy ↗": a break-in card and its application, fixed in the draft on arrival (arrive-fix.ts). */
+  arriveFix?: ArriveFix
 }) {
   const store = useBrand()
   /* The edition, which this surface ignored entirely.
@@ -185,6 +209,47 @@ export function BoardBuilder({
   const [describeState, setDescribeState] = useState<DescribeState>(emptyDescribe)
   const describeIds = useRef<RuleIds>(new Map())
   const session = useRef<DescribeSession | null>(null)
+  /* The thread as this opening found it: what the toast's Undo gives back
+     with the board, so the two never disagree about what was written. */
+  const openedWith = useRef<DescribeState | null>(null)
+  /* The name Done gave in place of the product's "Untitled policy", and the
+     one it replaced: taken back with the rules when an Undo returns the
+     board to the chooser — only while the policy still carries it, so a
+     name the admin typed since is theirs. */
+  const describedName = useRef<{ from: string; to: string } | null>(null)
+  const nameBack = (current: string) => {
+    const n = describedName.current
+    describedName.current = null
+    return n && current === n.to ? n.from : current
+  }
+  /* Every card id a reading has written on this visit (`describedDraft`). A
+     rule not in it was added by hand, and a panel write never takes it away. */
+  const describeWritten = useRef(new Set<string>())
+  /* The thread each history entry stands for, with the policy's facts beside
+     it (describe-session.ts, "Moving through the board's history"): the
+     board's own Undo, Redo and Discard bring the thread along with the rules,
+     so it never describes rules that are gone. */
+  const threadMarks = useRef(new WeakMap<Policy, ThreadMark>())
+  /* The facts as Describe it last left them: a move hands back only a fact
+     the admin has not changed since. */
+  const leftFacts = useRef<PolicyFacts | null>(saved ? factsOf(saved) : null)
+  /* The thread and the facts as the policy was last saved: what Discard puts
+     back with the rules — the name and applications a reading gave since go
+     too, as the thread that gave them does. */
+  const savedMark = useRef<ThreadMark>({ thread: emptyDescribe(), facts: saved ? factsOf(saved) : undefined })
+  /* The thread as last drawn, and whether it is open, for a toast's Undo
+     that runs seconds after the render that made it. */
+  const describeNow = useRef(describeState)
+  describeNow.current = describeState
+  const describingNow = useRef(describing)
+  describingNow.current = describing
+  /* The cards the panel's last write added or changed, edged for 2 s (V4 §4.1). */
+  const [fresh, setFresh] = useState<{ ids: string[]; n: number } | null>(null)
+  useEffect(() => {
+    if (!fresh) return
+    const t = window.setTimeout(() => setFresh(null), 2000)
+    return () => window.clearTimeout(t)
+  }, [fresh])
   /* The words each card was written from, by rule id, until the next save. */
   const [sources, setSources] = useState<Record<string, string>>({})
   /* Read as text (describe spec, §7.2): open in the inspector's slot, and the
@@ -211,16 +276,28 @@ export function BoardBuilder({
       alive.current = false
     }
   }, [])
-  /* Try a sign-in's test mode (try-sign-in.ts has the model, use-try-sign-in.ts
-     the run). Seeded from the route: the row menu's Try a sign-in lands here
-     with it on. */
+  /* Check access — test mode, the Sign-in tests page's experience inside the
+     policy (owner, 1 Oct 2026; PolicyCheck.tsx). Seeded from the route: the
+     row menu's and the page's Open policy land here with it on. */
   const [testing, setTesting] = useState(!!openTest)
-  /* Whether the column's current occupant took the other's place — the rule
-     editor opened from the chain, or the sign-in panel back from it — so it
-     fades in where it stands rather than sliding in as a new panel. */
-  const [swapped, setSwapped] = useState(false)
-  const testHeading = useRef<HTMLHeadingElement | null>(null)
   const testButton = useRef<HTMLSpanElement | null>(null)
+  /* Which panel it has open beside its canvas — the sign-in, or a view from
+     the bar — and at which of its two widths. Here, not in PolicyCheck: the
+     region's right-hand track and the bar's buttons follow them. Shut on
+     arrival, as the page's is; a route that names a view opens it, while
+     that view is offered. */
+  const [checkPanel, setCheckPanel] = useState<CheckPanel | null>(() => {
+    if (!openTest) return null
+    /* The page's link to Saved sign-ins, inside a policy: its saved ones, in the panel. */
+    if (SAVED_SIGN_INS && openPage === 'saved') return 'saved'
+    if (PEOPLE_AND_BREAK_IN && (openPage === 'person' || openPage === 'break-in')) return openPage === 'person' ? 'people' : 'break-in'
+    return null
+  })
+  const [checkWide, setCheckWide] = useState(true)
+  /* What Check access would lose as it shuts — its run, its sign-in, its
+     zoom — kept for the life of the builder, so opening it again shows the
+     run where it was. */
+  const checkKept = useRef<CheckKept | null>(null)
   const [hover, setHover] = useState<number | null>(null)
   /* The last row under the pointer — Describe it bolds its answer, as a rule card's. */
   const [hoverLast, setHoverLast] = useState(false)
@@ -321,6 +398,8 @@ export function BoardBuilder({
      card on it, sixty times a second, to change one width — the same trap the
      pan was in before it moved to a ref. The custom property is all the layout
      needs, so the drag writes that and React hears about it once, at the end. */
+  /* The inspector's alone: Check access's panels have the page's two widths
+     and their own button between them, and no grip. */
   const setW = useCallback((w: number) => {
     const next = Math.max(320, Math.min(720, w))
     shell.current?.style.setProperty('--bb-insp', `${next}px`)
@@ -371,7 +450,20 @@ export function BoardBuilder({
     if (d) setInspW(d.at)
   }, [])
 
+  /* A new history only for ANOTHER policy than the one it was opened on — a
+     route from one board to the next, which keeps this builder mounted.
+
+     It ran on mount as well, rebuilding the history `useState` had just built,
+     which did nothing until something was committed in the same pass: a fix
+     brought from Access checks (`arriveFix`, below) is, and StrictMode's
+     second run of this effect put the clean draft back over it — the toast
+     said "Rule added" over a board with no rule added. The id the history
+     was opened for is kept, so the mount and StrictMode's rerun both leave it
+     alone. */
+  const histFor = useRef(saved?.id)
   useEffect(() => {
+    if (histFor.current === saved?.id) return
+    histFor.current = saved?.id
     if (saved) setHist(historyOf(openForEditing(saved)))
   }, [saved?.id])
 
@@ -425,7 +517,9 @@ export function BoardBuilder({
      for the rest of the visit. The old scratch inserted a rule, and one Undo
      brought the chooser back; this keeps that way home. */
   const backToChooser = scratch && present.rules.length === 0 && !canUndo(hist)
-  const undoStep = () => (backToChooser ? setScratch(false) : setHist(undo))
+  /* Through `moveHistory` (below), which brings Describe it's thread along. */
+  const undoStep = () => (backToChooser ? setScratch(false) : moveHistory(undo(histNow.current)))
+  const redoStep = () => moveHistory(redo(histNow.current))
 
   /* The store's one env (sim-env.ts), shared with every other surface that
      evaluates, so the board and the gauntlet name things the same way. */
@@ -434,8 +528,33 @@ export function BoardBuilder({
   /* Only an app access policy decides sign-ins, so only one can be tried. */
   const canTest = features.trySignIn && draft.type === 'App Access'
   const testOn = testing && canTest && !!saved
-  /* Try a sign-in takes the column first: `T` closes the panel as Done does. */
+  /* The commit that opens or closes test mode switches the grid's columns
+     without their transition (`.bb.is-snap`), so the canvas that takes the
+     middle track has its final width at once — and the board hidden under
+     Check access is never seen to move (review, 29 Sep 2026: three moves and
+     a sliding marker). Dropped two frames later, when nothing is changing
+     width any more. */
+  /* Describe it's left track switches the same way (V4 §4.1): the panel's
+     own slide-in is the motion, and the canvas refits once beside it. */
   const describeOpen = describing && !testOn
+  const layout = testOn ? 'test' : describeOpen ? 'describe' : 'edit'
+  const [snapFor, setSnapFor] = useState(layout)
+  const snapping = snapFor !== layout
+  useEffect(() => {
+    if (!snapping) return
+    let second = 0
+    const first = window.requestAnimationFrame(() => {
+      second = window.requestAnimationFrame(() => setSnapFor(layout))
+    })
+    return () => {
+      window.cancelAnimationFrame(first)
+      window.cancelAnimationFrame(second)
+    }
+  }, [snapping, layout])
+  /* The right-hand column's width: Check access's panel's while it is on —
+     the page's two widths — the inspector's otherwise. */
+  const colW = testOn ? (checkWide ? CHECK_PANEL_WIDE : CHECK_PANEL_NARROW) : inspW
+  /* Check access takes the board first: `T` closes the panel as × does (`describeOpen`, above). */
   /* Read as text gives the column up to either of them. */
   const readOpen = reading && !testOn && !describeOpen
   /* What the reader matches against: this tenant's own names. */
@@ -445,7 +564,7 @@ export function BoardBuilder({
   )
   /* The checks under the answers (describe-checks.ts): a handful of sign-ins
      built from them, tried through the whole tenant with the draft on. On
-     today's date where the tenant is, as Try a sign-in starts. */
+     today's date where the tenant is, as Check access starts. */
   const today = useMemo(() => todayIn(), [])
   const checkCtx: Omit<CheckContext, 'draft' | 'sources'> = { tenant: describeTenant, env, adminId: store.account.id, today }
   const describeReading = describeState.reading
@@ -457,25 +576,27 @@ export function BoardBuilder({
     /* Not the box: typing leaves the reading as it was, so nothing here runs while the admin types. */
     [describeOpen, features.draftChecks, describeReading, draft, sources, describeTenant, env, store.account.id, today],
   )
-  const trying = useTrySignIn({ on: testOn, saved: saved ?? draft, draft, env })
-
+  /* The board as it stands, for the latest turn's change line. */
+  /* Less the rules the admin added by hand since the latest turn — a card no
+     reading wrote and the turn did not find there — so its change line never
+     claims one ("Added 2 rules" for a card from the canvas's +). */
+  const latestTurnRules = describeState.turns.at(-1)?.board.rules
+  const describeBoard = useMemo(
+    () => ({
+      rules: draft.rules.filter((r) => describeWritten.current.has(r.id) || !!latestTurnRules?.some((x) => x.id === r.id)),
+      fallback: draft.fallback,
+      checks: draft.checks,
+    }),
+    [draft.rules, draft.fallback, draft.checks, latestTurnRules],
+  )
   const testingSession = useTestingSession()
 
-  /* Policy testing (final spec, B V3) lives in this panel and
-     nowhere else, so the panel carries its views as tabs — Try a sign-in,
-     Check a person, Saved sign-ins — with the Break-in test pushed over Saved
-     sign-ins where the edition has it. Which page is open is held here, not in
-     the panel: a rule opened from the chain takes the panel's column, and its
-     × comes back to the page it left, and so is what the pages would lose
-     while the rule has the column (`viewsKept`), emptied when test mode
-     starts afresh. A route can name the page (`open`); otherwise
-     it opens on Try. The Break-in test is offered only on a policy it runs on. */
-  const views = features.policyTesting
-  const pagesAllowed = boardPagesAllowed(views, features.breakInTest, draft)
-  const [page, setPage] = useState<BoardTestPage>(() => firstBoardPage(openPage, pagesAllowed))
-  const [viewsKept, setViewsKept] = useState(boardViewsKept)
-  const arrivedOn = useRef(page)
-  const panelPage = pageShown(page, pagesAllowed)
+  /* Check access's views beside the sign-in (test-mode.ts `checkViews`):
+     Past sign-ins where the edition has Policy testing; People and the
+     Break-in test only while they are back — the Break-in test on a policy
+     it runs on. */
+  const pagesAllowed = boardPagesAllowed(features.policyTesting, features.breakInTest, draft)
+  const views = checkViews({ policyTesting: features.policyTesting, breakIn: pagesAllowed.breakIn })
   const diagnostics = useMemo(() => (saved ? diagnose(draft, store.groups, store.hooks, store.users, { zones: store.zones, fingerprints: store.fingerprints }) : []), [draft, store.groups, store.hooks, store.users, store.zones, store.fingerprints, saved])
   const shadowed = useMemo(() => (hover === null ? [] : shadowedBy(draft, hover)), [draft, hover])
   /* Draft mode — see policy-draft.ts.
@@ -495,42 +616,76 @@ export function BoardBuilder({
     [unsaved, draft.rules, draft.fallback],
   )
 
+  /* The leave guard's Save as draft too: the name and audience the thread
+     gives go on the policy first (`factsToSave`), or a draft described and
+     saved before Done kept the rules and lost who they are for. */
   const saveDraft = () => {
     if (!saved) return false
+    const latest = store.policyById(saved.id) ?? saved
+    const facts = saveFacts(latest)
     store.saveDraft(saved.id, { rules: draft.rules, fallback: draft.fallback, checks: draft.checks })
+    afterSave({ ...latest, ...facts })
     store.showToast('Draft saved')
     return true
   }
 
   /* First arrival only, and never on top of something else.
 
-     Arriving in test mode — the row menu's Try a sign-in, or a guard page's
-     Break-in "Open" — is somebody who knows what they came for, and
+     Arriving in Check access — the row menu's, the Sign-in tests page's
+     Open policy — is somebody who knows what they came for, and
      interrupting them with a walkthrough would be the product talking over a
      question it was just asked. The settle delay is so the spotlight measures a
      laid-out screen rather than a mounting one.
 
      Its own key, not the trail's: the two teach different surfaces, and
-     somebody who took the trail's tour has not been shown this one. */
+     somebody who took the trail's tour has not been shown this one.
+
+     Not at all while the walkthrough is hidden with its bar button (owner,
+     1 Oct 2026: "Hide this 3 as of now"; bar-tools.ts): a tour that opens by
+     itself, with no way back to it, would be the one door left.
+
+     Nor over a fix brought from Access checks: that is somebody arriving to
+     read one change on the chain. */
+  const arriving = arriveFix !== undefined
   useEffect(() => {
-    if (openTest || boardTourSeen()) return
+    if (!BAR_TOUR || openTest || arriving || boardTourSeen()) return
     const t = window.setTimeout(() => setTour(true), 600)
     return () => window.clearTimeout(t)
-  }, [openTest])
-  /* And the panel's heading takes focus, as it does when the bar opens it —
-     unless it opened on the Break-in test, whose Back takes it. */
+  }, [openTest, arriving])
+
+  /* The region's ground — its dots — follows whoever is drawn on it: the
+     board writes its pan and zoom there (`varsOnParent`), and Check access's
+     canvas its own scroll and zoom while it is on. What the board had written
+     is put back as Check access shuts, after the canvas has let go of it, so
+     the dots stand under the chain as they did. */
+  const groundBefore = useRef<Record<string, string> | null>(null)
   useEffect(() => {
-    if (openTest && arrivedOn.current !== 'break-in') focusSoon(() => testHeading.current)
-  }, [openTest])
+    const el = shell.current
+    if (!el) return
+    const VARS = ['--bb-x', '--bb-y', '--bb-z']
+    if (testOn) {
+      groundBefore.current = Object.fromEntries(VARS.map((v) => [v, el.style.getPropertyValue(v)]))
+      el.style.setProperty('--bb-x', '0px')
+      el.style.setProperty('--bb-y', '0px')
+      el.style.setProperty('--bb-z', String(checkKept.current?.zoom ?? 1))
+      return
+    }
+    const before = groundBefore.current
+    groundBefore.current = null
+    if (!before) return
+    for (const v of VARS) {
+      if (before[v]) el.style.setProperty(v, before[v])
+      else el.style.removeProperty(v)
+    }
+  }, [testOn])
 
   /* The draft lives in this component, so leaving the board would destroy it.
      Every way out asks first, and Save as draft keeps the work without
      publishing it. */
   useLeaveGuard({ dirty: unsaved, save: saveDraft, saveLabel: 'Save as draft' })
 
-  /* The rehearsal that was re-walked here on every draft is Try a sign-in's run
-     now, which reads the draft directly (use-try-sign-in.ts): an edit is an
-     update, and the route follows it without replaying. */
+  /* The rehearsal that was re-walked here on every draft is Check access's
+     run now, which reads the draft directly (TryJourney `policy`). */
 
   /* --- Keys -------------------------------------------------------------------
 
@@ -568,25 +723,45 @@ export function BoardBuilder({
   const keyHandler = useRef<(e: KeyboardEvent) => void>(() => {})
   keyHandler.current = (e: KeyboardEvent) => {
     const t = e.target as HTMLElement | null
-    const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+    /* An empty search box in the test panel lets Escape through: the first
+       Escape in one with text clears it (the panel stops that one), and the
+       next closes test mode, as it would anywhere else in the panel. Every
+       other key there is still typing. */
+    const emptySearch = e.key === 'Escape' && t instanceof HTMLInputElement && t.type === 'search' && t.value === '' && !!t.closest(CHECK_PANELS)
+    const typing = !emptySearch && t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
     const modal = !!document.querySelector('[role="dialog"], .bx-scrim')
     const action = historyKey(e)
     /* Not behind a dialog: undo would change the draft where nobody can see it.
        The walkthrough card is a non-modal dialog beside the board, and the
-       edits it makes are meant to be undone, so it does not block undo. */
+       edits it makes are meant to be undone, so it does not block undo. Not
+       under Check access either, for the same reason: the chain is hidden
+       under its canvas. */
     const blocking = !!document.querySelector('[role="dialog"]:not([aria-modal="false"]), .bx-scrim')
-    if (action && !typing && !blocking) {
+    if (action && !typing && !blocking && !testOn) {
       e.preventDefault()
-      if (action === 'redo') setHist(redo)
+      if (action === 'redo') redoStep()
       else undoStep()
       return
     }
 
     if (typing || modal) return
 
-    const inControl = t instanceof Element && !!t.closest(OWNS_KEYS)
+    const inControl = !emptySearch && t instanceof Element && !!t.closest(OWNS_KEYS)
     /* Rule bindings only: not in a control, not in the panel, not handled. */
-    const owned = e.defaultPrevented || inControl || (t instanceof Element && !!t.closest('.bb__insp'))
+    const owned = e.defaultPrevented || inControl || (t instanceof Element && (!!t.closest(TEST_SURFACES) || !!t.closest(DESCRIBE_SURFACE)))
+
+    /* Unmodified T, beside E and for the same reason: a toggle reached for
+       again and again while a rule is being worked out. Not in a field or a
+       control, not behind a dialog — the guards above — not in the rule
+       editor, and not on a policy that decides no sign-in. Tested before the
+       rule bindings stand down in the test panel: T is test mode's own
+       toggle, so it closes it from the panels it opened. */
+    if (e.key.toLowerCase() === 't' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.defaultPrevented && !inControl) {
+      if (!canTest || (t instanceof Element && !t.closest(CHECK_PANELS) && !!t.closest(`.bb__insp, ${DESCRIBE_SURFACE}`))) return
+      e.preventDefault()
+      toggleTest()
+      return
+    }
 
     const cmd = e.metaKey || e.ctrlKey
     const rules = draft.rules
@@ -629,11 +804,17 @@ export function BoardBuilder({
        collapsed panel for no reason you could trace back to a keystroke. */
     if (cmd && e.key === '\\') {
       e.preventDefault()
-      /* Test mode's column is always the sign-in or the rule; it does not hide. */
+      /* Not in test mode: the column always holds something there — the test
+         panel, or the rule editor in its place — and neither reads this flag,
+         so the flip would only surface once test mode closed. */
       if (testOn) return
       if (at >= 0 || selection.kind === 'fallback' || selection.kind === 'apps') setInspOpen((v) => !v)
       return
     }
+    /* Under Check access the chain is hidden under its canvas, so nothing
+       below — each acts on the selected rule — reaches it: only the
+       shortcut sheet, and Escape, which closes Check access. */
+    if (testOn && e.key !== 'Escape' && e.key !== '?') return
     /* Everything below acts on the selected rule, or is a single key. Escape
        still reaches the board from the panel; it has its own test at the end. */
     if (owned && e.key !== 'Escape') return
@@ -702,16 +883,6 @@ export function BoardBuilder({
       setKeys((v) => !v)
       return
     }
-    /* Unmodified T, beside E and for the same reason: a toggle reached for
-       again and again while a rule is being worked out. Not in a field, not
-       in the panel, not behind a dialog — the guards above — and not on a
-       policy that decides no sign-in. */
-    if (e.key.toLowerCase() === 't' && !cmd && !e.altKey && !e.shiftKey) {
-      if (!canTest) return
-      e.preventDefault()
-      toggleTest()
-      return
-    }
     /* Not past a dialog.
 
        This is a window listener, so it saw the Escape that closed the
@@ -720,12 +891,14 @@ export function BoardBuilder({
        were working in. Anything modal owns Escape while it is open; the
        board only gets it when nothing is over the board. */
     if (e.key === 'Escape' && !typing && !e.defaultPrevented && !inControl && !document.querySelector('[role="dialog"], .bx-scrim')) {
-      /* In test mode, a rule open in the column goes back to the sign-in
-         first; then test mode closes. Outside it, the selection clears. */
-      if (testOn) {
-        if (selection.kind !== 'none') backToTest()
-        else closeTest()
-      } else setSelection({ kind: 'none' })
+      /* Under Check access, its open panel takes the first Escape
+         (PolicyCheck.tsx); this one closes Check access. Outside it, the
+         selection clears. */
+      if (testOn) closeTest()
+      /* Describe it closes as × does, wherever focus fell — a click on the
+         canvas leaves it on <body>, out of the panel's own Escape. */
+      else if (describeOpen) finishDescribe()
+      else setSelection({ kind: 'none' })
     }
   }
 
@@ -790,7 +963,7 @@ export function BoardBuilder({
      Describe it wrote this draft's on this visit — a described draft turned on
      from the walkthrough's review has not been stored yet. */
   const guardInput = (kind: SaveGuard['kind'], d: Policy, signIns = store.savedSignIns): GuardInput => {
-    const after = committed(saved ?? d, d, kind === 'save' ? 'keep-off' : 'turn-on')
+    const after = committed(saved ?? d, withDescribed(d), kind === 'save' ? 'keep-off' : 'turn-on')
     return {
       kind,
       before: kind === 'save' ? (saved ?? null) : null,
@@ -808,7 +981,7 @@ export function BoardBuilder({
   const holdGuard = (kind: SaveGuard['kind'], d: Policy, result: GuardResult | 'error', run: number, intent: CommitIntent) =>
     setGuard({ kind, result, stamp: stampNow(), run, intent, rules: d.rules, fallback: d.fallback })
   const checkThenPublish = (intent: CommitIntent) => {
-    const turnsOn = intent === 'turn-on' && guardsTurnOn && !!saved && committed(saved, draft, 'turn-on').status === 'active'
+    const turnsOn = intent === 'turn-on' && guardsTurnOn && !!saved && committed(saved, withDescribed(draft), 'turn-on').status === 'active'
     const kind: SaveGuard['kind'] | null = guardsSave ? 'save' : turnsOn ? 'turn-on' : null
     if (!kind) return publish(intent)
     if (checking) return
@@ -824,6 +997,17 @@ export function BoardBuilder({
       setGuardOpen(true)
     })
   }
+  /* The walkthrough's review, as an element that keeps its identity until
+     it opens or the draft changes: closed, it still read the whole policy's
+     findings on every render — every hop of a run's marker among them. */
+  const commitRef = useRef(checkThenPublish)
+  commitRef.current = checkThenPublish
+  const onReviewCommit = useCallback((intent: CommitIntent) => commitRef.current(intent), [])
+  const closeReview = useCallback(() => setReview(false), [])
+  const reviewDialog = useMemo(
+    () => <ReviewDialog open={review} policy={draft} from="board" onClose={closeReview} onCommit={onReviewCommit} />,
+    [review, draft, closeReview, onReviewCommit],
+  )
 
   const selAt = selection.kind === 'rule' ? draft.rules.findIndex((r) => r.id === selection.id) : -1
   const selName = selAt >= 0 ? draft.rules[selAt].name : ''
@@ -867,14 +1051,6 @@ export function BoardBuilder({
     }
     setSelection(s)
     if (s.kind !== 'none') setInspOpen(true)
-    /* In test mode the rule opens in the sign-in's column, in its place, and
-       the chain stays folded — its evidence is what is being read. */
-    if (testOn) {
-      /* Only when the column's occupant actually changes: a click on the
-         background with the sign-in already showing swaps nothing. */
-      if ((s.kind !== 'none') !== hasSubject) setSwapped(true)
-      return
-    }
     /* Selecting a card unfolds it, and folds whatever was unfolded. The start
        node and a click on the background select no card, so they leave the
        chain as it is — nothing was chosen over the open card. */
@@ -917,50 +1093,44 @@ export function BoardBuilder({
   }, [panelShown])
   const panelLeaving = panelAlive && !panelShown
 
-  /* --- Test mode ------------------------------------------------------------------
+  /* --- Check access (test mode) ------------------------------------------------
 
-     Opening it clears the selection, so the column shows the sign-in. Closing
-     it hands focus back to the bar button it was opened from. */
-  const startTest = () => {
-    if (describing) finishDescribe()
+     Every door does the same housekeeping: Describe it and Read as text give
+     the column up (closed, not left latent behind the canvas to come back
+     when it shuts), and the panel opens as the door says — none for the bar's
+     button and T, the canvas alone, as the page arrives; a view for a door
+     that names one. The selection, the folds and the zoom are left as they
+     are, under the canvas (`.bb.is-checking`), for the way back: closing
+     gives the chain back exactly as it was, and hands focus to the bar's
+     button. */
+  const enterTest = (panel: CheckPanel | null = null) => {
+    /* Without the "Rules added" toast: it would stand over the canvas. ⌘Z
+       still takes it all back, once Check access shuts. */
+    if (describing) finishDescribe(true)
     setReading(false)
     setReadHover(null)
     setTesting(true)
-    setSelection({ kind: 'none' })
-    setSwapped(false)
-    setPage('try')
-    setViewsKept(boardViewsKept())
-    focusSoon(() => testHeading.current)
+    setCheckPanel(panel)
   }
-  /* The Break-in test, pushed in this panel a guard page's
-     "Open". Test mode opens on it, or the panel moves to it; the
-     test's Back takes focus as it arrives, so nothing here moves focus. */
-  const openBreakInPage =
-    pagesAllowed.breakIn && canTest
-      ? () => {
-          if (!testOn) {
-            setTesting(true)
-            setViewsKept(boardViewsKept())
-          }
-          if (hasSubject) setSwapped(true)
-          setSelection({ kind: 'none' })
-          setPage('break-in')
-        }
-      : undefined
-  /* Back to Try a sign-in from inside another page: the control pressed goes
-     with the page, so focus goes to the panel's heading. */
-  const toTry = () => {
-    setPage('try')
-    focusSoon(() => testHeading.current)
+  const startTest = () => enterTest()
+  /* The Break-in test, from a guard page's "Open": its view in Check access —
+     only while it is offered (hidden, test-mode.ts `PEOPLE_AND_BREAK_IN`);
+     otherwise the guard page offers no Open. */
+  const openBreakInPage = views.includes('break-in') && canTest ? () => enterTest('break-in') : undefined
+  const leaveTest = () => {
+    setTesting(false)
+    setCheckPanel(null)
   }
   const closeTest = () => {
-    setTesting(false)
+    leaveTest()
     focusSoon(() => testButton.current?.querySelector<HTMLElement>('button') ?? null)
   }
   const toggleTest = () => (testOn ? closeTest() : startTest())
+  /* A view's button on the bar (Past sign-ins): its view in the panel, or the panel shut. */
+  const toggleView = (v: CheckView) => setCheckPanel((p) => (p === v ? null : v))
   /* Read as text (describe spec, §7.2). It takes the column from whatever
      holds it — the rule editor, Describe it (closed as Done closes it), or
-     Try a sign-in — and gives it back on close: a card that is selected gets
+     Check access — and gives it back on close: a card that is selected gets
      its editor again. Focus returns to the bar's button. */
   const closeRead = () => {
     setReading(false)
@@ -968,8 +1138,8 @@ export function BoardBuilder({
     focusSoon(() => readButton.current?.querySelector<HTMLElement>('button') ?? null)
   }
   const openRead = () => {
-    if (describing) finishDescribe()
-    if (testOn) setTesting(false)
+    if (describing) finishDescribe(true)
+    if (testOn) leaveTest()
     setReading(true)
   }
   const toggleRead = () => (readOpen ? closeRead() : openRead())
@@ -982,28 +1152,76 @@ export function BoardBuilder({
     openOnly(id)
     setFlash({ id, key: Date.now() })
   }
-  /* The rule editor's ×, in test mode: back to the sign-in, focus on its heading. */
-  const backToTest = () => {
-    setSelection({ kind: 'none' })
-    setSwapped(true)
-    focusSoon(() => testHeading.current)
+  /* Back to the builder from Check access: Open policy on this policy, or
+     Open rule on one of its rules (a card, the answer's why). The chain as it
+     was left — and, for a rule, that card selected, opened in the panel and
+     shown on the chain. */
+  const backFromCheck = (rule?: string) => {
+    if (!rule) return closeTest()
+    leaveTest()
+    const r = rule === 'fallback' ? null : draft.rules.find((x) => x.id === rule)
+    if (rule !== 'fallback' && !r) return
+    select(r ? ruleAt(r.id) : { kind: 'fallback' })
+    setFlash({ id: rule, key: Date.now() })
+    focusSoon(r ? byId(`bb-rule-${r.id}-title`) : () => document.getElementById('bb-terminal-title'))
   }
+  const toggleCheckWidth = useCallback(() => setCheckWide((w) => !w), [])
+  const focusTestButton = useCallback(() => testButton.current?.querySelector<HTMLElement>('button')?.focus(), [])
+
+  /* --- A fix from Access checks --------------------------------------------------
+
+     "Fix in policy ↗" on a break-in row (owner, 1 Oct 2026: "can we implement
+     it in the check part? as a suggestion inside conflicts or somewhere else"
+     — then "go with your picks, start building"). The page has no draft, so
+     it only previews; the fix is made here, on this draft, the way every
+     ready fix on the board is — one commit, Undo in the toast, the save bar
+     awake, the leave guard on it — and the card it made or changed is
+     selected, opened in the panel and shown on the chain, as Open rule does
+     from Check access (`backFromCheck`). Nothing applies, and a plain toast
+     says why in a line. Never Check access: the change is read on the chain.
+
+     ONCE per arrival (`firstArrival`): the key is the policy, the card and
+     the application, held in a ref, so StrictMode's second run of this effect
+     and every later render find it taken. What it does is in a ref rewritten
+     every render, as the key handler is: `landArrival` is with the edits,
+     below the early return, and an effect runs after the render that defined
+     it — only where the policy exists, and where the edition has the
+     Break-in test the row came from. */
+  const arrived = useRef<string | null>(null)
+  const arrival = useRef<() => void>(() => {})
+  arrival.current = () => {
+    if (arriveFix && saved && features.breakInTest) landArrival(arriveFix)
+  }
+  const fixKey = arrivalKey(policyId, arriveFix)
+  useEffect(() => {
+    if (firstArrival(arrived, fixKey)) arrival.current()
+  }, [fixKey])
+
+  /* Describe it's thread, reopened from the palette as from the door on the canvas. */
+  const describeDoorCmd = !!saved && describeOffered(features.describePolicy, saved) && describeState.turns.length > 0 && !describeOpen && !testOn
+  /* Under Check access the chain is hidden under its canvas, so the palette
+     offers only what still means something there: the policy's save, the
+     sheet, Check access itself, and its views. */
+  const editing = !testOn
   const boardCommands: Cmd[] = [
-    { id: 'add', label: 'Add a rule', icon: Plus },
-    ...(selAt >= 0
+    /* Not while Describe it is open: the text writes the rules then. */
+    ...(describeOpen || !editing ? [] : ([{ id: 'add', label: 'Add a rule', icon: Plus }] as Cmd[])),
+    ...(selAt >= 0 && editing
       ? ([
           { id: 'dup', label: `Duplicate rule ${selAt + 1} · ${selName}`, kbd: chord(['mod'], 'D', MAC), icon: CopyPlus },
           { id: 'del', label: `Delete rule ${selAt + 1} · ${selName}`, kbd: 'Del', icon: Trash2, danger: true },
         ] as Cmd[])
       : []),
     ...(toPublish ? ([{ id: 'publish', label: features.publish ? 'Review and publish' : 'Review and save', kbd: chord(['mod'], 'Enter', MAC), icon: Check }] as Cmd[]) : []),
-    ...(canUndo(hist) || backToChooser ? ([{ id: 'undo', label: 'Undo', kbd: chord(['mod'], 'Z', MAC), icon: Undo2 }] as Cmd[]) : []),
-    ...(canRedo(hist) ? ([{ id: 'redo', label: 'Redo', kbd: chord(['mod', 'shift'], 'Z', MAC), icon: Redo2 }] as Cmd[]) : []),
-    /* Not in test mode, where the column is always the sign-in or the rule. */
+    ...((canUndo(hist) || backToChooser) && editing ? ([{ id: 'undo', label: 'Undo', kbd: chord(['mod'], 'Z', MAC), icon: Undo2 }] as Cmd[]) : []),
+    ...(canRedo(hist) && editing ? ([{ id: 'redo', label: 'Redo', kbd: chord(['mod', 'shift'], 'Z', MAC), icon: Redo2 }] as Cmd[]) : []),
+    /* Not in test mode, where the column is never hidden (the ⌘\ handler says why). */
     ...(hasSubject && !testOn ? ([{ id: 'panel', label: inspOpen ? 'Hide the panel' : 'Show the panel', kbd: chord(['mod'], '\\', MAC), icon: PanelRightClose }] as Cmd[]) : []),
     { id: 'keys', label: 'Keyboard shortcuts', kbd: '?', icon: Keyboard },
-    ...(canTest ? ([{ id: 'try', label: testOn ? 'Close Try a sign-in' : 'Try a sign-in', kbd: 'T', icon: LogIn }] as Cmd[]) : []),
-    ...draft.rules.map((r, i) => ({ id: `rule:${i}`, label: `Go to rule ${i + 1} · ${r.name}`, icon: ListOrdered }) as Cmd),
+    ...(canTest ? ([{ id: 'try', label: testOn ? `Close ${ACCESS_CHECK}` : ACCESS_CHECK, kbd: 'T', icon: LogIn }] as Cmd[]) : []),
+    ...(testOn ? views.map((v) => ({ id: `view:${v}`, label: DOCK_TAB_LABEL[v], icon: VIEW_ICON[v] }) as Cmd) : []),
+    ...(describeDoorCmd ? ([{ id: 'describe', label: 'Describe it', icon: PenLine }] as Cmd[]) : []),
+    ...(editing ? draft.rules.map((r, i) => ({ id: `rule:${i}`, label: `Go to rule ${i + 1} · ${r.name}`, icon: ListOrdered }) as Cmd) : []),
   ]
 
   if (!saved) return <div className="bpage">This policy no longer exists.</div>
@@ -1025,7 +1243,7 @@ export function BoardBuilder({
       run: () => {
         if (!alive.current) return
         if (after && histNow.current.present === after) {
-          setHist(undo)
+          moveHistory(undo(histNow.current))
           store.showToast('Restored')
         } else {
           store.showToast(`Other changes came after it. Use Undo in the toolbar (${chord(['mod'], 'Z', MAC)}).`)
@@ -1146,14 +1364,37 @@ export function BoardBuilder({
      The panel hands over its reading; the board composes it (describe-model.ts)
      and writes the rules and the last row as ONE history entry per opening of
      the panel. Applications are saved to the policy as the answer changes, as
-     the start node's pane saves them; the name and the audience once, at Done. */
+     the start node's pane saves them; the name and the audience once, at ×.
+
+     The thread (V4 §4.1) lives here for the visit, with the reading: closing
+     keeps it, and the door on the canvas reopens it as it was. Opening closes
+     Check access and Read as text; Check access closes it (`enterTest`). */
   const openDescribe = () => {
-    session.current = describeSession(saved.audience, present.fallback)
-    describeIds.current = new Map()
+    if (testOn) leaveTest()
+    const stored = store.policyById(saved.id) ?? saved
+    session.current = describeSession(stored.audience, present.fallback, stored.appIds)
+    /* A thread goes on keeping its cards' ids from opening to opening, so a
+       follow-up changes a card rather than replacing it. A new one starts afresh. */
+    if (describeState.turns.length === 0) describeIds.current = new Map()
+    openedWith.current = describeState
+    /* The entry the panel opens on stands for the thread as it is: an Undo
+       back to it brings this thread back with it. */
+    threadMarks.current.set(histNow.current.present, { thread: describeState, facts: factsOf(stored) })
     setSelection({ kind: 'none' })
-    setDescribeState((st) => withDraftApps(st, saved.appIds))
+    setDescribeState((st) => withDraftApps(st, stored.appIds))
     setReading(false)
+    setReadHover(null)
     setDescribing(true)
+  }
+  /* A composed draft from the answers: the last row the thread found when it
+     began, where the answers give none. The rules the admin added by hand
+     stay (`describeWritten`). */
+  const composeDescribed = (st: DescribeState, base: Policy) =>
+    describedDraft(base, st.reading.answers, describeTenant, describeIds.current, st.origin ? st.origin.fallback : session.current?.fallbackBefore, describeWritten.current)
+  /* The entry a write left as the present, while it is this opening's own,
+     stands for the thread that wrote it and the facts beside it. */
+  const markWrite = (s: DescribeSession, present: Policy, thread: DescribeState, facts: PolicyFacts) => {
+    if (s.wrote && s.last === present) threadMarks.current.set(present, { thread, facts })
   }
   const writeDescribe = (next: DescribeState, write: boolean) => {
     const answers = next.reading.answers
@@ -1161,71 +1402,234 @@ export function BoardBuilder({
     const shown = answers.apps.origin === 'text' || answers.apps.origin === 'picked' ? next : withDraftApps(next, saved.appIds)
     setDescribeState(shown)
     if (!write || !session.current) return
-    const { policy: composed, sources: from } = describedDraft(draft, shown.reading.answers, describeTenant, describeIds.current, session.current.fallbackBefore)
+    const { policy: composed, sources: from } = composeDescribed(shown, draft)
     /* The checks go in the same entry as the rules they were tried on, so
        Save policy stores them and Undo takes them back with the rules. */
     const policy = features.draftChecks ? withChecks(composed, shown.reading.answers, { ...checkCtx, sources: from }) : composed
+    const before = bodyOf(histNow.current.present)
     const { hist: h, session: s } = writeDescribed(histNow.current, policy, session.current)
     session.current = s
     if (h !== histNow.current) {
       lastCommitted.current = h.present
       histNow.current = h
       setHist(h)
+      const ids = changedCards(before, bodyOf(h.present))
+      if (ids.length > 0) setFresh((f) => ({ ids, n: (f?.n ?? 0) + 1 }))
     }
     setSources(from)
+    const latest = store.policyById(saved.id) ?? saved
+    let appIds = latest.appIds
     const apps = answers.apps
     if (apps.origin === 'text' || apps.origin === 'picked') {
-      const latest = store.policyById(saved.id)
-      const ids = apps.value ?? []
-      if (latest && JSON.stringify(latest.appIds) !== JSON.stringify(ids)) store.savePolicy({ ...latest, appIds: ids })
+      appIds = apps.value ?? []
+      if (JSON.stringify(latest.appIds) !== JSON.stringify(appIds)) {
+        store.savePolicy({ ...latest, appIds })
+        leftFacts.current = { ...(leftFacts.current ?? factsOf(latest)), appIds }
+      }
     }
+    markWrite(s, h.present, shown, { ...factsOf(latest), appIds })
   }
-  /* Done, the close button, Esc — and Try a sign-in, which takes the column.
-     Keeps everything. */
-  const finishDescribe = () => {
+  /* A message sent from the composer, an example or a follow-up chip. */
+  const sendDescribe = (message: string) => {
+    if (!session.current) return
+    const latest = store.policyById(saved.id) ?? saved
+    /* The applications are the store's: the draft's own copy goes stale when an answer saves them. */
+    const board = { ...bodyOf(histNow.current.present), appIds: latest.appIds }
+    const next = sendTurn(describeState, message, { dict: dictionaryOf(describeTenant), tenant: describeTenant, board, audience: latest.audience, view: describeBoard })
+    if (next !== describeState) writeDescribe(next, true)
+  }
+  /* The latest turn's Undo: the board, the text and the reading as they were
+     before it — in the history as this opening's one entry (describe-session.ts).
+     The first turn's goes back to the chooser, as the toast's Undo does. */
+  const undoDescribeTurn = () => {
+    const out = undoTurn(describeState)
+    if (!out || !session.current) return
+    const now = histNow.current.present
+    const to: Policy = { ...now, rules: out.board.rules, fallback: out.board.fallback, checks: out.board.checks }
+    const { hist: h, session: s } = revertDescribed(histNow.current, to, session.current)
+    session.current = s
+    if (h !== histNow.current) {
+      lastCommitted.current = h.present
+      histNow.current = h
+      setHist(h)
+    }
+    /* The applications the turn found: a turn that named others saved them
+       straight to the policy, so its Undo hands the old ones back. */
+    const stored = store.policyById(saved.id) ?? saved
+    const appIds = out.board.appIds ? [...out.board.appIds] : stored.appIds
+    if (JSON.stringify(stored.appIds) !== JSON.stringify(appIds)) store.savePolicy({ ...stored, appIds })
+    if (!out.first) {
+      const shown = withDraftApps(out.state, appIds)
+      setDescribeState(shown)
+      setSources(composeDescribed(shown, h.present).sources)
+      const ids = changedCards(bodyOf(now), out.board)
+      if (ids.length > 0) setFresh((f) => ({ ids, n: (f?.n ?? 0) + 1 }))
+      const facts = { ...factsOf(stored), appIds }
+      leftFacts.current = { ...(leftFacts.current ?? facts), appIds }
+      markWrite(s, h.present, shown, facts)
+      return
+    }
+    const origin = describeState.origin
+    setDescribeState(out.state)
+    setDescribing(false)
+    setTracing(null)
+    setHoverLast(false)
+    setSources({})
+    setFresh(null)
+    session.current = null
+    openedWith.current = null
+    const name = nameBack(stored.name)
+    const audience = origin ? origin.audience : stored.audience
+    if (name !== stored.name || JSON.stringify(stored.audience) !== JSON.stringify(audience)) store.savePolicy({ ...stored, name, audience, appIds })
+    /* The present stands for the empty thread now, and the facts from before it. */
+    const facts = { name, audience, appIds }
+    leftFacts.current = facts
+    threadMarks.current.set(h.present, { thread: out.state, facts })
+    if (h.present.rules.length === 0) setScratch(false)
+    /* Back on the chooser, on the card it came from. */
+    focusSoon(
+      () =>
+        [...document.querySelectorAll<HTMLElement>('.bb__empty .bb__start2')].find((b) => b.querySelector('strong')?.textContent === 'Describe it') ??
+        document.querySelector<HTMLElement>('.bb__empty .bb__start2') ??
+        document.getElementById('bb-start'),
+    )
+  }
+  /* The close button, Esc — and Check access or Read as text, which take
+     the board (`quiet`: no toast over the column they open). Keeps
+     everything, and saves the name and audience the thread gives. */
+  const finishDescribe = (quiet = false) => {
     if (!describing) return
     setDescribing(false)
     setTracing(null)
     setHoverLast(false)
+    setFresh(null)
     const s = session.current
     session.current = null
+    openedWith.current = null
+    /* Whenever there is a thread, not only after this opening wrote: a
+       thread a Redo brought back has rules on the board and no name yet. */
+    if (describeState.turns.length > 0) {
+      const latest = store.policyById(saved.id) ?? saved
+      const facts = saveFacts(latest)
+      const all = { ...factsOf(latest), ...facts }
+      leftFacts.current = all
+      threadMarks.current.set(histNow.current.present, { thread: describeState, facts: all })
+    }
     if (!s?.wrote) {
-      focusSoon(() => document.getElementById('bb-start') ?? document.querySelector<HTMLElement>('.bb__empty button'))
+      focusSoon(() => document.querySelector<HTMLElement>('.bdsc-door') ?? document.getElementById('bb-start') ?? document.querySelector<HTMLElement>('.bb__empty button'))
       return
     }
-    const latest = store.policyById(saved.id) ?? saved
-    const taken = store.policies.filter((p) => p.id !== latest.id).map((p) => p.name)
-    store.savePolicy({ ...latest, ...doneFacts(latest, describeState.reading.answers, describeTenant, taken) })
     /* The canvas stays up, as it does after "Start from scratch". */
     setScratch(true)
     const after = histNow.current.present
-    store.showToast(RULES_ADDED, {
-      label: 'Undo',
-      run: () => {
-        if (!alive.current) return
-        const back = undoDescribed(histNow.current, after, s)
-        if (!back) {
-          store.showToast(`Other changes came after it. Use Undo in the toolbar (${chord(['mod'], 'Z', MAC)}).`)
-          return
-        }
-        histNow.current = back.hist
-        setHist(back.hist)
-        const now = store.policyById(policyId)
-        if (now) store.savePolicy({ ...now, audience: back.audience })
-        /* No rules left: the chooser comes back, and Describe it reopens on the answers. */
-        if (back.chooser) setScratch(false)
-        store.showToast('Restored')
-      },
-    })
+    if (!quiet)
+      store.showToast(RULES_ADDED, {
+        label: 'Undo',
+        run: () => {
+          if (!alive.current) return
+          const back = undoDescribed(histNow.current, after, s)
+          if (!back) {
+            store.showToast(`Other changes came after it. Use Undo in the toolbar (${chord(['mod'], 'Z', MAC)}).`)
+            return
+          }
+          /* The thread, the name, the audience and the applications as this
+             opening found them, with the rules (`moveHistory`); no rules
+             left, and the chooser comes back. */
+          moveHistory(back.hist)
+          store.showToast('Restored')
+        },
+      })
     const first = after.rules[0]
     focusSoon(first ? byId(`bb-rule-${first.id}-title`) : () => document.getElementById('bb-start'))
   }
-  /* A check pressed (describe spec, §5.4): the panel closes as Done closes it,
-     toast and all, and Try a sign-in opens on this draft with the check's
-     sign-in in its fields — Today beside Draft, and the marker's first run. */
+  /* The name and audience the thread's answers give, as Done saves them —
+     for a save made before they are on the policy: the panel still open, or
+     a thread a Redo brought back. Null with no thread, or once the policy is
+     no longer a draft Describe it writes to. */
+  function factsToSave(p: Policy): { name: string; audience: Policy['audience'] } | null {
+    const st = describeNow.current
+    if (st.turns.length === 0 || !describeOffered(features.describePolicy, p)) return null
+    const taken = store.policies.filter((x) => x.id !== p.id).map((x) => x.name)
+    const facts = doneFacts(p, st.reading.answers, describeTenant, taken)
+    return facts.name === p.name && JSON.stringify(facts.audience) === JSON.stringify(p.audience) ? null : facts
+  }
+  /* Those facts saved straight to the policy, as Done does; the name it
+     replaced is kept, for an Undo back to the chooser to give back. */
+  function saveFacts(p: Policy): { name: string; audience: Policy['audience'] } | null {
+    const facts = factsToSave(p)
+    if (!facts) return null
+    if (facts.name !== p.name) describedName.current = { from: p.name, to: facts.name }
+    store.savePolicy({ ...p, ...facts })
+    return facts
+  }
+  /* A draft as a save stores it: with the thread's name and audience. */
+  function withDescribed(d: Policy): Policy {
+    const facts = factsToSave({ ...d, status: saved?.status ?? d.status })
+    return facts ? { ...d, ...facts } : d
+  }
+  /* After a save made with the panel open: a draft Describe it still writes
+     to keeps the panel, as a fresh opening from what was saved; anything
+     else closes it, with nothing more to say. */
+  function afterSave(p: Policy) {
+    savedMark.current = { thread: describeNow.current, facts: factsOf(p) }
+    threadMarks.current.set(histNow.current.present, { thread: describeNow.current, facts: factsOf(p) })
+    leftFacts.current = factsOf(p)
+    if (!describingNow.current) return
+    if (describeOffered(features.describePolicy, p)) {
+      session.current = describeSession(p.audience, histNow.current.present.fallback, p.appIds)
+      openedWith.current = describeNow.current
+      return
+    }
+    setDescribing(false)
+    setTracing(null)
+    setHoverLast(false)
+    setFresh(null)
+    session.current = null
+    openedWith.current = null
+  }
+  /* A move through the board's own history — Undo, Redo, Discard, a toast's
+     Undo — with Describe it's thread brought along: the entry it lands on
+     stands for a thread and the facts beside it (`threadMarks`), and the
+     thread becomes that one. It went on describing rules the move had taken
+     away. */
+  function moveHistory(next: History) {
+    if (next === histNow.current) return
+    histNow.current = next
+    setHist(next)
+    const land = threadMarks.current.get(next.present)
+    if (!land || land.thread === describeNow.current) return
+    const p = store.policyById(policyId)
+    let appIds = p?.appIds ?? []
+    let audience = p?.audience ?? next.present.audience
+    if (p && land.facts) {
+      const now = factsOf(p)
+      const back = factsBack(now, leftFacts.current ?? now, land.facts)
+      if (!sameFacts(back, now)) store.savePolicy({ ...p, name: back.name, audience: back.audience, appIds: [...back.appIds] })
+      leftFacts.current = back
+      appIds = [...back.appIds]
+      audience = back.audience
+    }
+    const thread = land.thread
+    describeNow.current = thread
+    setDescribeState(withDraftApps(thread, appIds))
+    setFresh(null)
+    setSources(thread.turns.length > 0 ? composeDescribed(thread, next.present).sources : {})
+    if (describingNow.current) {
+      /* A fresh opening on the thread it now shows: its next write is a step
+         of its own, and the toast's Undo comes back to here. */
+      session.current = describeSession(audience, next.present.fallback, appIds)
+      openedWith.current = thread
+    } else if (thread.turns.length === 0 && next.present.rules.length === 0) setScratch(false)
+  }
+  /* A check pressed (describe spec, §5.4): the panel closes as Done closes it
+     — without the toast, which would stand over the canvas — and Check
+     access opens on this draft with the check's sign-in, played from the
+     engine. Whatever an earlier Check access left is let go, so it is this
+     sign-in that plays (PolicyCheck.tsx starts from the session's). */
   const tryCheck = (facts: SignInFacts) => {
     if (!canTest) return
     testingSession.loadBoard(saved.id, formOf(facts, store.zones))
+    checkKept.current = null
     startTest()
   }
   const goFromDescribe = (to: 'create-zone' | 'device-profiles' | 'auth-methods') =>
@@ -1237,8 +1641,15 @@ export function BoardBuilder({
     : tracing === 'fallback'
       ? ['fallback']
       : [...describeIds.current.values()].filter((id) => draft.rules.some((r) => r.id === id))
-  /* Read as text rings the card of the sentence under the pointer. */
-  const ringed = readOpen && readHover ? [readHover] : traced
+  /* Read as text rings the card of the sentence under the pointer; while
+     Describe it has just written, the cards it added or changed are named
+     instead, and `.bb.is-fresh` draws them as an accent edge for 2 s. */
+  const freshOn = describeOpen && !!fresh
+  const ringed = readOpen && readHover ? [readHover] : freshOn && fresh ? fresh.ids : traced
+  /* Describe it can be reopened on its thread while the policy is still a
+     draft it may write to: the door on the canvas, and the palette. */
+  const canDescribe = describeOffered(features.describePolicy, saved)
+  const describeDoor = canDescribe && describeState.turns.length > 0 && !describeOpen && !testOn && !readOpen
 
   const publish = (intent: CommitIntent) => {
     /* One commit rule for both builders — see `committed` in policy-draft.ts.
@@ -1246,12 +1657,19 @@ export function BoardBuilder({
        admin chose it. Anything published keeps the status it has in the store,
        which the bar can change while this edit is open, so `saved` rather than
        `draft` supplies it. `committed` also clears a saved draft. */
-    const next = committed(saved, draft, intent)
+    /* With the name and audience the thread gives, when the panel has not
+       saved them yet — Save policy pressed with it open. */
+    const facts = factsToSave(store.policyById(saved.id) ?? saved)
+    if (facts && facts.name !== saved.name) describedName.current = { from: saved.name, to: facts.name }
+    const next = committed(saved, facts ? { ...draft, ...facts } : draft, intent)
     /* `next`, not `draft`, into both the store and the undo stack, so they
        agree about the record from the moment it is saved. The store stamps
        lastModified only when something besides the stamp changed. */
     store.savePolicy(next)
-    setHist(historyOf(next))
+    const h = historyOf(next)
+    histNow.current = h
+    setHist(h)
+    afterSave(next)
     setReview(false)
     /* "From your text" stays on a card until the policy is saved. */
     setSources({})
@@ -1309,68 +1727,57 @@ export function BoardBuilder({
   /* Back to the live rules, and a saved draft goes too — that case asks first,
      and only that case resets the undo stack. */
   const revert = () => {
-    setHist(historyOf({ ...saved, pendingDraft: undefined }))
+    const h = historyOf({ ...saved, pendingDraft: undefined })
+    /* The live rules of a new draft are none, and no thread says them. */
+    threadMarks.current.set(h.present, { thread: saved.rules.length === 0 ? emptyDescribe() : describeNow.current })
+    moveHistory(h)
     if (saved.pendingDraft) store.discardDraft(saved.id)
     setConfirmDiscard(false)
   }
   /* Unsaved edits alone are rolled back as one more step, so undo brings them
      back. Discard sits next to Save draft, and a mis-click cost the session. */
   const discardEdits = () => {
-    setHist((h) => revertTo(h, saved))
+    /* The thread (and what it gave the policy) as it was saved comes back
+       with its rules; ⌘Z brings both back again. */
+    const h = revertTo(histNow.current, saved)
+    if (h !== histNow.current) threadMarks.current.set(h.present, savedMark.current)
+    moveHistory(h)
     store.showToast(`Changes discarded. Press ${chord(['mod'], 'Z', MAC)} to undo.`)
   }
   const discard = () => (saved.pendingDraft ? setConfirmDiscard(true) : discardEdits())
 
-  /* A chip from Would change if. A sign-in chip restates the sign-in; a policy
-     chip is an ordinary edit to the board — on the undo stack, said in a toast
-     with Undo, and not saved. */
-  const runChip = (c: ChangeChip) => {
-    if (!trying) return
-    if (c.kind === 'sign-in' && c.patch && c.field) trying.patch(c.patch, c.field)
-    else if (c.rules) {
-      commitDraft({ ...draft, rules: c.rules })
-      offerUndo(c.toast ?? 'Not saved yet.')
-    }
-  }
-  /* A Break-in fix, from the panel: an ordinary edit to the draft, on the undo
+  /* A Break-in fix, from Check access's Break-in test (hidden while
+     `PEOPLE_AND_BREAK_IN` is off): an ordinary edit to the draft, on the undo
      stack and said in a toast with Undo — not saved (final spec, D §3.7). */
   const applyPanelFix = (next: Policy, toast: string) => {
     commitDraft({ ...draft, rules: next.rules, fallback: next.fallback })
     offerUndo(toast)
   }
-  /* A rule named on the Break-in test: opened on the chain, in the panel's
-     column, and shown there. Its × comes back to the Break-in test. */
-  const openRuleFromPanel = (rule?: string) => {
-    if (!rule) return
-    const r = rule === 'fallback' ? null : draft.rules.find((x) => x.id === rule)
-    if (rule !== 'fallback' && !r) return
-    select(r ? ruleAt(r.id) : { kind: 'fallback' })
-    setFlash({ id: rule, key: Date.now() })
+  /* "Fix in policy ↗", landed (the effect above; arrive-fix.ts). Asked of
+     the draft as this visit opened it — or, after a route from another
+     policy's board, which keeps this builder mounted, of this policy's own:
+     the history still holds the other one's rules until the reset above
+     lands, and the commit here is queued behind it. Acceptances are this
+     policy's, so a result accepted in its Break-in test is not fixed again.
+     A fix that leaves no rule keeps the canvas up, as "Start from scratch"
+     does, so its last row is there to be read. A board still under Check
+     access — the route came from inside it — gives the chain back first, as
+     Open rule does: the change is read there. */
+  const landArrival = (fix: ArriveFix) => {
+    const base = present.id === saved.id ? draft : openForEditing(saved)
+    const out = landFix(base, fix, env, { accepted: store.breakInAccepted[saved.id], policies: store.policies })
+    if ('none' in out) {
+      store.showToast(out.none)
+      return
+    }
+    commitDraft(out.draft)
+    offerUndo(out.toast)
+    if (out.draft.rules.length === 0) setScratch(true)
+    if (testOn) leaveTest()
+    select(out.select)
+    setFlash({ id: out.reveal, key: Date.now() })
+    focusSoon(out.reveal === 'fallback' ? () => document.getElementById('bb-terminal-title') : byId(`bb-rule-${out.reveal}-title`))
   }
-  const testApp = trying?.form.appId ? (store.apps.find((a) => a.id === trying.form.appId) ?? null) : null
-  const testChain: TestChain | null = trying
-    ? {
-        route: trying.route,
-        at: trying.at,
-        ms: trying.ms,
-        fadeIn: trying.fadeIn,
-        reached: trying.reached,
-        fade: trying.fade,
-        changed: trying.changed,
-        appName: testApp?.name ?? 'this application',
-        which: trying.form.appId ? (
-          <>
-            <WhichPolicy
-              compact
-              resolution={trying.right.resolution}
-              appId={trying.form.appId}
-              substitute={trying.right.spec.substitute}
-              watching={trying.watching}
-            />
-          </>
-        ) : null,
-      }
-    : null
 
   return (
     <>
@@ -1395,7 +1802,7 @@ export function BoardBuilder({
         onRevealRule={revealRule}
         onOpenBreakIn={openBreakInPage}
         onLearn={() => setTour(true)}
-        onWatchDemo={() => setDemo(true)}
+        onWatchDemo={BAR_DEMO ? () => setDemo(true) : undefined}
         actions={
           <BoardBarActions
             reading={readOpen}
@@ -1405,6 +1812,8 @@ export function BoardBuilder({
             canTest={canTest}
             onTest={toggleTest}
             testRef={testButton}
+            views={views.length > 0 ? <CheckBarViews views={views} panel={checkPanel} onToggle={toggleView} /> : undefined}
+            quietSave={testOn && checkPanel === 'form'}
             toPublish={toPublish}
             unsaved={unsaved}
             canDiscard={unsaved || hasDraft}
@@ -1420,9 +1829,39 @@ export function BoardBuilder({
 
     <div
       ref={shell}
-      className={`bb ${testOn ? 'is-testing' : panelShown || describeOpen || readOpen ? '' : 'is-insp-closed'} ${gripping ? 'is-gripping' : ''}`}
-      style={{ '--bb-insp': `${inspW}px` } as React.CSSProperties}
+      /* Check access keeps the ordinary two tracks, the right-hand one its
+         panel's — closed while no panel is open, as on the page, so its
+         canvas has the whole width. `is-checking`, not the old test mode's
+         `is-testing`: that one reshaped the chain it drew on, and the chain
+         under Check access is only hidden (check-access.css). */
+      /* Describe it opens its own leading track and keeps the right one
+         closed (V4 §4.1): the inspector never stands beside it. */
+      className={`bb ${testOn ? 'is-checking' : ''} ${describeOpen ? 'is-left-open' : ''} ${(testOn ? checkPanel !== null : panelShown || readOpen) ? '' : 'is-insp-closed'} ${freshOn && fresh ? `is-fresh is-fresh${fresh.n % 2}` : ''} ${gripping ? 'is-gripping' : ''} ${snapping ? 'is-snap' : ''}`}
+      style={{ '--bb-insp': `${colW}px` } as React.CSSProperties}
     >
+      {/* Describe it, on the left in its own track (V4 §4.1). The selection
+          is cleared while it is open, so the rule editor is never beside it.
+          First in the region, as it is drawn first: Tab goes from the bar to
+          the panel, then the canvas (the grid places each by its column). */}
+      {describeOpen && (
+        <DescribePanel
+          tenant={describeTenant}
+          policyId={saved.id}
+          state={describeState}
+          board={describeBoard}
+          onState={writeDescribe}
+          onSend={sendDescribe}
+          onUndoTurn={undoDescribeTurn}
+          onDone={() => finishDescribe()}
+          onGo={goFromDescribe}
+          focus={describeFocus}
+          bold={hover !== null ? 'signIn' : hoverLast ? 'fallback' : null}
+          onTrace={setTracing}
+          checks={describeChecks}
+          onTryCheck={canTest ? tryCheck : undefined}
+        />
+      )}
+
       {/* The canvas comes into existence when there is something on it.
 
           A policy with no rules used to draw the chooser INSIDE the pan-and-zoom
@@ -1430,20 +1869,20 @@ export function BoardBuilder({
           screen. `BoardEmpty` is an ordinary screen; `Board` is the canvas; and
           the board only ever mounts one of them.
 
-          Test mode draws the empty chain in the chooser's place — the start
-          node, the gates, the last row and the Decision — because the route
-          still runs down it. It does not set `scratch`, so the chooser is back
-          when test mode closes. Read as text does the same: its sentences
-          are about the start node and the last row, so those are what sit
-          beside it, and the chooser was too wide to share the width. */}
-      {draft.rules.length === 0 && !scratch && !testOn && !describing && !readOpen ? (
+          Check access leaves whichever is there in place, hidden under its
+          canvas, so the chooser or the chain is back as it was when it
+          shuts. Read as text draws the empty chain in the chooser's place:
+          its sentences are about the start node and the last row, so those
+          are what sit beside it, and the chooser was too wide to share the
+          width. */}
+      {draft.rules.length === 0 && !scratch && !describing && !readOpen ? (
         <BoardEmpty
           /* "No rules" once the policy is live or had rules; the first-run
              question only for a new draft nobody has written in yet. */
           fresh={saved.status === 'draft' && saved.rules.length === 0 && !canUndo(hist)}
           fallback={(draft.fallback ?? fallbackRule()).decision}
           onEditDefault={() => select({ kind: 'fallback' })}
-          onUndo={canUndo(hist) ? () => setHist(undo) : undefined}
+          onUndo={canUndo(hist) ? () => moveHistory(undo(histNow.current)) : undefined}
           undoLabel={`Undo (${chord(['mod'], 'Z', MAC)})`}
           onUseTemplate={() => setPicking(true)}
           /* Describe it on a new draft only: it saves the audience straight to
@@ -1468,42 +1907,46 @@ export function BoardBuilder({
            been deleted out from under the policy reads as no application, which
            is what it now is. */
         destination={
-          /* In test mode, the application the sign-in being tried arrives at.
-             Otherwise the chain's first node names ONE application, and says
-             how many more beside it — the bar no longer carries them. */
-          testApp
-            ? testApp.name
-            : draft.appIds.length > 0
-              ? (appsOf(draft, store.apps)[0]?.name ?? null)
-              : draft.isSystem
-                ? 'any application'
-                : null
+          /* The chain's first node names ONE application, and says how many
+             more beside it — the bar no longer carries them. */
+          draft.appIds.length > 0
+            ? (appsOf(draft, store.apps)[0]?.name ?? null)
+            : draft.isSystem
+              ? 'any application'
+              : null
         }
         /* The first application's id, for its logo in the start pill, so the
            logo and the name beside it are the same application. */
-        destinationAppId={testApp ? testApp.id : draft.appIds.length > 0 ? (appsOf(draft, store.apps)[0]?.id ?? null) : null}
-        destinationMore={testApp ? 0 : Math.max(appsOf(draft, store.apps).length - 1, 0)}
+        destinationAppId={draft.appIds.length > 0 ? (appsOf(draft, store.apps)[0]?.id ?? null) : null}
+        destinationMore={Math.max(appsOf(draft, store.apps).length - 1, 0)}
         selection={selection}
         diagnostics={diagnostics}
         shadowed={shadowed}
-        test={testChain}
-        fitKey={testOn ? 'test' : 'edit'}
+        /* Not refitted for Check access: the board waits under its canvas as
+           it was left, zoom and all, for the way back. */
+        fitKey={describeOpen ? 'describe' : 'edit'}
         flash={flash}
         resolve={resolve}
         onSelect={select}
-        expandedOf={testOn ? FOLDED : expandedOf}
+        expandedOf={expandedOf}
         onToggleExpand={toggleExpand}
+        /* Read-only while Describe it is open (V4 §4.1): the board is the
+           panel's output, and a card added, switched, moved or deleted by hand
+           would be claimed by the turn and then written over by the next one.
+           board.css hides the controls (`.bb.is-left-open`); these stand
+           down for the keys and a drag. */
         onInsert={(at) => {
+          if (describeOpen) return
           /* The first rule of a scratch policy: its name is the first thing
              to fill in, as it was when the chooser inserted it. */
           const first = draft.rules.length === 0
           insert(blankRule(), at)
           if (first) focusSoon(() => document.querySelector<HTMLElement>('.bb__insp input[aria-label="Rule name"]'), true)
         }}
-        onMove={move}
-        onToggle={(i, on) => patchRule(i, { enabled: on })}
-        onDuplicate={duplicate}
-        onDelete={remove}
+        onMove={(from, to) => (describeOpen ? undefined : move(from, to))}
+        onToggle={(i, on) => (describeOpen ? undefined : patchRule(i, { enabled: on }))}
+        onDuplicate={(i) => (describeOpen ? undefined : duplicate(i))}
+        onDelete={(i) => (describeOpen ? undefined : remove(i))}
         onHover={setHover}
         onHoverLast={describeOpen ? setHoverLast : undefined}
         sources={sources}
@@ -1527,16 +1970,13 @@ export function BoardBuilder({
               </button>
             </Tip>
             <Tip text={`Redo (${chord(['mod', 'shift'], 'Z', MAC)})`} placement="top">
-              <button type="button" className="bb__act" aria-label="Redo" disabled={!canRedo(hist)} onClick={() => setHist(redo)}>
+              <button type="button" className="bb__act" aria-label="Redo" disabled={!canRedo(hist)} onClick={redoStep}>
                 <Redo2 size={14} strokeWidth={2} />
               </button>
             </Tip>
           </>
         }
         aside={
-          /* Not in test mode: every card stays folded there, so Expand all
-             would promise what the route will not do. */
-          testOn ? undefined : (
           /* ONE labelled button that says what it will do — "Expand all" while
              the cards are folded, "Collapse all" while they are open (owner,
              21 Sep 2026: the two bare glyphs "are not making sense, need the
@@ -1556,19 +1996,20 @@ export function BoardBuilder({
             )}
             {density === 'outline' ? 'Expand all' : 'Collapse all'}
           </button>
-          )
         }
       />
       )}
 
 
-      {(panelShown || describeOpen || readOpen) && !testOn && (
+      {/* The inspector's alone: Check access's panels take the page's two
+          widths from their own button, and no grip. */}
+      {!testOn && (panelShown || readOpen) && (
         <div
           className="bb__grip"
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize the inspector"
-          aria-valuenow={inspW}
+          aria-valuenow={colW}
           aria-valuemin={320}
           aria-valuemax={720}
           tabIndex={0}
@@ -1595,79 +2036,43 @@ export function BoardBuilder({
           and nothing else. Closing also narrows its grid track, which
           `.bb.is-insp-closed` does by rewriting the template — to zero rather
           than to one column, so the width has something to animate between. */}
-      {testOn && trying && !hasSubject && (
-        <SignInPanel
-          t={trying}
+      {/* Check access (PolicyCheck.tsx): the Sign-in tests page's canvas over
+          the board's middle track, the board hidden under it as it was left,
+          and its panel — the sign-in, or a view from the bar — in the
+          right-hand track. Its status region is the testing session's, in
+          the page from the console's first draw. */}
+      {testOn && (
+        <PolicyCheck
+          saved={saved}
           draft={draft}
-          headingRef={testHeading}
-          swap={swapped}
-          onClose={closeTest}
-          onChip={runChip}
-          views={
-            views
-              ? {
-                  page: panelPage,
-                  onPage: setPage,
-                  body:
-                    panelPage === 'try' ? null : (
-                      <BoardTestViews
-                        page={panelPage}
-                        onPage={setPage}
-                        t={trying}
-                        saved={saved}
-                        draft={draft}
-                        breakIn={pagesAllowed.breakIn}
-                        kept={viewsKept}
-                        onApplyFix={applyPanelFix}
-                        onOpenRule={openRuleFromPanel}
-                        onToTry={toTry}
-                      />
-                    ),
-                }
-              : undefined
-          }
+          panel={checkPanel}
+          onPanel={setCheckPanel}
+          wide={checkWide}
+          onToggleWidth={toggleCheckWidth}
+          kept={checkKept}
+          onBack={backFromCheck}
+          onApplyFix={applyPanelFix}
+          focusBar={focusTestButton}
         />
       )}
-      {/* Try a sign-in's status region (Spec A §7): the decision once per run,
-          an update that moved it, a step's stage.
 
-          Here rather than in the panel, and mounted whether or not test mode
-          is on. The rule editor takes the panel's column in test mode, and an
-          edit made there moves the answer — "Now Deny. Changed by your
-          edits." — with the panel unmounted. A region mounted with its text
-          already in it is not reliably read either, so it is always here and
-          only its words come and go. */}
-      <p role="status" className="u-sr-only">
-        {testOn && trying ? trying.said : ''}
-      </p>
-
-      {/* Describe it, in the inspector's slot. The selection is cleared while
-          it is open, so the rule editor is never beside it. */}
-      {describeOpen && (
-        <DescribePanel
-          tenant={describeTenant}
-          policyId={saved.id}
-          state={describeState}
-          onState={writeDescribe}
-          onDone={finishDescribe}
-          onGo={goFromDescribe}
-          focus={describeFocus}
-          bold={hover !== null ? 'signIn' : hoverLast ? 'fallback' : null}
-          onTrace={setTracing}
-          checks={describeChecks}
-          onTryCheck={canTest ? tryCheck : undefined}
-        />
+      {/* And the way back to it while it is closed: its thread is kept. */}
+      {describeDoor && (draft.rules.length > 0 || scratch) && (
+        <button type="button" className="bdsc-door" onClick={openDescribe}>
+          <PenLine size={14} strokeWidth={2} aria-hidden />
+          Describe it
+        </button>
       )}
 
       {/* Read as text, in the inspector's slot. A sentence pressed selects its
           card and the text stays; the rule's editor waits until it closes. */}
       {readOpen && <ReadAsTextPanel saved={saved} draft={draft} onClose={closeRead} onHover={setReadHover} onPick={pickFromText} />}
 
-      {!describeOpen && !readOpen && (testOn ? hasSubject : panelAlive) && (
+      {/* Not under Check access, whose panels take the track: the selection
+          waits, and the editor is back as Check access shuts. */}
+      {!testOn && !describeOpen && !readOpen && panelAlive && (
         <Inspector
-          leaving={!testOn && panelLeaving}
-          testing={testOn}
-          swap={testOn && swapped}
+          leaving={panelLeaving}
           draft={draft}
           selection={selection}
           /* What is wrong with the rule on screen, said where it is edited.
@@ -1690,13 +2095,11 @@ export function BoardBuilder({
           }
           onSave={saveNow}
           onAppsSaved={() => {
-            if (testOn) return backToTest()
             setInspOpen(false)
             setSelection({ kind: 'none' })
             focusSoon(() => document.getElementById('bb-start'))
           }}
           onClose={() => {
-            if (testOn) return backToTest()
             setInspOpen(false)
             /* The close button goes with the panel; focus goes to the card it was editing. */
             focusSoon(
@@ -1731,13 +2134,16 @@ export function BoardBuilder({
           onClose={() => setCmd(false)}
           onRun={(id) => {
             setCmd(false)
-            if (id === 'add') insert(blankRule(), draft.rules.length)
-            else if (id === 'undo') undoStep()
-            else if (id === 'redo') setHist(redo)
+            if (id === 'add') {
+              if (!describeOpen) insert(blankRule(), draft.rules.length)
+            } else if (id === 'undo') undoStep()
+            else if (id === 'redo') redoStep()
             else if (id === 'publish') saveNow()
             else if (id === 'panel') setInspOpen((v) => !v)
             else if (id === 'keys') setKeys(true)
             else if (id === 'try') toggleTest()
+            else if (id.startsWith('view:')) setCheckPanel(id.slice(5) as CheckView)
+            else if (id === 'describe') openDescribe()
             else if (id === 'dup' && selAt >= 0) duplicate(selAt)
             else if (id === 'del' && selAt >= 0) remove(selAt)
             else if (id.startsWith('rule:')) {
@@ -1756,7 +2162,7 @@ export function BoardBuilder({
           was reached. */}
       <Modal open={keys} onClose={() => setKeys(false)} title="Keyboard shortcuts" width={480}>
         <dl className="bb__keys">
-          {boardShortcuts({ mac: MAC, commands: features.commands, testing: features.trySignIn, publish: features.publish }).map(([k, what]) => (
+          {keys && boardShortcuts({ mac: MAC, commands: features.commands, testing: features.trySignIn, publish: features.publish }).map(([k, what]) => (
             <div key={k}>
               <dt>
                 {k.split(' ').map((part) => (
@@ -1821,7 +2227,7 @@ export function BoardBuilder({
       )}
 
       {/* The walkthrough's review saves through the same checks as the bar. */}
-      <ReviewDialog open={review} policy={draft} from="board" onClose={() => setReview(false)} onCommit={checkThenPublish} />
+      {reviewDialog}
 
       {/* Before saving: your edits — or, for a draft the review turns on,
           Before turning on. Portalled, so the bar's stacking cannot trap its scrim. */}

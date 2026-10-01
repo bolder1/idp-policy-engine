@@ -4,6 +4,7 @@ import { audienceOf, type Policy } from '../data'
 import { showcaseTenantHrmsOn } from '../fixtures'
 import type { SignInFacts } from './sign-in-facts'
 import { envOf, resolveSignIn } from './tenant-resolver'
+import { devicePreset } from './testing/device-presets'
 import { differingWatch, watchingSentence, watchingWords } from './watching-words'
 
 /* What a monitoring policy says it would do, on the showcase's HRMS set to
@@ -15,7 +16,15 @@ const t = showcaseTenantHrmsOn()
 const env = envOf(t)
 const hrms = t.policies.find((p) => p.id === 'sc-hrms-office')!
 const monitoring = (over: Partial<Policy> = {}) => t.policies.map((p) => (p.id === hrms.id ? { ...p, status: 'monitor' as const, ...over } : p))
-const kavya = (over: Partial<SignInFacts> = {}): SignInFacts => ({ personId: 'u-hr-1', appId: 'hrms', network: { address: '203.0.113.24', source: 'stated' }, ...over })
+/* On her corporate laptop: the Global Default's baseline (30 Sep 2026) reads the
+   device, and it is what decides while HRMS only monitors. */
+const kavya = (over: Partial<SignInFacts> = {}): SignInFacts => ({
+  personId: 'u-hr-1',
+  appId: 'hrms',
+  network: { address: '203.0.113.24', source: 'stated' },
+  device: devicePreset('win11-registered').facts,
+  ...over,
+})
 
 describe('a monitor that would decide', () => {
   const res = resolveSignIn(monitoring(), kavya(), env)

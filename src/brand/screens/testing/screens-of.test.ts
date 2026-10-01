@@ -53,7 +53,7 @@ describe('refused', () => {
 describe('somebody the policy is not for', () => {
   it('gets the Global Default’s password page', () => {
     const [only] = pages(board(hrms, { personId: 'u-sales-1' }))
-    expect([only.policyName, only.ruleName]).toEqual(['Global Default Policy', 'Baseline access'])
+    expect([only.policyName, only.ruleName]).toEqual(['Global Default Policy', 'Corporate device, where we operate'])
     expect(only.steps.map(stepLabel)).toEqual(['Password'])
   })
 })
@@ -114,7 +114,8 @@ describe('what each page asks', () => {
     expect(step('phone-and-email')).toBe('Enter the code sent to your phone and k••••@mo.com')
     expect(step('questions')).toBe('Answer your security questions')
     expect(step('token')).toBe('Enter the code from your token')
-    expect(step('none', 'CAC Card')).toBe('CAC Card')
+    /* A method the catalogue does not know: a sentence a sign-in page says, never its bare name. */
+    expect(step('none', 'Hand scanner')).toBe('Continue with Hand scanner')
   })
 
   it('says a method nobody can be offered is not available', () => {

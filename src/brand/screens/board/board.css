@@ -101,7 +101,10 @@
      lost. */
   --bb-gap: 0px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) min(var(--bb-insp), 46%);
+  /* A leading track for Describe it (V4 §4.1): nothing until the panel opens
+     (`is-left-open`), so every placement below counts it — the stage and the
+     chooser are the second track, the inspector and its grip the third. */
+  grid-template-columns: var(--bb-left, 0px) minmax(0, 1fr) min(var(--bb-insp), 46%);
   grid-template-rows: minmax(0, 1fr);
   gap: var(--bb-gap);
   padding: var(--bb-gap);
@@ -121,9 +124,22 @@
 /* Placed, not auto-placed. The grip is an explicit grid item in the panel's
    own column — see the note where it is styled — and sparse auto-placement
    would then push the panel it belongs to onto a second row. */
-.bb__stage { grid-column: 1; grid-row: 1; }
+.bb__stage { grid-column: 2; grid-row: 1; }
 .bb__insp,
-.bb__grip { grid-column: 2; grid-row: 1; }
+.bb__grip { grid-column: 3; grid-row: 1; }
+/* Describe it's thread (describe.css places the aside in the first track).
+   400 px, and the right-hand track is closed while it is open. */
+.bb.is-left-open { --bb-left: 400px; }
+/* While it is open the board is the panel's output, read-only (V4 §4.1): no
+   insert points on the connectors, no switch, menu or grip on a card — only
+   the fold, which changes nothing. A card added or moved by hand would be
+   claimed by the turn and written over by the next one (BoardBuilder stands
+   the handlers down for the keys and a drag as well). */
+.bb.is-left-open .bb__link__add,
+.bb.is-left-open .bb__link__hint,
+.bb.is-left-open .bb__acts > :not(.bb__fold__btn),
+.bb.is-left-open .bb__idx__grip { display: none; }
+.bb.is-left-open .bb__idx { pointer-events: none; }
 /* An explicitly-sized track outlives the item in it, so closing the panel would
    otherwise leave 560px of empty gutter where it had been.
 
@@ -134,7 +150,7 @@
    nothing, which is a width and therefore animatable. The gap goes with it, or
    a closed panel leaves 8px of margin against the right edge that the open one
    does not. */
-.bb.is-insp-closed { grid-template-columns: minmax(0, 1fr) 0px; column-gap: 0; }
+.bb.is-insp-closed { grid-template-columns: var(--bb-left, 0px) minmax(0, 1fr) 0px; column-gap: 0; }
 /* The one motion the whole region makes, and it covers three gestures with one
    declaration: opening, closing, and the narrow/wide toggle — which was
    instant, and reads as the panel being replaced rather than resized.
@@ -143,6 +159,11 @@
    easing each one would put the panel 220ms behind the cursor. */
 .bb { transition: grid-template-columns var(--dur-normal) var(--ease-standard), column-gap var(--dur-normal) var(--ease-standard); }
 .bb.is-gripping { transition: none; }
+/* Nor on the commit that opens or closes Try a sign-in: the canvas refits in
+   that same commit, against the column it ends in, and a track still easing
+   there moved the chain three times (29 Sep 2026). The panel's own slide-in
+   is the motion; the grid simply switches. */
+.bb.is-snap { transition: none; }
 
 :root[data-theme='dark'] .bb,
 :root:not([data-theme='light']) .bb {
@@ -322,7 +343,7 @@
    while the policy has no rules and `Board` once it has some; the controls
    arrive with the rules they are for. */
 .bb__empty {
-  grid-column: 1; grid-row: 1;
+  grid-column: 2; grid-row: 1;
   min-width: 0; min-height: 0;
   display: grid; place-items: center;
   padding: var(--space-9) var(--space-8);
@@ -809,10 +830,8 @@
 .bb__card.is-shadowed { opacity: 0.4; }
 .bb__card.is-dragging { z-index: 5; box-shadow: var(--el-high); cursor: grabbing; }
 
-/* Test mode: a card the route never reached. The rehearsal's hit and miss
-   edges went with the rehearsal; the route's marked edge is in
-   try-sign-in.css. */
-.bb__card.is-unreached { opacity: 0.45; }
+/* Test mode's card states — lit, missed, dim — are trace.css's, scoped to
+   `.bb.is-testing`; the route's marked edge is in try-sign-in.css. */
 .bb__card.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); --tone-dot: var(--fb-negative-dot, #d01243); }
 .bb__card.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); --tone-dot: var(--fb-notice-dot, #b07a00); }
 .bb__card.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); --tone-dot: var(--fb-positive-dot, #128f43); }
@@ -1277,6 +1296,43 @@ button.bb__idx:hover { transform: none; background: var(--surface-inset, var(--s
   border-right-color: var(--border-strong);
   border-bottom-color: var(--border-strong);
 }
+/* Describe it: the cards a turn added or changed, for 2 s (V4 §4.1). The
+   builder names them through `traced` and marks the region `is-fresh`, so
+   here the trace is an accent down the card's left edge instead of a darker
+   border: a pseudo-element's inset shadow, following the card's radius, and
+   faded by its own animation. The card is a motion element, so nothing here
+   moves or transforms it. Two animation names, so a second write restarts
+   the edge; under reduced motion it simply stands for the 2 s. */
+.bb.is-fresh .bb__card.is-traced {
+  border-top-color: var(--border-subtle);
+  border-right-color: var(--border-subtle);
+  border-bottom-color: var(--border-subtle);
+}
+.bb.is-fresh .bb__card:not(.is-terminal).is-traced { border-left-color: var(--border-subtle); }
+.bb.is-fresh .bb__card.is-traced::before {
+  content: '';
+  position: absolute; inset: -1px;
+  border-radius: inherit;
+  box-shadow: inset 3px 0 0 var(--accent);
+  pointer-events: none;
+  animation: bb-fresh0 2s var(--ease-standard) forwards;
+}
+.bb.is-fresh.is-fresh1 .bb__card.is-traced::before { animation-name: bb-fresh1; }
+@keyframes bb-fresh0 {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes bb-fresh1 {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bb.is-fresh .bb__card.is-traced::before { animation: none !important; }
+}
 
 /* The pill. Neutral, never negative — locked is a lifecycle state, not a
    warning, and this kit keeps those grey. */
@@ -1688,8 +1744,14 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
      one-row template of its own here exactly as it gets a one-column one
      above. */
   .bb { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 54%; }
-  .bb.is-insp-closed { grid-template-rows: minmax(0, 1fr); }
+  .bb.is-insp-closed { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .bb__stage,
+  .bb__empty { grid-column: 1; grid-row: 1; }
   .bb__insp { grid-column: 1; grid-row: 2; }
+  /* Describe it takes the bottom row the inspector would, which is closed while it is open. */
+  .bb.is-left-open { grid-template-rows: minmax(0, 1fr) 54%; }
+  .bb.is-left-open .bdsc { grid-column: 1; grid-row: 2; margin: 0 var(--space-5) var(--space-5); }
+  .bdsc-door { grid-column: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2644,12 +2706,20 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    The three blocks that existed covered six selectors out of thirty-odd
    declared transitions, so most of the board still animated for somebody who
    had asked it not to. This is deliberately blunt: a reduced-motion request is
-   not a request for a subset. */
+   not a request for a subset.
+
+   `transition: none`, not a 0.01 ms duration. `transition-property` is `all`
+   by default, so a duration on every element made EVERY property of every
+   element a transition — one a frame long, but a frame in which the value
+   read back is the old one. Opening Try a sign-in refits the canvas in the
+   commit that opens it, and under reduced motion it measured the chain at the
+   width it was leaving, then moved it again a frame later (29 Sep 2026).
+   Nothing here waits for a transition to end. */
 @media (prefers-reduced-motion: reduce) {
   .bb *,
   .bb *::before,
   .bb *::after {
-    transition-duration: 0.01ms !important;
+    transition: none !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
@@ -3364,4 +3434,196 @@ ul.bb__wholist { margin: 0; padding: 0; list-style: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .bb__card.is-flash { animation: none; }
+}
+
+/* --- The trace: a card read by a sign-in test (RuleCard.tsx `RuleTraceCard`) ---
+
+   Sign-in tests draws the deciding policy's rules with the builder's own card,
+   read-only (TESTING-V4 §13.2, §14.3). Scoped to `.is-trace`, so nothing here
+   reaches a card on the board. The card is a plain element — its ring eases
+   in CSS — while the body's height (`.bb__tbody`) and a mark's pop
+   (`.bb__tmark`) are motion's, and take neither a transform nor a transition
+   here.
+
+   Compact (owner, 30 Sep: "the cards are very big"): a 24 px number, a
+   one-line head, and the who / if / then as one row each (`.bb__trow`: the
+   keyword, what answers it, the mark), so an open card reads at the folded
+   card's density.
+
+   Colour says what happened (owner, 30 Sep; 1 Oct: "here it's a match but
+   Deny, so for the deny I think we should use red only"): the accent (blue)
+   is the engine at work and nothing else — the card being read, its
+   "Checking", a row's spinner. The DECIDED PATH wears the outcome's colour:
+   the rule that matched takes its own decision's tone (`--tone-*`, the
+   card's `is-allow` / `is-mfa` / `is-deny`, which is the answer) for its
+   ring, "Matched" and the ✓ of its rows; "Decides" takes the path's
+   (`--tj-path-*`, set by the run's stage). A rule that did not match is
+   quiet — "No match" and its ✓ grey — its failing check's small ✕ the one
+   red. YELLOW is what cannot be told, the last row when it depends, and a
+   rule that would also apply; grey what was never reached. */
+/* Three tracks: the number, the title, the right end — the head never folds a pill onto a row of its own. */
+.bb__card.is-trace .bb__cardhead { grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-4); padding: var(--space-3) var(--space-4); }
+.bb__card.is-trace .bb__cardhead > .bb__cardmeta { grid-column: 3; grid-row: 1; }
+/* The number is a position here, not a grip. */
+.bb__card.is-trace .bb__idx { width: 24px; height: 24px; font-size: var(--fs-xs); cursor: inherit; }
+.bb__card.is-trace .bb__idx:hover { transform: none; }
+.bb__card.is-trace .bb__titlebtn { cursor: pointer; }
+/* A title no press acts on (the why's card: its Open rule is in its notice): words, not a control. */
+.bb__card.is-trace .bb__titlebtn.is-static { cursor: inherit; }
+.bb__card.is-trace .bb__title em { white-space: normal; }
+/* The builder's trail — the fold, and Open rule — in the head's third
+   track, not floating over the card (as the builder's Centred skin merges
+   it); shown on the card's hover and focus, as on the builder's card. The
+   fold wears no tint here: blue is the engine at work. */
+.bb__card.is-trace .bb__acts { position: static; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; opacity: 0; pointer-events: none; }
+/* Its own head's trail only: a card of rules inside a card (the policy) shows
+   the trail of the card under the pointer, not of every card inside it. */
+.bb__card.is-trace:hover > .bb__cardhead .bb__acts,
+.bb__card.is-trace:focus-within > .bb__cardhead .bb__acts { opacity: 1; pointer-events: auto; }
+.bb__card.is-trace .bb__fold__btn,
+.bb__card.is-trace .bb__fold__btn.is-open { background: none; color: var(--text-tertiary); }
+.bb__card.is-trace .bb__fold__btn:hover { background: var(--surface-sunken); filter: none; color: var(--text-primary); }
+/* Folded, the whole card opens it. */
+.bb__card.is-trace.is-foldable:not(.is-open) { cursor: pointer; }
+.bb__card.is-trace.is-foldable:not(.is-open):hover { border-color: var(--border-default); }
+/* The engine is reading it: its edge takes the accent's soft border. */
+.bb__card.is-trace.is-active { border-color: var(--accent-soft-border); }
+/* Matched: the ring in its decision's tone — the answer's — the one card the sign-in stopped at. */
+.bb__card.is-trace.is-t-matched {
+  border-color: var(--tone-dot, var(--fb-positive-dot));
+  box-shadow: 0 0 0 var(--bw-thin) var(--tone-dot, var(--fb-positive-dot)), var(--el-low);
+}
+.bb__card.is-trace.is-t-matched:hover { box-shadow: 0 0 0 var(--bw-thin) var(--tone-dot, var(--fb-positive-dot)), var(--el-mid); }
+/* The terminal card keeps its decision on the edge, and takes the ring on the other three. */
+.bb__card.is-trace.is-terminal.is-t-matched { border-left-color: var(--tone-dot, var(--fb-positive-dot)); }
+/* Would also apply: the notice tone on its edge. */
+.bb__card.is-trace.is-conflict { border-color: var(--fb-notice-border); }
+/* The last row, never reached: nothing failed there, so neither its edge
+   nor its decision is drawn in the decision's tone — grey, as every card
+   the walk never reached. Its tone comes back when that row decided. */
+.bb__card.is-trace.is-terminal.is-t-not-reached { border-left-color: var(--border-subtle); }
+.bb__card.is-trace.is-terminal.is-t-not-reached .bb__tthen .bb__ifchip { background: var(--surface-sunken); border-color: var(--border-subtle); color: var(--text-tertiary); }
+/* A rule that did not decide — it did not match, it was never reached, it
+   is switched off — keeps its decision grey when opened, so no green Allow
+   stands on a red path, nor a red Deny on a green one: one colour on the
+   way the sign-in took (owner, 1 Oct). A rule that would also apply keeps
+   its tone (the notice's card); attribute chips keep theirs. */
+.bb__card.is-trace.is-t-missed .bb__ifchip:is(.is-tone-allow, .is-tone-mfa, .is-tone-deny),
+.bb__card.is-trace.is-t-folded .bb__ifchip:is(.is-tone-allow, .is-tone-mfa, .is-tone-deny),
+.bb__card.is-trace.is-t-off .bb__ifchip:is(.is-tone-allow, .is-tone-mfa, .is-tone-deny),
+.bb__card.is-trace.is-t-not-reached:not(.is-conflict) .bb__ifchip:is(.is-tone-allow, .is-tone-mfa, .is-tone-deny) {
+  background: var(--surface-sunken);
+  border-color: var(--border-subtle);
+  color: var(--text-tertiary);
+}
+/* Not reached, switched off, waiting: the title quiet — colour tokens, never opacity on words. */
+.bb__card.is-trace.is-t-not-reached,
+.bb__card.is-trace.is-t-off,
+.bb__card.is-trace.is-t-waiting { box-shadow: none; }
+.bb__card.is-trace.is-t-not-reached:not(.is-conflict) .bb__title strong,
+.bb__card.is-trace.is-t-off .bb__title strong,
+.bb__card.is-trace.is-t-waiting .bb__title strong { color: var(--text-secondary); font-weight: var(--fw-medium); }
+.bb__card.is-trace.is-t-not-reached .bb__idx,
+.bb__card.is-trace.is-t-off .bb__idx,
+.bb__card.is-trace.is-t-waiting .bb__idx { color: var(--text-tertiary); }
+.bb__card.is-trace.is-t-not-reached .bb__cardsum,
+.bb__card.is-trace.is-t-waiting .bb__cardsum { color: var(--text-tertiary); }
+/* The last row's one line — always, and what it decides — under its title. */
+.bb__card.is-trace .bb__cardsum { padding: 0 var(--space-4) var(--space-3) calc(var(--space-4) + 24px + var(--space-4)); }
+
+/* The last row, folded: what it decides, beside its name. */
+.bb__tthen {
+  --if-chip: var(--surface-raised);
+  --if-chip-border: var(--border-default);
+  display: inline-flex; flex: none; align-items: center; gap: var(--space-2);
+  color: var(--text-tertiary);
+}
+
+/* The result, where the builder's card carries its state pill. */
+.bb__tstate { background: var(--fb-neutral-bg); color: var(--text-secondary); }
+.bb__tstate.is-reading { background: var(--accent-soft); color: var(--accent-strong); }
+.bb__tstate.is-matched { background: var(--tone-bg, var(--fb-positive-bg)); color: var(--tone-fg, var(--fb-positive-fg)); }
+.bb__tstate.is-decides { background: var(--tj-path-bg, var(--fb-positive-bg)); color: var(--tj-path-fg, var(--fb-positive-fg)); }
+.bb__tstate.is-missed,
+.bb__tstate.is-folded { background: var(--fb-neutral-bg); color: var(--text-secondary); }
+.bb__tstate.is-unknown,
+.bb__tstate.is-possible,
+.bb__tstate.is-conflict { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bb__tstate.is-not-reached,
+.bb__tstate.is-off { background: var(--fb-neutral-bg); color: var(--text-tertiary); }
+
+/* Folded: ONE line under the title naming the row that failed — quiet words, its ✕ first, the one red. */
+.bb__card.is-trace .bb__tmiss {
+  display: flex; align-items: center; gap: var(--space-2);
+  min-width: 0; font-size: var(--fs-xs); color: var(--text-secondary);
+}
+.bb__card.is-trace .bb__tmiss > svg { flex: none; color: var(--fb-negative-fg); }
+.bb__card.is-trace .bb__tmiss > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The body opens by height (motion's); its content is clipped as it grows. */
+.bb__tbody { overflow: hidden; }
+.bb__card.is-trace .bb__cardbody { padding: 0 var(--space-4) var(--space-4); gap: var(--space-3); }
+.bb__if.is-trace { gap: 0; padding: var(--space-3) var(--space-4); }
+
+/* One row a part: the keyword's track, what answers it, the mark — one
+   column of marks, so every right edge lines up. What answers it is one
+   line; the values elide, never the attribute or the operator. */
+.bb__trow {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  min-height: 26px;
+}
+.bb__trow__kw { display: flex; align-items: center; min-width: 0; }
+.bb__trow__body { display: flex; align-items: center; gap: 4px 6px; min-width: 0; overflow: hidden; }
+.bb__trow__body > .bb__ifchip.is-attr,
+.bb__trow__body > .bb__ifkw,
+.bb__trow__body > .bx-faces { flex: none; }
+.bb__trow__body > .bb__ifchip.is-val { min-width: 0; }
+.bb__trow.is-then { grid-template-columns: 34px minmax(0, 1fr); }
+.bb__trow.is-then > .bb__ifrow { min-height: 0; }
+.bb__trow.is-then > .bb__ifaction { min-height: 0; margin: 0; padding: 0; border-left: 0; }
+.bb__trow.is-skipped .bb__ifchip { color: var(--text-secondary); }
+.bb__tplain { display: grid; }
+.bb__tgroup { display: grid; margin: var(--space-1) 0; }
+/* Which of the person's groups let them in: "via Engineering". */
+.bb__tvia { flex: none; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-secondary); white-space: nowrap; }
+
+/* A row's mark, at the row's right end. */
+.bb__tmark {
+  display: inline-grid; place-items: center; flex: none;
+  width: 18px; height: 18px;
+  border-radius: var(--radius-full);
+}
+.bb__tmark.is-pass { background: var(--fb-neutral-bg); color: var(--text-secondary); }
+/* The rule that matched: the rows that held in its decision's tone, the answer's. */
+.bb__card.is-trace.is-t-matched .bb__tmark.is-pass { background: var(--tone-bg, var(--fb-positive-bg)); color: var(--tone-fg, var(--fb-positive-fg)); }
+.bb__tmark.is-fail { background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bb__tmark.is-unknown { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+.bb__tmark.is-working { background: none; }
+/* A rule that would also apply (a conflict) did not decide the run: the rows
+   that held are marked in the notice tone, never the green of a match. */
+.bb__card.is-trace.is-conflict .bb__tmark.is-pass { background: var(--fb-notice-bg); color: var(--fb-notice-fg); }
+/* The engine reading a row: an arc that turns. A plain span, never motion's. */
+.bb__tspin {
+  display: block; box-sizing: border-box;
+  width: 12px; height: 12px;
+  border: var(--bw-thick) solid var(--accent-soft-border); border-top-color: var(--accent);
+  border-radius: var(--radius-full);
+  animation: bb-tspin 700ms linear infinite;
+}
+@keyframes bb-tspin { to { transform: rotate(360deg); } }
+.bb__tskip { flex: none; font-size: var(--fs-xs); color: var(--text-tertiary); white-space: nowrap; }
+
+/* The slot at the card's foot: a notice a rule that would also apply carries. */
+.bb__tnotice {
+  display: grid; gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-4);
+  font-size: var(--fs-xs); color: var(--text-secondary);
+}
+.bb__tnotice:empty { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bb__tspin { animation: none; }
 }

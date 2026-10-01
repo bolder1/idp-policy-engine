@@ -175,25 +175,31 @@ export interface BreakInRow {
   accepted: BreakInAcceptance | null
 }
 
+/* One round as a row, its rule read in the policy that decided it. Out of
+   `breakInRows` so a run across the tenant (break-in-app.ts), where each card
+   can be decided by a different policy, reads each one in its own. A can't
+   tell row reads no rule at all. */
+export function breakInRow(round: AttemptRound, policy: Pick<Policy, 'rules'>, accepted?: Accepted): BreakInRow {
+  const group = groupOf(round.outcome)
+  const told = group !== 'cant-tell'
+  const index = told ? round.trace.hitIndex : undefined
+  return {
+    id: round.challenge.id,
+    round,
+    group,
+    name: round.challenge.name,
+    expected: round.want,
+    got: told ? round.decision : null,
+    ruleIndex: index,
+    ruleLabel: index === undefined ? '' : index === null ? 'Last row' : `Rule ${index + 1}`,
+    ruleRef: index === undefined ? undefined : index === null ? 'fallback' : policy.rules[index]?.id,
+    accepted: accepted?.[round.challenge.id] ?? null,
+  }
+}
+
 /** Every round, in deck order, with its group and the rule that decided it. */
 export function breakInRows(result: BreakInResult, policy: Policy, accepted?: Accepted): BreakInRow[] {
-  return result.rounds.map((round) => {
-    const group = groupOf(round.outcome)
-    const told = group !== 'cant-tell'
-    const index = told ? round.trace.hitIndex : undefined
-    return {
-      id: round.challenge.id,
-      round,
-      group,
-      name: round.challenge.name,
-      expected: round.want,
-      got: told ? round.decision : null,
-      ruleIndex: index,
-      ruleLabel: index === undefined ? '' : index === null ? 'Last row' : `Rule ${index + 1}`,
-      ruleRef: index === undefined ? undefined : index === null ? 'fallback' : policy.rules[index]?.id,
-      accepted: accepted?.[round.challenge.id] ?? null,
-    }
-  })
+  return result.rounds.map((round) => breakInRow(round, policy, accepted))
 }
 
 export interface RowGroup {
@@ -337,9 +343,11 @@ export function needsSaid(row: BreakInRow): string | null {
 
 export type BreakInFix = { kind: 'rule'; fix: ProposedFix } | { kind: 'factor'; fix: FactorFix }
 
-/** The fix a round's card names, if there is one to offer. Held, can't tell and the costs have none. */
-export function fixFor(round: AttemptRound, policy: Policy, env: SimEnv): BreakInFix | null {
-  const rule = proposeAttemptFix(round, policy, env)
+/* The fix a round's card names, if there is one to offer. Held, can't tell
+   and the costs have none. `appId` is the application the round was played
+   on, when that is not the policy's first (break-in-app.ts). */
+export function fixFor(round: AttemptRound, policy: Policy, env: SimEnv, appId?: string): BreakInFix | null {
+  const rule = proposeAttemptFix(round, policy, env, appId ?? policy.appIds[0])
   if (rule) return { kind: 'rule', fix: rule }
   const factor = proposeFactorFix(round, policy, env.library?.methods ?? AUTH_METHODS)
   return factor ? { kind: 'factor', fix: factor } : null

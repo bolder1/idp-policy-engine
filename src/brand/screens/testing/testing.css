@@ -181,45 +181,13 @@
 }
 .tsee__head:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
 .tsee__chev { color: var(--text-tertiary); }
+/* The same title where it does not fold (the board's popover): a heading, not a control. */
+.tsee > .tsee__title { margin: 0; letter-spacing: normal; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .tsee.is-closed .tsee__chev { rotate: -90deg; }
 .tsee__body { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }
 .tsee__caption { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
 
-/* One page of the sign-in, 320 px: a picture of somebody else's page, so every
-   "button" on it is ink, never orange. */
-.tscreen {
-  width: 320px; max-width: 100%;
-  display: flex; flex-direction: column; gap: var(--space-5);
-  padding: var(--space-6);
-  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  box-shadow: var(--el-low);
-}
-.tscreen__head { display: flex; align-items: center; gap: var(--space-3); }
-.tscreen__title { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.tscreen__body { display: flex; flex-direction: column; gap: var(--space-4); }
-.tscreen__h { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--text-primary); }
-.tscreen__ask, .tscreen__msg { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); }
-.tscreen__ask.is-muted { color: var(--text-tertiary); }
-.tscreen__field { display: flex; flex-direction: column; gap: var(--space-2); }
-.tscreen__label { font-size: var(--fs-xs); color: var(--text-secondary); }
-.tscreen__box {
-  display: block; min-height: 32px; padding: var(--space-3) var(--space-4);
-  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-sm);
-  font-size: var(--fs-sm); color: var(--text-primary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.tscreen__code { display: flex; gap: var(--space-3); }
-.tscreen__digit { width: 32px; height: 36px; border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-sm); }
-.tscreen__btn {
-  display: flex; align-items: center; justify-content: center;
-  min-height: var(--ctl-height-sm); border-radius: var(--radius-sm);
-  background: var(--surface-inverse); color: var(--text-inverse);
-  font-size: var(--fs-sm); font-weight: var(--fw-medium);
-}
-.tscreen__link { font-size: var(--fs-sm); color: var(--text-secondary); text-decoration: underline; }
-.tscreen__remember { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); color: var(--text-secondary); }
-.tscreen__tick { width: 12px; height: 12px; border: var(--bw-thin) solid var(--border-strong); border-radius: var(--radius-xs); }
+.tsee__page { align-self: stretch; min-width: 0; }
 
 /* --- Save sign-in ----------------------------------------------------------------- */
 

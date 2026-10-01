@@ -324,6 +324,28 @@
 }
 .bpage__headrow h1 { font-size: var(--fs-3xl); letter-spacing: -0.02em; }
 
+/* The way back over the title (`PageHead`'s `crumb`): the board bar's back
+   link on a page head — the 16px arrow in tertiary ink on a 26px square that
+   fills sunken on hover, then the word in secondary that turns primary and
+   underlines (board.css, `.bbtop__back` and `.bbtop__crumb`). The row is pulled
+   left by the square's inset, as the board's is, so the arrow's stroke and
+   not its box lines up with the title under it. Focus is the kit's ring. */
+.bpage__crumbs { display: flex; margin: 0 0 var(--space-2) calc(var(--space-4) * -1); }
+.bpage__crumb {
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  padding: 0 var(--space-3) 0 0;
+  border: 0; border-radius: var(--radius-sm); background: none;
+  font-family: inherit; font-size: var(--fs-md); color: var(--text-secondary);
+  white-space: nowrap; cursor: pointer;
+}
+.bpage__crumb-arrow {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px;
+  border-radius: var(--radius-sm); color: var(--text-tertiary);
+}
+.bpage__crumb:hover { color: var(--text-primary); }
+.bpage__crumb:hover .bpage__crumb-arrow { background: var(--surface-sunken); color: var(--text-primary); }
+.bpage__crumb:hover .bpage__crumb-label { text-decoration: underline; }
+
 /* --- Narrow --------------------------------------------------------------- */
 
 /* Narrow the rail by changing the variable the grid reads, as the collapsed state

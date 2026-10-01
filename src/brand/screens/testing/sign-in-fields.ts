@@ -1,4 +1,4 @@
-import { TIMEZONES, type Audience, type Group, type User, type Zone } from '../../data'
+import { TIMEZONES, memberGroupIds, type Audience, type Group, type User, type Zone } from '../../data'
 import { CANT_TELL, DECISION_WORDS } from '../../decision-words'
 import { PLACES, haversineKm, placeContext, type Place } from '../../places'
 import type { DevicePlatform, FactKey, FormFactor, ScreenLockFact, SignInDevice, SignInFacts } from '../sign-in-facts'
@@ -74,15 +74,18 @@ export interface FieldOption {
 export const IN_POLICY = 'In this policy'
 export const NOT_IN_POLICY = 'Not in this policy'
 
-const governs = (a: Audience, u: Pick<User, 'id' | 'groupId'>) => a.everyone || a.groupIds.includes(u.groupId) || a.userIds.includes(u.id)
+/* Governed through any group they are in, not only the first (Maya Iyer, in
+   Engineering and Finance, is in a Finance policy). */
+const governs = (a: Audience, u: Pick<User, 'id' | 'groupId' | 'alsoGroupIds'>) => a.everyone || memberGroupIds(u).some((g) => a.groupIds.includes(g)) || a.userIds.includes(u.id)
 
-/* Everybody in the sample directory, each with their group. On the board the
+/* Everybody in the sample directory, each with every group they are in
+   ("Maya Iyer · Engineering, Finance"). On the board the
    people the policy is for come first, under their own heading, because the
    person a tester wants is nearly always one of them; the page has no policy
    to sort by and lists them as the directory does. */
 export function personOptions(people: readonly User[], groups: readonly Group[], audience?: Audience | null): FieldOption[] {
   const groupName = (id: string) => groups.find((g) => g.id === id)?.name ?? id
-  const option = (u: User, group?: string): FieldOption => ({ value: u.id, label: u.name, meta: groupName(u.groupId), ...(group ? { group } : null) })
+  const option = (u: User, group?: string): FieldOption => ({ value: u.id, label: u.name, meta: memberGroupIds(u).map(groupName).join(', '), ...(group ? { group } : null) })
   if (!audience) return people.map((u) => option(u))
   return [
     ...people.filter((u) => governs(audience, u)).map((u) => option(u, IN_POLICY)),

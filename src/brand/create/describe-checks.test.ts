@@ -78,7 +78,7 @@ describe('the rows each example gets', () => {
       ['Should pass', 'Kavya Menon · HRMS · Office network · Windows 11 laptop · registered', 'Untitled policy 1 · Rule 1 · In Corporate offices'],
       ['Should stop', 'Kavya Menon · HRMS · Home broadband · Windows 11 laptop · registered', 'Untitled policy 1 · Nothing else matched'],
       ['Edge', 'Kavya Menon · HRMS · Office network · London · Windows 11 laptop · registered', 'Untitled policy 1 · Nothing else matched'],
-      ['Not named', 'Sanjay Bhatt · HRMS · Office network · Windows 11 laptop · registered', 'Global Default Policy · Baseline access'],
+      ['Not named', 'Sanjay Bhatt · HRMS · Office network · Windows 11 laptop · registered', 'Global Default Policy · Corporate device, where we operate'],
     ])
     expect(rows[0].title).toBe('From your text: “only from a corporate office”')
     expect(rows[3].title).toBeUndefined()
@@ -136,17 +136,22 @@ describe('the tenant around the draft', () => {
     })
     expect(runs.map((r) => r.check.kind)).toEqual(['pass', 'stop', 'edge', 'you', 'not-named'])
     const notNamed = runs.find((r) => r.check.kind === 'not-named')!
-    expect(notNamed.check.facts.personId).toBe('arun')
+    /* The first person Developer tools governs, in directory order: Finance joined its audience (TESTING-V4 §13). */
+    expect(notNamed.check.facts.personId).toBe('priya')
     expect(notNamed.result.decidedBy?.policyId).toBe('sc-dev-tools')
     const you = runs.find((r) => r.check.kind === 'you')!
     expect([you.result.decision, you.verdict]).toEqual(['2fa', 'match'])
     expect(runs.find((r) => r.check.kind === 'stop')!.check.expected).toBe('deny')
   })
 
-  it('shows Workday newly asked for 2FA and denied, and nobody newly allowed (scene 3)', () => {
+  /* 18 asked for 2FA and 72 denied until the Global Default's baseline (30 Sep
+     2026), which now refuses Austin and the proxy itself: what the draft
+     moves is the office laptops, from one factor to 2FA, and it newly denies
+     nobody. */
+  it('shows Workday newly asked for 2FA, and nobody newly allowed (scene 3)', () => {
     const { draft, policies, env } = described('HR and Finance reach Workday only from a corporate office, with Google Authenticator.')
     const line = whatChangesFor(draft, policies, env)
-    expect(whatChangesSaid(line)).toBe('Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 18 · Now denied 72')
+    expect(whatChangesSaid(line)).toBe('Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 3 · Now denied 0')
   })
 
   it('says What changes exactly as Before turning on will, for the same draft', () => {
@@ -243,5 +248,34 @@ describe('what a row can and cannot say', () => {
     const kept = withChecks(ctx.draft, answers, ctx).checks!
     expect(kept.map((c) => c.id)).toEqual(['pass', 'stop', 'edge', 'not-named'])
     expect(kept[0].phrase).toBe('password at low risk')
+  })
+})
+
+describe('a refusal another rule shadows', () => {
+  it('is Expected Deny on its Should stop row, and differs, never a pass', () => {
+    const { answers, ctx, policies, env } = described('Finance reach Workday only from the office with Google Authenticator. Block anything else.', {})
+    /* The board a reading once wrote for "only from <a place with no zone>":
+       the rule for Finance checks nothing, so the refusal after it is never
+       reached. */
+    const first = ctx.draft.rules[0]
+    const shadowed = { ...ctx.draft, rules: [{ ...first, when: { ...first.when, cards: [] } }, { ...first, id: 'r-only', name: 'Finance elsewhere', decision: 'deny' as const, when: { ...first.when, cards: [] } }] }
+    const checks = checksFor(answers, { ...ctx, draft: shadowed })
+    const stop = checks.find((c) => c.kind === 'stop')!
+    expect(stop.expected).toBe('deny')
+    const [run] = runChecks([stop], shadowed, policies, env)
+    expect(run.result.decision).toBe('2fa')
+    expect(run.verdict).toBe('differs')
+  })
+})
+
+describe('the rows, as the panel lists them', () => {
+  it('say once what every row shares, and keep this draft’s own name off each row', () => {
+    const { answers, ctx } = example('Corporate devices by risk')
+    const view = checksView(answers, ctx)!
+    expect(view.shared).toBe('On Google Workspace')
+    expect(view.rows.every((r) => !r.line.includes('Google Workspace'))).toBe(true)
+    expect(view.rows.some((r) => r.detail.includes('Untitled policy 1'))).toBe(false)
+    /* The accessible name is still the whole sign-in. */
+    expect(view.rows[0].label).toContain('Google Workspace')
   })
 })

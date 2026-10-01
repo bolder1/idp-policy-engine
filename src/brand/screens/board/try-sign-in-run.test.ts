@@ -9,9 +9,9 @@ import { columnsFor, routeOf, runColumns } from './try-sign-in'
 import {
   ENTRY_DELAY,
   FIRST_RUN,
-  canStepTo,
+  RETURN_MS,
   firstTrack,
-  markerStage,
+  landingMs,
   nextTrack,
   openRun,
   replayRun,
@@ -45,14 +45,16 @@ const render = (track: Track, form: SignInForm, run: number, { draft = hrms, tra
   nextTrack(track, { form, draft, route: routeFor(form, draft), run, travels })
 
 describe('what starts a run', () => {
-  it('opens test mode as a run that waits for the column, and Replay as one that does not', () => {
+  it('opens test mode as a run that waits for the panel, and Replay as one that waits for the marker to be back', () => {
     expect(openRun(FIRST_RUN)).toEqual({ id: 1, travel: true, delay: ENTRY_DELAY })
-    expect(replayRun(openRun(FIRST_RUN))).toEqual({ id: 2, travel: true, delay: 0 })
+    expect(replayRun(openRun(FIRST_RUN))).toEqual({ id: 2, travel: true, delay: RETURN_MS })
+    /* The move back to the start is one hop, and a hop is never longer. */
+    expect(RETURN_MS).toBeGreaterThanOrEqual(hopMs(1))
   })
 
   it('plays a run for an origin chip, and for nothing else the form is patched with', () => {
     const r = openRun(FIRST_RUN)
-    expect(runAfterPatch(r, originPatch('home'))).toEqual({ id: 2, travel: true, delay: 0 })
+    expect(runAfterPatch(r, originPatch('home'))).toEqual({ id: 2, travel: true, delay: RETURN_MS })
     /* The same object: no new run, nothing to re-render. */
     expect(runAfterPatch(r, typedAddressPatch('192.0.2.50'))).toBe(r)
     expect(runAfterPatch(r, { personId: 'u-sales-1' })).toBe(r)
@@ -110,38 +112,31 @@ describe('under reduced motion', () => {
 })
 
 describe('the marker', () => {
-  it('walks the route one hop at a time after the run’s delay, and lets go at the landing', () => {
+  it('leaves for each stage a hop apart after the run’s delay, and lets go at the last hop', () => {
     const hop = hopMs(3)
     expect(travelStops(3, ENTRY_DELAY)).toEqual([
-      { ms: ENTRY_DELAY + hop, at: 1 },
-      { ms: ENTRY_DELAY + 2 * hop, at: 2 },
-      { ms: ENTRY_DELAY + 3 * hop, at: null },
+      { ms: ENTRY_DELAY, at: 1, reached: 0 },
+      { ms: ENTRY_DELAY + hop, at: 2, reached: 1 },
+      { ms: ENTRY_DELAY + 2 * hop, at: null, reached: 2 },
     ])
     expect(travelStops(0, 0)).toEqual([])
   })
 
-  it('travels any route in 1.1 s at most, a hop at 180 ms at most', () => {
-    expect(travelStops(3, 0).at(-1)!.ms).toBe(540)
-    for (const hops of [1, 6, 12, 40]) expect(travelStops(hops, 0).at(-1)!.ms).toBeLessThanOrEqual(1100)
+  it('reveals a stage when the marker arrives there, a hop after it set off — never as it leaves', () => {
+    const hop = hopMs(4)
+    const stops = travelStops(4, 0)
+    for (let stage = 1; stage <= 3; stage++) {
+      const leaves = stops.find((s) => s.at === stage)!.ms
+      const arrives = stops.find((s) => s.reached === stage)!.ms
+      expect(arrives - leaves).toBe(hop)
+    }
+    /* The landing — the outcome, the status sentence — one hop after the last departure. */
+    expect(landingMs(4, 0)).toBe(stops.at(-1)!.ms + hop)
   })
 
-  it('stands where travel reached, else where a step put it, else on the landing', () => {
-    expect(markerStage(2, { run: 1, at: 0 }, 1, 4)).toBe(2)
-    expect(markerStage(null, { run: 1, at: 1 }, 1, 4)).toBe(1)
-    expect(markerStage(null, null, 1, 4)).toBe(4)
-  })
-
-  it('never stands past where the route now lands, and forgets a step from an earlier run', () => {
-    expect(markerStage(null, { run: 1, at: 4 }, 1, 2)).toBe(2)
-    expect(markerStage(null, { run: 1, at: 1 }, 2, 4)).toBe(4)
-  })
-
-  it('steps only once landed, and only between Sign-in and the landing', () => {
-    expect(canStepTo(2, 4, 1)).toBe(false)
-    expect(canStepTo(-1, 4, null)).toBe(false)
-    expect(canStepTo(5, 4, null)).toBe(false)
-    expect(canStepTo(0, 4, null)).toBe(true)
-    expect(canStepTo(4, 4, null)).toBe(true)
+  it('lands any route in 1.1 s at most, a hop at 180 ms at most', () => {
+    expect(landingMs(3, 0)).toBe(540)
+    for (const hops of [1, 6, 12, 40]) expect(landingMs(hops, 0)).toBeLessThanOrEqual(1100)
   })
 })
 

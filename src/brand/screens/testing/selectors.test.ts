@@ -48,6 +48,9 @@ const form = (patch: Partial<SignInForm> = {}): SignInForm => ({ ...base, ...pat
 const run = (f: SignInForm, policies: readonly Policy[] = t.policies) => tryResult(policies, f, env, t.zones)
 const off = (id: string, policies: readonly Policy[] = t.policies) => policies.map((p) => (p.id === id ? { ...p, status: 'inactive' as const } : p))
 const policyOf = (id: string) => t.policies.find((p) => p.id === id)!
+/* The Global Default reads the device since its baseline (30 Sep 2026): the
+   scenes it decides state the registered corporate laptop, its rule 1. */
+const LAPTOP: SignInForm['device'] = { kind: 'preset', id: 'win11-registered' }
 
 describe('Try a sign-in', () => {
   it('opens on Kavya Menon, HRMS, from the office today: Allow with 2FA by the office rule', () => {
@@ -113,7 +116,7 @@ describe('Try a sign-in', () => {
   })
 
   it('sends Aisha Khan to the Global Default, with HRMS struck through for its audience', () => {
-    const r = run(form({ personId: 'u-sales-1' }))
+    const r = run(form({ personId: 'u-sales-1', device: LAPTOP }))
     expect(r.shown.decision).toBe('1fa')
     expect(r.shown.decidedBy?.policyName).toBe('Global Default Policy')
     const rows = whichPolicyRows(r.shown, t.policies, 'hrms')
@@ -126,9 +129,9 @@ describe('Try a sign-in', () => {
   it('assumes an inactive policy on, and says what decides today', () => {
     const policies = off(HRMS)
     expect(policies).toEqual(showcaseTenant().policies)
-    expect(run(base, policies).shown).toMatchObject({ decision: '1fa', decidedBy: { policyName: 'Global Default Policy' } })
+    expect(run(form({ device: LAPTOP }), policies).shown).toMatchObject({ decision: '1fa', decidedBy: { policyName: 'Global Default Policy' } })
     expect(assumeOptions(policies, 'hrms')).toEqual([{ value: HRMS, label: 'HRMS access from corporate offices', meta: 'Inactive' }])
-    const r = run(form({ assumeOn: HRMS }), policies)
+    const r = run(form({ assumeOn: HRMS, device: LAPTOP }), policies)
     expect(r.shown.decision).toBe('2fa')
     expect(r.today.decision).toBe('1fa')
     expect(r.substitute?.id).toBe(HRMS)
@@ -183,9 +186,16 @@ describe('Check a person', () => {
       expect(at(id).res.status).toBe('depends')
       expect(answerSaid(at(id).res)).toBe("Can't tell · Allow on 1 factor or Deny")
     }
-    for (const r of rows.filter((x) => !['hrms', 'outlook', 'dropbox', 'google-workspace', 'github'].includes(x.appId))) {
-      expect([r.policyName, r.ruleName, r.res.decision]).toEqual(['Global Default Policy', 'Baseline access', '1fa'])
+    /* The Global Default's baseline reads the device, and Kavya's form states
+       none: in the office in India it is a password on a corporate laptop and
+       OTP over Email on anything else, so every one of these can't be told. */
+    for (const r of rows.filter((x) => !['hrms', 'outlook', 'dropbox', 'google-workspace', 'github', 'slack'].includes(x.appId))) {
+      expect([r.policyName, r.ruleName, answerSaid(r.res)]).toEqual(['Global Default Policy', 'Corporate device, where we operate', "Can't tell · Allow on 1 factor or Allow with 2FA"])
     }
+    /* Slack for everyone (30 Sep 2026) reads only the country: from the office
+       in India, a password whatever the device. AWS covers no HR person, so
+       the Global Default still decides it, above. */
+    expect([at('slack').policyName, at('slack').ruleName, answerSaid(at('slack').res)]).toEqual(['Slack for everyone', 'Where we operate', 'Allow on 1 factor'])
   })
 
   it('settles Outlook and Dropbox on an Android 14 phone', () => {
@@ -198,7 +208,7 @@ describe('Check a person', () => {
 
   it('says what decides today beside an assumed answer that differs', () => {
     const policies = off(HRMS)
-    const f = form({ assumeOn: HRMS })
+    const f = form({ assumeOn: HRMS, device: LAPTOP })
     const rows = personRows(policies, t.apps, f, env, t.zones, run(f, policies).substitute)
     const hrms = rows.find((r) => r.appId === 'hrms')!
     expect(hrms.res.decision).toBe('2fa')
@@ -208,12 +218,18 @@ describe('Check a person', () => {
 })
 
 describe('Saved sign-ins', () => {
-  it('passes all six seeded rows', () => {
+  /* Sixteen since the test panel's seed (V4 §5): three Protected, five Must
+     pass and eight Notes — and Maya Iyer's (§13), a ninth Note, and James
+     Whitfield in Austin (30 Sep 2026), a sixth Must pass: the Global
+     Default's refusal. Then nine troubleshooting cases, all Notes, and the
+     owner's two-group example on Box (1 Oct 2026: Tanmay Joshi in
+     Engineering and Design, Ishita Banerjee in Design alone), two more. */
+  it('passes all twenty-nine seeded rows', () => {
     const rows = savedRows(t.savedSignIns, t.policies, env)
-    expect(rows).toHaveLength(6)
+    expect(rows).toHaveLength(29)
     expect(rows.every((r) => r.result === 'pass')).toBe(true)
     /* Within a result, the strongest promise first. */
-    expect(rows.map((r) => r.saved.level)).toEqual(['protected', 'protected', 'must-pass', 'must-pass', 'note', 'note'])
+    expect(rows.map((r) => r.saved.level)).toEqual([...Array(3).fill('protected'), ...Array(6).fill('must-pass'), ...Array(20).fill('note')])
   })
 
   it('puts the failures first with HRMS turned off, Must pass before Note', () => {
@@ -247,7 +263,7 @@ describe('Saved sign-ins', () => {
   it('filters by name and level', () => {
     const rows = savedRows(t.savedSignIns, t.policies, env)
     expect(filterSaved(rows, 'hrms', 'all').map((r) => r.saved.id).sort()).toEqual(['ssi-aisha-hrms', 'ssi-ravi-hrms'])
-    expect(filterSaved(rows, '', 'protected').map((r) => r.saved.id).sort()).toEqual(['ssi-ravi-hrms', 'ssi-vikram-laptop'])
+    expect(filterSaved(rows, '', 'protected').map((r) => r.saved.id).sort()).toEqual(['ssi-ravi-hrms', 'ssi-tom-win10', 'ssi-vikram-laptop'])
     expect(filterSaved(rows, 'nobody', 'all')).toEqual([])
   })
 })

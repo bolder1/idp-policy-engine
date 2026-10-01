@@ -36,6 +36,10 @@ export interface SignInScreens {
   policyName: string
   ruleName: string
   steps: ScreenStep[]
+  /** Who is signing in, for the pages that name them: the account on a code
+      page, the face on the application once they are in. Absent when the
+      directory has nobody by that id. */
+  person?: { name: string; email: string }
 }
 
 export interface ScreensContext {
@@ -45,7 +49,8 @@ export interface ScreensContext {
   methods: readonly AuthMethod[]
   /** The tenant's default second method, or unset for the product's own. */
   defaultMethodId: string | null | undefined
-  person: Pick<User, 'email'> | null
+  /** The name, where the caller has it, is only for the pages that greet them. */
+  person: (Pick<User, 'email'> & Partial<Pick<User, 'name'>>) | null
 }
 
 /* A policy with no last row of its own lets everybody else in on a password,
@@ -145,7 +150,8 @@ export function screensOf(res: TenantResolution, ctx: ScreensContext): SignInScr
   return outcomes.flatMap(({ decision, index }) => {
     const rule = ruleAt(index)
     if (!rule) return []
-    return [{ decision, policyName: policy.name, ruleName: rule.name, steps: stepsOf(rule, ctx) }]
+    const who = ctx.person ? { person: { name: ctx.person.name ?? ctx.person.email, email: ctx.person.email } } : {}
+    return [{ decision, policyName: policy.name, ruleName: rule.name, steps: stepsOf(rule, ctx), ...who }]
   })
 }
 
@@ -182,8 +188,9 @@ export function promptText(step: ScreenStep): string {
         case 'token':
         case 'assigned':
           return 'Enter the code from your token'
+        /* A method the catalogue does not know: what a sign-in page says for one. */
         case 'none':
-          return step.name
+          return `Continue with ${step.name}`
       }
   }
 }

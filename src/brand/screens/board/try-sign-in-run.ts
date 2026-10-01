@@ -20,14 +20,17 @@ import { decisionSig, runSentence, updateSentence, type DecisionView, type Route
                 IP address") only when it moved the answer, because nothing
                 moved on screen to say so
      the words  once per run, when the marker lands — or at once, where it
-                does not travel; once per update that moved the answer; once
-                per step, naming the stage
+                does not travel; and once per update that moved the answer
    -------------------------------------------------------------------------- */
 
-/** The grid's 200 ms and the refit's start: travel waits for the column it runs down. */
+/* How long travel waits on opening test mode before its first hop: the panel
+   fades in beside the chain for this long, and the chain itself is already
+   where it will stay (Board.tsx refits in the commit that opens test mode). */
 export const ENTRY_DELAY = 240
-/** One stage, on Back or Next stage. */
-export const STEP_MS = 180
+/* How long a replay waits before its first hop: the marker's move back from
+   where the last run landed to the start, which is one hop (`hopMs` is never
+   more than 180 ms). */
+export const RETURN_MS = 180
 
 export interface Run {
   id: number
@@ -38,10 +41,10 @@ export interface Run {
 
 export const FIRST_RUN: Run = { id: 0, travel: false, delay: 0 }
 
-/** Opening test mode: a run, after the column it runs down has settled. */
+/** Opening test mode: a run, after the panel beside the chain has come in. */
 export const openRun = (r: Run): Run => ({ id: r.id + 1, travel: true, delay: ENTRY_DELAY })
-/** Replay: the same sign-in, travelled again from the start. */
-export const replayRun = (r: Run): Run => ({ id: r.id + 1, travel: true, delay: 0 })
+/** Replay: the same sign-in, travelled again from the start once the marker is back there. */
+export const replayRun = (r: Run): Run => ({ id: r.id + 1, travel: true, delay: RETURN_MS })
 /* An origin chip is the one edit that plays a run: a chip is a whole sign-in
    chosen at once, where a typed address is one fact changed. Any other patch
    leaves the run as it is — the same object, so nothing re-renders for it. */
@@ -52,28 +55,30 @@ export const runAfterPatch = (r: Run, p: Partial<SignInForm>): Run => (p.origin 
 export interface TravelStop {
   /** From the run's start. */
   ms: number
-  /** The stage reached; null at the last hop, the landing, where the route's own landing takes over. */
+  /** The stage the marker leaves for; null for the last hop, where the route's own landing takes over. */
   at: number | null
+  /** The stage it leaves, which is the last one it has ARRIVED at. */
+  reached: number
 }
 
-/* One stop per hop, `hopMs` apart after the run's delay. Letting go at the
-   landing rather than naming it means an update that lands the sign-in
-   somewhere else mid-run is followed, not overwritten by the timer. */
+/* The run's departures, one per hop, `hopMs` apart after the run's delay: at
+   each the marker leaves for the next stage, and the stage it leaves is the
+   one it has arrived at. So what a stage reveals — its pills, a card's ring,
+   the gate's words — waits for the marker to be there, never for it to set
+   off (review, 29 Sep 2026: the ring lit a hop early). The landing is one hop
+   after the last departure (`landingMs`): the outcome and the status sentence
+   arrive with the marker.
+
+   Letting go at the last hop rather than naming the landing means an update
+   that lands the sign-in somewhere else mid-run is followed, not overwritten
+   by the timer. A route of no hops does not travel. */
 export function travelStops(hops: number, delay: number): TravelStop[] {
   const hop = hopMs(hops)
-  return Array.from({ length: hops }, (_, i) => ({ ms: delay + (i + 1) * hop, at: i + 1 >= hops ? null : i + 1 }))
+  return Array.from({ length: Math.max(0, hops) }, (_, i) => ({ ms: delay + i * hop, at: i + 1 >= hops ? null : i + 1, reached: i }))
 }
 
-/* Where the marker stands: the stage a travelling run has reached; else the
-   stage a step put it on in this run, never past where the route now lands;
-   else the landing. */
-export function markerStage(travelAt: number | null, step: { run: number; at: number } | null, run: number, landing: number): number {
-  const stepAt = step && step.run === run ? Math.min(step.at, landing) : null
-  return travelAt ?? stepAt ?? landing
-}
-
-/** Back and Next stage: only once landed, and only between Sign-in and the landing. */
-export const canStepTo = (to: number, landing: number, travelAt: number | null): boolean => travelAt === null && to >= 0 && to <= landing
+/** When the marker lands, from the run's start: one hop after its last departure. */
+export const landingMs = (hops: number, delay: number): number => delay + Math.max(0, hops) * hopMs(hops)
 
 // --- Keeping the answer in view ------------------------------------------------------
 
@@ -105,7 +110,7 @@ export function revealKeepsWhich(prev: string | null, next: string): boolean {
 
 // --- What changed, and what to say ---------------------------------------------------
 
-export type Motion = 'travel' | 'step' | 'update'
+export type Motion = 'travel' | 'update'
 
 /** What the last render showed, to tell this one's cause from. */
 export interface Track {

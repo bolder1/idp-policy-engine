@@ -365,8 +365,8 @@ describe('policySentences', () => {
   it('ties each rule line to its card, and numbers only the rules', () => {
     const p = policy('sc-dev-tools')
     const lines = policySentences(p, tenantLookup, appName)
-    expect(lines.map((l) => l.ruleId)).toEqual([null, null, p.rules[0].id, p.rules[1].id, 'fallback'])
-    expect(lines.map((l) => l.n)).toEqual([null, null, 1, 2, null])
+    expect(lines.map((l) => l.ruleId)).toEqual([null, null, p.rules[0].id, p.rules[1].id, p.rules[2].id, 'fallback'])
+    expect(lines.map((l) => l.n)).toEqual([null, null, 1, 2, 3, null])
     expect(new Set(lines.map((l) => l.key)).size).toBe(lines.length)
   })
 

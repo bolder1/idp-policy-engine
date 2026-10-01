@@ -1,0 +1,60 @@
+/* -----------------------------------------------------------------------------
+   AnchoredPopover (AnchoredPopover.tsx): a panel hung off the control that
+   opened it. The Picker's popup is the model (picker.css): fixed, portalled,
+   above modals and below tooltips, border-box so a placement that reads its
+   width never grows it.
+
+   The entrance is opacity and the separate `translate` property on this plain
+   element — nothing here is animated by motion, so there is no inline
+   `transform` for a stylesheet to fight.
+   -------------------------------------------------------------------------- */
+
+.bx-apop {
+  position: fixed;
+  box-sizing: border-box;
+  z-index: var(--z-popover, 500);
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--surface-overlay, var(--surface-raised));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--el-high, var(--el-mid));
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  animation: bx-apop-in var(--dur-fast, 140ms) var(--ease-standard, ease-out) both;
+}
+
+.bx-apop.is-top {
+  animation-name: bx-apop-in-up;
+}
+
+@keyframes bx-apop-in {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes bx-apop-in-up {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bx-apop,
+  .bx-apop.is-top {
+    animation: none;
+  }
+}

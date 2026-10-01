@@ -213,6 +213,7 @@ export const REASON = {
   noZone: (place: string) => `No zone for ${place}`,
   off: (method: string) => `${method} is off in Authentication methods`,
   never: (name: string) => `Never reached: ${name} decides first`,
+  onlyUnreached: 'No place, device or time to limit to',
 } as const
 
 /* The tenant's own risk bands, when nothing says otherwise. */
@@ -1204,10 +1205,22 @@ export function readText(text: string, dict: Dictionary): Reading {
   }
   flush()
   notAdded.sort((a, b) => a.span.start - b.span.start)
+  /* A place with no zone, and the word that names what it is — "the Berlin
+     branch" — are one phrase not added, not a place and a stray word. */
+  for (let k = notAdded.length - 2; k >= 0; k--) {
+    const place = notAdded[k]
+    const next = notAdded[k + 1]
+    if (place.action !== 'create-zone' || next.reason !== REASON.unread || !PLACE_NOUNS.has(next.span.phrase.toLowerCase())) continue
+    if (text.slice(place.span.end, next.span.start).trim() !== '') continue
+    notAdded.splice(k, 2, { ...place, span: span(place.span.start, next.span.end) })
+  }
 
   const clauses: Clause[] = clauseRanges.map((_, ci) => ({ ...clauseSpan(ci), text: clauseSpan(ci).phrase, role: roles[ci] }))
   return { text, answers, choices, notAdded, clauses }
 }
+
+/* What a place is called after its name: "the Berlin branch", "the Pune campus". */
+const PLACE_NOUNS = new Set(['branch', 'branches', 'office', 'offices', 'campus', 'site', 'sites', 'hq', 'headquarters', 'centre', 'center', 'building', 'location'])
 
 /* A branch clause's outcome keeps the whole clause as its words, so the card
    it writes reads "password in the office" rather than "password". */
@@ -1570,10 +1583,19 @@ export function compose(a: DescribeAnswers, t: DescribeTenant, ids: RuleIds = ne
   }
 
   /* "only", with a clause for everyone else: the people named are refused
-     outside the conditions — a refusal for them, not a catch-all. */
+     outside the conditions — a refusal for them, not a catch-all. Not after
+     a rule for them that checks nothing (a place with no zone, left out):
+     every sign-in of theirs stops there, so the refusal could never be
+     reached. It is not written, and "only" is said under Not added — once
+     nothing is still being asked, since an answer may give that rule its
+     condition. */
   if (a.only && who && writesOnlyRule(a)) {
-    const r = make('only', `${whoWords(a, t)} elsewhere`, [], { decision: 'deny', method: null, message: null })
-    chain.push({ key: 'only', rule: r, source: a.only.phrase, conds: [] })
+    if (!chain.some((p) => p.conds.length === 0)) {
+      const r = make('only', `${whoWords(a, t)} elsewhere`, [], { decision: 'deny', method: null, message: null })
+      chain.push({ key: 'only', rule: r, source: a.only.phrase, conds: [] })
+    } else if (!pendingAny(a)) {
+      notAdded.push({ span: a.only, reason: REASON.onlyUnreached })
+    }
   }
 
   const rules = chain.map((p) => p.rule)

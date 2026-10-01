@@ -166,13 +166,20 @@ describe('Beat 2: Devon opens GitHub', () => {
   const form: SignInForm = { ...defaultForm(t.directory.people, t.apps, TODAY), personId: 'devon', appId: 'github', device: { kind: 'preset', id: 'android-12' } }
   const r = tryResult(t.policies, form, env, t.zones)
 
-  it('passes Developer tools, which does not govern a contractor, and the Global Default lets him in on one factor', () => {
+  /* The Global Default's baseline (30 Sep 2026): from the office in India,
+     but an Android phone is not a corporate device, so its rule 2 — OTP over
+     Email. It let him in on one factor before; the script's line changes. */
+  it('passes Developer tools, which does not govern a contractor, and the Global Default asks him for OTP over Email', () => {
     expect(r.shown.decidedBy).toMatchObject({ policyName: 'Global Default Policy', isGlobalDefault: true })
-    expect(r.shown.decision).toBe('1fa')
+    expect(r.shown.decision).toBe('2fa')
+    expect(ruleOf(r.shown, policy('global-default'))?.name).toBe('Any other device, where we operate')
     const rows = whichPolicyRows(r.shown, t.policies, 'github')
     expect(rows.on.map((x) => [x.name, x.reason, x.struck])).toEqual([
       ['Global Default Policy', 'Decides this sign-in', false],
-      ['Developer tools — office and device checks', 'Not in audience: Engineering, DevOps', true],
+      /* Finance joined the audience for Maya Iyer's conflict (TESTING-V4 §13). */
+      ['Developer tools — office and device checks', 'Not in audience: Engineering, DevOps, Finance', true],
+      /* The troubleshooting estate's GitHub draft (30 Sep 2026): on GitHub, not on. */
+      ['Code review for Finance', 'Draft', false],
     ])
   })
 })
@@ -189,8 +196,10 @@ describe('Beat 3: HRMS, Inactive, on the board — Kavya from the office network
   })
 
   it('reads Today beside the Stored version: the Global Default on one factor, and rule 1 with 2FA', () => {
+    /* Today is the Global Default's rule 1: the board's sign-in is on the
+       registered corporate laptop, in India (baseline, 30 Sep 2026). */
     expect(b.cols.map((c) => said(c, HRMS))).toEqual([
-      'Today · Global Default Policy · Baseline access · 1fa',
+      'Today · Global Default Policy · Corporate device, where we operate · 1fa',
       'Stored version · HRMS access from corporate offices · Rule 1 · In a corporate office · 2fa',
     ])
     expect(b.route.decision).toMatchObject({ status: 'decided', decision: '2fa', line: 'HRMS access from corporate offices · Rule 1 · In a corporate office' })
@@ -225,7 +234,7 @@ describe('Beat 4: 192.0.2.50, then the distance ruler', () => {
 
   it('is refused by the last row, and names the typed address as what changed it', () => {
     expect(b.cols.map((c) => said(c, HRMS))).toEqual([
-      'Today · Global Default Policy · Baseline access · 1fa',
+      'Today · Global Default Policy · Corporate device, where we operate · 1fa',
       'Stored version · HRMS access from corporate offices · Nothing else matched · deny',
     ])
     expect(changedBy(office, typed)).toBe('address')
@@ -360,12 +369,16 @@ describe('Beat 7: who turning HRMS on moves', () => {
     breakIn: {},
   })
 
+  /* 18 asked for 2FA and 72 denied until the Global Default's baseline (30 Sep
+     2026). It refuses Austin and the proxy itself now, and can't tell a
+     sign-in with no address or from Tor, so HRMS turned on newly denies
+     nobody: the only move is the office laptops, from one factor to 2FA. The
+     script's "Now denied: Priya" line is gone (what-changes.test.ts). */
   it('opens on Now allowed, with nobody in it, then the stricter moves with names', () => {
-    expect(whatChangesSaid(g.whatChanges)).toBe('Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 18 · Now denied 72')
+    expect(whatChangesSaid(g.whatChanges)).toBe('Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 3 · Now denied 0')
     expect(whatChangesBlocks(g.whatChanges)).toEqual([
       { key: 'nowAllowed', word: 'Now allowed', items: [] },
       { key: 'nowAskedFor2fa', word: 'Now asked for 2FA', items: [{ name: 'Priya Sharma (Finance)', value: 'Office network' }] },
-      { key: 'nowDenied', word: 'Now denied', items: [{ name: 'Priya Sharma (Finance)', value: 'No IP address, Austin, Tor exit, Proxy in Germany' }] },
     ])
     expect(g.newlyAllowed).toBe(false)
   })
@@ -407,7 +420,8 @@ describe('Beat 8: Before turning on HRMS, with your edits', () => {
     ])
     expect(checksSummary(g.saved, g.anySaved)).toBe('All pass')
     expect(g.protectedOwn.map((c) => [c.signIn.name, c.after.verdict])).toEqual([['Ravi Menon on HRMS', 'pass']])
-    expect(whatChangesSaid(g.whatChanges)).toBe('Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 18 · Now denied 72')
+    /* As in beat 7: the Global Default's baseline already refuses the rest. */
+    expect(whatChangesSaid(g.whatChanges)).toBe('Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 3 · Now denied 0')
     expect(breakInSummary(g.breakIn!)).toBe('Got through 0 · Weaker factor 0 · Locked out 1 · Extra prompts 0')
   })
 
@@ -469,8 +483,9 @@ describe('Beat 9: Describe it — HR and Finance on Workday, from the office', (
     expect(enforces(draft)).toBe(false)
     const today = resolveSignIn(policies, runs[0].check.facts, withDraft)
     expect([today.decidedBy?.policyName, today.decision]).toEqual(['Global Default Policy', '1fa'])
+    /* As in beat 7: the Global Default's baseline already refuses the rest. */
     expect(whatChangesSaid(whatChangesFor(draft, policies, withDraft))).toBe(
-      'Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 18 · Now denied 72',
+      'Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 3 · Now denied 0',
     )
   })
 })
@@ -489,7 +504,9 @@ describe('Beat 10: “MFA for all sales team members accessing the CRM from outs
 
   it('says there is no zone for the United States, offers to create one, and never invents one', () => {
     expect(reading.notAdded.map((n) => [n.span.phrase, n.reason, n.action])).toEqual([['outside the US', 'No zone for United States', 'create-zone']])
-    expect(t.zones.map((z) => z.name)).toEqual(['Corporate offices', 'India'])
+    /* Operating countries (India, the UK) is the Global Default's since 30 Sep
+       2026; still no zone names the United States. */
+    expect(t.zones.map((z) => z.name)).toEqual(['Corporate offices', 'India', 'Operating countries'])
     expect(compose(reading.answers, tenant).rules.flatMap((r) => r.when.cards.flatMap((k) => k.conditions))).toEqual([])
   })
 

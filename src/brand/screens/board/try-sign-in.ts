@@ -1,4 +1,4 @@
-import { FALLBACK_NAME, enforces, type AccessDecision, type Condition, type Policy, type Rule, type Zone } from '../../data'
+import { FALLBACK_NAME, enforces, memberGroupIds, type AccessDecision, type Condition, type Policy, type Rule, type Zone } from '../../data'
 import { CANT_TELL, DECISION_WORDS, decisionsOr, factWords } from '../../decision-words'
 import type { AuthMethod } from '../../methods'
 import { PLACES, searchPlaces, type PlaceKind } from '../../places'
@@ -278,7 +278,8 @@ function whoGate(draft: Policy, facts: SignInFacts, env: SimEnv): GateView {
   const value = `${person.name} · ${person.groupName}`
   const a = draft.audience
   if (a.everyone) return { value, word: 'Everyone', state: 'pass' }
-  const inside = a.groupIds.includes(person.groupId) || a.userIds.includes(person.id)
+  /* Through any group of theirs, as the resolver asks it: Maya Iyer is in AWS billing for Finance through Finance, her second group. */
+  const inside = memberGroupIds(person).some((g) => a.groupIds.includes(g)) || a.userIds.includes(person.id)
   return inside ? { value, word: 'In audience', state: 'pass' } : { value, word: 'Not in audience', state: 'fail' }
 }
 

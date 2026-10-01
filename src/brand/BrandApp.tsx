@@ -1,6 +1,7 @@
 import { Fragment, Suspense, lazy, useEffect, type ComponentProps } from 'react'
 import { MotionConfig } from 'motion/react'
 
+import { screenOffered } from './edition-screens'
 import { ScreenErrorBoundary } from './error-boundary'
 import { LeaveDialog } from './leave-guard'
 import { Shell, Toast } from './Shell'
@@ -40,6 +41,7 @@ const BuilderPage = lazy(() => import('./screens/BuilderPage').then((m) => ({ de
 const BoardPage = lazy(() => import('./screens/board/BoardPage').then((m) => ({ default: m.BoardPage })))
 const PolicyDetails = lazy(() => import('./screens/PolicyDetails').then((m) => ({ default: m.PolicyDetails })))
 const Applications = lazy(() => import('./screens/Applications').then((m) => ({ default: m.Applications })))
+const SignInTests = lazy(() => import('./screens/SignInTests').then((m) => ({ default: m.SignInTests })))
 
 /* Same specifiers as the lazy() calls above — Vite dedupes them to one chunk
    each, so this warms exactly what navigation will ask for and nothing else.
@@ -56,6 +58,7 @@ const warm = () => {
   void import('./screens/board/BoardPage')
   void import('./screens/PolicyDetails')
   void import('./screens/Applications')
+  void import('./screens/SignInTests')
 }
 
 function usePrefetchScreens() {
@@ -83,7 +86,15 @@ function Screen() {
 }
 
 function ScreenBody() {
-  const { screen } = useBrand()
+  const { screen, features, go } = useBrand()
+  /* A page this edition withholds (edition-screens.ts): a stale route, or a
+     link from a board, lands on the policies instead. The list draws at once,
+     and the route follows it — the same element, so it is not drawn twice. */
+  const withheld = !screenOffered(screen, features)
+  useEffect(() => {
+    if (withheld) go({ name: 'policies' })
+  }, [withheld, go])
+  if (withheld) return <Policies />
   switch (screen.name) {
     /* The admin catalogue and the end-user launcher, adjacent so the two
        names cannot be confused by anyone reading this switch. */
@@ -96,7 +107,7 @@ function ScreenBody() {
     case 'builder':
       return <BuilderPage policyId={screen.policyId} open={screen.open} />
     case 'board':
-      return <BoardPage policyId={screen.policyId} open={screen.open} rule={screen.rule} />
+      return <BoardPage policyId={screen.policyId} open={screen.open} rule={screen.rule} fix={screen.fix} />
     case 'policy-details':
       /* Cast to the screen's own prop type, so the route can offer a return
          target a moment before the screen handles it. */
@@ -115,6 +126,8 @@ function ScreenBody() {
       return <AuthMethodsPage />
     case 'display-tokens':
       return <DisplayTokensPage tab={screen.tab ?? 'assignments'} />
+    case 'sign-in-tests':
+      return <SignInTests tab={screen.tab} />
   }
 }
 

@@ -1,5 +1,6 @@
 import { enforces, type Policy, type PolicyStatus, type PolicyType } from '../data'
 import { monitorBlocker, openForEditing } from '../policy-draft'
+import { ACCESS_CHECK } from './sign-in-tests/names'
 
 /* What a published policy can be switched to, where its menu and dialog
    portal, and which switches ask first. Plain functions, kept apart from the
@@ -77,7 +78,7 @@ export function rowMenu(policy: Policy, opts: { monitor: boolean; trySignIn: boo
   const { monitor } = opts
   return [
     { id: 'edit', label: 'Edit policy' },
-    ...(opts.trySignIn && policy.type === 'App Access' ? [{ id: 'test' as const, label: 'Try a sign-in' }] : []),
+    ...(opts.trySignIn && policy.type === 'App Access' ? [{ id: 'test' as const, label: ACCESS_CHECK }] : []),
     ...statusOptions(policy, { monitor }).map((s) => ({ id: s.target, label: s.label })),
     /* What a monitoring policy would decide, were it on (spec C §3.4). */
     ...(offersMonitoringView(policy, { monitor }) ? [{ id: 'monitoring' as const, label: 'View monitoring' }] : []),

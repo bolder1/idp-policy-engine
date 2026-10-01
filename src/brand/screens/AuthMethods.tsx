@@ -62,8 +62,9 @@ import { useLeaveGuard } from '../leave-guard'
 import { compactClass, usePageWidth } from '../page-width'
 import { WidthSwitch } from './page-bar'
 import { SHOWCASE } from '../showcase'
-import { takesCaChain } from './ca-chain'
+import { chainStatus, chainsSaid, takesCaChain } from './ca-chain'
 import { CaChainDrawer } from './ca-chain-drawer'
+import { useCaChains } from './ca-chains'
 
 /* -----------------------------------------------------------------------------
    Authentication methods · final.
@@ -316,7 +317,8 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
   const [off, setOff] = useState<{ id: string; name: string; lines: string[] } | null>(null)
   const [offOpen, setOffOpen] = useState(false)
 
-  /* CAC Card's Upload CA chain slider. See ca-chain.ts. */
+  /* CAC Card's CA chains slider: the tenant's chains, and Add CA chain over
+     them. See ca-chain.ts. */
   const [caOpen, setCaOpen] = useState(false)
 
   const applyEnabled = (id: string, on: boolean) => {
@@ -589,7 +591,7 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
             onToggle={setEnabled}
             onSetup={openSetup}
             onMakeDefault={setDefaultMethodId}
-            onUploadCa={isUser ? undefined : () => setCaOpen(true)}
+            onCaChains={isUser ? undefined : () => setCaOpen(true)}
             enrolment={enrolment}
             configuredIds={configuredIds}
           />
@@ -614,14 +616,7 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
           />
 
           {!isUser && (
-            <CaChainDrawer
-              open={caOpen}
-              onClose={() => setCaOpen(false)}
-              onUpload={() => {
-                setCaOpen(false)
-                store.showToast('CA chain uploaded')
-              }}
-            />
+            <CaChainDrawer open={caOpen} onClose={() => setCaOpen(false)} by={store.account.name} />
           )}
         </>
       )}
@@ -875,7 +870,7 @@ function CategoryList({
   onSetup,
   onSettings,
   onMakeDefault,
-  onUploadCa,
+  onCaChains,
   enrolment,
   configuredIds,
 }: {
@@ -890,8 +885,8 @@ function CategoryList({
   /** A family of one's settings, opened straight from its row. */
   onSettings: (channel: string) => void
   onMakeDefault: (id: string) => void
-  /** CAC Card's Upload CA chain. The admin's list only. */
-  onUploadCa?: () => void
+  /** CAC Card's CA chains. The admin's list only. */
+  onCaChains?: () => void
   enrolment: UserEnrolment
   /** The person's set-up methods, for the Configured pill on their rows. */
   configuredIds: string[]
@@ -956,7 +951,7 @@ function CategoryList({
      40px button, a chevron a 17px glyph. Read off the rows rather than fixed,
      so a list of nothing but chevrons — a person's own methods, or a filter
      that leaves only families — keeps the narrow track it had. */
-  const anyGear = items.some((it) => it.kind === 'family' && marksGear(it.row.shape))
+  const anyGear = items.some((it) => it.kind === 'family' && (marksGear(it.row.shape) || !!caChainsRow(it.row.shape, onCaChains)))
   /* The whole list, not paged. Zones, device and risk profiles page theirs;
      the methods are one catalogue of about fifteen, and the owner wants it read
      top to bottom on one scroll. */
@@ -1035,7 +1030,7 @@ function CategoryList({
                   onToggle={onToggle}
                   onSetup={onSetup}
                   onMakeDefault={onMakeDefault}
-                  onUploadCa={onUploadCa}
+                  onCaChains={onCaChains}
                 />
               ),
             )}
@@ -1067,15 +1062,16 @@ function CategoryList({
    switches are. The slots keep their widths either way, so the figures beside
    them never move. That hole is what "this view feels broken" was.
 
-   `wide` is for a control that carries an action beside its switch — CAC
-   Card's Upload CA chain (21 Sep 2026). Its track grows to hold the button so
-   the row's text gives way instead of running under it; the switch still ends
-   the cluster, so it keeps the column. See `.bm8__rowend.is-wide`. */
-function RowEnd({ control, mark, wide = false }: { control?: ReactNode; mark?: ReactNode; wide?: boolean }) {
+   `wide` was for a control that carried an action beside its switch — CAC
+   Card's Upload CA chain (21 Sep 2026), whose track grew to hold the button so
+   the row's text gave way instead of running under it. Gone on 30 Sep 2026:
+   the chains are the row's own page now (see `caChainsRow`), so the row opens
+   them and its gear sits in the mark slot like every other gear. */
+function RowEnd({ control, mark }: { control?: ReactNode; mark?: ReactNode }) {
   const ctl = <span className="bm8__rowctl">{control}</span>
   const end = <span className="bm8__rowmark">{mark}</span>
   return (
-    <span className={`bm8__rowend${wide ? ' is-wide' : ''}`}>
+    <span className="bm8__rowend">
       {control ? (
         <>
           {end}
@@ -1114,6 +1110,27 @@ const marksGear = (shape: FamilyRow): boolean => {
   return !!t && t.kind !== 'family'
 }
 
+/* CAC Card's row opens its CA chains (owner, 30 Sep 2026: "this upload can be
+   multiple … add a list view of all uploaded files"). One page — the list, with
+   Add CA chain pushed over it — so the whole row opens it and it wears the
+   gear, the way RSA's row opens its configuration. It was a gear button beside
+   the switch that opened a single-upload form. Only where the row goes nowhere
+   else, and only on the admin's list, which is the one that passes `open`. */
+const caChainsRow = (shape: FamilyRow, open: (() => void) | undefined): (() => void) | undefined =>
+  !shape.opens && takesCaChain(shape.method) && !rowTarget(shape) ? open : undefined
+
+/* How many chains the tenant has, beside CAC Card's gear: the one place this
+   list says it. The slider lists them and does not count them again. Amber,
+   like a low balance, whenever no chain is in force — none at all, or every
+   one expired or still waiting for support: no card can be checked until one
+   is. */
+function CaChainCount() {
+  const [chains] = useCaChains()
+  const now = new Date()
+  const none = !chains.some((c) => chainStatus(c, now) === 'enabled')
+  return <span className={`bm8__txn bm8__cacount${none ? ' is-low' : ''}`}>{chainsSaid(chains.length)}</span>
+}
+
 /* One family on the list. A family of one is named for its method and carries
    its controls; a family with variants opens the slider. */
 function FamilyListRow({
@@ -1126,7 +1143,7 @@ function FamilyListRow({
   onToggle,
   onSetup,
   onMakeDefault,
-  onUploadCa,
+  onCaChains,
 }: {
   row: { f: Family; shape: FamilyRow; inside: AuthMethod[]; live: number; txns: number | null }
   isUser: boolean
@@ -1138,7 +1155,7 @@ function FamilyListRow({
   onToggle: (id: string, on: boolean) => void
   onSetup: (m: AuthMethod) => void
   onMakeDefault: (id: string) => void
-  onUploadCa?: () => void
+  onCaChains?: () => void
 }) {
   const { f, shape, inside, live, txns } = row
   /* A family of one is named for its method — "CAC Card", not "Smart Cards" —
@@ -1150,15 +1167,16 @@ function FamilyListRow({
     !isUser && (single ? defaultMethod === single.id : defaultMethod !== null && inside.some((m) => m.id === defaultMethod))
   const title = single ? single.name : f.channel
   const target = rowTarget(shape)
-  const open = !target
-    ? null
-    : target.kind === 'family'
-      ? () => onOpen(f.channel)
-      : target.kind === 'settings'
-        ? () => onSettings(f.channel)
-        : () => onSetup(target.method)
-  /* CAC Card's Upload CA chain rides in the control cluster, before the switch. */
-  const uploadCa = single && takesCaChain(single) ? onUploadCa : undefined
+  const caChains = caChainsRow(shape, onCaChains)
+  const open =
+    caChains ??
+    (!target
+      ? null
+      : target.kind === 'family'
+        ? () => onOpen(f.channel)
+        : target.kind === 'settings'
+          ? () => onSettings(f.channel)
+          : () => onSetup(target.method))
   const ctl = single ? (
     <MethodControls
       compact
@@ -1167,7 +1185,6 @@ function FamilyListRow({
       onToggle={onToggle}
       onSetup={onSetup}
       onMakeDefault={open ? undefined : onMakeDefault}
-      onUploadCa={uploadCa}
     />
   ) : undefined
 
@@ -1263,13 +1280,13 @@ function FamilyListRow({
             `methods.ts` and can come back wherever they are actually the
             question. See the "numbers once" rule. */}
         {isUser && configured && <Badge tone="positive">Configured</Badge>}
+        {caChains && <CaChainCount />}
 
         {/* Both slots, always — see `RowEnd`. */}
         <RowEnd
           control={ctl}
-          wide={!!uploadCa}
           mark={
-            !open ? undefined : marksGear(shape) ? (
+            !open ? undefined : caChains || marksGear(shape) ? (
               <span className="bm8__rowgear">
                 {/* A cog on the rows that open ONE page — see `marksGear`. It
                     replaced sliders on 18 Sep ("use gear icon") on the rows
@@ -1277,7 +1294,7 @@ function FamilyListRow({
                     wears the same glyph, so the row and its destination agree.
                     A button, not a decoration: it takes focus and says its own
                     name, over the link the row stretches across itself. */}
-                <IconButton icon={Settings} label={`${title} settings`} tone="ghost" onClick={open} />
+                <IconButton icon={Settings} label={caChains ? 'CA chains' : `${title} settings`} tone="ghost" onClick={open} />
               </span>
             ) : (
               /* A panel with a choice in it. Aria-hidden and unfocusable: the
@@ -2022,15 +2039,9 @@ function MethodCard({
 }
 
 /* `PHONE`, `subscribePhone` and `isPhone` stood here: the media query behind
-   the upload button's two forms. It is a gear at every width now (23 Sep 2026),
-   so nothing watches the viewport on this screen any more. */
-
-/* A gear, at every width (owner, 23 Sep 2026: "change this to a gear icon as
-   well"). It was a worded button on a wide screen and an upload arrow on a
-   phone; the row's other openers are gears, and the words are on its tip. */
-function UploadCaButton({ onClick }: { onClick: () => void }) {
-  return <IconButton icon={Settings} label="Upload CA chain" size="sm" tone="ghost" onClick={onClick} />
-}
+   the upload button's two forms. `UploadCaButton`, the gear that replaced them
+   (23 Sep 2026), went on 30 Sep: CAC Card's row opens its CA chains itself —
+   see `caChainsRow`. */
 
 /* A method's own controls — the switch, and whatever else it offers beside it.
 
@@ -2045,15 +2056,11 @@ function MethodControls({
   onMakeDefault,
   compact,
   setupOpen = false,
-  onUploadCa,
 }: {
   m: AuthMethod
   isDefault: boolean
   onToggle: (id: string, on: boolean) => void
   onSetup: (m: AuthMethod) => void
-  /* CAC Card's Upload CA chain, which opens its own slider. Passed only where
-     the method takes a chain — see `takesCaChain`. */
-  onUploadCa?: () => void
   /* Absent on a list row that also opens a page: a star, a switch and a
      chevron do not fit the end of one row, and the family it belongs to is
      where that method is made the default. */
@@ -2161,10 +2168,8 @@ function MethodControls({
         </Button>
       )}
 
-      {/* The trust a smart card is checked against (owner, 21 Sep 2026).
-          Whatever the switch says: the chain is uploaded before the method is
-          turned on, not after. Last before the switch, like Set up. */}
-      {onUploadCa && !m.locked && !setupOpen && <UploadCaButton onClick={onUploadCa} />}
+      {/* CAC Card's Upload CA chain gear stood here (21 Sep 2026). Its row
+          opens the CA chains now — see `caChainsRow`. */}
 
       <span className="bm8__rowswitch">
         {m.locked ? (

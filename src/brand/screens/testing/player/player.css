@@ -1,0 +1,555 @@
+/* -----------------------------------------------------------------------------
+   What they see, played (SignInPlayer.tsx): a stage as wide as the section,
+   the browser across all of it, a phone or a key held up in front of its
+   right part, a mail notification over it, and the step chips under it.
+
+   Flat, quiet surfaces, no washes: a sunken stage, a raised browser, devices
+   in solid shell colours with a hairline edge.
+
+   A picture of somebody else's pages, so the buttons in it are ink and none
+   is orange: the orange button on these screens is the admin's own.
+
+   Motion owns every transform. No rule below gives an element motion
+   animates — the browser (its `--tp-in`), the page, the phone and
+   each device in its slot, the notification, the sheets, every press, the
+   chip's fill —
+   a transform, a translate, a scale or a transition, in any state. The only
+   CSS animations are the caret's blink and the waiting spinner, on plain
+   elements, and both stop under reduced motion.
+
+   Devices are drawn in the shell's colours (`--shell-*`), dark in both
+   themes, as a phone or a key is; everything on a page is the page tokens.
+   -------------------------------------------------------------------------- */
+
+.tplay { container: tplay / inline-size; display: flex; flex-direction: column; gap: var(--space-4); width: 100%; min-width: 0; }
+
+/* As wide as the section, and 16:10 until that is taller than a sign-in
+   needs: never shorter than a phone and its margins, never past 352 px.
+
+   The sizes of what is held up in front of the browser live here, once:
+   each device is drawn at its width, and the room the sign-in card keeps
+   clear is worked out from the same width (`.tpw`), so a narrow
+   section can draw them smaller without the two falling out. */
+.tplay__stage {
+  --tp-w-phone: 128px;
+  --tp-h-phone: 252px;
+  --tp-w-token: 78px;
+  --tp-w-key: 44px;
+  --tp-w-card: 104px;
+  --tp-w-reader: 84px;
+  /* The device's distance from the stage's right edge. */
+  --tp-dev-right: var(--space-8);
+  position: relative;
+  height: clamp(288px, 62.5cqi, 352px);
+  overflow: hidden;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+.tpstage { position: absolute; inset: 0; }
+/* The device in front, named on the stage (Stage.tsx) — still named while it slides away. */
+.tpstage.has-phone { --tp-dev-w: var(--tp-w-phone); }
+.tpstage.has-token { --tp-dev-w: var(--tp-w-token); }
+.tpstage.has-key { --tp-dev-w: var(--tp-w-key); }
+.tpstage.has-card { --tp-dev-w: var(--tp-w-card); }
+.tpstage.has-reader { --tp-dev-w: var(--tp-w-reader); }
+
+/* --- The browser ---------------------------------------------------------------------------- */
+
+/* The whole stage, less one even margin. Its own stacking context, so a sheet
+   on its page stays under a phone held in front of it. */
+/* How much of it a device in front covers, from the stage's edge: the
+   device's width and margin, times how far in it is (motion's `--tp-in`,
+   0 to 1). The card and the address both keep clear of it. */
+.tpw {
+  --tp-card: 244px;
+  --tp-card-min: 200px;
+  --tp-room: calc(var(--tp-in, 0) * (var(--tp-dev-w, 0px) + var(--tp-dev-right)));
+  position: absolute;
+  inset: var(--space-5);
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--el-mid);
+}
+.tpw__bar {
+  display: flex; align-items: center; gap: var(--space-2);
+  height: 26px; flex: none; padding: 0 var(--space-4);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  background: var(--surface-sunken);
+}
+.tpw__nav { flex: none; color: var(--text-tertiary); }
+.tpw__url {
+  flex: 1 1 auto; min-width: 0;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  height: 18px; margin-left: var(--space-2); padding: 0 var(--space-4);
+  /* The address centres in the part of the bar the device leaves in view. */
+  padding-right: max(var(--space-4), calc(var(--tp-room) - var(--space-5)));
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-size: var(--fs-xs); line-height: 16px; color: var(--text-secondary);
+}
+.tpw__url > svg { flex: none; color: var(--text-tertiary); }
+.tpw__domain { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The application's address is a stand-in: quieter than the tenant's own. */
+.tpw__domain.is-app { color: var(--text-tertiary); }
+.tpw__view { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.tpw__screen { position: absolute; inset: 0; display: flex; flex-direction: column; box-sizing: border-box; }
+/* A phone or a key in front of the browser covers `--tp-room` of it from the
+   stage's edge: the card moves left only as far as it must to clear it
+   (none at all where the page is wide enough), and narrows no further than
+   --tp-card-min. A sheet over the page takes the same room, so it stays
+   centred on the card. */
+.tpw__screen.is-sign-in, .tps {
+  padding-right: clamp(0px, calc(2 * var(--tp-room, 0px) + var(--tp-card) - 100%), calc(100% - var(--tp-card-min)));
+}
+
+/* The sign-in card: the application's mark over every page. */
+.tpw__card {
+  display: flex; flex-direction: column; gap: var(--space-5);
+  width: 100%; max-width: var(--tp-card); margin: 0 auto; padding: var(--space-6) var(--space-6) var(--space-5);
+  box-sizing: border-box; min-width: 0;
+}
+.tpw__brand {
+  display: flex; align-items: center; gap: var(--space-3); min-width: 0;
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); line-height: 18px; color: var(--text-primary);
+  white-space: nowrap;
+}
+.tpw__brand > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tpw__page { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.tpw__heading { display: flex; flex-direction: column; gap: var(--space-1); }
+.tpw__h { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-semibold); line-height: 18px; color: var(--text-primary); }
+.tpw__ask { margin: 0; font-size: var(--fs-xs); line-height: 16px; color: var(--text-secondary); overflow-wrap: anywhere; }
+
+.tpw__field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.tpw__label { font-size: var(--fs-xs); line-height: 16px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tpw__box {
+  display: flex; align-items: center;
+  height: 28px; padding: 0 var(--space-4); box-sizing: border-box; overflow: hidden;
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--radius-sm);
+  background: var(--ctl-bg);
+  font-size: var(--fs-xs); color: var(--text-primary); white-space: nowrap;
+}
+.tpw__box.is-focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.tpw__box.is-secret .tpw__text { letter-spacing: 1px; }
+/* A key's one-time code runs past the box: the end it is typing at stays in view. */
+.tpw__box.is-mono { justify-content: flex-end; font-variant-numeric: tabular-nums; }
+.tpw__box.is-mono .tpw__text { flex: none; }
+.tpw__text { min-width: 0; }
+.tpw__caret { flex: none; width: 1px; height: 14px; margin-left: 1px; background: var(--text-primary); animation: tp-blink 1s steps(1) infinite; }
+@keyframes tp-blink { 50% { background: transparent; } }
+
+.tpw__account {
+  display: inline-flex; align-items: center; gap: var(--space-3); align-self: flex-start; max-width: 100%;
+  padding: var(--space-1) var(--space-4) var(--space-1) var(--space-1);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  font-size: var(--fs-xs); line-height: 16px; color: var(--text-secondary);
+}
+.tpw__email { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tpw__avatar {
+  display: grid; place-items: center; flex: none;
+  width: 24px; height: 24px; border-radius: var(--radius-full);
+  background: var(--surface-inset); color: var(--text-secondary);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); line-height: 1;
+}
+.tpw__avatar.is-sm { width: 20px; height: 20px; }
+
+/* Ink, never orange: a label pressed by the film, not a control. */
+.tpw__btn {
+  display: flex; align-items: center; justify-content: center; gap: var(--space-3);
+  height: 28px; border-radius: var(--radius-sm);
+  background: var(--surface-inverse); color: var(--text-inverse);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium);
+}
+.tpw__btn.is-pressed { background: color-mix(in srgb, var(--surface-inverse) 78%, var(--surface-raised)); }
+
+.tpw__code { display: flex; gap: var(--space-3); }
+.tpw__digit {
+  display: grid; place-items: center;
+  flex: 1 1 0; max-width: 30px; height: 30px; box-sizing: border-box;
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--radius-sm);
+  background: var(--ctl-bg);
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.tpw__digit.is-focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.tpw__digit > span { display: inline-block; }
+
+.tpw__remember { display: flex; align-items: flex-start; gap: var(--space-3); font-size: var(--fs-xs); line-height: 16px; color: var(--text-secondary); }
+.tpw__tick {
+  display: grid; place-items: center; flex: none;
+  width: 14px; height: 14px; margin-top: 1px; box-sizing: border-box;
+  border: var(--bw-thin) solid var(--border-strong); border-radius: var(--radius-xs);
+  color: var(--text-inverse);
+}
+.tpw__remember.is-on .tpw__tick { border-color: var(--accent); background: var(--accent); }
+
+.tpw__wait { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); color: var(--text-tertiary); }
+.tpw__wait.is-done { color: var(--fb-positive-fg); }
+.tpw__wicon {
+  display: grid; place-items: center; width: 24px; height: 24px;
+  border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--text-secondary);
+}
+.tpw__spin { display: inline-flex; color: var(--text-tertiary); animation: tp-spin 1s linear infinite; }
+@keyframes tp-spin { to { rotate: 360deg; } }
+.tpw__done {
+  display: grid; place-items: center; flex: none;
+  width: 18px; height: 18px; box-sizing: border-box; border-radius: var(--radius-full);
+  border: var(--bw-thin) solid var(--fb-positive-border); background: var(--fb-positive-bg); color: var(--fb-positive-fg);
+}
+.tpw__number {
+  align-self: center; padding: 0 var(--space-6);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: var(--fs-4xl); font-weight: var(--fw-semibold); line-height: 40px; letter-spacing: 0.04em; color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.tpw__qr {
+  position: relative; display: grid; place-items: center; align-self: center;
+  padding: var(--space-3); border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+.tpw__qr > .tpw__done { position: absolute; right: -8px; bottom: -8px; }
+.tpw__grid { display: grid; gap: 3px; width: 108px; align-self: center; }
+.tpw__cell {
+  display: grid; place-items: center; aspect-ratio: 1;
+  border-radius: var(--radius-xs); background: var(--surface-inset);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); line-height: 1; color: var(--surface-inset);
+}
+.tpw__cell.is-on { background: var(--accent); color: var(--text-inverse); }
+
+/* Where the film ends on the page: denied, or a method nobody can be offered. */
+.tpw__end { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); text-align: center; }
+.tpw__mark {
+  display: grid; place-items: center; flex: none;
+  width: 32px; height: 32px; box-sizing: border-box; border-radius: var(--radius-full);
+  border: var(--bw-thin) solid var(--fb-neutral-border); background: var(--fb-neutral-bg); color: var(--fb-neutral-fg);
+}
+.tpw__welcome .tpw__mark { width: 36px; height: 36px; }
+.tpw__mark.is-positive { border-color: var(--fb-positive-border); background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.tpw__mark.is-negative { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+/* A deny message is said whole, never cut: the console holds it to 200 characters, which is six lines here. */
+.tpw__msg { margin: 0; font-size: var(--fs-xs); line-height: 16px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.tpw__link { font-size: var(--fs-xs); color: var(--text-link); }
+
+/* The application's home, once they are in. */
+.tpw__home { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.tpw__appbar {
+  display: flex; align-items: center; gap: var(--space-3); flex: none;
+  height: 36px; padding: 0 var(--space-5);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-primary);
+}
+.tpw__appname { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tpw__welcome { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-6) var(--space-6) var(--space-5); min-width: 0; }
+.tpw__hello { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.tpw__blocks { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); padding: 0 var(--space-6) var(--space-6); }
+.tpw__block { height: 40px; border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-sunken); }
+.tpw__block.is-wide { grid-column: 1 / -1; height: 24px; }
+
+/* Under 460 px the stage is at its floor, 288 px tall: the card's spacing
+   tightens so the tallest pages — the pattern grid with its box, a deny
+   message of 200 characters — keep their last line in view. */
+@container tplay (max-width: 460px) {
+  .tpw__card { padding-top: var(--space-5); gap: var(--space-4); }
+  .tpw__page { gap: var(--space-3); }
+  .tpw__grid { width: 92px; }
+}
+
+/* A narrow section — the board's outcome popover — where a phone in front
+   leaves the card at its narrowest: a slimmer phone, nearer the edge, with
+   tighter sides so its type stays at the 12 px floor and its labels whole,
+   and the card's sides give the fields the room. */
+@container tplay (max-width: 420px) {
+  .tplay__stage { --tp-w-phone: 120px; --tp-h-phone: 244px; --tp-dev-right: var(--space-6); }
+  .tpw { --tp-card-min: 184px; }
+  .tpw__card { padding-left: var(--space-5); padding-right: var(--space-5); }
+  .tpp .tpp__body { padding-left: var(--space-3); padding-right: var(--space-3); }
+  .tpp .tpp__notice { padding-left: var(--space-3); padding-right: var(--space-3); }
+}
+
+/* Compact: beside an answer's words (the Sign-in tests page's outcome, the
+   player about 360 px wide). The stage 16:10 at its width, so the answer
+   stays short; the browser nearer the stage's edge, its bar and the card's
+   spacing tighter so the tallest pages keep their last line; a smaller phone
+   held up in front, its screens' spacing tighter so a push keeps both its
+   answers in view; the mail a little shorter, over the bar and clear of the
+   card's first line — every word still at the 12 px floor. */
+.tplay.is-compact .tplay__stage { --tp-w-phone: 112px; --tp-h-phone: 214px; --tp-dev-right: var(--space-5); height: clamp(212px, 62.5cqi, 240px); }
+.tplay.is-compact .tpw { --tp-card-min: 180px; inset: var(--space-4); }
+.tplay.is-compact .tpw__bar { height: 22px; }
+.tplay.is-compact .tpw__card { padding: var(--space-5) var(--space-5) var(--space-4); gap: var(--space-4); }
+.tplay.is-compact .tpw__page { gap: var(--space-3); }
+.tplay.is-compact .tpp { border-width: 3px; border-radius: 18px; }
+.tplay.is-compact .tpp__status { height: 16px; padding-top: 0; }
+.tplay.is-compact .tpp__body { padding: var(--space-2) var(--space-3) var(--space-4); }
+.tplay.is-compact .tpp__app { gap: var(--space-3); }
+.tplay.is-compact .tpp__apphead { padding-bottom: var(--space-2); }
+.tplay.is-compact .tpp__push { gap: var(--space-2); }
+.tplay.is-compact .tpp__choice { height: 24px; }
+.tplay.is-compact .tpp__notice { padding-inline: var(--space-3); }
+/* The mail over the browser's bar and the room above the page, clear of the card's first line. */
+.tplay.is-compact .tpt { top: var(--space-1); height: 36px; }
+.tplay.is-compact .tpt__body { line-height: 14px; }
+
+/* --- The browser's sheets ------------------------------------------------------------------- */
+
+.tps {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: var(--space-6);
+  background: color-mix(in srgb, var(--surface-inverse) 10%, transparent);
+}
+.tps__sheet {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
+  width: 184px; max-width: calc(100% - var(--space-8)); box-sizing: border-box;
+  padding: var(--space-5) var(--space-5) var(--space-6);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-overlay); box-shadow: var(--el-high);
+  text-align: center;
+}
+.tps__title { margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold); line-height: 16px; color: var(--text-primary); }
+.tps__sub { max-width: 100%; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); line-height: 16px; color: var(--text-tertiary); }
+.tps__print {
+  position: relative; display: grid; place-items: center;
+  width: 44px; height: 44px; margin: var(--space-2) 0; border-radius: var(--radius-full);
+  background: var(--accent-soft); color: var(--accent);
+}
+.tps__print.is-done { background: var(--fb-positive-bg); color: var(--fb-positive-fg); }
+.tps__ring { position: absolute; inset: 0; border: var(--bw-thick) solid var(--accent); border-radius: var(--radius-full); pointer-events: none; }
+.tps__cert {
+  display: flex; align-items: center; gap: var(--space-3); width: 100%; box-sizing: border-box;
+  padding: var(--space-3) var(--space-4);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  font-size: var(--fs-xs); color: var(--text-primary); text-align: left;
+}
+.tps__cert > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tps__cert.is-on { border-color: var(--accent); background: var(--accent-soft); }
+.tps__ok {
+  display: inline-flex; align-items: center; align-self: flex-end;
+  height: 24px; padding: 0 var(--space-6); border-radius: var(--radius-sm);
+  background: var(--surface-inverse); color: var(--text-inverse);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium);
+}
+
+/* --- In front of the browser: the device slot ------------------------------------------------
+
+   Over the browser's right part, as a phone held up to a screen, at the
+   stage's `--tp-dev-right`; each device is drawn at its `--tp-w-*`. */
+
+.tpdev { position: absolute; top: 0; bottom: 0; right: var(--tp-dev-right); z-index: 1; display: flex; align-items: center; justify-content: flex-end; pointer-events: none; }
+
+/* --- The phone ------------------------------------------------------------------------------- */
+
+/* The bezel, in the shell's colour; each screen brings its own surface
+   (Phone.tsx) and a new one fades in over the last, stacked. */
+.tpp {
+  position: relative;
+  width: var(--tp-w-phone); height: var(--tp-h-phone); box-sizing: border-box; overflow: hidden;
+  border: 4px solid var(--shell-bg); border-radius: 22px;
+  background: var(--shell-bg); box-shadow: var(--el-high);
+}
+.tpp__notch { position: absolute; top: 5px; left: 50%; z-index: 2; width: 32px; height: 9px; margin-left: -16px; border-radius: 5px; background: var(--shell-bg); }
+.tpp__screen {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  background: var(--surface-raised); color: var(--text-primary);
+}
+.tpp__screen.is-lock { background: var(--shell-bg); color: var(--shell-text); }
+.tpp__screen.is-camera { background: var(--shell-bg-deep); color: var(--shell-text); }
+.tpp__status { flex: none; height: 20px; padding: 3px var(--space-5) 0; box-sizing: border-box; font-size: var(--fs-xs); font-weight: var(--fw-semibold); line-height: 16px; }
+.tpp__body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; padding: var(--space-3) var(--space-4) var(--space-5); box-sizing: border-box; }
+.tpp__lock { display: flex; flex: 1 1 auto; flex-direction: column; align-items: center; gap: var(--space-5); padding-top: var(--space-4); }
+.tpp__clock { font-size: var(--fs-3xl); font-weight: var(--fw-semibold); line-height: 28px; letter-spacing: -0.01em; }
+.tpp__notice {
+  display: flex; flex-direction: column; gap: var(--space-1); align-self: stretch;
+  padding: var(--space-3) var(--space-4); border-radius: 10px;
+  background: var(--surface-raised); box-shadow: var(--el-mid); color: var(--text-primary);
+}
+.tpp__nhead { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); line-height: 16px; }
+.tpp__napp { display: grid; place-items: center; flex: none; width: 14px; height: 14px; border-radius: var(--radius-sm); color: var(--shell-text); }
+.tpp__napp.is-positive { background: var(--fb-positive-dot); }
+.tpp__napp.is-info { background: var(--fb-info-dot); }
+.tpp__nname { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--fw-semibold); }
+.tpp__ntext { font-size: var(--fs-xs); line-height: 15px; overflow-wrap: anywhere; }
+.tpp__ntext b { font-weight: var(--fw-semibold); }
+.tpp__link { position: relative; display: block; color: var(--text-link); text-decoration: underline; overflow-wrap: anywhere; }
+.tpp__touch {
+  position: absolute; top: 50%; left: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px;
+  border-radius: var(--radius-full); background: color-mix(in srgb, var(--accent) 45%, transparent); pointer-events: none;
+}
+.tpp__title { font-size: var(--fs-xs); font-weight: var(--fw-semibold); line-height: 16px; text-align: center; }
+.tpp__sub { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); line-height: 16px; color: var(--text-tertiary); }
+.tpp__sub.is-wrap { white-space: normal; text-align: center; }
+.tpp__screen.is-lock .tpp__sub { color: var(--shell-text-secondary); }
+.tpp__approved { display: flex; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-4); }
+.tpp__ok {
+  display: grid; place-items: center; width: 40px; height: 40px; box-sizing: border-box; border-radius: var(--radius-full);
+  border: var(--bw-thin) solid var(--fb-positive-border); background: var(--fb-positive-bg); color: var(--fb-positive-fg);
+}
+
+.tpp__call { display: flex; flex: 1 1 auto; flex-direction: column; align-items: center; gap: var(--space-3); padding-top: var(--space-7); }
+.tpp__caller { display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-full); background: color-mix(in srgb, var(--shell-text) 16%, transparent); }
+.tpp__spoken { font-size: var(--fs-xl); font-weight: var(--fw-semibold); line-height: 24px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.tpp__callbtns { display: flex; gap: var(--space-8); margin-top: auto; padding-bottom: var(--space-5); }
+.tpp__round { position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: var(--radius-full); color: var(--shell-text); }
+.tpp__round.is-decline { background: var(--fb-negative-dot); }
+.tpp__round.is-answer { background: var(--fb-positive-dot); }
+
+.tpp__app { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.tpp__apphead {
+  align-self: stretch; padding-bottom: var(--space-3);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); line-height: 16px; text-align: left;
+}
+.tpp__apphead.is-light { border-bottom-color: transparent; color: var(--shell-text); text-align: center; }
+.tpp__otp { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.tpp__issuer { font-size: var(--fs-xs); font-weight: var(--fw-semibold); line-height: 16px; }
+.tpp__acct { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); line-height: 16px; color: var(--text-tertiary); }
+.tpp__otprow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.tpp__otpcode { font-size: var(--fs-xl); font-weight: var(--fw-semibold); line-height: 24px; color: var(--text-link); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tpp__ring { flex: none; rotate: -90deg; }
+.tpp__rows { display: flex; flex-direction: column; gap: var(--space-4); padding-top: var(--space-4); border-top: var(--bw-thin) solid var(--border-subtle); }
+.tpp__row { height: 22px; border-radius: var(--radius-sm); background: var(--surface-sunken); }
+.tpp__ringbg { fill: none; stroke: var(--border-subtle); stroke-width: 2; }
+.tpp__ringfg { fill: none; stroke: var(--text-link); stroke-width: 2; }
+
+.tpp__push { display: flex; flex: 1 1 auto; flex-direction: column; align-items: center; gap: var(--space-3); min-width: 0; text-align: center; }
+.tpp__shield { display: grid; place-items: center; width: 30px; height: 30px; border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent); }
+.tpp__enter { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+.tpp__numbox {
+  display: grid; place-items: center; width: 44px; height: 26px; box-sizing: border-box;
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--radius-sm);
+  font-size: var(--fs-md); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums;
+}
+.tpp__numbox.is-focus { border-color: var(--accent); }
+.tpp__choices { display: flex; flex-direction: column; gap: var(--space-2); align-self: stretch; margin-top: auto; }
+.tpp__choice {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  height: 26px; border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium);
+}
+.tpp__choice.is-yes { border-color: var(--surface-inverse); background: var(--surface-inverse); color: var(--text-inverse); }
+.tpp__choice.is-yes.is-pressed { background: color-mix(in srgb, var(--surface-inverse) 78%, var(--surface-raised)); }
+.tpp__bio { position: relative; display: grid; place-items: center; width: 44px; height: 44px; margin-top: auto; margin-bottom: var(--space-3); border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent); }
+.tpp__bioring { position: absolute; inset: 0; border: var(--bw-thick) solid var(--accent); border-radius: var(--radius-full); pointer-events: none; }
+
+.tpp__cam { display: flex; flex: 1 1 auto; flex-direction: column; align-items: center; gap: var(--space-6); }
+.tpp__finder {
+  position: relative; display: grid; place-items: center;
+  width: 72px; height: 72px; margin-top: var(--space-6); box-sizing: border-box; overflow: hidden;
+  border: var(--bw-thick) solid color-mix(in srgb, var(--shell-text) 70%, transparent); border-radius: 10px;
+}
+.tpp__finder.is-done { border-color: var(--fb-positive-border); color: var(--fb-positive-border); }
+.tpp__scanline { position: absolute; top: 12px; left: var(--space-4); right: var(--space-4); height: 2px; background: var(--accent); }
+
+/* --- The mail notification --------------------------------------------------------------------
+
+   Two lines, over the browser's bar and the margin above the page: the page
+   it is for stays in view while its code is typed. */
+
+.tpt {
+  position: absolute; top: var(--space-2); right: var(--space-4); z-index: 3;
+  display: flex; align-items: center; gap: var(--space-4);
+  width: 300px; max-width: calc(100% - var(--space-6)); height: 42px; box-sizing: border-box;
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg);
+  background: var(--surface-overlay); box-shadow: var(--el-high);
+}
+.tpt__icon { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: var(--radius-md); background: var(--fb-info-bg); color: var(--fb-info-fg); }
+.tpt__body { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; font-size: var(--fs-xs); line-height: 15px; }
+.tpt__subject, .tpt__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tpt__subject { font-weight: var(--fw-semibold); color: var(--text-primary); }
+.tpt__text { color: var(--text-secondary); }
+.tpt__code { font-weight: var(--fw-semibold); letter-spacing: 0.04em; color: var(--text-primary); }
+.tpt__action {
+  display: inline-flex; align-items: center; flex: none;
+  height: 24px; padding: 0 var(--space-5); border-radius: var(--radius-sm);
+  background: var(--surface-inverse); color: var(--text-inverse);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium);
+}
+.tpt__action.is-pressed { background: color-mix(in srgb, var(--surface-inverse) 78%, var(--surface-raised)); }
+
+/* --- The hardware ----------------------------------------------------------------------------- */
+
+/* A faint light edge on every dark device body, so it keeps its outline on a dark page too. */
+.tpp, .tph--fob, .tph__keybody, .tph__slot, .tph--reader { outline: var(--bw-thin) solid color-mix(in srgb, var(--shell-text) 12%, transparent); outline-offset: -1px; }
+
+.tph--fob {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-5);
+  width: var(--tp-w-token); height: 132px; box-sizing: border-box; padding: var(--space-6) var(--space-4);
+  border-radius: 18px 18px 26px 26px; background: var(--shell-bg); box-shadow: var(--el-high);
+}
+.tph__lcd {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  width: 100%; box-sizing: border-box; padding: var(--space-4) var(--space-2) var(--space-3); border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--shell-text) 82%, var(--fb-lime-dot));
+}
+.tph__lcdcode { font-size: var(--fs-md); font-weight: var(--fw-semibold); line-height: 18px; letter-spacing: 0.06em; color: var(--shell-bg); font-variant-numeric: tabular-nums; }
+.tph__bar { display: block; width: 100%; height: 3px; overflow: hidden; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--shell-bg) 18%, transparent); }
+.tph__barfill { display: block; height: 100%; background: var(--shell-bg); }
+.tph__label { font-size: var(--fs-xs); font-weight: var(--fw-semibold); letter-spacing: 0.06em; color: var(--shell-text-secondary); }
+
+.tph--key { display: flex; flex-direction: column; align-items: center; }
+.tph__plug { width: 22px; height: 18px; border-radius: 2px 2px 0 0; background: color-mix(in srgb, var(--shell-text) 70%, var(--border-strong)); }
+.tph__keybody { display: grid; place-items: center; width: var(--tp-w-key); height: 104px; border-radius: 10px; background: var(--shell-bg); box-shadow: var(--el-high); }
+.tph__disc {
+  position: relative; width: 22px; height: 22px; border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--fb-notice-dot) 75%, var(--shell-text));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--fb-notice-dot) 55%, var(--shell-bg));
+}
+.tph__disc.is-on { background: var(--fb-notice-dot); }
+.tph__glow { position: absolute; inset: 0; border-radius: inherit; background: color-mix(in srgb, var(--fb-notice-dot) 55%, transparent); pointer-events: none; }
+
+.tph--card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: var(--tp-w-card); height: 156px; }
+.tph__cardbody {
+  position: absolute; top: 8px; left: 50%; width: 64px; height: 96px; margin-left: -32px; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-4); padding: var(--space-5) var(--space-3);
+  border: var(--bw-thin) solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--surface-raised); box-shadow: var(--el-mid);
+}
+.tph__chip { width: 18px; height: 14px; border-radius: 3px; background: color-mix(in srgb, var(--fb-notice-dot) 70%, var(--surface-raised)); }
+.tph__cardname { font-size: var(--fs-xs); line-height: 14px; color: var(--text-primary); text-align: center; overflow-wrap: anywhere; }
+.tph__slot { position: relative; z-index: 1; width: 100px; height: 44px; border-radius: 8px; background: var(--shell-bg); box-shadow: var(--el-high); }
+/* The slot the card goes into, along the reader's top edge. */
+.tph__slot::before { content: ''; position: absolute; top: 6px; left: 14px; right: 14px; height: 3px; border-radius: var(--radius-xs); background: var(--shell-bg-deep); }
+.tph__slot.is-on { box-shadow: var(--el-high), inset 0 -3px 0 var(--fb-positive-dot); }
+
+.tph--reader { display: grid; place-items: center; width: var(--tp-w-reader); height: 100px; border-radius: 16px; background: var(--shell-bg); box-shadow: var(--el-high); }
+.tph__pad {
+  position: relative; display: grid; place-items: center; width: 54px; height: 62px; border-radius: 12px;
+  background: color-mix(in srgb, var(--shell-text) 12%, var(--shell-bg)); color: color-mix(in srgb, var(--shell-text) 80%, var(--shell-bg));
+}
+.tph__pad.is-done { color: var(--fb-positive-border); }
+
+/* --- The steps, under the stage ---------------------------------------------------------------- */
+
+.tplay__bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-width: 0; }
+.tplay__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.tplay__chip {
+  position: relative; display: inline-flex; align-items: center; overflow: hidden;
+  height: 24px; padding: 0 var(--space-4); box-sizing: border-box;
+  border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised); cursor: pointer;
+  font: inherit; font-size: var(--fs-xs); line-height: 16px; color: var(--text-tertiary);
+}
+.tplay__chip:hover { border-color: var(--border-default); color: var(--text-primary); }
+.tplay__chip.is-past { color: var(--text-secondary); }
+.tplay__chip.is-on { border-color: var(--accent); color: var(--text-primary); }
+.tplay__chip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.tplay__fill { position: absolute; inset: 0; background: var(--accent-soft); pointer-events: none; }
+.tplay__chiptext { position: relative; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tplay__replay {
+  display: grid; place-items: center; flex: none;
+  width: 28px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-md);
+  background: none; color: var(--int-ghost-text); cursor: pointer;
+}
+.tplay__replay:hover { background: var(--int-ghost-bg-hover); color: var(--text-primary); }
+.tplay__replay:active { background: var(--int-ghost-bg-active); }
+.tplay__replay:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tpw__caret, .tpw__spin { animation: none; }
+}

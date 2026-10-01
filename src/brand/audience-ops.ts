@@ -1,4 +1,4 @@
-import type { Audience, RuleWho, User } from './data'
+import { memberGroupIds, type Audience, type RuleWho, type User } from './data'
 
 /* -----------------------------------------------------------------------------
    The policy audience, and how a rule's who sits inside it.
@@ -36,7 +36,7 @@ export function outsideAudience(
     users: userIds.filter((id) => {
       if (a.userIds.includes(id)) return false
       const u = directory.find((x) => x.id === id)
-      return u ? !a.groupIds.includes(u.groupId) : false
+      return u ? !memberGroupIds(u).some((g) => a.groupIds.includes(g)) : false
     }),
   }
 }

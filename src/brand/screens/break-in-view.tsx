@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { Check, ListFilter, Minus, Users, X } from 'lucide-react'
 
 import type { Policy } from '../data'
+import { CantTell, DecisionBadge } from '../decision-badge'
 import { DECISION_WORDS } from '../decision-words'
 import { EmptyState } from '../empty'
 import { Badge, Button, Callout, Field, Tip, TipDot } from '../kit'
@@ -67,6 +68,15 @@ import './break-in.css'
    A result the tenant agrees with can be accepted, with a reason, and the row
    moves to Held saying who accepted it and when. Restore expectation undoes it.
 
+   Two layouts. `table` is the page's and the slider's: a header of columns
+   (Sign-in, Expected, Got, Rule) over one-line rows. `panel` is the board's
+   test panel, 460 px wide (V4 §7 F1): the Saved sign-ins tab's two-line rows,
+   because the table's columns cut the names and wrapped "Allow on 1 factor"
+   there — the name whole on up to two lines, what it got as a badge at the
+   row's right with the mark beside it, and under it in grey what it expected
+   and the rule that decided it, a link. The tab is the view's title, so the
+   panel does not print it again.
+
    Motion explains a change and nothing else. The first run — a new policy
    included — fades the rows in, in order, opacity only. After that, a row
    whose group moved slides to its new place (framer `layout`, position only)
@@ -124,6 +134,7 @@ export function BreakInView({
   onApplyFix,
   onOpenInBoard,
   kept,
+  layout = 'table',
 }: {
   /** The rules to test: the board's draft, or a stored policy as the builders open it. */
   policy: Policy
@@ -138,7 +149,10 @@ export function BreakInView({
   onOpenInBoard?: (rule?: string) => void
   /** The board's panel: what the test keeps while a rule it opened takes the column. */
   kept?: { current: BreakInKept | null }
+  /** `panel`: two-line rows for the board's test panel, where a column header does not fit. */
+  layout?: 'table' | 'panel'
 }) {
+  const panel = layout === 'panel'
   const { breakInAccepted, acceptBreakIn, account } = useBrand()
   const resolve = useNameLookup()
   const say = useTestingSay()
@@ -209,8 +223,8 @@ export function BreakInView({
 
   if (!run) {
     return (
-      <section className="bbi" aria-labelledby={headId}>
-        <Head id={headId} caption={caption} />
+      <section className={`bbi${panel ? ' is-panel' : ''}`} aria-labelledby={headId}>
+        <Head id={headId} caption={caption} titleShown={!panel} />
         <Callout tone="notice">Break-in test could not run.</Callout>
       </section>
     )
@@ -222,8 +236,8 @@ export function BreakInView({
   const order = new Map(groups.flatMap((g) => g.rows).map((r, i) => [r.id, i]))
 
   return (
-    <section className="bbi" aria-labelledby={headId}>
-      <Head id={headId} caption={caption} />
+    <section className={`bbi${panel ? ' is-panel' : ''}`} aria-labelledby={headId}>
+      <Head id={headId} caption={caption} titleShown={!panel} />
 
       {run.rounds.length === 0 ? (
         <EmptyState compact icon={Users} title="No scripted sign-ins for this audience" />
@@ -252,7 +266,7 @@ export function BreakInView({
             })}
           </div>
 
-          {groups.length > 0 && (
+          {groups.length > 0 && !panel && (
             <div className="bbi__cols" aria-hidden>
               <span className="bbi__colname">Sign-in</span>
               <span>Expected</span>
@@ -310,6 +324,7 @@ export function BreakInView({
                         refocus(row.id)
                       }}
                       fixLabel={onApplyFix ? undefined : 'Open in board'}
+                      panel={panel}
                       onAccept={(reason) => {
                         const a = acceptanceFor(row.round, account.name, new Date().toISOString(), reason)
                         if (a) acceptBreakIn(policy.id, row.id, a)
@@ -336,7 +351,23 @@ export function BreakInView({
 const toggleId = (base: string, cardId: string) => `${base}-row-${cardId}`
 const cellId = (base: string, key: CountKey) => `${base}-count-${key}`
 
-function Head({ id, caption }: { id: string; caption: string }) {
+/* The title and which version of the rules ran. Where a tab already says
+   "Break-in test" over the view, the heading is kept for the section's name
+   and not shown twice; the caption carries the note instead. */
+function Head({ id, caption, titleShown = true }: { id: string; caption: string; titleShown?: boolean }) {
+  if (!titleShown) {
+    return (
+      <div className="bbi__head">
+        <h2 id={id} className="u-sr-only">
+          Break-in test
+        </h2>
+        <span className="bbi__titleline">
+          <p className="bbi__caption">{caption}</p>
+          <TipDot text={BREAK_IN_TIP} label="About the break-in test" />
+        </span>
+      </div>
+    )
+  }
   return (
     <div className="bbi__head">
       <span className="bbi__titleline">
@@ -372,6 +403,7 @@ function Row({
   fixLabel,
   onAccept,
   onRestore,
+  panel = false,
 }: {
   row: BreakInRow
   policy: Policy
@@ -394,6 +426,8 @@ function Row({
   fixLabel?: string
   onAccept: (reason: string) => void
   onRestore: () => void
+  /** The test panel's two-line row. */
+  panel?: boolean
 }) {
   const bodyId = `${baseId}-body-${row.id}`
   const mark = MARK[row.group]
@@ -409,29 +443,60 @@ function Row({
       animate={{ opacity: 1 }}
       transition={{ opacity: { duration: FADE.duration, delay: fadeDelay ?? 0 }, layout: MOVE }}
     >
-      <div className="bbi__line">
-        <button type="button" id={toggleId(baseId, row.id)} className="bbi__toggle" aria-expanded={open} aria-controls={bodyId} aria-label={rowSpoken(row)} onClick={onToggle}>
-          <span className={`bbi__mark is-${mark.tone}`} aria-hidden>
-            <Icon size={14} strokeWidth={2.2} />
-          </span>
-          <span className="bbi__name">
-            <span className="bbi__clip" title={row.name}>
-              {row.name}
+      {panel ? (
+        <div className="bbi__line is-panel">
+          <button type="button" id={toggleId(baseId, row.id)} className="bbi__toggle" aria-expanded={open} aria-controls={bodyId} aria-label={rowSpoken(row)} onClick={onToggle}>
+            <span className="bbi__name">
+              <span className="bbi__wrap">{row.name}</span>
+              {heldAccepted && <Badge tone="neutral">Accepted</Badge>}
+              {moved && reduced && <span className="bbi__changed">Changed</span>}
             </span>
-            {heldAccepted && <Badge tone="neutral">Accepted</Badge>}
-            {moved && reduced && <span className="bbi__changed">Changed</span>}
-          </span>
-          <span className="bbi__dec">{DECISION_WORDS[row.expected]}</span>
-          <span className={`bbi__dec${row.got ? '' : ' is-unknown'}`}>{row.got ? DECISION_WORDS[row.got] : "Can't tell"}</span>
-        </button>
-        {row.ruleLabel && onRule && row.ruleRef ? (
-          <button type="button" className="bbi__rule" aria-label={ruleSpoken(row)} onClick={() => onRule(row.ruleRef)}>
-            {row.ruleLabel}
+            <span className="bbi__got">{row.got ? <DecisionBadge decision={row.got} /> : <CantTell />}</span>
+            <span className={`bbi__mark is-${mark.tone}`} aria-hidden>
+              <Icon size={14} strokeWidth={2.2} />
+            </span>
           </button>
-        ) : (
-          <span className="bbi__rule is-text">{row.ruleLabel}</span>
-        )}
-      </div>
+          <p className="bbi__sub">
+            <span>Expected {DECISION_WORDS[row.expected]}</span>
+            {row.ruleLabel && (
+              <>
+                <span aria-hidden> · </span>
+                {onRule && row.ruleRef ? (
+                  <button type="button" className="bbi__rule" aria-label={ruleSpoken(row)} onClick={() => onRule(row.ruleRef)}>
+                    {row.ruleLabel}
+                  </button>
+                ) : (
+                  <span className="bbi__rule is-text">{row.ruleLabel}</span>
+                )}
+              </>
+            )}
+          </p>
+        </div>
+      ) : (
+        <div className="bbi__line">
+          <button type="button" id={toggleId(baseId, row.id)} className="bbi__toggle" aria-expanded={open} aria-controls={bodyId} aria-label={rowSpoken(row)} onClick={onToggle}>
+            <span className={`bbi__mark is-${mark.tone}`} aria-hidden>
+              <Icon size={14} strokeWidth={2.2} />
+            </span>
+            <span className="bbi__name">
+              <span className="bbi__clip" title={row.name}>
+                {row.name}
+              </span>
+              {heldAccepted && <Badge tone="neutral">Accepted</Badge>}
+              {moved && reduced && <span className="bbi__changed">Changed</span>}
+            </span>
+            <span className="bbi__dec">{DECISION_WORDS[row.expected]}</span>
+            <span className={`bbi__dec${row.got ? '' : ' is-unknown'}`}>{row.got ? DECISION_WORDS[row.got] : "Can't tell"}</span>
+          </button>
+          {row.ruleLabel && onRule && row.ruleRef ? (
+            <button type="button" className="bbi__rule" aria-label={ruleSpoken(row)} onClick={() => onRule(row.ruleRef)}>
+              {row.ruleLabel}
+            </button>
+          ) : (
+            <span className="bbi__rule is-text">{row.ruleLabel}</span>
+          )}
+        </div>
+      )}
       {open && (
         <Body
           id={bodyId}

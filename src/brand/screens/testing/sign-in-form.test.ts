@@ -267,10 +267,18 @@ describe('changedBy', () => {
     expect(changedBy(hrms, { ...hrms, assumeOn: 'sc-hrms-office' })).toBe('assume-on')
   })
 
-  it('says each field by the word its fact is said in', () => {
-    expect(CHANGED_BY_WORDS.address).toBe('IP address')
-    expect(CHANGED_BY_WORDS.device).toBe('Device')
-    expect(CHANGED_BY_WORDS.edits).toBe('your edits')
+  it('says each field by the word its fact is said in, mid-sentence', () => {
+    expect(CHANGED_BY_WORDS).toEqual({
+      person: 'person',
+      app: 'application',
+      address: 'IP address',
+      place: 'place',
+      when: 'time',
+      device: 'device',
+      risk: 'risk score',
+      'assume-on': 'turning it on',
+      edits: 'your edits',
+    })
   })
 })
 

@@ -176,10 +176,11 @@ describe('the keyboard sheet', () => {
     expect(isMacPlatform(undefined)).toBe(false)
   })
 
-  it('lists no palette in Lite, Try a sign-in on T, and no Mac glyphs on Windows', () => {
+  /* Check access on T: Try a sign-in until the rename (owner, 1 Oct 2026; names.ts). */
+  it('lists no palette in Lite, Check access on T, and no Mac glyphs on Windows', () => {
     const lite = boardShortcuts({ mac: false, commands: false, testing: true, publish: false })
-    expect(lite.find(([k]) => k === 'T')?.[1]).toBe('Try a sign-in')
-    expect(lite.find(([k]) => k === 'Esc')?.[1]).toBe('Close Try a sign-in, then clear the selection')
+    expect(lite.find(([k]) => k === 'T')?.[1]).toBe('Check access')
+    expect(lite.find(([k]) => k === 'Esc')?.[1]).toBe('Close Check access, then clear the selection')
     const text = lite.map(([k, v]) => `${k} ${v}`).join('\n')
     expect(text).not.toMatch(/Command palette/)
     expect(text).not.toMatch(/rehearsal/)

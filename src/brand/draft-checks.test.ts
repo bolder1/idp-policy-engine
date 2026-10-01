@@ -99,11 +99,14 @@ describe('Before turning on, with the policy’s checks', () => {
 
   /* Salesforce, which only the Global Default decides today: turning on a
      policy that refuses a device that is not compliant fails a check expecting
-     today's Allow on 1 factor — it passed, and now does not. The same sign-in
-     at Must pass blocks, so it is the level alone that lets this one through. */
+     today's answer — it passed, and now does not. The same sign-in at Must
+     pass blocks, so it is the level alone that lets this one through. Today's
+     answer is Allow with 2FA since the Global Default's baseline (30 Sep
+     2026): an Android phone in India is not a corporate device, so OTP over
+     Email; it was Allow on 1 factor before. */
   it('never blocks on one it newly fails, because a check is a note', () => {
     const salesforce: Policy = { ...stored, id: 'p-salesforce', appIds: ['salesforce'] }
-    const wrong: DraftCheck = { ...CHECKS[1], id: 'not-named', kind: 'not-named', facts: { ...CHECKS[1].facts, appId: 'salesforce' }, expected: '1fa' }
+    const wrong: DraftCheck = { ...CHECKS[1], id: 'not-named', kind: 'not-named', facts: { ...CHECKS[1].facts, appId: 'salesforce' }, expected: '2fa' }
     const r = run([wrong], salesforce)
     const c = r.saved.find((x) => x.signIn.id === 'p-salesforce:not-named')!
     expect([c.before.verdict, c.after.verdict, c.after.decision, c.regressed]).toEqual(['pass', 'fail', 'deny', true])

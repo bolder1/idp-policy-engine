@@ -48,7 +48,12 @@ describe('the samples', () => {
 describe('the plan line', () => {
   it('reads HRMS turned on from monitoring exactly (A6b)', () => {
     const rows = monitorRows(hrms, monitoring, env, monitorSamples(hrms, env, MONDAY))
-    expect(planLine(planOf(rows))).toBe('If turned on: 0 to allow on 1 factor, 3 to allow with 2FA, 5 to deny, 4 unchanged.')
+    /* Since the Global Default's baseline (30 Sep 2026) today is no longer one
+       factor for all twelve: a phone at home already gets OTP over Email, and
+       Austin and the proxy are already refused. So HRMS moves fewer — the
+       office laptops to 2FA, the four home and London sign-ins to Deny — and
+       Bengaluru (2FA either way) and the refusals stand still. */
+    expect(planLine(planOf(rows))).toBe('If turned on: 0 to allow on 1 factor, 2 to allow with 2FA, 4 to deny, 6 unchanged.')
     /* Today the Global Default decides every one of them. */
     expect(rows.every((r) => r.today.decidedBy?.isGlobalDefault)).toBe(true)
   })

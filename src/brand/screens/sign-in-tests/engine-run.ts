@@ -1,0 +1,1195 @@
+import { FALLBACK_NAME, memberGroupIds, zoneScopeOf, type AccessDecision, type Policy, type PolicyStatus, type Rule } from '../../data'
+import { DECISION_PHRASE, DECISION_WORDS, decisionsOr, factWords } from '../../decision-words'
+import { cardJoin, leaves, topJoin } from '../../predicate'
+import type { SavedSignIn } from '../../saved-sign-ins'
+import { incompleteLine, type DecisionView } from '../board/try-sign-in'
+import { normaliseWho } from '../../rule-who'
+import { personOf, type ConditionResult, type RuleTrace, type SignInFacts, type SimEnv } from '../simulate'
+import { evaluatedList, tierOf, type StandingKind, type TenantResolution } from '../tenant-resolver'
+import { LAST_ROW, conditionLines, lineText, placeActual, whoLine, type EvidenceLine, type LineStatus } from '../testing/evidence'
+import { policiesOn, type RowsLibrary } from '../testing/rows-read'
+import type { SignInScreens } from '../testing/screens-of'
+import type { FormField, SignInForm } from '../testing/sign-in-form'
+import { tokenValue, type SentenceContext } from '../testing/sign-in-sentence'
+import { conditionRequirement, nameLookupOf, outcomeOf, whoRequirement, type NameLookup, type PillCategory, type Requirement } from '../testing/trace-pills'
+import { whichPolicyRows, type WhichRowKind } from '../testing/which-policy'
+import { differingWatch } from '../watching-words'
+import { asEachGroup, conflictsOf, viaOf, type GroupComparison, type SignInConflicts, type Via } from './conflicts'
+
+/* -----------------------------------------------------------------------------
+   Try a sign-in on the Sign-in tests page, as an ENGINE RUN (TESTING-V4 §8).
+
+   The owner found a journey that was already drawn when the page opened "too
+   overwhelming". The answer is to let the engine do its work in front of the
+   admin, one step at a time, and let the loading BE the explanation — and, the
+   owner's refinement (§8.6), to let it open LEVEL BY LEVEL, a hierarchy rather
+   than four columns drawn at once:
+
+     it finds the policy     each policy on the application, in the order the
+                             engine asks them, until the one that decides
+     it opens that policy    the deciding policy grows and its rules appear
+                             inside it, in order: the policy holds its rules
+     it checks the rules     each rule's checks one row at a time, the first
+                             failing check ending that rule — first match wins,
+                             drawn — and a rule that did not match folds to one
+                             line, naming the check that failed, as the engine
+                             leaves it
+     it decides              the answer lands
+
+   This file is the plan, and nothing else: from the resolver's answer
+   (`resolveSignIn`) and the tenant, the rows each column holds and the ordered
+   steps the canvas plays, each with the words the engine line says while it
+   runs. The component only plays it (TryJourney.tsx). Nothing here decides
+   anything: which policy is the resolver's `decidedBy`, where each stands is
+   its `standings`, each rule's match is its trace. The steps are the order
+   those answers are SHOWN in — which is why it is tested for parity with the
+   resolver on the whole showcase tenant (engine-run.test.ts).
+
+   Checks with hierarchy (§8.4). A rule's checks are grouped by category — Who,
+   Network, Place, Device, Time, Risk — one row each in the rule's order, so a
+   device profile with nine checks is ONE row whose sub-checks open in place,
+   and "Mon–Fri" and "09:00–18:00" are one Time row. The row's standing is its
+   conditions', never its evidence lines': a zone condition naming two zones
+   passes when either does, which a row built from the lines would get wrong.
+
+   First match wins, literally. The engine reads a rule's rows in order and
+   the first that fails ends the rule — "No match" — and as the engine moves on
+   the rule folds to that one row, said as one line ("Network · Home broadband
+   is not in Corporate offices"); Show all checks opens it again, the rows
+   after the failing one "Not checked". That short cut is exact only when the
+   rule is one run of ANDs, which is every rule the editor writes and every
+   rule in the showcase; a rule of alternatives ("this card or that one") is
+   read whole, every row checked, and its standing is the trace's.
+
+   A row is read in two beats: it arrives, its spinner turning (`check`), then
+   its mark lands and the engine line says what it found, in the sign-in's own
+   words — "Arun Patel is in Engineering", "Home broadband is not in Corporate
+   offices", "Android 12 phone does not meet Compliant devices" (`checked`).
+   The line changes when an answer is found, never while a row is only
+   arriving, so it reads one finding at a time; and a passing finding is said
+   once a run — rule 2 asking Who again does not say "Arun Patel is in
+   Engineering" twice, the line keeps the rule's name — so what the line says
+   is always news. A failing finding is always said: it ends its rule.
+   -------------------------------------------------------------------------- */
+
+// --- Nodes -----------------------------------------------------------------------------
+
+/* Every box the canvas measures, by id. A rule card is `rule:{rule id}`, and
+   the last row is `rule:fallback` (evidence.ts files it under `LAST_ROW`).
+   `which` is the card that holds the policies ("Policies on HRMS"): the one
+   column's spine runs into its top and out of its foot. */
+export type NodeId = 'sign-in' | 'outcome' | 'which' | `policy:${string}` | `rule:${string}`
+
+const policyNode = (policyId: string): NodeId => `policy:${policyId}`
+const ruleNode = (ruleId: string): NodeId => `rule:${ruleId}`
+
+// --- The model --------------------------------------------------------------------------
+
+/** A policy's rule as a title: what a policy that did not decide shows when it is opened by hand. */
+export interface RuleLine {
+  /** The rule's id, or `LAST_ROW` for "Nothing else matched". */
+  id: string
+  /** 0-based position in the policy; null for the last row. */
+  index: number | null
+  name: string
+  decision: AccessDecision
+  enabled: boolean
+}
+
+/** One policy that could govern this application, as its card in the stack of policies. */
+export interface EnginePolicy {
+  policyId: string
+  node: NodeId
+  /** 1-based: where the engine asks it, the number its row shows. */
+  order: number
+  name: string
+  status: PolicyStatus
+  kind: WhichRowKind
+  /** "Switched off", "Not in this policy", "Checked after Developer tools"; '' on the one that decides. */
+  reason: string
+  /** The resolver's own sentence, for the tooltip — only where it says more than the reason does; else ''. */
+  tip: string
+  decides: boolean
+  isGlobalDefault: boolean
+  /** The scan stops on it: every policy up to and including the one that decides. */
+  scanned: boolean
+  /** The step it is scanned at, or null when the scan never reaches it. */
+  scanAt: number | null
+  /** The step it settles at — dimmed with its reason, or lit. */
+  settleAt: number
+  /** The one that decides: the step the scan has found it, a light travelling once around it before it settles; null on every other. */
+  foundAt: number | null
+  /** The step the one that decides opens at, its rules appearing inside it; null on every other. */
+  expandAt: number | null
+  /** Its rules, as titles, then the last row: what it shows when it is opened by hand. */
+  lines: RuleLine[]
+}
+
+/** A sub-check under a row: a device profile's own checks, a zone's two halves. */
+export interface SubCheck {
+  key: string
+  label: string
+  actual: string
+  required: string
+  status: LineStatus
+}
+
+/** One row of checks in a rule card: one category. */
+export interface CheckRow {
+  key: string
+  category: PillCategory
+  /** "Network", "Device": the category, said. */
+  word: string
+  /** What the rule asks for: "Corporate offices", "Mon–Fri 09:00–18:00", "Below 40". */
+  requirement: string
+  /** What this sign-in showed: "Office network", "Windows 11 laptop · registered", or "Not stated". */
+  value: string
+  status: LineStatus
+  /** The fact is not stated, so the row offers Add: the card's field that states it. */
+  missing: FormField | null
+  subs: SubCheck[]
+  /** The evidence, whole: every line's "actual · required" and its tip. */
+  tip: string
+  /** The row said as a sentence: "Network · Office network is in Corporate offices" — what a folded rule's one line names it by. */
+  say: string
+  /** The finding in the sign-in's words, for the engine line and the folded line: "Home broadband is not in Corporate offices". */
+  line: string
+}
+
+/*   match        every row passed: the rule decides
+     no-match     a row failed
+     unknown      no row failed and one could not be told: the walk goes on
+                  past it (the definite reading), and the answer Depends
+     possible     the last row, reached only if every rule that could not be
+                  told does not match: "If not" — never drawn as a match
+     off          switched off: passed on the way, nothing asked
+     not-reached  after the rule that decided */
+export type RuleState = 'match' | 'no-match' | 'unknown' | 'possible' | 'off' | 'not-reached'
+
+export interface EngineRule {
+  /** The rule's id, or `LAST_ROW` for "Nothing else matched". */
+  id: string
+  node: NodeId
+  /** 0-based position in the policy; null for the last row. */
+  index: number | null
+  name: string
+  /** Its THEN. */
+  decision: AccessDecision
+  state: RuleState
+  /** Every row of the rule, in its order. */
+  checks: CheckRow[]
+  /** How many rows the engine reads before the rule is settled: to the first failure, or all. */
+  checked: number
+  /** The row that ended it, or null. */
+  failing: number | null
+  /** One run of ANDs: the first failing row ends it. */
+  shortCircuit: boolean
+  /** The engine walks into it and reads it. */
+  visited: boolean
+  startAt: number
+  endAt: number
+  /** The step each read row arrives at, its spinner turning, `checked` of them. */
+  checkAt: number[]
+  /** The step each read row's mark lands at, the engine line saying what it found. */
+  markAt: number[]
+  /** A rule that did not match folds to one line as the engine leaves it: that step, or null. */
+  compactAt: number | null
+  /** The one line's check: "Network · Home broadband is not in Corporate offices" — the failing row's words, or ''. */
+  miss: string
+  /** Which of the person's groups (or their name) its who lets them in by — "via Finance" (conflicts.ts `viaOf`). Absent on the last row. */
+  via?: Via
+  /* A later rule that also applies to this person, with another answer (a
+     conflict, §13.2): its rows as the resolver traced them, though the
+     engine never read it — so its card can show which rows held. Only on a
+     conflict. */
+  alsoChecks?: CheckRow[]
+}
+
+export interface EngineOutcome {
+  status: TenantResolution['status']
+  decision: AccessDecision | null
+  possible: AccessDecision[]
+  policyId: string | null
+  policyName: string | null
+  /** "Rule 2 · In the office", "Nothing else matched", or ''. */
+  ruleLine: string
+  /** "Decided by {policy} · Rule 2 · {rule}", or what is missing. */
+  why: string
+  /** The outcome's own line: "Decided by {policy} · Rule 2 — {rule}", "Decided by {policy} · Nothing else matched"; '' when no policy decides. */
+  by: string
+  /** The board's outcome node takes this (TracePills.tsx `OutcomeNode`). */
+  view: DecisionView
+}
+
+/*   fill       a saved sign-in shown in the card, for a beat
+     collapse   the card folds into the sign-in node
+     find       the card of policies appears, its rows as skeletons
+     scan       one policy is asked: a sweep passes over its row
+     found      the scan has found the one that decides: a light travels
+                once around its row
+     decides    it settles to the accent ring and "Decides"; the rest have settled
+     expand     it opens: its rules appear inside it, as skeletons
+     rule       a rule opens
+     check      one of its rows arrives, its spinner turning; the engine line
+                keeps what it said
+     checked    the row's mark lands, and the engine line says what it found;
+                the failing row of a run of ANDs settles its rule here too
+     rule-end   the rule settles: Match, Can't tell (and No match, for a rule
+                of alternatives, read whole)
+     compact    a rule that did not match folds to its failing row, one line
+     deciding   the wire draws out from the rule that decided
+     outcome    the answer lands at its end
+     done       the quiet summary */
+export type StepKind = 'fill' | 'collapse' | 'find' | 'scan' | 'found' | 'decides' | 'expand' | 'rule' | 'check' | 'checked' | 'rule-end' | 'compact' | 'deciding' | 'outcome' | 'done'
+
+export interface EngineStep {
+  kind: StepKind
+  /** The engine line while this step runs. */
+  text: string
+  /** A new stage: what the status region says aloud as it starts. Checks are never said. */
+  stage?: string
+  /** Which policy row, rule or check row it works on. */
+  policy?: number
+  rule?: number
+  check?: number
+  /** A rule that is switched off is passed quickly. */
+  quick?: boolean
+  /** A finding that ends a rule holds a little longer: it is the one to read. */
+  hold?: boolean
+  /** The engine line says it in the notice tone: a later rule that also applies to this person (a conflict, §13.2). */
+  notice?: boolean
+}
+
+/** How a run starts: the card filled first (a saved sign-in, a suggestion), the card collapsing (Run), or neither (Replay). */
+export type Intro = 'fill' | 'collapse' | 'none'
+
+export interface EngineRun {
+  /** No person or no application: there is nothing to run. */
+  empty: boolean
+  appName: string
+  /** The application's policies and the Global Default, in the order the engine asks them. */
+  policies: EnginePolicy[]
+  decider: { id: string; name: string; isGlobalDefault: boolean } | null
+  /** The deciding policy's rules, then "Nothing else matched". */
+  rules: EngineRule[]
+  /** Index into `rules` of where the walk stopped, or null when no policy decides. */
+  landing: number | null
+  outcome: EngineOutcome
+  steps: EngineStep[]
+  /** Step indices: the policies appear, the scan finds the one that decides (-1 when none does), it lights, it opens, the answer lands, the run is done. */
+  at: { which: number; found: number; decides: number; expand: number; outcome: number; done: number }
+  /** "Checked 2 policies · 1 rule · 4 checks": the engine line once it is done. */
+  summary: string
+  /** What else would apply to this person (TESTING-V4 §13.1, conflicts.ts): set once a policy decides. It adds no step. */
+  conflicts?: SignInConflicts
+  /** The answer as a member of each of the person's groups alone, and as the person (conflicts.ts `asEachGroup`): set once a policy decides, for a person in two or more groups. It adds no step. */
+  asEachGroup?: GroupComparison
+}
+
+export interface EngineInput {
+  res: TenantResolution
+  policies: readonly Policy[]
+  form: SignInForm
+  facts: SignInFacts
+  env: SimEnv
+  /** The tenant the values are said against: people, applications, zones. */
+  ctx: SentenceContext
+  names?: NameLookup
+  intro?: Intro
+  /* The policy `res` was resolved with in place of its stored twin — a
+     policy's draft, or one asked as if it were on (`resolveSignIn(…, {
+     substitute })`). Every lookup the plan makes — the one that decides, its
+     rules, the order, the titles, the check rows — is in the list as it was
+     evaluated, so the draft's result is drawn against the draft's rules. */
+  substitute?: Policy
+  /* Draw only this policy and the one that decides: a policy's own trace
+     (Try a sign-in inside it). Absent, every policy on the application. The
+     focus is drawn even when it does not cover the application, with why. */
+  focus?: string | null
+}
+
+// --- Words ------------------------------------------------------------------------------
+
+export const CATEGORY_WORD: Record<PillCategory, string> = {
+  who: 'Who',
+  network: 'Network',
+  place: 'Place',
+  device: 'Device',
+  time: 'Time',
+  risk: 'Risk',
+  app: 'Application',
+  other: 'Check',
+}
+
+export const NOT_STATED_WORD = 'Not stated'
+
+const capital = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
+/* The row's words, few. The resolver's reasons are sentences written for a
+   list with room; a row in a 230 px column says the gist, and the sentence is
+   its tooltip. */
+function whichReason(
+  kind: WhichRowKind,
+  standing: StandingKind | undefined,
+  decider: string | null,
+  watched: { decision: AccessDecision | null; possible: { decision: AccessDecision }[] } | null,
+  /* The policy the trace is drawn for (`focus`): its reason names the person
+     and the application, since it is the only other line there. */
+  own: { person: string; app: string } | null = null,
+  /** The person signing in, named where the reason is about them: "Kavya Menon is not in it". */
+  person: string | null = null,
+): string {
+  switch (kind) {
+    case 'decides':
+      return ''
+    case 'watching':
+      if (!watched) return 'Only watching'
+      return watched.decision ? `Would ${DECISION_PHRASE[watched.decision]}` : `Would ${decisionsOr(watched.possible.map((o) => o.decision)).toLowerCase()}`
+    case 'waiting':
+      return standing === 'draft' ? 'Not turned on yet' : 'Switched off'
+    case 'elsewhere':
+      if (standing === 'other-app') return own ? `Does not cover ${own.app}` : 'Another application'
+      if (standing === 'not-app-access') return 'Not an app access policy'
+      return standing === 'draft' ? 'Not turned on yet' : 'Switched off'
+    default:
+      if (standing === 'not-in-audience') return own ? `${own.person} is not in this policy` : person ? `${person} is not in it` : 'Not in this policy'
+      return decider ? `Checked after ${decider}` : 'Another policy applies'
+  }
+}
+
+/* The standings whose sentence says more than the row's reason: the audience
+   it is not in, the policy ahead of it, why the Global Default was not reached,
+   that it is only watching. The rest restate the row — "Decides this sign-in"
+   beside "Decides", "Inactive" beside "Switched off", a second word for one
+   state — and have no tooltip. */
+const TIPPED: ReadonlySet<StandingKind> = new Set(['not-in-audience', 'same-app-and-group', 'default-group-yields', 'not-reached', 'monitoring'])
+const tipped = (k: StandingKind | undefined): boolean => k !== undefined && TIPPED.has(k)
+
+/* The lookup a row names zones, profiles, groups and people by: the caller's
+   (the store's `useNameLookup`), else one from the env's own library, else the
+   env's name functions. */
+function namesOf(env: SimEnv): NameLookup {
+  const lib = env.library
+  if (lib) return nameLookupOf({ zones: lib.zones, fingerprints: lib.fingerprints, groups: lib.groups, users: lib.people })
+  return (kind, id) => {
+    if (kind === 'zone') return env.zoneName(id)
+    if (kind === 'fingerprint') return env.fingerprintName(id)
+    if (kind === 'group') return env.groupName(id)
+    if (kind === 'user') return env.userName?.(id)
+    return undefined
+  }
+}
+
+// --- Checks, by category ----------------------------------------------------------------------
+
+/** One condition (or the who), before rows of one category are put together. */
+interface Unit {
+  key: string
+  req: Requirement
+  status: LineStatus
+  lines: EvidenceLine[]
+  subs: SubCheck[]
+}
+
+/* The sign-in's own value for a category, as the card states it: the origin's
+   name rather than its address, the device preset rather than its facts. */
+function valueOf(category: PillCategory, form: SignInForm, facts: SignInFacts, ctx: SentenceContext, lines: readonly EvidenceLine[]): { value: string; missing: FormField | null } {
+  const said = (t: Parameters<typeof tokenValue>[0]) => {
+    const v = tokenValue(t, form, ctx)
+    return v.unset ? null : v.text
+  }
+  switch (category) {
+    case 'who': {
+      const v = said('person')
+      return v ? { value: v, missing: null } : { value: NOT_STATED_WORD, missing: 'person' }
+    }
+    case 'network': {
+      const address = form.address.trim()
+      if (!address) return { value: NOT_STATED_WORD, missing: 'address' }
+      const v = said('from')
+      return { value: v ?? address, missing: null }
+    }
+    case 'place': {
+      const place = placeActual(facts)
+      if (place === 'Not stated') return { value: NOT_STATED_WORD, missing: 'address' }
+      return { value: place, missing: null }
+    }
+    case 'device': {
+      const v = said('device')
+      return v ? { value: v, missing: null } : { value: NOT_STATED_WORD, missing: 'device' }
+    }
+    case 'time': {
+      const v = said('when')
+      return v ? { value: v, missing: null } : { value: NOT_STATED_WORD, missing: 'when' }
+    }
+    case 'risk': {
+      const v = form.risk.trim()
+      return v ? { value: v, missing: null } : { value: NOT_STATED_WORD, missing: 'risk' }
+    }
+    default:
+      return { value: lines[0]?.actual ?? '', missing: null }
+  }
+}
+
+/* A finding, in the sign-in's own words: the relation said the way an admin
+   would. "Office network is in Corporate offices", "Windows 10 laptop does not
+   meet Compliant devices", "Risk score 86 is not below 71". A device is said
+   by its kind, not its detail ("Windows 11 laptop"; the row keeps
+   "· registered"). A fact left unstated is said so, and nothing else. */
+function findingOf(word: string, value: string, status: LineStatus, category: PillCategory, req: Pick<Requirement, 'core' | 'negated'>): string {
+  if (status === 'unknown') return value === NOT_STATED_WORD ? `${word} not stated` : `Can't tell for ${value}`
+  const pass = status === 'pass'
+  const inside = pass !== req.negated
+  switch (category) {
+    case 'device':
+      return `${value.split(' · ')[0]} ${inside ? 'meets' : 'does not meet'} ${req.core}`
+    case 'time':
+      return `${value} is ${inside ? 'in' : 'outside'} ${req.core}`
+    case 'risk':
+      return `Risk score ${value} is ${pass ? '' : 'not '}${req.core}`
+    case 'app':
+    case 'other':
+      return `${capital(req.core)} ${pass ? 'passes' : 'fails'}`
+    default:
+      return `${value} is ${inside ? 'in' : 'not in'} ${req.core}`
+  }
+}
+
+/* The finding with its category's word before it — "Network · Home broadband
+   is not in Corporate offices", "Risk · 86 is not below 71" — for the folded
+   line's name and its tooltip. */
+function sayOf(word: string, value: string, status: LineStatus, category: PillCategory, req: Pick<Requirement, 'core' | 'negated'>): string {
+  if (status === 'unknown') return value === NOT_STATED_WORD ? `${word} · not stated` : `${word} · ${value}, can't tell`
+  const f = findingOf(word, value, status, category, req)
+  if (category === 'risk') return `${word} · ${f.replace(/^Risk score /, '')}`
+  if (category === 'device') return `${word} · ${value} ${f.slice(value.split(' · ')[0].length + 1)}`
+  if (category === 'app' || category === 'other') return `${word} · ${req.core} ${passWord(status)}`
+  return `${word} · ${f}`
+}
+const passWord = (s: LineStatus) => (s === 'pass' ? 'passes' : 'fails')
+
+/* The Who finding: the group that let the person in, not the rule's whole
+   list — "Arun Patel is in Engineering" — or the list they are outside of:
+   "Sam Okonkwo is not in Engineering or DevOps". A person in two groups is
+   said in by the one the rule names: Maya Iyer "is in Finance" on the Finance
+   rule, though Engineering is her first group. */
+function whoFinding(rule: Pick<Rule, 'who'>, status: LineStatus, facts: SignInFacts, env: SimEnv): string {
+  const person = personOf(facts.personId, env)
+  if (!person || status === 'unknown') return 'Who not stated'
+  const w = normaliseWho(rule.who)
+  if (status === 'pass') {
+    if (w?.userIds.includes(person.id)) return `${person.name} is named in the rule`
+    const via = viaOf(rule, person, env)
+    if (via.kind === 'groups') return `${person.name} is in ${via.label}`
+    return person.groupName ? `${person.name} is in ${person.groupName}` : `${person.name} is in the rule`
+  }
+  /* Left out by an exception (TESTING-V4 §13, the troubleshooting cases): said
+     by the exception, since the person may well be in the group the rule
+     names — Leo Fernandes is in Engineering, and "Engineering except
+     Contractors" leaves him out because he is in Contractors too. */
+  const excepted = exceptionOf(w, person, env)
+  if (excepted) return excepted
+  const groups = (w?.groupIds ?? []).map((id) => env.groupName(id))
+  if (groups.length === 0) return `${person.name} is not in the rule`
+  const list = groups.length === 1 ? groups[0] : `${groups.slice(0, -1).join(', ')} or ${groups.at(-1)}`
+  return `${person.name} is not in ${list}`
+}
+
+/* "Leo Fernandes is in Contractors, an exception", "Devon Rao is an
+   exception"; null when no exception takes this person out of the who. */
+function exceptionOf(w: ReturnType<typeof normaliseWho>, person: NonNullable<ReturnType<typeof personOf>>, env: SimEnv): string | null {
+  if (!w) return null
+  if (w.exceptUserIds?.includes(person.id)) return `${person.name} is an exception`
+  const groups = memberGroupIds(person).filter((g) => (w.exceptGroupIds ?? []).includes(g))
+  if (groups.length === 0) return null
+  const names = groups.map((g) => env.groupName(g))
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+  return `${person.name} is in ${list}, ${names.length === 1 ? 'an exception' : 'exceptions'}`
+}
+
+/* A condition's sub-checks: a zone's halves when it has two lines, a device
+   profile's checks (every one it asked, not only the failures — the row is
+   where to see what passed). One line is the row itself, and has none. */
+function subsOf(r: ConditionResult, lines: readonly EvidenceLine[]): SubCheck[] {
+  if (r.typeId === 'fingerprint' && r.profiles && r.profiles.length > 0) {
+    const many = r.profiles.length > 1
+    return r.profiles.flatMap((p) =>
+      p.checks
+        .filter((c) => c.status !== 'not applicable')
+        .map((c) => ({
+          key: `${r.conditionId}:${p.profileId}:${c.id}`,
+          label: many ? `${p.profileName} · ${c.label}` : c.label,
+          actual: c.actual,
+          required: c.required,
+          status: c.status as LineStatus,
+        })),
+    )
+  }
+  if (lines.length < 2) return []
+  return lines.map((l) => ({
+    key: l.key,
+    label: l.label === 'Network' ? 'IP address' : l.label,
+    actual: l.actual,
+    required: l.required,
+    status: l.status,
+  }))
+}
+
+const worst = (s: readonly LineStatus[]): LineStatus => (s.includes('fail') ? 'fail' : s.includes('unknown') ? 'unknown' : 'pass')
+
+/* One run of ANDs: the who is always ANDed with the WHEN, and the WHEN is one
+   bracket when every card is an AND-run and the cards are ANDed too (or there
+   is only one). A rule of alternatives is anything else. */
+export function allAnd(rule: Pick<Rule, 'when'>): boolean {
+  const cards = rule.when.cards
+  if (!cards.every((k) => cardJoin(k) === 'and')) return false
+  return cards.length <= 1 || topJoin(rule.when) === 'and'
+}
+
+/* The requirement a row says, from its conditions'. Time reads as one
+   window ("Mon–Fri 09:00–18:00"), risk as its bounds ("Above 39 and below
+   71" — the row's word already says Risk), the rest as a list. */
+function rowRequirement(category: PillCategory, units: readonly Unit[]): Pick<Requirement, 'core' | 'negated'> & { text: string } {
+  if (units.length === 1) {
+    const r = units[0].req
+    if (category === 'risk') return { text: capital(r.core), core: r.core, negated: false }
+    return { text: r.text, core: r.core, negated: r.negated }
+  }
+  if (category === 'risk') {
+    const core = units.map((u) => u.req.core).join(' and ')
+    return { text: capital(core), core, negated: false }
+  }
+  const text = units.map((u) => u.req.text).join(category === 'time' ? ' ' : ', ')
+  return { text, core: text, negated: false }
+}
+
+function checkRowsOf(
+  rule: Rule,
+  step: RuleTrace,
+  input: Pick<EngineInput, 'form' | 'facts' | 'env' | 'ctx'> & { names: NameLookup },
+): { rows: CheckRow[]; shortCircuit: boolean } {
+  const { form, facts, env, ctx, names } = input
+  const units: Unit[] = []
+  const who = whoLine(rule, step, facts, env)
+  if (who) units.push({ key: who.key, req: whoRequirement(rule, names), status: who.status, lines: [who], subs: [] })
+  const byId = new Map(leaves(rule.when).map((c) => [c.id, c]))
+  for (const r of step.conditions) {
+    const c = byId.get(r.conditionId)
+    if (!c) continue
+    const lines = conditionLines(r, c, facts, env)
+    units.push({ key: r.conditionId, req: conditionRequirement(c, names), status: r.status, lines, subs: subsOf(r, lines) })
+  }
+
+  const shortCircuit = allAnd(rule)
+  /* Grouped by category, first appearance first — only where every condition
+     is required, since a row's standing is then every one of its conditions
+     passing. A rule of alternatives keeps one row per condition. */
+  const groups: { category: PillCategory; units: Unit[] }[] = []
+  for (const u of units) {
+    const g = shortCircuit ? groups.find((x) => x.category === u.req.category) : undefined
+    if (g) g.units.push(u)
+    else groups.push({ category: u.req.category, units: [u] })
+  }
+
+  const rows = groups.map(({ category, units: us }): CheckRow => {
+    const word = CATEGORY_WORD[category]
+    const req = rowRequirement(category, us)
+    const status = worst(us.map((u) => u.status))
+    const lines = us.flatMap((u) => u.lines)
+    const { value, missing } = valueOf(category, form, facts, ctx, lines)
+    const subs =
+      us.length > 1
+        ? us.map((u) => ({ key: u.key, label: category === 'risk' ? capital(u.req.core) : u.req.text, actual: value, required: '', status: u.status }))
+        : us[0].subs
+    /* A row of several conditions that failed is said by the one that failed. */
+    const failed = us.length > 1 && status === 'fail' ? us.find((u) => u.status === 'fail') : undefined
+    /* A who that failed on an exception is said by the exception, not by the
+       groups the rule names — which the person may be in. */
+    const who = category === 'who' && status === 'fail' ? personOf(facts.personId, env) : null
+    const excepted = who ? exceptionOf(normaliseWho(rule.who), who, env) : null
+    const say = excepted ? `${word} · ${excepted}` : failed ? sayOf(word, value, 'fail', category, failed.req) : sayOf(word, value, status, category, req)
+    const line =
+      category === 'who' ? whoFinding(rule, status, facts, env) : failed ? findingOf(word, value, 'fail', category, failed.req) : findingOf(word, value, status, category, req)
+    const tip = lines.map((l) => (l.tip ? `${lineText(l)}\n${l.tip}` : lineText(l))).join('\n')
+    return {
+      key: us[0].key,
+      category,
+      word,
+      requirement: req.text,
+      value,
+      status,
+      missing: status === 'unknown' ? missing : null,
+      subs,
+      tip,
+      say,
+      line,
+    }
+  })
+  return { rows, shortCircuit }
+}
+
+/* How far the engine reads a rule, and what it settles to. The first failing
+   row ends a rule of ANDs; otherwise every row is read, and the standing is
+   the trace's own. */
+function readRule(rows: readonly CheckRow[], shortCircuit: boolean, match: RuleTrace['match']): { checked: number; failing: number | null; state: 'match' | 'no-match' | 'unknown' } {
+  const traced = match === 'yes' ? 'match' : match === 'no' ? 'no-match' : 'unknown'
+  if (!shortCircuit) {
+    const failing = match === 'no' ? rows.findIndex((r) => r.status === 'fail') : -1
+    return { checked: rows.length, failing: failing >= 0 ? failing : null, state: traced }
+  }
+  const failing = rows.findIndex((r) => r.status === 'fail')
+  if (failing >= 0) return { checked: failing + 1, failing, state: 'no-match' }
+  return { checked: rows.length, failing: null, state: rows.some((r) => r.status === 'unknown') ? 'unknown' : 'match' }
+}
+
+// --- The run -------------------------------------------------------------------------------------
+
+const NOTHING: DecisionView = { status: 'incomplete', decision: null, line: '', outcomes: [], needs: [], watching: [] }
+
+/* The policies on the application in the order the engine asks them: the
+   custom-group tier in list order, then the DEFAULT-group tier, then the
+   Global Default (tenant-resolver.ts `governingPolicy`). The first of them
+   that can govern this person decides; the scan stops there. */
+function inEngineOrder<T extends { policyId: string }>(rows: readonly T[], policies: readonly Policy[]): T[] {
+  const at = new Map(policies.map((p, i) => [p.id, i]))
+  const tier = new Map(policies.map((p) => [p.id, { custom: 0, 'default-group': 1, 'global-default': 2 }[tierOf(p)]]))
+  return [...rows].sort((a, b) => (tier.get(a.policyId) ?? 3) - (tier.get(b.policyId) ?? 3) || (at.get(a.policyId) ?? 0) - (at.get(b.policyId) ?? 0))
+}
+
+function outcomeOfRun(res: TenantResolution, decider: Policy | null): EngineOutcome {
+  const trace = res.trace
+  const hit = trace?.hitIndex ?? null
+  const hitRule = decider && hit !== null ? decider.rules[hit] : undefined
+  const ruleLine = res.status === 'decided' ? (hitRule && hit !== null ? `Rule ${hit + 1} · ${hitRule.name}` : FALLBACK_NAME) : ''
+  /* The outcome says the rule as "Rule 2 — Compliant device, working remotely": its number, then its name. */
+  const ruleSaid = res.status === 'decided' ? (hitRule && hit !== null ? `Rule ${hit + 1} — ${hitRule.name}` : FALLBACK_NAME) : ''
+  const needs = factWords((trace?.unknowns ?? []).flatMap((u) => u.missing))
+  const policyName = res.decidedBy?.policyName ?? null
+
+  let view: DecisionView = NOTHING
+  let why = ''
+  let by = ''
+  if (res.status === 'incomplete') {
+    const line = incompleteLine(res)
+    view = { ...NOTHING, line }
+    why = line
+  } else if (res.status === 'decided') {
+    view = { status: 'decided', decision: res.decision, line: `${policyName} · ${ruleLine}`, outcomes: [], needs: [], watching: differingWatch(res) }
+    why = `Decided by ${policyName} · ${ruleLine}`
+    by = `Decided by ${policyName} · ${ruleSaid}`
+  } else {
+    /* The rules column numbers the deciding policy's rules, so the outcomes
+       name them by number, as the board's do; the last is always the walk past
+       every undecided rule — "If not". */
+    const outcomes = res.possible.map((o, i, list) => ({
+      label: (i === list.length - 1 && list.length > 1) || o.ruleIndex === null ? 'If not' : `If rule ${o.ruleIndex + 1} matches`,
+      decision: o.decision,
+    }))
+    view = { status: 'depends', decision: null, line: policyName ?? '', outcomes, needs, watching: differingWatch(res) }
+    why = needs.length > 0 ? `Decided by ${policyName} · Needs: ${needs.join(', ')}` : `Decided by ${policyName}`
+    by = policyName ? `Decided by ${policyName}` : ''
+  }
+  return { status: res.status, decision: res.decision, possible: res.possible.map((o) => o.decision), policyId: res.decidedBy?.policyId ?? null, policyName, ruleLine, why, by, view }
+}
+
+/* What the person is asked for, or told — the outcome's one line under the
+   decision (§12.4), from the pages they would get (screens-of.ts): "Asked
+   for Google Authenticator", "Asked for their password", "Blocked with
+   “Your device does not meet …”". The second factor is the one named: the
+   password before it goes without saying. Nothing when it is not settled. */
+export function askOf(screens: readonly SignInScreens[], decision: AccessDecision | null): string {
+  if (!decision) return ''
+  const last = (screens.find((sc) => sc.decision === decision) ?? screens[0])?.steps.at(-1)
+  if (!last) return ''
+  switch (last.kind) {
+    case 'deny':
+      return `Blocked with “${last.message}”`
+    case 'second':
+      return last.method ? `Asked for ${last.name}` : `Asked for ${last.name}, which nobody can be offered`
+    case 'first-method':
+      return `Asked for ${last.method}`
+    case 'password':
+      return 'Asked for their password'
+  }
+}
+
+function answerText(o: EngineOutcome): string {
+  if (o.status === 'decided' && o.decision) return DECISION_WORDS[o.decision]
+  if (o.status === 'depends') return 'Depends'
+  return o.view.line || 'No policy decides'
+}
+
+/* A policy's rules as titles, then its last row: what a policy that did not
+   decide shows when it is opened by hand. Nothing about this sign-in — the
+   engine never asked it, so there is nothing to say about its checks. */
+function linesOf(p: Policy): RuleLine[] {
+  return [
+    ...p.rules.map((r, i) => ({ id: r.id, index: i, name: r.name, decision: r.decision, enabled: r.enabled })),
+    { id: LAST_ROW, index: null, name: FALLBACK_NAME, decision: outcomeOf(null, p), enabled: true },
+  ]
+}
+
+export function engineRun(input: EngineInput): EngineRun {
+  const { res, policies: stored, facts, env, intro = 'collapse', substitute, focus = null } = input
+  /* The policies as `res` evaluated them: every lookup below is in these. */
+  const policies = evaluatedList(stored, substitute)
+  const names = input.names ?? namesOf(env)
+  const appId = facts.appId ?? null
+  const appName = appId ? (env.appName?.(appId) ?? appId) : ''
+  const person = personOf(facts.personId, env)
+  const missing = res.missing as readonly string[]
+  const empty = !person || !appId || missing.includes('person') || missing.includes('app')
+
+  const decider = res.decidedBy ? (policies.find((p) => p.id === res.decidedBy?.policyId) ?? null) : null
+  const outcome = outcomeOfRun(res, decider)
+  const steps: EngineStep[] = []
+  const push = (s: EngineStep) => steps.push(s) - 1
+  const at = { which: -1, found: -1, decides: -1, expand: -1, outcome: -1, done: -1 }
+
+  if (empty) {
+    at.done = push({ kind: 'done', text: outcome.why })
+    return { empty, appName, policies: [], decider: null, rules: [], landing: null, outcome, steps, at, summary: outcome.why }
+  }
+
+  // --- 1. Finding the policy ---
+
+  const finding = `Finding the policy for ${appName}`
+  if (intro === 'fill') push({ kind: 'fill', text: '' })
+  if (intro !== 'none') push({ kind: 'collapse', text: finding, stage: finding })
+  at.which = push({ kind: 'find', text: finding, ...(intro === 'none' ? { stage: finding } : null) })
+
+  const standing = new Map(res.standings.map((s) => [s.policyId, s.kind]))
+  const byId = new Map(policies.map((p) => [p.id, p]))
+  /* The rows read the STORED list with the substitute beside it: a monitor
+     standing in keeps its pill, a struck row reads the stored status. */
+  const which = whichPolicyRows(res, stored, appId, substitute ? { substitute } : {})
+  /* A policy's own trace: it and the one that decides, where the engine
+     meets them — and it even when it is not on this application, with why. */
+  const own = focus !== null ? [...which.on, ...which.off].find((r) => r.policyId === focus) : undefined
+  const rows =
+    focus === null
+      ? inEngineOrder(which.on, policies)
+      : inEngineOrder([...which.on.filter((r) => r.policyId === focus || r.kind === 'decides'), ...(own && !which.on.includes(own) ? [own] : [])], policies)
+  const ownWords = focus !== null && person ? { person: person.name, app: appName } : null
+  const stop = rows.findIndex((r) => r.kind === 'decides')
+  const scanTo = stop >= 0 ? stop : rows.length - 1
+  const engPolicies: EnginePolicy[] = rows.map((row, i) => {
+    const p = byId.get(row.policyId)
+    const scanned = i <= scanTo
+    return {
+      policyId: row.policyId,
+      node: policyNode(row.policyId),
+      order: i + 1,
+      name: row.name,
+      status: p?.status ?? 'inactive',
+      kind: row.kind,
+      /* The scan stops at the one that decides, so one it never reached says so — the order is the reason, and the resolver's sentence is the tooltip. */
+      reason:
+        !scanned && row.kind === 'lost'
+          ? 'Not reached'
+          : whichReason(row.kind, standing.get(row.policyId), decider?.name ?? null, row.watched, row.policyId === focus ? ownWords : null, person?.name ?? null),
+      tip: tipped(standing.get(row.policyId)) ? row.reason : '',
+      decides: row.kind === 'decides',
+      isGlobalDefault: p?.isSystem === true,
+      scanned,
+      scanAt: scanned ? push({ kind: 'scan', text: `Checking ${row.name}`, policy: i }) : null,
+      settleAt: -1,
+      foundAt: null,
+      expandAt: null,
+      lines: p ? linesOf(p) : [],
+    }
+  })
+  /* Found: the scan stops on the one that decides, and a light travels once
+     around its row before it settles — the line says so as the light starts. */
+  const decidesText = decider ? `${decider.name} decides` : 'No policy decides'
+  if (stop >= 0) {
+    at.found = push({ kind: 'found', text: decidesText, policy: stop })
+    engPolicies[stop].foundAt = at.found
+  }
+  at.decides = push({ kind: 'decides', text: decidesText, ...(stop >= 0 ? { policy: stop } : null) })
+  /* A policy that did not decide settles as the next one is asked (or as the
+     light starts); the one that decides, after its light. */
+  const lastScanned = at.found >= 0 ? at.found : at.decides
+  for (const p of engPolicies) p.settleAt = p.scanAt !== null && p.scanAt + 1 < lastScanned ? p.scanAt + 1 : at.decides
+
+  // --- 2. Opening it, and checking its rules ---
+
+  const trace = decider ? res.trace : null
+  const engRules: EngineRule[] = []
+  let landing: number | null = null
+  const pending: EngineRule[] = []
+  /* The rows of each rule past the one that matched, as the resolver traced them: read only for a conflict. */
+  const later = new Map<string, () => CheckRow[]>()
+  if (decider && trace) {
+    const checking = `Checking rules in ${decider.name}`
+    at.expand = push({ kind: 'expand', text: checking, stage: checking, ...(stop >= 0 ? { policy: stop } : null) })
+    const opening = engPolicies.find((p) => p.decides)
+    if (opening) opening.expandAt = at.expand
+    const ctxNames = { ...input, names }
+    const fresh = { compactAt: null, miss: '', markAt: [] as number[] }
+    /* The passing findings the line has said this run. */
+    const heard = new Set<string>()
+    decider.rules.forEach((r, i) => {
+      const step = trace.steps.find((s) => s.ruleId === r.id)
+      const base = { id: r.id, node: ruleNode(r.id), index: i, name: r.name, decision: r.decision, ...fresh, via: viaOf(r, person, env) }
+      if (!step || step.kind === 'unreached') {
+        if (step) later.set(r.id, () => checkRowsOf(r, step, ctxNames).rows)
+        const rule: EngineRule = { ...base, state: 'not-reached', checks: [], checked: 0, failing: null, shortCircuit: allAnd(r), visited: false, startAt: -1, endAt: -1, checkAt: [] }
+        engRules.push(rule)
+        pending.push(rule)
+        return
+      }
+      if (step.kind === 'off') {
+        const s = push({ kind: 'rule', text: `Rule ${i + 1} · switched off`, rule: engRules.length, quick: true })
+        engRules.push({ ...base, state: 'off', checks: [], checked: 0, failing: null, shortCircuit: allAnd(r), visited: false, startAt: s, endAt: s, checkAt: [] })
+        return
+      }
+      const { rows: checks, shortCircuit } = checkRowsOf(r, step, ctxNames)
+      const read = readRule(checks, shortCircuit, step.match)
+      const index = engRules.length
+      /* Each row in two beats: it arrives, and the line keeps what it said;
+         its mark lands, and the line says what it found. */
+      const title = `Rule ${i + 1} · ${r.name}`
+      const startAt = push({ kind: 'rule', text: title, rule: index })
+      /* The failing row of a run of ANDs ends the rule on its own beat: the ✕
+         and "No match" land together, and the line holds what failed. */
+      const endsOnRow = shortCircuit && read.state === 'no-match' && read.failing !== null
+      const checkAt: number[] = []
+      const markAt: number[] = []
+      let said = title
+      checks.slice(0, read.checked).forEach((c, k) => {
+        checkAt.push(push({ kind: 'check', text: said, rule: index, check: k }))
+        if (c.status !== 'pass' || !heard.has(c.line)) said = c.line
+        if (c.status === 'pass') heard.add(c.line)
+        markAt.push(push({ kind: 'checked', text: said, rule: index, check: k, ...(endsOnRow && k === read.failing ? { hold: true } : null) }))
+      })
+      const endText = read.state === 'match' ? `Rule ${i + 1} matches` : read.state === 'no-match' ? `Rule ${i + 1} · no match` : `Rule ${i + 1} · can't tell`
+      const endAt = endsOnRow ? markAt[markAt.length - 1] : push({ kind: 'rule-end', text: endText, rule: index })
+      const miss = read.state === 'no-match' && read.failing !== null ? checks[read.failing].say : ''
+      /* No match: the walk always goes on — to the next rule, or the last row —
+         so the rule always folds, on the step after it settles and before the
+         next one opens. The line keeps what failed while it folds. */
+      const compactAt = read.state === 'no-match' ? push({ kind: 'compact', text: endsOnRow ? said : endText, rule: index }) : null
+      engRules.push({ ...base, state: read.state, checks, checked: read.checked, failing: read.failing, shortCircuit, visited: true, startAt, endAt, checkAt, markAt, compactAt, miss })
+      if (trace.hitIndex === i) landing = index
+    })
+
+    /* The last row: reached when every rule above it missed, under the
+       definite reading — the walk the resolver's `hitIndex` is. When a rule
+       above it could not be told, the answer Depends and the last row is only
+       what happens if not: reached, but not a match. */
+    const lastDecision = outcomeOf(null, decider)
+    const lastBase = { id: LAST_ROW, node: ruleNode(LAST_ROW), index: null, name: FALLBACK_NAME, decision: lastDecision, checks: [], checked: 0, failing: null, shortCircuit: true, checkAt: [], ...fresh }
+    if (trace.hitIndex === null && trace.lastRow !== null) {
+      const possible = res.status === 'depends'
+      const index = engRules.length
+      const startAt = push({ kind: 'rule', text: FALLBACK_NAME, rule: index })
+      const endAt = push({ kind: 'rule-end', text: possible ? `${FALLBACK_NAME} · if not` : `${FALLBACK_NAME} · ${DECISION_WORDS[lastDecision]}`, rule: index })
+      engRules.push({ ...lastBase, state: possible ? 'possible' : 'match', visited: true, startAt, endAt })
+      landing = index
+    } else {
+      const rule: EngineRule = { ...lastBase, state: 'not-reached', visited: false, startAt: -1, endAt: -1 }
+      engRules.push(rule)
+      pending.push(rule)
+    }
+  }
+
+  // --- 3. The outcome ---
+
+  /* The wire draws out from the rule that decided while the line keeps what
+     it said ("Rule 2 matches"); the status region says the stage. The rules
+     the walk never reached settle as the one that matched does — it matched,
+     so they are not reached: one moment — and the wire then draws alone. */
+  /* What else would apply to this person (§13.1): worked out once a policy
+     decides. A rule that would also apply, with another answer, is drawn
+     whole as the engine decides — so that beat holds a little longer, to be
+     read. */
+  /* A conflict is named as the engine decides — "Rule 3 also applies to
+     Maya Iyer · via Finance", in the notice tone — and held long enough to
+     be read and traced to the card (CONFLICT_MS), before the answer. */
+  const conflicts = decider ? conflictsOf({ res, policies: stored, facts, env, substitute }) : undefined
+  const perGroup = decider && conflicts && conflicts.groups.length > 1 ? asEachGroup({ policies: stored, facts, env, substitute, res }) : undefined
+  for (const c of conflicts?.conflicts ?? []) {
+    const r = engRules.find((x) => x.id === c.ruleId)
+    const rows = later.get(c.ruleId)
+    if (r && rows) r.alsoChecks = rows()
+  }
+  const clash = conflicts?.conflicts[0]
+  const deciding = push(
+    clash
+      ? { kind: 'deciding', text: conflictText(clash.number, conflicts?.personName || person?.name || '', clash.via.say), stage: 'Deciding', hold: true, notice: true }
+      : { kind: 'deciding', text: steps.at(-1)?.text || 'Deciding', stage: 'Deciding' },
+  )
+  const landed = landing as number | null
+  const matchedAt = landed !== null ? engRules[landed].endAt : -1
+  for (const r of pending) {
+    r.startAt = matchedAt >= 0 ? matchedAt : deciding
+    r.endAt = r.startAt
+  }
+  at.outcome = push({ kind: 'outcome', text: answerText(outcome) })
+
+  const scanned = engPolicies.filter((p) => p.scanned).length
+  const ruled = engRules.filter((r) => r.visited && r.index !== null).length
+  const checks = engRules.reduce((n, r) => n + r.checked, 0)
+  const summary = ['Checked ' + plural(scanned, 'policy', 'policies'), ruled > 0 ? plural(ruled, 'rule', 'rules') : null, checks > 0 ? plural(checks, 'check', 'checks') : null]
+    .filter(Boolean)
+    .join(' · ')
+  at.done = push({ kind: 'done', text: summary })
+
+  return {
+    empty,
+    appName,
+    policies: engPolicies,
+    decider: decider ? { id: decider.id, name: decider.name, isGlobalDefault: decider.isSystem === true } : null,
+    rules: engRules,
+    landing,
+    outcome,
+    steps,
+    at,
+    summary,
+    ...(conflicts ? { conflicts } : null),
+    ...(perGroup ? { asEachGroup: perGroup } : null),
+  }
+}
+
+/** The engine line on a conflict: "Rule 3 also applies to Maya Iyer · via Finance". */
+export function conflictText(number: number, person: string, via: string): string {
+  return [`Rule ${number} also applies${person ? ` to ${person}` : ''}`, via].filter(Boolean).join(' · ')
+}
+
+// --- Pace ------------------------------------------------------------------------------------------
+
+/* How long each step holds, at full pace, in ms (owner, 30 Sep: "the
+   loading is very fast, so the user can't trace the whole process with their
+   eyes" — about 7 to 9 s a run, where §13.2 had 3 to 4).
+
+   Finding the policy is a search, and reads as one — about 2 s for the
+   stage: the card arrives with its rows as skeletons, a sweep passes over
+   each row as the engine asks it, one row after another (the scans share one
+   budget, each between its least and its most, so one policy is not a flash
+   and five are not a wait), the one that decides has a light travel once
+   around it, and only then does it settle and open. Then each rule takes
+   about 1 to 1.4 s, its rows ticking one at a time — a row arrives with its
+   spinner turning, and its mark lands a beat later — and the answer about
+   1 s. Those beats keep their length; the rules' rows (a rule opened, a
+   check read, a rule settled, a rule folding away) share what is left of the
+   cap, so a policy with many checks reads faster rather than longer. */
+const BASE_MS: Record<StepKind, number> = {
+  fill: 460,
+  /* The card's fold is 340 ms: the stack starts to arrive before it ends. */
+  collapse: 280,
+  /* The card of policies arrives, its rows as shimmering skeletons, before the first sweep. */
+  find: 360,
+  /* Set by the scans' shared budget (SCAN_MS). */
+  scan: 0,
+  /* The light's one lap around the row that decides. */
+  found: 480,
+  /* "Decides" settles before it opens. */
+  decides: 300,
+  expand: 460,
+  rule: 220,
+  /* A row slides in with its spinner turning, and is seen turning before
+     its mark lands, then held long enough to read what it found. */
+  check: 160,
+  checked: 260,
+  'rule-end': 240,
+  compact: 340,
+  deciding: 420,
+  /* The answer's spring, its ring's one pulse and its lines, 60 ms apart — and a beat to read it. */
+  outcome: 1000,
+  done: 0,
+}
+
+/* A conflict, named as the engine decides, holds at least this long at any
+   pace: the line names it, the canvas takes the eye to the rule's card and
+   its notice, and only then does the answer land. */
+export const CONFLICT_MS = 1600
+
+/** The scans share this, each held between the least and the most: one policy is 640 ms, two 500 each, three and more 420. */
+export const SCAN_MS = { budget: 1000, min: 420, max: 640 } as const
+
+const ROW_STEPS: ReadonlySet<StepKind> = new Set(['rule', 'check', 'checked', 'rule-end', 'compact'])
+
+/** The whole of a full-pace run, the card's own fill aside, is at most about this (owner, 30 Sep: about 7 to 9 s). */
+export const CAP_MS = 9000
+/** Rows never read faster than this share of their pace: a finding held under ~150 ms is not read. */
+const MIN_ROW_SHARE = 0.55
+/** A run started by editing the sign-in plays at this share. */
+export const EDIT_SHARE = 0.6
+
+export type Pace = 'full' | 'edit' | 'instant'
+
+export interface Timeline {
+  /** When each step starts, ms from the start. */
+  at: number[]
+  /** How long each holds. */
+  dur: number[]
+  total: number
+}
+
+export function timeline(steps: readonly EngineStep[], pace: Pace): Timeline {
+  if (pace === 'instant') return { at: steps.map(() => 0), dur: steps.map(() => 0), total: 0 }
+  const scans = steps.filter((s) => s.kind === 'scan').length
+  const scanMs = scans > 0 ? Math.min(SCAN_MS.max, Math.max(SCAN_MS.min, SCAN_MS.budget / scans)) : 0
+  const base = steps.map((s) => (s.notice ? CONFLICT_MS : (s.kind === 'scan' ? scanMs : BASE_MS[s.kind]) * (s.quick ? 0.6 : 1) * (s.hold ? 1.3 : 1)))
+  const fixed = steps.reduce((n, s, i) => (ROW_STEPS.has(s.kind) || s.kind === 'fill' ? n : n + base[i]), 0)
+  const rows = steps.reduce((n, s, i) => (ROW_STEPS.has(s.kind) ? n + base[i] : n), 0)
+  const share = rows > 0 ? Math.min(1, Math.max(MIN_ROW_SHARE, (CAP_MS - fixed) / rows)) : 1
+  const mult = pace === 'edit' ? EDIT_SHARE : 1
+  /* Down, never up: rounded to the nearest, a long run came 2 ms past the cap. */
+  const dur = steps.map((s, i) => (s.notice ? CONFLICT_MS : Math.floor(base[i] * (ROW_STEPS.has(s.kind) ? share : 1) * mult)))
+  const at: number[] = []
+  let t = 0
+  for (const d of dur) {
+    at.push(t)
+    t += d
+  }
+  return { at, dur, total: t }
+}
+
+// --- The state of a thing at a step ----------------------------------------------------------------
+
+export type RowPhase = 'waiting' | 'working' | 'settled'
+
+/** A policy card at step `s`: a skeleton, being asked, or settled. */
+export function policyPhase(p: Pick<EnginePolicy, 'scanAt' | 'settleAt'>, s: number): RowPhase {
+  if (s >= p.settleAt) return 'settled'
+  if (p.scanAt !== null && s >= p.scanAt) return 'working'
+  return 'waiting'
+}
+
+/** The one that decides, found: its light is travelling around it, from its found step until it settles. */
+export function policyFound(p: Pick<EnginePolicy, 'foundAt' | 'settleAt'>, s: number): boolean {
+  return p.foundAt !== null && s >= p.foundAt && s < p.settleAt
+}
+
+/** A rule at step `s`: a skeleton, open with its checks arriving, or settled from its rule-end on. */
+export function rulePhase(r: Pick<EngineRule, 'startAt' | 'endAt'>, s: number): RowPhase {
+  if (r.startAt < 0 || s < r.startAt) return 'waiting'
+  return s < r.endAt ? 'working' : 'settled'
+}
+
+/** A check row at step `s`: not there yet, its spinner turning, or its mark. */
+export function checkPhase(r: Pick<EngineRule, 'checkAt' | 'markAt'>, k: number, s: number): 'hidden' | 'working' | 'settled' {
+  const at = r.checkAt[k]
+  if (at === undefined || s < at) return 'hidden'
+  return s < (r.markAt[k] ?? at + 1) ? 'working' : 'settled'
+}
+
+/** The one that decides has opened, and holds its rules, from its expand step on. */
+export function policyOpen(p: Pick<EnginePolicy, 'expandAt'>, s: number): boolean {
+  return p.expandAt !== null && s >= p.expandAt
+}
+
+/** A rule that did not match has folded to one line, from its compact step on. */
+export function ruleFolded(r: Pick<EngineRule, 'compactAt'>, s: number): boolean {
+  return r.compactAt !== null && s >= r.compactAt
+}
+
+/* What the engine is working on at step `s`, for the canvas to keep in view:
+   the policy it asks or opens, the rule it reads, the answer. Null before the
+   stack appears and once it is done. */
+export function activeNode(run: Pick<EngineRun, 'steps' | 'policies' | 'rules'>, s: number): NodeId | null {
+  const step = run.steps[s]
+  if (!step) return null
+  switch (step.kind) {
+    case 'scan':
+    case 'found':
+    case 'decides':
+    case 'expand':
+      return step.policy !== undefined ? (run.policies[step.policy]?.node ?? null) : null
+    case 'rule':
+    case 'check':
+    case 'checked':
+    case 'rule-end':
+    case 'compact':
+      return step.rule !== undefined ? (run.rules[step.rule]?.node ?? null) : null
+    case 'deciding':
+    case 'outcome':
+      return 'outcome'
+    default:
+      return null
+  }
+}
+
+// --- Stage 0: what the card asks ---------------------------------------------------------------------
+
+export type AskedField = 'from' | 'place' | 'device' | 'when' | 'risk'
+
+/* Which rules read each fact the card can ask, as the TipDot on the field's
+   label says it: "Read by Developer tools — office and device checks · Rules
+   1, 2". The rules asked are rows-read.ts's own: every enabled rule of every
+   app access policy on the application, the Global Default's included —
+   with `extra` (a policy's draft) in place of its stored twin, so the dot
+   names the rules on the board, not the saved ones. */
+export function readersOf(policies: readonly Policy[], appId: string | null, lib: RowsLibrary, extra?: Policy | null): Record<AskedField, string> {
+  const by: Record<AskedField, Map<string, number[]>> = { from: new Map(), place: new Map(), device: new Map(), when: new Map(), risk: new Map() }
+  const note = (f: AskedField, policy: string, n: number) => {
+    const list = by[f].get(policy) ?? []
+    if (!list.includes(n)) list.push(n)
+    by[f].set(policy, list)
+  }
+  for (const p of policiesOn(policies, appId, extra)) {
+    p.rules.forEach((r, i) => {
+      if (!r.enabled) return
+      for (const c of leaves(r.when)) {
+        switch (c.typeId) {
+          case 'zone':
+            for (const id of c.values) {
+              const scope = zoneScopeOf(c, id)
+              const zone = lib.zones.find((z) => z.id === id)
+              const l = zone?.location
+              const hasPlace = l ? l.countries.length + l.states.length + l.cities.length + l.ranges.length > 0 : false
+              if (scope !== 'location') note('from', p.name, i + 1)
+              if (scope !== 'ip' && hasPlace) note('place', p.name, i + 1)
+            }
+            break
+          case 'country':
+          case 'state':
+          case 'city':
+            note('place', p.name, i + 1)
+            break
+          case 'time':
+          case 'day':
+            note('when', p.name, i + 1)
+            break
+          case 'device-risk':
+            note('risk', p.name, i + 1)
+            break
+          case 'fingerprint':
+            note('device', p.name, i + 1)
+            break
+        }
+      }
+    })
+  }
+  const said = (m: Map<string, number[]>): string => {
+    if (m.size === 0) return ''
+    const parts = [...m.entries()].map(([name, ns]) => `${name} · ${ns.length === 1 ? 'Rule' : 'Rules'} ${ns.join(', ')}`)
+    const shown = parts.slice(0, 2).join('; ')
+    return `Read by ${shown}${parts.length > 2 ? ` +${parts.length - 2}` : ''}`
+  }
+  return { from: said(by.from), place: said(by.place), device: said(by.device), when: said(by.when), risk: said(by.risk) }
+}
+
+/* Three saved sign-ins that take different paths — one allowed on one
+   factor, one stepped up, one denied — for the chips under the empty card.
+   Judged as `judge` says (the tenant as it stands, or with a policy's
+   draft); a sign-in `prefer` likes is chosen first — by default one some app
+   policy decides over one the Global Default does, because its run has more
+   to show; inside a policy, one that policy decides. */
+export function suggestionsOf(
+  saved: readonly SavedSignIn[],
+  judge: (s: SavedSignIn) => TenantResolution,
+  prefer: (res: TenantResolution) => boolean = (res) => res.decidedBy !== null && !res.decidedBy.isGlobalDefault,
+): SavedSignIn[] {
+  const judged = saved.filter((s) => !s.generated).map((s) => ({ s, res: judge(s) }))
+  const out: SavedSignIn[] = []
+  for (const d of ['1fa', '2fa', 'deny'] as const) {
+    const fits = judged.filter((j) => j.res.status === 'decided' && j.res.decision === d && !out.includes(j.s))
+    const pick = fits.find((j) => prefer(j.res)) ?? fits[0]
+    if (pick) out.push(pick.s)
+  }
+  return out
+}

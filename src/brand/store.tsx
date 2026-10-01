@@ -78,8 +78,14 @@ export type BrandScreen =
      Break-in test pushed over Saved sign-ins. It
      named two sheets over the stage as well, Check and What changes, until
      M4 retired them. `rule` selects a rule on arrival — its id, or
-     'fallback' for the last row. */
-  | { name: 'board'; policyId: string; open?: 'try' | 'person' | 'saved' | 'break-in'; rule?: string }
+     'fallback' for the last row. `fix` is Access checks' "Fix in policy": a
+     break-in card and the application it was played on, fixed in the draft
+     on arrival (break-in-app.ts `fixOnArrival`, 1 Oct 2026). */
+  | { name: 'board'; policyId: string; open?: 'try' | 'person' | 'saved' | 'break-in'; rule?: string; fix?: { card: string; app: string } }
+  /* The tenant's Sign-in tests (Policy testing V4, §3): the tester, the saved
+     sign-ins, people and runs for every policy at once. A policy's board keeps
+     only its own; its test panel links here, carrying the tab. */
+  | { name: 'sign-in-tests'; tab?: 'try' | 'saved' | 'people' | 'runs' }
   /* The policy's own three facts — name, applications, audience — on one page.
 
      They used to be scattered across a top-bar input, a dialog and a card at
@@ -763,10 +769,11 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       /* The showcase pin (showcase.ts): lite, plus the tenant-wide testing
          page and the Break-in test the owner is comparing (25 Sep 2026). The
          one place any feature is pinned, so the store is where to look.
-         Describe it and its checks are on in both editions already; they are
-         named here as well, so the pin says everything the showcase shows. */
+         Describe it is hidden for now (owner, 30 Sep 2026: "hide this, not
+         needed as of now") — the chooser card, the canvas door and the
+         palette entry all go with the flag; its checks stay on. */
       features: SHOWCASE
-        ? { ...featuresOf(edition), policyTesting: true, breakInTest: true, describePolicy: true, draftChecks: true }
+        ? { ...featuresOf(edition), policyTesting: true, breakInTest: true, describePolicy: false, draftChecks: true }
         : featuresOf(edition),
       setEdition,
       persona,

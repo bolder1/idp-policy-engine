@@ -148,7 +148,6 @@ export function SignInFields({
     [users, groups, audience],
   )
   const appOptions = useMemo<PickerOption[]>(() => apps.map((a) => ({ value: a.id, label: a.name, art: <AppLogo appId={a.id} name={a.name} size={16} /> })), [apps])
-  const places = useMemo(() => placeOptions(), [])
 
   return (
     <div className={`tfields${stacked ? ' is-stacked' : ''}`}>
@@ -186,37 +185,11 @@ export function SignInFields({
 
       <AddressRow id={row('address')} form={form} error={issue('address')} onCommit={(v) => onPatch(typedAddressPatch(v), 'address')} />
 
-      {read.rows.has('place') && (
-        <Row id={row('place')} label="Place" tip="Sample address table, not geo-IP" source={placeSource(form, facts)}>
-          <Picker
-            label="Place"
-            value={placeValue(form.place)}
-            summary={placeSummary(form, facts)}
-            options={places}
-            onChange={(v) => onPatch({ place: placeOfValue(v) }, 'place')}
-            searchable
-            noun="places"
-            width="fill"
-            size={size}
-          />
-        </Row>
-      )}
+      {read.rows.has('place') && <PlaceRow id={row('place')} form={form} facts={facts} size={size} onPatch={onPatch} />}
 
       {read.rows.has('distance') && boundaries?.distance && <DistanceRow form={form} ruler={boundaries.distance} onPatch={onPatch} />}
 
-      {read.rows.has('when') && (
-        <Row
-          id={row('when')}
-          label="When"
-          tip={read.rows.has('time-track') ? 'Buffer time not modelled' : undefined}
-          source={form.time ? 'stated' : null}
-        >
-          <WhenControls form={form} size={size} onPatch={onPatch} />
-          {read.rows.has('time-track') && boundaries?.time && (
-            <BandStrip bands={boundaries.time.bands} max={1439} ticks={boundaries.time.edges.map((m) => ({ at: m, label: clock(m) }))} />
-          )}
-        </Row>
-      )}
+      {read.rows.has('when') && <WhenRow id={row('when')} form={form} rows={read} boundaries={boundaries} size={size} onPatch={onPatch} />}
 
       {read.rows.has('device') && (
         <DeviceRows id={row('device')} form={form} rows={read.device} size={size} onPatch={onPatch} />
@@ -245,7 +218,13 @@ export function SignInFields({
 
 // --- A row -------------------------------------------------------------------------
 
-function Row({
+/* The rows below are exported for the sign-in sentence (SignInSentence.tsx),
+   whose token popovers state the same facts with the same controls: the IP
+   address, the place, the distance ruler, when, the device details and the
+   risk score. One copy of each control, so the sentence and these rows can
+   never commit, word or validate a fact differently. */
+
+export function Row({
   id,
   label,
   htmlFor,
@@ -330,7 +309,7 @@ function OriginChips({ value, onPick }: { value: SignInForm['origin']; onPick: (
 
 // --- IP address ------------------------------------------------------------------------
 
-function AddressRow({ id, form, error, onCommit }: { id: string; form: SignInForm; error?: string; onCommit: (v: string) => void }) {
+export function AddressRow({ id, form, error, onCommit }: { id: string; form: SignInForm; error?: string; onCommit: (v: string) => void }) {
   const inputId = useId()
   const errorId = useId()
   const text = useIdleText(form.address, onCommit)
@@ -353,12 +332,73 @@ function AddressRow({ id, form, error, onCommit }: { id: string; form: SignInFor
   )
 }
 
+// --- Place ---------------------------------------------------------------------------------
+
+export function PlaceRow({
+  id,
+  form,
+  facts,
+  size,
+  onPatch,
+}: {
+  id: string
+  form: SignInForm
+  /** The form's facts, for what the closed picker says and the source word. */
+  facts: ReturnType<typeof factsOf>['facts']
+  size: 'sm' | 'md'
+  onPatch: (p: Partial<SignInForm>, field: FormField) => void
+}) {
+  const places = useMemo(() => placeOptions(), [])
+  return (
+    <Row id={id} label="Place" tip="Sample address table, not geo-IP" source={placeSource(form, facts)}>
+      <Picker
+        label="Place"
+        value={placeValue(form.place)}
+        summary={placeSummary(form, facts)}
+        options={places}
+        onChange={(v) => onPatch({ place: placeOfValue(v) }, 'place')}
+        searchable
+        noun="places"
+        width="fill"
+        size={size}
+      />
+    </Row>
+  )
+}
+
 // --- When ----------------------------------------------------------------------------------
+
+/* The When row: the controls, and the time ruler's bands under them where a
+   rule on the application reads a window. */
+export function WhenRow({
+  id,
+  form,
+  rows: read,
+  boundaries,
+  size,
+  onPatch,
+}: {
+  id: string
+  form: SignInForm
+  rows: RowsRead
+  boundaries?: Boundaries
+  size: 'sm' | 'md'
+  onPatch: (p: Partial<SignInForm>, field: FormField) => void
+}) {
+  return (
+    <Row id={id} label="When" tip={read.rows.has('time-track') ? 'Buffer time not modelled' : undefined} source={form.time ? 'stated' : null}>
+      <WhenControls form={form} size={size} onPatch={onPatch} />
+      {read.rows.has('time-track') && boundaries?.time && (
+        <BandStrip bands={boundaries.time.bands} max={1439} ticks={boundaries.time.edges.map((m) => ({ at: m, label: clock(m) }))} />
+      )}
+    </Row>
+  )
+}
 
 /* The date and the time commit as the address does — on a pause, on leaving
    the box, on Enter — because each is typed a segment at a time. The time zone
    is a Picker and commits at once. */
-function WhenControls({ form, size, onPatch }: { form: SignInForm; size: 'sm' | 'md'; onPatch: (p: Partial<SignInForm>, field: FormField) => void }) {
+export function WhenControls({ form, size, onPatch }: { form: SignInForm; size: 'sm' | 'md'; onPatch: (p: Partial<SignInForm>, field: FormField) => void }) {
   const date = useIdleText(form.date, (v) => onPatch({ date: v }, 'when'))
   const time = useIdleText(form.time, (v) => onPatch({ time: v }, 'when'))
   return (
@@ -382,7 +422,7 @@ function WhenControls({ form, size, onPatch }: { form: SignInForm; size: 'sm' | 
    the same share is 70 px on the board and 110 on the page, and a decision is
    said whole or not at all — never "Allow with…". Measured before paint and
    again whenever the strip is resized (the rail opening, a wider drawer). */
-function BandStrip({ bands, max, ticks }: { bands: readonly Band[]; max: number; ticks: { at: number; label: string }[] }) {
+export function BandStrip({ bands, max, ticks }: { bands: readonly Band[]; max: number; ticks: { at: number; label: string }[] }) {
   const labelsRef = useRef<HTMLDivElement | null>(null)
   const [clipped, setClipped] = useState<ReadonlySet<number>>(() => new Set())
   const words = bands.map((b) => `${b.from}:${bandWords(b)}`).join('|')
@@ -438,7 +478,7 @@ function BandStrip({ bands, max, ticks }: { bands: readonly Band[]; max: number;
    and a neutral thumb, announced without a band, where the zone takes the
    place by name. Dragging states a point on the ruler, which is its own
    answer. */
-function DistanceRow({
+export function DistanceRow({
   form,
   ruler,
   onPatch,
@@ -476,7 +516,7 @@ function DistanceRow({
 
 // --- Device --------------------------------------------------------------------------------
 
-function DeviceRows({
+export function DeviceRows({
   id,
   form,
   rows,
@@ -541,7 +581,7 @@ function DeviceRows({
   )
 }
 
-function DetailRow({
+export function DetailRow({
   row,
   facts,
   size,
@@ -621,7 +661,7 @@ function DetailRow({
 
 // --- Device risk score ------------------------------------------------------------------------
 
-function RiskRow({
+export function RiskRow({
   id,
   form,
   error,

@@ -719,8 +719,22 @@ export interface User {
   name: string
   email: string
   groupId: string
+  /* The groups this person is in besides `groupId` (30 Sep 2026, TESTING-V4
+     §13: a person in both Engineering and Finance). Absent for almost everyone,
+     so every one-group person reads exactly as before. `groupId` stays the
+     person's first group — what `department` answers and what a picker files
+     them under. Every membership test reads `memberGroupIds`, never the two
+     fields by hand. */
+  alsoGroupIds?: string[]
   userType: 'Employee' | 'Contractor' | 'Partner'
   role: string
+}
+
+/** Every group a person is in: their first group, then any others, once each. */
+export function memberGroupIds(u: { groupId: string; alsoGroupIds?: readonly string[] }): string[] {
+  const out = u.groupId ? [u.groupId] : []
+  for (const id of u.alsoGroupIds ?? []) if (id && !out.includes(id)) out.push(id)
+  return out
 }
 
 export interface Policy {
@@ -1205,7 +1219,7 @@ export function reach(a: Audience, allGroups: Group[], allUsers: User[]): number
   const fromGroups = a.groupIds.reduce((n, id) => n + (allGroups.find((g) => g.id === id)?.memberCount ?? 0), 0)
   const named = a.userIds.filter((id) => {
     const u = allUsers.find((x) => x.id === id)
-    return u ? !a.groupIds.includes(u.groupId) : false
+    return u ? !memberGroupIds(u).some((g) => a.groupIds.includes(g)) : false
   }).length
   return fromGroups + named
 }

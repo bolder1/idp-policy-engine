@@ -1,9 +1,8 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { ChevronDown, CornerDownLeft, LogIn, X } from 'lucide-react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { ArrowRight, ArrowUp, ChevronDown, Clock, Gauge, MapPin, MonitorSmartphone, PenLine, Undo2, UserMinus, UserRound, Users, X } from 'lucide-react'
 
-import { Button, Field, IconButton, NumberStepper, TipDot, TipMark } from '../../kit'
+import { Button, Field, IconButton, NumberStepper, Tip, TipDot, TipMark } from '../../kit'
 import { CantTell, DecisionBadge } from '../../decision-badge'
-import { EmptyState } from '../../empty'
 import { Picker, type PickerOption } from '../../picker'
 import { AppLogo } from '../../logos/AppLogo'
 import { EVERYONE, TIMEZONES, enforces, type AccessDecision, type Group, type User } from '../../data'
@@ -11,78 +10,70 @@ import { DECISION_WORDS } from '../../decision-words'
 import { RULE_METHODS } from '../../methods'
 import { DAY_NAMES } from '../../create/describe-words'
 import {
-  ANSWER_ORDER,
   EXAMPLES,
-  NOT_SET,
   TENANT_TIME_ZONE,
-  answerOfChoice,
-  applyChoice,
   audienceOfAnswers,
   branchLabel,
   branchesOf,
-  compose,
+  deviceWords,
   dictionaryOf,
-  firstNeeding,
   lastRowOf,
-  leaveOutAsked,
-  openAfter,
   openChoices,
-  readText,
-  sentenceOf,
-  signInMissing,
-  summaryOf,
-  type Answer,
+  riskWords,
+  whenWords,
+  whereWords,
   type AnswerKey,
   type BranchId,
-  type Choice,
+  type ClauseRule,
   type DescribeAnswers,
   type DescribeTenant,
   type DeviceAnswer,
   type NotAdded,
-  type Origin,
   type Outcome,
   type Reading,
   type RiskAnswer,
-  type Span,
   type WhenAnswer,
   type WhereAnswer,
 } from '../../create/describe-model'
 import type { ChecksView } from '../../create/describe-checks'
 import type { SignInFacts } from '../sign-in-facts'
+import { AnchoredPopover } from '../testing/AnchoredPopover'
 import { WhoPicker } from '../who-picker'
-import type { DescribeState } from './describe-session'
+import { answerAsk, asksOf, composerSends, corrected, followUps, skipChoice, turnView, type Ask, type BoardBody, type DescribeState, type TurnView } from './describe-session'
 import { Seg } from './Section'
 
 /* -----------------------------------------------------------------------------
-   Describe it: the panel.
+   Describe it: the panel (V4 §4 and §4.1).
 
-   Two ways in, one panel (describe spec, §3). Type what the policy should do,
-   or answer six questions — and either way the answers write ordinary cards
-   onto the draft beside it, list what could not be used, and ask only where
-   the tenant holds more than one fitting object.
+   A thread on the LEFT of the board, text first. The admin writes what the
+   policy should do; each message is a turn — the bubble, and under it what
+   the board made of it: "Understood" rows of chips for what the text said
+   (never a default), one question at a time where the tenant holds more than
+   one fitting object, the phrases not added, and one line saying what the
+   turn did to the board, with Undo. A follow-up extends the text and the
+   whole is read again; the bubble's pencil rewrites a message in its place.
 
-   It sits in the inspector's slot, at the inspector's width and in its
-   floating card, because it is the same kind of thing: a form about what is
-   on the board. It saves nothing. The board's own "Save policy" does, and the
-   status pill and its checks turn the policy on.
+   A chip opens that answer's own controls in a popover, so a correction is
+   two clicks. The panel saves nothing: the board's "Save policy" does. Its
+   writes are one history entry per opening (describe-session.ts), and the
+   thread lives in BoardBuilder for the visit, so closing and reopening shows
+   it as it was.
 
-   Reading happens on Enter, the Read button or an example — never on a pause
-   in typing — so nothing on the panel or the board moves while the admin
-   types. Changing an answer by hand rewrites the text box from the answers
-   (`sentenceOf`), so the two ways in never disagree about what was said.
-
-   No framer-motion here: plain CSS, so nothing on the panel can be caught by
-   the transform-fill trap the board's cards are careful about.
+   Not `.bb__insp`: it is its own track at the leading edge of `.bb`, and it
+   enters by opacity and the `translate` property on this plain aside — no
+   motion component here, so nothing can be caught by the transform trap.
    -------------------------------------------------------------------------- */
 
-const LABEL: Record<AnswerKey, string> = {
+/* The label a turn's row wears (§4.1): Then and Everyone else, the words the
+   reply reads in. The popover over a row is named the same way. */
+const ROW: Record<AnswerKey, string> = {
   apps: 'Applications',
   who: 'Who',
   leaveOut: 'Leave out',
   where: 'Where and when',
   devices: 'Devices',
-  signIn: 'Sign-in',
-  fallback: 'Nothing else matched',
+  signIn: 'Then',
+  fallback: 'Everyone else',
 }
 const ACTION_LABEL: Record<NonNullable<NotAdded['action']>, string> = {
   'create-zone': 'Create zone',
@@ -90,54 +81,169 @@ const ACTION_LABEL: Record<NonNullable<NotAdded['action']>, string> = {
   'auth-methods': 'Authentication methods',
 }
 
-/* One origin for an answer drawn from two (Where and when, Devices and risk). */
-function originOf(key: AnswerKey, a: DescribeAnswers): Origin {
-  const all = (xs: Origin[]): Origin =>
-    xs.includes('unset') ? 'unset' : xs.includes('text') ? 'text' : xs.includes('picked') ? 'picked' : 'default'
-  switch (key) {
-    case 'apps':
-      return a.apps.origin
-    case 'who':
-      return a.who.origin
-    case 'leaveOut':
-      return a.leaveOut.origin
-    case 'where':
-      return all([a.where.origin, a.when.origin])
-    case 'devices':
-      return all([a.devices.origin, a.risk.origin])
-    case 'signIn':
-      return all([...branchesOf(a).map((b) => a.signIn[b]?.origin ?? 'unset'), ...a.more.map((m) => m.outcome.origin)])
-    default:
-      return a.fallback.origin
+const isSaid = (o: string | undefined) => o === 'text' || o === 'picked'
+const DONT_ADD = "Don't add"
+
+/* Where and when names only the half the text said. */
+function rowLabel(key: AnswerKey, a: DescribeAnswers): string {
+  if (key !== 'where') return ROW[key]
+  const where = isSaid(a.where.origin)
+  const when = isSaid(a.when.origin)
+  return where && when ? 'Where and when' : when ? 'When' : 'Where'
+}
+
+interface ChipSpec {
+  id: string
+  art?: ReactNode
+  body: ReactNode
+  /** The chip's words, for its accessible name. */
+  name: string
+  muted?: boolean
+  /** Its body is a decision badge: the badge is the pill, so the chip draws no box of its own. */
+  outcome?: boolean
+  /** A branch and its outcome: one line of the Then row's two columns. */
+  branch?: boolean
+}
+
+const outcomeBody = (o: Outcome): { body: ReactNode; name: string } => {
+  const extra = o.decision === 'deny' ? (o.message ? 'Custom message' : null) : o.method
+  return {
+    body: (
+      <>
+        <DecisionBadge decision={o.decision} />
+        {extra && <span className="bdsc__chipextra">{extra}</span>}
+      </>
+    ),
+    name: [DECISION_WORDS[o.decision], extra].filter(Boolean).join(' · '),
   }
 }
 
-/* The words an answer came from, when it came from the text. */
-function traceOf(key: AnswerKey, a: DescribeAnswers): Span[] {
-  const said = <T,>(x: Answer<T> | undefined) => (x && x.origin === 'text' ? x.spans : [])
-  switch (key) {
-    case 'apps':
-      return said(a.apps)
-    case 'who':
-      return said(a.who)
-    case 'leaveOut':
-      return said(a.leaveOut)
-    case 'where':
-      return [...said(a.where), ...said(a.when)]
-    case 'devices':
-      return [...said(a.devices), ...said(a.risk)]
-    case 'signIn':
-      return [...branchesOf(a).flatMap((b) => said(a.signIn[b])), ...a.more.flatMap((m) => said(m.outcome))]
-    default:
-      return said(a.fallback)
+/* A later sentence's own rule, by what it checks. */
+function moreLabel(m: ClauseRule, t: DescribeTenant): string {
+  const parts = [
+    m.where.value && m.where.value.mode !== 'anywhere' ? whereWords(m.where.value, t) : '',
+    m.devices.value && m.devices.value.mode !== 'any' ? deviceWords(m.devices.value, t) : '',
+    m.when.value && m.when.value.mode !== 'any' ? whenWords(m.when.value) : '',
+    m.risk.value ? riskWords(m.risk.value) : '',
+  ].filter(Boolean)
+  return parts.join(' · ') || 'Also'
+}
+
+/* The chips of one row: only what was said, as it now stands. */
+function chipsOf(key: AnswerKey, a: DescribeAnswers, t: DescribeTenant): ChipSpec[] {
+  const icon = (I: typeof Users) => <I size={14} strokeWidth={2} aria-hidden />
+  const people = (who: { groupIds: string[]; userIds: string[] }, none: string, I: typeof Users): ChipSpec[] => {
+    const out: ChipSpec[] = [
+      ...who.groupIds.map((id) => {
+        const name = t.groups.find((g) => g.id === id)?.name ?? id
+        return { id: `g:${id}`, art: icon(I), body: name, name }
+      }),
+      ...who.userIds.map((id) => {
+        const name = t.users.find((u) => u.id === id)?.name ?? id
+        return { id: `u:${id}`, art: icon(UserRound), body: name, name }
+      }),
+    ]
+    return out.length > 0 ? out : [{ id: 'none', body: none, name: none, muted: true }]
   }
+  switch (key) {
+    case 'apps': {
+      const ids = a.apps.value ?? []
+      const apps = t.apps.filter((p) => ids.includes(p.id))
+      if (apps.length === 0) return [{ id: 'none', body: 'None', name: 'None', muted: true }]
+      return apps.map((p) => ({ id: p.id, art: <AppLogo appId={p.id} name={p.name} size={16} />, body: p.name, name: p.name }))
+    }
+    case 'who': {
+      const v = a.who.value
+      if (!v || v === 'everyone') return [{ id: 'everyone', art: icon(Users), body: 'Everyone', name: 'Everyone' }]
+      return people(v, 'Everyone', Users)
+    }
+    case 'leaveOut':
+      return people(a.leaveOut.value ?? { groupIds: [], userIds: [] }, 'Nobody', UserMinus)
+    case 'where': {
+      const out: ChipSpec[] = []
+      const w = a.where.value
+      if (isSaid(a.where.origin) && w) {
+        const name = w.mode === 'split' ? whereWords({ ...w, mode: 'only' }, t).replace(/^Only from /, '') : whereWords(w, t)
+        out.push({ id: 'where', art: icon(MapPin), body: name, name })
+      }
+      const wh = a.when.value
+      /* The tenant's own time zone goes without saying; another is named. */
+      const when = wh && wh.mode === 'between' && wh.timeZone === TENANT_TIME_ZONE ? whenWords({ ...wh, timeZone: '' }) : wh ? whenWords(wh) : ''
+      if (isSaid(a.when.origin) && wh) out.push({ id: 'when', art: icon(Clock), body: when, name: when })
+      return out
+    }
+    case 'devices': {
+      const out: ChipSpec[] = []
+      const d = a.devices.value
+      if (isSaid(a.devices.origin) && d) out.push({ id: 'devices', art: icon(MonitorSmartphone), body: deviceWords(d, t), name: deviceWords(d, t) })
+      const r = a.risk.value
+      if (isSaid(a.risk.origin) && r && r.mode !== 'any') out.push({ id: 'risk', art: icon(Gauge), body: riskWords(r), name: riskWords(r) })
+      return out
+    }
+    case 'signIn': {
+      const branches = branchesOf(a)
+      const out: ChipSpec[] = []
+      for (const b of branches) {
+        const o = a.signIn[b]?.value
+        if (!o || !isSaid(a.signIn[b]?.origin)) continue
+        const { body, name } = outcomeBody(o)
+        if (branches.length === 1) out.push({ id: b, body, name, outcome: true })
+        else {
+          const label = branchLabel(b, a, t)
+          out.push({ id: b, body: <BranchBody label={label}>{body}</BranchBody>, name: `${label}, ${name}`, outcome: true, branch: true })
+        }
+      }
+      a.more.forEach((m, k) => {
+        if (!m.outcome.value) return
+        const label = moreLabel(m, t)
+        const { body, name } = outcomeBody(m.outcome.value)
+        out.push({ id: `more:${k}`, body: <BranchBody label={label}>{body}</BranchBody>, name: `${label}, ${name}`, outcome: true, branch: true })
+      })
+      return out
+    }
+    default: {
+      const state = lastRowOf(a, t)
+      if (state === 'not-reached') return [{ id: 'fallback', body: 'Not reached', name: 'Not reached', muted: true }]
+      const o = state === 'merged' ? a.signIn.match?.value : a.fallback.value
+      if (!o) return []
+      return [{ id: 'fallback', ...outcomeBody(o), outcome: true }]
+    }
+  }
+}
+
+/* A branch and its outcome, in the Then row's two columns (describe.css
+   `is-branches`): the words and their arrow in the first, which wraps if it
+   must; the badge and its method in the second, so every badge starts at
+   the same place and the outcomes read down one column. */
+function BranchBody({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <>
+      <span className="bdsc__branch">
+        <span className="bdsc__branchwords">{label}</span>
+        <ArrowRight size={12} strokeWidth={2} className="bdsc__arrow" aria-hidden />
+      </span>
+      <span className="bdsc__branchout">{children}</span>
+    </>
+  )
+}
+
+/** One row of a reply: the chips of one answer, live or as a turn said it. */
+interface ReplyRow {
+  key: AnswerKey
+  label: string
+  chips: ChipSpec[]
+  /** A later message said it again: what this turn said then, not a control. */
+  past: boolean
 }
 
 export function DescribePanel({
   tenant,
   policyId,
   state,
+  board,
   onState,
+  onSend,
+  onUndoTurn,
   onDone,
   onGo,
   focus,
@@ -149,21 +255,26 @@ export function DescribePanel({
   tenant: DescribeTenant
   policyId: string
   state: DescribeState
-  /** A new box or reading. `write` is true when the answers changed and the board should follow. */
+  /** The board as it stands: the latest turn's change line is measured against it. */
+  board: BoardBody
+  /** The state changed. `write` is true when the answers changed and the board should follow. */
   onState: (next: DescribeState, write: boolean) => void
-  /** Done, ×, Esc: close and keep everything. */
+  /** A message sent: the first, a follow-up, or a rewrite (`state.rewrite`). */
+  onSend: (message: string) => void
+  /** The latest turn's Undo. */
+  onUndoTurn: () => void
+  /** ×, Esc: close and keep everything. */
   onDone: () => void
   /** A Not added row's way to fix it: a page of its own, behind the leave guard. */
   onGo: (to: NonNullable<NotAdded['action']>) => void
-  /** A card was clicked on the board: open the answer it came from. */
+  /** A card was clicked on the board: flash the reply row it came from. */
   focus: { key: AnswerKey; n: number } | null
-  /** A card is under the pointer: its answer's summary is bolded. */
+  /** A card is under the pointer: its row's label is bolded. */
   bold: AnswerKey | null
   /** The answer under the pointer, for the ring on the cards it wrote. */
   onTrace: (key: AnswerKey | null) => void
-  /* The checks under the answers (describe spec, §3.7): the rows, or null
-     while no application is chosen. Undefined draws no Checks at all — the
-     edition's `draftChecks` is off. */
+  /* The checks under the latest reply (describe spec, §3.7): the rows, or
+     null while no application is chosen. Undefined draws no Checks at all. */
   checks?: ChecksView | null
   /** A check pressed: Try a sign-in on this draft, with its sign-in. */
   onTryCheck?: (facts: SignInFacts) => void
@@ -172,137 +283,204 @@ export function DescribePanel({
   const dict = useMemo(() => dictionaryOf(tenant), [tenant])
   const r = state.reading
   const a = r.answers
-  const open = openChoices(r)
-  const [openKey, setOpenKey] = useState<AnswerKey | null>(() => firstNeeding(r, tenant))
-  const [said, setSaid] = useState('')
-  const box = useRef<HTMLTextAreaElement | null>(null)
-  const heading = useRef<HTMLHeadingElement | null>(null)
-  const composed = useMemo(() => compose(a, tenant), [a, tenant])
-  const shown = ANSWER_ORDER.filter((k) => k !== 'leaveOut' || leaveOutAsked(a, tenant))
+  const turns = state.turns
+  const views = useMemo(() => turns.map((_, i) => turnView(state, i, board, tenant)), [state, turns, board, tenant])
+  const asks = useMemo(() => asksOf(r, tenant, state.dismissed), [r, tenant, state.dismissed])
+  const ask = asks[0] ?? null
+  /* Shortest first, so the chips pack into as few lines as they can. */
+  const suggestions = useMemo(() => (ask ? [] : followUps(state, tenant, dict).sort((x, y) => x.length - y.length)), [ask, state, tenant, dict])
   const methods = RULE_METHODS.filter((m) => tenant.methods.find((x) => x.name === m)?.active !== false)
+  /* The follow-ups keep to one line, so the foot never grows over the
+     thread: drawn all at first, measured, and the ones past the first line
+     dropped before the paint. Shortest first, so the most fit. */
+  const suggestRow = useRef<HTMLDivElement | null>(null)
+  const suggestKey = suggestions.join('|')
+  const [fit, setFit] = useState<{ key: string; n: number } | null>(null)
+  const fits = fit?.key === suggestKey ? fit.n : suggestions.length
+  useLayoutEffect(() => {
+    const row = suggestRow.current
+    if (!row || fit?.key === suggestKey) return
+    const chips = [...row.querySelectorAll<HTMLElement>('.bdsc__suggestion')]
+    const line = chips[0]?.offsetTop ?? 0
+    setFit({ key: suggestKey, n: Math.max(1, chips.filter((c) => c.offsetTop === line).length) })
+  }, [suggestKey, fit])
+
+  /* Each turn's rows. Live ones read the answers as they now stand; a row a
+     later message said again reads what this turn said then (`past`). */
+  const rowsOf = useMemo(
+    () =>
+      views.map((v): ReplyRow[] =>
+        v.keys
+          .map((key) => {
+            const past = v.past.includes(key)
+            const from = past ? v.answers : a
+            return { key, past, label: rowLabel(key, from), chips: chipsOf(key, from, tenant) }
+          })
+          .filter((row) => row.chips.length > 0),
+      ),
+    [views, a, tenant],
+  )
+  const rowId = (turnId: number, key: AnswerKey) => `${uid}-t${turnId}-${key}`
+  /* The row an answer is changed from: the newest live one. A card on the
+     board, hovered or clicked, points at it. */
+  const ownerOf = (key: AnswerKey): string | null => {
+    for (let i = turns.length - 1; i >= 0; i--) if (rowsOf[i]?.some((row) => row.key === key && !row.past)) return rowId(turns[i].id, key)
+    return null
+  }
+
+  const box = useRef<HTMLTextAreaElement | null>(null)
+  const thread = useRef<HTMLDivElement | null>(null)
+  const [said, setSaid] = useState('')
+  /* A chip's popover hangs from its ROW's chips, not the chip: taking the
+     group you clicked out of Who removes that chip, and the popover stays
+     open for the one you put in its place. */
+  const [pop, setPop] = useState<{ key: AnswerKey; row: string; chip: string } | null>(null)
+  const popAnchor = useRef<HTMLElement | null>(null)
+  const popBody = useRef<HTMLDivElement | null>(null)
+  /* The control last focused in the popover. A change can remove the
+     control that had focus — "Any device" takes the profile Picker away — and
+     focus would fall to <body>, where Escape reaches neither the popover nor
+     the panel. It comes back here. (A Picker's own pick hands focus back to
+     its trigger.) */
+  const popFocus = useRef<HTMLElement | null>(null)
+  const keepPopFocus = () =>
+    window.requestAnimationFrame(() => {
+      const at = document.activeElement
+      if (at && at !== document.body && at.isConnected) return
+      const home = popFocus.current?.isConnected ? popFocus.current : popBody.current?.querySelector<HTMLElement>('button:not([disabled]), input:not([disabled]), [tabindex="0"]')
+      home?.focus({ preventScroll: true })
+    })
+  const [flash, setFlash] = useState<{ id: string; n: number } | null>(null)
 
   useEffect(() => {
-    if (box.current) box.current.focus()
-    else heading.current?.focus()
+    box.current?.focus()
   }, [])
 
-  /* A card clicked on the board opens its answer and brings it into view. */
+  /* A new turn: into view, and said once in the status region. */
+  const latest = turns.at(-1)
+  const latestId = latest?.id ?? 0
+  useEffect(() => {
+    const el = thread.current
+    const turn = el?.querySelector<HTMLElement>('.bdsc__turn:last-child')
+    if (!el || !turn) return
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const top = (x: HTMLElement) => x.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop
+    /* Its message at the top of the thread — unless the whole turn does not
+       fit, when the end of the reply (its checks, or the change line with
+       Undo) comes to the bottom instead: what the turn did, and the way to
+       take it back, matter more than the words just typed. Never past an
+       open question, which is the next thing to do. */
+    const end = turn.querySelector<HTMLElement>('.bdsc__checks') ?? turn.querySelector<HTMLElement>('.bdsc__change')
+    const ask = turn.querySelector<HTMLElement>('.bdsc__ask')
+    let to = top(turn) - 12
+    if (end) to = Math.max(to, top(end) + end.offsetHeight + 12 - el.clientHeight)
+    if (ask) to = Math.min(to, top(ask) - 12)
+    el.scrollTo({ top: Math.max(0, to), behavior: still ? 'auto' : 'smooth' })
+  }, [latestId])
+  const announced = useRef(latestId)
+  useEffect(() => {
+    if (announced.current === latestId || latestId === 0) return
+    announced.current = latestId
+    const view = views.at(-1)
+    const notAdded = (view?.notAdded ?? []).map((n) => `“${n.span.phrase}”`)
+    const choose = openChoices(r).map((c) => `“${c.span.phrase}”`)
+    setSaid(['Read.', notAdded.length > 0 ? `Not added: ${notAdded.join(', ')}.` : '', choose.length > 0 ? `Choose: ${choose.join(', ')}.` : ''].filter(Boolean).join(' '))
+  }, [latestId, views, r])
+
+  /* A card clicked on the board: the row it came from, brought into view and
+     flashed. Read from a ref, so a click flashes once — not again whenever the
+     thread redraws. */
+  const owner = useRef(ownerOf)
+  owner.current = ownerOf
   useEffect(() => {
     if (!focus) return
-    setOpenKey(focus.key)
-    document.getElementById(`${uid}-h-${focus.key}`)?.scrollIntoView({ block: 'nearest' })
-  }, [focus, uid])
+    const id = owner.current(focus.key)
+    if (!id) return
+    document.getElementById(id)?.scrollIntoView({ block: 'nearest' })
+    setFlash({ id, n: focus.n })
+  }, [focus])
 
-  /* A card under the pointer brings its answer into view, bolded, without opening it. */
+  /* A popover whose row went away — its answer is no longer said, or a later
+     message said it again — closes, in the same render. */
+  const popAlive = !!pop && turns.some((t, i) => rowId(t.id, pop.key) === pop.row && !!rowsOf[i]?.some((row) => row.key === pop.key && !row.past))
+  if (pop && !popAlive) setPop(null)
+
+  /* Focus after a question is answered: the next question's first reply,
+     else the composer — never <body>, where the board's keys act. */
+  const refocus = useRef(false)
   useEffect(() => {
-    if (bold) document.getElementById(`${uid}-h-${bold}`)?.scrollIntoView({ block: 'nearest' })
-  }, [bold, uid])
-
-  const read = (text: string) => {
-    const reading = readText(text, dictionaryOf(tenant))
-    onState({ text, reading }, true)
-    setOpenKey(firstNeeding(reading, tenant))
-    const notAdded = reading.notAdded.map((n) => `“${n.span.phrase}”`)
-    const asks = openChoices(reading).map((c) => `“${c.span.phrase}”`)
-    setSaid(['Read.', notAdded.length > 0 ? `Not added: ${notAdded.join(', ')}.` : '', asks.length > 0 ? `Choose: ${asks.join(', ')}.` : ''].filter(Boolean).join(' '))
-  }
-
-  /* Where focus goes when a pick takes away what held it — the question
-     answered, or the whole answer closing under it: the next question in the
-     answer still open, else that answer's header. `control` sends it to the
-     answer's own list instead ("Another application" promises the
-     Applications list), whatever held it. Set in `settle`, spent after the
-     render that removed it. Left alone, focus falls to <body>, where the
-     board's own keys (Delete, the arrows) act on the chain. */
-  const refocus = useRef<{ key: AnswerKey; control?: boolean } | null>(null)
-  useEffect(() => {
-    const to = refocus.current
-    if (!to) return
-    refocus.current = null
-    const region = document.getElementById(`${uid}-r-${to.key}`)
-    if (to.control) {
-      region?.querySelector<HTMLElement>('[role="combobox"]')?.focus()
-      return
-    }
-    const now = document.activeElement
-    if (now && now !== document.body && !now.closest('[inert]')) return
-    /* Still open: a list still showing (Applications takes several) keeps
-       the keys — its trigger, whose Escape shuts the list and not the panel —
-       else the next question, else the header. */
-    const here = openKey === to.key ? region : null
-    const list = here?.querySelector<HTMLElement>('[role="combobox"][aria-expanded="true"]')
-    const question = here?.querySelector<HTMLElement>('.bdsc__q [tabindex="0"]')
-    ;(list ?? question ?? document.getElementById(`${uid}-h-${to.key}`))?.focus()
+    if (!refocus.current) return
+    refocus.current = false
+    const next = thread.current?.querySelector<HTMLElement>('.bdsc__ask button')
+    ;(next ?? box.current)?.focus()
   })
 
-  /* An answer changed by hand. The box follows the answers — unless a question
-     from the text is still open, when the text still carries it. The answer
-     closes only when this filled its last missing value (`openAfter`). */
-  const settle = (reading: Reading, from: AnswerKey, stay = false) => {
-    const stillOpen = openChoices(reading).length > 0
-    onState({ text: stillOpen ? state.text : sentenceOf(reading.answers, tenant), reading }, true)
-    const next = openAfter(r, reading, from, openKey, tenant, stay)
-    setOpenKey(next)
-    refocus.current = { key: next ?? from }
+  // --- Writes ----------------------------------------------------------------------
+
+  /* An answer changed. The text stays the admin's own words — a card's
+     "From your text" quotes it — and a change made by hand (a chip's
+     popover, or a gap a question filled that no words carry) is kept beside
+     it (`corrected`), so the next follow-up, which reads the whole text
+     again, keeps it too. A question the reader asked about the text's own
+     words is answered again from them (`carryPicks`) and needs no keeping. */
+  const settle = (reading: Reading, hand: boolean) => onState(hand ? corrected(state, reading) : { ...state, reading }, true)
+  const change = (answers: DescribeAnswers) => settle({ ...r, answers }, true)
+  const answer = (q: Ask, value: string) => {
+    refocus.current = true
+    settle(answerAsk(r, q.id, value, dict), q.id.startsWith('ask:'))
   }
-  const change = (answers: DescribeAnswers, from: AnswerKey, stay = false) => settle({ ...r, answers }, from, stay)
-  const choose = (c: Choice, value: string) => {
-    const next = applyChoice(r, c.id, value, dict)
-    if (c.slot === 'apps' && value === '*') {
-      onState({ ...state, reading: next }, false)
-      setOpenKey('apps')
-      refocus.current = { key: 'apps', control: true }
+  const skip = (q: Ask) => {
+    refocus.current = true
+    if (q.id.startsWith('ask:')) onState({ ...state, dismissed: [...state.dismissed, q.id] }, false)
+    else settle(skipChoice(r, q.id, dict), false)
+  }
+  const send = (text: string) => {
+    if (!text.trim()) {
+      box.current?.focus()
       return
     }
-    settle(next, answerOfChoice(c))
+    setPop(null)
+    onSend(text)
+    box.current?.focus()
+  }
+  const rewrite = (i: number) => {
+    onState({ ...state, box: turns[i].said, rewrite: i }, false)
+    window.requestAnimationFrame(() => {
+      const el = box.current
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
+    })
+  }
+  const cancelRewrite = () => onState({ ...state, box: '', rewrite: null }, false)
+  /* Undo takes its own button away with the turn: focus goes to the
+     composer, to say it again. After the first turn's the panel is gone
+     and the board puts focus on the chooser (BoardBuilder). */
+  const undoLatest = () => {
+    setPop(null)
+    onUndoTurn()
+    window.requestAnimationFrame(() => {
+      const el = box.current
+      if (el?.isConnected && !el.contains(document.activeElement)) el.focus({ preventScroll: true })
+    })
   }
 
   const onKey = (e: KeyboardEvent<HTMLElement>) => {
-    if (e.key === 'Escape' && !e.defaultPrevented) {
-      e.preventDefault()
-      onDone()
-    }
+    if (e.key !== 'Escape' || e.defaultPrevented) return
+    e.preventDefault()
+    if (state.rewrite !== null) cancelRewrite()
+    else onDone()
   }
 
-  const choicesFor = (key: AnswerKey) => open.filter((c) => answerOfChoice(c) === key)
-
-  /* 1–9 pick the Nth option of the answer's first open question, else of its
-     first segmented control, from anywhere in the answer but a text field. */
-  const quick = (key: AnswerKey, e: KeyboardEvent<HTMLElement>, firstSeg?: { values: string[]; pick: (v: string) => void }) => {
-    const target = e.target as HTMLElement
-    if (!/^[1-9]$/.test(e.key) || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.closest('[role="combobox"], [role="listbox"]')) return
-    const n = Number(e.key) - 1
-    const q = choicesFor(key)[0]
-    if (q) {
-      const o = q.options[n]
-      if (o) {
-        e.preventDefault()
-        choose(q, o.value)
-      }
-      return
-    }
-    const v = firstSeg?.values[n]
-    if (firstSeg && v !== undefined) {
-      e.preventDefault()
-      firstSeg.pick(v)
-    }
-  }
-
-  // --- The answers ------------------------------------------------------------------
+  // --- The answers' own controls, in a chip's popover ---------------------------------
 
   const setWhere = (w: WhereAnswer, scopeSaid = a.scopeSaid) =>
-    change({ ...a, where: { value: w, origin: w.mode !== 'anywhere' && !w.zoneId ? 'unset' : 'picked', spans: a.where.spans }, scopeSaid }, 'where')
-  const setWhen = (w: WhenAnswer) => change({ ...a, when: { value: w, origin: 'picked', spans: a.when.spans } }, 'where')
-  const setDevices = (d: DeviceAnswer) =>
-    change({ ...a, devices: { value: d, origin: d.mode !== 'any' && !d.profileId ? 'unset' : 'picked', spans: a.devices.spans } }, 'devices')
-  const setRisk = (x: RiskAnswer) => change({ ...a, risk: { value: x, origin: 'picked', spans: a.risk.spans } }, 'devices')
-  /* Allow with 2FA and Deny each bring a control of their own — Method,
-     Message — so the answer stays open for it. */
-  const grows = (o: Outcome) => o.decision !== '1fa'
-  const setBranch = (b: BranchId, o: Outcome) =>
-    change({ ...a, signIn: { ...a.signIn, [b]: { value: o, origin: 'picked', spans: a.signIn[b]?.spans ?? [] } } }, 'signIn', grows(o))
-  const setMore = (k: number, o: Outcome) =>
-    change({ ...a, more: a.more.map((m, i) => (i === k ? { ...m, outcome: { value: o, origin: 'picked', spans: m.outcome.spans } } : m)) }, 'signIn', grows(o))
+    change({ ...a, where: { value: w, origin: w.mode !== 'anywhere' && !w.zoneId ? 'unset' : 'picked', spans: a.where.spans }, scopeSaid })
+  const setWhen = (w: WhenAnswer) => change({ ...a, when: { value: w, origin: 'picked', spans: a.when.spans } })
+  const setDevices = (d: DeviceAnswer) => change({ ...a, devices: { value: d, origin: d.mode !== 'any' && !d.profileId ? 'unset' : 'picked', spans: a.devices.spans } })
+  const setRisk = (x: RiskAnswer) => change({ ...a, risk: { value: x, origin: 'picked', spans: a.risk.spans } })
+  const setBranch = (b: BranchId, o: Outcome) => change({ ...a, signIn: { ...a.signIn, [b]: { value: o, origin: 'picked', spans: a.signIn[b]?.spans ?? [] } } })
+  const setMore = (k: number, o: Outcome) => change({ ...a, more: a.more.map((m, i) => (i === k ? { ...m, outcome: { value: o, origin: 'picked', spans: m.outcome.spans } } : m)) })
 
   const w = a.where.value
   const wh = a.when.value ?? { mode: 'any' as const }
@@ -329,77 +507,66 @@ export function DescribePanel({
           return `Decided elsewhere: ${names.join(', ')} (${p.name})`
         })
     : []
-  const lastRow = lastRowOf(a, tenant)
-  const notAdded = [...r.notAdded, ...composed.notAdded]
 
-  const body = (key: AnswerKey): { node: ReactNode; firstSeg?: { values: string[]; pick: (v: string) => void } } => {
+  const body = (key: AnswerKey): ReactNode => {
     switch (key) {
       case 'apps':
-        return {
-          node: (
-            <>
-              <Picker
-                multiple
-                searchable
-                width="fill"
-                label="Applications"
-                placeholder="Choose applications"
-                value={a.apps.value ?? []}
-                options={tenant.apps.map((p) => ({ value: p.id, label: p.name, art: <AppLogo appId={p.id} name={p.name} size={18} /> }))}
-                onChange={(id) => {
-                  const cur = a.apps.value ?? []
-                  const nextIds = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]
-                  const ordered = tenant.apps.filter((p) => nextIds.includes(p.id)).map((p) => p.id)
-                  /* Picked, even when the last one goes: an empty list is the
-                     admin's answer, not a gap for the policy's own to fill.
-                     The list stays open for more, so the answer does too. */
-                  change({ ...a, apps: { value: ordered, origin: 'picked', spans: ordered.length > 0 ? a.apps.spans : [] } }, 'apps', true)
-                }}
-              />
-              {alsoCovers.map((line) => (
-                <p key={line} className="bdsc__aside">
-                  {line}
-                </p>
-              ))}
-            </>
-          ),
-        }
+        return (
+          <>
+            <Picker
+              multiple
+              searchable
+              width="fill"
+              label="Applications"
+              placeholder="Choose applications"
+              value={a.apps.value ?? []}
+              options={tenant.apps.map((p) => ({ value: p.id, label: p.name, art: <AppLogo appId={p.id} name={p.name} size={18} /> }))}
+              onChange={(id) => {
+                const cur = a.apps.value ?? []
+                const nextIds = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]
+                const ordered = tenant.apps.filter((p) => nextIds.includes(p.id)).map((p) => p.id)
+                /* Picked, even when the last one goes: an empty list is the
+                   admin's answer, not a gap for the policy's own to fill. */
+                change({ ...a, apps: { value: ordered, origin: 'picked', spans: ordered.length > 0 ? a.apps.spans : [] } })
+              }}
+            />
+            {alsoCovers.map((line) => (
+              <p key={line} className="bdsc__aside">
+                {line}
+              </p>
+            ))}
+          </>
+        )
       case 'who':
-        return {
-          node: (
-            <WhoPicker
-              compact
-              label="Who"
-              exceptions={false}
-              who={a.who.value && a.who.value !== 'everyone' ? a.who.value : undefined}
-              onChange={(next) =>
-                change({ ...a, who: { value: next ? { groupIds: next.groupIds, userIds: next.userIds } : 'everyone', origin: 'picked', spans: a.who.spans } }, 'who')
-              }
-              audience={EVERYONE}
-              directory={tenant.users as User[]}
-              groups={tenant.groups as Group[]}
-            />
-          ),
-        }
+        return (
+          <WhoPicker
+            compact
+            label="Who"
+            exceptions={false}
+            who={a.who.value && a.who.value !== 'everyone' ? a.who.value : undefined}
+            onChange={(next) => change({ ...a, who: { value: next ? { groupIds: next.groupIds, userIds: next.userIds } : 'everyone', origin: 'picked', spans: a.who.spans } })}
+            audience={EVERYONE}
+            directory={tenant.users as User[]}
+            groups={tenant.groups as Group[]}
+          />
+        )
       case 'leaveOut':
-        return {
-          node: (
-            <WhoPicker
-              compact
-              label="Leave out"
-              emptyText="Nobody"
-              placeholder="Add groups or people to leave out"
-              exceptions={false}
-              who={a.leaveOut.value ?? undefined}
-              onChange={(next) =>
-                change({ ...a, leaveOut: { value: next ? { groupIds: next.groupIds, userIds: next.userIds } : { groupIds: [], userIds: [] }, origin: 'picked', spans: a.leaveOut.spans } }, 'leaveOut')
-              }
-              audience={EVERYONE}
-              directory={tenant.users as User[]}
-              groups={tenant.groups as Group[]}
-            />
-          ),
-        }
+        return (
+          <WhoPicker
+            compact
+            label="Leave out"
+            emptyText="Nobody"
+            placeholder="Add groups or people to leave out"
+            exceptions={false}
+            who={a.leaveOut.value ?? undefined}
+            onChange={(next) =>
+              change({ ...a, leaveOut: { value: next ? { groupIds: next.groupIds, userIds: next.userIds } : { groupIds: [], userIds: [] }, origin: 'picked', spans: a.leaveOut.spans } })
+            }
+            audience={EVERYONE}
+            directory={tenant.users as User[]}
+            groups={tenant.groups as Group[]}
+          />
+        )
       case 'where': {
         const modes = [
           { value: 'anywhere' as const, label: 'Anywhere' },
@@ -409,81 +576,70 @@ export function DescribePanel({
         ]
         const pickMode = (mode: WhereAnswer['mode']) =>
           setWhere(mode === 'anywhere' ? { mode } : { mode, zoneId: w && w.mode !== 'anywhere' ? w.zoneId : '', scope: w && w.mode !== 'anywhere' ? w.scope : 'both' })
-        return {
-          firstSeg: { values: modes.map((m) => m.value), pick: (v) => pickMode(v as WhereAnswer['mode']) },
-          node: (
-            <>
-              <Seg label="Where" value={w?.mode ?? null} options={modes} onChange={pickMode} block />
-              {w && w.mode !== 'anywhere' && (
-                <div className="bdsc__pair">
-                  <Picker label="Zone" width="fill" placeholder="Choose…" value={w.zoneId || null} options={zoneOptions} onChange={(id) => setWhere({ ...w, zoneId: id })} />
-                  <div className="bdsc__labelled">
-                    <span className="bdsc__minilabel">
-                      Match on{!a.scopeSaid && <span className="bdsc__tag">Default</span>}
-                    </span>
-                    <Seg
-                      label="Match on"
-                      value={w.scope}
-                      options={[
-                        { value: 'both', label: 'Both' },
-                        { value: 'ip', label: 'IP' },
-                        { value: 'location', label: 'Location' },
-                      ]}
-                      onChange={(scope) => setWhere({ ...w, scope }, true)}
-                    />
-                  </div>
+        return (
+          <>
+            <Seg label="Where" value={w?.mode ?? null} options={modes} onChange={pickMode} block />
+            {w && w.mode !== 'anywhere' && (
+              <div className="bdsc__pair">
+                <Picker label="Zone" width="fill" placeholder="Choose…" value={w.zoneId || null} options={zoneOptions} onChange={(id) => setWhere({ ...w, zoneId: id })} />
+                <div className="bdsc__labelled">
+                  <span className="bdsc__minilabel">
+                    Match on{!a.scopeSaid && <span className="bdsc__tag">Default</span>}
+                  </span>
+                  <Seg
+                    label="Match on"
+                    value={w.scope}
+                    options={[
+                      { value: 'both', label: 'Both' },
+                      { value: 'ip', label: 'IP' },
+                      { value: 'location', label: 'Location' },
+                    ]}
+                    onChange={(scope) => setWhere({ ...w, scope }, true)}
+                  />
                 </div>
-              )}
-              <Seg
-                label="When"
-                value={wh.mode === 'any' ? 'any' : 'between'}
-                options={[
-                  { value: 'any', label: 'Any time' },
-                  { value: 'between', label: 'Between' },
-                ]}
-                onChange={(m) =>
-                  setWhen(m === 'any' ? { mode: 'any' } : { mode: 'between', from: '09:00', to: '18:00', days: wh.mode === 'days' ? wh.days : [], timeZone: TENANT_TIME_ZONE })
-                }
-                block
-              />
-              {wh.mode !== 'any' && (
-                <div className="bdsc__time">
-                  <TimeField
-                    label="From"
-                    value={wh.mode === 'between' ? wh.from : ''}
-                    onCommit={(from) => setWhen({ mode: 'between', from, to: wh.mode === 'between' ? wh.to : '18:00', days: wh.days, timeZone: wh.mode === 'between' ? wh.timeZone : TENANT_TIME_ZONE })}
-                  />
-                  <TimeField
-                    label="To"
-                    value={wh.mode === 'between' ? wh.to : ''}
-                    onCommit={(to) => setWhen({ mode: 'between', from: wh.mode === 'between' ? wh.from : '09:00', to, days: wh.days, timeZone: wh.mode === 'between' ? wh.timeZone : TENANT_TIME_ZONE })}
-                  />
-                  <Picker
-                    multiple
-                    width="fill"
-                    label="Days"
-                    placeholder="Every day"
-                    value={wh.days}
-                    options={DAY_NAMES.map((x) => ({ value: x, label: x }))}
-                    onChange={(day) => {
-                      const days = DAY_NAMES.filter((x) => (x === day ? !wh.days.includes(x) : wh.days.includes(x)))
-                      setWhen(wh.mode === 'between' ? { ...wh, days: [...days] } : { mode: 'days', days: [...days] })
-                    }}
-                  />
-                  {wh.mode === 'between' && (
-                    <Picker
-                      width="fill"
-                      label="Time zone"
-                      value={wh.timeZone}
-                      options={TIMEZONES.map((z) => ({ value: z, label: z }))}
-                      onChange={(timeZone) => setWhen({ ...wh, timeZone })}
-                    />
-                  )}
-                </div>
-              )}
-            </>
-          ),
-        }
+              </div>
+            )}
+            <Seg
+              label="When"
+              value={wh.mode === 'any' ? 'any' : 'between'}
+              options={[
+                { value: 'any', label: 'Any time' },
+                { value: 'between', label: 'Between' },
+              ]}
+              onChange={(m) => setWhen(m === 'any' ? { mode: 'any' } : { mode: 'between', from: '09:00', to: '18:00', days: wh.mode === 'days' ? wh.days : [], timeZone: TENANT_TIME_ZONE })}
+              block
+            />
+            {wh.mode !== 'any' && (
+              <div className="bdsc__time">
+                <TimeField
+                  label="From"
+                  value={wh.mode === 'between' ? wh.from : ''}
+                  onCommit={(from) => setWhen({ mode: 'between', from, to: wh.mode === 'between' ? wh.to : '18:00', days: wh.days, timeZone: wh.mode === 'between' ? wh.timeZone : TENANT_TIME_ZONE })}
+                />
+                <TimeField
+                  label="To"
+                  value={wh.mode === 'between' ? wh.to : ''}
+                  onCommit={(to) => setWhen({ mode: 'between', from: wh.mode === 'between' ? wh.from : '09:00', to, days: wh.days, timeZone: wh.mode === 'between' ? wh.timeZone : TENANT_TIME_ZONE })}
+                />
+                <Picker
+                  multiple
+                  width="fill"
+                  label="Days"
+                  placeholder="Every day"
+                  value={wh.days}
+                  options={DAY_NAMES.map((x) => ({ value: x, label: x }))}
+                  onChange={(day) => {
+                    const days = DAY_NAMES.filter((x) => (x === day ? !wh.days.includes(x) : wh.days.includes(x)))
+                    setWhen(wh.mode === 'between' ? { ...wh, days: [...days] } : { mode: 'days', days: [...days] })
+                  }}
+                />
+                {wh.mode === 'between' && (
+                  <Picker width="fill" label="Time zone" value={wh.timeZone} options={TIMEZONES.map((z) => ({ value: z, label: z }))} onChange={(timeZone) => setWhen({ ...wh, timeZone })} />
+                )}
+              </div>
+            )}
+          </>
+        )
       }
       case 'devices': {
         const modes = [
@@ -499,93 +655,224 @@ export function DescribePanel({
           { value: 'above' as const, label: 'Above' },
           ...(risk?.mode === 'below' ? [{ value: 'below' as const, label: 'Below' }] : []),
         ]
-        return {
-          firstSeg: { values: modes.map((m) => m.value), pick: (v) => pickMode(v as DeviceAnswer['mode']) },
-          node: (
-            <>
-              <Seg label="Devices" value={d?.mode ?? null} options={modes} onChange={pickMode} block />
-              {d && d.mode !== 'any' && (
-                <Picker label="Device profile" width="fill" placeholder="Choose…" value={d.profileId || null} options={profileOptions} onChange={(id) => setDevices({ ...d, profileId: id })} />
-              )}
-              <div className="bdsc__labelled">
-                <span className="bdsc__minilabel">Device risk score</span>
-                <Seg
-                  label="Device risk score"
-                  value={risk?.mode ?? null}
-                  options={riskModes}
-                  onChange={(m) =>
-                    setRisk(
-                      m === 'any'
-                        ? { mode: 'any' }
-                        : m === 'bands'
-                          ? { mode: 'bands', mediumFrom, highAbove }
-                          : { mode: m, score: risk && (risk.mode === 'above' || risk.mode === 'below') ? risk.score : m === 'above' ? highAbove : mediumFrom },
-                    )
-                  }
-                />
-              </div>
-              {risk?.mode === 'bands' && (
-                <div className="bdsc__pair">
-                  <label className="bdsc__labelled">
-                    <span className="bdsc__minilabel">Medium from</span>
-                    <NumberStepper value={risk.mediumFrom} min={1} max={Math.max(1, risk.highAbove)} label="Medium from" onChange={(n) => setRisk({ ...risk, mediumFrom: n })} />
-                  </label>
-                  <label className="bdsc__labelled">
-                    <span className="bdsc__minilabel">High above</span>
-                    <NumberStepper value={risk.highAbove} min={risk.mediumFrom} max={99} label="High above" onChange={(n) => setRisk({ ...risk, highAbove: n })} />
-                  </label>
-                </div>
-              )}
-              {risk && (risk.mode === 'above' || risk.mode === 'below') && (
+        return (
+          <>
+            <Seg label="Devices" value={d?.mode ?? null} options={modes} onChange={pickMode} block />
+            {d && d.mode !== 'any' && (
+              <Picker label="Device profile" width="fill" placeholder="Choose…" value={d.profileId || null} options={profileOptions} onChange={(id) => setDevices({ ...d, profileId: id })} />
+            )}
+            <div className="bdsc__labelled">
+              <span className="bdsc__minilabel">Device risk score</span>
+              <Seg
+                label="Device risk score"
+                value={risk?.mode ?? null}
+                options={riskModes}
+                onChange={(m) =>
+                  setRisk(
+                    m === 'any'
+                      ? { mode: 'any' }
+                      : m === 'bands'
+                        ? { mode: 'bands', mediumFrom, highAbove }
+                        : { mode: m, score: risk && (risk.mode === 'above' || risk.mode === 'below') ? risk.score : m === 'above' ? highAbove : mediumFrom },
+                  )
+                }
+              />
+            </div>
+            {risk?.mode === 'bands' && (
+              <div className="bdsc__pair">
                 <label className="bdsc__labelled">
-                  <span className="bdsc__minilabel">{risk.mode === 'above' ? 'Above' : 'Below'}</span>
-                  <NumberStepper value={risk.score} min={0} max={100} label={risk.mode === 'above' ? 'Above' : 'Below'} onChange={(n) => setRisk({ ...risk, score: n })} />
+                  <span className="bdsc__minilabel">Medium from</span>
+                  <NumberStepper value={risk.mediumFrom} min={1} max={Math.max(1, risk.highAbove)} label="Medium from" onChange={(n) => setRisk({ ...risk, mediumFrom: n })} />
                 </label>
-              )}
-            </>
-          ),
-        }
+                <label className="bdsc__labelled">
+                  <span className="bdsc__minilabel">High above</span>
+                  <NumberStepper value={risk.highAbove} min={risk.mediumFrom} max={99} label="High above" onChange={(n) => setRisk({ ...risk, highAbove: n })} />
+                </label>
+              </div>
+            )}
+            {risk && (risk.mode === 'above' || risk.mode === 'below') && (
+              <label className="bdsc__labelled">
+                <span className="bdsc__minilabel">{risk.mode === 'above' ? 'Above' : 'Below'}</span>
+                <NumberStepper value={risk.score} min={0} max={100} label={risk.mode === 'above' ? 'Above' : 'Below'} onChange={(n) => setRisk({ ...risk, score: n })} />
+              </label>
+            )}
+          </>
+        )
       }
       case 'signIn':
-        return {
-          node: (
-            <div className="bdsc__branches">
-              {branchesOf(a).map((b) => (
-                <OutcomeRow
-                  key={b}
-                  label={branchesOf(a).length > 1 ? branchLabel(b, a, tenant) : undefined}
-                  value={a.signIn[b]?.value ?? null}
-                  methods={methods}
-                  onChange={(o) => setBranch(b, o)}
-                />
-              ))}
-              {a.more.map((m, k) => (
-                <OutcomeRow key={`more:${k}`} label={m.span.phrase} value={m.outcome.value} methods={methods} onChange={(o) => setMore(k, o)} />
-              ))}
-            </div>
-          ),
-        }
+        return (
+          <div className="bdsc__branches">
+            {branchesOf(a).map((b) => (
+              <OutcomeRow
+                key={b}
+                label={branchesOf(a).length > 1 ? branchLabel(b, a, tenant) : undefined}
+                value={a.signIn[b]?.value ?? null}
+                methods={methods}
+                onChange={(o) => setBranch(b, o)}
+              />
+            ))}
+            {a.more.map((m, k) => (
+              <OutcomeRow key={`more:${k}`} label={moreLabel(m, tenant)} value={m.outcome.value} methods={methods} onChange={(o) => setMore(k, o)} />
+            ))}
+          </div>
+        )
       default:
-        return {
-          node:
-            lastRow === 'not-reached' || lastRow === 'merged' ? null : (
-              <>
-                <OutcomeRow value={a.fallback.value} methods={methods} onChange={(o) => change({ ...a, fallback: { value: o, origin: 'picked', spans: a.fallback.spans } }, 'fallback', grows(o))} />
-                {decidedElsewhere.map((line) => (
-                  <p key={line} className="bdsc__aside">
-                    {line}
-                  </p>
-                ))}
-              </>
-            ),
-        }
+        return (
+          <>
+            <OutcomeRow value={a.fallback.value} methods={methods} onChange={(o) => change({ ...a, fallback: { value: o, origin: 'picked', spans: a.fallback.spans } })} />
+            {decidedElsewhere.map((line) => (
+              <p key={line} className="bdsc__aside">
+                {line}
+              </p>
+            ))}
+          </>
+        )
     }
   }
 
+  const openPop = (key: AnswerKey, row: string, chip: string, el: HTMLElement) => {
+    if (pop?.row === row && pop.chip === chip) {
+      setPop(null)
+      return
+    }
+    popAnchor.current = el.closest<HTMLElement>('.bdsc__chips') ?? el
+    setPop({ key, row, chip })
+  }
+  /* Where Escape hands focus back: the chip that opened it, or — gone — its row's first. */
+  const popHome = () => {
+    const chips = popAnchor.current
+    if (!chips || !pop) return
+    ;(chips.querySelector<HTMLElement>(`[data-chip="${CSS.escape(pop.chip)}"]`) ?? chips.querySelector<HTMLElement>('button'))?.focus()
+  }
+
+  // --- The thread ------------------------------------------------------------------------
+
+  const reply = (i: number, view: TurnView) => {
+    const turn = turns[i]
+    const rows = rowsOf[i] ?? []
+    const fixes = [...new Set(view.notAdded.flatMap((n) => (n.action ? [n.action] : [])))]
+    const boldRow = bold ? ownerOf(bold) : null
+    return (
+      <div className="bdsc__reply">
+        {rows.length > 0 && <p className="bdsc__understood">Understood</p>}
+        {rows.length > 0 && (
+          <div className="bdsc__rows">
+            {rows.map(({ key, label, chips, past }) => {
+              const id = rowId(turn.id, key)
+              const flashing = flash?.id === id ? ` is-flash${flash.n % 2}` : ''
+              const art = (c: ChipSpec) => (
+                <>
+                  {c.art && <span className="bdsc__chipart">{c.art}</span>}
+                  <span className="bdsc__chipbody">{c.body}</span>
+                </>
+              )
+              const chipClass = (c: ChipSpec) => `bdsc__chip${c.muted ? ' is-muted' : ''}${c.outcome ? ' is-outcome' : ''}`
+              return (
+                <div
+                  key={key}
+                  id={id}
+                  className={`bdsc__row${past ? ' is-past' : ''}${boldRow === id ? ' is-bold' : ''}${flashing}`}
+                  title={past ? 'Changed in a later message' : undefined}
+                  onMouseEnter={past ? undefined : () => onTrace(key)}
+                  onMouseLeave={past ? undefined : () => onTrace(null)}
+                >
+                  <span className="bdsc__rowlabel">{label}</span>
+                  <span className={`bdsc__chips${chips.some((c) => c.branch) ? ' is-branches' : ''}`}>
+                    {chips.map((c) => {
+                      /* Said again later: what this turn said, as words, not a control. */
+                      if (past)
+                        return (
+                          <span key={c.id} className={`${chipClass(c)} is-past`}>
+                            {art(c)}
+                          </span>
+                        )
+                      const open = pop?.row === id && pop.chip === c.id
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className={`${chipClass(c)}${open ? ' is-open' : ''}`}
+                          aria-label={`${label}: ${c.name}`}
+                          aria-haspopup="dialog"
+                          aria-expanded={open}
+                          data-chip={c.id}
+                          onClick={(e) => openPop(key, id, c.id, e.currentTarget)}
+                          onFocus={() => onTrace(key)}
+                          onBlur={() => onTrace(null)}
+                        >
+                          {art(c)}
+                        </button>
+                      )
+                    })}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {view.settled.length > 0 && (
+          <ul className="bdsc__settled">
+            {view.settled.map((s) => (
+              <li key={s.key}>
+                <span className="bdsc__settledphrase">“{s.phrase}”</span>
+                <ArrowRight size={12} strokeWidth={2} className="bdsc__arrow" aria-hidden />
+                <span className="bdsc__settledanswer">{s.answer}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {view.latest && ask && <AskCard key={ask.id} uid={uid} ask={ask} onAnswer={(v) => answer(ask, v)} onSkip={() => skip(ask)} />}
+
+        {view.notAdded.length > 0 && (
+          <div className="bdsc__row bdsc__notadded">
+            <span className="bdsc__rowlabel">Not added</span>
+            <span className="bdsc__chips">
+              {view.notAdded.map((n) => (
+                <Tip key={`${n.span.start}:${n.span.phrase}:${n.reason}`} text={n.reason}>
+                  <span className="bdsc__gone" tabIndex={0} aria-label={`Not added: ${n.span.phrase}. ${n.reason}`}>
+                    {n.span.phrase}
+                  </span>
+                </Tip>
+              ))}
+              {fixes.map((f) => (
+                <Button key={f} variant="link" size="sm" onClick={() => onGo(f)}>
+                  {ACTION_LABEL[f]}
+                </Button>
+              ))}
+            </span>
+          </div>
+        )}
+
+        <p className="bdsc__change">
+          <span className="bdsc__changeline">
+            <Parts text={view.change} />
+          </span>
+          {view.latest && (
+            <Button variant="ghost" size="sm" icon={Undo2} onClick={undoLatest}>
+              Undo
+            </Button>
+          )}
+        </p>
+
+        {/* Only once there is something to check: while no application is
+            chosen, the question card is already asking for one. */}
+        {view.latest && checks && <ChecksRow uid={uid} view={checks} onTry={onTryCheck} />}
+      </div>
+    )
+  }
+
+  const rewriting = state.rewrite !== null && state.rewrite < turns.length
+  const hasText = state.box.trim().length > 0
+
   return (
-    <aside className="bb__insp bdsc" aria-labelledby={`${uid}-title`} onKeyDown={onKey}>
-      <div className="bb__inspbar bdsc__bar">
-        <h2 id={`${uid}-title`} ref={heading} tabIndex={-1} className="bdsc__title">
+    /* Focusable from a click only: a click on its words keeps focus in the
+       panel — not on <body>, where the board's keys act and Escape would
+       not reach it. */
+    <aside className="bdsc" aria-labelledby={`${uid}-title`} tabIndex={-1} onKeyDown={onKey}>
+      <div className="bdsc__bar">
+        <h2 id={`${uid}-title`} className="bdsc__title">
           Describe the policy
         </h2>
         <TipDot
@@ -597,187 +884,247 @@ export function DescribePanel({
         </span>
       </div>
 
-      <div className="bb__inspbody bdsc__body">
-        <div className="bdsc__textblock">
-          <label htmlFor="bdsc-text" className="bdsc__label">
-            Your text
-          </label>
-          <div className="bdsc__box">
-            <textarea
-              id="bdsc-text"
-              ref={box}
-              rows={2}
-              maxLength={500}
-              placeholder="Who, which applications, where or when, what happens"
-              value={state.text}
-              onChange={(e) => onState({ ...state, text: e.target.value }, false)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  read(state.text)
-                }
-              }}
-            />
-            <span className="bdsc__read">
-              <IconButton icon={CornerDownLeft} size="sm" tone="ghost" label="Read (Enter)" onClick={() => read(state.text)} />
+      <div className="bdsc__thread" ref={thread}>
+        {turns.length === 0 ? (
+          <div className="bdsc__empty">
+            <span className="bdsc__glyph" aria-hidden>
+              <PenLine size={18} strokeWidth={1.9} />
             </span>
-          </div>
-          <div className="bdsc__examples" role="group" aria-label="Examples">
-            <span className="bdsc__minilabel">Examples</span>
-            {EXAMPLES.map((ex) => (
-              <Button key={ex.label} variant="ghost" size="sm" onClick={() => read(ex.text)}>
-                {ex.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {notAdded.length > 0 && (
-          <section className="bdsc__notadded" aria-labelledby={`${uid}-na`}>
-            <h3 id={`${uid}-na`}>Not added</h3>
-            <ul>
-              {notAdded.map((n) => (
-                <li key={`${n.span.start}:${n.span.phrase}:${n.reason}`}>
-                  <span className="bdsc__phrase">“{n.span.phrase}”</span>
-                  <span className="bdsc__why">{n.reason}</span>
-                  {n.action && (
-                    <Button variant="link" size="sm" onClick={() => onGo(n.action as NonNullable<NotAdded['action']>)}>
-                      {ACTION_LABEL[n.action]}
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        <div className="bdsc__answers">
-          {shown.map((key) => {
-            const isOpen = openKey === key
-            const summary = summaryOf(key, a, tenant)
-            /* A Sign-in with one branch of several undecided is not set either,
-               though its summary names the branches that are. */
-            const unset = summary === NOT_SET || (key === 'signIn' && signInMissing(a))
-            const origin = originOf(key, a)
-            /* The last row holding Sign-in's outcome took none of its own words. */
-            const trace = key === 'fallback' && lastRow === 'merged' ? [] : traceOf(key, a)
-            const { node, firstSeg } = body(key)
-            const qs = choicesFor(key)
-            return (
-              <div key={key} className={`bdsc__answer${isOpen ? ' is-open' : ''}`}>
-                <button
-                  type="button"
-                  id={`${uid}-h-${key}`}
-                  className="bdsc__head"
-                  aria-expanded={isOpen}
-                  aria-controls={`${uid}-r-${key}`}
-                  onClick={() => setOpenKey(isOpen ? null : key)}
-                  onMouseEnter={() => onTrace(key)}
-                  onMouseLeave={() => onTrace(null)}
-                  onFocus={() => onTrace(key)}
-                  onBlur={() => onTrace(null)}
-                >
-                  <span className="bdsc__headlabel">{LABEL[key]}</span>
-                  <span className={`bdsc__summary${unset ? ' is-unset' : ''}${bold === key ? ' is-bold' : ''}`} title={summary}>
-                    <span className="bdsc__value" key={summary}>
-                      {summary}
-                    </span>
-                    {trace.length > 0 && <span className="bdsc__trace">From your text: “{trace.map((s) => s.phrase).join(' · ')}”</span>}
-                  </span>
-                  <span className="bdsc__headend">
-                    {origin === 'default' && summary !== NOT_SET && <span className="bdsc__tag">Default</span>}
-                    <ChevronDown size={16} strokeWidth={2} className="bdsc__chev" aria-hidden />
-                  </span>
+            <p className="bdsc__prompt">What should this policy do?</p>
+            <div className="bdsc__examples" role="group" aria-label="Examples">
+              {EXAMPLES.map((ex) => (
+                <button key={ex.label} type="button" className="bdsc__example" title={ex.text} onClick={() => send(ex.text)}>
+                  <span className="bdsc__exampletext">{ex.text}</span>
                 </button>
-                <div
-                  id={`${uid}-r-${key}`}
-                  role="region"
-                  aria-labelledby={`${uid}-h-${key}`}
-                  className="bdsc__region"
-                  inert={!isOpen}
-                  onKeyDown={(e) => quick(key, e, firstSeg)}
-                >
-                  <div className="bdsc__regioninner">
-                    <div className="bdsc__controls">
-                      {qs.map((c) => (
-                        <ChoiceRow key={c.id} c={c} onPick={(v) => choose(c, v)} />
-                      ))}
-                      {node}
-                    </div>
-                  </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <ol className="bdsc__turns">
+            {turns.map((turn, i) => (
+              <li key={turn.id} className="bdsc__turn">
+                <div className={`bdsc__msg${rewriting && state.rewrite === i ? ' is-rewriting' : ''}`}>
+                  <span className="bdsc__pencil">
+                    <IconButton icon={PenLine} size="sm" tone="ghost" label="Rewrite" onClick={() => rewrite(i)} />
+                  </span>
+                  <p className="bdsc__bubble">{turn.said}</p>
                 </div>
-              </div>
-            )
-          })}
-        </div>
-        {checks !== undefined && <Checks uid={uid} view={checks} onTry={onTryCheck} />}
-
+                {reply(i, views[i])}
+              </li>
+            ))}
+          </ol>
+        )}
         <p role="status" className="u-sr-only">
           {said}
         </p>
       </div>
 
-      {/* Buttons only: no sentence ever sits in a footer (owner, 26 Sep 2026).
-          The inspector's own foot, so the two panels end alike. */}
-      <div className="bb__inspfoot bdsc__foot">
-        <Button variant="secondary" size="sm" onClick={onDone}>
-          Done
-        </Button>
+      <div className="bdsc__foot">
+        {suggestions.length > 0 && !rewriting && (
+          <div className="bdsc__suggest" role="group" aria-label="Suggestions" ref={suggestRow}>
+            {suggestions.slice(0, fits).map((s) => (
+              <button key={s} type="button" className="bdsc__suggestion" onClick={() => send(s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className={`bdsc__composer${rewriting ? ' is-rewriting' : ''}`}>
+          {rewriting && (
+            <div className="bdsc__rewrite">
+              <PenLine size={14} strokeWidth={2} aria-hidden />
+              <span>Rewrite</span>
+              <span className="bdsc__rewriteend">
+                <IconButton icon={X} size="sm" tone="ghost" label="Cancel rewrite" onClick={cancelRewrite} />
+              </span>
+            </div>
+          )}
+          <label htmlFor="bdsc-text" className="u-sr-only">
+            {turns.length === 0 ? 'What should this policy do?' : 'Add or change something'}
+          </label>
+          <div className="bdsc__field">
+            <textarea
+              id="bdsc-text"
+              ref={box}
+              rows={1}
+              maxLength={500}
+              placeholder={turns.length === 0 ? 'Who, which applications, where or when, what happens' : 'Add or change something'}
+              value={state.box}
+              onChange={(e) => onState({ ...state, box: e.target.value }, false)}
+              onKeyDown={(e) => {
+                if (composerSends({ key: e.key, shiftKey: e.shiftKey, isComposing: e.nativeEvent.isComposing })) {
+                  e.preventDefault()
+                  send(state.box)
+                }
+              }}
+            />
+            <Tip text="Send (Enter)" placement="top">
+              <button type="button" className={`bdsc__send${hasText ? ' has-text' : ''}`} aria-label="Send" aria-keyshortcuts="Enter" onClick={() => send(state.box)}>
+                <ArrowUp size={16} strokeWidth={2.2} aria-hidden />
+              </button>
+            </Tip>
+          </div>
+        </div>
       </div>
+
+      {pop && popAlive && (
+        <AnchoredPopover anchor={popAnchor} open onClose={() => setPop(null)} label={ROW[pop.key]} width={360} className="bdsc-pop">
+          <p className="bdsc-pop__title">{rowLabel(pop.key, a)}</p>
+          {/* Escape shuts an open list first; with none open it shuts the
+              popover and goes back to the chip. The Picker's trigger stops
+              every Escape, open or not, so the popover has to take it first. */}
+          <div
+            ref={popBody}
+            className="bdsc-pop__body"
+            onFocusCapture={(e) => {
+              if (e.currentTarget.contains(e.target as Node)) popFocus.current = e.target as HTMLElement
+            }}
+            onClick={keepPopFocus}
+            onKeyDownCapture={(e) => {
+              if (e.key !== 'Escape') return
+              const t = e.target as HTMLElement
+              if (t.closest('[aria-expanded="true"]') || document.querySelector('.bx-picker__pop')) return
+              e.preventDefault()
+              e.stopPropagation()
+              popHome()
+              setPop(null)
+            }}
+          >
+            {body(pop.key)}
+          </div>
+        </AnchoredPopover>
+      )}
     </aside>
   )
 }
 
-/* The checks (describe spec, §3.7): each row one sign-in and what the whole
-   tenant decides for it with the draft on — the same thing Try a sign-in
-   shows, so no count and no grade. The one number on the panel is in the
-   What changes line under them. A row is one button: pressing it tries that
-   sign-in on the board. Can't tell is grey text, never a badge, and the facts
-   that would settle it are in the row's name as well as its mark. */
-function Checks({ uid, view, onTry }: { uid: string; view: ChecksView | null; onTry?: (facts: SignInFacts) => void }) {
+/* A line of parts joined by " · " — the change line, What changes — that
+   wraps between its parts, never inside one, so a count stays with its
+   words. Each part leads with its separator, the first with an empty one
+   kept from the screen reader, and the one that would open a wrapped line
+   is clipped: no line starts or ends with "·". */
+function Parts({ text }: { text: string }) {
   return (
-    <section className="bdsc__checks" aria-labelledby={`${uid}-ck`}>
-      <h3 id={`${uid}-ck`} className="bdsc__checkshead">
-        Checks
-        <TipDot label="About checks" text="Through every policy on these applications" />
-      </h3>
-      {view === null ? (
-        <EmptyState compact icon={LogIn} title="Choose an application" />
-      ) : (
-        <>
-          {view.rows.length > 0 && (
+    <span className="bdsc__parts">
+      <span className="bdsc__partsrow">
+        {text.split(' · ').map((part, k) => (
+          <span key={`${k}:${part}`} className="bdsc__part">
+            <span className="bdsc__sep" aria-hidden={k === 0 || undefined}>
+              {k > 0 && ' · '}
+            </span>
+            {part}
+          </span>
+        ))}
+      </span>
+    </span>
+  )
+}
+
+/* One question, with nothing picked: the question in a line, its replies as
+   chips (four at most, the rest behind More…), and Don't add. 1–4 pick a
+   reply from anywhere in the card. */
+function AskCard({ uid, ask, onAnswer, onSkip }: { uid: string; ask: Ask; onAnswer: (value: string) => void; onSkip: () => void }) {
+  const shown = ask.options.length > 4 ? ask.options.slice(0, 3) : ask.options
+  const more = ask.options.length > 4 ? ask.options.slice(3) : []
+  /* A reply's detail is said only where it tells two replies apart (two
+     people of one name); otherwise it is the reply's tooltip. */
+  const twice = (label: string) => ask.options.filter((o) => o.label === label).length > 1
+  const qid = `${uid}-ask-${ask.id}`
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement
+    if (!/^[1-4]$/.test(e.key) || target.closest('[role="combobox"], [role="listbox"]')) return
+    const o = shown[Number(e.key) - 1]
+    if (!o) return
+    e.preventDefault()
+    onAnswer(o.value)
+  }
+  return (
+    <div className="bdsc__ask" role="group" aria-labelledby={qid} onKeyDown={onKey}>
+      <p id={qid} className="bdsc__askq">
+        {ask.question}
+        {ask.order && <TipDot label="About order" text="Proposed model: first match wins" />}
+      </p>
+      {ask.detail && <p className="bdsc__askdetail">{ask.detail}</p>}
+      <div className="bdsc__replies">
+        {shown.map((o) => (
+          <button key={o.value} type="button" className="bdsc__replychip" title={o.meta && !twice(o.label) ? o.meta : undefined} onClick={() => onAnswer(o.value)}>
+            <span>{o.label}</span>
+            {o.meta && twice(o.label) && <span className="bdsc__replymeta">{o.meta}</span>}
+          </button>
+        ))}
+        {more.length > 0 && <Picker label={`More: ${ask.question}`} summary="More…" searchable value={null} options={more.map((o) => ({ value: o.value, label: o.label, meta: o.meta }))} onChange={onAnswer} />}
+        {ask.canSkip && (
+          <button type="button" className="bdsc__skip" onClick={onSkip}>
+            {DONT_ADD}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* The checks (describe spec, §3.7), collapsed to one row: how many sign-ins
+   land as the text meant, how many differ, and a grey word for the ones it
+   cannot tell. Opened, the rows as before — each a button that tries its
+   sign-in on the board — and the What changes line under them. Drawn only
+   once there is an application to check on. */
+function ChecksRow({ uid, view, onTry }: { uid: string; view: ChecksView; onTry?: (facts: SignInFacts) => void }) {
+  const [open, setOpen] = useState(false)
+  const rows = view.rows
+  const cant = rows.filter((r) => r.decision === null).length
+  const differs = rows.filter((r) => r.decision !== null && r.detail.startsWith('Expected ')).length
+  const pass = rows.length - cant - differs
+  const id = `${uid}-checks`
+  /* What every row shares is said here once, not on each row. */
+  const tip = [view.shared, 'Through every policy on these applications'].filter(Boolean).join('. ')
+  return (
+    <section className={`bdsc__checks${open ? ' is-open' : ''}`}>
+      <button type="button" className="bdsc__checkshead" aria-expanded={open} aria-controls={id} onClick={() => setOpen((v) => !v)}>
+        <span className="bdsc__checksword">Checks</span>
+        <TipMark text={tip} />
+        <span className="u-sr-only">{tip}.</span>
+        <span className="bdsc__checkspills">
+          {pass > 0 && <span className="bdsc__pill">{pass} pass</span>}
+          {differs > 0 && <span className="bdsc__pill is-differs">{differs} differ</span>}
+          {cant > 0 && <span className="bdsc__checksnote">{`${cant} can't tell`}</span>}
+        </span>
+        <ChevronDown size={16} strokeWidth={2} className="bdsc__chev" aria-hidden />
+      </button>
+      <div id={id} role="region" aria-label="Checks" className="bdsc__region" inert={!open}>
+        <div className="bdsc__regioninner">
+          {rows.length > 0 && (
             <ul className="bdsc__checklist">
-              {view.rows.map((r) => {
+              {rows.map((row) => {
                 const cells = (
                   <>
-                    <span className="bdsc__checkkind">{r.word}</span>
+                    <span className="bdsc__checkkind">{row.word}</span>
                     <span className="bdsc__checkbody">
-                      <span className="bdsc__checkline" title={r.line}>
-                        {r.line}
+                      <span className="bdsc__checkline" title={row.full ?? row.line}>
+                        {row.line}
                       </span>
-                      <span className="bdsc__checkdetail">{r.detail}</span>
+                      <span className="bdsc__checkdetail">{row.detail}</span>
                     </span>
                     {/* Keyed by the answer, so a changed one fades in. */}
-                    <span className="bdsc__checkres" key={r.decision ?? `cant:${r.needs.join()}`}>
-                      {r.decision ? (
-                        <DecisionBadge decision={r.decision} />
+                    <span className="bdsc__checkres" key={row.decision ?? `cant:${row.needs.join()}`}>
+                      {row.decision ? (
+                        <DecisionBadge decision={row.decision} />
                       ) : (
                         <>
                           <CantTell />
-                          {r.needs.length > 0 && <TipMark text={`Needs: ${r.needs.join(', ')}`} />}
+                          {row.needs.length > 0 && <TipMark text={`Needs: ${row.needs.join(', ')}`} />}
                         </>
                       )}
                     </span>
                   </>
                 )
                 return (
-                  <li key={r.id}>
+                  <li key={row.id}>
                     {onTry ? (
-                      <button type="button" className="bdsc__check" aria-label={r.label} title={r.title} onClick={() => onTry(r.facts)}>
+                      <button type="button" className="bdsc__check" aria-label={row.label} title={row.title} onClick={() => onTry(row.facts)}>
                         {cells}
                       </button>
                     ) : (
-                      <div className="bdsc__check" aria-label={r.label} title={r.title} role="group">
+                      <div className="bdsc__check" aria-label={row.label} title={row.title} role="group">
                         {cells}
                       </div>
                     )}
@@ -788,30 +1135,13 @@ function Checks({ uid, view, onTry }: { uid: string; view: ChecksView | null; on
           )}
           <p className="bdsc__changes">
             <span className="bdsc__changesword">What changes</span>
-            <span className="bdsc__changesline">{view.whatChanges}</span>
+            <span className="bdsc__changesline">
+              <Parts text={view.whatChanges} />
+            </span>
           </p>
-        </>
-      )}
+        </div>
+      </div>
     </section>
-  )
-}
-
-/* A question from the text, with nothing picked: the phrase, then its options. */
-function ChoiceRow({ c, onPick }: { c: Choice; onPick: (v: string) => void }) {
-  const title = `“${c.span.phrase}”`
-  return (
-    <div className="bdsc__q">
-      <p className="bdsc__qphrase">
-        {title}
-        {c.slot === 'order' && <TipDot label="About order" text="Proposed model: first match wins" />}
-      </p>
-      {c.detail && <p className="bdsc__qdetail">{c.detail}</p>}
-      {c.options.length <= 3 ? (
-        <Seg label={title} value={null} options={c.options.map((o) => ({ value: o.value, label: o.label, title: o.meta }))} onChange={onPick} />
-      ) : (
-        <Picker label={title} placeholder="Choose…" width="fill" value={null} options={c.options.map((o) => ({ value: o.value, label: o.label, meta: o.meta }))} onChange={onPick} />
-      )}
-    </div>
   )
 }
 
@@ -853,9 +1183,8 @@ function OutcomeRow({ label, value, methods, onChange }: { label?: string; value
   )
 }
 
-/* A time, committed on blur or Enter like the message below — not on every
-   digit, so neither the card nor the box moves while it is typed. An empty or
-   half-typed value commits nothing. */
+/* A time, committed on blur or Enter — not on every digit, so neither the
+   card nor the chip moves while it is typed. */
 function TimeField({ label, value, onCommit }: { label: string; value: string; onCommit: (hhmm: string) => void }) {
   const [draft, setDraft] = useState(value)
   useEffect(() => setDraft(value), [value])

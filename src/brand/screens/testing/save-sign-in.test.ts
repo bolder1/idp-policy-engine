@@ -33,8 +33,10 @@ describe('where the save form starts', () => {
 
 describe('while the sign-in changes under the open form', () => {
   it('follows the screen until the admin answers, then keeps their answer', () => {
-    /* Opened on Kavya (2FA), then the person changed to Aisha, whom HRMS is not for. */
-    const aisha: SignInForm = { ...form, personId: 'u-sales-1' }
+    /* Opened on Kavya (2FA), then the person changed to Aisha, whom HRMS is not
+       for — on her corporate laptop, which the Global Default reads since its
+       baseline (30 Sep 2026); with no device it could not tell 1FA from 2FA. */
+    const aisha: SignInForm = { ...form, personId: 'u-sales-1', device: { kind: 'preset', id: 'win11-registered' } }
     const aishaShown = resolveSignIn(t.policies, factsOf(aisha, t.zones).facts, env).decision
     expect(aishaShown).toBe('1fa')
     expect(currentDraft(draft(aisha, aishaShown), {})).toEqual({ name: 'Aisha Khan on HRMS 2', expected: '1fa', level: 'note' })

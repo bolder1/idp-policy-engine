@@ -391,7 +391,10 @@ export function checksFor(a: DescribeAnswers, ctx: CheckContext): DraftCheck[] {
   const denies = rules.find((r) => r.decision === 'deny') ?? null
   if (a.fallback.value !== null || denies) {
     const stops = (hit: number | null) => hit === null || draft.rules[hit]?.decision === 'deny'
-    let stop: { form: SignInForm; phrase: string } | null = null
+    /* `refusal`: the sign-in was built to meet the refusing rule, so what the
+       text meant for it is that rule's Deny — whatever the draft gives it. A
+       refusal another rule shadows then says Expected Deny, not a pass. */
+    let stop: { form: SignInForm; phrase: string; refusal?: AccessDecision } | null = null
     if (pass && target) {
       for (const f of flips(target, pass, a, ctx)) {
         const own = ownOutcome(draft, facts(f.form), env)
@@ -404,14 +407,14 @@ export function checksFor(a: DescribeAnswers, ctx: CheckContext): DraftCheck[] {
     if (!stop && denies) {
       const person = personFor(denies, t, draft.id, appId)
       const form = person ? formMeeting(denies, person, appId, ctx) : null
-      if (form) stop = { form, phrase: ctx.sources[denies.id] ?? '' }
+      if (form) stop = { form, phrase: ctx.sources[denies.id] ?? '', refusal: denies.decision }
     }
     const own = stop ? ownOutcome(draft, facts(stop.form), env) : null
     if (stop && own) {
       /* The words it came from: the condition turned over, else what the text
          said for the rest, else the refusing rule's own. */
       const phrase = stop.phrase || (own.hit === null ? said(a.fallback) || a.only?.phrase || '' : (ctx.sources[draft.rules[own.hit]?.id ?? ''] ?? ''))
-      out.push({ id: 'stop', kind: 'stop', facts: facts(stop.form), expected: own.decision, phrase: phrase || undefined })
+      out.push({ id: 'stop', kind: 'stop', facts: facts(stop.form), expected: stop.refusal ?? own.decision, phrase: phrase || undefined })
     }
   }
 
@@ -498,6 +501,9 @@ export interface CheckRowView {
   word: string
   /** "Kavya Menon · HRMS · Office network · Windows 11 laptop · registered". */
   line: string
+  /* The whole sign-in, where `line` says only part of it (`RowTrim`): the
+     line's tooltip. */
+  full?: string
   /** "Expected Deny · HRMS access from corporate offices · In a corporate office". */
   detail: string
   decision: AccessDecision | null
@@ -514,9 +520,11 @@ const readsOf = (rules: readonly Rule[]) => {
   return { risk: all.some((c) => c.typeId === 'device-risk'), time: all.some((c) => c.typeId === 'time' || c.typeId === 'day') }
 }
 
-/* The sign-in in one line: who, where to, from where, on what — and the risk
+type PartKey = 'person' | 'app' | 'origin' | 'place' | 'device' | 'risk' | 'when'
+
+/* The sign-in's parts: who, where to, from where, on what — and the risk
    and the day only where the draft reads them. */
-function lineOf(f: SignInFacts, t: DescribeTenant, reads: { risk: boolean; time: boolean }): string {
+function partsOf(f: SignInFacts, t: DescribeTenant, reads: { risk: boolean; time: boolean }): [PartKey, string][] {
   const person = t.users.find((u) => u.id === f.personId)?.name ?? f.personId ?? 'Person not stated'
   const app = t.apps.find((a) => a.id === f.appId)?.name ?? f.appId ?? 'Application not stated'
   const address = f.network?.address
@@ -526,7 +534,36 @@ function lineOf(f: SignInFacts, t: DescribeTenant, reads: { risk: boolean; time:
   const device = !f.device ? 'Device not stated' : preset ? (DEVICE_PRESETS.find((d) => d.id === preset)?.label ?? 'Custom device') : 'Custom device'
   const risk = reads.risk && f.risk ? `Risk ${f.risk.score}` : null
   const when = reads.time && f.when ? `${f.when.date ? weekdayOf(f.when.date) : ''} ${f.when.time}`.trim() : null
-  return [person, app, origin, place, device, risk, when].filter(Boolean).join(' · ')
+  const all: [PartKey, string | null][] = [
+    ['person', person],
+    ['app', app],
+    ['origin', origin],
+    ['place', place],
+    ['device', device],
+    ['risk', risk],
+    ['when', when],
+  ]
+  return all.filter((x): x is [PartKey, string] => !!x[1])
+}
+
+/* The sign-in in one line — less what the list says once (`RowTrim`). */
+function lineOf(f: SignInFacts, t: DescribeTenant, reads: { risk: boolean; time: boolean }, trim: RowTrim = {}): string {
+  const base = trim.against ? new Map(partsOf(trim.against, t, reads)) : null
+  const parts = partsOf(f, t, reads).filter(([k]) => !(trim.person && k === 'person') && !(trim.app && k === 'app'))
+  const differs = base ? parts.filter(([k, v]) => base.get(k) !== v) : parts
+  return (differs.length > 0 ? differs : parts).map(([, v]) => v).join(' · ')
+}
+
+/* What a list of rows says once, above them, rather than on every row: the
+   person and the application every row shares, and the draft's own name.
+   `against`: the Should pass sign-in, which every other row is made from by
+   one change — so such a row names only what it changed (Home broadband,
+   London, another person), the fact a narrow row must not cut off. */
+export interface RowTrim {
+  person?: boolean
+  app?: boolean
+  ownName?: boolean
+  against?: SignInFacts
 }
 
 const distinct = <T,>(xs: readonly T[]): T[] => [...new Set(xs)]
@@ -538,29 +575,34 @@ function needsOf(r: TenantResolution): string[] {
 }
 
 /** One row as the panel prints it (describe spec, §3.7). `draft` is the policy the checks ran. */
-export function checkRowView(run: CheckRun, draft: Policy, t: DescribeTenant, policies: readonly Policy[]): CheckRowView {
+export function checkRowView(run: CheckRun, draft: Policy, t: DescribeTenant, policies: readonly Policy[], trim: RowTrim = {}): CheckRowView {
   const { check, result } = run
-  const line = lineOf(check.facts, t, readsOf(draft.rules))
+  const reads = readsOf(draft.rules)
+  const line = lineOf(check.facts, t, reads, trim)
   const decided = result.status === 'decided' && result.decision !== null
+  const own = trim.ownName && result.decidedBy?.policyId === draft.id
   const where =
     result.status === 'incomplete' || !result.decidedBy
       ? incompleteLine(result)
-      : [result.decidedBy.policyName, decided ? ruleLine(result, draft.id, policies, draft) : ''].filter(Boolean).join(' · ')
+      : [own ? '' : result.decidedBy.policyName, decided ? ruleLine(result, draft.id, policies, draft) : ''].filter(Boolean).join(' · ')
   const expected = check.kind !== 'you' && run.verdict !== 'match' ? `Expected ${DECISION_WORDS[check.expected]}` : ''
   const needs = decided ? [] : needsOf(result)
   const word = CHECK_KIND_WORDS[check.kind]
   const answer = decided ? DECISION_WORDS[result.decision!] : [CANT_TELL, needs.length > 0 ? `needs ${needs.join(', ')}` : ''].filter(Boolean).join(', ')
+  const whole = lineOf(check.facts, t, reads)
   return {
     id: check.id,
     kind: check.kind,
     facts: check.facts,
     word,
     line,
+    ...(line !== whole ? { full: whole } : null),
     detail: [expected, where].filter(Boolean).join(' · '),
     decision: decided ? result.decision : null,
     needs,
     title: check.phrase ? `From your text: “${check.phrase}”` : undefined,
-    label: `${word}, ${line}, ${answer}`,
+    /* The whole sign-in, whatever the line leaves to the list's heading. */
+    label: `${word}, ${whole}, ${answer}`,
   }
 }
 
@@ -569,6 +611,10 @@ export function checkRowView(run: CheckRun, draft: Policy, t: DescribeTenant, po
 /** What the panel's foot shows: the rows, and the What changes line. */
 export interface ChecksView {
   rows: CheckRowView[]
+  /* What every row shares and so no row repeats — "Kavya Menon on HRMS",
+     "On HRMS" — said once, in the tip on the heading. Absent when every
+     row differs in both. */
+  shared?: string
   /** "Of 360 modelled sign-ins: Now allowed 0 · …" — the one number on the panel. */
   whatChanges: string
 }
@@ -581,8 +627,19 @@ export function checksView(a: DescribeAnswers, ctx: CheckContext): ChecksView | 
   if (!ctx.tenant.apps.some((x) => (a.apps.value ?? []).includes(x.id))) return null
   const policies = ctx.tenant.policies
   const runs = runChecks(checksFor(a, { ...ctx, draft }), draft, policies, ctx.env)
+  /* Every row the same person, or the same application: said once, so each
+     row has room for the fact it differs by (Home broadband, London). */
+  const one = <T,>(xs: T[]) => (xs.length > 1 && xs.every((x) => x === xs[0]) ? xs[0] : null)
+  const person = one(runs.map((r) => r.check.facts.personId ?? null))
+  const app = one(runs.map((r) => r.check.facts.appId ?? null))
+  const trim: RowTrim = { person: !!person, app: !!app, ownName: true }
+  const pass = runs.find((r) => r.check.kind === 'pass')?.check.facts
+  const who = person ? ctx.tenant.users.find((u) => u.id === person)?.name : undefined
+  const where = app ? ctx.tenant.apps.find((x) => x.id === app)?.name : undefined
+  const shared = who && where ? `${who} on ${where}` : where ? `On ${where}` : who ? `As ${who}` : ''
   return {
-    rows: runs.map((r) => checkRowView(r, draft, ctx.tenant, policies)),
+    rows: runs.map((r) => checkRowView(r, draft, ctx.tenant, policies, r.check.kind === 'pass' || !pass ? trim : { ...trim, against: pass })),
+    ...(shared ? { shared } : null),
     whatChanges: whatChangesSaid(whatChangesFor(draft, policies, ctx.env)),
   }
 }

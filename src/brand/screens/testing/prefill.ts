@@ -11,6 +11,9 @@ import type { SignInForm } from './sign-in-form'
    slider's lazy body exists to keep out.
    -------------------------------------------------------------------------- */
 
+/** In the group, as their first group or another (data.ts `memberGroupIds`, said here so this module stays types only). */
+const inGroup = (u: Pick<User, 'groupId' | 'alsoGroupIds'>, g: string) => u.groupId === g || (u.alsoGroupIds ?? []).includes(g)
+
 /** An app access policy on this application — the Global Default is on all of them. */
 export const covers = (p: Policy, appId: string | null): boolean =>
   p.type === 'App Access' && (p.isSystem === true || (appId !== null && p.appIds.includes(appId)))
@@ -31,18 +34,20 @@ export function patchFor(form: SignInForm, patch: Partial<SignInForm>, policies:
    Default is on every application and for everybody, so it keeps both.
 
    Somebody it is for: the person already being tried when the policy is for
-   them, else the first person in its first group — the board's own pick
-   (`defaultBoardForm`), so the row menu and the board open on the same
-   person — then its named people. */
-export function formForPolicy(policy: Policy, people: readonly Pick<User, 'id' | 'groupId'>[], current: SignInForm, policies: readonly Policy[]): SignInForm {
+   them — through any group they are in — else the first person in its first
+   group — the board's own pick (`defaultBoardForm`), so the row menu and the
+   board open on the same person; somebody in it as another group when nobody
+   has it first — then its named people. */
+export function formForPolicy(policy: Policy, people: readonly Pick<User, 'id' | 'groupId' | 'alsoGroupIds'>[], current: SignInForm, policies: readonly Policy[]): SignInForm {
   const appId = policy.isSystem ? current.appId : (policy.appIds[0] ?? current.appId)
   const a = policy.audience
   const now = people.find((u) => u.id === current.personId)
-  const governed = now !== undefined && (a.groupIds.includes(now.groupId) || a.userIds.includes(now.id))
+  const governed = now !== undefined && (a.groupIds.some((g) => inGroup(now, g)) || a.userIds.includes(now.id))
+  const memberOf = (g: string) => (people.find((u) => u.groupId === g) ?? people.find((u) => inGroup(u, g)))?.id
   const personId =
     a.everyone || governed
       ? current.personId
-      : (a.groupIds.map((g) => people.find((u) => u.groupId === g)?.id).find((id) => id !== undefined) ?? a.userIds[0] ?? current.personId)
+      : (a.groupIds.map(memberOf).find((id) => id !== undefined) ?? a.userIds[0] ?? current.personId)
   const next: SignInForm = { ...current, appId, personId }
   const off = policy.status === 'inactive' || policy.status === 'draft'
   if (off && covers(policy, appId)) return { ...next, assumeOn: policy.id }

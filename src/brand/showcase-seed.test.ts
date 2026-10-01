@@ -34,27 +34,49 @@ const authored = t.policies.filter((p) => !p.isSystem)
 const templateRules = t.scenarios.flatMap((s) => s.rules.map((spec) => spec.build()))
 
 describe('the showcase policies', () => {
-  it('are the system default and the four scenarios, in that order', () => {
+  /* Then the troubleshooting estate (30 Sep 2026): three on AWS, two on
+     Slack, a draft on GitHub — after the scenarios, so no scenario moves.
+     Then the owner's two-group example (1 Oct 2026: "Tanmay is in 2 groups
+     … Engineering … password as first factor … Design … 2FA"): a Box policy
+     per group, Engineering's first, last so nothing above them moves. */
+  it('are the system default, the four scenarios, the troubleshooting estate and the two Box policies, in that order', () => {
     expect(t.policies.map((p) => p.id)).toEqual([
       'global-default',
       'sc-hrms-office',
       'sc-corporate-devices',
       'sc-device-compliance',
       'sc-dev-tools',
+      'sc-aws-engineering',
+      'sc-aws-finance',
+      'sc-aws-devops',
+      'sc-slack-everyone',
+      'sc-slack-engineering',
+      'sc-code-review-finance',
+      'sc-box-engineering',
+      'sc-box-design',
     ])
     expect(t.policies.filter((p) => p.isSystem)).toHaveLength(1)
   })
 
   /* HRMS opens Inactive, so the pitch starts on a policy that is built and not
      yet on (Phase 4): Try reads "Today | Stored version", and Turn on runs
-     Before turning on. The other three are live. */
-  it('are live but for HRMS, which opens off, each on applications the tenant has', () => {
+     Before turning on. The other three are live. Code review for Finance is
+     a draft: the policy that would change nothing if turned on. */
+  it('are live but for HRMS, which opens off, and the Code review draft, each on applications the tenant has', () => {
     expect(t.policies.map((p) => [p.id, p.status])).toEqual([
       ['global-default', 'always-on'],
       ['sc-hrms-office', 'inactive'],
       ['sc-corporate-devices', 'active'],
       ['sc-device-compliance', 'active'],
       ['sc-dev-tools', 'active'],
+      ['sc-aws-engineering', 'active'],
+      ['sc-aws-finance', 'active'],
+      ['sc-aws-devops', 'active'],
+      ['sc-slack-everyone', 'active'],
+      ['sc-slack-engineering', 'active'],
+      ['sc-code-review-finance', 'draft'],
+      ['sc-box-engineering', 'active'],
+      ['sc-box-design', 'active'],
     ])
     for (const p of authored) {
       expect(p.appIds.length, p.id).toBeGreaterThan(0)
@@ -70,7 +92,8 @@ describe('the showcase policies', () => {
   })
 
   it('name only zones, device profiles, groups and people the tenant has', () => {
-    for (const p of authored) {
+    /* The Global Default too, since its baseline names a zone and a profile. */
+    for (const p of t.policies) {
       for (const id of p.audience.groupIds) expect(groupIds.has(id), `${p.id} audience ${id}`).toBe(true)
       for (const id of p.audience.userIds) expect(userIds.has(id), `${p.id} audience ${id}`).toBe(true)
       for (const r of allRules(p.rules, p.fallback)) {
@@ -97,6 +120,45 @@ describe('the showcase policies', () => {
       expect(p.fallback?.decision, p.id).toBe('deny')
       expect(p.fallback?.denyMessage?.trim().length, p.id).toBeGreaterThan(0)
     }
+  })
+})
+
+/* The owner, 30 Sep 2026: the Global Default was "allow everything and
+   everyone". It keeps its system contract and gets a baseline: the operating
+   countries on a corporate laptop are a password, any other device there adds
+   OTP over Email, and the last row refuses everything else. */
+describe('the Global Default', () => {
+  const gd = t.policies.find((p) => p.isSystem)!
+  const leafIds = (r: Rule) => leaves(r.when).map((c) => `${c.typeId} ${c.operator} ${c.values.join(',')}`)
+
+  it('is still the one system policy: always on, every application, everyone', () => {
+    expect(gd).toMatchObject({ id: 'global-default', status: 'always-on', appIds: [], isSystem: true })
+    expect(gd.audience.everyone).toBe(true)
+  })
+
+  it('lets a corporate laptop in the operating countries in on a password, and asks any other device there for OTP over Email', () => {
+    expect(gd.rules.map((r) => [r.name, r.decision, r.firstFactor, r.secondFactorMethods ?? []])).toEqual([
+      ['Corporate device, where we operate', '1fa', 'Password', []],
+      ['Any other device, where we operate', '2fa', 'Password', ['OTP over Email']],
+    ])
+    expect(leafIds(gd.rules[0])).toEqual(['zone in zone operating-countries', 'fingerprint matches fp-corp-devices'])
+    expect(leafIds(gd.rules[1])).toEqual(['zone in zone operating-countries'])
+    for (const r of gd.rules) expect(r.who, r.name).toBeUndefined()
+    /* A method the tenant has switched on. */
+    const otp = t.methods.find((m) => m.name === 'OTP over Email')!
+    expect([otp.configured, otp.active]).toEqual([true, true])
+  })
+
+  it('refuses everything else by its last row, with a plain message', () => {
+    expect(gd.fallback?.name).toBe(FALLBACK_NAME)
+    expect(gd.fallback?.decision).toBe('deny')
+    expect(gd.fallback?.denyMessage).toBe('Sign-ins from outside the countries we work in are blocked. Contact your IT team.')
+  })
+
+  it('reads the countries the company works in, where its people sign in from', () => {
+    const zone = t.zones.find((z) => z.id === 'operating-countries')!
+    expect(zone).toMatchObject({ name: 'Operating countries', kind: 'allowed', ip: [], asn: [] })
+    expect(zone.location.countries).toEqual(['India', 'United Kingdom'])
   })
 })
 

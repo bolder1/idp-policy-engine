@@ -87,6 +87,7 @@ export function Picker({
   prefix,
   icon: Ico,
   noun = 'options',
+  listClassName,
 }: {
   value: string | string[] | null
   options: PickerOption[]
@@ -127,6 +128,8 @@ export function Picker({
   icon?: LucideIcon
   /** Plural, lower case, for the empty states: 'applications', 'zones'. */
   noun?: string
+  /** A class on the option list, for a page that styles its lists (the popup is in a portal, outside the page). */
+  listClassName?: string
 }) {
   const [open, setOpen] = useState(autoOpen)
   const [q, setQ] = useState('')
@@ -250,8 +253,15 @@ export function Picker({
     if (open) place()
   }, [q, open, place])
 
+  /* A pick hands focus back to the trigger, the one control left when the
+     list closes. An option is not focusable, so a click on one used to leave
+     focus on <body> — where Escape and the arrow keys reach nothing, and the
+     next Tab starts from the top of the page — and Enter in the search field
+     took the field away with focus in it. Before `onChange`, so a caller that
+     moves focus on a pick still has the last word. */
   const commit = (o: PickerOption) => {
     if (o.disabled) return
+    if (!multiple) anchor.current?.focus({ preventScroll: true })
     onChange(o.value)
     if (!multiple) setOpen(false)
   }
@@ -440,7 +450,7 @@ export function Picker({
               role="listbox"
               aria-label={label}
               aria-multiselectable={multiple || undefined}
-              className="bx-picker__list"
+              className={listClassName ? `bx-picker__list ${listClassName}` : 'bx-picker__list'}
               hidden={shown.length === 0}
             >
               {shown.map((o) => {
@@ -465,6 +475,10 @@ export function Picker({
                         o.disabled ? 'is-off' : ''
                       }`}
                       onMouseEnter={() => i >= 0 && setCursor(i)}
+                      /* Focus stays where it is — the search field, or the
+                         trigger — so a list that stays open (multiple) keeps
+                         its keys, and one that closes has focus to hand back. */
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => commit(o)}
                     >
                       <span className="bx-picker__tick" aria-hidden>

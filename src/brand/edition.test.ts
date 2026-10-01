@@ -59,10 +59,11 @@ describe('the two editions', () => {
     /* The showcase is lite plus the two testing surfaces the owner is
        comparing. One pin, at the call site, as the SHOWCASE convention asks
        (showcase.ts) — not a helper that hides which flags it moves. Describe
-       it and its checks are on in lite already and are named anyway, so the
-       pin says everything the showcase shows. */
+       it is pinned OFF for now (owner, 30 Sep 2026: "hide this, not needed as
+       of now"); its checks stay on. Both are named, so the pin says
+       everything the showcase shows. */
     expect(storeSrc.replace(/\s+/g, ' ')).toContain(
-      'features: SHOWCASE ? { ...featuresOf(edition), policyTesting: true, breakInTest: true, describePolicy: true, draftChecks: true } : featuresOf(edition),',
+      'features: SHOWCASE ? { ...featuresOf(edition), policyTesting: true, breakInTest: true, describePolicy: false, draftChecks: true } : featuresOf(edition),',
     )
     expect(storeSrc.match(/featuresOf\(/g)?.length).toBe(2)
   })

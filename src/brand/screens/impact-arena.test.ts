@@ -42,9 +42,15 @@ describe('people the policy does not govern', () => {
     expect(SITUATIONS.every((x) => s.outside[x.index] === !governed(x.index))).toBe(true)
   })
 
+  /* Situation by situation, since the Global Default's baseline (30 Sep 2026)
+     is no longer one factor for all: a password on a corporate laptop in
+     India or the UK, 2FA on anything else there, Deny elsewhere. Its Deny is
+     its own last row, never this policy's. */
   it('gives them the Global Default’s decision, not this policy’s Deny', () => {
-    const theirs = SITUATIONS.filter((x) => !governed(x.index)).map((x) => s.decisions[x.index])
-    expect(new Set(theirs)).toEqual(new Set(['1fa']))
+    const outsiders = SITUATIONS.filter((x) => !governed(x.index))
+    const gd = sweep(t.policies.find((p) => p.isSystem)!, env, noon)
+    expect(outsiders.map((x) => s.decisions[x.index])).toEqual(outsiders.map((x) => gd.decisions[x.index]))
+    expect(new Set(outsiders.map((x) => s.decisions[x.index]))).toEqual(new Set(['1fa', '2fa', 'deny']))
     expect(SITUATIONS.filter((x) => !governed(x.index)).every((x) => s.winners[x.index] === null)).toBe(true)
   })
 

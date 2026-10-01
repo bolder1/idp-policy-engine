@@ -35,6 +35,11 @@ type DotProps = {
   ms?: number
   /** Fade in where it lands, for an update that moved it without travel. */
   fadeIn?: boolean
+  /* The stage it is drawn in, as its layout dependency: the dot measures its
+     place only when it changes stage. A pan or a refit of the world, or a
+     re-render for a hover, is not a move of the dot — without this each one
+     was measured as a layout change and the dot slid after the chain. */
+  stage?: number
 }
 
 type BarProps = {
@@ -58,6 +63,7 @@ export function RouteMarker(props: DotProps | BarProps) {
         aria-hidden
         className={`tmarker tmarker--dot${props.unknown ? ' is-unknown' : ''}`}
         layoutId={props.layoutId ?? 'route-marker'}
+        layoutDependency={props.stage}
         initial={props.fadeIn && !reduced ? { opacity: 0 } : false}
         animate={{ opacity: 1 }}
         transition={{ layout: { type: 'tween', duration: seconds, ease: MARKER_EASE }, opacity: { duration: reduced ? 0 : 0.12 } }}

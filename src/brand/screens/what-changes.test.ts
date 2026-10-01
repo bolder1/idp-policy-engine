@@ -47,12 +47,15 @@ describe('sweepTenant', () => {
 })
 
 describe('whatChangesLine', () => {
-  it('reads turning HRMS on as 18 more asked for 2FA and 72 denied, all of them Priya (A6)', () => {
+  /* 18 and 72 until 30 Sep 2026, against a Global Default that let everybody
+     in on one factor. Its baseline now refuses Austin and the proxy itself
+     and can't tell a sign-in it cannot place, so HRMS turned on moves only
+     the office sign-ins on a corporate laptop, from one factor to 2FA. */
+  it('reads turning HRMS on as 3 more asked for 2FA and none denied, all of them Priya (A6)', () => {
     const line = whatChangesLine([swept(swap(HRMS, { status: 'inactive' }))], [swept(t.policies)], env)
-    expect(whatChangesSaid(line)).toBe('Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 18 · Now denied 72')
-    expect(line.nowDenied).toEqual([
-      { personId: 'priya', label: 'Priya Sharma (Finance)', origins: ['No IP address', 'Austin', 'Tor exit', 'Proxy in Germany'] },
-    ])
+    expect(whatChangesSaid(line)).toBe('Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 3 · Now denied 0')
+    expect(line.nowAskedFor2fa).toEqual([{ personId: 'priya', label: 'Priya Sharma (Finance)', origins: ['Office network'] }])
+    expect(line.nowDenied).toEqual([])
     expect(line.appNames).toEqual(['HRMS'])
     expect(line.total).toBe(360)
     expect(loosens(line)).toBe(false)

@@ -17,6 +17,7 @@ import {
   type SimContext,
 } from './screens/simulate'
 import { envOf, resolveSignIn } from './screens/tenant-resolver'
+import { devicePreset } from './screens/testing/device-presets'
 
 /* -----------------------------------------------------------------------------
    The showcase tenant, asked the questions a presenter will ask of it.
@@ -48,6 +49,10 @@ const ruleNamed = (p: Policy, name: string) => p.rules.findIndex((r) => r.name =
 const STORED = { substitute: { ...policy('sc-hrms-office'), status: 'active' as const } }
 
 const at = (address: string, over: Partial<SignInFacts> = {}): SignInFacts => ({ network: { address, source: 'typed' }, ...over })
+/* The Global Default reads the device since its baseline (30 Sep 2026): a
+   corporate laptop in the operating countries is its rule 1, one factor. The
+   scenes that land on it state one, so it decides rather than depends. */
+const CORP_LAPTOP = devicePreset('win11-registered').facts
 const place = (city: string, lat: number, lon: number, country = 'India', state: string | null = 'Maharashtra'): SignInPlace => ({
   country,
   state,
@@ -62,7 +67,7 @@ describe('Scene 1: HR in the office', () => {
   const r = resolveSignIn(t.policies, facts, env, STORED)
 
   it('is the Global Default today, on 1 factor, while HRMS is off', () => {
-    const today = resolveSignIn(t.policies, facts, env)
+    const today = resolveSignIn(t.policies, { ...facts, device: CORP_LAPTOP }, env)
     expect(today.decidedBy?.policyId).toBe('global-default')
     expect(today.decision).toBe('1fa')
     expect(today.standings.find((s) => s.policyId === 'sc-hrms-office')).toMatchObject({ kind: 'inactive', reason: 'Inactive' })
@@ -126,7 +131,7 @@ describe('Scene 2b: the office address, with other stated places', () => {
 
 describe('Scene 3: Sales on HRMS falls to the Global Default', () => {
   it('sends Aisha past the HRMS policy, which does not govern her, to the Global Default', () => {
-    const r = resolveSignIn(t.policies, at('203.0.113.25', { appId: 'hrms', personId: 'u-sales-1' }), env, STORED)
+    const r = resolveSignIn(t.policies, at('203.0.113.25', { appId: 'hrms', personId: 'u-sales-1', device: CORP_LAPTOP }), env, STORED)
     expect(r.decidedBy?.policyId).toBe('global-default')
     expect(r.decision).toBe('1fa')
     const hrms = r.standings.find((s) => s.policyId === 'sc-hrms-office')!
@@ -135,7 +140,10 @@ describe('Scene 3: Sales on HRMS falls to the Global Default', () => {
   })
 
   it('does the same for Arun in Engineering, and never applies the HRMS policy’s Deny', () => {
-    const r = resolveSignIn(t.policies, at('192.0.2.130', { appId: 'hrms', personId: 'arun' }), env)
+    /* From home in Pune (not an office block, so HRMS would refuse him): the
+       Global Default's rule 1 lets his corporate laptop in. Austin was the
+       address here until the Global Default's baseline refused it. */
+    const r = resolveSignIn(t.policies, at('192.0.2.10', { appId: 'hrms', personId: 'arun', device: CORP_LAPTOP }), env)
     expect(r.decidedBy?.policyId).toBe('global-default')
     expect(r.decision).toBe('1fa')
   })
@@ -149,7 +157,7 @@ describe('Scene 3b: a named person in the audience', () => {
   })
 
   it('leaves Mehak, an executive it does not name, to the Global Default', () => {
-    const r = resolveSignIn(t.policies, at('203.0.113.25', { appId: 'google-workspace', personId: 'mehak' }), env)
+    const r = resolveSignIn(t.policies, at('203.0.113.25', { appId: 'google-workspace', personId: 'mehak', device: CORP_LAPTOP }), env)
     expect(r.decidedBy?.policyId).toBe('global-default')
     expect(r.decision).toBe('1fa')
   })

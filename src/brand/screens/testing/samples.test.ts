@@ -41,12 +41,16 @@ describe('the samples', () => {
   })
 
   /* What the Samples view shows on a clean load. The HRMS scenes do not
-     answer apart until HRMS is on: all four read the Global Default, and none
-     is Can't tell. */
+     answer apart until HRMS is on: the three that state a place read the
+     Global Default's rule 1 (India, a corporate laptop). The one with no
+     address can't be told even today, since the Global Default's baseline
+     (30 Sep 2026) reads the country and the device. */
   it('answer on the tenant as it opens, with HRMS Inactive', () => {
-    for (const id of ['hr-office', 'hr-home', 'sales-hrms', 'no-address']) {
-      expect(answer(id)).toMatchObject({ status: 'decided', decision: '1fa', policy: 'Global Default Policy', rule: 'Baseline access' })
+    for (const id of ['hr-office', 'hr-home', 'sales-hrms']) {
+      expect(answer(id)).toMatchObject({ status: 'decided', decision: '1fa', policy: 'Global Default Policy', rule: 'Corporate device, where we operate' })
     }
+    expect(answer('no-address')).toMatchObject({ status: 'depends', decision: null, policy: 'Global Default Policy' })
+    expect(new Set(answer('no-address').possible)).toEqual(new Set(['1fa', '2fa', 'deny']))
     expect(answer('android-12')).toMatchObject({ decision: 'deny', policy: 'Device compliance for Outlook and Dropbox', rule: 'Nothing else matched' })
     expect(answer('personal-laptop')).toMatchObject({ decision: 'deny', policy: 'Access the app through corporate devices only', rule: 'Nothing else matched' })
     expect(answer('third-device')).toMatchObject({ decision: 'deny', policy: 'Access the app through corporate devices only', rule: 'Nothing else matched' })
@@ -58,7 +62,7 @@ describe('the samples', () => {
     const a = answerOn(on)
     expect(a('hr-office')).toMatchObject({ decision: '2fa', policy: 'HRMS access from corporate offices', rule: 'In a corporate office' })
     expect(a('hr-home')).toMatchObject({ decision: 'deny', policy: 'HRMS access from corporate offices', rule: 'Nothing else matched' })
-    expect(a('sales-hrms')).toMatchObject({ decision: '1fa', policy: 'Global Default Policy', rule: 'Baseline access' })
+    expect(a('sales-hrms')).toMatchObject({ decision: '1fa', policy: 'Global Default Policy', rule: 'Corporate device, where we operate' })
     expect(a('no-address')).toMatchObject({ status: 'depends', decision: null, possible: ['2fa', 'deny'] })
     for (const id of ['android-12', 'personal-laptop', 'third-device', 'medium-risk', 'dev-office']) expect(a(id)).toEqual(answer(id))
   })

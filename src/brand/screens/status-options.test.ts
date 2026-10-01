@@ -265,24 +265,24 @@ describe('rowMenu', () => {
   const showcase = { monitor: true, trySignIn: true, trail: false }
   const labels = (p: Policy, opts = showcase) => rowMenu(p, opts).map((i) => i.label)
 
-  it('reads Edit policy, Try a sign-in, Monitor, Turn off, … for an active policy (check 3)', () => {
-    expect(labels(as('active'))).toEqual(['Edit policy', 'Try a sign-in', 'Monitor', 'Turn off', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
+  it('reads Edit policy, Check access, Monitor, Turn off, … for an active policy (check 3)', () => {
+    expect(labels(as('active'))).toEqual(['Edit policy', 'Check access', 'Monitor', 'Turn off', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
   })
 
   it('reads Turn on, Turn off, View monitoring for a monitoring policy (check 4)', () => {
     expect(rowMenu(as('monitor'), showcase).map((i) => i.id)).toEqual(['edit', 'test', 'active', 'inactive', 'monitoring', 'text', 'template', 'duplicate', 'delete'])
-    expect(labels(as('monitor'))).toEqual(['Edit policy', 'Try a sign-in', 'Turn on', 'Turn off', 'View monitoring', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
+    expect(labels(as('monitor'))).toEqual(['Edit policy', 'Check access', 'Turn on', 'Turn off', 'View monitoring', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
   })
 
   it('offers View monitoring for no other status, and nowhere the edition has no Monitoring status', () => {
     for (const status of ['draft', 'active', 'inactive'] as const) expect(labels(as(status))).not.toContain('View monitoring')
-    expect(labels(as('monitor'), { ...showcase, monitor: false })).toEqual(['Edit policy', 'Try a sign-in', 'Turn on', 'Turn off', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
+    expect(labels(as('monitor'), { ...showcase, monitor: false })).toEqual(['Edit policy', 'Check access', 'Turn on', 'Turn off', 'Read as text', 'Save as template', 'Duplicate', 'Delete policy'])
   })
 
   it('offers the trail builder outside the showcase, after the switches', () => {
     expect(labels(as('inactive'), { ...showcase, trail: true })).toEqual([
       'Edit policy',
-      'Try a sign-in',
+      'Check access',
       'Turn on',
       'Monitor',
       'Open in trail',
@@ -294,7 +294,7 @@ describe('rowMenu', () => {
   })
 
   it('leaves out what a policy cannot do: Try without the edition, a template of no rules, Duplicate and Delete of the system policy', () => {
-    expect(labels(as('active'), { ...showcase, trySignIn: false })).not.toContain('Try a sign-in')
+    expect(labels(as('active'), { ...showcase, trySignIn: false })).not.toContain('Check access')
     expect(labels({ ...as('active'), rules: [] })).not.toContain('Save as template')
     const system = t.policies.find((p) => p.isSystem)!
     expect(labels(system)).not.toContain('Duplicate')
@@ -309,7 +309,7 @@ describe('rowMenu', () => {
       [as('active'), { ...showcase, trySignIn: false, monitor: false }],
     ]
     for (const [p, opts] of cases) expect(labels(p, opts)).toContain('Read as text')
-    expect(labels({ ...as('draft'), rules: [] })).toEqual(['Edit policy', 'Try a sign-in', 'Read as text', 'Duplicate', 'Delete policy'])
+    expect(labels({ ...as('draft'), rules: [] })).toEqual(['Edit policy', 'Check access', 'Read as text', 'Duplicate', 'Delete policy'])
   })
 })
 

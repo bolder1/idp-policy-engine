@@ -17,6 +17,7 @@ import { Button, RowMenu, Toggle } from '../../kit'
 import { SHOWCASE } from '../../showcase'
 import { fallbackRule, type Policy, type Rule } from '../../data'
 import type { Diagnostic } from '../diagnostics'
+import { ACCESS_CHECK } from '../sign-in-tests/names'
 import { AppsPane } from './AppsPane'
 import { type Selection } from './model'
 import { settledName } from './parts'
@@ -85,9 +86,10 @@ export function Inspector({
   onToggleWidth: () => void
   /** On its way out. The board keeps it mounted for the length of the slide. */
   leaving?: boolean
-  /* Opened from the chain in Try a sign-in. The panel's width is test mode's,
-     so there is no width to toggle, and × goes back to the sign-in rather than
-     closing the column — the route is still being read beside it. */
+  /* Opened from the chain in the old test mode. The panel's width is test
+     mode's, so there is no width to toggle, and × goes back to the sign-in
+     rather than closing the column. Check access (1 Oct 2026) hides the chain
+     and never opens the editor beside it, so the builder no longer sets it. */
   testing?: boolean
   /** Took the sign-in panel's place in the same column: a fade, not the slide. */
   swap?: boolean
@@ -179,8 +181,8 @@ export function Inspector({
         <button
           type="button"
           className="bb__act"
-          aria-label={testing ? 'Back to Try a sign-in' : 'Close the panel'}
-          title={testing ? 'Back to Try a sign-in' : 'Close'}
+          aria-label={testing ? `Back to ${ACCESS_CHECK}` : 'Close the panel'}
+          title={testing ? `Back to ${ACCESS_CHECK}` : 'Close'}
           onClick={onClose}
         >
           <X size={15} strokeWidth={2} />

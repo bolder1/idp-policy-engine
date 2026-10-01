@@ -24,6 +24,7 @@ import {
   type TaskCtx,
 } from './board-tour'
 import { TOUR_SEEN } from './tour-stops'
+import { BAR_DEMO, BAR_READ, BAR_TOUR } from '../screens/board/bar-tools'
 
 /* A walkthrough breaks silently, and an INTERACTIVE one breaks twice as
    quietly: a step whose anchor was renamed away just stops lighting anything,
@@ -406,6 +407,21 @@ describe('the board walkthrough', () => {
     expect(boardBuilder).toContain('onLearn={() => setTour(true)}')
   })
 
+  it('is hidden from the bar for now, with the recording and Read as text, behind one flag each', () => {
+    // Owner, 1 Oct 2026, of Demo · 1:16, Learn the board and Read as text:
+    // "Hide this 3 as of now" — superseding the showcase's "keep demo + tour".
+    // Hidden, not deleted: each button is drawn behind its flag, and the
+    // walkthrough no longer opens by itself either (the test above).
+    expect(BAR_DEMO).toBe(false)
+    expect(BAR_TOUR).toBe(false)
+    expect(BAR_READ).toBe(false)
+    expect(boardBar).toContain('{BAR_DEMO && onWatchDemo && <DemoButton onClick={onWatchDemo} />}')
+    expect(boardBar).toContain('{BAR_TOUR && onLearn && (')
+    expect(boardBar).toMatch(/\{BAR_READ && \(\s+<span className="bbtop__read"/)
+    // No key and no palette entry reaches them: the palette lists none of the three.
+    expect(boardBuilder).not.toMatch(/id: '(tour|demo|read)'/)
+  })
+
   it('keeps its own seen-key, because it teaches its own surface', () => {
     // Somebody who took the trail's tour has not been shown this one.
     expect(BOARD_TOUR_SEEN).not.toBe(TOUR_SEEN)
@@ -413,11 +429,15 @@ describe('the board walkthrough', () => {
   })
 
   it('does not interrupt somebody who arrived with a question', () => {
-    // Arriving in Try a sign-in's test mode — the Policies row menu (final
-    // spec, A.2) or a guard page's Break-in Open — is a person who already
-    // knows what they came for. The route used to open a sheet as well, and
-    // that arrival counted too, until M4 retired the sheets.
-    expect(boardBuilder).toContain('if (openTest || boardTourSeen()) return')
+    // Arriving in Check access — the Policies row menu (final spec, A.2) or
+    // the Sign-in tests page's Open policy — is a person who already knows
+    // what they came for. The route used to open a sheet as well, and that
+    // arrival counted too, until M4 retired the sheets. And not at all while
+    // the walkthrough is hidden with its bar button (owner, 1 Oct 2026:
+    // "Hide this 3 as of now"; bar-tools.ts `BAR_TOUR`). Nor a fix brought
+    // from Access checks' Break-in attempts (1 Oct 2026, arrive-fix.ts):
+    // somebody come to read one change on the chain.
+    expect(boardBuilder).toContain('if (!BAR_TOUR || openTest || arriving || boardTourSeen()) return')
   })
 
   it('stays non-modal, and carries what a non-modal dialog owes', () => {

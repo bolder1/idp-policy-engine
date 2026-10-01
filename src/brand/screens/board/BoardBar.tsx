@@ -9,7 +9,9 @@ import { ChangeState } from '../../leave-guard'
 import type { RuleSet } from '../../policy-draft'
 import { POLICY_NAME_MAX, policyNameIssue } from '../../policy-name'
 import { useBrand } from '../../store'
+import { ACCESS_CHECK } from '../sign-in-tests/names'
 import { StatusControl } from '../status-control'
+import { BAR_DEMO, BAR_READ, BAR_TOUR } from './bar-tools'
 
 /* -----------------------------------------------------------------------------
    The board's top row.
@@ -229,9 +231,12 @@ export function BoardBar({
           the bar is meant to be quiet. The rules themselves say who they cover on
           the Who pane, per rule, which is where the narrowing actually happens. */}
 
+      {/* Demo · 1:16 and Learn the board are hidden (owner, 1 Oct 2026:
+          "Hide this 3 as of now"; bar-tools.ts): the flags, not the callers,
+          decide, so turning one back on brings its button back as it was. */}
       <div className="bbtop__acts">
-        {onWatchDemo && <DemoButton onClick={onWatchDemo} />}
-        {onLearn && (
+        {BAR_DEMO && onWatchDemo && <DemoButton onClick={onWatchDemo} />}
+        {BAR_TOUR && onLearn && (
           <button
             type="button"
             className="bbtop__learn"
@@ -248,7 +253,38 @@ export function BoardBar({
   )
 }
 
-/* --- Try a sign-in, and the verbs --------------------------------------------
+/* --- The same bar, for a page that is not a policy -----------------------------
+
+   Sign-in tests wears the builder's layout (TESTING-V4 §14.1): this row, the
+   dotted canvas, the floating panel. The page is not a policy, so it has no
+   status, no change-state pill and no rename — the crumbs are "← Policies ›"
+   and the page's name, and the page's own verbs sit at the right. The same
+   markup and classes as `BoardBar`, so the two rows cannot drift apart; the
+   builder's bar is untouched. */
+
+export function BoardBarPlain({ title, actions }: { title: string; actions?: ReactNode }) {
+  const store = useBrand()
+  const back = () => store.go({ name: 'policies' })
+  return (
+    <header className="bbtop">
+      <nav className="bbtop__crumbs" aria-label="Where this page sits">
+        <button type="button" className="bbtop__back" aria-label="Back to policies" onClick={back}>
+          <ArrowLeft size={16} strokeWidth={2} aria-hidden />
+        </button>
+        <button type="button" className="bbtop__crumb" onClick={back}>
+          Policies
+        </button>
+        <ChevronRight size={13} strokeWidth={2} className="bbtop__sl" aria-hidden />
+        <h1 className="bbtop__title" title={title}>
+          {title}
+        </h1>
+      </nav>
+      {actions && <div className="bbtop__acts">{actions}</div>}
+    </header>
+  )
+}
+
+/* --- Check access, and the verbs --------------------------------------------
 
    Two pips stood first here — "Check · A · 2 through" and "What changes · 14"
    — the readings of a graded deck and a before/after sweep, in the full
@@ -256,8 +292,14 @@ export function BoardBar({
    and M4 retired the sheets they opened and the ⌘K commands that stood in for
    them: the Break-in test is in Saved sign-ins, and What changes is a row of
    the checks before saving. The bar's first control is the one testing verb
-   every edition has, Try a sign-in. Pressed while test mode is on, and
-   blue then — the active state, never the brand.
+   every edition has, Check access (it was Try a sign-in until 1 Oct 2026:
+   names.ts). Pressed while test mode is on, and blue then — the active
+   state, never the brand.
+
+   While it is on, its views stand before it (`views`: Past sign-ins — owner,
+   1 Oct: "past sign-ins can be a dedicated button in the top header";
+   PolicyCheck.tsx `CheckBarViews`), as the Sign-in tests page's Saved
+   sign-ins stands before its Try a sign-in.
 
    Then the two things that end a draft.
    -------------------------------------------------------------------------- */
@@ -270,6 +312,8 @@ export function BoardBarActions({
   canTest,
   onTest,
   testRef,
+  views,
+  quietSave = false,
   toPublish,
   unsaved,
   canDiscard,
@@ -292,6 +336,11 @@ export function BoardBarActions({
   onTest: () => void
   /** The button's wrapper, so focus can come back to it when test mode closes. */
   testRef?: Ref<HTMLSpanElement>
+  /** Check access's views (Past sign-ins), before its button while it is on. */
+  views?: ReactNode
+  /* Check access's sign-in panel is open, and its Run is the view's one
+     orange: the policy's save steps down to secondary until it shuts. */
+  quietSave?: boolean
   /** Something differs from live, or the policy has never been published. */
   toPublish: boolean
   /** Edits since the last save or draft. */
@@ -311,13 +360,17 @@ export function BoardBarActions({
   return (
     <>
       {/* Read as text (describe spec, §7.2): the whole policy as numbered
-          sentences, in the panel's slot. An icon, before Try a sign-in —
+          sentences, in the panel's slot. An icon, before Check access —
           reading is quieter than testing, and a second labelled button in
           the bar would make it louder. Every edition: it only reads. Pressed
-          while open, blue then, like Try a sign-in. */}
-      <span className="bbtop__read" ref={readRef}>
-        <IconButton icon={AlignLeft} size="sm" tone="ghost" label="Read as text" pressed={reading} onClick={onRead} />
-      </span>
+          while open, blue then, like Check access. Hidden (owner, 1 Oct
+          2026: "Hide this 3 as of now"; bar-tools.ts). */}
+      {BAR_READ && (
+        <span className="bbtop__read" ref={readRef}>
+          <IconButton icon={AlignLeft} size="sm" tone="ghost" label="Read as text" pressed={reading} onClick={onRead} />
+        </span>
+      )}
+      {testing && views}
       {/* On a wrapper, for the reason the review button's anchor is: `Button`
           passes no extra props, and the walkthrough and the focus return both
           need a real box to find. */}
@@ -330,10 +383,10 @@ export function BoardBarActions({
             pressed={testing}
             keys="T"
             disabled={!canTest}
-            title={canTest ? 'Try a sign-in (T)' : 'Only app access policies decide sign-ins'}
+            title={canTest ? `${ACCESS_CHECK} (T)` : 'Only app access policies decide sign-ins'}
             onClick={onTest}
           >
-            Try a sign-in
+            {ACCESS_CHECK}
           </Button>
         </span>
       )}
@@ -372,7 +425,7 @@ export function BoardBarActions({
           needs a real box for the spotlight to measure. */}
       <span className="bbtop__reviewwrap" data-tour="review">
         <Button
-          variant="brand"
+          variant={quietSave ? 'secondary' : 'brand'}
           size="sm"
           disabled={!toPublish || saveBlocked || checking}
           busy={checking}

@@ -2,6 +2,8 @@
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
+import { ACCESS_CHECK } from './screens/sign-in-tests/names'
+
 import decisionWordsSrc from './decision-words.ts?raw'
 import decisionBadgeSrc from './decision-badge.tsx?raw'
 import savedSignInsSrc from './saved-sign-ins.ts?raw'
@@ -23,7 +25,8 @@ import proseSrc from './screens/predicate-prose.ts?raw'
 import trySignInSrc from './screens/board/try-sign-in.ts?raw'
 import useTrySignInSrc from './screens/board/use-try-sign-in.ts?raw'
 import trySignInRunSrc from './screens/board/try-sign-in-run.ts?raw'
-import signInPanelSrc from './screens/board/SignInPanel.tsx?raw'
+import testModeSrc from './screens/board/test-mode.ts?raw'
+import signInTestsSrc from './screens/SignInTests.tsx?raw'
 import routeGateSrc from './screens/board/RouteGate.tsx?raw'
 import boardBarSrc from './screens/board/BoardBar.tsx?raw'
 import boardBuilderSrc from './screens/board/BoardBuilder.tsx?raw'
@@ -108,14 +111,17 @@ const NAMED: Record<string, string> = {
      the guard pages alike. */
   './screens/watching-line.tsx': watchingLineSrc,
   './screens/watching-words.ts': watchingWordsSrc,
-  /* Try a sign-in on the board: its model, its run, its panel, and the gates
-     and evidence it draws on the chain. */
+  /* Try a sign-in on the board: its model, its run, the words and choices of
+     test mode (the why-line, the tab a route opens), and the gate it still
+     draws on the chain. The test panel, the sentence and the trace live in
+     screens/testing/, and the glob picks them up. */
   './screens/board/try-sign-in.ts': trySignInSrc,
   './screens/board/use-try-sign-in.ts': useTrySignInSrc,
   './screens/board/try-sign-in-run.ts': trySignInRunSrc,
-  './screens/board/SignInPanel.tsx': signInPanelSrc,
+  './screens/board/test-mode.ts': testModeSrc,
   './screens/board/RouteGate.tsx': routeGateSrc,
-  /* Policy testing's page (Version 1); its views live in screens/testing/. */
+  /* The tenant's Sign-in tests page (V4 §3); its views live in screens/testing/. */
+  './screens/SignInTests.tsx': signInTestsSrc,
   /* The Break-in test: its model, its view, and the What changes line its fix
      preview prints (and the guard pages will). */
   './screens/break-in-model.ts': breakInModelSrc,
@@ -228,10 +234,15 @@ describe('the testing surfaces', () => {
 
   /* The board's own entry to it. The bar's pips said "Check" and graded a
      deck; Check's first section was "Try a login", which Try a sign-in retired
-     (final spec, A.8). */
-  it('reach the board by Try a sign-in', () => {
+     (final spec, A.8) — and Try a sign-in became Check access (owner, 1 Oct
+     2026: "can we call it something related to access"), said once in
+     names.ts, so the bar names it by the constant. */
+  it('reach the board by Check access', () => {
     expect(offences(boardBarSrc, 'BoardBar.tsx')).toEqual([])
-    expect(uiStrings(boardBarSrc, 'BoardBar.tsx')).toContain('Try a sign-in')
+    expect(uiStrings(boardBarSrc, 'BoardBar.tsx')).not.toContain('Try a sign-in')
+    expect(boardBarSrc).toContain('{ACCESS_CHECK}')
+    expect(boardBarSrc).toContain('`${ACCESS_CHECK} (T)`')
+    expect(ACCESS_CHECK).toBe('Check access')
   })
 
   /* And the two sheets the pips opened, which the palette reached until M4:
@@ -352,9 +363,11 @@ describe('sign-in, not login', () => {
 
   /* The Break-in test prints its cards' names and the rules their fixes add.
      They live in gauntlet.ts, beside the chip deck's older words, so they are
-     read from the deck itself rather than from the file. */
+     read from the deck itself rather than from the file. And their stories
+     and whys: Access checks prints each attempt's story on its row (owner,
+     1 Oct 2026), and seven of them said "logs in" or "logs back in". */
   it('names every Break-in card and fix in sign-ins', () => {
-    const shown = TYPED_DECK.flatMap((c) => [c.name, ...(c.fix ? [c.fix.name] : [])])
-    expect(shown.filter((s) => LOGIN.test(s))).toEqual([])
+    const shown = TYPED_DECK.flatMap((c) => [c.name, c.story, c.why, ...(c.fix ? [c.fix.name, c.fix.why] : [])])
+    expect(shown.filter((s) => LOGIN.test(s) || /\blogs back in\b/i.test(s))).toEqual([])
   })
 })

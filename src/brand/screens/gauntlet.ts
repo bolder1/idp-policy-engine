@@ -159,7 +159,7 @@ export const DECK: Challenge[] = [
     id: 'tor-exec',
     kind: 'threat',
     name: 'Executive account from a Tor exit',
-    story: 'Someone logs in as an executive from an anonymising network on a device nobody has seen before.',
+    story: 'Someone signs in as an executive from an anonymising network on a device nobody has seen before.',
     userId: 'mehak', place: 'Tor exit node', device: 'New / unknown', authState: 'Normal returning user', risk: 'High', at: '02:40',
     want: 'deny',
     why: 'An anonymised origin on an unknown device is the shape of a credential-stuffing success. There is no legitimate reading of it.',
@@ -187,7 +187,7 @@ export const DECK: Challenge[] = [
     id: 'no-mfa',
     kind: 'threat',
     name: 'Account with no second factor enrolled',
-    story: 'A contractor with no MFA configured logs in from outside every known zone.',
+    story: 'A contractor with no MFA configured signs in from outside every known zone.',
     userId: 'devon', place: 'Outside all zones', device: 'New / unknown', authState: 'No MFA configured', risk: 'High',  at: '23:05',
     want: 'deny',
     why: 'Asking for a second factor the account cannot produce is the same as asking for nothing. Enrolment has to happen before access, not instead of it.',
@@ -249,7 +249,7 @@ export const DECK: Challenge[] = [
     id: 'unmanaged-contractor',
     kind: 'threat',
     name: 'Contractor on an unmanaged device',
-    story: 'A contractor logs in from their own laptop, never enrolled in MDM.',
+    story: 'A contractor signs in from their own laptop, never enrolled in MDM.',
     userId: 'devon', place: 'Outside all zones', device: 'New / unknown', authState: 'Normal returning user', risk: 'Medium', at: '10:05',
     want: '2fa',
     why: 'Non-employees on their own hardware are the standard step-up case. Blocking them outright usually just moves the work somewhere unmanaged.',
@@ -273,7 +273,7 @@ export const DECK: Challenge[] = [
     id: 'exec-office',
     kind: 'legit',
     name: 'Executive at their desk',
-    story: 'An executive logs in from the office on a corporate-managed machine.',
+    story: 'An executive signs in from the office on a corporate-managed machine.',
     userId: 'mehak', place: 'Office Network', device: 'Managed (MDM)', authState: 'Normal returning user', risk: 'Low', at: '08:55',
     want: '1fa',
     why: 'Seniority is not risk. If executives are challenged for being executives, they are the people who will ask for an exemption.',
@@ -282,7 +282,7 @@ export const DECK: Challenge[] = [
     id: 'finance-home',
     kind: 'legit',
     name: 'Finance working from home',
-    story: 'A finance user logs in from home on their usual, recently verified laptop.',
+    story: 'A finance user signs in from home on their usual, recently verified laptop.',
     userId: 'priya', place: 'Outside all zones', device: 'Known < 90 days', authState: 'Normal returning user', risk: 'Low', at: '19:20',
     want: '2fa',
     why: 'Off-network access to regulated data is worth one extra step. It is not worth a denial — that is how shadow IT starts.',
@@ -300,17 +300,17 @@ export const DECK: Challenge[] = [
     id: 'first-login',
     kind: 'legit',
     name: 'Brand new joiner',
-    story: 'A new starter logs in for the first time, at the office, on a machine with no history.',
+    story: 'A new starter signs in for the first time, at the office, on a machine with no history.',
     userId: 'priya', place: 'Office Network', device: 'New / unknown', authState: 'First time login', risk: 'Low', at: '09:05',
     want: '2fa',
-    why: 'First login is the one moment an account is worth binding to a person. Skipping it means the first real verification never happens.',
+    why: 'The first sign-in is the one moment an account is worth binding to a person. Skipping it means the first real verification never happens.',
     /* No fix — see the note on `no-mfa`. */
   },
   {
     id: 'after-reset',
     kind: 'legit',
     name: 'Straight after an MFA reset',
-    story: 'Someone who just had their second factor reset by the help desk logs back in.',
+    story: 'Someone who just had their second factor reset by the help desk signs back in.',
     userId: 'arun', place: 'Office Network', device: 'Known < 90 days', authState: 'MFA recently reset', risk: 'Low', at: '13:40',
     want: '2fa',
     why: 'A help-desk reset is the most impersonated event in identity. Re-verifying here is what stops a phone call from becoming an account takeover.',
@@ -323,7 +323,7 @@ export const DECK: Challenge[] = [
     story: 'A long-trusted device appears from a network the platform cannot place in any zone.',
     userId: 'arun', place: 'Any location', device: 'Known > 90 days', authState: 'Normal returning user', risk: 'Low', at: '17:15',
     want: '2fa',
-    why: 'When the origin cannot be established, zone rules decide nothing. Something else has to, or the login falls through to the default unexamined.',
+    why: 'When the origin cannot be established, zone rules decide nothing. Something else has to, or the sign-in falls through to the default unexamined.',
     /* No fix, and that IS this card's lesson now.
 
        It used to propose an enrolment rule, on the grounds that when the origin
@@ -371,7 +371,7 @@ export function classify(want: Expect, got: AccessDecision): Outcome {
    B on friction while doing exactly that. An ordinary card denied where it did
    not ask to be is a lockout, whatever it asked for. A hostile card denied
    harder than asked is still friction here: stopping an attacker harder costs
-   nobody legitimate, and the grade's sentences are about ordinary logins. */
+   nobody legitimate, and the grade's sentences are about ordinary sign-ins. */
 function classifyRound(card: Pick<Challenge, 'kind'>, want: Expect, got: AccessDecision): Outcome {
   if (card.kind === 'legit' && got === 'deny' && want !== 'deny') return 'lockout'
   return classify(want, got)
@@ -418,10 +418,10 @@ function gradeOf(breaches: number, lockouts: number, friction: number): { grade:
   if (lockouts > 0)
     return {
       grade: 'C',
-      reason: `Nothing got through, but ${lockouts} ordinary login${lockouts === 1 ? '' : 's'} ${lockouts === 1 ? 'was' : 'were'} denied outright.`,
+      reason: `Nothing got through, but ${lockouts} ordinary sign-in${lockouts === 1 ? '' : 's'} ${lockouts === 1 ? 'was' : 'were'} denied outright.`,
     }
   if (friction > 2)
-    return { grade: 'B', reason: `Nothing got through and nobody was locked out, but ${friction} ordinary logins were challenged more than the deck asks for.` }
+    return { grade: 'B', reason: `Nothing got through and nobody was locked out, but ${friction} ordinary sign-ins were challenged more than the deck asks for.` }
   if (friction > 0)
     return { grade: 'A', reason: `Every card landed as expected, bar ${friction} extra challenge${friction === 1 ? '' : 's'}.` }
   return { grade: 'A', reason: 'Every card in the deck landed exactly as expected.' }
@@ -529,11 +529,21 @@ const specWhen = (conditions: SpecCondition[]): Predicate =>
 const specKey = (spec: FixSpec) => ruleSig({ who: spec.who, when: specWhen(spec.conditions) })
 
 /** A fix spec as the rule it would add, deciding `decision`. The insert branch
-    below and the typed deck's tests build it the same way. */
+    below and the typed deck's tests build it the same way.
+
+    Not pristine. `blankRule` marks a rule nobody has chosen an outcome for
+    yet, and only a `decision` patch on the board clears the mark (model.ts);
+    this one is born with its outcome chosen, so the mark goes here — as the
+    board's patch clears it, `pristine: undefined`. Left on, the card read
+    "then Outcome not chosen yet" over a rule the Inspector showed as Deny,
+    and went on saying it once saved (review, 1 Oct 2026: Access checks'
+    "Fix in policy" was the first road to it — the builder's Break-in test,
+    the only other one, is hidden). */
 export function ruleFromFix(spec: FixSpec, decision: AccessDecision): Rule {
   return withWho(
     {
       ...blankRule(spec.name),
+      pristine: undefined,
       /* One card: a fix spec is a set of conditions that must all hold — or no
          card, when the spec is only about who. A rule cannot be broader than its
          policy, so there is nothing to widen it to. */
@@ -704,10 +714,10 @@ function proposeFrom(
       why: spec.why,
       placement:
         tooWeak && tooLate
-          ? `Rule ${twinIndex + 1} · ${twin.name} already checks this, but it is weaker than the card asks for and sits below rule ${at + 1}, which decides the login first. Re-aimed and moved above it.`
+          ? `Rule ${twinIndex + 1} · ${twin.name} already checks this, but it is weaker than the card asks for and sits below rule ${at + 1}, which decides the sign-in first. Re-aimed and moved above it.`
           : tooWeak
             ? `Rule ${twinIndex + 1} · ${twin.name} already checks this and answers ${EXPECT_LABEL[twin.decision]}. A second rule with the same conditions would make one of the two unreachable, so this changes the answer instead of adding one.`
-            : `Rule ${twinIndex + 1} · ${twin.name} already says this, but sits below rule ${at + 1}, which decides the login first. Moved above it.`,
+            : `Rule ${twinIndex + 1} · ${twin.name} already says this, but sits below rule ${at + 1}, which decides the sign-in first. Moved above it.`,
       headline:
         tooLate && !tooWeak
           ? `Move rule ${twinIndex + 1} above rule ${at + 1}`
@@ -723,7 +733,7 @@ function proposeFrom(
     at,
     why: spec.why,
     placement: decider
-      ? `Inserted above rule ${at + 1} · ${decider.name}, which is what decides this login today. Below it, the new rule would never run.`
+      ? `Inserted above rule ${at + 1} · ${decider.name}, which is what decides this sign-in today. Below it, the new rule would never run.`
       : null,
     headline: `Insert as rule ${at + 1}`,
   }
@@ -814,7 +824,9 @@ export function runGauntlet(
 
    On screen in the Break-in test (break-in-view.tsx), inside Saved sign-ins,
    and in Check's counts row. `DECK` stays for the surface that still prints
-   its length and its grade — the trail's dialog — until it is retired.
+   its length and its grade — the trail's dialog — until it is retired. And
+   on the Access checks page, played on an application across the tenant
+   rather than on one policy (break-in-app.ts, 1 Oct 2026).
    ========================================================================== */
 
 /** The ways a typed card can come back. Named for what happened. */
@@ -1131,24 +1143,71 @@ const COUNT_OF: Record<AttemptOutcome, Exclude<keyof BreakInCounts, 'skipped'>> 
   undecided: 'undecided',
 }
 
-/* The typed deck against one policy, on the typed evaluator.
+/* One typed card, judged against the trace of the policy that decided it.
 
-   A card about somebody the policy does not govern is skipped, with the
-   audience named — the policy was never asked. Every other card is traced
-   three-valued, and each decision the policy COULD reach is classified with
-   the second factor of the rule that would reach it. When they all agree the
-   round has that outcome; when a missing fact would change it, the round is
-   undecided, and `outcomes` says between what. A round is never scored on a
-   guess. */
-export function runBreakIn(policy: Policy, env: SimEnv, opts: BreakInOptions = {}): BreakInResult {
-  const deck = opts.deck ?? TYPED_DECK
-  const e: SimEnv = opts.match ? { ...env, deviceMatch: opts.match } : env
-  const methods = e.library?.methods ?? AUTH_METHODS
+   Each decision the policy COULD reach is classified with the second factor
+   of the rule that would reach it. When they all agree the round has that
+   outcome; when a missing fact would change it, the round is undecided, and
+   `outcomes` says between what. A round is never scored on a guess.
+
+   Out of `runBreakIn`, which asks it of one policy for every card, so the
+   Access checks page can ask it of whichever policy the tenant hands each
+   card to (break-in-app.ts) and the two cannot judge a card two ways (owner,
+   1 Oct 2026: "can we implement it in the check part?"). The trace is the
+   caller's: `tracePolicy` here, the resolver's own trace there. A trace with
+   no possible outcome — out of the audience, or no policy at all — comes
+   back undecided with no outcomes; `runBreakIn` skips those before asking. */
+export function judgeAttempt(
+  card: TypedChallenge,
+  policy: Policy,
+  trace: PolicyTrace,
+  opts: Pick<BreakInOptions, 'overrides' | 'factorOk'>,
+  methods: readonly AuthMethod[],
+): AttemptRound {
   /* The second factor of the rule at an index; null is the last row. */
   const factorOf = (ruleIndex: number | null): FactorStrength | null => {
     const r = ruleIndex === null ? policy.fallback : policy.rules[ruleIndex]
     return r ? ruleFactor(r, methods) : null
   }
+  const want = opts.overrides?.[card.id] ?? card.want
+  const judged = opts.factorOk?.has(card.id) ? { ...card, minFactor: undefined } : card
+  const outcomes = [...new Set(trace.possible.map((o) => classifyAttempt(judged, want, o.decision, factorOf(o.ruleIndex))))]
+  return {
+    challenge: card,
+    want,
+    trace,
+    decision: trace.decision,
+    factor: trace.decision === '2fa' ? factorOf(trace.hitIndex) : null,
+    outcome: outcomes.length === 1 ? outcomes[0] : 'undecided',
+    outcomes,
+  }
+}
+
+/** The counts of a list of rounds; `skipped` is the caller's. */
+export function countRounds(rounds: readonly AttemptRound[], skipped = 0): BreakInCounts {
+  const counts: BreakInCounts = {
+    held: 0,
+    gotThrough: 0,
+    weakerFactor: 0,
+    lessThanAsked: 0,
+    lockedOut: 0,
+    extraPrompts: 0,
+    undecided: 0,
+    skipped,
+  }
+  for (const r of rounds) counts[COUNT_OF[r.outcome]] += 1
+  return counts
+}
+
+/* The typed deck against one policy, on the typed evaluator.
+
+   A card about somebody the policy does not govern is skipped, with the
+   audience named — the policy was never asked. Every other card is traced
+   three-valued and judged (`judgeAttempt`). */
+export function runBreakIn(policy: Policy, env: SimEnv, opts: BreakInOptions = {}): BreakInResult {
+  const deck = opts.deck ?? TYPED_DECK
+  const e: SimEnv = opts.match ? { ...env, deviceMatch: opts.match } : env
+  const methods = e.library?.methods ?? AUTH_METHODS
 
   const rounds: AttemptRound[] = []
   const skipped: BreakInResult['skipped'] = []
@@ -1162,32 +1221,10 @@ export function runBreakIn(policy: Policy, env: SimEnv, opts: BreakInOptions = {
       skipped.push({ cardId: card.id, audience: outside })
       continue
     }
-    const want = opts.overrides?.[card.id] ?? card.want
-    const judged = opts.factorOk?.has(card.id) ? { ...card, minFactor: undefined } : card
-    const outcomes = [...new Set(trace.possible.map((o) => classifyAttempt(judged, want, o.decision, factorOf(o.ruleIndex))))]
-    rounds.push({
-      challenge: card,
-      want,
-      trace,
-      decision: trace.decision,
-      factor: trace.decision === '2fa' ? factorOf(trace.hitIndex) : null,
-      outcome: outcomes.length === 1 ? outcomes[0] : 'undecided',
-      outcomes,
-    })
+    rounds.push(judgeAttempt(card, policy, trace, opts, methods))
   }
 
-  const counts: BreakInCounts = {
-    held: 0,
-    gotThrough: 0,
-    weakerFactor: 0,
-    lessThanAsked: 0,
-    lockedOut: 0,
-    extraPrompts: 0,
-    undecided: 0,
-    skipped: skipped.length,
-  }
-  for (const r of rounds) counts[COUNT_OF[r.outcome]] += 1
-  return { rounds, counts, skipped }
+  return { rounds, counts: countRounds(rounds, skipped.length), skipped }
 }
 
 /* --- Fixes for the typed deck ---------------------------------------------------
@@ -1201,7 +1238,9 @@ export function runBreakIn(policy: Policy, env: SimEnv, opts: BreakInOptions = {
    zone, profile, group or person the tenant does not have is withheld. Only
    the question "does this rule match the card" differs: the typed evaluator,
    on the card's own facts and the policy's first application, exactly as
-   `runBreakIn` asked it.
+   `runBreakIn` asked it — or on `appId`, the application the Access checks
+   page ran the card on (break-in-app.ts), when the policy that decided it
+   covers more than one.
 
    A round held on the decision and weak on the factor is closed by asking for
    a stronger second factor on the rule that decided it — not by a new rule,
@@ -1210,14 +1249,14 @@ export function runBreakIn(policy: Policy, env: SimEnv, opts: BreakInOptions = {
    A round that came back stricter than asked is never "fixed" here. Closing it
    would mean loosening a rule, and advice to loosen does not come from a test
    of what gets through. */
-export function proposeAttemptFix(round: AttemptRound, policy: Policy, env: SimEnv): ProposedFix | null {
+export function proposeAttemptFix(round: AttemptRound, policy: Policy, env: SimEnv, appId: string | undefined = policy.appIds[0]): ProposedFix | null {
   const spec = round.challenge.fix
   if (!spec || (round.outcome !== 'got-through' && round.outcome !== 'less-than-asked')) return null
   if (namesMissing(spec, env)) return null
   const card = round.challenge
   const person = personOf(card.personId, env)
   if (!person) return null
-  const app = policy.appIds[0]
+  const app = appId
   const facts: SignInFacts = { ...card.facts, ...(app ? { appId: app } : null), personId: card.personId }
   const at = round.trace.hitIndex ?? policy.rules.length
   return proposeFrom(spec, round.want, at, person, policy, (r) => traceRule(r, at, facts, person, env).match === 'yes')

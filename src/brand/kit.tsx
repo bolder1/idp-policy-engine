@@ -34,6 +34,7 @@ import {
 
 import type { AccessDecision, PolicyStatus } from './data'
 import { appRoot, useDialogChrome } from './dialog-chrome'
+import { describeBy, nameOf, tipAdds, tipTarget } from './tip-describe'
 import { ChangeList, ChangeSection, type ChangeItem } from './change-list'
 import { groupSections, reviewItemName, reviewSave, sectionsOpen, type KindBlock, type ReviewLine } from './review-rows'
 import { useReviewView, type ReviewView } from './review-view'
@@ -1321,9 +1322,14 @@ export function Tip({
 }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number; side: 'top' | 'bottom' } | null>(null)
+  /* What the tip adds when it starts with the control's own name —
+     "Documentation. Coming soon." on a button named Documentation — said by
+     a hidden element of its own, so the name is not read twice. */
+  const [rest, setRest] = useState<string | null>(null)
   const anchor = useRef<HTMLSpanElement | null>(null)
   const pop = useRef<HTMLSpanElement | null>(null)
   const id = useId()
+  const restId = `${id}-rest`
 
   const place = useCallback(() => {
     const a = anchor.current?.getBoundingClientRect()
@@ -1349,6 +1355,27 @@ export function Tip({
     const left = Math.max(TIP_MARGIN, Math.min(centred, window.innerWidth - w - TIP_MARGIN))
     setPos({ top, left, side })
   }, [placement, width])
+
+  /* The description goes on the control, not on this wrapper. A span that
+     never takes focus described by the tip was never read: a screen reader
+     reads a description off the element that has focus (V4 review MAP-6).
+     So while the tip is open, the focused control inside — or, opened by the
+     pointer, the first control inside — is described by it, added to any
+     description of its own and taken off again on close. Only by what the
+     tip adds to the control's name (tip-describe.ts): nothing when the name
+     already says it — an icon button's tip is its label, "Replay, button,
+     Replay" says nothing twice over — and only the rest when the tip opens
+     with the name. A wrapper with no control inside (a badge, a line of
+     text) describes nothing, as before. */
+  useLayoutEffect(() => {
+    if (!open) return
+    const trigger = tipTarget(anchor.current, document.activeElement)
+    if (!trigger) return
+    const adds = tipAdds(pop.current?.textContent ?? '', nameOf(trigger))
+    setRest(adds.kind === 'rest' ? adds.text : null)
+    if (adds.kind === 'none') return
+    return describeBy(trigger, adds.kind === 'rest' ? restId : id) ?? undefined
+  }, [open, id, restId])
 
   /* Measured after the pop is in the DOM, so `h` is real rather than guessed —
      the first pass renders it invisible at 0,0 and the second puts it right. */
@@ -1382,31 +1409,38 @@ export function Tip({
       onFocusCapture={() => setOpen(true)}
       onBlurCapture={() => setOpen(false)}
       onTouchStart={() => setOpen((v) => !v)}
-      aria-describedby={open ? id : undefined}
     >
       {children}
       {open &&
         createPortal(
-          <AnimatePresence>
-            <motion.span
-              ref={pop}
-              id={id}
-              role="tooltip"
-              className={`bx-tip__pop is-${pos?.side ?? placement}`}
-              style={{
-                top: pos?.top ?? 0,
-                left: pos?.left ?? 0,
-                width,
-                /* Hidden until measured, so nothing is ever seen at 0,0. */
-                visibility: pos ? 'visible' : 'hidden',
-              }}
-              initial={{ opacity: 0, y: (pos?.side ?? placement) === 'bottom' ? -3 : 3 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.13 }}
-            >
-              {text}
-            </motion.span>
-          </AnimatePresence>,
+          <>
+            <AnimatePresence>
+              <motion.span
+                ref={pop}
+                id={id}
+                role="tooltip"
+                className={`bx-tip__pop is-${pos?.side ?? placement}`}
+                style={{
+                  top: pos?.top ?? 0,
+                  left: pos?.left ?? 0,
+                  width,
+                  /* Hidden until measured, so nothing is ever seen at 0,0. */
+                  visibility: pos ? 'visible' : 'hidden',
+                }}
+                initial={{ opacity: 0, y: (pos?.side ?? placement) === 'bottom' ? -3 : 3 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.13 }}
+              >
+                {text}
+              </motion.span>
+            </AnimatePresence>
+            {/* Referenced by id, so read though hidden. */}
+            {rest && (
+              <span id={restId} hidden>
+                {rest}
+              </span>
+            )}
+          </>,
           document.body,
         )}
     </span>

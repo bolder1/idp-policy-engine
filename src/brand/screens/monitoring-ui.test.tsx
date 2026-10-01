@@ -48,26 +48,39 @@ describe('the Monitoring page', () => {
   it('says the sign-ins are modelled, and the plan line exactly (acceptance 5)', () => {
     expect(said).toContain('Modelled sign-ins')
     expect(out).toContain('aria-label="About modelled sign-ins"')
-    expect(said).toContain('If turned on: 0 to allow on 1 factor, 3 to allow with 2FA, 5 to deny, 4 unchanged.')
+    /* The Global Default's baseline (30 Sep 2026) already steps up or refuses
+       some of the twelve today, so fewer move (monitor-sample.test.ts). */
+    expect(said).toContain('If turned on: 0 to allow on 1 factor, 2 to allow with 2FA, 4 to deny, 6 unchanged.')
     expect(said).toContain('Modelled sign-ins for HRMS access from corporate offices')
   })
 
   it('lists twelve rows: the 2FA moves, then the denials, then the unchanged', () => {
     expect(said).toContain('Time Person Application From Today If turned on Details')
-    const order = [...said.matchAll(/Would allow with 2FA|Would deny|No change/g)].map((m) => m[0])
-    expect(order).toEqual([...Array(3).fill('Would allow with 2FA'), ...Array(5).fill('Would deny'), ...Array(4).fill('No change')])
+    /* The moves' badges only: since the Global Default's baseline (30 Sep
+       2026) two No change rows say under them what HRMS would give — the same
+       as today ("Would allow with 2FA", "Would deny") — which is not a move. */
+    const order = [...said.matchAll(/Would allow with 2FA(?= In a corporate office)|Would deny(?= Nothing else matched)|No change/g)].map((m) => m[0])
+    expect(order).toEqual([...Array(2).fill('Would allow with 2FA'), ...Array(4).fill('Would deny'), ...Array(6).fill('No change')])
     expect(count(out, /aria-label="Show why: /g)).toBe(12)
     expect(count(out, /aria-expanded="false"/g)).toBe(12)
   })
 
+  /* Today is the Global Default's baseline (30 Sep 2026): two on one factor,
+     seven with OTP over Email, two refused and the Tor exit it can't place —
+     eleven badges, each over the Global Default, and grey text for the twelfth. */
   it('says Today as a decision badge over the policy deciding it, on every row', () => {
-    expect(count(out, /bx-badge--positive bx-decision-badge/g)).toBe(12)
-    expect(count(said, /Allow on 1 factor Global Default Policy/g)).toBe(12)
+    expect(count(out, /bx-decision-badge/g)).toBe(11)
+    expect(count(said, /Allow on 1 factor Global Default Policy/g)).toBe(2)
+    /* Not the Tor exit's grey "Deny or Allow with 2FA", which is no badge. */
+    expect(count(said, /(?<!or )Allow with 2FA Global Default Policy/g)).toBe(7)
+    expect(count(said, /Deny Global Default Policy/g)).toBe(2)
   })
 
   it('draws a would-be decision as an info badge, never the decision’s tone', () => {
-    expect(count(out, /bx-badge--info bx-would-badge/g)).toBe(8)
-    expect(count(out, /bx-badge--negative/g)).toBe(0)
+    expect(count(out, /bx-badge--info bx-would-badge/g)).toBe(6)
+    /* The only negative badges are Today's two refusals, never a would-be one. */
+    expect(count(out, /bx-badge--negative/g)).toBe(2)
+    expect(count(out, /bx-badge--negative bx-would-badge/g)).toBe(0)
     expect(said).toContain('Would allow with 2FA In a corporate office')
     expect(said).toContain('Would deny Nothing else matched')
     expect(said).toContain('No change Not in audience')

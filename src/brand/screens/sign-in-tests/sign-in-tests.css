@@ -1,0 +1,437 @@
+/* -----------------------------------------------------------------------------
+   Sign-in tests: the page (V4 §14 — the policy builder's layout). Prefix
+   `sit` for the page's frame and the panel, `hiw` for the empty canvas
+   (HowItWorks.tsx); the journey is `tj` (journey.css), the Saved sign-ins
+   picker `tbar-saved` (try-bar.css) and the locked-off tables `sitl`
+   (library.css).
+
+   The builder's own pieces are worn, not copied: the bar is `.bbtop`, the
+   region `.bb` (its dotted ground, its tracks, the floating `.bb__insp`), the
+   dock `.bb__dock`, the panel's sections `.bb__sec` and its fields
+   `.bb__thenfield` and `.cp__stack` (board.css, condition-popover.css). What
+   is here is only what the page adds: its frame, the canvas's track, the
+   journey standing on the region's ground instead of its own, and the
+   panel's few parts the Inspector has no word for.
+
+   The page is a flex column — the bar, then the region taking exactly what
+   is left of the window (a min-height: 0 chain, no fixed heights) — so it
+   never scrolls at any window size; the canvas scrolls itself.
+
+   Tokens only (console-theme.css). Nothing here is moved: the empty canvas's
+   light and glows, the fact rows sliding in, the panel sliding in and out,
+   the cue fading, are motion's (their `top`, opacity, `x` and `y`), so no
+   rule here has a transform or a transition — and the one CSS animation the
+   builder gives its panel is switched off for this one.
+   -------------------------------------------------------------------------- */
+
+/* --- The page ------------------------------------------------------------------ */
+
+.bshell__main > .sit { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.sit > .bbtop { flex: none; }
+.sit > .bb { flex: 1 1 auto; min-height: 0; }
+/* A query container, so the panel can hold its track's width in `cqw` (below). */
+.sit > .sit__bb { container-type: inline-size; }
+
+/* Saved sign-ins, on the builder's bar (its views' buttons) and in the panel: pressed while what it opened is open. */
+.sit__savedbtn.is-on,
+.sit-panel__saved.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); }
+.sit__savedbtn > svg { color: var(--text-tertiary); }
+.sit__savedbtn.is-on > svg { color: var(--accent-strong); }
+
+/* The tabs, while the tables are locked on: they belong to the head above
+   them, not to the body under them. */
+.bpage > .sit__tabs { margin-top: calc(var(--space-6) * -1 + var(--space-2)); }
+.sit__panel { min-width: 0; }
+.sit__panel:focus-visible { outline: none; }
+
+/* --- The canvas: the region's middle track ---------------------------------------
+
+   Where the builder's stage stands, and a containing block for the dock. The
+   journey's canvas inside it keeps its scroller, its engine line and its
+   size container; it gives up only its own frame and ground, so the dots
+   under it are the region's — one surface with the ground under the panel,
+   as on the builder. The fade that clips the scroller under the engine line
+   fades to that ground.
+
+   The rules for the journey on it are the stage's, not the page's (1 Oct
+   2026): the builder's Check access stands the same canvas in its own
+   region's middle track (board/PolicyCheck.tsx, `.sit__stage.bbchk`), so
+   one set of rules draws both. */
+.sit__stage {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.sit__stage > .tj { flex: 1 1 auto; min-height: 0; }
+.sit__stage .tj-canvas { border: 0; border-radius: 0; background: none; }
+.sit__stage .tj-canvas::before { content: none; }
+.sit__stage .tj-canvas::after { border-radius: 0; background: linear-gradient(to bottom, var(--bb-stage) 40%, transparent); }
+/* The dock's zoom: the run's column scaled in place (a plain element —
+   motion animates the lanes inside it, never the stage). */
+.sit__stage .tj-stage { zoom: var(--sit-z, 1); }
+/* The room over the run (the engine line) and under it (the dock, which
+   floats over the canvas's foot) is the scroller's own padding, so no zoom
+   shrinks it: at any zoom the run's end scrolls clear of the dock, and its
+   start clear of the engine line. The stage keeps a little of its own. */
+.sit__stage .tj-scroll:has(> .tj-stage) { padding-top: 60px; padding-bottom: 64px; }
+.sit__stage .tj-stage.is-vertical { padding-top: var(--space-4); padding-bottom: var(--space-4); }
+
+/* No scrollbar on the canvas (owner, 30 Sep: "the scrollbar looks weird"):
+   it moves as the builder's does — a drag on the ground, the wheel, a pinch
+   (TryJourney.tsx) — and the cue at its right edge says where the view is. */
+.sit__stage .tj-scroll { scrollbar-width: none; }
+.sit__stage .tj-scroll::-webkit-scrollbar { display: none; }
+.sit__stage .tj-canvas:focus-visible { outline: none; }
+/* The ground pans under a drag: the hand, where there is somewhere to go.
+   The cards and the answer keep the ordinary pointer. */
+.sit__stage .tj-canvas.can-pan .tj-scroll { cursor: grab; }
+.sit__stage .tj-canvas.is-panning .tj-scroll { cursor: grabbing; }
+.sit__stage .tj-canvas.can-pan :is(.bb__card, .bb__start, .tj-out) { cursor: auto; }
+
+/* The cue: a hairline track at the canvas's right edge, between the engine
+   line and the dock, and a thumb on it the share of the run in view (its
+   top and height written by TryJourney; its fade motion's). */
+.sit-cue {
+  position: absolute;
+  top: 64px;
+  right: var(--space-3);
+  bottom: 64px;
+  z-index: 5;
+  width: 3px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--border-subtle) 70%, transparent);
+  pointer-events: none;
+}
+.sit-cue__thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+}
+
+/* --- The panel (TryPanel.tsx) ----------------------------------------------------
+
+   The rule Inspector's card, slid in and out by motion (so the builder's CSS
+   animation on `.bb__insp` is off here). It holds its track's width —
+   `min(var(--bb-insp), 46%)` of the region, less its margin — rather than
+   the track's, and stands at the track's end: so as the track opens it is
+   not squeezed, and as the track closes under it on the way out it keeps its
+   place and fades from its edge while the canvas widens behind it. */
+.sit-panel.bb__insp {
+  justify-self: end;
+  width: calc(min(var(--bb-insp), 46cqw) - var(--space-5));
+  animation: none;
+}
+/* The body's scroll keeps a thin bar in the console's own grey. */
+.sit-panel .bb__inspbody { scrollbar-width: thin; scrollbar-color: var(--border-default) transparent; }
+
+/* Its header is the rule head's row, holding the sign-in's name where the
+   rule's name field stands, at the field's height. */
+.sit-panel__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  line-height: 36px;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Use a saved sign-in: a quiet row at the head of the body, not a section. */
+.sit-panel__saved {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: calc(100% - 2 * var(--space-5));
+  margin: var(--space-5) var(--space-5) 0;
+  padding: var(--space-3) var(--space-4);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.sit-panel__saved > span { flex: 1; min-width: 0; }
+.sit-panel__saved > svg { flex: none; color: var(--text-tertiary); }
+.sit-panel__saved:hover { border-color: var(--border-default); color: var(--text-primary); }
+.sit-panel__saved:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+
+/* Identity (IdentityField.tsx): Entra's What If order — a label over each
+   field, the identity type's picker, then the builder's Who row for the one
+   chosen; under it every group a person is in, and a quiet line where that
+   is more than one, or who a group was tested as. */
+.sit-ident { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.sit-ident__label { font-size: var(--fs-xs); font-weight: var(--fw-medium); line-height: 16px; color: var(--text-secondary); }
+.sit-ident > .sit-ident__label:not(:first-child) { margin-top: var(--space-3); }
+.sit-ident > .bb__whorow.is-invalid { border-color: var(--fb-negative-border); }
+.sit-ident .sit-ident__val { display: flex; align-items: center; justify-content: flex-start; gap: var(--space-3); text-align: left; }
+/* One choice: the dialog's ticks are round. */
+.sit-ident__list .bx-tick { border-radius: 50%; }
+.sit-ident__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sit-ident__groups { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.sit-ident__groups > .sit-ident__label { margin-right: var(--space-1); }
+.sit-ident__note { margin: 0; font-size: var(--fs-xs); line-height: 16px; color: var(--text-tertiary); }
+/* The dialog's list: a heading between the policy's people and the rest. */
+.sit-ident__item { display: contents; }
+.sit-ident__head {
+  margin: 0;
+  padding: var(--space-3) var(--space-5) var(--space-2);
+  border-bottom: var(--bw-thin) solid var(--border-subtle);
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+}
+
+/* Sign-in conditions: one condition frame per fact, the Inspector's gap apart.
+   The left half says what is stated and is not a control, so it takes no
+   press, no hover and no caret; the TipDot beside its words names the reader. */
+.sit-facts { display: flex; flex-direction: column; gap: var(--space-4); }
+.sit-fact { display: flex; flex-direction: column; min-width: 0; }
+.sit-panel .cp__stackrow > .cp__fld.sit-fact__what { flex: 0 0 136px; cursor: default; }
+.sit-panel .cp__stackrow > .cp__fld.sit-fact__what:hover { background: none; }
+.sit-panel .cp__stackrow > .cp__fld.sit-fact__val { flex: 1 1 auto; }
+.sit-fact__mark { display: inline-flex; flex: none; color: var(--text-tertiary); }
+
+/* The foot: Save sign-in is a plain secondary beside Run, the page's one
+   orange — not the Inspector's brand-tinted Save rule, which would make two. */
+.sit-panel__savewrap { display: inline-flex; }
+.sit-panel .bb__inspfoot .bx-btn--neutral {
+  background: var(--int-neutral-bg);
+  border-color: var(--int-neutral-border);
+  color: var(--int-neutral-text);
+}
+.sit-panel .bb__inspfoot .bx-btn--neutral:not(:disabled):hover {
+  background: var(--int-neutral-bg-hover);
+  border-color: var(--int-neutral-border-hover);
+}
+.sit-panel .bb__inspfoot .bx-btn--neutral.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); }
+
+/* --- The sign-in node, compact (SignInCard.tsx) -------------------------------------
+
+   A button: the run's sign-in, and a press takes the focus to the panel's
+   Person picker. No tools in its corner, so no room kept for them. */
+.tj-sin.is-compact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-5) var(--space-6);
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.tj-sin.is-compact:hover { border-color: var(--border-default); }
+.tj-sin.is-compact:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 2px; }
+.tj-sin.is-compact .tj-sin__who { padding-right: 0; }
+.tj-sin.is-compact .tj-facts { padding-top: var(--space-4); }
+
+/* --- The empty canvas (HowItWorks.tsx) ---------------------------------------------
+
+   What an access check is, and the one way in (owner, 1 Oct 2026: "a better
+   state, a better layout and a better experience"): the headline, one line,
+   Check access, and what the run will show.
+   Centred in the canvas's track, in a column no wider than the line can be
+   read across; sized to sit in it whole, with no scroll, down to a 440 px
+   canvas; only a shorter one scrolls, with the canvas.
+
+   Nothing scrolls under an engine line here, so the canvas's top fade (a
+   journey's, journey.css) is off. */
+.tj-canvas:has(> .tj-scroll > .tj-empty)::after { content: none; }
+
+.tj-empty {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: var(--space-8) var(--space-9);
+}
+
+.hiw {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(520px, 100%);
+  text-align: center;
+}
+
+/* The words: the headline, ONE line under it, the way in. */
+.hiw .hiw__head {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  line-height: 26px;
+  color: var(--text-primary);
+}
+.hiw__lede {
+  margin: var(--space-3) 0 0;
+  max-width: 440px;
+  font-size: var(--fs-sm);
+  line-height: 20px;
+  color: var(--text-secondary);
+}
+/* Check access (and Saved sign-ins, where offered): pressed — the builder's
+   blue, the active state — while the panel holds what it opened. */
+.hiw__act { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-4); margin-top: var(--space-7); }
+.hiw__act .bx-btn[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft-border);
+  color: var(--accent-strong);
+}
+/* What the run will show: three short phrases with their marks, quiet. */
+.hiw__gets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3) var(--space-7);
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  color: var(--text-tertiary);
+}
+.hiw__gets > li { display: inline-flex; align-items: center; gap: var(--space-2); }
+.hiw__gets svg { flex: none; color: var(--text-tertiary); }
+
+/* A short canvas: less air. */
+@container tj (max-height: 520px) {
+  .tj-empty { padding-block: var(--space-6); }
+  .hiw__gets { margin-top: var(--space-6); }
+}
+
+/* The why, in the right-hand panel (TryPanel.tsx `WhyPanel`): the why's own
+   head is the panel's — its mark, the answer's line, its X — and its body
+   scrolls in the rest of the panel's height, the console's thin grey bar. */
+.sit-whypanel.bb__insp { display: flex; flex-direction: column; }
+.sit-whypanel__slot { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+.sit-whypanel .tj-why { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; margin: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.sit-whypanel .tj-why__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border-default) transparent; }
+
+/* The break-in attempts, in the right-hand panel (BreakInPanel.tsx; owner,
+   1 Oct 2026): the sign-in panel's chrome, its title the attempts' label,
+   the way back to the why before it where they came from the why. The body:
+   the four counts once with their ⓘ, then each result's heading and its
+   rows, Held last behind its fold.
+
+   A row is a card in the why's grain: the press that plays the attempt —
+   the person's face, the attempt, its one line, what it should get and what
+   it got, in a grid so nothing sits over anything — and under it, on the
+   text's own left edge and outside the press, who decided (a quiet link
+   into the builder) and, on a hole, the fix with what it would move on the
+   sunken ground, Fix in policy a plain secondary: the panel has no orange. */
+.sit-panel .sit-att { display: flex; flex-direction: column; gap: var(--space-6); padding: var(--space-5) var(--space-5) var(--space-8); }
+.sit-att__counts { display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; }
+.sit-att__counts > .tj-cells { flex: 1 1 auto; }
+.sit-att__counts > .bx-tip { flex: none; margin-top: var(--space-1); }
+.sit-att__group { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.sit-att__gh { margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold); line-height: 16px; color: var(--text-secondary); }
+.sit-att__list { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.sit-att__row { display: flex; flex-direction: column; min-width: 0; border: var(--bw-thin) solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-raised); }
+.sit-att__row.is-got-through,
+.sit-att__row.is-weaker-factor { border-color: var(--fb-notice-border); }
+
+/* The press: the face, the words, the play mark — three tracks, the words the only one that grows. */
+.sit-att__play {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 14px;
+  align-items: start;
+  column-gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.sit-att__play:hover { background: var(--surface-sunken); }
+.sit-att__play:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.sit-att__face { display: inline-grid; place-items: center; }
+.sit-att__text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.sit-att__name { font-size: var(--fs-sm); font-weight: var(--fw-semibold); line-height: 18px; color: var(--text-primary); }
+.sit-att__story { font-size: var(--fs-xs); line-height: 17px; color: var(--text-secondary); }
+.sit-att__result { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-1); font-size: var(--fs-xs); line-height: 20px; color: var(--text-tertiary); }
+/* A word and its badge, kept on one line: the narrow panel breaks between the two pairs, never inside one. */
+.sit-att__pair { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+.sit-att__go { margin-top: var(--space-1); color: var(--text-tertiary); }
+.sit-att__play:hover .sit-att__go { color: var(--text-link); }
+
+/* Outside the press: who decided, and the fix. */
+.sit-att__foot { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: 0 var(--space-4) var(--space-4) calc(var(--space-4) + 24px + var(--space-4)); }
+/* Why it sits under its heading, where Expected and Got do not say: quiet, one line's weight. */
+.sit-att__note { margin: 0; font-size: var(--fs-xs); line-height: 17px; color: var(--text-secondary); }
+.sit-att__byline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: 0; font-size: var(--fs-xs); line-height: 18px; }
+.sit-att__by {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  margin-left: calc(var(--space-1) * -1);
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  text-align: left;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.sit-att__by > svg { flex: none; color: var(--text-tertiary); }
+.sit-att__by:hover { background: var(--int-ghost-bg-hover); color: var(--text-link); }
+.sit-att__by:hover > svg { color: var(--text-link); }
+.sit-att__by:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 1px; }
+.sit-att__by.is-text { color: var(--text-tertiary); cursor: default; }
+.sit-att__accepted { padding: 0 var(--space-2); border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--text-secondary); }
+.sit-att__fix { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); min-width: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken); }
+.sit-att__fixline,
+.sit-att__moved,
+.sit-att__tenant { margin: 0; font-size: var(--fs-xs); line-height: 17px; }
+.sit-att__fixline { color: var(--text-primary); }
+.sit-att__fixword { margin-right: var(--space-2); font-weight: var(--fw-semibold); }
+.sit-att__moved { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.sit-att__tenant { color: var(--text-tertiary); }
+.sit-att__fixact { display: inline-flex; margin-top: var(--space-1); }
+
+/* Held: last, folded behind its word and count (a native disclosure, its
+   chevron the page's own mark, not the browser's). */
+.sit-att__held { min-width: 0; }
+.sit-att__heldsum {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  margin-left: calc(var(--space-2) * -1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  line-height: 18px;
+  color: var(--text-secondary);
+  list-style: none;
+  cursor: pointer;
+}
+.sit-att__heldsum::-webkit-details-marker { display: none; }
+.sit-att__heldsum > svg { flex: none; color: var(--text-tertiary); }
+.sit-att__heldsum:hover { background: var(--int-ghost-bg-hover); color: var(--text-primary); }
+.sit-att__heldsum:focus-visible { outline: var(--bw-thick) solid var(--accent); outline-offset: 1px; }
+.sit-att__heldn { font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; color: var(--text-tertiary); }
+.sit-att__held > .sit-att__list { margin-top: var(--space-3); }

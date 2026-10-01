@@ -1,4 +1,5 @@
 import type { BrandScreen } from '../../store'
+import type { ArriveFix } from './arrive-fix'
 import { BoardBuilder } from './BoardBuilder'
 
 /* -----------------------------------------------------------------------------
@@ -21,21 +22,30 @@ import { BoardBuilder } from './BoardBuilder'
    `impact`, Check and What changes over the stage — and both went with M4:
    the Break-in test lives in Saved sign-ins, and What changes is a row of the
    checks before saving.
+
+   `fix` is Access checks' "Fix in policy ↗" (owner, 1 Oct 2026: "go with your
+   picks, start building"): a break-in card and the application it was played
+   on, fixed in the draft as the board opens (arrive-fix.ts). It opens the
+   board, never Check access — the change is read on the chain, where it was
+   made — so a route carrying both lands on the board.
    -------------------------------------------------------------------------- */
 
 type BoardOpen = Extract<BrandScreen, { name: 'board' }>['open']
 
-export function BoardPage({ policyId, open, rule }: { policyId: string; open?: BoardOpen; rule?: string }) {
-  /* Every `open` opens test mode; anything but `try` also names the page the
-     panel opens on — Check a person, Saved sign-ins, or the Break-in test
-     pushed over Saved sign-ins. Where the edition has no Policy testing the
-     panel is Try a sign-in alone, and opens there. */
+export function BoardPage({ policyId, open, rule, fix }: { policyId: string; open?: BoardOpen; rule?: string; fix?: ArriveFix }) {
+  /* Every `open` opens Check access (test mode, test-mode.ts), which has no
+     tabs: `saved` opens its Saved sign-ins while that phase is on
+     (sign-in-tests/phase.ts), and a route naming People or the Break-in test
+     (`person`, `break-in`) lands on the sign-in while they are hidden
+     (`PEOPLE_AND_BREAK_IN`). A route with a `fix` opens the board instead. */
+  const testing = open !== undefined && fix === undefined
   return (
     <BoardBuilder
       policyId={policyId}
-      openTest={open !== undefined}
-      openPage={open}
+      openTest={testing}
+      openPage={testing ? open : undefined}
       rule={rule}
+      arriveFix={fix}
     />
   )
 }

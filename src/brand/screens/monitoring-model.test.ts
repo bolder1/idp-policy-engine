@@ -24,8 +24,10 @@ const rows = orderRows(modelled)
 const at = (address: string, person: string) => rows.find((r) => r.sample.address === address && r.sample.personName === person)!
 
 describe('the order', () => {
+  /* Two, four and six since the Global Default's baseline (30 Sep 2026): what
+     today already asks for 2FA or refuses does not move (monitor-sample.test). */
   it('runs 2FA, then deny, then unchanged, newest first within each (acceptance 5)', () => {
-    expect(rows.map((r) => r.change)).toEqual([...Array(3).fill('to-2fa'), ...Array(5).fill('to-deny'), ...Array(4).fill('unchanged')])
+    expect(rows.map((r) => r.change)).toEqual([...Array(2).fill('to-2fa'), ...Array(4).fill('to-deny'), ...Array(6).fill('unchanged')])
     const moments = (change: string) => rows.filter((r) => r.change === change).map((r) => `${r.sample.facts.when?.date} ${r.sample.time}`)
     for (const change of ['to-2fa', 'to-deny', 'unchanged']) {
       const m = moments(change)
@@ -52,8 +54,30 @@ describe('the order', () => {
 })
 
 describe('the cells', () => {
+  /* The Global Default's baseline (30 Sep 2026): one factor on the office
+     laptops, OTP over Email on any other device in India or the UK, Deny from
+     Austin and the Frankfurt proxy, and can't tell for the Tor exit, which the
+     lookup cannot place. */
   it('says Today as the Global Default decides it, on every row (acceptance 5)', () => {
-    for (const r of rows) expect(todayCell(r.today)).toEqual({ kind: 'decided', decision: '1fa', by: 'Global Default Policy' })
+    for (const r of rows) expect(todayCell(r.today).kind === 'none' ? null : (todayCell(r.today) as { by: string }).by).toBe('Global Default Policy')
+    const said = (r: MonitorRow) => {
+      const c = todayCell(r.today)
+      return c.kind === 'decided' ? c.decision : c.kind
+    }
+    expect(rows.map((r) => `${r.sample.address} ${said(r)}`)).toEqual([
+      '203.0.113.24 1fa',
+      '203.0.113.24 1fa',
+      '2001:db8:1::20 2fa',
+      '192.0.2.10 2fa',
+      '192.0.2.10 2fa',
+      '192.0.2.200 2fa',
+      '198.51.100.20 2fa',
+      '198.51.100.20 2fa',
+      '192.0.2.130 deny',
+      '192.0.2.200 2fa',
+      '192.0.2.66 depends',
+      '192.0.2.82 deny',
+    ])
   })
 
   it('says what the office would get, and which rule gives it', () => {
@@ -168,6 +192,9 @@ describe('Show why', () => {
   })
 
   it('gives one line, the standing, for somebody the policy would still not decide', () => {
-    expect(whyOf(rows.find((r) => r.change === 'unchanged')!, hrms, env)).toEqual({ kind: 'standing', line: 'Not in audience: Human Resources, Finance' })
+    /* Somebody outside the audience: the first unchanged row is now Neha in
+       Bengaluru, whom HRMS decides as the Global Default already does. */
+    const outsider = rows.find((r) => r.change === 'unchanged' && r.sample.personName === 'Sanjay Bhatt')!
+    expect(whyOf(outsider, hrms, env)).toEqual({ kind: 'standing', line: 'Not in audience: Human Resources, Finance' })
   })
 })

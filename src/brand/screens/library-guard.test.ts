@@ -48,17 +48,27 @@ describe('saving a zone', () => {
   it('reads only the policies that are on: with HRMS off, as the seed opens, Developer tools alone, and nothing stops the save', () => {
     const seed = showcaseTenant()
     const g = zoneGuard({ ...tenant, policies: seed.policies, env: envOf(seed) }, OFFICES, withoutOfficeBlock)
-    expect(g.policies.map((p) => p.name)).toEqual(['Developer tools — office and device checks'])
-    expect(g.whatChanges?.appNames).toEqual(['GitHub Enterprise', 'Jira'])
+    /* AWS for engineering teams names the office zone too (the troubleshooting
+       estate, 30 Sep 2026): its contractors rules are "away from" and "in" the
+       office. Removing the Pune block moves AWS's contractors in Pune to the
+       Deny for contractors away from the office — twelve more modelled
+       refusals, and no saved sign-in (Leo's is from London). */
+    expect(g.policies.map((p) => p.name)).toEqual(['Developer tools — office and device checks', 'AWS for engineering teams'])
+    expect(g.whatChanges?.appNames).toEqual(['GitHub Enterprise', 'Jira', 'AWS Console'])
     expect(g.blocking).toEqual([])
   })
 
   it('lists the enforcing policies that name it, and one line of what moves where they decide (A9)', () => {
     const g = zoneGuard(tenant, OFFICES, withoutOfficeBlock)
-    expect(g.policies.map((p) => p.name)).toEqual(['HRMS access from corporate offices', 'Developer tools — office and device checks'])
+    /* AWS for engineering teams names the office zone too (the troubleshooting
+       estate, 30 Sep 2026): its contractors rules are "away from" and "in" the
+       office. Removing the Pune block moves AWS's contractors in Pune to the
+       Deny for contractors away from the office — twelve more modelled
+       refusals, and no saved sign-in (Leo's is from London). */
+    expect(g.policies.map((p) => p.name)).toEqual(['HRMS access from corporate offices', 'Developer tools — office and device checks', 'AWS for engineering teams'])
     // Each application swept once, each modelled sign-in counted once.
-    expect(g.whatChanges?.appNames).toEqual(['HRMS', 'GitHub Enterprise', 'Jira'])
-    expect(whatChangesSaid(g.whatChanges!)).toBe('Of 1,080 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 24 · Now denied 18')
+    expect(g.whatChanges?.appNames).toEqual(['HRMS', 'GitHub Enterprise', 'Jira', 'AWS Console'])
+    expect(whatChangesSaid(g.whatChanges!)).toBe('Of 1,440 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 24 · Now denied 30')
   })
 
   it('stops the save for a Must pass that now fails, with the ready fix (A9)', () => {
@@ -81,10 +91,10 @@ describe('saving a zone', () => {
       {
         label: 'Active policies',
         before: '',
-        after: 'HRMS access from corporate offices, Developer tools — office and device checks',
+        after: 'HRMS access from corporate offices, Developer tools — office and device checks, AWS for engineering teams',
         effect: true,
       },
-      { label: 'What changes', before: '', after: 'Of 1,080 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 24 · Now denied 18', effect: true },
+      { label: 'What changes', before: '', after: 'Of 1,440 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 24 · Now denied 30', effect: true },
       {
         label: 'Kavya Menon in the office · Must pass',
         before: 'Allow with 2FA',
@@ -178,7 +188,13 @@ describe('saving a device profile', () => {
 
   it('stops the save when a Must pass would now be let in, and offers the saved profile back', () => {
     const g = profileGuard(tenant, COMPLIANT, lowered)
-    expect(g.policies.map((p) => p.name)).toEqual(['Device compliance for Outlook and Dropbox', 'Developer tools — office and device checks'])
+    /* The two AWS policies that read the compliant profile too (30 Sep 2026). */
+    expect(g.policies.map((p) => p.name)).toEqual([
+      'Device compliance for Outlook and Dropbox',
+      'Developer tools — office and device checks',
+      'AWS for engineering teams',
+      'AWS billing for Finance',
+    ])
     expect(stopLine(g)).toBe('Devon Rao on Android 12 must pass and would get Allow on 1 factor.')
     expect(g.fix).toEqual({ label: 'Restore the saved profile', value: COMPLIANT })
     expect(libraryLines(g).at(-1)?.after).toBe('Allow on 1 factor · expected Deny')

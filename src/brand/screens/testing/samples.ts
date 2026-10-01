@@ -12,8 +12,11 @@ import { devicePreset } from './device-presets'
    field by field before seeing one.
 
    The showcase opens with HRMS Inactive (Phase 4), and a sample is read as the
-   tenant stands: until HRMS is turned on, the four HRMS scenes all read the
-   Global Default, Allow on 1 factor (samples.test.ts pins both).
+   tenant stands: until HRMS is turned on, the HRMS scenes read the Global
+   Default — Allow on 1 factor, from India on the corporate laptop each states
+   (its rule 1 since 30 Sep 2026), and Can't tell for the one with no address,
+   because the Global Default reads the country too (samples.test.ts pins
+   both).
 
    Samples are NOT saved sign-ins. A saved sign-in is a promise the tenant keeps
    ("Kavya in the office must keep getting 2FA") and the guard checks it; a
@@ -41,11 +44,14 @@ export interface SampleSignIn {
 const MONDAY_0930: NonNullable<SignInFacts['when']> = { date: '2026-09-28', time: '09:30', timeZone: TENANT_TZ, source: 'stated' }
 const at = (address: string): NonNullable<SignInFacts['network']> => ({ address, source: 'stated' })
 const LOW_RISK: NonNullable<SignInFacts['risk']> = { score: 12, source: 'stated' }
+/* The HRMS scenes' device: HRMS never reads one, but the Global Default that
+   decides while HRMS is off does, so it is stated rather than left to depend. */
+const CORP_LAPTOP = devicePreset('win11-registered').facts
 
 export const SAMPLE_SIGN_INS: readonly SampleSignIn[] = [
-  { id: 'hr-office', name: 'HR in the office', facts: { personId: 'u-hr-1', appId: 'hrms', network: at('203.0.113.24'), when: MONDAY_0930 } },
-  { id: 'hr-home', name: 'HR at home', facts: { personId: 'u-hr-2', appId: 'hrms', network: at('192.0.2.10'), when: MONDAY_0930 } },
-  { id: 'sales-hrms', name: 'Sales on HRMS', facts: { personId: 'u-sales-1', appId: 'hrms', network: at('203.0.113.24'), when: MONDAY_0930 } },
+  { id: 'hr-office', name: 'HR in the office', facts: { personId: 'u-hr-1', appId: 'hrms', network: at('203.0.113.24'), when: MONDAY_0930, device: CORP_LAPTOP } },
+  { id: 'hr-home', name: 'HR at home', facts: { personId: 'u-hr-2', appId: 'hrms', network: at('192.0.2.10'), when: MONDAY_0930, device: CORP_LAPTOP } },
+  { id: 'sales-hrms', name: 'Sales on HRMS', facts: { personId: 'u-sales-1', appId: 'hrms', network: at('203.0.113.24'), when: MONDAY_0930, device: CORP_LAPTOP } },
   /* The one that can't be told: the office rule reads the address, and none was given. */
   { id: 'no-address', name: 'No address given', facts: { personId: 'u-hr-1', appId: 'hrms', when: MONDAY_0930 } },
   {

@@ -28,9 +28,20 @@ describe('before an application is chosen', () => {
   it('lists no policy as on it: the ones outside the audience are elsewhere', () => {
     const r = rows(t.policies, form({ appId: null }))
     expect(r.on).toEqual([])
+    /* And the troubleshooting estate (30 Sep 2026) that does not cover HR:
+       Slack for everyone does, so it is not here. Then the two Box policies
+       of the owner's two-group example (1 Oct 2026), for Engineering and
+       Design. */
     expect(r.off.map((x) => [x.name, x.kind])).toEqual([
       ['Access the app through corporate devices only', 'elsewhere'],
       ['Developer tools — office and device checks', 'elsewhere'],
+      ['AWS for engineering teams', 'elsewhere'],
+      ['AWS billing for Finance', 'elsewhere'],
+      ['AWS production for DevOps', 'elsewhere'],
+      ['Slack for engineering and contractors', 'elsewhere'],
+      ['Code review for Finance', 'elsewhere'],
+      ['Box for engineering', 'elsewhere'],
+      ['Box for design', 'elsewhere'],
     ])
   })
 })
@@ -46,10 +57,21 @@ describe('HR in the office', () => {
   })
 
   it('folds the policies on other applications away, without "Does not cover HRMS"', () => {
+    /* The troubleshooting estate (30 Sep 2026) too, and the two Box policies
+       (1 Oct 2026). A draft says it is a draft wherever it is — its standing
+       is read before its applications. */
     expect(r.off.map((x) => [x.name, x.showReason])).toEqual([
       ['Access the app through corporate devices only', false],
       ['Device compliance for Outlook and Dropbox', false],
       ['Developer tools — office and device checks', false],
+      ['AWS for engineering teams', false],
+      ['AWS billing for Finance', false],
+      ['AWS production for DevOps', false],
+      ['Slack for everyone', false],
+      ['Slack for engineering and contractors', false],
+      ['Code review for Finance', true],
+      ['Box for engineering', false],
+      ['Box for design', false],
     ])
   })
 })

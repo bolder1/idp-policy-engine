@@ -281,7 +281,22 @@ describe('the fixes', () => {
 describe('which policy it runs on', () => {
   it('offers App Access policies with an application, never the Global Default', () => {
     const ids = breakInPolicies(t.policies).map((p) => p.id)
-    expect(ids).toEqual(['sc-hrms-office', 'sc-corporate-devices', 'sc-device-compliance', 'sc-dev-tools'])
+    /* The four scenarios, then the troubleshooting estate (showcase-seed.ts,
+       30 Sep 2026), then the owner's two-group example on Box (1 Oct 2026). */
+    expect(ids).toEqual([
+      'sc-hrms-office',
+      'sc-corporate-devices',
+      'sc-device-compliance',
+      'sc-dev-tools',
+      'sc-aws-engineering',
+      'sc-aws-finance',
+      'sc-aws-devops',
+      'sc-slack-everyone',
+      'sc-slack-engineering',
+      'sc-code-review-finance',
+      'sc-box-engineering',
+      'sc-box-design',
+    ])
     expect(t.policies.some((p) => p.isSystem && ids.includes(p.id))).toBe(false)
   })
 

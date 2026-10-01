@@ -224,8 +224,11 @@ describe('Before turning on (A6)', () => {
     expect(decidingSummary(r.deciding)).toBe('HRMS')
   })
 
+  /* 18 and 72 until the Global Default's baseline (30 Sep 2026): it refuses
+     Austin and the proxy itself now, so HRMS moves only the office laptops
+     (what-changes.test.ts). */
   it('reads the grid and the deck on the version turning on, with no was', () => {
-    expect(whatChangesSaid(r.whatChanges)).toBe('Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 18 · Now denied 72')
+    expect(whatChangesSaid(r.whatChanges)).toBe('Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 3 · Now denied 0')
     expect(breakInSummary(r.breakIn!)).toBe('Got through 0 · Weaker factor 0 · Locked out 1 · Extra prompts 0')
   })
 
@@ -239,7 +242,15 @@ describe('Before turning off and switching to monitoring', () => {
   it('opens when somebody is newly allowed, and never blocks (A6, assumption 24)', () => {
     for (const kind of ['turn-off', 'to-monitor'] as const) {
       const r = switchTo(kind, t.policies, HRMS.id, kind === 'turn-off' ? 'inactive' : 'monitor')
-      expect(r.whatChanges.counts.nowAllowed).toBe(72)
+      /* Since the Global Default's baseline (30 Sep 2026) none of the modelled
+         sign-ins HRMS refuses gets in without it — Austin and the proxy are
+         refused by the Global Default too — so what opens the page is the
+         saved one: Neha at home, a Deny HRMS keeps, which the Global Default
+         lets in on her corporate laptop. */
+      expect(r.whatChanges.counts.nowAllowed).toBe(0)
+      const neha = r.saved.find((c) => c.signIn.id === 'ssi-neha-home')!
+      expect([neha.before.decision, neha.after.decision]).toEqual(['deny', '1fa'])
+      expect(r.newlyAllowed).toBe(true)
       expect(guardOpens(r)).toBe(true)
       /* Kavya's Must pass fails once HRMS stops deciding, and still blocks nothing. */
       const kavya = r.saved.find((c) => c.signIn.id === 'ssi-kavya-office')!
@@ -252,9 +263,11 @@ describe('Before turning off and switching to monitoring', () => {
 
   it('stays the plain confirm when nobody is newly allowed', () => {
     /* HRMS asked everybody for 2FA and kept nobody out: switching it off hands
-       them to the Global Default Policy, which lets them in on one factor.
-       That is a real change — What changes lists all 90 — but nobody is let in
-       who was kept out, and Now on 1 factor never opens a page (assumption 4). */
+       them to the Global Default Policy. Since its baseline (30 Sep 2026) that
+       is one factor for the office laptops, 2FA still for every other device
+       in India or the UK, and Deny from Austin and the proxy. A real change,
+       but nobody is let in who was kept out — the moves are to one factor and
+       to Deny — and Now on 1 factor never opens a page (assumption 4). */
     const open = { ...HRMS, rules: [], fallback: { ...HRMS.fallback!, decision: '2fa' as const } }
     const policies = withPolicy(t.policies, open)
     for (const [kind, status] of [
@@ -262,7 +275,7 @@ describe('Before turning off and switching to monitoring', () => {
       ['to-monitor', 'monitor'],
     ] as const) {
       const r = switchTo(kind, policies, HRMS.id, status)
-      expect(whatChangesSaid(r.whatChanges), kind).toBe('Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 90 · Now asked for 2FA 0 · Now denied 0')
+      expect(whatChangesSaid(r.whatChanges), kind).toBe('Of 360 modelled sign-ins: Now allowed 0 · Now on 1 factor 3 · Now asked for 2FA 0 · Now denied 72')
       expect(r.deciding.map(decidingValue), kind).toEqual(['Human Resources, Finance · now Global Default Policy'])
       expect(r.newlyAllowed, kind).toBe(false)
       expect(guardOpens(r), kind).toBe(false)

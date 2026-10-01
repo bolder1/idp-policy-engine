@@ -52,9 +52,10 @@ describe('a zone save a Must pass stops', () => {
   })
 
   it('draws the policies and what changes as plain rows, with no stop of their own', () => {
+    /* AWS for engineering teams reads the office zone too (the troubleshooting estate, 30 Sep 2026). */
     expect(review.rows.slice(0, 2).map((r) => [r.label, r.after, r.check])).toEqual([
-      ['Active policies', 'HRMS access from corporate offices, Developer tools — office and device checks', undefined],
-      ['What changes', 'Of 1,080 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 24 · Now denied 18', undefined],
+      ['Active policies', 'HRMS access from corporate offices, Developer tools — office and device checks, AWS for engineering teams', undefined],
+      ['What changes', 'Of 1,440 modelled sign-ins: Now allowed 0 · Now on 1 factor 0 · Now asked for 2FA 24 · Now denied 30', undefined],
     ])
   })
 

@@ -15,7 +15,6 @@ import { pageRows, rowsRead } from './rows-read'
 import { SaveSignInForm } from './SaveSignInForm'
 import { screensOf } from './screens-of'
 import { SignInFields } from './SignInFields'
-import { SignInScreen } from './SignInScreen'
 import { defaultBoardForm, factsOf, originPatch, typedAddressPatch, type SignInForm } from './sign-in-form'
 import { WhatTheySee } from './WhatTheySee'
 import { WhichPolicy } from './WhichPolicy'
@@ -133,27 +132,36 @@ describe('What they see', () => {
   const kavya = t.directory.people.find((u) => u.id === 'u-hr-1')!
   const screens = screensOf(resolve(form()), { policies: t.policies, methods: t.methods, defaultMethodId: undefined, person: kavya })
 
-  it('opens on the second factor, with a switch between the pages and the caption', () => {
-    const out = text(html(<WhatTheySee screens={screens} appId="hrms" defaultOpen />))
-    expect(out).toContain('Password Google Authenticator')
-    expect(out).toContain('Enter the code from Google Authenticator')
-    expect(out).toContain('Approximation of the sign-in page')
+  it('plays the sign-in: the page, its steps under it, and the caption', () => {
+    const out = html(<WhatTheySee screens={screens} appId="hrms" defaultOpen />)
+    expect(out).toContain('aria-label="Password, then Google Authenticator, then Signed in"')
+    expect(text(out)).toContain('Sign in to HRMS Username Next')
+    expect(text(out)).toContain('Password Google Authenticator Signed in')
+    expect(text(out)).toContain('Approximation of the sign-in page')
   })
 
-  it('starts closed on the page', () => {
-    expect(text(html(<WhatTheySee screens={screens} appId="hrms" />))).toBe('What they see')
+  it('opens by default, on the page and the board alike (owner, 30 Sep 2026)', () => {
+    const out = html(<WhatTheySee screens={screens} appId="hrms" />)
+    expect(out).toMatch(/<button[^>]*class="tsee__head"[^>]*aria-expanded="true"/)
+    expect(out).toContain('tplay__stage')
+    /* A caller can still start it closed. */
+    expect(text(html(<WhatTheySee screens={screens} appId="hrms" defaultOpen={false} />))).toBe('What they see')
+  })
+
+  it('has no fold where the surface is the disclosure: the board’s popover gets a heading, always open', () => {
+    const out = html(<WhatTheySee screens={screens} appId="hrms" title="What they see · Live" collapsible={false} defaultOpen={false} />)
+    expect(out).toContain('<h3 class="tsee__title">What they see · Live</h3>')
+    expect(out).not.toContain('tsee__head')
+    expect(out).not.toContain('aria-expanded')
+    expect(out).not.toContain('tsee__chev')
+    expect(out).toContain('tplay__stage')
   })
 
   it('holds the pages back, in their place, while the answer has not landed', () => {
     const held = html(<WhatTheySee screens={screens} appId="hrms" defaultOpen hidden />)
     expect(held).toMatch(/class="tsee__body"[^>]*aria-hidden="true"[^>]*style="opacity:0"/)
-    expect(text(held)).toContain('Enter the code from Google Authenticator')
+    expect(text(held)).toContain('Sign in to HRMS')
     expect(html(<WhatTheySee screens={screens} appId="hrms" defaultOpen />)).toMatch(/class="tsee__body" style="opacity:1"/)
-  })
-
-  it('draws the deny page with the message word for word', () => {
-    const out = text(html(<SignInScreen appId="hrms" appName="HRMS" step={{ kind: 'deny', message: 'Only from the office.' }} />))
-    expect(out).toBe('Sign in to HRMS Access denied Only from the office. Back to sign in')
   })
 })
 

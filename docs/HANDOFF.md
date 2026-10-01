@@ -94,6 +94,14 @@ Hidden means kept, not deleted. Flip the flag and the door comes back with every
 | `ACCESS_CHECK`, `ACCESS_CHECKS` | `screens/sign-in-tests/names.ts` | `'Check access'`, `'Access checks'` | The names of the button and the page. The code still says sign-in-tests. | Owner, 1 Oct: "something related to access" |
 | `features` | `src/brand/store.tsx` | lite + `policyTesting`, `breakInTest`, `draftChecks`; `describePolicy: false` | Describe it (the plain-English builder) is hidden | Owner, 30 Sep: "hide this, not needed as of now" |
 
+### Waiting on the owner's pick (2 Oct 2026)
+
+Two switches stay on screen even in the showcase build until he chooses; then pin the choice and delete the switch and the losing styles.
+
+- **Toggle style** — on Authentication methods, page head: Blue (today's), Green, Grayscale, Navy, Outlined, Icons. App-wide via `html[data-toggle-style]`, remembered per viewer (`src/brand/toggle-style.ts`, the blocks in `kit.css`).
+- **Note style** — on a zone's page head: Classic (the original card, as at d03d761), Sticky note, Clipboard, Pointer (`screens/zone-notes.tsx`, `zone-notes-model.ts`, `zones-final.css`). He cut Colours, Example rows, Inline tip, Note pile and Index card.
+- Small open calls from the last review: Classic's example descriptions measure 3.93:1 (the original styling; `opacity: 0.78` on `.bz7__sidelist em` would pass); the Clipboard's top padding and the Pointer's notch were sized up from the research spec in the browser.
+
 ### Pending phases
 
 - **Saved sign-ins:** the panel, saving from the form, and using one. Built and tested, but off.
@@ -133,7 +141,8 @@ Test objects were left in the vendor tenants (Entra, Okta, Duo), all named "Clau
 - Remotes:
   - `origin` = github.com/bolder1/idp-policy-engine. Vercel production (https://idp-policy-engine-zrhl.vercel.app) follows `origin/main`, which is at afd9391 (24 Sep).
   - `creator` = github.com/surajitdutta-creator/idp-policy-engine, at 6b2b67b.
-- **Nothing has been pushed since then.** b67f2fc (Policy testing), d03d761 (Access checks) and the consolidation are local only, so the public showcase predates both.
+- **Nothing has been pushed since then.** b67f2fc (Policy testing), d03d761 (Access checks), b266be9 (the consolidation) and 23ae818 (the 1–2 Oct review pass: zones, renames, CA chains, toggle styles) are local only, so the public showcase predates all of them.
+- The worktrees were retired on 2 Oct 2026: each one's leftover changes were committed on its own branch as an "Archive:" commit first, so nothing was lost, then the folders were removed. Only `.claude/worktrees/keen-goldwasser-ce39db` may still be on disk (the session that did the consolidation ran from it); its branch `claude/pending-takes-backlog-15caea` is fully in `main`. Remove it with `git worktree remove --force .claude/worktrees/keen-goldwasser-ce39db` once nothing runs from it.
 - **Both remotes are public** (`gh repo view`, 1 Oct). So the internal material is **local only — on this disk, never in git** (owner's choice, 1 Oct 2026): `docs/memory/`, `docs/research/`, `docs/artifacts/` and `tools/rigs/walkthroughs/` are in `.gitignore`. They hold tenant identifiers (the Okta integrator org and its admin URL, the Entra test user, a miniOrange test address, the Vercel project and team ids) and internal material (the manager's scenario sheet, the audits, the team deck, the memory notes). Everything else in the repo carries none of these; there are no passwords, tokens or cookies anywhere. Back the four folders up yourself if this disk is ever replaced.
 - The owner's convention when he does push: push `main`, plus a `YYYY-MM-DD-<topic>` tracking branch for the day's work.
 

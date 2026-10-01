@@ -1,0 +1,96 @@
+/* ============================================================================
+   Rebrand · Shell
+
+   The admin and end-user chrome: Shell, UserShell, the persona and edition bars, the profile menu.
+
+   Every rule here starts with [data-brand='rebrand']. This sheet loads after
+   rebrand.css, so at equal weight a rule here wins over one there. The rules
+   it follows are in docs/rebrand-guideline.md.
+   ========================================================================== */
+
+/* --- Top bar: the kit's icon-button size ------------------------------------ */
+[data-brand='rebrand'] .bshell__burger,
+[data-brand='rebrand'] .bshell__icon {
+  width: var(--ctl-height-md);
+  height: var(--ctl-height-md);
+}
+
+/* --- Avatar: one spec, the trigger's navy disc, in the menu as well --------- */
+[data-brand='rebrand'] .bshell__avatar { font-size: var(--fs-xs); }
+[data-brand='rebrand'] .bpm__whoav {
+  width: 30px;
+  height: 30px;
+  background: var(--shell-raised);
+  color: var(--text-inverse);
+}
+
+/* --- Account menu: space under who you are, not a second kind of rule ------- */
+[data-brand='rebrand'] .bpm__who { border-bottom: 0; }
+
+/* --- Rail "WIP": the one pill, neutral, drawn for the dark ground -----------
+   The light neutral tint would glare on the rail and outshine "New". This is a
+   caveat, so it stays the quieter of the two. */
+[data-brand='rebrand'] .bshell__wip {
+  padding: var(--pill-py) var(--pill-px);
+  border: 0;
+  border-radius: var(--pill-radius);
+  background: var(--shell-raised);
+  font-size: var(--pill-fs);
+  font-weight: var(--pill-fw);
+  line-height: var(--pill-line);
+  letter-spacing: 0;
+  color: var(--shell-text-muted);
+}
+
+/* --- Persona panel: the menu's shadow, a section one-liner, the one pill ----
+   Hover stays the sunken grey: on the inset grey the neutral pills would vanish. */
+[data-brand='rebrand'] .bpb__panel { box-shadow: var(--el-high); }
+[data-brand='rebrand'] .bpb__intro { font-size: var(--fs-sm); color: var(--text-tertiary); }
+[data-brand='rebrand'] .bpb__meta i {
+  padding: var(--pill-py) var(--pill-px);
+  border-radius: var(--pill-radius);
+  font-weight: var(--pill-fw);
+  line-height: var(--pill-line);
+}
+[data-brand='rebrand'] .bpb__meta i:not(.is-gap) { background: var(--fb-neutral-bg); color: var(--fb-neutral-fg); }
+
+/* --- End-user top nav: line tabs, the chosen one in blue -------------------- */
+[data-brand='rebrand'] .bus__navitem { color: var(--text-tertiary); }
+[data-brand='rebrand'] .bus__navitem:hover { color: var(--text-primary); }
+[data-brand='rebrand'] .bus__navitem.is-on { color: var(--blue-strong); }
+
+/* --- The launcher: a page one-liner, a field, grey tiles --------------------- */
+[data-brand='rebrand'] .buapps__head p {
+  margin-top: var(--space-2);
+  max-width: 72ch;
+  font-size: var(--fs-md);
+  color: var(--text-tertiary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+[data-brand='rebrand'] .buapps__search:hover { border-color: var(--ctl-border-hover); }
+[data-brand='rebrand'] .buapps__search:focus-within { border-color: var(--ctl-border-focus); }
+[data-brand='rebrand'] .buapps__card { background: var(--surface-sunken); border-color: transparent; }
+[data-brand='rebrand'] .buapps__card:hover { background: var(--surface-inset); border-color: transparent; box-shadow: none; }
+[data-brand='rebrand'] .buapps__card:focus-visible { border-color: transparent; box-shadow: 0 0 0 2px var(--blue); }
+
+/* --- Edition bar and drawer (not rendered today) -----------------------------
+   Sentence-case labels, the kit drawer's 16px title, and each gap a tile rather
+   than a bordered card in a bordered panel. The coloured left edge stays: it is
+   the risk order. */
+[data-brand='rebrand'] .bed__label,
+[data-brand='rebrand'] .bed__eyebrow,
+[data-brand='rebrand'] .bed__surface,
+[data-brand='rebrand'] .bed__weight {
+  letter-spacing: 0;
+  text-transform: none;
+}
+[data-brand='rebrand'] .bed__panel { border-left: 0; box-shadow: var(--el-overlay); }
+[data-brand='rebrand'] .bed__panel h2 { font-size: var(--fs-lg); }
+[data-brand='rebrand'] .bed__panel > footer { background: var(--surface-raised); }
+[data-brand='rebrand'] .bed__gap { border-color: transparent; background: var(--surface-sunken); }
+[data-brand='rebrand'] .bed__gap.is-high { border-left-color: var(--fb-negative-dot); }
+[data-brand='rebrand'] .bed__gap.is-medium { border-left-color: var(--fb-notice-dot); }
+[data-brand='rebrand'] .bed__gap.is-low { border-left-color: var(--border-strong); }

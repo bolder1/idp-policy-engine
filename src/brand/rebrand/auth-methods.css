@@ -1,0 +1,9 @@
+/* ============================================================================
+   Rebrand · Authentication methods
+
+   Authentication methods, recovery, the method forms, the audience drawer and external hooks.
+
+   Every rule here starts with [data-brand='rebrand']. This sheet loads after
+   rebrand.css, so at equal weight a rule here wins over one there. The rules
+   it follows are in docs/rebrand-guideline.md.
+   ========================================================================== */

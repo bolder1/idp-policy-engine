@@ -28,6 +28,8 @@ import {
 // call site below. The component and its stylesheet are untouched.
 import { ProfileMenu } from './ProfileMenu'
 import { PersonaBar } from './PersonaBar'
+import { BrandSwitch } from './BrandSwitch'
+import { Tip } from './kit'
 import { useBrand, useToast, type BrandScreen } from './store'
 
 /* -----------------------------------------------------------------------------
@@ -165,14 +167,30 @@ const NAV: { section?: string; items: NavItem[] }[] = [
   },
 ]
 
+/* What a row says in its Tip. These were native titles, which a keyboard never
+   reached. */
+const NOT_BUILT = 'Not built in this prototype.'
+const WIP_TIP = 'Work in progress: the page opens, but it is not finished.'
+
 /* Every screen that lives under Policies.
 
    `board`, `policy-details` and `hooks` were missing, and three things key off
    this list: the parent's `is-active` class, its `aria-current`, and the
    submenu that auto-opens. So on the board the rail showed no location at all
    — no highlight, nothing announced as the current page — while being the
-   widest thing on the screen. */
-const POLICY_SCREENS = ['policies', 'builder', 'board', 'policy-details', 'templates', 'zones', 'fingerprint', 'hooks', 'methods']
+   widest thing on the screen. `risk-signals` was missing the same way. */
+const POLICY_SCREENS = [
+  'policies',
+  'builder',
+  'board',
+  'policy-details',
+  'templates',
+  'zones',
+  'fingerprint',
+  'risk-signals',
+  'hooks',
+  'methods',
+]
 
 /* The two builders, which want the rail out of the way.
 
@@ -262,16 +280,17 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <div className={`bshell ${collapsed ? 'is-collapsed' : ''}`}>
       <header className="bshell__top">
-        <button
-          type="button"
-          className="bshell__burger"
-          onClick={toggleRail}
-          aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
-          aria-expanded={!collapsed}
-          title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
-        >
-          <Menu size={21} strokeWidth={1.7} />
-        </button>
+        <Tip text={collapsed ? 'Expand navigation' : 'Collapse navigation'}>
+          <button
+            type="button"
+            className="bshell__burger"
+            onClick={toggleRail}
+            aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+            aria-expanded={!collapsed}
+          >
+            <Menu size={21} strokeWidth={1.7} />
+          </button>
+        </Tip>
 
         <a className="bshell__logo" href="#" onClick={(e) => e.preventDefault()} aria-label="Xecurify by miniOrange">
           <img src="/xecurify-logo.png" alt="Xecurify by miniOrange" />
@@ -284,6 +303,7 @@ export function Shell({ children }: { children: ReactNode }) {
               The edition switch changes what the product CAN do; the persona
               switch changes who is looking and what is in their tenant. */}
           <PersonaBar />
+          <BrandSwitch />
           {/* `<EditionBar />` stood here: the Lite / Full switch and the
               "N things this cannot answer" button beside it.
 
@@ -297,20 +317,28 @@ export function Shell({ children }: { children: ReactNode }) {
 
               `lite` is the default now — see `store.tsx`. Restoring the bar is
               uncommenting this line. */}
-          <button
-            className="bshell__icon"
-            onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
-            title={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
-            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
-          >
-            {theme === 'light' ? <Moon size={20} strokeWidth={1.7} /> : <Sun size={20} strokeWidth={1.7} />}
-          </button>
-          <button className="bshell__icon" title="Documentation" aria-label="Documentation">
-            <BookOpen size={20} strokeWidth={1.7} />
-          </button>
-          <button className="bshell__icon" title="Settings" aria-label="Settings">
-            <Settings size={20} strokeWidth={1.7} />
-          </button>
+          {/* Each icon shows its name in a Tip. A native title never reached a
+              keyboard. */}
+          <Tip text={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
+            <button
+              type="button"
+              className="bshell__icon"
+              onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
+              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+            >
+              {theme === 'light' ? <Moon size={20} strokeWidth={1.7} /> : <Sun size={20} strokeWidth={1.7} />}
+            </button>
+          </Tip>
+          <Tip text="Documentation">
+            <button type="button" className="bshell__icon" aria-label="Documentation">
+              <BookOpen size={20} strokeWidth={1.7} />
+            </button>
+          </Tip>
+          <Tip text="Settings">
+            <button type="button" className="bshell__icon" aria-label="Settings">
+              <Settings size={20} strokeWidth={1.7} />
+            </button>
+          </Tip>
           <ProfileMenu initials="JT" />
         </div>
       </header>
@@ -325,28 +353,37 @@ export function Shell({ children }: { children: ReactNode }) {
                 const active = isActive(screen, item)
                 const expanded = !collapsed && open === item.label
                 const Ico = item.icon
+                /* Collapsed, the label and the badge are hidden, so the row takes
+                   its name from aria-label and shows it in a Tip. */
+                const name = item.badge ? `${item.label}, ${item.badge}` : item.label
+                const caveat = item.screen ? null : NOT_BUILT
+                const collapsedTip = caveat ? `${name}. ${caveat}` : name
+                const tip = collapsed ? collapsedTip : caveat
+                const row = (
+                  <button
+                    type="button"
+                    className={`bshell__item ${active ? 'is-active' : ''} ${item.screen ? '' : 'is-inert'}`}
+                    onClick={() => toggle(item)}
+                    aria-current={active ? 'page' : undefined}
+                    aria-expanded={item.children ? expanded : undefined}
+                    aria-label={collapsed ? name : undefined}
+                  >
+                    <Ico className="bshell__ico" size={20} strokeWidth={1.6} aria-hidden />
+                    <span className="bshell__item-label">{item.label}</span>
+                    {item.badge && <span className="bshell__badge">{item.badge}</span>}
+                    {item.children && (
+                      <ChevronRight
+                        className={`bshell__chev ${expanded ? 'is-open' : ''}`}
+                        size={16}
+                        strokeWidth={1.8}
+                        aria-hidden
+                      />
+                    )}
+                  </button>
+                )
                 return (
                   <div key={item.label}>
-                    <button
-                      type="button"
-                      className={`bshell__item ${active ? 'is-active' : ''} ${item.screen ? '' : 'is-inert'}`}
-                      onClick={() => toggle(item)}
-                      aria-current={active ? 'page' : undefined}
-                      aria-expanded={item.children ? expanded : undefined}
-                      title={collapsed ? item.label : item.screen ? undefined : 'Outside the scope of this revamp'}
-                    >
-                      <Ico className="bshell__ico" size={20} strokeWidth={1.6} aria-hidden />
-                      <span className="bshell__item-label">{item.label}</span>
-                      {item.badge && <span className="bshell__badge">{item.badge}</span>}
-                      {item.children && (
-                        <ChevronRight
-                          className={`bshell__chev ${expanded ? 'is-open' : ''}`}
-                          size={16}
-                          strokeWidth={1.8}
-                          aria-hidden
-                        />
-                      )}
-                    </button>
+                    {tip ? <Tip text={tip}>{row}</Tip> : row}
 
                     <AnimatePresence initial={false}>
                       {item.children && expanded && (
@@ -359,28 +396,32 @@ export function Shell({ children }: { children: ReactNode }) {
                         >
                           <div className="bshell__sub">
                             {item.children.map((c) => {
+                              /* Both builders and the details page are a policy
+                                 opened from All Policies, so all three light it. */
                               const on =
                                 c.screen &&
                                 (screen.name === c.screen.name ||
-                                  (c.screen.name === 'policies' && screen.name === 'builder'))
-                              return (
+                                  (c.screen.name === 'policies' &&
+                                    [...BUILDER_SCREENS, 'policy-details'].includes(screen.name)))
+                              const tip = c.tag ? WIP_TIP : c.screen ? null : NOT_BUILT
+                              const row = (
                                 <button
                                   key={c.label}
                                   type="button"
                                   className={`bshell__subitem ${on ? 'is-active' : ''} ${c.screen ? '' : 'is-inert'}`}
                                   onClick={() => c.screen && go(c.screen)}
                                   aria-current={on ? 'page' : undefined}
-                                  title={
-                                    c.tag
-                                      ? 'Work in progress — this page is not finished'
-                                      : c.screen
-                                        ? undefined
-                                        : 'Outside the scope of this revamp'
-                                  }
                                 >
                                   {c.label}
                                   {c.tag && <span className="bshell__wip">{c.tag}</span>}
                                 </button>
+                              )
+                              return tip ? (
+                                <Tip key={c.label} text={tip}>
+                                  {row}
+                                </Tip>
+                              ) : (
+                                row
                               )
                             })}
                           </div>

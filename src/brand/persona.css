@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
-   The persona switcher and its strip.
+   The persona switcher.
 
    Reads as prototype furniture on purpose — it sits beside the edition switch,
    which is the same kind of control, and neither pretends to be part of the
@@ -106,50 +106,9 @@
 }
 .bpb__tabs em + em::before { content: '·'; margin-right: var(--space-3); }
 
-/* --- The strip ------------------------------------------------------------- */
-
-.bpb__strip {
-  display: flex;
-  align-items: center;
-  gap: var(--space-5);
-  margin-bottom: var(--space-6);
-  padding: var(--space-4) var(--space-5);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-subtle);
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-sm);
-}
-.bpb__stripwho {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  font-weight: var(--fw-medium);
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-.bpb__stripwho svg { color: var(--text-muted); }
-.bpb__stripwho em { font-style: normal; font-weight: 400; color: var(--text-muted); }
-.bpb__stripq {
-  flex: 1;
-  min-width: 0;
-  color: var(--text-tertiary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.bpb__stripdepth {
-  flex: none;
-  padding: 2px var(--space-4);
-  border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-  border: 1px solid var(--border-default);
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
+/* `.bpb__strip`, a persona banner above the page, was styled here. Nothing
+   renders it any more, so its rules went with it. */
 
 @media (max-width: 900px) {
-  .bpb__stripq { display: none; }
   .bpb__panel { width: min(460px, calc(100vw - 32px)); }
 }

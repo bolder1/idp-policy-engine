@@ -1,0 +1,9 @@
+/* ============================================================================
+   Rebrand · Trail builder
+
+   The trail builder, its dialogs, the test drawer, the gauntlet, the impact arena and the condition popover.
+
+   Every rule here starts with [data-brand='rebrand']. This sheet loads after
+   rebrand.css, so at equal weight a rule here wins over one there. The rules
+   it follows are in docs/rebrand-guideline.md.
+   ========================================================================== */

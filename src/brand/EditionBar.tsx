@@ -2,7 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useState } from 'react'
 import { ArrowRight, Layers, Minus, Sparkles, TriangleAlert, X } from 'lucide-react'
 
-import { Button } from './kit'
+import { Button, Tip } from './kit'
 import { gapsFor, type Gap } from './edition'
 import { useBrand } from './store'
 
@@ -36,28 +36,30 @@ export function EditionBar() {
     <div className="bed">
       <div className="bed__switch" role="radiogroup" aria-label="Console edition">
         <span className="bed__label">Edition</span>
-        <button
-          type="button"
-          role="radio"
-          aria-checked={lite}
-          className={lite ? 'is-on' : ''}
-          onClick={() => store.setEdition('lite')}
-          title="The scope as requested — v0 and nothing beyond it"
-        >
-          <Minus size={12} strokeWidth={2.4} aria-hidden />
-          Lite
-        </button>
-        <button
-          type="button"
-          role="radio"
-          aria-checked={!lite}
-          className={!lite ? 'is-on' : ''}
-          onClick={() => store.setEdition('full')}
-          title="Everything this prototype argues for"
-        >
-          <Layers size={12} strokeWidth={2.2} aria-hidden />
-          Full
-        </button>
+        <Tip text="The scope as requested: v0 and nothing beyond it.">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={lite}
+            className={lite ? 'is-on' : ''}
+            onClick={() => store.setEdition('lite')}
+          >
+            <Minus size={12} strokeWidth={2.4} aria-hidden />
+            Lite
+          </button>
+        </Tip>
+        <Tip text="Everything this prototype argues for.">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!lite}
+            className={!lite ? 'is-on' : ''}
+            onClick={() => store.setEdition('full')}
+          >
+            <Layers size={12} strokeWidth={2.2} aria-hidden />
+            Full
+          </button>
+        </Tip>
       </div>
 
       {/* Only in lite, and only when something is actually withheld. */}

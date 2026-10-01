@@ -67,6 +67,16 @@ import './brand/screens/used-by.css'
 import './brand/screens/applications.css'
 import './brand/create/create.css'
 import './brand/screens/board/describe.css'
+// Policy testing: the panel a sentence token, Save sign-in or What they see hangs open.
+import './brand/screens/testing/anchored-popover.css'
+// Policy testing V4 on the board: the sign-in sentence, the trace on the chain, the test panel.
+import './brand/screens/testing/sign-in-sentence.css'
+import './brand/screens/testing/trace.css'
+import './brand/screens/testing/test-panel.css'
+// Policy testing V4, the tenant's Sign-in tests page: the journey, the library and report tabs, the page frame.
+import './brand/screens/sign-in-tests/journey.css'
+import './brand/screens/sign-in-tests/library.css'
+import './brand/screens/sign-in-tests/sign-in-tests.css'
 /* Here and not in ReadAsTextPanel.tsx, for picker.css's reason: Policies.tsx
    is eager and imports the drawer, so the sheet landed before kit.css and the
    button reset won the tie with `.brat__line` — the rule lines lost their

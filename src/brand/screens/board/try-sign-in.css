@@ -1,51 +1,66 @@
 /* -----------------------------------------------------------------------------
-   Try a sign-in on the board: test mode's layout, its gates and evidence on
-   the chain, and the sign-in panel.
+   Try a sign-in on the board: test mode's layout on the canvas, and the one
+   gate left on the chain (Policy testing V4, §2).
 
-   Geometry first (final spec, A.3). At 1,120 px the rail folds to 64, so the
-   board is 1,056 wide: the panel's track is a fixed 492 — a 480 panel inside
-   the inspector's own 12 px margin — and the chain keeps 564, where cards of
-   380 fit at 100 % with the fit's padding. With the rail reopened (920) the
-   chain is 428 and still holds 380 + 40 at 100 %. A fixed track, not the
-   inspector's `min(var(--bb-insp), 46%)`: 46 % of 920 is 423, and the panel
-   would change width as the rail moved.
+   Layout first. The right-hand column is test mode's again (§2.4-bis): the
+   test panel (test-panel.css) holds the sentence, the verdict and the tests,
+   in the inspector's own track, so `.bb.is-testing` sets no columns of its
+   own — the board's ordinary two tracks, the grip between them. A rule
+   clicked on the chain puts its editor in the panel's place. The canvas keeps
+   the trace (trace.css) and the zoom and undo dock at its bottom centre.
 
    Colour, from the owner's rules. Blue (`--accent`) for what is active and
-   nothing else: the stage the marker stands on, the marker, a chip that is
-   on, the pressed Try a sign-in button. The decision badges carry the only
-   green, amber and red, and the status words their feedback text colours.
-   "Can't tell" and "Depends" are `--text-tertiary`, which passes AA on white
-   in both themes — never a pass colour, never a badge.
+   nothing else: the stage the marker stands on, the marker, the lit spine,
+   the pressed Try a sign-in button. The decision badges carry the only green,
+   amber and red. "Can't tell" and "Depends" are `--text-tertiary`.
 
    Motion owns the marker and every card: nothing below gives them, or any
-   element motion animates, a transform or a transition. The panel's swap is
-   an opacity keyframe on the aside, which motion never touches.
+   element motion animates, a transform or a transition.
    -------------------------------------------------------------------------- */
 
 /* --- The board in test mode ------------------------------------------------- */
 
-.bb.is-testing { grid-template-columns: minmax(0, 1fr) 492px; --bb-card: 380px; }
-.bb.is-testing .bb__grip { display: none; }
-/* The world's own side padding goes, so the fit measures the 380 column and
-   the canvas's 40 px margin alone: 564 and 428 both hold that at 100 %. The
-   80 px each side is room for the hover trail beside a card, which test mode
-   folds away. */
+.bb.is-testing { --bb-card: 440px; }
+
+/* The world's side padding goes, so the fit measures the card column and the
+   canvas's margin alone. */
 .bb.is-testing .bb__world { padding-left: 0; padding-right: 0; }
-/* The cards stay folded while a route is read, so the fold has nothing to do. */
+/* A route is read top to bottom in one look where it can be: at a laptop's
+   900 px a two-rule policy, its gates and its outcome fit above the view
+   dock. The connectors are shorter than the editing chain's, which leaves
+   room for the `+` it no longer draws, and the last row keeps its name alone. */
+.bb.is-testing .bb__link.is-bare { height: 28px; }
+.bb.is-testing .bb__card.is-terminal .bb__title em { display: none; }
+/* The cards stay folded while a route is read, so the fold has nothing to do,
+   and a folded card's summary line repeats the outcome pill beside its name. */
 .bb.is-testing .bb__fold__btn { display: none; }
+.bb.is-testing .bb__fold--sum { display: none; }
 /* The start node heads the column the marker runs down, and is no wider than
    it: the pill's sentence ellipsises rather than widening the world the fit
    measures. */
 .bb.is-testing .bb__stage .bb__start { align-self: flex-start; position: relative; max-width: var(--bb-card); }
 .bb.is-testing .bb__start > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* The outcome pill and the grey word on a card's head, pushed to its right. */
+.bb__tout { display: inline-flex; align-items: center; gap: var(--space-3); flex: none; margin-left: auto; padding-left: var(--space-3); }
+/* The last row's padlock says what cannot be done to it — edits, not reads. */
+.bb.is-testing .bb__card.is-terminal .bb__lockmark { display: none; }
+/* The card a row in the test panel lands on, while the pointer is on the
+   row: the accent, quieter than the matched card's ring. */
+.bb.is-testing .bb__card.is-traced { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--el-low); }
+
+/* What they see, in the outcome node's popover: the panel's own padding. */
+.bb__tsee { padding: var(--space-5); }
 /* A connector and nothing on it. */
 .bb__link.is-bare { pointer-events: none; }
 
 /* The stage the marker stands on: the blue edge, the active state. */
 .bb__card.is-marked { border-color: var(--accent); }
-/* The marker on a card sits on its head row, not the middle of its evidence. */
+/* The marker on a card sits on its head row, not the middle of its pills. */
 .bb__card > .tmarker--dot { top: calc(var(--space-4) + 13px); }
+
+/* "This policy decides", on the spine: the marker stands beside it. */
+.bb__tdecides { position: relative; align-self: center; display: flex; }
 
 /* The pressed bar button: the one blue button on the bar while test mode is on. */
 .bbtop__try .bx-btn[aria-pressed='true'] {
@@ -55,7 +70,7 @@
 }
 .bbtop__try { display: inline-flex; }
 
-/* --- Gates ------------------------------------------------------------------- */
+/* --- Which policy, when another one decides ------------------------------------ */
 
 .bb__gate {
   position: relative;
@@ -77,6 +92,11 @@
   border: 0; background: none; text-align: left; font: inherit; color: inherit;
 }
 .bb__gate__row.is-button { grid-template-columns: 88px minmax(0, 1fr) auto 14px; cursor: pointer; border-radius: var(--radius-md); }
+/* "Decided by {policy}" and its reason pill, in place of label · value · word. */
+.bb__gate__row.has-content,
+.bb__gate__row.is-button.has-content { grid-template-columns: minmax(0, 1fr) 14px; padding-top: var(--space-3); padding-bottom: var(--space-3); }
+.bb__gate__row:not(.is-button).has-content { grid-template-columns: minmax(0, 1fr); }
+.bb__gate__content { display: flex; min-width: 0; }
 .bb__gate__row.is-button:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
 .bb__gate__chev { color: var(--text-tertiary); rotate: -90deg; }
 .bb__gate__row[aria-expanded='true'] .bb__gate__chev { rotate: 0deg; }
@@ -89,92 +109,3 @@
 .bb__gate__word.is-unknown { color: var(--text-tertiary); }
 .bb__gate__body { padding: 0 var(--space-3) var(--space-3); border-top: var(--bw-thin) solid var(--border-subtle); }
 .bb__gate__body .twhich { padding-top: var(--space-3); }
-
-/* The Decision: a badge and the rule that gave it, stacked beside the label. */
-.bb__gate.is-decision .bb__gate__row { grid-template-columns: 88px minmax(0, 1fr); align-items: start; padding-top: var(--space-4); padding-bottom: var(--space-4); }
-.bb__gate__decision { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); min-width: 0; }
-.bb__gate__line { font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
-.bb__gate__unknown { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary); }
-.bb__gate__outcomes { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.bb__gate__outcomes li { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-secondary); }
-.bb__gate__needs { font-size: var(--fs-xs); color: var(--text-tertiary); }
-.bb__gate__changed { font-size: var(--fs-xs); color: var(--text-secondary); }
-.bb__gate__watch { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
-
-.bb__tnote {
-  display: inline-flex; align-items: center; gap: var(--space-2); align-self: flex-start;
-  margin: var(--space-4) 0 0; font-size: var(--fs-xs); color: var(--text-tertiary);
-}
-
-/* --- Evidence on a card ------------------------------------------------------ */
-
-.bb__evidence { display: flex; flex-direction: column; gap: var(--space-3); padding: 0 var(--space-5) var(--space-5); }
-.bb__evword { margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-secondary); }
-.bb__evword.is-pass { color: var(--fb-positive-fg); }
-.bb__evword.is-fail { color: var(--text-primary); }
-.bb__evword.is-unknown { color: var(--text-tertiary); }
-.bb__evlines { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
-.bb__evline {
-  display: grid; grid-template-columns: 88px minmax(0, 1fr) 64px; column-gap: var(--space-4); align-items: baseline;
-  font-size: var(--fs-xs);
-}
-.bb__evlabel { color: var(--text-secondary); overflow-wrap: anywhere; }
-.bb__evtext { color: var(--text-primary); overflow-wrap: anywhere; }
-.bb__evtip { display: inline-flex; vertical-align: middle; margin-left: var(--space-2); cursor: default; }
-.bb__evstatus { text-align: right; white-space: nowrap; font-weight: var(--fw-medium); }
-.bb__evstatus.is-pass { color: var(--fb-positive-fg); }
-.bb__evstatus.is-fail { color: var(--fb-negative-fg); }
-.bb__evstatus.is-unknown { color: var(--text-tertiary); }
-
-/* --- The panel ---------------------------------------------------------------- */
-
-/* Back from the rule editor: the same column, a fade rather than the slide. */
-.bb__insp.is-swap { animation: bb-insp-swap var(--dur-fast) var(--ease-standard); }
-@keyframes bb-insp-swap {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.bb__inspbar.is-test { min-height: 44px; gap: var(--space-1); padding: 0 var(--space-3) 0 var(--space-6); }
-.bb__thead {
-  flex: 1; min-width: 0; margin: 0;
-  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
-}
-.bb__thead:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
-
-/* Version 3's views: the grey pill tabs under the heading, the panel's
-   padding either side (final spec, B V3). Greyscale, as the page's are. */
-.bb__tviews { flex: none; display: flex; min-width: 0; padding: var(--space-5) var(--space-6) 0; }
-
-.bb__tbody {
-  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
-  display: flex; flex-direction: column; gap: var(--space-7);
-  padding: var(--space-6);
-}
-
-/* Two versions, side by side; one spans the panel. */
-.bb__tcols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
-.bb__tcols.is-one { grid-template-columns: minmax(0, 1fr); }
-.bb__tcol {
-  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); min-width: 0;
-  padding: var(--space-5);
-  border-radius: var(--radius-md);
-  background: var(--surface-sunken);
-}
-.bb__tcol__label { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-secondary); }
-.bb__tcol__policy,
-.bb__tcol__line { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bb__tcol__policy { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
-.bb__tcol__line { font-size: var(--fs-xs); color: var(--text-secondary); }
-.bb__tcol__decision { margin-top: var(--space-2); max-width: 100%; }
-
-/* Would change if: a board section, flush with the panel's own padding. */
-.bb__insp.is-test .bb__sec { padding: 0; border: 0; }
-.bb__insp.is-test .bb__sec + .bb__sec::before { content: none; }
-.bb__insp.is-test .bb__sechead { height: 32px; padding: 0; }
-.bb__insp.is-test .bb__secbody { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-3) 0 0; }
-.bb__tchips { display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: var(--space-4); align-items: start; }
-.bb__tchips__label { min-height: var(--ctl-height-sm); display: inline-flex; align-items: center; font-size: var(--fs-xs); color: var(--text-secondary); }
-.bb__tchips__list { display: flex; flex-wrap: wrap; gap: var(--space-3); min-width: 0; }
-.bb__tchips .bx-chip__main { display: inline-flex; align-items: center; gap: var(--space-2); }
-.bb__tchips .bx-chip__main:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }

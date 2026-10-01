@@ -41,9 +41,16 @@ const facts = (f: SignInForm) => factsOf(f, t.zones).facts
 
 describe('finding the row a fact is stated on', () => {
   it('sends every "Needs:" word to the row that change is named by', () => {
-    /* "Needs: IP address" goes to the row whose change reads "Changed by IP address". */
+    /* "Needs: IP address" goes to the row whose change reads "Changed by IP
+       address": every fact on one row has that row's one word, and "Changed
+       by" says the same word mid-sentence. */
+    const mid = (w: string) => ({ When: 'time', 'Device risk score': 'risk score' })[w] ?? w.toLowerCase()
+    const wordOfRow = new Map<string, string>()
     for (const key of Object.keys(FACT_WORDS) as (keyof typeof FACT_WORDS)[]) {
-      expect(`${key} → ${CHANGED_BY_WORDS[FIELD_OF_FACT[key]]}`).toBe(`${key} → ${FACT_WORDS[key]}`)
+      const row = FIELD_OF_FACT[key]
+      expect(`${key} → ${wordOfRow.get(row) ?? FACT_WORDS[key]}`).toBe(`${key} → ${FACT_WORDS[key]}`)
+      wordOfRow.set(row, FACT_WORDS[key])
+      expect(`${key} → ${CHANGED_BY_WORDS[row].toLowerCase()}`).toBe(`${key} → ${mid(FACT_WORDS[key])}`)
     }
     expect(fieldRowId('page', FIELD_OF_FACT['location.city'])).toBe('page-place')
   })

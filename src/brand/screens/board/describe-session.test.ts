@@ -1,8 +1,34 @@
 import { describe, expect, it } from 'vitest'
 
 import { EVERYONE, blankPolicy, rule, type Policy } from '../../data'
+import { showcaseTenant } from '../../fixtures'
+import { EXAMPLES, compose, dictionaryOf, openChoices, readText, type DescribeTenant } from '../../create/describe-model'
 import { historyOf, undo } from '../history'
-import { UNTITLED_NAME, describeSession, emptyDescribe, writeDescribed } from './describe-session'
+import {
+  LEFT_OUT,
+  UNTITLED_NAME,
+  answerAsk,
+  asksOf,
+  bodyOf,
+  carryPicks,
+  changeLine,
+  changedCards,
+  describeSession,
+  describedDraft,
+  emptyDescribe,
+  extendText,
+  followUps,
+  revertDescribed,
+  saidKeys,
+  sendTurn,
+  skipChoice,
+  turnKeys,
+  turnView,
+  undoTurn,
+  writeDescribed,
+  type BoardBody,
+  type DescribeState,
+} from './describe-session'
 
 /* One opening of Describe it is one step on the undo stack, however many
    answers it writes (describe spec, §4.8 and §8.5). */

@@ -19,6 +19,8 @@ import { hasWho, whoSummary } from '../../rule-who'
 import type { NameLookup } from '../predicate-prose'
 import type { RuleState } from '../rule-form'
 import type { CardState } from '../testing/evidence'
+import type { CardTone } from '../testing/trace-pills'
+import { useCardHighlighted, type CardHighlight } from './card-highlight'
 import { DECISION_NAME, TONE, type Part } from './model'
 import { IfBlock, IfChip, IfKw } from './IfBlock'
 import { isPristine, stateLabel } from './parts'
@@ -160,20 +162,27 @@ function CardSummary({ rule, resolve, terminal }: { rule: Rule; resolve?: NameLo
 }
 
 /* Try a sign-in's reading of one card (try-sign-in.ts builds it, Board draws
-   it): the evidence under the head, the marker when it stands here, and the
-   card's standing, which dims a card the sign-in never reached. The card's
-   body stays folded in test mode — the evidence is what is being read. */
+   it, Policy testing V4 §2.3): a row of check pills under the head, the
+   rule's outcome and its standing word on the head's right, the marker when
+   it stands here, and the card's tone — lit where the sign-in matched, missed
+   where it was asked and did not, dim where it never came. The card's body
+   stays folded in test mode — the pills are what is being read. */
 export interface CardRoute {
   state: CardState
-  evidence: ReactNode
+  /** Null while the marker has not reached the card on a run that travels. */
+  tone: CardTone | null
+  /** The check pills, one per condition. */
+  checks: ReactNode
+  /** The outcome pill and the grey standing word, on the head's right. */
+  head: ReactNode
   /** The marker, when it stands on this card. */
   marker?: ReactNode
 }
 
-/* Blue edge where the marker stands; dimmed where the sign-in never came. A
-   rule that is switched off is already drawn as one (`is-off`). */
+/* Blue edge where the marker stands; the tone's class for trace.css. A rule
+   that is switched off is already drawn as one (`is-off`). */
 const routeClass = (route: CardRoute | undefined): string =>
-  !route ? '' : `is-routed${route.marker ? ' is-marked' : ''}${route.state === 'not-reached' ? ' is-unreached' : ''}`
+  !route ? '' : `is-routed${route.marker ? ' is-marked' : ''}${route.tone ? ` is-${route.tone}` : ''}`
 
 export function RuleCard({
   rule,
@@ -201,6 +210,7 @@ export function RuleCard({
   flash = false,
   source,
   traced = false,
+  highlight,
 }: {
   rule: Rule
   index: number
@@ -239,9 +249,12 @@ export function RuleCard({
   source?: string
   /** An answer in Describe it that wrote this card is under the pointer: a 1px ring, border only. */
   traced?: boolean
+  /** Test mode: the card a hovered row in the test panel lands on (card-highlight.ts). */
+  highlight?: CardHighlight
 }) {
   const tone = TONE[rule.decision]
   const titleId = `bb-rule-${rule.id}-title`
+  const ringed = useCardHighlighted(highlight, rule.id) || traced
   const selected = openPart !== null
   /* The ⋯ menu is open: holds the trail out while the pointer is in the menu. */
   const [menuOpen, setMenuOpen] = useState(false)
@@ -255,7 +268,7 @@ export function RuleCard({
          the first — each measured a position the other was mid-way through
          changing, which is the small shiver a reorder used to end on. One
          element animates the move, and it is the one that moves. */
-      className={`bb__card is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${rule.enabled ? '' : 'is-off'} ${shadowed ? 'is-shadowed' : ''} ${dragging ? 'is-dragging' : ''} ${menuOpen ? 'is-menu' : ''} ${flash ? 'is-flash' : ''} ${traced ? 'is-traced' : ''} ${kindClass}`}
+      className={`bb__card is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${rule.enabled ? '' : 'is-off'} ${shadowed ? 'is-shadowed' : ''} ${dragging ? 'is-dragging' : ''} ${menuOpen ? 'is-menu' : ''} ${flash ? 'is-flash' : ''} ${ringed ? 'is-traced' : ''} ${kindClass}`}
       /* No style prop while dragging, deliberately. Board writes this element's
          transform directly on every pointer move; a `style` React manages would
          be reset to a stale offset on the next re-render, which is the classic
@@ -376,9 +389,15 @@ export function RuleCard({
                 between the title and the buttons, reading as the first of them.
                 People pressed it. Beside the name it is what it is: a fact
                 about this rule, next to the thing it is a fact about. */}
-            <span className={`bb__state ${rule.enabled ? `is-${state}` : 'is-off'}`} title={rule.enabled ? stateNote : undefined}>
-              {stateLabel(state, rule.enabled, unreachable)}
-            </span>
+            {/* In test mode the head says what the rule decides instead: the
+                sign-in is being read against it, and Ready is not news. */}
+            {route ? (
+              <span className="bb__tout">{route.head}</span>
+            ) : (
+              <span className={`bb__state ${rule.enabled ? `is-${state}` : 'is-off'}`} title={rule.enabled ? stateNote : undefined}>
+                {stateLabel(state, rule.enabled, unreachable)}
+              </span>
+            )}
           </span>
           {source && (
             <p className="bb__card__from" title={`From your text: “${source}”`}>
@@ -473,15 +492,17 @@ export function RuleCard({
           somewhere invisible. */}
       <div className="bb__fold bb__fold--body" id={`bb-rule-${rule.id}-body`} inert={!expanded}>
         <div>
-          <div className="bb__cardbody">
-            <IfBlock rule={rule} resolve={resolve} />
-          </div>
+          {/* Not in test mode: every card is folded there and cannot be
+              unfolded (the chevron is hidden), so a rule's body is drawn for
+              nobody — and it was most of what a marker's hop redrew. It is
+              back, still at zero height, the moment test mode closes, so the
+              first press of the chevron after it still glides. */}
+          <div className="bb__cardbody">{!route && <IfBlock rule={rule} resolve={resolve} />}</div>
         </div>
       </div>
 
-      {/* What the sign-in being tried made of this rule, in place of the
-          rehearsal's one-sentence verdict (RouteGate.tsx). */}
-      {route?.evidence}
+      {/* What the sign-in being tried made of this rule: one pill per check. */}
+      {route?.checks}
     </motion.div>
   )
 }
@@ -500,6 +521,7 @@ export function TerminalCard({
   cardRef,
   flash = false,
   traced = false,
+  highlight,
   onHover,
 }: {
   rule: Rule
@@ -517,8 +539,11 @@ export function TerminalCard({
   traced?: boolean
   /** Describe it: the pointer is over this row. */
   onHover?: (on: boolean) => void
+  /** Test mode: the card a hovered row in the test panel lands on. */
+  highlight?: CardHighlight
 }) {
   const tone = TONE[rule.decision]
+  const ringed = useCardHighlighted(highlight, 'fallback') || traced
   return (
     <motion.div
       ref={cardRef}
@@ -526,7 +551,7 @@ export function TerminalCard({
          changes the card's height, and a size animation stretches its text. */
       layout={route ? 'position' : true}
       transition={{ type: 'spring', stiffness: 520, damping: 40 }}
-      className={`bb__card is-terminal is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${flash ? 'is-flash' : ''} ${traced ? 'is-traced' : ''} ${routeClass(route)}`}
+      className={`bb__card is-terminal is-${tone} ${expanded ? 'is-open' : ''} ${selected ? 'is-selected' : ''} ${flash ? 'is-flash' : ''} ${ringed ? 'is-traced' : ''} ${routeClass(route)}`}
       /* The same shape as every other card: a group named by its title
          button. It has no inner controls to hide, so the old whole-card button
          cost nothing here — but `aria-pressed` is a toggle's attribute and
@@ -578,7 +603,7 @@ export function TerminalCard({
                   controls — move, duplicate, delete, the on/off switch — are absent
                   rather than disabled, because a row of greyed-out buttons invites
                   somebody to work out why. */}
-              <span className="bb__state">Always on</span>
+              {route ? <span className="bb__tout">{route.head}</span> : <span className="bb__state">Always on</span>}
               {/* A mark, not a pill with a word in it.
 
                   The row read `Always on` · `Locked` · fold: two labelled pills and a
@@ -628,17 +653,15 @@ export function TerminalCard({
       </div>
       <div className="bb__fold bb__fold--sum" aria-hidden={expanded} inert={expanded}>
         <div>
-          <CardSummary terminal rule={rule} />
+          {!route && <CardSummary terminal rule={rule} />}
         </div>
       </div>
       <div className="bb__fold bb__fold--body" id="bb-terminal-body" inert={!expanded}>
         <div>
-          <div className="bb__cardbody">
-            <IfBlock terminal rule={rule} resolve={resolve} />
-          </div>
+          <div className="bb__cardbody">{!route && <IfBlock terminal rule={rule} resolve={resolve} />}</div>
         </div>
       </div>
-      {route?.evidence}
+      {route?.checks}
     </motion.div>
   )
 }

@@ -4,14 +4,20 @@ import { showcaseTenant, showcaseTenantHrmsOn, tenantAt } from './fixtures'
 import { LEVEL_LABEL, LEVEL_PICKER_ORDER, SAVED_NAME_MAX, SIGN_IN_LEVELS } from './saved-sign-ins'
 import { envOf, resolveSignIn } from './screens/tenant-resolver'
 
-/* The seeded saved sign-ins are the guard's fixture. Four are promises about
-   policies that are on, and pass today. Two are promises about HRMS as it
-   will decide once it is on — Kavya in the office gets 2FA, Neha at home is
-   refused — and HRMS opens Inactive (Phase 4), so today the Global Default
-   decides both and they read Fail until HRMS is turned on or assumed on. A
-   failure that is already there never opens the guard: only a check that
-   passed and now fails can block, and only a Deny that is now let in counts
-   as newly allowed (guard.ts, `checkOf`). Turning HRMS on moves both to Pass. */
+/* The seeded saved sign-ins are the guard's fixture. Fourteen are promises
+   about policies that are on, or about the Global Default, and pass today.
+   Two are promises about HRMS as it will decide once it is on — Kavya in the
+   office gets 2FA, Neha at home is refused — and HRMS opens Inactive (Phase
+   4), so today the Global Default decides both and they read Fail until HRMS
+   is turned on or assumed on. A failure that is already there never opens
+   the guard: only a check that passed and now fails can block, and only a
+   Deny that is now let in counts as newly allowed (guard.ts, `checkOf`).
+   Turning HRMS on moves both to Pass.
+
+   Sixteen since 28 Sep 2026 (Policy testing V4 §5): the first six, one per
+   thing the four policies decide, and ten more so that every policy's Tests
+   dock opens on three or four of its own. The list is pinned whole, so a
+   sign-in added or dropped is a decision somebody made here. */
 
 const t = showcaseTenant()
 const env = envOf(t)
@@ -19,7 +25,7 @@ const on = showcaseTenantHrmsOn()
 const HRMS_PROMISES = ['ssi-kavya-office', 'ssi-neha-home']
 
 describe('the showcase saved sign-ins', () => {
-  it('are six, with unique ids and names that fit the save form', () => {
+  it('are sixteen, with unique ids and names that fit the save form', () => {
     expect(t.savedSignIns.map((s) => s.id)).toEqual([
       'ssi-kavya-office',
       'ssi-neha-home',
@@ -27,8 +33,29 @@ describe('the showcase saved sign-ins', () => {
       'ssi-devon-android',
       'ssi-ravi-hrms',
       'ssi-vikram-laptop',
+      'ssi-arun-office',
+      'ssi-sofia-london',
+      'ssi-tom-win10',
+      'ssi-contractor-jira',
+      'ssi-sanjay-iphone',
+      'ssi-priya-mac',
+      'ssi-ivy-android',
+      'ssi-rahul-medium',
+      'ssi-emily-high',
+      'ssi-aisha-laptop',
     ])
     for (const s of t.savedSignIns) expect(s.name.length).toBeLessThanOrEqual(SAVED_NAME_MAX)
+    expect(new Set(t.savedSignIns.map((s) => s.name.toLowerCase())).size).toBe(t.savedSignIns.length)
+  })
+
+  /* So no policy's Saved sign-ins tab opens empty in the demo: two to four on every
+     scenario policy's applications (V4 §5). */
+  it('give every scenario policy two to four of its own', () => {
+    for (const p of t.policies.filter((x) => !x.isSystem)) {
+      const own = t.savedSignIns.filter((s) => s.facts.appId !== undefined && p.appIds.includes(s.facts.appId))
+      expect(own.length, p.id).toBeGreaterThanOrEqual(2)
+      expect(own.length, p.id).toBeLessThanOrEqual(4)
+    }
   })
 
   it('name a person and an application this tenant has', () => {
@@ -68,6 +95,19 @@ describe('the showcase saved sign-ins', () => {
     expect(by('ssi-devon-android')).toEqual(['sc-device-compliance', null])
     expect(by('ssi-ravi-hrms')).toEqual(['global-default', 0])
     expect(by('ssi-vikram-laptop')).toEqual(['sc-corporate-devices', 0])
+    /* The ten added for the test panel's tabs: each of Developer tools' answers and a
+       contractor outside it, both of Device compliance's, and the other two
+       risk bands and a laptop that is not a corporate one. */
+    expect(by('ssi-arun-office')).toEqual(['sc-dev-tools', 0])
+    expect(by('ssi-sofia-london')).toEqual(['sc-dev-tools', 1])
+    expect(by('ssi-tom-win10')).toEqual(['sc-dev-tools', null])
+    expect(by('ssi-contractor-jira')).toEqual(['global-default', 0])
+    expect(by('ssi-sanjay-iphone')).toEqual(['sc-device-compliance', 0])
+    expect(by('ssi-priya-mac')).toEqual(['sc-device-compliance', null])
+    expect(by('ssi-ivy-android')).toEqual(['sc-device-compliance', 0])
+    expect(by('ssi-rahul-medium')).toEqual(['sc-corporate-devices', 1])
+    expect(by('ssi-emily-high')).toEqual(['sc-corporate-devices', 2])
+    expect(by('ssi-aisha-laptop')).toEqual(['sc-corporate-devices', null])
   })
 
   it('use every level, and state every fact they give', () => {

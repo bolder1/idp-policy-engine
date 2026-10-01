@@ -33,7 +33,7 @@ import {
 } from 'lucide-react'
 
 import type { AccessDecision, PolicyStatus } from './data'
-import { appRoot, useDialogChrome } from './dialog-chrome'
+import { FOCUSABLE, appRoot, useDialogChrome } from './dialog-chrome'
 import { ChangeList, ChangeSection, type ChangeItem } from './change-list'
 import { groupSections, reviewItemName, reviewSave, sectionsOpen, type KindBlock, type ReviewLine } from './review-rows'
 import { useReviewView, type ReviewView } from './review-view'
@@ -1308,6 +1308,19 @@ export function NumberStepper({
 const TIP_GAP = 7
 const TIP_MARGIN = 8
 
+/* The control a tip describes: the one inside it with focus, else the first
+   one inside it. Never the wrapper, and never a control around it — a
+   TipMark in a row-sized button leaves the row's name to say its words. */
+function triggerOf(wrap: HTMLElement | null): HTMLElement | null {
+  if (!wrap) return null
+  const active = document.activeElement
+  if (active instanceof HTMLElement && active !== wrap && wrap.contains(active)) return active
+  return wrap.querySelector<HTMLElement>(FOCUSABLE)
+}
+
+/** A control's name as a reader says it, near enough to tell a tip that only repeats it. */
+const nameOf = (el: HTMLElement): string => (el.getAttribute('aria-label') ?? el.textContent ?? '').trim()
+
 export function Tip({
   text,
   children,
@@ -1350,6 +1363,30 @@ export function Tip({
     setPos({ top, left, side })
   }, [placement, width])
 
+  /* The description goes on the control, not on this wrapper. A span that
+     never takes focus described by the tip was never read: a screen reader
+     reads a description off the element that has focus (V4 review MAP-6).
+     So while the tip is open, the focused control inside — or, opened by the
+     pointer, the first control inside — is described by it, added to any
+     description of its own and taken off again on close. Not when the tip
+     only repeats the control's name, as an icon button's does: "Replay,
+     button, Replay" says nothing twice over. A wrapper with no control
+     inside (a badge, a line of text) describes nothing, as before. */
+  useLayoutEffect(() => {
+    if (!open) return
+    const trigger = triggerOf(anchor.current)
+    const said = pop.current?.textContent?.trim() ?? ''
+    if (!trigger || !said || said === nameOf(trigger)) return
+    const own = (trigger.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
+    if (own.includes(id)) return
+    trigger.setAttribute('aria-describedby', [...own, id].join(' '))
+    return () => {
+      const left = (trigger.getAttribute('aria-describedby') ?? '').split(/\s+/).filter((x) => x && x !== id)
+      if (left.length > 0) trigger.setAttribute('aria-describedby', left.join(' '))
+      else trigger.removeAttribute('aria-describedby')
+    }
+  }, [open, id])
+
   /* Measured after the pop is in the DOM, so `h` is real rather than guessed —
      the first pass renders it invisible at 0,0 and the second puts it right. */
   useEffect(() => {
@@ -1382,7 +1419,6 @@ export function Tip({
       onFocusCapture={() => setOpen(true)}
       onBlurCapture={() => setOpen(false)}
       onTouchStart={() => setOpen((v) => !v)}
-      aria-describedby={open ? id : undefined}
     >
       {children}
       {open &&

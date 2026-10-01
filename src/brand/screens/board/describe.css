@@ -1,188 +1,396 @@
 /* -----------------------------------------------------------------------------
-   Describe it's panel (DescribePanel.tsx, describe spec §3).
+   Describe it's panel (DescribePanel.tsx, V4 §4.1): a thread on the LEFT of
+   the board, in `.bb`'s leading track (board.css, `is-left-open`).
 
-   It borrows the inspector's shell — `.bb__insp` is the floating card, its
-   margin, radius, shadow and `bb-insp-in` entrance, in the inspector's grid
-   track — and adds only what a list of answers needs. Grey throughout: the
-   one orange on the board stays on "Save policy", and a selected option is
-   the segmented control's own grey.
+   The inspector's floating card, mirrored: inset from the region's top, left
+   and bottom, its own edge, radius and lift. It enters by opacity and the
+   separate `translate` property on this plain aside — nothing here is
+   animated by motion, and nothing here transforms anything.
 
-   Motion is CSS only, and short: an answer opens by its row growing from 0fr
-   to 1fr, a changed summary fades up, and under reduced motion both are
-   instant. Nothing here transforms anything.
+   Grey throughout. The one orange on the board stays on "Save policy": the
+   send button is ink when there is text, a chip is the control ground with
+   the accent only while its popover is open, and colour on a reply is a
+   DecisionBadge's own. Under reduced motion everything is its final state
+   at once.
    -------------------------------------------------------------------------- */
 
-.bdsc__bar { gap: var(--space-3); min-height: 44px; padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5); }
-.bdsc__title {
-  margin: 0;
-  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary);
+.bdsc {
+  grid-column: 1; grid-row: 1;
+  position: relative; z-index: 4;
+  display: flex; flex-direction: column;
+  min-width: 0; min-height: 0;
+  margin: var(--space-5) 0 var(--space-5) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--el-mid);
+  background: var(--surface-raised);
+  overflow: hidden;
+  animation: bdsc-in var(--dur-normal) var(--ease-standard) both;
 }
-.bdsc__title:focus { outline: none; }
+@keyframes bdsc-in {
+  from { opacity: 0; translate: -16px 0; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+/* --- Header --------------------------------------------------------------------- */
+
+.bdsc__bar {
+  flex: none;
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: 44px; padding: var(--space-2) var(--space-3) var(--space-2) var(--space-6);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.bdsc__title { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .bdsc__barend { margin-left: auto; display: inline-flex; }
 
-.bdsc__body { display: flex; flex-direction: column; gap: var(--space-6); padding: var(--space-5) var(--space-5) var(--space-8); }
+/* --- The thread: the only scroller --------------------------------------------------- */
 
-/* --- Your text ---------------------------------------------------------------- */
-
-.bdsc__textblock { display: flex; flex-direction: column; gap: var(--space-3); }
-.bdsc__label,
-.bdsc__minilabel {
-  display: inline-flex; align-items: center; gap: var(--space-3);
-  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary);
+.bdsc__thread {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: var(--space-6);
 }
-.bdsc__box { position: relative; }
-/* Two lines to six, then it scrolls. `field-sizing` grows it with its own
-   words; the bounds are in lines so the box and its text agree. */
-.bdsc__box textarea {
+
+/* Empty: one question, the four examples, and the composer below. */
+.bdsc__empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-5); padding-top: var(--space-6); }
+.bdsc__glyph {
+  display: inline-grid; place-items: center;
+  width: 32px; height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+.bdsc__prompt { margin: 0 0 var(--space-2); font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text-primary); }
+.bdsc__examples { display: flex; flex-direction: column; gap: var(--space-4); width: 100%; }
+.bdsc__example {
   display: block;
-  field-sizing: content;
-  min-height: calc(2lh + 2 * var(--space-4));
-  max-height: calc(6lh + 2 * var(--space-4));
-  padding-right: calc(var(--space-5) + 28px);
-  resize: none;
-  font-size: var(--fs-md); line-height: 1.5; color: var(--text-primary);
+  width: 100%; padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font: inherit; font-size: var(--fs-sm); line-height: 1.45; text-align: left;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 }
-.bdsc__read { position: absolute; right: var(--space-2); bottom: var(--space-2); }
-
-.bdsc__examples { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.bdsc__examples .bdsc__minilabel { margin-right: var(--space-2); }
-
-/* --- Not added ------------------------------------------------------------------ */
-
-.bdsc__notadded h3 {
-  margin: 0 0 var(--space-3);
-  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-secondary);
+/* Its words on two lines at most; the whole sentence is its title. */
+.bdsc__exampletext {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  overflow: hidden;
 }
-.bdsc__notadded ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
-.bdsc__notadded li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-4); font-size: var(--fs-md); }
-.bdsc__phrase { color: var(--text-primary); }
-.bdsc__why { color: var(--text-tertiary); }
+.bdsc__example:hover { background: var(--surface-sunken); border-color: var(--border-default); color: var(--text-primary); }
+.bdsc__example:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 3px var(--focus-halo); }
 
-/* --- The answers ----------------------------------------------------------------- */
+/* --- A turn ---------------------------------------------------------------------------- */
 
-.bdsc__answers { display: flex; flex-direction: column; border-top: 1px solid var(--border-subtle); }
-.bdsc__answer { border-bottom: 1px solid var(--border-subtle); }
-.bdsc__head {
-  display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; align-items: center; gap: var(--space-4);
+.bdsc__turns { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-8); }
+.bdsc__turn { display: flex; flex-direction: column; gap: var(--space-5); }
+
+/* The message: right-aligned, the pencil beside it on hover or focus. */
+.bdsc__msg { display: flex; justify-content: flex-end; align-items: flex-start; gap: var(--space-2); }
+.bdsc__bubble {
+  margin: 0; max-width: 85%;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  font-size: var(--fs-md); line-height: 1.45; color: var(--text-primary);
+  overflow-wrap: anywhere; white-space: pre-wrap;
+}
+.bdsc__msg.is-rewriting .bdsc__bubble { box-shadow: 0 0 0 1px var(--accent); }
+.bdsc__pencil { opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard); }
+.bdsc__msg:hover .bdsc__pencil,
+.bdsc__msg:focus-within .bdsc__pencil,
+.bdsc__msg.is-rewriting .bdsc__pencil { opacity: 1; }
+
+/* The reply: no avatar, a tertiary word, then the rows. */
+.bdsc__reply { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.bdsc__understood { margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-tertiary); }
+.bdsc__rows { display: flex; flex-direction: column; gap: var(--space-3); }
+.bdsc__row {
+  display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: start; gap: var(--space-4);
+  margin: 0 calc(-1 * var(--space-3)); padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+}
+.bdsc__rowlabel { padding-top: 5px; font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
+.bdsc__row.is-bold .bdsc__rowlabel { font-weight: var(--fw-semibold); color: var(--text-primary); }
+/* A card clicked on the board: its row, flashed. Two names, so a second click restarts it. */
+.bdsc__row.is-flash0 { animation: bdsc-flash0 1.2s var(--ease-standard); }
+.bdsc__row.is-flash1 { animation: bdsc-flash1 1.2s var(--ease-standard); }
+@keyframes bdsc-flash0 { from { background-color: var(--accent-soft); } to { background-color: transparent; } }
+@keyframes bdsc-flash1 { from { background-color: var(--accent-soft); } to { background-color: transparent; } }
+
+.bdsc__chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-width: 0; }
+/* A chip: the sentence token's geometry, a size down. Neutral; the accent while its popover is open. */
+.bdsc__chip {
+  box-sizing: border-box;
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  min-height: 28px; max-width: 100%; min-width: 0;
+  padding: var(--space-1) var(--space-4) var(--space-1) var(--space-3);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--ctl-bg);
+  font: inherit; font-size: var(--fs-sm); line-height: 1.3; text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bdsc__chip:hover { background: var(--ctl-bg-hover); border-color: var(--border-strong); }
+.bdsc__chip:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 3px var(--focus-halo); }
+.bdsc__chip.is-open,
+.bdsc__chip.is-open:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); }
+.bdsc__chip.is-muted { color: var(--text-tertiary); }
+/* An outcome: the decision badge is the pill, so the chip draws no box
+   round it — only the ground a control shows on hover, and the accent
+   while its popover is open. */
+.bdsc__chip.is-outcome { border-color: transparent; background: none; padding-inline: var(--space-2); }
+.bdsc__chip.is-outcome:hover { border-color: transparent; background: var(--surface-sunken); }
+.bdsc__chip.is-outcome.is-open,
+.bdsc__chip.is-outcome.is-open:hover { border-color: var(--accent-soft-border); background: var(--accent-soft); }
+.bdsc__row .bdsc__chips:has(> .is-outcome) { margin-left: calc(-1 * var(--space-2)); }
+.bdsc__chipart { flex: none; display: inline-flex; color: var(--text-secondary); }
+.bdsc__chip.is-open .bdsc__chipart { color: var(--accent-strong); }
+.bdsc__chipbody { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); min-width: 0; }
+.bdsc__chipextra { font-size: var(--fs-xs); color: var(--text-secondary); }
+.bdsc__branch { color: var(--text-secondary); }
+.bdsc__arrow { flex: none; color: var(--text-tertiary); }
+
+/* A question settled: one line, the words and what they became. */
+.bdsc__settled { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.bdsc__settled li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); }
+.bdsc__settledphrase { color: var(--text-tertiary); }
+.bdsc__settledanswer { font-weight: var(--fw-medium); color: var(--text-primary); }
+
+/* One question at a time: its line, its replies, Don't add. */
+.bdsc__ask {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  animation: bdsc-ask var(--dur-normal) var(--ease-standard) both;
+}
+@keyframes bdsc-ask {
+  from { opacity: 0; translate: 0 4px; }
+  to { opacity: 1; translate: 0 0; }
+}
+.bdsc__askq { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bdsc__askdetail { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bdsc__replies { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.bdsc__replychip {
+  display: inline-flex; align-items: baseline; gap: var(--space-3);
+  min-height: 28px; padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  background: var(--ctl-bg);
+  font: inherit; font-size: var(--fs-sm); color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bdsc__replychip:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); }
+.bdsc__replychip:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 3px var(--focus-halo); }
+.bdsc__replymeta { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bdsc__skip {
+  min-height: 28px; padding: var(--space-2) var(--space-3);
+  border: none; border-radius: var(--radius-sm); background: none;
+  font: inherit; font-size: var(--fs-sm); color: var(--text-secondary);
+  cursor: pointer;
+}
+.bdsc__skip:hover { color: var(--text-primary); background: var(--surface-sunken); }
+.bdsc__skip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+
+/* Not added: grey words, the reason in a tip, the fix beside them. */
+.bdsc__gone {
+  display: inline-flex; align-items: center;
+  min-height: 24px; padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm); color: var(--text-secondary);
+  cursor: default;
+}
+.bdsc__gone:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+
+/* What the turn did to the board, and its Undo at the row's end. */
+.bdsc__change {
+  display: flex; align-items: center; gap: var(--space-4);
+  margin: 0; min-height: 28px;
+  font-size: var(--fs-sm); color: var(--text-secondary);
+}
+.bdsc__changeline { flex: 1 1 auto; min-width: 0; }
+.bdsc__changepart { white-space: nowrap; }
+.bdsc__change .bx-btn { flex: none; }
+
+/* --- Checks, collapsed to one row ------------------------------------------------------ */
+
+.bdsc__checks { border-top: 1px solid var(--border-subtle); }
+.bdsc__checkshead {
+  display: flex; align-items: center; gap: var(--space-3);
   width: 100%; min-height: 40px; padding: var(--space-3) 0;
   border: none; background: none; text-align: left; cursor: pointer;
   font: inherit; color: inherit;
 }
-.bdsc__head:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
-.bdsc__headlabel { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-secondary); }
-.bdsc__summary { display: flex; flex-direction: column; min-width: 0; }
-.bdsc__value {
-  font-size: var(--fs-md); color: var(--text-primary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  animation: bdsc-said var(--dur-fast) var(--ease-standard);
+.bdsc__checkshead:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); border-radius: var(--radius-sm); }
+.bdsc__checksword { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary); }
+.bdsc__checkspills { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-left: auto; }
+.bdsc__pill {
+  display: inline-flex; align-items: center;
+  padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  line-height: var(--pill-line);
+  font-size: var(--pill-fs); font-weight: var(--pill-fw);
+  border: 1px solid var(--fb-neutral-border); background: var(--fb-neutral-bg); color: var(--fb-neutral-fg);
 }
-.bdsc__summary.is-unset .bdsc__value { color: var(--text-tertiary); }
-.bdsc__summary.is-bold .bdsc__value { font-weight: var(--fw-semibold); }
-.bdsc__trace {
-  font-size: var(--fs-sm); color: var(--text-tertiary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bdsc__headend { display: inline-flex; align-items: center; gap: var(--space-3); }
-.bdsc__tag { font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--text-tertiary); }
+.bdsc__pill.is-differs { border-color: var(--fb-negative-border); background: var(--fb-negative-bg); color: var(--fb-negative-fg); }
+.bdsc__checksnote { font-size: var(--fs-xs); color: var(--text-tertiary); }
 .bdsc__chev { flex: none; color: var(--text-tertiary); transition: rotate 160ms var(--ease-standard); }
-.bdsc__answer.is-open .bdsc__chev { rotate: 180deg; }
+.bdsc__checks.is-open .bdsc__chev { rotate: 180deg; }
 
-/* The answer opens by its one row growing: 0fr to 1fr, in 160ms. */
+/* It opens by its one row growing: 0fr to 1fr, in 160ms. */
 .bdsc__region {
   display: grid; grid-template-rows: 0fr;
   transition: grid-template-rows 160ms var(--ease-standard);
 }
-.bdsc__answer.is-open .bdsc__region { grid-template-rows: 1fr; }
+.bdsc__checks.is-open .bdsc__region { grid-template-rows: 1fr; }
 .bdsc__regioninner { min-height: 0; overflow: hidden; }
-.bdsc__controls { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-2) 0 var(--space-6); }
 
-.bdsc__pair { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--space-4); }
-.bdsc__labelled { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-.bdsc__time { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
-.bdsc__time .bx-picker { grid-column: span 1; }
-.bdsc__aside { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
-
-/* A question the text raised, with nothing picked. */
-.bdsc__q { display: flex; flex-direction: column; gap: var(--space-3); }
-.bdsc__qphrase { display: inline-flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--fs-md); color: var(--text-primary); }
-.bdsc__qdetail { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
-
-/* Sign-in: one row per branch, the branch named on the left. */
-.bdsc__branches { display: flex; flex-direction: column; gap: var(--space-5); }
-.bdsc__outcome.has-label { display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: start; gap: var(--space-4); }
-.bdsc__branchlabel {
-  padding-top: var(--space-3);
-  font-size: var(--fs-md); color: var(--text-secondary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bdsc__outcomectl { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
-
-/* --- Checks ---------------------------------------------------------------------------
-
-   One sign-in a row, and what the tenant decides for it: the kind, the
-   sign-in over the policy and rule that decided it, then the decision. A row
-   is a button (it opens Try a sign-in on it), quiet until hovered: the badge
-   in its last column is the only colour it carries, and Can't tell is grey
-   text. The What changes line under them holds the panel's one number. */
-
-.bdsc__checks { display: flex; flex-direction: column; gap: var(--space-3); }
-.bdsc__checkshead {
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  margin: 0;
-  font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-secondary);
-}
 .bdsc__checklist { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border-subtle); }
 .bdsc__checklist li { border-bottom: 1px solid var(--border-subtle); }
 .bdsc__check {
-  display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; align-items: center; gap: var(--space-4);
-  width: 100%; min-height: 44px; padding: var(--space-2) var(--space-2);
+  display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; gap: var(--space-4);
+  width: 100%; min-height: 44px; padding: var(--space-2);
   border: none; border-radius: var(--radius-sm); background: none; text-align: left;
   font: inherit; color: inherit;
 }
 button.bdsc__check { cursor: pointer; }
 button.bdsc__check:hover { background: var(--surface-sunken); }
-button.bdsc__check:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
-.bdsc__checkkind { font-size: var(--fs-sm); color: var(--text-secondary); }
+button.bdsc__check:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bdsc__checkkind { font-size: var(--fs-xs); color: var(--text-secondary); }
 .bdsc__checkbody { display: flex; flex-direction: column; min-width: 0; }
 .bdsc__checkline,
 .bdsc__checkdetail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bdsc__checkline { font-size: var(--fs-md); color: var(--text-primary); }
-.bdsc__checkdetail { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bdsc__checkline { font-size: var(--fs-sm); color: var(--text-primary); }
+.bdsc__checkdetail { font-size: var(--fs-xs); color: var(--text-tertiary); }
 .bdsc__checkres {
   display: inline-flex; align-items: center; gap: var(--space-2); justify-self: end;
   animation: bdsc-said var(--dur-fast) var(--ease-standard);
 }
-
-.bdsc__changes { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; }
-.bdsc__changesword { font-size: var(--fs-sm); color: var(--text-secondary); }
-.bdsc__changesline { font-size: var(--fs-md); color: var(--text-primary); }
-
-/* --- Foot: buttons only ------------------------------------------------------------
-
-   The inspector's foot (`.bb__inspfoot`), at this panel's 56px. Done is a
-   grey button WITH a background (owner, 23 Sep 2026: "don't use outline —
-   use the grey button with a background"), not the inspector's warm save
-   tint: Done closes the panel, it saves nothing. */
-
-.bdsc__foot { min-height: 56px; padding: var(--space-3) var(--space-5); }
-.bb__inspfoot.bdsc__foot .bx-btn--neutral {
-  background: var(--int-neutral-bg-active);
-  border-color: var(--int-neutral-bg-active);
-  color: var(--int-neutral-text);
-}
-.bb__inspfoot.bdsc__foot .bx-btn--neutral:not(:disabled):hover {
-  background: var(--int-neutral-border);
-  border-color: var(--int-neutral-border);
-}
+.bdsc__changes { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: var(--space-4) 0 var(--space-2); }
+.bdsc__changesword { font-size: var(--fs-xs); color: var(--text-secondary); }
+.bdsc__changesline { font-size: var(--fs-sm); color: var(--text-primary); }
 
 @keyframes bdsc-said {
   from { opacity: 0.4; }
   to { opacity: 1; }
 }
 
+/* --- The foot: follow-ups and the composer, pinned --------------------------------------- */
+
+.bdsc__foot {
+  flex: none;
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+.bdsc__suggest { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.bdsc__suggestion {
+  min-height: 28px; padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font: inherit; font-size: var(--fs-sm); color: var(--text-secondary); text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bdsc__suggestion:hover { background: var(--surface-sunken); border-color: var(--border-default); color: var(--text-primary); }
+.bdsc__suggestion:focus-visible { outline: none; border-color: var(--ctl-border-focus); box-shadow: 0 0 0 3px var(--focus-halo); }
+
+.bdsc__composer {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border-default); border-radius: var(--radius-lg);
+  background: var(--ctl-bg);
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.bdsc__composer:focus-within { border-color: var(--ctl-border-focus); box-shadow: 0 0 0 3px var(--focus-halo); }
+.bdsc__composer.is-rewriting { border-color: var(--accent); }
+.bdsc__rewrite {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) 0 var(--space-5);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--accent-strong);
+}
+.bdsc__rewriteend { margin-left: auto; display: inline-flex; }
+.bdsc__field { display: flex; align-items: flex-end; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5); }
+/* One line to six, then it scrolls; `field-sizing` grows it with its words. */
+.bdsc__field textarea {
+  flex: 1 1 auto; display: block; min-width: 0;
+  field-sizing: content;
+  min-height: 1lh; max-height: 6lh;
+  margin: 0; padding: var(--space-2) 0;
+  border: none; outline: none; background: none; box-shadow: none;
+  resize: none;
+  font: inherit; font-size: var(--fs-md); line-height: 1.5; color: var(--text-primary);
+}
+.bdsc__field textarea:focus { outline: none; box-shadow: none; }
+.bdsc__field textarea::placeholder { color: var(--text-placeholder); }
+/* Round, ink when there is something to send; never the brand. */
+.bdsc__send {
+  flex: none;
+  display: inline-grid; place-items: center;
+  width: 28px; height: 28px; margin-bottom: 1px;
+  border: none; border-radius: 50%;
+  background: var(--surface-sunken); color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.bdsc__send.has-text { background: var(--text-primary); color: var(--surface-raised); }
+.bdsc__send:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+
+/* --- A chip's popover: that answer's own controls ----------------------------------------- */
+
+.bdsc-pop { padding: var(--space-5) var(--space-6) var(--space-6); gap: var(--space-4); }
+.bdsc-pop__title { margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-tertiary); }
+.bdsc-pop__body { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.bdsc__pair { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--space-4); }
+.bdsc__labelled { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.bdsc__minilabel { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary); }
+.bdsc__tag { font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--text-tertiary); }
+.bdsc__time { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.bdsc__aside { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+.bdsc__branches { display: flex; flex-direction: column; gap: var(--space-5); }
+.bdsc__outcome.has-label { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: start; gap: var(--space-4); }
+.bdsc__branchlabel {
+  padding-top: var(--space-3);
+  font-size: var(--fs-sm); color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bdsc__outcomectl { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+/* --- The door back, on the canvas while the panel is closed -------------------------------- */
+
+.bdsc-door {
+  grid-column: 2; grid-row: 1;
+  align-self: start; justify-self: start;
+  position: relative; z-index: 4;
+  display: inline-flex; align-items: center; gap: var(--space-3);
+  margin: var(--space-5);
+  min-height: 30px; padding: 0 var(--space-5) 0 var(--space-4);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised); box-shadow: var(--el-low);
+  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.bdsc-door:hover { background: var(--surface-sunken); border-color: var(--border-default); }
+.bdsc-door:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.bdsc-door svg { color: var(--text-secondary); }
+
 @media (prefers-reduced-motion: reduce) {
-  .bdsc__region,
-  .bdsc__chev { transition: none; }
-  .bdsc__value,
+  .bdsc,
+  .bdsc__ask,
+  .bdsc__row.is-flash0,
+  .bdsc__row.is-flash1,
   .bdsc__checkres { animation: none; }
+  .bdsc__example,
+  .bdsc__pencil,
+  .bdsc__chip,
+  .bdsc__replychip,
+  .bdsc__chev,
+  .bdsc__region,
+  .bdsc__suggestion,
+  .bdsc__composer,
+  .bdsc__send,
+  .bdsc-door { transition: none; }
 }

@@ -1,0 +1,16 @@
+/* -----------------------------------------------------------------------------
+   Sign-in tests: the page that holds the four tabs (V4 §3.1). Prefix `sit`,
+   the page's own; the journey is `tj` (journey.css) and the library and
+   report tabs are `sitl` (library.css), which also turns the page into a
+   flex column while one of its tabs is open.
+
+   Only the page's frame is here: the line tabs under the head, and the
+   panel they control. Tokens only (console-theme.css).
+   -------------------------------------------------------------------------- */
+
+/* The tabs belong to the head above them, not to the body under them: the
+   grid's gap would hang them halfway between. */
+.bpage.sit > .sit__tabs { margin-top: calc(var(--space-6) * -1 + var(--space-2)); }
+
+.sit__panel { min-width: 0; }
+.sit__panel:focus-visible { outline: none; }

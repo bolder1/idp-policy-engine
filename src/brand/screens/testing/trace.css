@@ -1,0 +1,285 @@
+/* -----------------------------------------------------------------------------
+   The trace on the board (TracePills.tsx, TESTING-V4 §2.3): check pills under
+   a card's head, the rule's outcome beside its name, the card states in test
+   mode, the lit spine, the start node's content and the outcome node.
+
+   Colour, from the owner's rules. The accent (`--accent*`, blue in the
+   rebrand look) is what is active and nothing else: the card the sign-in
+   matched, the spine it travelled, the change that just happened. Green,
+   amber and red are the decisions' (DecisionBadge, `--fb-*`) and a failed
+   check's; every other pill is the neutral one. "Can't tell" and "Depends"
+   are `--text-tertiary` text, never a badge.
+
+   One pill family. Every pill here is drawn on the `--pill-*` tokens the kit's
+   Badge uses, so a check pill, the audience pill and a decision badge are the
+   same height, radius and type. No dots, no dashed or dotted edges.
+
+   Motion owns every element it animates — a pill (`.bb-check`), a pill's
+   glyph (`.bb-check__mark`), the outcome node (`.bb-outcome`), its content
+   (`.bb-outcome__in`) and the Changed by chip — so none of them takes a
+   transform or a transition here. The one keyframe is the matched card's
+   ring pulse, and it moves `box-shadow` only; the card's position is
+   motion's. It stops under reduced motion.
+
+   Card states are scoped to `.bb.is-testing`, so a class left on a card when
+   test mode closes draws nothing.
+   -------------------------------------------------------------------------- */
+
+/* --- The pill family ----------------------------------------------------------- */
+
+.bb-tpill,
+.bb-check__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--pill-py) var(--pill-px);
+  border: var(--bw-thin) solid var(--fb-neutral-border);
+  border-radius: var(--pill-radius);
+  background: var(--fb-neutral-bg);
+  color: var(--fb-neutral-fg);
+  font-size: var(--pill-fs);
+  font-weight: var(--pill-fw);
+  line-height: var(--pill-line);
+  white-space: nowrap;
+}
+
+/* --- Check pills --------------------------------------------------------------- */
+
+/* One row under the card's head, wrapping when a rule checks more than fits.
+   The padding is the card's own, so the row lines up with the title. */
+.bb-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-5);
+  list-style: none;
+}
+.bb-check { display: inline-flex; min-width: 0; max-width: 100%; }
+.bb-check .bx-tip { min-width: 0; max-width: 100%; }
+.bb-check__icon { flex: none; color: var(--text-tertiary); }
+/* A long zone name ellipsises; the tooltip carries the sentence behind it. */
+.bb-check__text { min-width: 0; max-width: 28ch; overflow: hidden; text-overflow: ellipsis; }
+.bb-check__mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  font-weight: var(--fw-semibold);
+}
+.bb-check__mark > svg { display: block; }
+.bb-check.is-pass .bb-check__mark { color: var(--fb-positive-fg); }
+.bb-check.is-unknown .bb-check__mark { color: var(--text-tertiary); }
+/* The one check that failed is the vivid thing on a card that missed: the whole
+   pill in the negative tint, its mark and its icon with it. */
+.bb-check.is-fail .bb-check__pill {
+  border-color: var(--fb-negative-border);
+  background: var(--fb-negative-bg);
+  color: var(--fb-negative-fg);
+}
+.bb-check.is-fail .bb-check__icon,
+.bb-check.is-fail .bb-check__mark { color: var(--fb-negative-fg); }
+/* The tooltip's two lines: the evidence sentence, then what would settle it. */
+.bb-check__tip { white-space: pre-line; }
+
+/* --- A card's head in test mode ------------------------------------------------- */
+
+.bb-ruleout { flex: none; }
+.bb-cardword { flex: none; font-size: var(--fs-xs); color: var(--text-tertiary); white-space: nowrap; }
+
+/* The rule's name, whole, on two lines when it needs them. The outcome pill
+   and the grey word take the head's right-hand end, and a name cut to "In the
+   office on a compliant …" beside "No match" was cut exactly where two rules
+   differ (owner-eye review, 29 Sep 2026). The pill and the word stay on the
+   name's first line. */
+.bb.is-testing .bb__card .bb__titlerow { align-items: flex-start; }
+.bb.is-testing .bb__card .bb__titlebtn > strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.bb.is-testing .bb__card .bb__tout { min-height: 20px; }
+
+/* --- Card states ------------------------------------------------------------------
+
+   lit     matched: a 2 px accent ring (the 1 px border and 1 px of shadow, so
+           the edge does not double), lifted to --el-mid, pulsed once
+   missed  asked, not matched: the text steps down, the border goes quiet, and
+           the pills keep their own colours — a failed one stays vivid
+   dim     switched off or never reached: no pills, and the card sinks into
+           the ground — the sunken surface, the quiet border, tertiary words.
+           Tokens, not opacity: 45 % took "Not reached" to 1.98:1 and the
+           focus halo with it, on a card that is still pressed to open
+           (review, 29 Sep 2026). */
+
+.bb.is-testing .bb__card.is-lit {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), var(--el-mid);
+  animation: bb-lit-pulse 720ms var(--ease-standard);
+}
+@keyframes bb-lit-pulse {
+  from {
+    box-shadow: 0 0 0 1px var(--accent), 0 0 0 1px var(--accent-soft-border), var(--el-mid);
+  }
+  to {
+    box-shadow: 0 0 0 1px var(--accent), 0 0 0 10px transparent, var(--el-mid);
+  }
+}
+
+.bb.is-testing .bb__card.is-missed { border-color: var(--border-subtle); }
+.bb.is-testing .bb__card.is-missed .bb__title strong,
+.bb.is-testing .bb__card.is-missed .bb__title em,
+.bb.is-testing .bb__card.is-missed .bb__idx { color: var(--text-tertiary); }
+
+.bb.is-testing .bb__card.is-dim {
+  opacity: 1;
+  border-color: var(--border-subtle);
+  background: var(--surface-sunken);
+  box-shadow: none;
+}
+.bb.is-testing .bb__card.is-dim .bb__title strong,
+.bb.is-testing .bb__card.is-dim .bb__idx { color: var(--text-tertiary); }
+/* What it would have decided, quieter than a missed card's: an outline, no fill. */
+.bb.is-testing .bb__card.is-dim .bb-ruleout.is-muted {
+  border-color: var(--border-subtle);
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+/* --- The spine ---------------------------------------------------------------------
+
+   Grey, and the accent down the path the sign-in took. The connector's own
+   background transition (board.css) is what makes it draw as the marker
+   passes; it is a pseudo-element of a plain div, never a motion element. */
+
+.bb.is-testing .bb__link::before { background: var(--border-default); }
+.bb.is-testing .bb__link.is-lit::before { width: 2px; background: var(--accent); }
+
+/* "This policy decides": a tiny pill on the spine, centred on it. */
+.bb-decides { align-self: center; }
+.bb-decidedby {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.bb-decidedby__text { min-width: 0; overflow-wrap: anywhere; }
+.bb-decidedby strong { font-weight: var(--fw-semibold); color: var(--text-primary); }
+
+/* --- The start node's content ------------------------------------------------------ */
+
+.bb-startsign { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.bb-startsign__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+}
+.bb-startsign__none { color: var(--text-tertiary); white-space: nowrap; }
+.bb-startsign__arrow { flex: none; color: var(--text-tertiary); }
+.bb-startsign .applogo,
+.bb-startsign .bx-face { flex: none; }
+
+.bb-aud { flex: none; }
+.bb-aud.is-in .bb-aud__mark { flex: none; color: var(--fb-positive-fg); }
+.bb-aud.is-out {
+  border-color: var(--fb-negative-border);
+  background: var(--fb-negative-bg);
+  color: var(--fb-negative-fg);
+}
+
+/* --- The outcome node --------------------------------------------------------------- */
+
+/* Centred under the last row, as wide as it needs to be and no wider than the
+   chain. */
+.bb-outcome {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 240px;
+  max-width: 100%;
+  padding: var(--space-6) var(--space-7);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--el-mid);
+  text-align: center;
+}
+.bb-outcome__in {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  max-width: 100%;
+}
+/* The decision, big: the badge's own tokens, raised on this one badge. */
+.bb-outcome .bb-outcome__badge.bx-badge {
+  --pill-fs: var(--fs-md);
+  --pill-line: 24px;
+  --pill-px: var(--space-5);
+  --pill-py: var(--space-1);
+  --badge-max: 28ch;
+}
+.bb-outcome__word { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-tertiary); }
+.bb-outcome__rows {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bb-outcome__rows li { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); color: var(--text-secondary); }
+.bb-outcome__arrow { flex: none; color: var(--text-tertiary); }
+.bb-outcome__needs { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.bb-outcome__line { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
+.bb-outcome__versions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+.bb-outcome__version { display: inline-flex; align-items: center; gap: var(--space-2); }
+.bb-outcome__vword { color: var(--text-tertiary); }
+.bb-outcome__watch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+/* What just moved the answer: the active colour, for as long as it is news. */
+.bb-outcome__changed {
+  border-color: var(--accent-soft-border);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.bb-outcome__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-4); }
+.bb-outcome__note { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); color: var(--text-tertiary); }
+
+/* --- Reduced motion ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .bb.is-testing .bb__card.is-lit { animation: none; }
+}

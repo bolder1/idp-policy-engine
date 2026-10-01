@@ -1,7 +1,7 @@
 import { useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { Policy } from '../../data'
+import { appsOf, type Policy } from '../../data'
 import { useBrand } from '../../store'
 import type { SimEnv } from '../simulate'
 import type { WatchedResult } from '../tenant-resolver'
@@ -11,32 +11,8 @@ import { rowsRead, type RowsRead } from '../testing/rows-read'
 import { screensOf, type SignInScreens } from '../testing/screens-of'
 import { useTestingSession } from '../testing/session-state'
 import { CHANGED_BY_WORDS, defaultBoardForm, factsOf, todayIn, type FormField, type FormIssue, type SignInForm } from '../testing/sign-in-form'
-import {
-  columnView,
-  columnsFor,
-  routeOf,
-  runColumns,
-  stageSentence,
-  standingWatch,
-  wouldChangeIf,
-  type ChangeChip,
-  type ColumnResult,
-  type ColumnView,
-  type RouteModel,
-} from './try-sign-in'
-import {
-  FIRST_RUN,
-  STEP_MS,
-  canStepTo,
-  firstTrack,
-  landedSentence,
-  markerStage,
-  nextTrack,
-  openRun,
-  replayRun,
-  runAfterPatch,
-  travelStops,
-} from './try-sign-in-run'
+import { columnView, columnsFor, routeOf, runColumns, standingWatch, type ColumnResult, type ColumnView, type RouteModel } from './try-sign-in'
+import { FIRST_RUN, firstTrack, landedSentence, landingMs, nextTrack, openRun, replayRun, runAfterPatch, travelStops } from './try-sign-in-run'
 
 /* -----------------------------------------------------------------------------
    Try a sign-in's state on the board: the sign-in, its run, and where the
@@ -45,8 +21,8 @@ import {
    The sign-in itself is the testing session's (`boardForms`, one per policy),
    so it outlasts the board: leave HRMS, come back, and Kavya from the office
    is still what is being tried. Everything else here is the run in front of
-   the admin — whether the marker is travelling, which stage a step has put it
-   on, what the status region last said — and goes with the board.
+   the admin — whether the marker is travelling, the stage it has reached,
+   what the status region last said — and goes with the board.
 
    Motion has three triggers and no others (route-marker.ts): opening test
    mode, an origin chip, and Replay. Each is a RUN, and the marker travels it
@@ -72,13 +48,12 @@ export interface TrySignIn {
      policy list — beside the Stored version only (`standingWatch`). */
   watching: readonly WatchedResult[]
   route: RouteModel
-  chips: ChangeChip[]
   screens: SignInScreens[]
-  /** The stage the marker stands on, and how it got there. */
+  /** The stage the marker stands on — or, while it travels, is on its way to — and how it gets there. */
   at: number
   ms: number
   fadeIn: boolean
-  /** While a run travels, the last stage reached; null once landed. */
+  /** While a run travels, the last stage the marker has arrived at; null once it has landed. */
   reached: number | null
   /** Content may fade: not under reduced motion, not while a slider is held. */
   fade: boolean
@@ -87,10 +62,6 @@ export interface TrySignIn {
   /** The status region's words. */
   said: string
   replay: () => void
-  canBack: boolean
-  canNext: boolean
-  back: () => void
-  next: () => void
 }
 
 const NO_ROWS: RowsRead = { rows: new Set(), device: new Set() }
@@ -102,10 +73,31 @@ export function useTrySignIn({ on, saved, draft, env }: { on: boolean; saved: Po
   const today = useMemo(() => todayIn(), [])
 
   /* The policy's sign-in, or where it starts: somebody it is for, on its first
-     application, from the office at 09:30 today (sign-in-form.ts). */
+     application, from the office at 09:30 today (sign-in-form.ts).
+
+     Scoped to the draft's applications, always. The session keeps the sign-in
+     past the board (`boardForms`), and the applications can change under it —
+     on the start node's pane, or while test mode was closed — so a sign-in to
+     an application this policy no longer protects is moved onto its first
+     one. Without that the sentence went on naming Jira beside a spine that
+     said "Does not cover Jira" (review, 29 Sep 2026). The Global Default, and
+     a draft with no applications (tried "as if on" any), keep what was
+     chosen. */
   const stored = session.boardForms[saved.id]
   const { users, apps, zones, fingerprints, policies, methods, defaultMethodId } = store
-  const form = useMemo(() => stored ?? defaultBoardForm(saved, users, apps, today), [stored, saved, users, apps, today])
+  const form = useMemo(() => {
+    const f = stored ?? defaultBoardForm(draft, users, apps, today)
+    if (draft.isSystem || draft.appIds.length === 0 || (f.appId !== null && draft.appIds.includes(f.appId))) return f
+    const first = appsOf(draft, apps)[0]
+    return first ? { ...f, appId: first.id } : f
+  }, [stored, draft, users, apps, today])
+  /* And the session keeps the move, so the application does not come back
+     from under a later edit. The same sign-in either way: nothing is "Changed
+     by" in it, and nothing replays. */
+  const keepBoard = session.loadBoard
+  useEffect(() => {
+    if (stored && stored.appId !== form.appId) keepBoard(saved.id, form)
+  }, [stored, form, saved.id, keepBoard])
 
   const rows = useMemo(() => (on ? rowsRead(policies, draft, form.appId, { zones, fingerprints }) : NO_ROWS), [on, policies, draft, form.appId, zones, fingerprints])
   const { facts, issues } = useMemo(() => factsOf(form, zones), [form, zones])
@@ -115,10 +107,6 @@ export function useTrySignIn({ on, saved, draft, env }: { on: boolean; saved: Po
   const boundaries = useMemo<Boundaries>(
     () => (right ? boundariesOf(form, rows, right.spec.substitute ? { substitute: right.spec.substitute } : {}, policies, env, zones) : {}),
     [right, form, rows, policies, env, zones],
-  )
-  const chips = useMemo(
-    () => (right ? wouldChangeIf({ form, saved, draft, right, policies, env, zones, methods }) : []),
-    [right, form, saved, draft, policies, env, zones, methods],
   )
   const screens = useMemo(
     () =>
@@ -133,6 +121,8 @@ export function useTrySignIn({ on, saved, draft, env }: { on: boolean; saved: Po
         : [],
     [right, policies, methods, defaultMethodId, users, form.personId],
   )
+  /* Kept by identity, so what reads it — Which policy's list — can sit out a hop. */
+  const watching = useMemo(() => standingWatch(cols), [cols])
   const columns = useMemo(
     () => cols.map((c) => columnView(c, draft.id, policies, (id) => apps.find((a) => a.id === id)?.name ?? id)),
     [cols, draft.id, policies, apps],
@@ -192,40 +182,41 @@ export function useTrySignIn({ on, saved, draft, env }: { on: boolean; saved: Po
 
   // --- The marker ----------------------------------------------------------------------
 
-  /* While a run travels, the stage it has reached; the timers step it along and
-     let go at the landing (`travelStops`). */
-  const [travel, setTravel] = useState<{ run: number; at: number | null }>({ run: -1, at: null })
+  /* While a run travels, the stage the marker is leaving for and the one it
+     has arrived at; the timers step both along and let go at the landing
+     (`travelStops`). */
+  const [travel, setTravel] = useState<{ run: number; at: number | null; reached: number | null }>({ run: -1, at: null, reached: null })
   useEffect(() => {
     if (!on || !travels) return
     const say = () => {
       const r = latest.current.route
       if (r) setTrack((t) => ({ ...t, said: landedSentence(r, run.id) }))
     }
-    const stops = travelStops(latest.current.landing, run.delay)
+    const hops = latest.current.landing
+    const stops = travelStops(hops, run.delay)
     if (stops.length === 0) {
-      setTravel({ run: run.id, at: null })
+      setTravel({ run: run.id, at: null, reached: null })
       say()
       return
     }
-    setTravel({ run: run.id, at: 0 })
-    const timers = stops.map((s) =>
+    setTravel({ run: run.id, at: 0, reached: 0 })
+    const timers = stops.map((s) => window.setTimeout(() => setTravel({ run: run.id, at: s.at, reached: s.reached }), s.ms))
+    timers.push(
       window.setTimeout(() => {
-        setTravel({ run: run.id, at: s.at })
-        if (s.at === null) say()
-      }, s.ms),
+        setTravel({ run: run.id, at: null, reached: null })
+        say()
+      }, landingMs(hops, run.delay)),
     )
     return () => timers.forEach((t) => window.clearTimeout(t))
   }, [on, travels, run])
 
-  const travelAt = on && travels ? (travel.run === run.id ? travel.at : 0) : null
-  const [step, setStep] = useState<{ run: number; at: number } | null>(null)
-  const at = markerStage(travelAt, step, run.id, landing)
-
-  const moveTo = (to: number) => {
-    if (!route || !canStepTo(to, landing, travelAt)) return
-    setStep({ run: run.id, at: to })
-    setTrack((t) => ({ ...t, motion: 'step', said: stageSentence(route, to, draft) }))
-  }
+  /* Before the effect has started this run's clock, the run stands at the
+     start: the first frame of a run already has the marker there. */
+  const current = travel.run === run.id
+  const travelling = on && travels
+  const reached = travelling ? (current ? travel.reached : 0) : null
+  /* Never past where the route now lands: an update mid-run can shorten it. */
+  const at = travelling ? (current ? Math.min(travel.at ?? landing, landing) : 0) : landing
 
   /* A slider held down updates the answer many times a second; nothing fades
      while it is, or every stage would flicker under the thumb. */
@@ -258,21 +249,16 @@ export function useTrySignIn({ on, saved, draft, env }: { on: boolean; saved: Po
     boundaries,
     columns,
     right,
-    watching: standingWatch(cols),
+    watching,
     route,
-    chips,
     screens,
     at,
-    ms: motionNow === 'travel' ? hopMs(landing) : motionNow === 'step' ? STEP_MS : 0,
+    ms: motionNow === 'travel' ? hopMs(landing) : 0,
     fadeIn: motionNow === 'update',
-    reached: travelAt,
+    reached,
     fade: !reduced && !held.current,
     changed: track.run === run.id && track.changed ? CHANGED_BY_WORDS[track.changed] : null,
     said: track.said,
     replay,
-    canBack: travelAt === null && at > 0,
-    canNext: travelAt === null && at < landing,
-    back: () => moveTo(at - 1),
-    next: () => moveTo(at + 1),
   }
 }

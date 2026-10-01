@@ -37,6 +37,7 @@ import { PersonaBar } from './PersonaBar'
 import { BrandSwitch } from './BrandSwitch'
 import { SHOWCASE } from './showcase'
 import { Tip } from './kit'
+import { screenOffered } from './edition-screens'
 import { useBrand, useToast, type BrandScreen } from './store'
 import type { ToastTone } from './toast-tone'
 import { useTheme } from './theme-mode'
@@ -97,6 +98,9 @@ const NAV: { section?: string; items: NavItem[] }[] = [
         screen: { name: 'policies' },
         children: [
           { label: 'All Policies', screen: { name: 'policies' } },
+          /* The tenant's sign-in tests, beside the list of the policies they
+             test (Policy testing V4, §3). */
+          { label: 'Sign-in tests', screen: { name: 'sign-in-tests' } },
           /* Two of these are honestly unfinished, and the rail says so rather
              than letting somebody find out by opening them. A quiet tag, not
              the brand-filled badge "New" gets: one is an announcement and the
@@ -210,6 +214,7 @@ const POLICY_SCREENS = [
   'hooks',
   'methods',
   'display-tokens',
+  'sign-in-tests',
 ]
 
 /* The two builders, which want the rail out of the way.
@@ -260,7 +265,7 @@ function useNarrow() {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { screen, go } = useBrand()
+  const { screen, go, features } = useBrand()
   const main = useRef<HTMLElement>(null)
   const nav = useRef<HTMLElement>(null)
   const [theme, setTheme] = useTheme()
@@ -528,7 +533,8 @@ export function Shell({ children }: { children: ReactNode }) {
                           style={{ overflow: 'hidden' }}
                         >
                           <div className="bshell__sub">
-                            {item.children.map((c) => {
+                            {/* Less what this edition withholds: Lite has no Sign-in tests page (edition-screens.ts). */}
+                            {item.children.filter((c) => screenOffered(c.screen, features)).map((c) => {
                               /* Its own screen, or one opened from it — see `UNDER_ITEM`. */
                               const on =
                                 c.screen &&

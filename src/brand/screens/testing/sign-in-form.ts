@@ -72,18 +72,22 @@ export interface SignInForm {
 /** The controls a change can come from, in form order. */
 export type FormField = 'person' | 'app' | 'address' | 'place' | 'when' | 'device' | 'risk' | 'assume-on'
 
-/* "Changed by {word}". A field's word is the fact word it states, so the
-   decision line and the Needs line name the same row; a change to the policy
-   itself is "your edits". */
+/* "Changed by {word}": the row that changed, said mid-sentence — the fact
+   word of the row it states ("Needs: IP address" and "Changed by IP address"
+   name the same row), in sentence case where it sits. The chip read "Changed
+   by Device" and "Changed by When" while it borrowed the rows' labels as they
+   are (owner-eye review, 29 Sep 2026); a time is a time, and the risk row's
+   "Device risk score" is the risk score of the device already on the line. A
+   change to the policy itself is "your edits". */
 export const CHANGED_BY_WORDS: Record<FormField | 'edits', string> = {
-  person: FACT_WORDS.person,
-  app: FACT_WORDS.app,
+  person: 'person',
+  app: 'application',
   address: FACT_WORDS.address,
-  place: FACT_WORDS.location,
-  when: FACT_WORDS.time,
-  device: FACT_WORDS['device.platform'],
-  risk: FACT_WORDS.risk,
-  'assume-on': 'Assume on',
+  place: 'place',
+  when: 'time',
+  device: 'device',
+  risk: 'risk score',
+  'assume-on': 'turning it on',
   edits: 'your edits',
 }
 

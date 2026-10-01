@@ -101,7 +101,10 @@
      lost. */
   --bb-gap: 0px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) min(var(--bb-insp), 46%);
+  /* A leading track for Describe it (V4 §4.1): nothing until the panel opens
+     (`is-left-open`), so every placement below counts it — the stage and the
+     chooser are the second track, the inspector and its grip the third. */
+  grid-template-columns: var(--bb-left, 0px) minmax(0, 1fr) min(var(--bb-insp), 46%);
   grid-template-rows: minmax(0, 1fr);
   gap: var(--bb-gap);
   padding: var(--bb-gap);
@@ -121,9 +124,12 @@
 /* Placed, not auto-placed. The grip is an explicit grid item in the panel's
    own column — see the note where it is styled — and sparse auto-placement
    would then push the panel it belongs to onto a second row. */
-.bb__stage { grid-column: 1; grid-row: 1; }
+.bb__stage { grid-column: 2; grid-row: 1; }
 .bb__insp,
-.bb__grip { grid-column: 2; grid-row: 1; }
+.bb__grip { grid-column: 3; grid-row: 1; }
+/* Describe it's thread (describe.css places the aside in the first track).
+   400 px, and the right-hand track is closed while it is open. */
+.bb.is-left-open { --bb-left: 400px; }
 /* An explicitly-sized track outlives the item in it, so closing the panel would
    otherwise leave 560px of empty gutter where it had been.
 
@@ -134,7 +140,7 @@
    nothing, which is a width and therefore animatable. The gap goes with it, or
    a closed panel leaves 8px of margin against the right edge that the open one
    does not. */
-.bb.is-insp-closed { grid-template-columns: minmax(0, 1fr) 0px; column-gap: 0; }
+.bb.is-insp-closed { grid-template-columns: var(--bb-left, 0px) minmax(0, 1fr) 0px; column-gap: 0; }
 /* The one motion the whole region makes, and it covers three gestures with one
    declaration: opening, closing, and the narrow/wide toggle — which was
    instant, and reads as the panel being replaced rather than resized.
@@ -143,6 +149,11 @@
    easing each one would put the panel 220ms behind the cursor. */
 .bb { transition: grid-template-columns var(--dur-normal) var(--ease-standard), column-gap var(--dur-normal) var(--ease-standard); }
 .bb.is-gripping { transition: none; }
+/* Nor on the commit that opens or closes Try a sign-in: the canvas refits in
+   that same commit, against the column it ends in, and a track still easing
+   there moved the chain three times (29 Sep 2026). The panel's own slide-in
+   is the motion; the grid simply switches. */
+.bb.is-snap { transition: none; }
 
 :root[data-theme='dark'] .bb,
 :root:not([data-theme='light']) .bb {
@@ -322,7 +333,7 @@
    while the policy has no rules and `Board` once it has some; the controls
    arrive with the rules they are for. */
 .bb__empty {
-  grid-column: 1; grid-row: 1;
+  grid-column: 2; grid-row: 1;
   min-width: 0; min-height: 0;
   display: grid; place-items: center;
   padding: var(--space-9) var(--space-8);
@@ -809,10 +820,8 @@
 .bb__card.is-shadowed { opacity: 0.4; }
 .bb__card.is-dragging { z-index: 5; box-shadow: var(--el-high); cursor: grabbing; }
 
-/* Test mode: a card the route never reached. The rehearsal's hit and miss
-   edges went with the rehearsal; the route's marked edge is in
-   try-sign-in.css. */
-.bb__card.is-unreached { opacity: 0.45; }
+/* Test mode's card states — lit, missed, dim — are trace.css's, scoped to
+   `.bb.is-testing`; the route's marked edge is in try-sign-in.css. */
 .bb__card.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); --tone-dot: var(--fb-negative-dot, #d01243); }
 .bb__card.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); --tone-dot: var(--fb-notice-dot, #b07a00); }
 .bb__card.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); --tone-dot: var(--fb-positive-dot, #128f43); }
@@ -1277,6 +1286,43 @@ button.bb__idx:hover { transform: none; background: var(--surface-inset, var(--s
   border-right-color: var(--border-strong);
   border-bottom-color: var(--border-strong);
 }
+/* Describe it: the cards a turn added or changed, for 2 s (V4 §4.1). The
+   builder names them through `traced` and marks the region `is-fresh`, so
+   here the trace is an accent down the card's left edge instead of a darker
+   border: a pseudo-element's inset shadow, following the card's radius, and
+   faded by its own animation. The card is a motion element, so nothing here
+   moves or transforms it. Two animation names, so a second write restarts
+   the edge; under reduced motion it simply stands for the 2 s. */
+.bb.is-fresh .bb__card.is-traced {
+  border-top-color: var(--border-subtle);
+  border-right-color: var(--border-subtle);
+  border-bottom-color: var(--border-subtle);
+}
+.bb.is-fresh .bb__card:not(.is-terminal).is-traced { border-left-color: var(--border-subtle); }
+.bb.is-fresh .bb__card.is-traced::before {
+  content: '';
+  position: absolute; inset: -1px;
+  border-radius: inherit;
+  box-shadow: inset 3px 0 0 var(--accent);
+  pointer-events: none;
+  animation: bb-fresh0 2s var(--ease-standard) forwards;
+}
+.bb.is-fresh.is-fresh1 .bb__card.is-traced::before { animation-name: bb-fresh1; }
+@keyframes bb-fresh0 {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes bb-fresh1 {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bb.is-fresh .bb__card.is-traced::before { animation: none !important; }
+}
 
 /* The pill. Neutral, never negative — locked is a lifecycle state, not a
    warning, and this kit keeps those grey. */
@@ -1688,8 +1734,14 @@ textarea.bb__input { height: auto; min-height: 64px; padding: var(--space-2) var
      one-row template of its own here exactly as it gets a one-column one
      above. */
   .bb { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 54%; }
-  .bb.is-insp-closed { grid-template-rows: minmax(0, 1fr); }
+  .bb.is-insp-closed { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .bb__stage,
+  .bb__empty { grid-column: 1; grid-row: 1; }
   .bb__insp { grid-column: 1; grid-row: 2; }
+  /* Describe it takes the bottom row the inspector would, which is closed while it is open. */
+  .bb.is-left-open { grid-template-rows: minmax(0, 1fr) 54%; }
+  .bb.is-left-open .bdsc { grid-column: 1; grid-row: 2; margin: 0 var(--space-5) var(--space-5); }
+  .bdsc-door { grid-column: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2644,12 +2696,20 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
    The three blocks that existed covered six selectors out of thirty-odd
    declared transitions, so most of the board still animated for somebody who
    had asked it not to. This is deliberately blunt: a reduced-motion request is
-   not a request for a subset. */
+   not a request for a subset.
+
+   `transition: none`, not a 0.01 ms duration. `transition-property` is `all`
+   by default, so a duration on every element made EVERY property of every
+   element a transition — one a frame long, but a frame in which the value
+   read back is the old one. Opening Try a sign-in refits the canvas in the
+   commit that opens it, and under reduced motion it measured the chain at the
+   width it was leaving, then moved it again a frame later (29 Sep 2026).
+   Nothing here waits for a transition to end. */
 @media (prefers-reduced-motion: reduce) {
   .bb *,
   .bb *::before,
   .bb *::after {
-    transition-duration: 0.01ms !important;
+    transition: none !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;

@@ -26,10 +26,10 @@ import { BoardBuilder } from './BoardBuilder'
 type BoardOpen = Extract<BrandScreen, { name: 'board' }>['open']
 
 export function BoardPage({ policyId, open, rule }: { policyId: string; open?: BoardOpen; rule?: string }) {
-  /* Every `open` opens test mode; anything but `try` also names the page the
-     panel opens on — Check a person, Saved sign-ins, or the Break-in test
-     pushed over Saved sign-ins. Where the edition has no Policy testing the
-     panel is Try a sign-in alone, and opens there. */
+  /* Every `open` opens test mode; anything but `try` also opens the test
+     panel on a tab — People, Saved sign-ins or the Break-in test (Policy
+     testing V4, §2.4-bis). Where the edition has no Policy testing there are
+     no tabs, and the panel is the sign-in alone beside the trace. */
   return (
     <BoardBuilder
       policyId={policyId}

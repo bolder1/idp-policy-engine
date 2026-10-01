@@ -809,10 +809,8 @@
 .bb__card.is-shadowed { opacity: 0.4; }
 .bb__card.is-dragging { z-index: 5; box-shadow: var(--el-high); cursor: grabbing; }
 
-/* Test mode: a card the route never reached. The rehearsal's hit and miss
-   edges went with the rehearsal; the route's marked edge is in
-   try-sign-in.css. */
-.bb__card.is-unreached { opacity: 0.45; }
+/* Test mode's card states — lit, missed, dim — are trace.css's, scoped to
+   `.bb.is-testing`; the route's marked edge is in try-sign-in.css. */
 .bb__card.is-deny { --tone-bg: var(--fb-negative-bg); --tone-fg: var(--fb-negative-fg); --tone-border: var(--fb-negative-border); --tone-dot: var(--fb-negative-dot, #d01243); }
 .bb__card.is-mfa { --tone-bg: var(--fb-notice-bg); --tone-fg: var(--fb-notice-fg); --tone-border: var(--fb-notice-border); --tone-dot: var(--fb-notice-dot, #b07a00); }
 .bb__card.is-allow { --tone-bg: var(--fb-positive-bg); --tone-fg: var(--fb-positive-fg); --tone-border: var(--fb-positive-border); --tone-dot: var(--fb-positive-dot, #128f43); }

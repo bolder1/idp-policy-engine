@@ -80,6 +80,10 @@ export type BrandScreen =
      M4 retired them. `rule` selects a rule on arrival — its id, or
      'fallback' for the last row. */
   | { name: 'board'; policyId: string; open?: 'try' | 'person' | 'saved' | 'break-in'; rule?: string }
+  /* The tenant's Sign-in tests (Policy testing V4, §3): the tester, the saved
+     sign-ins, people and runs for every policy at once. A policy's board keeps
+     only its own; its test panel links here, carrying the tab. */
+  | { name: 'sign-in-tests'; tab?: 'try' | 'saved' | 'people' | 'runs' }
   /* The policy's own three facts — name, applications, audience — on one page.
 
      They used to be scattered across a top-bar input, a dialog and a card at

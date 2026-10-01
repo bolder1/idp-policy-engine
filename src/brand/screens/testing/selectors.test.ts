@@ -208,12 +208,14 @@ describe('Check a person', () => {
 })
 
 describe('Saved sign-ins', () => {
-  it('passes all six seeded rows', () => {
+  /* Sixteen since the test panel's seed (V4 §5): three Protected, five Must
+     pass and eight Notes. */
+  it('passes all sixteen seeded rows', () => {
     const rows = savedRows(t.savedSignIns, t.policies, env)
-    expect(rows).toHaveLength(6)
+    expect(rows).toHaveLength(16)
     expect(rows.every((r) => r.result === 'pass')).toBe(true)
     /* Within a result, the strongest promise first. */
-    expect(rows.map((r) => r.saved.level)).toEqual(['protected', 'protected', 'must-pass', 'must-pass', 'note', 'note'])
+    expect(rows.map((r) => r.saved.level)).toEqual([...Array(3).fill('protected'), ...Array(5).fill('must-pass'), ...Array(8).fill('note')])
   })
 
   it('puts the failures first with HRMS turned off, Must pass before Note', () => {
@@ -247,7 +249,7 @@ describe('Saved sign-ins', () => {
   it('filters by name and level', () => {
     const rows = savedRows(t.savedSignIns, t.policies, env)
     expect(filterSaved(rows, 'hrms', 'all').map((r) => r.saved.id).sort()).toEqual(['ssi-aisha-hrms', 'ssi-ravi-hrms'])
-    expect(filterSaved(rows, '', 'protected').map((r) => r.saved.id).sort()).toEqual(['ssi-ravi-hrms', 'ssi-vikram-laptop'])
+    expect(filterSaved(rows, '', 'protected').map((r) => r.saved.id).sort()).toEqual(['ssi-ravi-hrms', 'ssi-tom-win10', 'ssi-vikram-laptop'])
     expect(filterSaved(rows, 'nobody', 'all')).toEqual([])
   })
 })

@@ -19,7 +19,7 @@ import {
 import { type FingerprintProfile } from './fingerprint'
 import type { SavedSignIn } from './saved-sign-ins'
 import { devicePreset } from './screens/testing/device-presets'
-import { TENANT_TZ, type SignInFacts } from './screens/sign-in-facts'
+import { TENANT_TZ, type SignInDevice, type SignInFacts } from './screens/sign-in-facts'
 
 /* -----------------------------------------------------------------------------
    The showcase tenant: what the presentation build loads (24 Sep 2026).
@@ -420,10 +420,11 @@ export const showcaseScenarios: Scenario[] = [
 
 // --- Saved sign-ins -------------------------------------------------------------
 
-/* Six sign-ins somebody on this tenant has promised will keep working, or keep
-   being refused, one per thing the four policies decide. The four on live
-   policies pass on load, so the first thing a change can do to them is break
-   one — which is what the guard is for. Kavya in the office and Neha at home
+/* Sixteen sign-ins somebody on this tenant has promised will keep working, or
+   keep being refused: the first six one per thing the four policies decide,
+   then ten more so every policy has a few (below). Every one on a live policy
+   passes on load, so the first thing a change can do to them is break one —
+   which is what the guard is for. Kavya in the office and Neha at home
    are promises about HRMS as it will decide, and HRMS opens Inactive, so they
    read Fail until it is turned on (or assumed on); turning it on is what makes
    them pass (saved-sign-ins.test.ts).
@@ -434,7 +435,28 @@ export const showcaseScenarios: Scenario[] = [
 const MONDAY_0930: NonNullable<SignInFacts['when']> = { date: '2026-09-28', time: '09:30', timeZone: TENANT_TZ, source: 'stated' }
 const OFFICE = { address: '203.0.113.24', source: 'stated' } as const
 const HOME = { address: '192.0.2.10', source: 'stated' } as const
+/* The Bengaluru office block, and a London residential line (RFC 5737). */
+const BRANCH = { address: '198.51.100.20', source: 'stated' } as const
+const LONDON = { address: '192.0.2.200', source: 'stated' } as const
 const SAVED = { savedBy: 'Jaspreet Toor', savedAt: '2026-09-24T16:30:00+05:30' }
+
+/* A personal Mac a year behind: macOS 13 under the Compliant devices floor of
+   14, no Device Agent, and — as on every laptop row — the handset-only
+   signals stated absent. No preset describes it, so it is stated in full. */
+const UNMANAGED_MAC: SignInDevice = {
+  source: 'stated',
+  platform: 'macos',
+  osVersion: '13',
+  formFactor: 'Laptop',
+  browser: { family: 'safari', version: '17.0' },
+  integrity: null,
+  screenLock: null,
+  authenticatorVersion: null,
+  agentInstalled: false,
+  agentVersion: null,
+  registeredToPerson: false,
+  registeredCount: 0,
+}
 
 export const showcaseSavedSignIns: SavedSignIn[] = [
   {
@@ -494,6 +516,114 @@ export const showcaseSavedSignIns: SavedSignIn[] = [
     },
     expected: '1fa',
     level: 'protected',
+    ...SAVED,
+  },
+
+  /* ---------------------------------------------------------------------------
+     Ten more (28 Sep 2026, Policy testing V4 §5), so that no policy's Tests
+     dock opens empty in the demo: every scenario policy's applications now
+     have three or four, at a mix of levels, each expecting what the seeded
+     policies decide as they stand — a saved sign-in that failed on a clean
+     tenant would stop every save the guard reads it on.
+
+     Each is chosen to stay where the guard scenes pin the tenant
+     (library-guard.test.ts): the office sign-ins on GitHub and Jira come from
+     the Bengaluru office block, so removing the Pune block moves only Kavya;
+     the one away from the office is in London, so adding the home block to
+     the office zone moves only Neha; and no new device is on Android 12, so
+     lowering the Android floor lets in only Devon. Names never repeat one the
+     demo saves live ("Hannah Lowe on an iPhone", "Devon Rao on Dropbox").
+     ------------------------------------------------------------------------ */
+
+  /* Developer tools (GitHub, Jira): each of its three answers, and a person
+     outside its audience. */
+  {
+    id: 'ssi-arun-office',
+    name: 'Arun Patel in the office',
+    facts: { personId: 'arun', appId: 'github', network: BRANCH, when: MONDAY_0930, device: devicePreset('win11-registered').facts },
+    expected: '1fa',
+    level: 'must-pass',
+    ...SAVED,
+  },
+  {
+    id: 'ssi-sofia-london',
+    name: 'Sofia Marchetti in London on an iPhone',
+    facts: { personId: 'u-eng-2', appId: 'jira', network: LONDON, when: MONDAY_0930, device: devicePreset('iphone').facts },
+    expected: '2fa',
+    level: 'note',
+    ...SAVED,
+  },
+  {
+    id: 'ssi-tom-win10',
+    name: 'Tom Whelan on Windows 10',
+    facts: { personId: 'u-dev-3', appId: 'github', network: BRANCH, when: MONDAY_0930, device: devicePreset('win10').facts },
+    expected: 'deny',
+    level: 'protected',
+    ...SAVED,
+  },
+  /* Contractors are outside Developer tools' audience, so the Global Default
+     decides: the sign-in that proves the policy has not grown past its
+     engineers. */
+  {
+    id: 'ssi-contractor-jira',
+    name: 'Contractor at home on Jira',
+    facts: { personId: 'u-con-5', appId: 'jira', network: HOME, when: MONDAY_0930, device: devicePreset('win10').facts },
+    expected: '1fa',
+    level: 'note',
+    ...SAVED,
+  },
+
+  /* Device compliance (Outlook, Dropbox), beside Devon's Android 12. */
+  {
+    id: 'ssi-sanjay-iphone',
+    name: 'Sanjay Bhatt on Outlook from an iPhone',
+    facts: { personId: 'u-emp-1', appId: 'outlook', network: HOME, when: MONDAY_0930, device: devicePreset('iphone').facts },
+    expected: '1fa',
+    level: 'must-pass',
+    ...SAVED,
+  },
+  {
+    id: 'ssi-priya-mac',
+    name: 'Priya on an unmanaged Mac',
+    facts: { personId: 'priya', appId: 'dropbox', network: HOME, when: MONDAY_0930, device: UNMANAGED_MAC },
+    expected: 'deny',
+    level: 'note',
+    ...SAVED,
+  },
+  {
+    id: 'ssi-ivy-android',
+    name: 'Ivy Zhang on an Android 14 phone',
+    facts: { personId: 'u-con-2', appId: 'dropbox', network: HOME, when: MONDAY_0930, device: devicePreset('android-14').facts },
+    expected: '1fa',
+    level: 'note',
+    ...SAVED,
+  },
+
+  /* Corporate devices (Google Workspace): the other two risk bands, and a
+     laptop that is not a corporate one. Each states its score, so no risk
+     profile moves it. */
+  {
+    id: 'ssi-rahul-medium',
+    name: 'Rahul Verma at medium risk',
+    facts: { personId: 'u-sales-2', appId: 'google-workspace', network: OFFICE, when: MONDAY_0930, device: devicePreset('win11-registered').facts, risk: { score: 55, source: 'stated' } },
+    expected: '2fa',
+    level: 'must-pass',
+    ...SAVED,
+  },
+  {
+    id: 'ssi-emily-high',
+    name: 'Emily Carter at high risk',
+    facts: { personId: 'u-sales-3', appId: 'google-workspace', network: HOME, when: MONDAY_0930, device: devicePreset('win11-registered').facts, risk: { score: 86, source: 'stated' } },
+    expected: 'deny',
+    level: 'note',
+    ...SAVED,
+  },
+  {
+    id: 'ssi-aisha-laptop',
+    name: 'Aisha Khan on a personal laptop',
+    facts: { personId: 'u-sales-1', appId: 'google-workspace', network: HOME, when: MONDAY_0930, device: devicePreset('win11-no-agent').facts, risk: { score: 12, source: 'stated' } },
+    expected: 'deny',
+    level: 'note',
     ...SAVED,
   },
 ]

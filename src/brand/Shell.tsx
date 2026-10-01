@@ -97,6 +97,9 @@ const NAV: { section?: string; items: NavItem[] }[] = [
         screen: { name: 'policies' },
         children: [
           { label: 'All Policies', screen: { name: 'policies' } },
+          /* The tenant's sign-in tests, beside the list of the policies they
+             test (Policy testing V4, §3). */
+          { label: 'Sign-in tests', screen: { name: 'sign-in-tests' } },
           /* Two of these are honestly unfinished, and the rail says so rather
              than letting somebody find out by opening them. A quiet tag, not
              the brand-filled badge "New" gets: one is an announcement and the
@@ -210,6 +213,7 @@ const POLICY_SCREENS = [
   'hooks',
   'methods',
   'display-tokens',
+  'sign-in-tests',
 ]
 
 /* The two builders, which want the rail out of the way.

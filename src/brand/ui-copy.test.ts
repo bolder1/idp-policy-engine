@@ -23,7 +23,8 @@ import proseSrc from './screens/predicate-prose.ts?raw'
 import trySignInSrc from './screens/board/try-sign-in.ts?raw'
 import useTrySignInSrc from './screens/board/use-try-sign-in.ts?raw'
 import trySignInRunSrc from './screens/board/try-sign-in-run.ts?raw'
-import signInPanelSrc from './screens/board/SignInPanel.tsx?raw'
+import testModeSrc from './screens/board/test-mode.ts?raw'
+import signInTestsSrc from './screens/SignInTests.tsx?raw'
 import routeGateSrc from './screens/board/RouteGate.tsx?raw'
 import boardBarSrc from './screens/board/BoardBar.tsx?raw'
 import boardBuilderSrc from './screens/board/BoardBuilder.tsx?raw'
@@ -108,14 +109,17 @@ const NAMED: Record<string, string> = {
      the guard pages alike. */
   './screens/watching-line.tsx': watchingLineSrc,
   './screens/watching-words.ts': watchingWordsSrc,
-  /* Try a sign-in on the board: its model, its run, its panel, and the gates
-     and evidence it draws on the chain. */
+  /* Try a sign-in on the board: its model, its run, the words and choices of
+     test mode (the why-line, the tab a route opens), and the gate it still
+     draws on the chain. The test panel, the sentence and the trace live in
+     screens/testing/, and the glob picks them up. */
   './screens/board/try-sign-in.ts': trySignInSrc,
   './screens/board/use-try-sign-in.ts': useTrySignInSrc,
   './screens/board/try-sign-in-run.ts': trySignInRunSrc,
-  './screens/board/SignInPanel.tsx': signInPanelSrc,
+  './screens/board/test-mode.ts': testModeSrc,
   './screens/board/RouteGate.tsx': routeGateSrc,
-  /* Policy testing's page (Version 1); its views live in screens/testing/. */
+  /* The tenant's Sign-in tests page (V4 §3); its views live in screens/testing/. */
+  './screens/SignInTests.tsx': signInTestsSrc,
   /* The Break-in test: its model, its view, and the What changes line its fix
      preview prints (and the guard pages will). */
   './screens/break-in-model.ts': breakInModelSrc,

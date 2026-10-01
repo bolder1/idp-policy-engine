@@ -40,6 +40,7 @@ const BuilderPage = lazy(() => import('./screens/BuilderPage').then((m) => ({ de
 const BoardPage = lazy(() => import('./screens/board/BoardPage').then((m) => ({ default: m.BoardPage })))
 const PolicyDetails = lazy(() => import('./screens/PolicyDetails').then((m) => ({ default: m.PolicyDetails })))
 const Applications = lazy(() => import('./screens/Applications').then((m) => ({ default: m.Applications })))
+const SignInTests = lazy(() => import('./screens/SignInTests').then((m) => ({ default: m.SignInTests })))
 
 /* Same specifiers as the lazy() calls above — Vite dedupes them to one chunk
    each, so this warms exactly what navigation will ask for and nothing else.
@@ -56,6 +57,7 @@ const warm = () => {
   void import('./screens/board/BoardPage')
   void import('./screens/PolicyDetails')
   void import('./screens/Applications')
+  void import('./screens/SignInTests')
 }
 
 function usePrefetchScreens() {
@@ -115,6 +117,8 @@ function ScreenBody() {
       return <AuthMethodsPage />
     case 'display-tokens':
       return <DisplayTokensPage tab={screen.tab ?? 'assignments'} />
+    case 'sign-in-tests':
+      return <SignInTests tab={screen.tab} />
   }
 }
 

@@ -1,0 +1,317 @@
+/* -----------------------------------------------------------------------------
+   Try a sign-in on the Sign-in tests page: the journey canvas (TryJourney.tsx,
+   TESTING-V4 §3.1).
+
+   A dotted ground holding five columns left to right — Sign-in, Which policy,
+   Rules, Outcome, What they see — with the connectors drawn under them in one
+   SVG. The pieces borrowed from the board (the check pills, the rule's
+   outcome, the grey word, the outcome node) bring their own look from
+   trace.css; this sheet places them, and draws the nodes, the rows, the
+   cards, the wires and the marker.
+
+   Colour, from the owner's rules. The accent (`--accent*`, blue in the
+   rebrand look) is what is active and nothing else: the route the sign-in
+   took, the marker on it, the policy that decides, the rule it matched.
+   Green, amber and red are the decisions' own (DecisionBadge) and a failed
+   check's. Everything else is neutral; a column that lost steps back.
+
+   Motion owns every element it animates — a column (`.tj-col`), a wire
+   (`.tj-wire`), the route (`.tj-route`), the marker (`.tj-marker`) — so none
+   of them takes a transform or a transition here. What moves in CSS is only
+   what motion never touches: a card's and a row's colours and opacity, and
+   the one keyframe, the ring's pulse, which moves `box-shadow` alone. Both
+   stop under reduced motion.
+   -------------------------------------------------------------------------- */
+
+.tj { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+
+/* --- The canvas ----------------------------------------------------------------
+
+   The board's dotted ground, from tokens: the dot is the default border on
+   the sunken surface. It scrolls sideways only as a last resort, below the
+   narrowest the four columns can go. */
+
+.tj-canvas {
+  min-width: 0;
+  overflow-x: auto;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background-color: var(--surface-sunken);
+  background-image: radial-gradient(circle, var(--border-default) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+  background-position: 11px 11px;
+}
+
+/* The stage is the SVG's and the marker's coordinate space: both are placed
+   at its corner, and every box is measured against it. */
+.tj-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(170px, 0.75fr) minmax(210px, 1fr) minmax(280px, 1.3fr) minmax(230px, 1.05fr);
+  column-gap: var(--space-10);
+  align-items: start;
+  min-width: min-content;
+  min-height: 380px;
+  padding: var(--space-7) var(--space-8) var(--space-10);
+}
+.tj-stage.is-wide {
+  grid-template-columns: minmax(170px, 0.75fr) minmax(210px, 1fr) minmax(280px, 1.3fr) minmax(230px, 1.05fr) minmax(250px, 1.1fr);
+}
+
+/* --- The wires ------------------------------------------------------------------ */
+
+.tj-wires { position: absolute; top: 0; left: 0; z-index: 0; overflow: visible; pointer-events: none; }
+.tj-wire { fill: none; stroke: var(--border-default); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.tj-wire.is-lit { stroke: var(--accent); stroke-width: 2; }
+.tj-route { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The marker: a dot in the accent with a soft halo, riding the route under
+   the nodes, so it enters a row or a card and comes out the other side. Its
+   place on the route is `offset-path` and motion's `offsetDistance`, both
+   written inline. A hollow ring where the route stops unsure. */
+.tj-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 0 0 9px var(--accent-soft);
+  pointer-events: none;
+}
+.tj-marker.is-unknown {
+  border: var(--bw-thick) solid var(--text-tertiary);
+  background: var(--surface-raised);
+  box-shadow: none;
+}
+
+/* --- Columns ----------------------------------------------------------------------- */
+
+.tj-col { position: relative; z-index: 2; display: flex; flex-direction: column; min-width: 0; }
+.tj-col__head {
+  height: 16px;
+  margin: 0 0 var(--space-5);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 16px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+.tj-col__body { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+
+/* A node: the raised surface every stop on the journey is drawn on. */
+.tj-node {
+  min-width: 0;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+.tj-none { font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* --- 1. The sign-in ------------------------------------------------------------------ */
+
+.tj-signin { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-6); }
+.tj-signin__line { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.tj-signin__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.tj-signin__text strong,
+.tj-signin__app {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+}
+.tj-signin__text > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); color: var(--text-tertiary); }
+.tj-signin .applogo { flex: none; }
+
+/* The facts the rules read, as the sentence states them: neutral pills of
+   the one family, a mark before the words. */
+.tj-facts { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: 0; padding: var(--space-4) 0 0; border-top: var(--bw-thin) solid var(--border-subtle); list-style: none; }
+.tj-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--pill-py) var(--pill-px);
+  border: var(--bw-thin) solid var(--fb-neutral-border);
+  border-radius: var(--pill-radius);
+  background: var(--fb-neutral-bg);
+  color: var(--fb-neutral-fg);
+  font-size: var(--pill-fs);
+  font-weight: var(--pill-fw);
+  line-height: var(--pill-line);
+}
+.tj-fact > svg,
+.tj-fact > .bplat { flex: none; color: var(--text-tertiary); }
+.tj-fact__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- 2. Which policy ------------------------------------------------------------------- */
+
+.tj-which { display: flex; flex-direction: column; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.tj-whichrow { min-width: 0; }
+.tj-whichrow > .bx-tip { display: flex; width: 100%; }
+.tj-whichrow__btn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+  font: inherit;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: opacity var(--dur-normal) var(--ease-standard), border-color var(--dur-normal) var(--ease-standard), box-shadow var(--dur-normal) var(--ease-standard);
+}
+.tj-whichrow__btn:hover { border-color: var(--border-default); }
+.tj-whichrow__btn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.tj-whichrow__top { display: flex; align-items: baseline; gap: var(--space-4); min-width: 0; }
+/* A policy's name is the row: two lines before it gives up, never one. */
+.tj-whichrow__name {
+  display: -webkit-box;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.tj-whichrow__word { flex: none; font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--accent-strong); }
+/* The reason sits beside the status when it fits ("Switched off") and takes
+   the line under it when it does not ("Checked after Device compliance for
+   Outlook and Dropbox"): its base is its whole length, so it wraps as a unit
+   before its words do, and is never cut off. */
+.tj-whichrow__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); min-width: 0; }
+.tj-whichrow__meta .bx-status { flex: none; }
+.tj-whichrow__reason { flex: 1 0 auto; max-width: 100%; min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-xs); line-height: 1.35; color: var(--text-tertiary); }
+
+/* The one that decides: the accent ring, lifted, pulsed once as the marker
+   arrives. The rest step back, and come forward under the pointer. */
+.tj-whichrow.is-decides .tj-whichrow__btn {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), var(--el-mid);
+  animation: tj-ring 720ms var(--ease-standard);
+}
+.tj-whichrow.is-dim .tj-whichrow__btn { opacity: 0.62; box-shadow: none; }
+.tj-whichrow.is-dim .tj-whichrow__btn:hover,
+.tj-whichrow.is-dim .tj-whichrow__btn:focus-visible { opacity: 1; }
+
+/* --- 3. Rules --------------------------------------------------------------------------- */
+
+.tj-rules { display: flex; flex-direction: column; gap: var(--space-5); margin: 0; padding: 0; list-style: none; }
+.tj-rule { min-width: 0; }
+.tj-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  cursor: pointer;
+  transition: opacity var(--dur-normal) var(--ease-standard), border-color var(--dur-normal) var(--ease-standard), box-shadow var(--dur-normal) var(--ease-standard);
+}
+.tj-card:hover { border-color: var(--border-default); }
+.tj-card:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); }
+.tj-card__head { display: flex; align-items: flex-start; gap: var(--space-4); min-width: 0; }
+.tj-card__head > .bx-badge { flex: none; }
+.tj-card__idx {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-secondary);
+}
+.tj-card__idx.is-last { color: var(--text-tertiary); }
+.tj-card__name {
+  display: -webkit-box;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  padding-top: 1px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: 18px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.tj-card__body { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-width: 0; }
+/* The board's pill row carries a card's padding of its own; here the card has it. */
+.tj-card .bb-checks { padding: 0; gap: var(--space-3); }
+.tj-card .bb-check__text { max-width: 22ch; }
+
+/* The card states, as the board's (trace.css):
+     lit     matched — the accent ring, lifted, pulsed once
+     missed  asked, no match — the words step down, the failing pill stays vivid
+     dim     switched off or never reached — 45 %, no pills */
+.tj-card.is-lit {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), var(--el-mid);
+  animation: tj-ring 720ms var(--ease-standard);
+}
+.tj-card.is-missed { border-color: var(--border-subtle); box-shadow: none; }
+.tj-card.is-missed .tj-card__name,
+.tj-card.is-missed .tj-card__idx { color: var(--text-tertiary); }
+.tj-card.is-dim { opacity: 0.45; box-shadow: none; }
+.tj-card.is-dim:hover,
+.tj-card.is-dim:focus-visible { opacity: 0.8; }
+
+@keyframes tj-ring {
+  from {
+    box-shadow: 0 0 0 1px var(--accent), 0 0 0 1px var(--accent-soft-border), var(--el-mid);
+  }
+  to {
+    box-shadow: 0 0 0 1px var(--accent), 0 0 0 12px transparent, var(--el-mid);
+  }
+}
+
+/* --- 4. The outcome, and 5. what they see ----------------------------------------------- */
+
+.tj-outcome { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-5); min-width: 0; }
+.tj-outcome__node { display: flex; min-width: 0; }
+/* The board's node, as wide as its column here rather than centred under a chain. */
+.tj-outcome__node .bb-outcome { flex: 1; min-width: 0; padding: var(--space-6); }
+.tj-outcome > .bx-btn { align-self: center; }
+/* Depends, in a column this narrow: each possible outcome as its condition
+   over its badge, rather than "If rule 1 matches → [Allow on 1 factor]" on
+   one line, which does not fit a laptop's column and broke mid-phrase. The
+   arrow says "then" on the board's wide chain; stacked, the order says it. */
+.tj-outcome__node .bb-outcome__rows { align-items: center; gap: var(--space-4); }
+.tj-outcome__node .bb-outcome__rows li { flex-direction: column; gap: var(--space-2); text-align: center; }
+.tj-outcome__node .bb-outcome__rows .bb-outcome__arrow { display: none; }
+.tj-see { min-width: 0; padding-top: var(--space-2); }
+/* The page's picture fills the column rather than its own 320 px. */
+.tj-see .tsee__body { align-items: stretch; }
+.tj-see .tscreen { width: auto; max-width: 100%; }
+
+/* --- The sentence over it --------------------------------------------------------------- */
+
+.tj__sentence { max-width: none; }
+
+/* --- Reduced motion ----------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .tj-card.is-lit,
+  .tj-whichrow.is-decides .tj-whichrow__btn { animation: none; }
+  .tj-card,
+  .tj-whichrow__btn { transition: none; }
+}

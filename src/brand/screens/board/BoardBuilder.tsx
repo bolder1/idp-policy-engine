@@ -22,11 +22,15 @@ import { GuardDrawer } from '../guard-page'
 import { offersMonitorAfterSave, portalRoot, statusToast } from '../status-options'
 import { canRedo, canUndo, commit, historyKey, historyOf, redo, revertTo, undo, type History } from '../history'
 import { useSimEnv } from '../sim-env'
-import { BoardTestViews } from '../testing/BoardTestViews'
+import { BreakInView, type BreakInKept } from '../break-in-view'
 import { WhichPolicy } from '../testing/WhichPolicy'
-import { boardPagesAllowed, boardViewsKept, firstBoardPage, pageShown, type BoardTestPage } from '../testing/board-views'
+import { WhatTheySee } from '../testing/WhatTheySee'
+import { TestPanel } from '../testing/TestPanel'
+import { boardPagesAllowed } from '../testing/board-views'
 import { useTestingSession } from '../testing/session-state'
 import { formOf, todayIn } from '../testing/sign-in-form'
+import { boardScope } from '../testing/sign-in-sentence'
+import { PANEL_MAX_W, PANEL_MIN_W, clampPanelWidth, readPanel, writePanel, type DockTab } from '../testing/test-dock'
 import type { SignInFacts } from '../sign-in-facts'
 import { Board, type TestChain } from './Board'
 import { DescribePanel } from './DescribePanel'
@@ -45,8 +49,8 @@ import {
 } from './describe-session'
 import { Inspector } from './Inspector'
 import { ReadAsTextPanel } from './ReadAsTextPanel'
-import { SignInPanel } from './SignInPanel'
-import type { ChangeChip } from './try-sign-in'
+import { audienceOf, notDecidingReason, panelTabForRoute, whyLine, type BoardOpen } from './test-mode'
+import { boardVersion } from './try-sign-in'
 import { useTrySignIn } from './use-try-sign-in'
 import { nextPart, patchRule as patchOne, ruleAt, type Part, type Selection } from './model'
 import { copyName } from './parts'
@@ -106,14 +110,23 @@ function focusSoon(find: () => HTMLElement | null, force = false) {
 }
 const byId = (id: string) => () => document.getElementById(id)
 
-/* Every card folded, while Try a sign-in reads the chain: the evidence under
-   each head is what is being read, and a card open at its full height is a
-   rule's editor standing in the route. Module-level, so it is one function. */
+/* Every card folded, while Try a sign-in reads the chain: the check pills
+   under each head are what is being read, and a card open at its full height
+   is a rule's editor standing in the route. Module-level, so it is one function. */
 const FOLDED = () => false
+
+/* The sentence's ids: a token's is its field's row id under this prefix
+   (sign-in-sentence.ts, `tokenDomId`), so a "Needs:" line can find one. */
+const TRY_PREFIX = 'bb-try'
 
 /* Controls that take keys of their own. A rule shortcut never fires from inside
    one — Backspace in a picker is not "delete this rule". */
 const OWNS_KEYS = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="combobox"], [role="listbox"], [role="menu"], [role="dialog"]'
+/* Surfaces that are not the chain: the inspector, test mode's panel (which
+   wears the inspector's chrome and holds the sentence and the tests), and the
+   sentence's popovers (portalled, so not inside it). A rule shortcut pressed
+   in any of them acts on a rule nobody there is looking at. */
+const TEST_SURFACES = '.bb__insp, .tpanel, .bx-apop'
 
 /* Before saving, as it last ran: what the checks said, what they read, and
    the rules they read — by reference, so an Undo pressed behind the page is
@@ -138,10 +151,10 @@ export function BoardBuilder({
   policyId: string
   /** Arrive in Try a sign-in's test mode: the Policies row menu's Try a sign-in. */
   openTest?: boolean
-  /* The page Try a sign-in's panel opens on: Check a person, Saved sign-ins
-     or the Break-in test (final spec, B V3), where the edition has Policy
-     testing; without it the panel is Try alone. */
-  openPage?: BoardTestPage
+  /* Which tab the test panel opens on (V4 §2.4-bis): the last one this viewer
+     was on (`try`), or People, Saved sign-ins or the Break-in test, where the
+     edition has Policy testing. */
+  openPage?: BoardOpen
   /** Arrive with this rule selected, or the last row ('fallback'). */
   rule?: string
 }) {
@@ -215,12 +228,25 @@ export function BoardBuilder({
      the run). Seeded from the route: the row menu's Try a sign-in lands here
      with it on. */
   const [testing, setTesting] = useState(!!openTest)
+  const testButton = useRef<HTMLSpanElement | null>(null)
+  /* The test panel's heading: focus lands on it when test mode opens and
+     when the rule editor hands the column back. */
+  const testHeading = useRef<HTMLHeadingElement | null>(null)
   /* Whether the column's current occupant took the other's place — the rule
-     editor opened from the chain, or the sign-in panel back from it — so it
+     editor opened from the chain, or the test panel back from it — so it
      fades in where it stands rather than sliding in as a new panel. */
   const [swapped, setSwapped] = useState(false)
-  const testHeading = useRef<HTMLHeadingElement | null>(null)
-  const testButton = useRef<HTMLSpanElement | null>(null)
+  /* The test panel's tab (V4 §2.4-bis), held here rather than in the panel:
+     a card clicked on the chain swaps the rule editor in, and its × must
+     bring the panel back on the tab it left. Seeded once from this viewer's
+     last tab and the route that opened test mode; the tab is what is kept
+     per viewer (`writePanel`, below), with the panel's width. */
+  const [testTab, setTestTab] = useState<DockTab>(() => panelTabForRoute(openTest ? openPage : undefined, readPanel().tab))
+  /* The card a row in a tab lands on, ringed while the pointer is on the row. */
+  const [rowHighlight, setRowHighlight] = useState<string | null>(null)
+  /* Save sign-in's popover, held here so Saved sign-ins' "Save this sign-in"
+     can open it on the header's bookmark. */
+  const [saveOpen, setSaveOpen] = useState(false)
   const [hover, setHover] = useState<number | null>(null)
   /* The last row under the pointer — Describe it bolds its answer, as a rule card's. */
   const [hoverLast, setHoverLast] = useState(false)
@@ -274,6 +300,14 @@ export function BoardBuilder({
      areas at the foot of board.css are for. The grip moves it 320 to 720, and
      closing the panel gives the canvas the whole region. */
   const [inspW, setInspW] = useState(560)
+  /* The test panel's width: the same column and the same grip, its own range
+     (400 to 640, 460 to start) and remembered per viewer, as an IDE keeps a
+     side panel's width. The rule editor swapped in from the chain takes this
+     width too — the column does not jump when its occupant changes. */
+  const [testW, setTestW] = useState(() => readPanel().width)
+  useEffect(() => {
+    writePanel({ tab: testTab, width: testW })
+  }, [testTab, testW])
   /* How much of itself every card shows, and the per-card exceptions.
 
      Two pieces of state rather than one, because they answer different
@@ -321,8 +355,10 @@ export function BoardBuilder({
      card on it, sixty times a second, to change one width — the same trap the
      pan was in before it moved to a ref. The custom property is all the layout
      needs, so the drag writes that and React hears about it once, at the end. */
-  const setW = useCallback((w: number) => {
-    const next = Math.max(320, Math.min(720, w))
+  /* Test mode's column has its own range (`clampPanelWidth`). `testMode` is
+     passed rather than read, so this stays one stable callback. */
+  const setW = useCallback((w: number, testMode = false) => {
+    const next = testMode ? clampPanelWidth(w) : Math.max(320, Math.min(720, w))
     shell.current?.style.setProperty('--bb-insp', `${next}px`)
     return next
   }, [])
@@ -341,9 +377,14 @@ export function BoardBuilder({
   const NARROW = 380
   const wide = inspW > NARROW
 
+  /* In test mode the grip moves the test panel's width; otherwise the
+     inspector's. `testing` and `testW` are read through a ref: the drag's
+     handlers are memoised on the width they started from. */
+  const colMode = useRef({ testing: false, testW })
   const onGrab = useCallback(
     (e: React.PointerEvent) => {
-      drag.current = { x: e.clientX, w: inspW, at: inspW }
+      const w = colMode.current.testing ? colMode.current.testW : inspW
+      drag.current = { x: e.clientX, w, at: w }
       setGripping(true)
       e.currentTarget.setPointerCapture(e.pointerId)
     },
@@ -358,7 +399,7 @@ export function BoardBuilder({
          panel grows as the pointer moves away from it. Clamped rather than
          free — under 320 the condition rows stack and stop being rows, and over
          720 the stage is no longer the thing you are working on. */
-      d.at = setW(d.w + (d.x - e.clientX))
+      d.at = setW(d.w + (d.x - e.clientX), colMode.current.testing)
     },
     [setW],
   )
@@ -368,7 +409,7 @@ export function BoardBuilder({
     drag.current = null
     setGripping(false)
     e.currentTarget.releasePointerCapture(e.pointerId)
-    if (d) setInspW(d.at)
+    if (d) (colMode.current.testing ? setTestW : setInspW)(d.at)
   }, [])
 
   useEffect(() => {
@@ -434,6 +475,10 @@ export function BoardBuilder({
   /* Only an app access policy decides sign-ins, so only one can be tried. */
   const canTest = features.trySignIn && draft.type === 'App Access'
   const testOn = testing && canTest && !!saved
+  /* The right-hand column's width: the test panel's while test mode is on
+     (the rule editor swapped in takes it too), the inspector's otherwise. */
+  const colW = testOn ? testW : inspW
+  colMode.current = { testing: testOn, testW }
   /* Try a sign-in takes the column first: `T` closes the panel as Done does. */
   const describeOpen = describing && !testOn
   /* Read as text gives the column up to either of them. */
@@ -458,24 +503,22 @@ export function BoardBuilder({
     [describeOpen, features.draftChecks, describeReading, draft, sources, describeTenant, env, store.account.id, today],
   )
   const trying = useTrySignIn({ on: testOn, saved: saved ?? draft, draft, env })
+  /* The version every tab of the test panel judges by: Your edits while the
+     board differs from live, the Stored version of a policy that is off. */
+  const version = useMemo(() => (saved ? boardVersion(saved, draft) : null), [saved, draft])
 
   const testingSession = useTestingSession()
 
-  /* Policy testing (final spec, B V3) lives in this panel and
-     nowhere else, so the panel carries its views as tabs — Try a sign-in,
-     Check a person, Saved sign-ins — with the Break-in test pushed over Saved
-     sign-ins where the edition has it. Which page is open is held here, not in
-     the panel: a rule opened from the chain takes the panel's column, and its
-     × comes back to the page it left, and so is what the pages would lose
-     while the rule has the column (`viewsKept`), emptied when test mode
-     starts afresh. A route can name the page (`open`); otherwise
-     it opens on Try. The Break-in test is offered only on a policy it runs on. */
+  /* Policy testing's lists — this policy's saved sign-ins, its people, last
+     week, the Break-in test — are the test panel's tabs (V4 §2.4-bis), where
+     the edition has Policy testing; without it the panel is the sign-in alone.
+     The Break-in test is a tab only on a policy it runs on. What its view
+     would lose when another tab or the rule editor takes its place — the
+     last run, the pressed count, the open row — is kept here for the life of
+     test mode. */
   const views = features.policyTesting
   const pagesAllowed = boardPagesAllowed(views, features.breakInTest, draft)
-  const [page, setPage] = useState<BoardTestPage>(() => firstBoardPage(openPage, pagesAllowed))
-  const [viewsKept, setViewsKept] = useState(boardViewsKept)
-  const arrivedOn = useRef(page)
-  const panelPage = pageShown(page, pagesAllowed)
+  const breakInKept = useRef<BreakInKept | null>(null)
   const diagnostics = useMemo(() => (saved ? diagnose(draft, store.groups, store.hooks, store.users, { zones: store.zones, fingerprints: store.fingerprints }) : []), [draft, store.groups, store.hooks, store.users, store.zones, store.fingerprints, saved])
   const shadowed = useMemo(() => (hover === null ? [] : shadowedBy(draft, hover)), [draft, hover])
   /* Draft mode — see policy-draft.ts.
@@ -517,10 +560,11 @@ export function BoardBuilder({
     const t = window.setTimeout(() => setTour(true), 600)
     return () => window.clearTimeout(t)
   }, [openTest])
-  /* And the panel's heading takes focus, as it does when the bar opens it —
-     unless it opened on the Break-in test, whose Back takes it. */
+  /* And the test panel's heading takes focus, as it does when the bar's
+     button opens test mode: the panel is announced by its name, and the
+     sentence's first token is the next Tab. */
   useEffect(() => {
-    if (openTest && arrivedOn.current !== 'break-in') focusSoon(() => testHeading.current)
+    if (openTest) focusSoon(() => testHeading.current)
   }, [openTest])
 
   /* The draft lives in this component, so leaving the board would destroy it.
@@ -586,7 +630,7 @@ export function BoardBuilder({
 
     const inControl = t instanceof Element && !!t.closest(OWNS_KEYS)
     /* Rule bindings only: not in a control, not in the panel, not handled. */
-    const owned = e.defaultPrevented || inControl || (t instanceof Element && !!t.closest('.bb__insp'))
+    const owned = e.defaultPrevented || inControl || (t instanceof Element && !!t.closest(TEST_SURFACES))
 
     const cmd = e.metaKey || e.ctrlKey
     const rules = draft.rules
@@ -629,8 +673,6 @@ export function BoardBuilder({
        collapsed panel for no reason you could trace back to a keystroke. */
     if (cmd && e.key === '\\') {
       e.preventDefault()
-      /* Test mode's column is always the sign-in or the rule; it does not hide. */
-      if (testOn) return
       if (at >= 0 || selection.kind === 'fallback' || selection.kind === 'apps') setInspOpen((v) => !v)
       return
     }
@@ -867,11 +909,11 @@ export function BoardBuilder({
     }
     setSelection(s)
     if (s.kind !== 'none') setInspOpen(true)
-    /* In test mode the rule opens in the sign-in's column, in its place, and
-       the chain stays folded — its evidence is what is being read. */
+    /* In test mode the rule opens in the test panel's column, in its place,
+       and the chain stays folded — its check pills are what is being read. */
     if (testOn) {
       /* Only when the column's occupant actually changes: a click on the
-         background with the sign-in already showing swaps nothing. */
+         background with the panel already showing swaps nothing. */
       if ((s.kind !== 'none') !== hasSubject) setSwapped(true)
       return
     }
@@ -919,42 +961,37 @@ export function BoardBuilder({
 
   /* --- Test mode ------------------------------------------------------------------
 
-     Opening it clears the selection, so the column shows the sign-in. Closing
-     it hands focus back to the bar button it was opened from. */
+     Opening it clears the selection, so the right-hand column is the test
+     panel; focus goes to its heading. Closing it hands focus back to the bar
+     button it was opened from. */
   const startTest = () => {
     if (describing) finishDescribe()
     setReading(false)
     setReadHover(null)
     setTesting(true)
-    setSelection({ kind: 'none' })
     setSwapped(false)
-    setPage('try')
-    setViewsKept(boardViewsKept())
+    setSelection({ kind: 'none' })
+    breakInKept.current = null
     focusSoon(() => testHeading.current)
   }
-  /* The Break-in test, pushed in this panel a guard page's
-     "Open". Test mode opens on it, or the panel moves to it; the
-     test's Back takes focus as it arrives, so nothing here moves focus. */
+  /* The Break-in test, from a guard page's "Open": test mode opens on its
+     tab, or the panel moves to it. */
   const openBreakInPage =
     pagesAllowed.breakIn && canTest
       ? () => {
           if (!testOn) {
             setTesting(true)
-            setViewsKept(boardViewsKept())
+            breakInKept.current = null
           }
-          if (hasSubject) setSwapped(true)
           setSelection({ kind: 'none' })
-          setPage('break-in')
+          setTestTab('break-in')
         }
       : undefined
-  /* Back to Try a sign-in from inside another page: the control pressed goes
-     with the page, so focus goes to the panel's heading. */
-  const toTry = () => {
-    setPage('try')
-    focusSoon(() => testHeading.current)
-  }
   const closeTest = () => {
     setTesting(false)
+    setSaveOpen(false)
+    /* A row hovered as test mode closed never sends its mouseleave. */
+    setRowHighlight(null)
     focusSoon(() => testButton.current?.querySelector<HTMLElement>('button') ?? null)
   }
   const toggleTest = () => (testOn ? closeTest() : startTest())
@@ -982,10 +1019,12 @@ export function BoardBuilder({
     openOnly(id)
     setFlash({ id, key: Date.now() })
   }
-  /* The rule editor's ×, in test mode: back to the sign-in, focus on its heading. */
+  /* The rule editor's ×, in test mode: the test panel comes back into the
+     column on the tab it left (the tab is held here), and focus to its
+     heading. */
   const backToTest = () => {
-    setSelection({ kind: 'none' })
     setSwapped(true)
+    setSelection({ kind: 'none' })
     focusSoon(() => testHeading.current)
   }
   const boardCommands: Cmd[] = [
@@ -999,8 +1038,7 @@ export function BoardBuilder({
     ...(toPublish ? ([{ id: 'publish', label: features.publish ? 'Review and publish' : 'Review and save', kbd: chord(['mod'], 'Enter', MAC), icon: Check }] as Cmd[]) : []),
     ...(canUndo(hist) || backToChooser ? ([{ id: 'undo', label: 'Undo', kbd: chord(['mod'], 'Z', MAC), icon: Undo2 }] as Cmd[]) : []),
     ...(canRedo(hist) ? ([{ id: 'redo', label: 'Redo', kbd: chord(['mod', 'shift'], 'Z', MAC), icon: Redo2 }] as Cmd[]) : []),
-    /* Not in test mode, where the column is always the sign-in or the rule. */
-    ...(hasSubject && !testOn ? ([{ id: 'panel', label: inspOpen ? 'Hide the panel' : 'Show the panel', kbd: chord(['mod'], '\\', MAC), icon: PanelRightClose }] as Cmd[]) : []),
+    ...(hasSubject ? ([{ id: 'panel', label: inspOpen ? 'Hide the panel' : 'Show the panel', kbd: chord(['mod'], '\\', MAC), icon: PanelRightClose }] as Cmd[]) : []),
     { id: 'keys', label: 'Keyboard shortcuts', kbd: '?', icon: Keyboard },
     ...(canTest ? ([{ id: 'try', label: testOn ? 'Close Try a sign-in' : 'Try a sign-in', kbd: 'T', icon: LogIn }] as Cmd[]) : []),
     ...draft.rules.map((r, i) => ({ id: `rule:${i}`, label: `Go to rule ${i + 1} · ${r.name}`, icon: ListOrdered }) as Cmd),
@@ -1321,25 +1359,15 @@ export function BoardBuilder({
   }
   const discard = () => (saved.pendingDraft ? setConfirmDiscard(true) : discardEdits())
 
-  /* A chip from Would change if. A sign-in chip restates the sign-in; a policy
-     chip is an ordinary edit to the board — on the undo stack, said in a toast
-     with Undo, and not saved. */
-  const runChip = (c: ChangeChip) => {
-    if (!trying) return
-    if (c.kind === 'sign-in' && c.patch && c.field) trying.patch(c.patch, c.field)
-    else if (c.rules) {
-      commitDraft({ ...draft, rules: c.rules })
-      offerUndo(c.toast ?? 'Not saved yet.')
-    }
-  }
-  /* A Break-in fix, from the panel: an ordinary edit to the draft, on the undo
+  /* A Break-in fix, from the test panel: an ordinary edit to the draft, on the undo
      stack and said in a toast with Undo — not saved (final spec, D §3.7). */
   const applyPanelFix = (next: Policy, toast: string) => {
     commitDraft({ ...draft, rules: next.rules, fallback: next.fallback })
     offerUndo(toast)
   }
-  /* A rule named on the Break-in test: opened on the chain, in the panel's
-     column, and shown there. Its × comes back to the Break-in test. */
+  /* A rule named on the Break-in test: opened on the chain, in the right-hand
+     column in the test panel's place, and shown there. Its × comes back to
+     the Break-in test's tab. */
   const openRuleFromPanel = (rule?: string) => {
     if (!rule) return
     const r = rule === 'fallback' ? null : draft.rules.find((x) => x.id === rule)
@@ -1348,6 +1376,10 @@ export function BoardBuilder({
     setFlash({ id: rule, key: Date.now() })
   }
   const testApp = trying?.form.appId ? (store.apps.find((a) => a.id === trying.form.appId) ?? null) : null
+  const testPerson = trying?.form.personId ? (store.users.find((u) => u.id === trying.form.personId) ?? null) : null
+  /* Why this policy is not the one deciding, when it is not: on the spine's
+     gate and in the panel's why-line, in the same words. */
+  const whichReason = trying && !trying.route.policy.decides ? notDecidingReason(trying.right.resolution, draft.id, trying.route.who) : undefined
   const testChain: TestChain | null = trying
     ? {
         route: trying.route,
@@ -1358,19 +1390,37 @@ export function BoardBuilder({
         fade: trying.fade,
         changed: trying.changed,
         appName: testApp?.name ?? 'this application',
+        appId: testApp?.id ?? null,
+        person: testPerson,
+        audience: audienceOf(trying.route.who),
+        /* Not "Not in this policy" on the gate: the start node right above it
+           already says so in the same words. */
+        whichReason: trying.route.who.state === 'fail' ? undefined : whichReason,
         which: trying.form.appId ? (
-          <>
-            <WhichPolicy
-              compact
-              resolution={trying.right.resolution}
-              appId={trying.form.appId}
-              substitute={trying.right.spec.substitute}
-              watching={trying.watching}
-            />
-          </>
+          <WhichPolicy
+            compact
+            resolution={trying.right.resolution}
+            appId={trying.form.appId}
+            substitute={trying.right.spec.substitute}
+            watching={trying.watching}
+          />
         ) : null,
+        columns: trying.columns,
+        /* The pages the person would see for the answer on the board, in the
+           outcome node's popover — open on its pages, since the popover is
+           the disclosure. */
+        whatTheySee: (
+          <div className="bb__tsee">
+            <WhatTheySee key={draft.id} screens={trying.screens} appId={trying.form.appId} title={`What they see · ${trying.columns.at(-1)?.label ?? 'Live'}`} defaultOpen />
+          </div>
+        ),
       }
     : null
+  /* The one line under the verdict: the rule that decided, who decided
+     instead and why, or what is missing (test-mode.ts). */
+  const why = trying
+    ? whyLine({ right: trying.columns.at(-1), decision: trying.route.decision, decides: trying.route.policy.decides, reason: whichReason })
+    : ''
 
   return (
     <>
@@ -1420,8 +1470,11 @@ export function BoardBuilder({
 
     <div
       ref={shell}
-      className={`bb ${testOn ? 'is-testing' : panelShown || describeOpen || readOpen ? '' : 'is-insp-closed'} ${gripping ? 'is-gripping' : ''}`}
-      style={{ '--bb-insp': `${inspW}px` } as React.CSSProperties}
+      /* Test mode keeps the ordinary two tracks: the right-hand one always
+         holds something while it is on — the test panel, or the rule editor
+         in its place — so it is never closed. */
+      className={`bb ${testOn ? 'is-testing' : ''} ${testOn || panelShown || describeOpen || readOpen ? '' : 'is-insp-closed'} ${gripping ? 'is-gripping' : ''}`}
+      style={{ '--bb-insp': `${colW}px` } as React.CSSProperties}
     >
       {/* The canvas comes into existence when there is something on it.
 
@@ -1507,7 +1560,8 @@ export function BoardBuilder({
         onHover={setHover}
         onHoverLast={describeOpen ? setHoverLast : undefined}
         sources={sources}
-        traced={ringed}
+        /* In test mode, the card a row in the test panel lands on. */
+        traced={testOn ? (rowHighlight ? [rowHighlight] : undefined) : ringed}
         /* Undo and redo, into the one dock pill `Board` draws. Density comes
            first in that pill (`aside`, below), then this history group, then
            zoom, which lives in `Board` because the zoom state does. */
@@ -1562,15 +1616,15 @@ export function BoardBuilder({
       )}
 
 
-      {(panelShown || describeOpen || readOpen) && !testOn && (
+      {(testOn || panelShown || describeOpen || readOpen) && (
         <div
           className="bb__grip"
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize the inspector"
-          aria-valuenow={inspW}
-          aria-valuemin={320}
-          aria-valuemax={720}
+          aria-label={testOn ? 'Resize Try a sign-in' : 'Resize the inspector'}
+          aria-valuenow={colW}
+          aria-valuemin={testOn ? PANEL_MIN_W : 320}
+          aria-valuemax={testOn ? PANEL_MAX_W : 720}
           tabIndex={0}
           onPointerDown={onGrab}
           onPointerMove={onDrag}
@@ -1578,8 +1632,9 @@ export function BoardBuilder({
           /* Arrow keys move it too. A divider that only responds to a drag is a
              divider somebody navigating by keyboard cannot move at all. */
           onKeyDown={(e) => {
-            if (e.key === 'ArrowLeft') setInspW((w) => setW(w + 24))
-            else if (e.key === 'ArrowRight') setInspW((w) => setW(w - 24))
+            const set = testOn ? setTestW : setInspW
+            if (e.key === 'ArrowLeft') set((w) => setW(w + 24, testOn))
+            else if (e.key === 'ArrowRight') set((w) => setW(w - 24, testOn))
             else return
             e.preventDefault()
           }}
@@ -1595,39 +1650,54 @@ export function BoardBuilder({
           and nothing else. Closing also narrows its grid track, which
           `.bb.is-insp-closed` does by rewriting the template — to zero rather
           than to one column, so the width has something to animate between. */}
+      {/* Try a sign-in's test panel (V4 §2.4-bis), in the right-hand column:
+          the sentence, what it gets and why, then the tests as tabs. A card
+          clicked on the chain puts the rule editor in its place (below), and
+          the editor's × brings it back on the same tab. */}
       {testOn && trying && !hasSubject && (
-        <SignInPanel
-          t={trying}
+        <TestPanel
           draft={draft}
+          version={version}
+          form={trying.form}
+          onPatch={trying.patch}
+          onLoad={trying.load}
+          rows={trying.rows}
+          issues={trying.issues}
+          boundaries={trying.boundaries}
+          scope={boardScope(draft)}
+          idPrefix={TRY_PREFIX}
+          columns={trying.columns}
+          why={why}
+          shown={trying.right.resolution.status === 'decided' ? trying.right.resolution.decision : null}
+          onReplay={trying.replay}
+          onClose={closeTest}
+          saveOpen={saveOpen}
+          onSaveOpenChange={setSaveOpen}
+          views={views}
+          tab={testTab}
+          onTab={setTestTab}
+          breakIn={
+            pagesAllowed.breakIn ? (
+              <div className="tpanel__breakin">
+                <BreakInView
+                  policy={draft}
+                  policies={store.policies}
+                  env={env}
+                  caption={`${draft.name} · ${version?.label ?? 'Live'}`}
+                  onApplyFix={applyPanelFix}
+                  onOpenInBoard={openRuleFromPanel}
+                  kept={breakInKept}
+                />
+              </div>
+            ) : null
+          }
+          onHighlight={setRowHighlight}
+          onOpenLibrary={(tab) => store.go({ name: 'sign-in-tests', tab })}
           headingRef={testHeading}
           swap={swapped}
-          onClose={closeTest}
-          onChip={runChip}
-          views={
-            views
-              ? {
-                  page: panelPage,
-                  onPage: setPage,
-                  body:
-                    panelPage === 'try' ? null : (
-                      <BoardTestViews
-                        page={panelPage}
-                        onPage={setPage}
-                        t={trying}
-                        saved={saved}
-                        draft={draft}
-                        breakIn={pagesAllowed.breakIn}
-                        kept={viewsKept}
-                        onApplyFix={applyPanelFix}
-                        onOpenRule={openRuleFromPanel}
-                        onToTry={toTry}
-                      />
-                    ),
-                }
-              : undefined
-          }
         />
       )}
+
       {/* Try a sign-in's status region (Spec A §7): the decision once per run,
           an update that moved it, a step's stage.
 

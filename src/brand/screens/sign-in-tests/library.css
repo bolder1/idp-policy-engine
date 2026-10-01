@@ -1,0 +1,391 @@
+/* -----------------------------------------------------------------------------
+   Sign-in tests: the library and report tabs — Saved sign-ins, People, Runs
+   (V4 §3.1). Prefix `sitl`, checked against the whole tree before it was
+   chosen.
+
+   Tokens only (console-theme.css): the table recipe's --table-*, the pill
+   family through the kit's Badge, --accent* for what is chosen or just
+   moved, --fb-* only where a decision or a failed check is shown.
+
+   Motion: the Saved rows are `motion.tr` (their layout transform is motion's),
+   so no rule here puts a transform or a transition on a row, a settle
+   wrapper or a run row. The accent flash is a CSS animation on a plain span
+   of its own, and it is off under reduced motion like every animation here.
+   -------------------------------------------------------------------------- */
+
+/* --- The page ---------------------------------------------------------------------
+
+   A tab body takes the page's free height, with the pager at its foot — the
+   Display tokens recipe (screens.css, `.bdt__panel`): the list's last row on
+   the window's bottom edge. The paged-list hook counts the pager by its
+   height, so it lands where it is measured to.
+
+   While one of these tabs is open the page is a flex column rather than the
+   ten-column grid: head, tabs, then the body growing into what is left,
+   however many rows the page puts above it and whether it holds the body
+   directly or inside its tab panel. Same gap as the grid's rows, so the head
+   and the tabs do not move when the tab changes. */
+.bshell__main > .bpage:has(.sitl) { flex: 1 0 auto; }
+.bpage:has(> .sitl),
+.bpage:has(> [role='tabpanel'] > .sitl) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.bpage > .sitl,
+.bpage > [role='tabpanel']:has(> .sitl) { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+
+.sitl {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  min-height: 0;
+}
+.sitl > .btoolbar { margin-bottom: 0; }
+.sitl > .blist__pager { margin-top: auto; }
+/* An empty tab centres its state in the body, not at the top of it. */
+.sitl > .bempty:only-child { margin: auto 0; }
+
+/* --- The table recipe -------------------------------------------------------------- */
+
+.sitl-wrap { flex: none; }
+.sitl-scroll { overflow-x: auto; }
+.sitl-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: var(--fs-md);
+}
+.sitl-table thead th {
+  height: var(--table-header-h);
+  padding: 0 var(--table-cell-x);
+  text-align: left;
+  background: var(--table-head-bg);
+  border-bottom: var(--bw-thin) solid var(--table-head-rule);
+  font-size: var(--table-head-fs);
+  font-weight: var(--table-head-fw);
+  color: var(--table-head-fg);
+  white-space: nowrap;
+}
+.sitl-table tbody td,
+.sitl-table tbody th {
+  padding: 0 var(--table-cell-x);
+  border-bottom: var(--bw-thin) solid var(--table-rule);
+  vertical-align: middle;
+  text-align: left;
+  font-weight: var(--fw-regular);
+  background: var(--surface-raised);
+}
+.sitl-table tbody tr:last-child > * { border-bottom: none; }
+/* The hover fill on the cells, not the row: the Saved row is motion's, and
+   the sticky People column needs a fill of its own over what scrolls under
+   it. No transition — the row is animated by motion. */
+.sitl-table tbody tr:hover > * { background: var(--table-row-hover); }
+
+.sitl-muted { color: var(--text-tertiary); font-size: var(--fs-sm); }
+.sitl-clip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sitl-cell { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; }
+
+/* --- Saved sign-ins ------------------------------------------------------------------ */
+
+.sitl-saved tbody td { height: 60px; }
+.sitl-c-decision { width: 172px; }
+.sitl-c-now { width: 224px; }
+.sitl-c-level { width: 120px; }
+.sitl-c-by { width: 196px; }
+.sitl-c-menu { width: 56px; }
+/* A laptop's width: the fixed columns give the sign-in its share back. */
+@media (max-width: 1360px) {
+  .sitl-c-decision { width: 152px; }
+  .sitl-c-now { width: 204px; }
+  .sitl-c-level { width: 108px; }
+  .sitl-c-by { width: 164px; }
+}
+.sitl-table .sitl-menu { text-align: center; padding: 0; }
+
+.sitl-first { position: relative; }
+/* The accent edge a run lights on a row that moved: a plain span, remounted
+   by each run so it plays again, fading after a beat. */
+.sitl-flash {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: var(--accent);
+  pointer-events: none;
+  animation: sitl-flash 1600ms var(--ease-standard) both;
+}
+@keyframes sitl-flash {
+  0%,
+  45% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.sitl-settle { display: flex; align-items: center; min-width: 0; }
+
+.sitl-signin { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sitl-signin > .bx-tip { display: block; min-width: 0; }
+.sitl-name {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sitl-name:hover { color: var(--accent-strong); text-decoration: underline; text-underline-offset: 2px; }
+.sitl-name:focus-visible { outline: none; border-radius: var(--radius-sm); box-shadow: 0 0 0 3px var(--focus-halo); }
+.sitl-name.is-text { cursor: inherit; }
+.sitl-name.is-text:hover { color: var(--text-primary); text-decoration: none; }
+.sitl-line {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+}
+
+.sitl-now { display: inline-flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.sitl-pass {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+.sitl-pass svg { color: var(--fb-positive-fg); }
+
+.sitl-link {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-link);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sitl-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+.sitl-link:focus-visible { outline: none; border-radius: var(--radius-sm); box-shadow: 0 0 0 3px var(--focus-halo); }
+
+/* The rest of the sign-in every People cell assumes, at the bar's end. */
+.sitl-rest {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 420px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+/* --- People -----------------------------------------------------------------------------
+
+   Every application is a column, so the table is as wide as it needs to be
+   and scrolls sideways inside its card; the person column stays put. */
+.sitl-xscroll { overscroll-behavior-x: contain; }
+.sitl-people { width: max-content; min-width: 100%; table-layout: auto; }
+.sitl-people tbody td,
+.sitl-people tbody th { height: 56px; }
+.sitl-apphead { min-width: 156px; }
+.sitl-app { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 0; max-width: 180px; }
+.sitl-app > .applogo { flex: none; }
+
+.sitl-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 240px;
+  min-width: 240px;
+  max-width: 240px;
+  border-right: var(--bw-thin) solid var(--table-rule);
+}
+.sitl-table thead th.sitl-sticky { z-index: 2; background: var(--table-head-bg); }
+
+.sitl-prow { cursor: pointer; }
+.sitl-prow.is-current > .sitl-sticky { box-shadow: inset 3px 0 0 var(--accent); }
+.sitl-person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sitl-person:focus-visible { outline: none; border-radius: var(--radius-sm); box-shadow: 0 0 0 3px var(--focus-halo); }
+.sitl-person > .bx-face { flex: none; }
+.sitl-person__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sitl-person__name { font-weight: var(--fw-medium); color: var(--text-primary); }
+.sitl-sub { font-size: var(--fs-sm); color: var(--text-tertiary); }
+.sitl-prow:hover .sitl-person__name { color: var(--accent-strong); }
+
+/* --- Runs -------------------------------------------------------------------------------
+
+   Two panes: the runs, and the chosen one. The page stops at the window
+   here — the report is taller than one screen — and each pane scrolls on
+   its own, so the tiles never leave while the rows under them are read. */
+.bshell__main > .bpage:has(.sitl-runs) { flex: 1 1 0; min-height: 0; }
+.sitl.sitl-runs {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: stretch;
+  min-height: 360px;
+}
+
+.sitl-runlist {
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+.sitl-runlist ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.sitl-runitem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  border: var(--bw-thin) solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sitl-runitem:hover { background: var(--state-hover-bg); }
+.sitl-runitem[aria-current='true'] { background: var(--accent-soft); border-color: var(--accent-soft-border); }
+.sitl-runitem:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.sitl-runitem__title { font-weight: var(--fw-medium); color: var(--text-primary); line-height: 1.35; }
+.sitl-runitem[aria-current='true'] .sitl-runitem__title { color: var(--accent-strong); }
+.sitl-runitem__meta { font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+/* The tiny bar: the share that changed, the share that did not. A failed
+   promise is the one place outside a decision that earns a tone, so the
+   changed part is the notice tone; the rest is the neutral rule. */
+.sitl-runbar {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  height: 4px;
+  margin-top: var(--space-1);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+.sitl-runbar__seg { display: block; height: 100%; border-radius: 1px; }
+.sitl-runbar__seg.is-changed { background: var(--fb-notice-dot); }
+.sitl-runbar__seg.is-same { background: var(--border-default); }
+
+.sitl-rundetail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-6);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--el-low);
+}
+.sitl-runhead { display: flex; flex-direction: column; gap: var(--space-2); }
+.sitl-runhead__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+}
+.sitl-runhead__meta { margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
+
+.sitl-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.sitl-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5);
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font: inherit;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.sitl-tile:hover { border-color: var(--border-default); background: var(--surface-sunken); }
+.sitl-tile[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-soft); }
+.sitl-tile:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.sitl-tile__n { font-size: var(--fs-xl); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; }
+.sitl-tile__label { font-size: var(--fs-sm); color: var(--text-secondary); }
+.sitl-tile[aria-pressed='true'] .sitl-tile__label { color: var(--accent-strong); }
+
+.sitl-none { margin: var(--space-6) 0; text-align: center; color: var(--text-tertiary); }
+
+.sitl-runrows {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: var(--bw-thin) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.sitl-runrows ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; }
+.sitl-runrows li + li { border-top: var(--bw-thin) solid var(--table-rule); }
+.sitl-rungrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 164px 16px 164px 104px;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--table-cell-x);
+}
+.sitl-runrows__head {
+  flex: none;
+  height: var(--table-header-h);
+  background: var(--table-head-bg);
+  border-bottom: var(--bw-thin) solid var(--table-head-rule);
+  font-size: var(--table-head-fs);
+  font-weight: var(--table-head-fw);
+  color: var(--table-head-fg);
+}
+.sitl-runrow {
+  width: 100%;
+  min-height: 56px;
+  border: 0;
+  background: var(--surface-raised);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sitl-runrow:hover { background: var(--table-row-hover); }
+.sitl-runrow:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.sitl-arrow { color: var(--text-tertiary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sitl-flash { animation: none; opacity: 0; }
+}

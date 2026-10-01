@@ -3,38 +3,32 @@ import { describe, expect, test } from 'vitest'
 import { AUTH_METHODS } from './methods'
 import { NPS_SERVERS, QR_SIZE, isPasscode, qrMatrix, secretFor, setupCardFor, setupReady } from './setup-guide'
 
+/* The three code apps kept an install-and-scan card until 23 Sep 2026, when the
+   owner took it off every row but Microsoft Push's. `secretFor` and the QR
+   helpers still serve those ids wherever a code is shown. */
 const CODE_APPS = ['google-auth', 'ms-auth', 'authy']
 
 describe('setupCardFor', () => {
-  test('the three code apps each get the install, scan and enter-a-code card', () => {
-    for (const id of CODE_APPS) expect(setupCardFor(id)?.kind, id).toBe('app')
+  test('a code app has no setup card of its own', () => {
+    for (const id of CODE_APPS) expect(setupCardFor(id), id).toBe(null)
   })
 
   test('Microsoft Push gets the Azure NPS card', () => {
     expect(setupCardFor('ms-push')).toEqual({ kind: 'nps' })
   })
 
-  test('every card belongs to a method on the Authenticator App page, and nothing else has one', () => {
+  test('Microsoft Push is the only method with a card, and it is on the Authenticator App page', () => {
     const withCards = AUTH_METHODS.filter((m) => setupCardFor(m.id))
-    expect(withCards.map((m) => m.id).sort()).toEqual([...CODE_APPS, 'ms-push'].sort())
+    expect(withCards.map((m) => m.id)).toEqual(['ms-push'])
     for (const m of withCards) expect(m.channel, m.id).toBe('Authenticator App')
-  })
-
-  test('the install buttons go to the two stores', () => {
-    for (const id of CODE_APPS) {
-      const card = setupCardFor(id)
-      if (card?.kind !== 'app') throw new Error(`${id} has no app card`)
-      expect(card.android, id).toMatch(/^https:\/\/play\.google\.com\//)
-      expect(card.ios, id).toMatch(/^https:\/\/apps\.apple\.com\//)
-    }
   })
 })
 
 describe('setupReady', () => {
-  const app = setupCardFor('google-auth')!
+  const app = { kind: 'app', app: 'Google Authenticator', android: 'https://play.google.com/x', ios: 'https://apps.apple.com/x' } as const
   const nps = setupCardFor('ms-push')!
 
-  test('a code app is ready once the six digits it showed are in', () => {
+  test('an app card is ready once the six digits it showed are in', () => {
     expect(setupReady(app, { passcode: '', server: '' })).toBe(false)
     expect(setupReady(app, { passcode: '12345', server: '' })).toBe(false)
     expect(setupReady(app, { passcode: '123456', server: '' })).toBe(true)

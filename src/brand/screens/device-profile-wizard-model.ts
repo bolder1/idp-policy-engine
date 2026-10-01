@@ -40,7 +40,7 @@ import { checkLine } from './profile-aside'
    same way and the tests can hold it without rendering a page.
 
    The state is permissive and the write is strict, as the drawer this replaced
-   was: ticks survive a trip back to "What it can read" and a switch to
+   was: ticks survive a trip back to "Device restriction type" and a switch to
    agentless (the agent-only rows are hidden, not dropped), values survive
    unticking a row, and `draftOf` is what prunes both away. Nothing incoherent
    can be created, and nothing is silently deleted on the way past.
@@ -408,7 +408,7 @@ export function reviewSections(s: WizardState, step3: Step3Shape): ReviewSection
       title: 'Devices',
       summary: reachLabel(d.reach),
       facts: [
-        { label: 'What it can read', value: reachLabel(d.reach), pill: true },
+        { label: 'Device restriction type', value: reachLabel(d.reach), pill: true },
         /* Asked only with the agent — agentless has one method, so the step
            never showed the question and Review does not report an answer to it. */
         ...(d.reach === 'agent'

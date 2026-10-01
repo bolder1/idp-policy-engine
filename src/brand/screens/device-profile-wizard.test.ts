@@ -349,7 +349,7 @@ describe('the review', () => {
     const s = state({ name: 'Fleet', mode: 'device', reach: 'agent', picked: ['mac'], weights: { mac: TIER_WEIGHT.Low }, autoRegister: true })
     const [, devices, signals] = reviewSections(s, 'inline')
     expect(devices.facts.map((f) => [f.label, f.value])).toEqual([
-      ['What it can read', 'Agent-based'],
+      ['Device restriction type', 'Agent-based'],
       ['Device registration method', 'Self registration by user'],
       ['Allowed device registrations', '3'],
       ['Mobile device restriction', 'Off'],
@@ -358,7 +358,7 @@ describe('the review', () => {
     expect(reviewSections({ ...s, restrictMobile: true }, 'inline')[1].facts[3].value).toBe('On')
     /* Agentless has one method, so the step never asks it and Review says nothing about it. */
     expect(reviewSections({ ...s, reach: 'agentless', picked: [] }, 'inline')[1].facts.map((f) => f.label)).toEqual([
-      'What it can read',
+      'Device restriction type',
       'Allowed device registrations',
       'Mobile device restriction',
       'Device auto-registration',

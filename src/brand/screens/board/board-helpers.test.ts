@@ -5,6 +5,7 @@ import { scenarioCard } from '../../create/TemplateCard'
 import { buildTemplate, templateBlocker, withoutMissing } from './apply-template'
 import { journeyOf } from './model'
 import { copyName, isPristine, settledName } from './parts'
+import { patchRule } from './model'
 import { boardShortcuts, chord, isMacPlatform } from './shortcuts'
 
 /* -----------------------------------------------------------------------------
@@ -25,6 +26,20 @@ describe('a rule nobody has touched', () => {
     expect(isPristine({ ...blankRule(), who: { groupIds: ['finance'], userIds: [] } })).toBe(false)
     expect(isPristine({ ...blankRule(), when: when(card(cond('zone', 'in zone', ['office']))) })).toBe(false)
     expect(isPristine({ ...blankRule(), secondFactor: 'specific', secondFactorMethods: ['TOTP Authenticator'] })).toBe(false)
+  })
+
+  it('stops being blank the moment an outcome is chosen, even one equal to the default', () => {
+    const r = blankRule()
+    expect(isPristine(patchRule(r, { name: 'Everyone else' }))).toBe(true)
+    expect(isPristine(patchRule(r, { enabled: false }))).toBe(true)
+    const allowed = patchRule(r, { decision: '1fa' })
+    expect(isPristine(allowed)).toBe(false)
+    // back to the blank's own values — Allow, then "any enabled method" — and still written
+    expect(isPristine(patchRule(allowed, { decision: '2fa', secondFactor: 'any' }))).toBe(false)
+  })
+
+  it('never calls a rule blank that was not born blank', () => {
+    expect(isPristine({ ...blankRule(), pristine: undefined })).toBe(false)
   })
 })
 

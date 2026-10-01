@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'motion/react'
-import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useEffect } from 'react'
 import {
   ArrowLeft,
@@ -22,7 +22,6 @@ import {
   Settings,
   Smartphone,
   Star,
-  Upload,
 } from 'lucide-react'
 
 import { Badge, Button, Callout, Drawer, IconButton, MenuButton, Modal, SearchBox, TipDot, Toggle } from '../kit'
@@ -265,7 +264,6 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
      made now, not a preference. */
   /* On in the showcase build — the owner's pick ("by default, gear on settings
      rows") — with the comparison switch hidden (see showcase.ts). */
-  const [gearEnds, setGearEnds] = useState(SHOWCASE)
 
   /* Arriving by a link that unmounted with its page — the Display tokens back
      link, above all — focus is on <body>. It goes to the Hardware Token row
@@ -415,17 +413,8 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
      and this page is about the second step. */
   const reachable = isUser ? methods.filter((m) => m.use !== 'primary' && !methodBlocker(m)) : methods
 
-  /* Which rows the gear variant reaches, read off the same primitives the list
-     uses: a family that narrows to ONE method and has settings. */
-  const gearRows = useMemo(
-    () =>
-      FAMILIES.flatMap((f) => {
-        const inside = reachable.filter((m) => m.use === 'second' && m.channel === f.channel && matchesUse(m, use))
-        const shape = familyRow(f.channel, inside)
-        return !shape.opens && rowTarget(shape)?.kind === 'settings' ? [shape.method.name] : []
-      }),
-    [reachable, use],
-  )
+  /* `gearRows` stood here: the rows the gear variant reached, named under the
+     switch that compared it with the chevron. Both are gone (23 Sep 2026). */
 
   /* --- The person's side ---------------------------------------------------------- */
 
@@ -543,17 +532,9 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
             slot `PageHead` gives the other library pages. */}
         {!SHOWCASE && (
           <div className="bpage__preview">
-            {/* The comparison switch. A person's page never shows it: their rows
-                all open onto an enrolment form and none carries a switch. */}
-            {!isUser && gearRows.length > 0 && (
-              <div className="bm8__variant">
-                <Toggle size="sm" checked={gearEnds} onChange={setGearEnds} label="Gear on settings rows" />
-                <span>
-                  Gear on settings rows
-                  <i>{gearRows.join(', ')}</i>
-                </span>
-              </div>
-            )}
+            {/* The gear/chevron comparison switch stood here. The gear won on
+                23 Sep 2026 and is on every row that opens, so there is nothing
+                left to compare. */}
             <WidthSwitch />
           </div>
         )}
@@ -601,7 +582,6 @@ export function AuthMethods({ role = 'admin' }: { role?: Role }) {
             methods={reachable}
             onOpen={(channel) => setPanel([{ kind: 'family', channel }])}
             onSettings={(channel) => setPanel([{ kind: 'settings', channel }])}
-            gearEnds={gearEnds}
             defaultMethod={defaultMethod}
             use={use}
             onUse={setUse}
@@ -898,7 +878,6 @@ function CategoryList({
   onUploadCa,
   enrolment,
   configuredIds,
-  gearEnds = false,
 }: {
   methods: AuthMethod[]
   onOpen: (channel: string) => void
@@ -916,8 +895,6 @@ function CategoryList({
   enrolment: UserEnrolment
   /** The person's set-up methods, for the Configured pill on their rows. */
   configuredIds: string[]
-  /** The variant switch in the page head. See `gearEnds` on the screen. */
-  gearEnds?: boolean
 }) {
   const [q, setQ] = useState('')
   const needle = q.trim().toLowerCase()
@@ -975,6 +952,11 @@ function CategoryList({
     ...primaries.map((m) => ({ kind: 'primary' as const, m })),
     ...rows.map((row) => ({ kind: 'family' as const, row })),
   ]
+  /* The mark track holds the widest mark the list actually draws: a gear is a
+     40px button, a chevron a 17px glyph. Read off the rows rather than fixed,
+     so a list of nothing but chevrons — a person's own methods, or a filter
+     that leaves only families — keeps the narrow track it had. */
+  const anyGear = items.some((it) => it.kind === 'family' && marksGear(it.row.shape))
   /* The whole list, not paged. Zones, device and risk profiles page theirs;
      the methods are one catalogue of about fifteen, and the owner wants it read
      top to bottom on one scroll. */
@@ -1027,7 +1009,7 @@ function CategoryList({
               row reserves one width so the figures beside them read as a column. */}
           <ul
             aria-label={isUser ? 'Your methods' : 'Methods'}
-            className={`bm8__list bm8__list--oneline ${isUser ? 'is-person' : ''} ${gearEnds ? 'is-gear' : ''}`}
+            className={`bm8__list bm8__list--oneline ${isUser ? 'is-person' : ''} ${anyGear ? 'is-gear' : ''}`}
           >
             {items.map((item) =>
               item.kind === 'primary' ? (
@@ -1046,7 +1028,6 @@ function CategoryList({
                   key={item.row.f.channel}
                   row={item.row}
                   isUser={isUser}
-                  gearEnds={gearEnds}
                   defaultMethod={defaultMethod}
                   configured={item.row.inside.some((m) => configuredIds.includes(m.id))}
                   onOpen={onOpen}
@@ -1110,12 +1091,34 @@ function RowEnd({ control, mark, wide = false }: { control?: ReactNode; mark?: R
   )
 }
 
+/* Which mark a row that opens wears.
+
+   The owner drew the line on 23 Sep 2026: "only use a gear where we only have
+   one page — if you have multiple pages use the chevron… SMS and Email have
+   multiple settings with tabs, for that the chevron is fine; only change the
+   gear for one page, like RSA or CAC Card".
+
+   A family with methods inside opens a panel you CHOOSE in: its methods on one
+   tab and the shared settings on another. That is what a chevron has always
+   promised on this list, and it keeps it.
+
+   A family of one has nothing to choose. Its row opens straight onto a single
+   page — the family's settings, or RSA's configuration form — and that is the
+   gear: the same glyph the Settings tab wears, and the one every console in
+   this category puts on a row that leads to one screen of settings.
+
+   Read off `rowTarget`, so the two stay in step with where the row goes rather
+   than being listed by hand. */
+const marksGear = (shape: FamilyRow): boolean => {
+  const t = rowTarget(shape)
+  return !!t && t.kind !== 'family'
+}
+
 /* One family on the list. A family of one is named for its method and carries
    its controls; a family with variants opens the slider. */
 function FamilyListRow({
   row,
   isUser,
-  gearEnds,
   defaultMethod,
   configured,
   onOpen,
@@ -1127,7 +1130,6 @@ function FamilyListRow({
 }: {
   row: { f: Family; shape: FamilyRow; inside: AuthMethod[]; live: number; txns: number | null }
   isUser: boolean
-  gearEnds: boolean
   defaultMethod: string | null
   /** The person has set up a method in this family. */
   configured: boolean
@@ -1155,7 +1157,6 @@ function FamilyListRow({
       : target.kind === 'settings'
         ? () => onSettings(f.channel)
         : () => onSetup(target.method)
-  const gear = Boolean(gearEnds && single && target?.kind === 'settings' && open)
   /* CAC Card's Upload CA chain rides in the control cluster, before the switch. */
   const uploadCa = single && takesCaChain(single) ? onUploadCa : undefined
   const ctl = single ? (
@@ -1207,7 +1208,10 @@ function FamilyListRow({
           {(single ? !!single.summary : true) && (
             <TipDot text={single ? single.description : `${f.blurb} ${f.detail}`} label={`About ${title}`} />
           )}
-          {single && single.name !== f.channel && <i className="bm8__badge bm8__badge--use">{f.channel}</i>}
+          {/* The family's own name rode here on a row named for its one method
+              — "OTP over Phone Call · Call Verification" (owner, 23 Sep 2026:
+              "remove this tag, not needed"). The row is named for the thing
+              the switch turns on, and the family adds nothing to that. */}
           {f.isNew && <i className="bm8__new">New</i>}
           {holdsDefault && (
             <i className="bm8__defchip">
@@ -1221,8 +1225,8 @@ function FamilyListRow({
               it with the switch; a row that opens a drawer said nothing until
               you went in. On the name, after Default, and grey (owner, same
               day: "move this beside the heading, and use grey instead of
-              green"): a count of what is on is a fact about the row, not an
-              alert, so it takes no colour of its own. Counted after the Use
+              green", then on 23 Sep: "green when some are on, grey at zero").
+              Counted after the Use
               filter, like the row's other numbers, so it describes what
               opening the row will show.
 
@@ -1232,7 +1236,10 @@ function FamilyListRow({
               "0 of 3 enabled" says what is true — the methods inside are
               off — in the same words as every other row. */}
           {!isUser && !single && (
-            <Badge tone="neutral" className="bm8__state">
+            /* Green while something inside is on, grey at zero (owner, 23 Sep
+               2026): the colour then marks the rows that are actually doing
+               something, and a family with nothing on stays quiet. */
+            <Badge tone={live > 0 ? 'positive' : 'neutral'} className="bm8__state">
               {`${live} of ${inside.length} enabled`}
             </Badge>
           )}
@@ -1262,21 +1269,24 @@ function FamilyListRow({
           control={ctl}
           wide={!!uploadCa}
           mark={
-            gear ? (
+            !open ? undefined : marksGear(shape) ? (
               <span className="bm8__rowgear">
-                {/* A cog, at the full control size (owner, 18 Sep 2026: "use
-                    gear icon"). It shipped as sliders on the argument that a
-                    cog reads as APP settings rather than this row's; the owner
-                    read it the other way, and a cog is what every console in
-                    this category puts on a row that opens its own settings.
-                    The Settings tab it opens wears the same glyph. */}
-                <IconButton icon={Settings} label={`${title} settings`} tone="ghost" onClick={open ?? undefined} />
+                {/* A cog on the rows that open ONE page — see `marksGear`. It
+                    replaced sliders on 18 Sep ("use gear icon") on the rows
+                    that open a settings page, and the Settings tab it lands on
+                    wears the same glyph, so the row and its destination agree.
+                    A button, not a decoration: it takes focus and says its own
+                    name, over the link the row stretches across itself. */}
+                <IconButton icon={Settings} label={`${title} settings`} tone="ghost" onClick={open} />
               </span>
-            ) : open ? (
+            ) : (
+              /* A panel with a choice in it. Aria-hidden and unfocusable: the
+                 name beside it is already the link, and the chevron only says
+                 which way it goes. */
               <span className="bm8__rowchev" aria-hidden>
                 <ChevronRight size={17} strokeWidth={2} />
               </span>
-            ) : undefined
+            )
           }
         />
       </span>
@@ -2011,34 +2021,15 @@ function MethodCard({
   )
 }
 
-/* CAC Card's Upload CA chain, in words — and on a narrow screen as the kit's
-   icon button, the way the compact row already draws "Make default" as a star.
+/* `PHONE`, `subscribePhone` and `isPhone` stood here: the media query behind
+   the upload button's two forms. It is a gear at every width now (23 Sep 2026),
+   so nothing watches the viewport on this screen any more. */
 
-   The words are 118px, and at 375px the row had no room for them: the text
-   went to 0px wide, the name and blurb vanished, and the row's end overflowed
-   6px past the column every other switch keeps. As an icon the cluster is
-   84px, the name and blurb get their room back and the switch holds the
-   column. 720px is the step where the console drops a label to keep a row
-   (the width scale at the top of screens.css). */
-const PHONE = '(max-width: 720px)'
-
-function subscribePhone(on: () => void) {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {}
-  const mq = window.matchMedia(PHONE)
-  mq.addEventListener('change', on)
-  return () => mq.removeEventListener('change', on)
-}
-const isPhone = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(PHONE).matches
-
+/* A gear, at every width (owner, 23 Sep 2026: "change this to a gear icon as
+   well"). It was a worded button on a wide screen and an upload arrow on a
+   phone; the row's other openers are gears, and the words are on its tip. */
 function UploadCaButton({ onClick }: { onClick: () => void }) {
-  const phone = useSyncExternalStore(subscribePhone, isPhone, () => false)
-  return phone ? (
-    <IconButton icon={Upload} label="Upload CA chain" size="sm" onClick={onClick} />
-  ) : (
-    <Button variant="secondary" size="sm" onClick={onClick}>
-      Upload CA chain
-    </Button>
-  )
+  return <IconButton icon={Settings} label="Upload CA chain" size="sm" tone="ghost" onClick={onClick} />
 }
 
 /* A method's own controls — the switch, and whatever else it offers beside it.
@@ -2134,13 +2125,13 @@ function MethodControls({
         )
       )}
 
-      {/* The authenticator apps' one-card setup — install and scan, or
-          Microsoft Push's server — on a button of its own beside the switch,
-          because it is something you do rather than somewhere you go. */}
+      {/* Microsoft Push's NPS server, on a gear beside the switch (owner,
+          23 Sep 2026: "add a gear icon only for the setup"). A worded button on
+          every row in the drawer read as four things to do before any method
+          would work; the gear is the same glyph the rows on the page use for
+          settings, and its name is on its tooltip. */}
       {m.configured && !m.locked && setupCardFor(m.id) && !setupOpen && (
-        <Button variant="secondary" size="sm" onClick={() => onSetup(m)}>
-          Set up
-        </Button>
+        <IconButton icon={Settings} size="sm" tone="ghost" label={`Set up ${m.name}`} onClick={() => onSetup(m)} />
       )}
 
       {/* Display Token's inventory, beside its switch once a token is assigned

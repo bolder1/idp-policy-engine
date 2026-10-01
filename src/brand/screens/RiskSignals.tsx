@@ -7,6 +7,7 @@ import {
   Check,
   CircleCheck,
   Copy,
+  CopyPlus,
   Crosshair,
   FileWarning,
   Gauge,
@@ -310,7 +311,13 @@ function RiskProfileList({
   onDuplicate: (p: RiskProfile) => void
   onDelete: (p: RiskProfile) => void
 }) {
-  const [view, setView] = useLibView('risk-profiles')
+  /* The showcase presents ONE view (owner, 23 Sep 2026: "keep list view only,
+     remove the view selection — make it the default and hide the three").
+     Pinned here, at the call site, so a view saved by an earlier visit cannot
+     bring a hidden one back; `useLibView` still describes storage, and flipping
+     SHOWCASE gives the switch and the saved preference back. */
+  const [savedView, setView] = useLibView('risk-profiles')
+  const view = SHOWCASE ? 'list' : savedView
   /* By name, as on every other list page. */
   const [q, setQ] = useState('')
   const needle = q.trim().toLowerCase()
@@ -412,7 +419,10 @@ function RiskProfileList({
   const menuItems = (inUse: boolean): MenuItem[] => [
     /* Absent on the row that already carries it, rather than present and disabled. */
     ...(inUse ? [] : [{ id: 'use', label: 'Use this profile', icon: CircleCheck }]),
-    { id: 'duplicate', label: 'Duplicate', icon: Copy },
+    /* CopyPlus, the glyph the policy builder's rule menu uses (owner, 23 Sep
+       2026: "use the one we use inside the policy builder"). Two sheets alone
+       read as "copy to the clipboard"; the plus says a second one is made. */
+    { id: 'duplicate', label: 'Duplicate', icon: CopyPlus },
     /* The tenant must always have a scale, so the profile producing it cannot
        be deleted; the badge says why. */
     ...(inUse ? [] : [{ id: 'delete', label: 'Delete', icon: Trash2, danger: true, divide: true }]),
@@ -440,7 +450,7 @@ function RiskProfileList({
         }
         right={
           <>
-            <ViewSwitch value={view} onChange={setView} label="Risk profile view" />
+            {!SHOWCASE && <ViewSwitch value={view} onChange={setView} label="Risk profile view" />}
             <Button variant="brand" onClick={onCreate}>
               <Plus size={14} strokeWidth={2.2} aria-hidden />
               Create profile

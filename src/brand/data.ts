@@ -607,6 +607,12 @@ export interface Rule {
   secondFactor: 'any' | 'specific' | 'chain' | 'preferred'
   /** Chosen methods, when secondFactor is 'specific'. */
   secondFactorMethods?: string[]
+  /** Born blank and not yet touched. Only `blankRule` sets it; the board's
+      `patchRule` clears it on the first edit to the outcome, the who or the
+      conditions. It is what lets a rule whose fields happen to EQUAL the
+      blank's — Allow, then "any enabled method" — still count as written
+      (23 Sep 2026: that rule was reading "Nothing set yet"). */
+  pristine?: true
   /** Ordered steps, when secondFactor is 'chain'. */
   methodChain?: string[]
   /** Fallback method, when secondFactor is 'preferred' and the user set none. */
@@ -819,17 +825,34 @@ export interface ZoneRange {
   lon: number
   label: string
   placeId?: string
+  /** What the number is in. Absent means km, which is what every seed is. */
+  unit?: DistanceUnit
 }
 
-/** The distance a range can take, in whole km. Typed, not picked from a list
-    (owner, 21 Sep 2026). Past the ceiling a state or a country says it better. */
+/* Kilometres or miles, as the live console offers them (owner, 23 Sep 2026:
+   "a basic input box with a selection, km or miles"). The number is stored as
+   the admin typed it, in the unit beside it, rather than converted on the way
+   in: a zone written as "10 miles" should still read as 10 miles tomorrow. */
+export type DistanceUnit = 'km' | 'mi'
+export const DISTANCE_UNITS: { value: DistanceUnit; label: string }[] = [
+  { value: 'km', label: 'km' },
+  { value: 'mi', label: 'miles' },
+]
+export const unitOf = (r: ZoneRange): DistanceUnit => r.unit ?? 'km'
+/** The word after the number: "25 km", "10 miles" — singular where it reads better. */
+export const unitWord = (u: DistanceUnit, n: number) => (u === 'km' ? 'km' : n === 1 ? 'mile' : 'miles')
+
+/** The distance a range can take, in whole units. Typed, not picked from a
+    list (owner, 21 Sep 2026). Past the ceiling a state or a country says it
+    better; the mile ceiling is the same distance, rounded down. */
 export const RANGE_KM_MIN = 1
 export const RANGE_KM_MAX = 1000
+export const RANGE_MAX: Record<DistanceUnit, number> = { km: RANGE_KM_MAX, mi: 620 }
 /** What a new range starts at: a metro area, not a building. */
 export const DEFAULT_RANGE_KM = 25
 
-/** A range in words: "Within 25 km of Pune". */
-export const rangeText = (r: ZoneRange) => `Within ${r.km} km of ${r.label}`
+/** A range in words: "Within 25 km of Pune", "Within 10 miles of Pune". */
+export const rangeText = (r: ZoneRange) => `Within ${r.km} ${unitWord(unitOf(r), r.km)} of ${r.label}`
 
 /* What a zone is *for*. A zone is only a boundary — it says where a request
    came from, not what to do about it — but in practice every one is written
@@ -3840,7 +3863,7 @@ export const scenarios: Scenario[] = [
 ]
 
 export function blankRule(name = 'New rule'): Rule {
-  return rule({ name, decision: '2fa', matchEstimate: 1240 })
+  return { ...rule({ name, decision: '2fa', matchEstimate: 1240 }), pristine: true }
 }
 
 /** The one name the terminal rule is allowed to have. */

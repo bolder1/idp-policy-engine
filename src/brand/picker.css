@@ -60,6 +60,10 @@
 /* "Type  Device health": the prefix quiet, the value in ink — Claude's
    "Sort by  Next run". */
 .bx-picker__prefix { flex: none; margin-right: var(--space-2); color: var(--text-tertiary); }
+/* The filter's own mark, before its prefix: the same tertiary ink, so the
+   answer stays the loudest thing on the trigger. */
+.bx-picker__icon { flex: none; margin-right: var(--space-3); color: var(--text-tertiary); }
+.bx-picker__icon + .bx-picker__prefix { margin-left: 0; }
 .bx-picker__trigger:has(.bx-picker__prefix) .bx-picker__value { font-weight: var(--fw-medium); }
 .bx-picker__trigger.is-invalid { border-color: var(--fb-negative-border); }
 

@@ -254,8 +254,17 @@ export const partForFinding = (code: string): Part => (WHO_FINDINGS.has(code) ? 
    `secondFactorMethods`, and a delete followed by a re-add would move it to the
    end — the same rule, a different string, and the save bar lit on a no-op. */
 export function patchRule(r: Rule, p: Partial<Rule>): Rule {
-  if (!('who' in p)) return { ...r, ...p }
-  return { ...r, ...p, who: normaliseWho(p.who) }
+  /* CHOOSING AN OUTCOME is the one edit the blank flag exists to remember.
+     Conditions and a who the card can see for itself (`configured`), and the
+     factor pickers cannot be reached until an outcome is chosen — so a patch
+     that carries `decision` is the first real write, and nothing else is.
+     Not who or when: a group added and taken away again has to serialise
+     exactly like one never added, or the save bar lights on a no-op (the test
+     below this one's). `undefined` rather than a delete, for the same reason
+     `who` is stored that way: JSON drops it, and the key keeps its place. */
+  const base = r.pristine && 'decision' in p ? { ...r, pristine: undefined } : r
+  if (!('who' in p)) return { ...base, ...p }
+  return { ...base, ...p, who: normaliseWho(p.who) }
 }
 
 /** A stable, human short label for a situation axis value. */

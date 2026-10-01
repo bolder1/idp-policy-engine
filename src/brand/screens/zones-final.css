@@ -123,7 +123,7 @@
 /* Locations add the Range column BESIDE the place, not out of it (owner, 22 Sep
    2026: "why reduce the space of the location picker — keep it as it was and add
    the range"): the list is the IP list's width plus the column and its gap. */
-.bz7__sec--places:not(.bz7__sec--empty) { max-width: calc(max(50%, 360px) + 120px); }
+.bz7__sec--places:not(.bz7__sec--empty) { max-width: calc(max(50%, 360px) + 192px); }
 @media (max-width: 720px) {
   .bz7__sec:not(.bz7__sec--empty),
   .bz7__sec--places:not(.bz7__sec--empty) { max-width: none; }
@@ -205,25 +205,85 @@ button.bz7__place:hover { border-color: var(--ctl-border-hover); }
    country or a state. A fieldset for the native disable, stripped of its own
    frame. */
 .bz7__rangecol {
-  flex: none; width: 112px; min-inline-size: 0;
+  /* The number and its unit, as the live console pairs them (23 Sep 2026):
+     a 72px box for up to four digits, then the km / miles picker. The track,
+     shared with the column heading and the search row's spacer — only the
+     fieldset below draws a control in it. */
+  flex: none; width: 184px; min-inline-size: 0;
   margin: 0; padding: 0; border: 0;
   display: flex; align-items: center;
 }
-.bz7__rangecol:disabled { opacity: var(--disabled-opacity); }
+/* ONE control, not two side by side (owner, 23 Sep 2026: "combine both — they
+   become a single entity, so the user adds the number and selects the value
+   type together"). "500 km" is one answer; two boxes with a gap between them
+   read as two questions, and the gap is where the eye stops.
+
+   The box belongs to the FIELDSET, and the number and the unit sit inside it
+   bare, divided by one hairline: whatever is focused inside, the ring is drawn
+   once, around the whole answer. The element selector keeps it off the
+   heading's "Range" label and the search row's spacer, which wear the same
+   class for their width alone. */
+fieldset.bz7__rangecol {
+  /* Both halves take the box's full height, so the hairline between them runs
+     edge to edge and the unit is as tall a target as the number. Centred
+     instead, the trigger's `height: 100%` had no definite parent to measure
+     and collapsed to its own 21px of text. */
+  align-items: stretch;
+  height: var(--ctl-height-md);
+  background: var(--ctl-bg);
+  border: var(--bw-thin) solid var(--ctl-border); border-radius: var(--ctl-radius);
+  overflow: hidden;
+}
+fieldset.bz7__rangecol:hover:not(:disabled) { border-color: var(--ctl-border-hover); }
+fieldset.bz7__rangecol:focus-within,
+fieldset.bz7__rangecol:has(.bx-picker__trigger.is-open) {
+  border-color: var(--ctl-border-focus); box-shadow: 0 0 0 4px var(--focus-halo);
+}
+/* A row with no range to draw — a country, a state — greys the whole box, so
+   the two halves grey together. They used not to: the number kept the white
+   field background while the picker beside it went sunken. */
+.bz7__rangecol:disabled { opacity: var(--disabled-opacity); background: var(--surface-sunken); }
 .bz7__rangecol:disabled * { cursor: not-allowed; }
-.bz7__rangecol .bx-stepwrap--field,
-.bz7__rangecol .bx-step--field { width: 100%; }
-.bz7__rangecol .bx-step--field { height: var(--ctl-height-md); }
+.bz7__rangenum {
+  flex: none; width: 72px; min-width: 0;
+  height: 100%; padding: 0 10px;
+  background: none; border: 0; border-right: var(--bw-thin) solid var(--ctl-border); border-radius: 0;
+  font-size: var(--fs-md); color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+/* The box has the ring; a second one inside it would draw a rectangle around
+   half the control. */
+.bz7__rangenum:focus-visible { outline: none; }
+.bz7__rangecol > .bx-picker { flex: 1 1 auto; min-width: 0; }
+/* The unit keeps its chevron and its popup and loses its chrome: inside the
+   box it is the right-hand half of one field, not a control sitting next to
+   one. Every state listed, because the trigger paints its own border and
+   background on hover, on focus and while open. */
+.bz7__rangecol > .bx-picker .bx-picker__trigger,
+.bz7__rangecol > .bx-picker .bx-picker__trigger:hover,
+.bz7__rangecol > .bx-picker .bx-picker__trigger:focus-visible,
+.bz7__rangecol > .bx-picker .bx-picker__trigger.is-open {
+  width: 100%; height: 100%;
+  background: none; border: 0; border-radius: 0; box-shadow: none;
+}
 /* The columns' names over the list. */
 .bz7__colhead {
-  padding-bottom: var(--space-3); margin-bottom: var(--space-4);
-  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: var(--space-2); margin-bottom: var(--space-3);
   font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary);
 }
 .bz7__colhead__place { flex: 1 1 0; min-width: 0; }
 .bz7__colhead .bz7__rangecol { padding-left: var(--space-1); }
 .bz7__colhead__del { width: var(--ctl-height-sm); }
 .bz7__placekind { margin-left: auto; flex: none; font-size: var(--fs-sm); color: var(--text-tertiary); white-space: nowrap; }
+/* "In India" on a row a wider place already covers (23 Sep 2026). Quiet, and
+   beside the name rather than at the row's end, so the kind column still lines
+   up down the list. */
+.bz7__covered {
+  flex: none; margin-left: var(--space-4);
+  padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
+  background: var(--surface-inset); color: var(--text-tertiary);
+  font-size: var(--pill-fs); font-weight: var(--pill-fw); line-height: var(--pill-line); white-space: nowrap;
+}
 /* The search row: the label is the field, so the magnifier sits inside it and
    the ring goes round both. The input inside is bare. */
 .bz7__placesearch { width: 100%; gap: 8px; cursor: text; }

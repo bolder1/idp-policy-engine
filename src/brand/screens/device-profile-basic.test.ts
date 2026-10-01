@@ -61,8 +61,8 @@ describe('setting up basic details, as a change', () => {
 
   it('is not named in the footer beside the parts it covers', () => {
     const applied = { ...withReach(unmanaged, 'agent'), restrictionSet: true }
-    expect(profileChangeParts(unmanaged, applied)).toEqual(['What it can read'])
-    expect(profileReview(unmanaged, applied).map((r) => r.label)).toEqual(['Basic details', 'What it can read'])
+    expect(profileChangeParts(unmanaged, applied)).toEqual(['Device restriction type'])
+    expect(profileReview(unmanaged, applied).map((r) => r.label)).toEqual(['Basic details', 'Device restriction type'])
   })
 
   /* Review changes files every setup answer under Basic details, and an answer

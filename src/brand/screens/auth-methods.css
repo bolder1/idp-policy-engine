@@ -262,12 +262,15 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
    rules" line under each name. Row details are on the tip beside the name now,
    and how many rules use a method is said when it is turned off. */
 
+/* Grey (owner, 23 Sep 2026: "make this gray"). It was green, which read as a
+   state — something switched on and healthy — when it is a fact about what the
+   method IS. The row's switch and its enabled count carry the state. */
 .bm8__badge {
   display: inline-flex; align-items: center; gap: var(--pill-gap);
   padding: var(--pill-py) var(--pill-px); border-radius: var(--pill-radius);
   line-height: var(--pill-line);
-  background: var(--fb-positive-bg); color: var(--fb-positive-fg);
-  border: var(--bw-thin) solid var(--fb-positive-border);
+  background: var(--fb-neutral-bg); color: var(--fb-neutral-fg);
+  border: var(--bw-thin) solid var(--border-subtle);
   font-style: normal; font-size: var(--pill-fs); font-weight: var(--pill-fw); white-space: nowrap;
 }
 
@@ -363,22 +366,34 @@ ul.bm8__list { margin: 0; padding: 0; list-style: none; }
 .bm8__rowctl .bm8__rowswitch { min-width: 0; }
 .bm8__rowctl .bm8__rowswitch:empty { display: none; }
 
-/* --- The gear variant ------------------------------------------------------------
-   The same row end wearing a gear where the chevron was. See the note in
-   AuthMethods.tsx for which two rows this reaches and why it is a variant
-   rather than a change.
+/* --- Two marks, one column -------------------------------------------------------
+   A row that opens a single page ends in a gear; a row that opens a panel with
+   a choice in it keeps its chevron (23 Sep 2026 — see `marksGear`). Both land
+   in the same list, so the track is sized for the wider of the two.
 
-   Only the mark's WIDTH changes, and it changes for the whole list: a gear is
-   40px against the chevron's 17px, so widening the track on the rows that grow
+   The mark's WIDTH is set for the whole list, not per row: a gear is 40px
+   against the chevron's 17px, so growing the track only on the rows that wear
    one would step those rows' switches 23px out of the column. The ORDER does
-   not change — the mark keeps the right edge in both variants, because a
-   chevron that stops short of an edge its neighbours' switches reach is the
-   one thing this row end exists to prevent.
+   not change either — the mark keeps the right edge, because a chevron that
+   stops short of an edge its neighbours' switches reach is the one thing this
+   row end exists to prevent.
 
    `--ctl-height-md`, the icon button's own box, not the `-sm` it was: at 34px
    the 40px button overflowed its track to the left and took 6px out of the gap
    that holds it off the switch. */
 .bm8__list.is-gear { --bm8-mark: var(--ctl-height-md); }
+/* The two never land in the same slot, which is why a gear beside a chevron
+   costs the column nothing. A chevron row is a family with methods inside, so
+   it has no switch: `RowEnd` swaps its mark into the switch's slot and the
+   chevron takes the row's right edge, with the switches. A gear row is a
+   family of ONE, so it does have a switch, and the gear sits in the mark slot
+   just inside it. Every row still ends on one x; what changes down the list is
+   only which glyph ends it.
+
+   Measured at 1440px: the chevrons and the switches both end at 1258, and the
+   gears sit at 1158–1198, one 16px gap inside them. Giving the chevron the
+   gear's 40px box to centre in was tried first and stopped it 12px short of
+   that edge — the one thing this row end exists to prevent. */
 /* A person's rows end in a chevron and never a switch, so nothing is reserved
    for one: the chevron takes the outer slot and the inner one collapses. */
 .bm8__list.is-person .bm8__rowend { grid-template-columns: 0 var(--bm8-mark); }

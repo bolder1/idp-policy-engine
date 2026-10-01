@@ -27,6 +27,13 @@ export const PART_LABEL: Record<Part, string> = { who: 'Who', when: 'Condition' 
    nothing about what the rule does. */
 export function isPristine(rule: Rule): boolean {
   const b = blankRule()
+  /* The flag first. The blank rule's own default is "allow after a second
+     factor", so a rule somebody has set to exactly that — Allow, then any
+     enabled method — is field-for-field the blank, and the comparison below
+     alone called it untouched: the card read "Nothing set yet" over a rule that
+     was fully written, and the panel lit no tile when it reopened. Only
+     `blankRule` sets the flag, so a seeded or template rule is never blank. */
+  if (rule.pristine !== true) return false
   return (
     !hasWho(rule.who) &&
     leafCount(rule.when) === 0 &&

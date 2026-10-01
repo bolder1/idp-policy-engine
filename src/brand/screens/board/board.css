@@ -1537,6 +1537,37 @@ button.bb__idx:hover { transform: none; background: var(--surface-inset, var(--s
 /* Why the card says "Needs setup" or "Check", under the name it is about. */
 .bb__findings { padding: var(--space-2) var(--space-5); border-bottom: 1px solid var(--border-subtle); }
 .bb__inspbody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+/* The panel's own foot (23 Sep 2026). A row of its own under the scroll, not
+   inside it: the body scrolls behind a save that stays put, which is the whole
+   point of putting it down here. `flex: none` so a long form cannot squeeze it,
+   and the panel's `overflow: hidden` rounds its bottom corners for it. */
+.bb__inspfoot {
+  flex: none;
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+/* TINTED, not outlined (owner, 23 Sep 2026: "don't use outline — use the grey
+   button with a background, or a subtle orange background to elevate the save
+   button"). A white button with a hairline, alone on a white strip, read as
+   nothing at all: the only thing drawing it was its own outline, and at the
+   foot of a panel that is the one control there.
+
+   The brand's own subtle set — the tint the console already uses for a warm
+   surface — so it is plainly the save without becoming a second solid orange
+   fighting "Save policy" on the bar. One solid brand button per screen; this
+   is the same act, said quieter. `--brand-text` is a rebrand token, so the
+   fallback keeps it readable in the console look. */
+.bb__inspfoot .bx-btn--neutral {
+  background: var(--brand-subtle-bg);
+  border-color: var(--brand-subtle-border);
+  color: var(--brand-text, var(--brand));
+}
+.bb__inspfoot .bx-btn--neutral:not(:disabled):hover {
+  background: var(--brand-subtle-border);
+  border-color: var(--brand-subtle-border);
+}
 
 /* A section: Figma's grammar — a title row you can collapse, an action on the
    right where adding is the point, the body underneath. */
@@ -3083,15 +3114,9 @@ button.bb__ifchip.is-muted:hover { border-style: solid; }
 .bb__outcard.is-deny { --out-fg: var(--fb-negative-fg); --out-bg: var(--fb-negative-bg); --out-border: var(--fb-negative-border); }
 .bb__outcard.is-on { border-color: var(--out-border); background: var(--out-bg); }
 .bb__outcard.is-on .bb__outcard__ico { background: var(--surface-raised); color: var(--out-fg); }
-/* Drawn and not choosable yet: quieter, no pointer, a "Coming soon" chip. */
-.bb__outcard.is-soon { cursor: default; background: var(--surface-sunken); border-color: var(--border-subtle); }
-.bb__outcard.is-soon:hover { border-color: var(--border-subtle); }
-.bb__outcard.is-soon .bb__outcard__text b { color: var(--text-secondary); }
-.bb__outcard__soon {
-  margin-left: 4px; padding: 1px 6px; border-radius: var(--radius-full);
-  font-style: normal; font-size: 11px; font-weight: var(--fw-medium); vertical-align: 1px;
-  background: var(--fb-neutral-bg); color: var(--fb-neutral-fg);
-}
+/* `.bb__outcard.is-soon` and `.bb__outcard__soon` stood here: the quiet
+   "Next rule · Coming soon" card, removed 23 Sep 2026 with the card itself.
+   `is-soon` elsewhere (condition-popover.css) is a different list. */
 @media (prefers-reduced-motion: reduce) { .bb__outcard { transition: none; } }
 
 /* --- WHO: the people a rule applies to ---------------------------------------

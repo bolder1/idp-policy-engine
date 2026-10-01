@@ -13,7 +13,7 @@ import {
   XCircle,
 } from 'lucide-react'
 
-import { RowMenu, Toggle } from '../../kit'
+import { Button, RowMenu, Toggle } from '../../kit'
 import { SHOWCASE } from '../../showcase'
 import { fallbackRule, type Policy, type Rule } from '../../data'
 import type { Diagnostic } from '../diagnostics'
@@ -60,6 +60,10 @@ export function Inspector({
   onMoveRule,
   onDuplicateRule,
   onDeleteRule,
+  canSave = false,
+  saveLabel = 'Save rule',
+  saveTitle,
+  onSave,
 }: {
   draft: Policy
   selection: Selection
@@ -81,6 +85,14 @@ export function Inspector({
   onMoveRule?: (from: number, to: number) => void
   onDuplicateRule?: (i: number) => void
   onDeleteRule?: (i: number) => void
+  /** Something to store, and nothing blocking it — the bar's own test. */
+  canSave?: boolean
+  /** "Save rule". Never the bar's own label — see the foot below. */
+  saveLabel?: string
+  /** Why it is off, when it is off. */
+  saveTitle?: string
+  /** Stores the policy. The same call the bar's Save makes. */
+  onSave?: () => void
 }) {
   /* Resolved once. `at` is -1 when the selected rule is gone — undone, deleted,
      discarded — but the board no longer mounts this component in that case, so
@@ -233,6 +245,38 @@ export function Inspector({
           </motion.div>
         ) : null}
       </div>
+
+      {/* The save, at the foot of the form it belongs to (owner, 23 Sep 2026:
+          "we need a dedicated save button for this configure form").
+
+          It stores the policy — the same call the bar's Save makes, disabled by
+          the same test and saying the same thing when it is off. It is not a
+          second kind of save: editing has not changed, the card beside the
+          panel still follows every keystroke, and this is here because the work
+          is here and the bar is a screen away at the top of the page.
+
+          Not on the Applications pane, which has a Save of its own for the
+          applications it is editing — two Saves on one pane, meaning two
+          different things, is the one arrangement worth avoiding.
+
+          SECONDARY, and named for the thing in front of you: the bar says
+          "Save policy", this says "Save rule" (owner, 23 Sep 2026 — first
+          "give them different names and a different button style", then
+          "instead of saying save changes can we call it save rule"). Two brand
+          buttons both reading "Save", one at each end of the screen, read as
+          two different saves and made you stop to work out which.
+
+          It stores the whole policy either way — that is the bar's business,
+          and the bar's word for it. What the panel names is the work you are
+          doing in the panel. The default at the foot of the chain is a rule
+          too, so the word holds there as well. */}
+      {selection.kind !== 'apps' && onSave && (
+        <div className="bb__inspfoot">
+          <Button variant="secondary" size="sm" disabled={!canSave} title={saveTitle} onClick={onSave}>
+            {saveLabel}
+          </Button>
+        </div>
+      )}
     </aside>
   )
 }

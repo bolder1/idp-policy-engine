@@ -1,0 +1,101 @@
+/* The on-screen keyboard (keyboard.js). Charcoal caps on a near-black plate,
+   the same in both themes: a keyboard is an object in the room, not part of
+   the console's chrome, so it does not retokenise. Every colour here is
+   literal for that reason. No transitions — keyboard.js computes each frame. */
+
+.kbd {
+  position: absolute;
+  right: 40px;
+  bottom: 40px;
+  width: 620px;
+  height: 223px;
+  opacity: 0;
+  z-index: 26;
+  pointer-events: none;
+}
+.kbd[data-corner='bl'] {
+  right: auto;
+  left: 40px;
+}
+/* The drop shadow carries the plate on the light ground; on the dark ground
+   (#131922) it disappears and the plate composites to within a few levels
+   of the ground, so a 1px inset hairline gives it an edge there. On the
+   light ground the hairline is invisible against the shadow. */
+.kbd__plate {
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+  background: rgba(27, 35, 45, 0.92);
+  box-shadow: 0 22px 60px rgba(8, 12, 18, 0.38), 0 4px 14px rgba(8, 12, 18, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* A cap: the top face, and a 3px skirt drawn as a hard shadow so it can be
+   taken up as the cap sinks. The skirt is darker than the plate, not just
+   the cap — at the plate's own shade it vanished and the sink with it. The
+   faint top hairline is what makes the cap read as a raised object rather
+   than a rounded rectangle. */
+.kbd__key {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: #2b3440;
+  box-shadow: 0 3px 0 #0e141b;
+  color: #e8edf2;
+  font: 500 16px/1 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+}
+.kbd__key::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 0;
+  height: 1px;
+  border-radius: 6px 6px 0 0;
+  background: rgba(255, 255, 255, 0.07);
+}
+.kbd__leg {
+  display: block;
+  position: relative;
+  top: 0.5px;
+}
+/* Words on the wide caps */
+.kbd__key--word {
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+/* Shifted symbol over its plain one, like a real ANSI cap. 12.5px is the
+   floor at which '~' and ',' still read in a 1080p frame. */
+.kbd__key--sym {
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0 5px;
+  font-size: 12.5px;
+}
+.kbd__key--sym .kbd__leg--top,
+.kbd__key--sym .kbd__leg--bot {
+  line-height: 13px;
+  height: 13px;
+  top: 0;
+}
+/* The four caps whose plain glyph is a dot or a tick: at 12.5px they were
+   2px specks in a 1080p frame. Drawn bigger; the two that hang from the
+   top of their line (` and ') are also let down, so they sit in the lower
+   half of the cap instead of clustering under the shifted symbol. */
+.kbd__key[data-cap='Comma'] .kbd__leg--bot,
+.kbd__key[data-cap='Period'] .kbd__leg--bot,
+.kbd__key[data-cap='Backquote'] .kbd__leg--bot,
+.kbd__key[data-cap='Quote'] .kbd__leg--bot {
+  font-size: 17px;
+}
+.kbd__key[data-cap='Backquote'] .kbd__leg--bot,
+.kbd__key[data-cap='Quote'] .kbd__leg--bot {
+  top: 3px;
+}
+.kbd__key--icon svg {
+  display: block;
+}

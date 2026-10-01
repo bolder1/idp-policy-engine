@@ -69,7 +69,7 @@ export function sessionReducer(s: TestingSessionState, a: SessionAction): Testin
       }
     case 'load':
       return { ...s, form: a.form, runId: s.runId + 1, lastEdited: null }
-    /* The board plays its own run (use-try-sign-in.ts), so no runId here; what
+    /* The board plays its own run (Check access, PolicyCheck.tsx), so no runId here; what
        changed is forgotten, as a load on the page forgets it. */
     case 'load-board':
       return { ...s, boardForms: { ...s.boardForms, [a.policyId]: a.form }, lastEdited: null }

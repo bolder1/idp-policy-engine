@@ -1,0 +1,22 @@
+// s7: after Fix in policy, the builder's Check access holds the attempt and the draft denies it
+const L = require('./lib.cjs')
+const O = L.OUT + 's7-'
+;(async () => {
+  const { browser, page, errors } = await L.open()
+  await L.toChecks(page)
+  await L.fillAndRun(page, 'Arun', 'AWS Console')
+  await page.locator('button.tj-hero__strip').first().click()
+  await page.waitForTimeout(1100)
+  await page.locator('.sit-attpanel').getByRole('button', { name: /Fix in policy/ }).first().click()
+  await page.waitForTimeout(2200)
+  await page.getByRole('button', { name: 'Check access', exact: true }).first().click()
+  await page.waitForTimeout(13000)
+  await page.screenshot({ path: O + '01-check.png' })
+  const sin = page.locator('[data-node="sign-in"]').first()
+  if (await sin.count()) console.log('signin:', (await sin.innerText()).replace(/\n/g, ' / ').slice(0, 200))
+  const out = page.locator('[data-node="outcome"]').first()
+  if (await out.count()) console.log('outcome:', (await out.innerText()).replace(/\n/g, ' / ').slice(0, 300))
+  console.log('builder strip', (await page.locator('button.tj-hero__strip').allTextContents()).join(' | '), 'attempts link', await page.locator('.tj-hero__attempts').count())
+  console.log(errors.length ? 'ERRORS ' + errors.join(' | ') : 'no errors')
+  await browser.close()
+})().catch((e) => { console.error(e); process.exit(1) })

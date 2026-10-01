@@ -69,7 +69,7 @@ export type BrandScreen =
   | { name: 'builder'; policyId: string; open?: 'gauntlet' | 'impact' }
   /* Builder v2 — the board, and the one a policy opens in. The same policy,
      store and evaluator under a different shape: a chain of cards on a stage,
-     an inspector beside it. See docs/builder-board.md.
+     an inspector beside it. See docs/archive/builder-board.md.
 
      `open` is not the field the trail has, though it has the same purpose: a
      caller that knows why you are coming can land you on the answer rather

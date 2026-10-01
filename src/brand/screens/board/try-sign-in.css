@@ -108,4 +108,3 @@
 .bb__gate__word { font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; }
 .bb__gate__word.is-unknown { color: var(--text-tertiary); }
 .bb__gate__body { padding: 0 var(--space-3) var(--space-3); border-top: var(--bw-thin) solid var(--border-subtle); }
-.bb__gate__body .twhich { padding-top: var(--space-3); }

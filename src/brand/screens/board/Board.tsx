@@ -83,7 +83,7 @@ export interface TestChain {
   audience: AudienceStanding | null
   /** Why this policy is not the one deciding, when it is not: the reason pill on the spine. */
   whichReason?: string
-  /** Which policy's list: every policy on the application (WhichPolicy compact). */
+  /** Which policy's list: every policy on the application. */
   which: ReactNode
   /** Every version in play, left to right, for the outcome node's "Live → Your edits". */
   columns: readonly ColumnView[]

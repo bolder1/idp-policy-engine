@@ -58,9 +58,6 @@
   font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary);
 }
 .bbi__colname { grid-column: 2; }
-/* On the page the header stays in view while the list scrolls under it; in the
-   slider the views' tabs hold the top edge, so it scrolls with the rows. */
-.tst.is-page .bbi__cols { position: sticky; top: 0; z-index: 1; background: var(--surface-page); }
 
 .bbi__groups { display: flex; flex-direction: column; gap: var(--space-5); }
 .bbi__group { display: flex; flex-direction: column; gap: var(--space-2); }

@@ -79,7 +79,7 @@ import './library.css'
    left, and a Run all after editing a policy elsewhere flashes what the edit
    moved.
 
-   Delete keeps the library's rules (SavedView.tsx): a hard delete through
+   Delete keeps the library's rules: a hard delete through
    ConfirmDelete, and a Protected sign-in asks for the typed DELETE first.
    -------------------------------------------------------------------------- */
 

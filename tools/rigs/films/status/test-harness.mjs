@@ -1,0 +1,18 @@
+import { start, toMp4, newestWebm } from './harness.mjs'
+const out = process.argv[2]
+const { browser, ctx, page, rec } = await start({ out })
+await page.goto('http://localhost:5173', { waitUntil: 'load' })
+await page.waitForSelector('main')
+await rec.card('<div class="kick">Test</div><h1>Harness check</h1><p>Chapter card, cursor, caption.</p>', 1500)
+await rec.uncard()
+await rec.tag('<i>#2</i>Rooted / jailbroken devices')
+await rec.cap('A first-time admin opens <b>Device profiles</b>')
+await rec.click(page.getByRole('button', { name: 'Device profiles', exact: true }))
+await rec.hold(1200)
+await rec.click(page.getByText('Corporate managed', { exact: true }))
+await rec.hold(1500)
+await page.screenshot({ path: out + '/frame.png' })
+await rec.cap(''); await rec.tag('')
+const v = page.video(); await ctx.close(); await browser.close()
+console.log('log', JSON.stringify(rec.log), 'errors', JSON.stringify(rec.errors))
+console.log(toMp4(await v.path(), out + '/test.mp4'))

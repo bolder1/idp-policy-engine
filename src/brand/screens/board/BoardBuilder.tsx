@@ -127,8 +127,8 @@ const OWNS_KEYS = 'input, textarea, select, [contenteditable]:not([contenteditab
    them acts on a rule nobody there is looking at. */
 const TEST_SURFACES = '.bb__insp, .sit-panel, .bx-apop'
 /* Check access's panels: T, pressed in one of them, still closes Check
-   access, as it did from the old test panel (`.tpanel`). */
-const CHECK_PANELS = '.sit-panel, .tpanel'
+   access, as it did from the old test panel. */
+const CHECK_PANELS = '.sit-panel'
 /* Each Check access view's mark in the palette, as on its bar button. */
 const VIEW_ICON: Record<CheckView, LucideIcon> = { past: PastIcon, people: Users, 'break-in': ShieldAlert }
 /* Describe it's thread (V4 §4.1): its own track on the left, not the

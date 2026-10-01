@@ -17,7 +17,6 @@ import { screensOf } from './screens-of'
 import { SignInFields } from './SignInFields'
 import { defaultBoardForm, factsOf, originPatch, typedAddressPatch, type SignInForm } from './sign-in-form'
 import { WhatTheySee } from './WhatTheySee'
-import { WhichPolicy } from './WhichPolicy'
 import testingCss from './testing.css?raw'
 
 /* The shared testing components, drawn once each without a browser: that they
@@ -101,21 +100,10 @@ describe('the sign-in rows', () => {
   })
 })
 
-describe('Which policy', () => {
-  it('lists the policies on HRMS, with the Global Default not struck and the others folded away', () => {
-    const out = html(<WhichPolicy resolution={resolve(form())} appId="hrms" onOpen={() => {}} />)
-    expect(text(out)).toContain('HRMS access from corporate offices Decides this sign-in')
-    expect(text(out)).toContain('Not on HRMS')
-    expect(out).not.toContain('is-struck')
-  })
-
-  it('draws a monitoring HRMS with its pill and would-badge, never struck', () => {
+describe('a monitor’s would-be decision', () => {
+  it('says what a monitoring HRMS would do', () => {
     const policies = t.policies.map((p) => (p.id === hrms.id ? { ...p, status: 'monitor' as const } : p))
     const res = resolve(form(), policies)
-    const out = html(<WhichPolicy compact resolution={res} appId="hrms" />)
-    expect(text(out)).toContain('Monitoring')
-    expect(text(out)).toContain('Would allow with 2FA')
-    expect(out).not.toContain('is-struck')
     expect(text(html(<WatchingBadge watched={res.watching[0]} />))).toBe('Would allow with 2FA')
   })
 

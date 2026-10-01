@@ -1,11 +1,10 @@
 /* -----------------------------------------------------------------------------
-   The shared testing UI: the sign-in rows, Which policy, the route marker,
-   What they see and Save sign-in. Used by the board's Try a sign-in and by
+   The shared testing UI: the sign-in rows, a monitor's badge, the route
+   marker, What they see and Save sign-in. Used by the board's Try a sign-in and by
    Policy testing; each page keeps its own layout in its own sheet.
 
    Colour, from the owner's rules. Blue (`--accent`, the rebrand's selection
-   blue) only for what is active: the deciding row's edge, the marker, the
-   chip that is on. Orange nowhere — Save is the kit's brand button where it
+   blue) only for what is active: the marker and the chip that is on. Orange nowhere — Save is the kit's brand button where it
    is the page's one primary, and brings its own. Decisions in their badge tones, and nothing else here in green,
    amber or red except the thin band strips under a ruler, which are the same
    decisions. "Can't tell" and every source word in `--text-tertiary`, which
@@ -115,40 +114,7 @@
 .tband__label.is-unknown { color: var(--text-tertiary); }
 .tband__label.is-clipped { visibility: hidden; }
 
-/* --- Which policy ------------------------------------------------------------ */
-
-.twhich { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
-.twhich__list { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
-.twhich__row {
-  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1);
-  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
-  border-left: 3px solid transparent;
-  border-radius: var(--radius-sm);
-}
-/* The one active state in the list: the policy that decides. */
-.twhich__row.is-decides { border-left-color: var(--accent); }
-.twhich__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-width: 0; }
-.twhich__name {
-  min-width: 0; padding: 0; border: 0; background: none; text-align: left;
-  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-secondary);
-}
-.twhich__row.is-decides .twhich__name { color: var(--text-primary); }
-.twhich__name.is-link { cursor: pointer; }
-.twhich__name.is-link:hover { text-decoration: underline; }
-.twhich__name.is-link:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
-.twhich__row.is-struck .twhich__name { text-decoration: line-through; }
-.twhich__reason { margin: 0; font-size: var(--fs-xs); color: var(--text-tertiary); }
-.twhich__row.is-decides .twhich__reason { color: var(--text-secondary); }
-.twhich__act { display: inline-flex; }
-.twhich__fold {
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  padding: var(--space-2) 0; border: 0; background: none; cursor: pointer;
-  font-size: var(--fs-sm); color: var(--text-secondary);
-}
-.twhich__fold:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
-.twhich__chev { color: var(--text-tertiary); rotate: -90deg; }
-.twhich__fold[aria-expanded='true'] .twhich__chev { rotate: 0deg; }
-.twhich.is-compact .twhich__row { padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4); }
+/* --- A monitor ------------------------------------------------------------- */
 
 /* A monitor's would-be decision, and who would still go first. */
 .bx-watching { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }
@@ -198,97 +164,3 @@
   background: var(--surface-sunken);
 }
 .tsave__actions { display: flex; justify-content: flex-end; gap: var(--space-3); }
-
-/* --- Policy testing's views (in the board's test panel) --------------------- */
-
-.tst { container-type: inline-size; display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
-
-/* --- The other views: a bar, a line, a table ------------------------------------ */
-
-.tst__view { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
-.tst__controls, .tst__bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); }
-.tst__person { flex: 0 1 320px; min-width: 0; }
-/* The bar's own action — Saved sign-ins' Break-in test — at its far end. */
-.tst__bar > .tst__barend { display: inline-flex; margin-left: auto; }
-
-/* A page pushed over a view: the Break-in test over Saved sign-ins. Back names
-   where it goes, above what it leaves, as the sliders' pushed pages do. */
-.tst__back {
-  align-self: flex-start;
-  display: inline-flex; align-items: center; gap: var(--space-3);
-  height: var(--ctl-height-sm); margin-left: calc(-1 * var(--space-4)); padding: 0 var(--space-5) 0 var(--space-4);
-  border: 0; border-radius: var(--radius-md); background: none; cursor: pointer;
-  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-tertiary);
-}
-.tst__back:hover { background: var(--state-hover-bg); color: var(--text-primary); }
-.tst__back:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
-.tst__scenario { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-3); margin: 0; font-size: var(--fs-sm); color: var(--text-tertiary); }
-
-/* The decision log's table shell (builder-test.css), without its own scroll
-   box: the panel scrolls, and a table as tall as its rows uses the room
-   there is. */
-.tst .tst__table { max-height: none; overflow: clip; }
-
-.tst__table .bdl__table { table-layout: fixed; }
-/* Tighter cells than the log's: a row here carries two pickers and two
-   badges, and the log's padding would cut all four. */
-.tst__table .bdl__table :is(th, td) { padding: 0 var(--space-3); }
-.tst__table .bdl__table :is(th, td):first-child { padding-left: var(--space-5); }
-.tst__row { cursor: pointer; }
-.tst__rowbtn {
-  display: inline-flex; align-items: center; gap: var(--space-4); max-width: 100%;
-  padding: 0; border: 0; background: none; font: inherit; color: var(--text-primary); text-align: left; cursor: pointer;
-}
-.tst__rowbtn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--focus-halo); border-radius: var(--radius-sm); }
-.tst__clip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tst__table td > .tst__clip { display: block; }
-.tst__name { display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%; color: var(--text-primary); }
-.tst__muted { color: var(--text-secondary); }
-.tst__cell { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); padding: var(--space-3) 0; }
-.tst__sub { font-size: var(--fs-xs); color: var(--text-tertiary); }
-.tst__cant-text { color: var(--text-tertiary); }
-/* A tip beside a name in a row that is itself a way into Try. */
-.tst__tipwrap { display: inline-flex; flex: none; }
-/* Which version the answers are for, in the board's panel: "Your edits". */
-.tst__version { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; }
-
-/* Column widths, as fractions of the table: the names take what is left,
-   and say the rest on hover. The panel narrows some below. */
-.tst__c-app { width: 25%; }
-.tst__c-policy { width: 32%; }
-.tst__c-rule { width: 23%; }
-.tst__c-decision { width: 20%; }
-.tst__c-signin { width: 18%; }
-.tst__c-level { width: 18.5%; }
-.tst__c-expected { width: 20.5%; }
-.tst__c-actual { width: 17%; }
-.tst__c-result { width: 8%; }
-.tst__c-by { width: 12%; }
-.tst__c-menu { width: 44px; }
-
-/* --- The board's test panel ------------------------------
-
-   The page's views at the panel's 448 px (final spec, B.5): the body of the
-   panel is the scroll, so the table's header sticks to it, and the columns
-   the draft moved into tooltips are not drawn. Fractions of the table — the
-   448, or about 430 once the body scrolls — in the draft's proportions for
-   Check a person (150 · 150 · 148). Saved sign-ins gives Expected more than
-   the draft's 130: its picker holds a decision, and "Allow on 1 factor" is
-   said whole or the column is wrong (measured: 105 px of words in a 151 px
-   picker). The name gives it up and says the rest on hover. */
-
-.tst.is-panel .tst__table .bdl__table { font-size: var(--fs-sm); }
-.tst.is-panel .tst__c-app { width: 33.5%; }
-.tst.is-panel .tst__c-policy { width: 33.5%; }
-.tst.is-panel .tst__c-decision { width: 33%; }
-.tst.is-panel .tst__c-signin { width: 34%; }
-.tst.is-panel .tst__c-expected { width: 38%; }
-.tst.is-panel .tst__c-result { width: 18%; }
-.tst.is-panel .tst__person { flex-basis: 240px; }
-/* A name is what a row is, and at this width an ellipsis took most of it
-   ("Kavya Menon in t…"): names wrap here, in the cell's own width. */
-.tst.is-panel .tst__table .tst__clip { white-space: normal; overflow-wrap: anywhere; }
-.tst.is-panel .tst__table .tst__name { padding: var(--space-3) 0; }
-
-/* The slider's views while their chunk arrives: blank, and said to be busy. */
-

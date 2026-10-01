@@ -1,0 +1,15 @@
+import { createRequire } from 'node:module'
+const require = createRequire(new URL('../../../../video/package.json', import.meta.url))
+const { chromium } = require('playwright')
+const ff = require('@ffmpeg-installer/ffmpeg')
+const out = process.argv[2]
+const browser = await chromium.launch({ channel: 'chrome', headless: true })
+const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, recordVideo: { dir: out, size: { width: 1920, height: 1080 } } })
+const page = await ctx.newPage()
+await page.goto('http://localhost:5173', { waitUntil: 'networkidle' })
+console.log('title:', await page.title())
+await page.waitForTimeout(2500)
+const v = page.video()
+await ctx.close(); await browser.close()
+console.log('video:', await v.path())
+console.log('ffmpeg:', ff.path)

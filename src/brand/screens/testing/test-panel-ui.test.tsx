@@ -4,185 +4,66 @@ import { describe, expect, it } from 'vitest'
 
 import type { Policy } from '../../data'
 import { BrandProvider, useBrand } from '../../store'
-import { boardVersion, type ColumnView } from '../board/try-sign-in'
-import { rowsRead } from './rows-read'
+import { boardVersion } from '../board/try-sign-in'
+import { useSimEnv } from '../sim-env'
+import { savedOnPolicy } from './board-views'
+import { DockPast } from './DockPast'
+import { DockPeople } from './DockPeople'
+import { DockSaved } from './DockSaved'
+import { savedRows } from './selectors'
 import { defaultBoardForm } from './sign-in-form'
-import { boardScope } from './sign-in-sentence'
-import { TestPanel } from './TestPanel'
-import type { DockTab } from './test-dock'
+import { policyApps, type DockTab } from './test-dock'
 import panelCss from './test-panel.css?raw'
-import panelSrc from './TestPanel.tsx?raw'
 import savedSrc from './DockSaved.tsx?raw'
 import peopleSrc from './DockPeople.tsx?raw'
 import pastSrc from './DockPast.tsx?raw'
 import pureSrc from './test-dock.ts?raw'
 
-/* The test panel drawn without a browser, on the showcase tenant, through the
-   props the board feeds it (V4 §2.4-bis): its header, the sentence and the
-   verdict under it, and each tab at the panel's width. test-dock.test.ts
-   pins the tabs' rules; this is what they print. The browser pass checks the
-   rest — the grip, the swap with the rule editor, Esc, a row lighting its
-   card. */
+/* The dock's views drawn without a browser, on the showcase tenant, through
+   the props their host feeds them: Saved sign-ins, People and Past sign-ins
+   at a right-hand panel's width. They were the tabs of the board's test
+   panel; Check access opens People and Past sign-ins as panels of its own
+   (board/PolicyCheck.tsx), and the panel that held them as tabs is gone.
+   test-dock.test.ts pins their rules; this is what they print. */
 
 const text = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&#39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim()
 const noop = () => {}
 const TODAY = '2026-09-28'
 
-const col = (id: ColumnView['id'], label: string, status: ColumnView['status'], decision: ColumnView['decision'] = null): ColumnView => ({
-  id,
-  label,
-  tip: label === 'Live' ? 'Decides sign-ins now' : 'The rules on this board, as if saved',
-  status,
-  policyName: null,
-  line: '',
-  decision,
-  possible: [],
-})
-const LIVE = [col('live', 'Live', 'decided', '1fa')]
-
 interface Board {
   id?: string
-  tab?: DockTab
+  tab?: Exclude<DockTab, 'break-in'>
   edit?: (p: Policy) => Policy
-  breakIn?: boolean
-  views?: boolean
-  columns?: ColumnView[]
-  why?: string
 }
 
-function Panel({ board }: { board: Board }) {
+/* What the test panel handed each view: the policy's own applications, the
+   board's version, and — for Saved sign-ins — this policy's saved sign-ins
+   only, judged by that version. */
+function View({ board }: { board: Board }) {
   const store = useBrand()
+  const env = useSimEnv()
   const saved = store.policyById(board.id ?? 'sc-dev-tools')!
   const draft = board.edit ? board.edit(saved) : saved
   const form = defaultBoardForm(saved, store.users, store.apps, TODAY)
-  return (
-    <TestPanel
-      draft={draft}
-      version={boardVersion(saved, draft)}
-      form={form}
-      onPatch={noop}
-      onLoad={noop}
-      rows={rowsRead(store.policies, draft, form.appId, { zones: store.zones, fingerprints: store.fingerprints })}
-      issues={[]}
-      boundaries={{}}
-      scope={boardScope(draft)}
-      idPrefix="bb-try"
-      columns={board.columns ?? LIVE}
-      why={board.why ?? 'Rule 1 · In the office on a compliant device'}
-      shown="1fa"
-      onReplay={noop}
-      onClose={noop}
-      saveOpen={false}
-      onSaveOpenChange={noop}
-      views={board.views ?? true}
-      tab={board.tab ?? 'saved'}
-      onTab={noop}
-      breakIn={board.breakIn ? <p className="bbi-stub">The Break-in test</p> : null}
-      onOpenLibrary={noop}
-      headingRef={{ current: null }}
-    />
-  )
+  const version = boardVersion(saved, draft)
+  const mine = policyApps(draft, store.apps)
+  const tab = board.tab ?? 'saved'
+  if (tab === 'people') return <DockPeople draft={draft} apps={mine} form={form} version={version} onPatch={noop} />
+  if (tab === 'past') return <DockPast draft={draft} apps={mine} version={version} onLoad={noop} />
+  const onApps = draft.isSystem ? store.savedSignIns : store.savedSignIns.filter((s) => s.facts.appId !== undefined && draft.appIds.includes(s.facts.appId))
+  const rows = savedOnPolicy(savedRows(onApps, store.policies, env, version?.substitute), draft, 'policy')
+  return <DockSaved draft={draft} rows={rows} apps={mine} onLoad={noop} onSaveThis={noop} onManage={noop} />
 }
 
 const draw = (board: Board = {}) =>
   renderToStaticMarkup(
     <BrandProvider>
-      <Panel board={board} />
+      <View board={board} />
     </BrandProvider>,
   )
 
-const lineTabs = (out: string) => [...out.matchAll(/role="tab"[^>]*>([\s\S]*?)<\/button>/g)].map((m) => text(m[1]))
-const selected = (out: string) => text(/<button[^>]*role="tab"[^>]*aria-selected="true"[^>]*>([\s\S]*?)<\/button>/.exec(out)?.[1] ?? '')
 const rowNames = (out: string) => [...out.matchAll(/class="tpanel-rowbtn tpanel-name"[^>]*>([\s\S]*?)<\/button>/g)].map((m) => text(m[1]))
 const count = (s: string, needle: string) => s.split(needle).length - 1
-const labels = (out: string) => [...out.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1])
-
-describe('the panel', () => {
-  const out = draw()
-
-  it('is one aside in the inspector’s chrome, named by its heading', () => {
-    expect(out).toMatch(/^<aside class="bb__insp tpanel" aria-labelledby="([^"]+)-title"/)
-    expect(out).toMatch(/<h2 id="[^"]+-title" tabindex="-1" class="tpanel__title">Try a sign-in<\/h2>/)
-    expect(count(out, '<aside')).toBe(1)
-  })
-
-  it('says Save sign-in opens a panel, not that it is pressed', () => {
-    expect(out).toMatch(/aria-label="Save sign-in" aria-haspopup="dialog" aria-expanded="false"/)
-    expect(out).not.toMatch(/aria-label="Save sign-in"[^>]*aria-pressed/)
-  })
-
-  it('links to Sign-in tests only where the edition has them', () => {
-    expect(draw({ views: false })).not.toContain('aria-label="Open Sign-in tests"')
-  })
-
-  it('has the run’s buttons in the header, in order, with the hairline before Close', () => {
-    const header = out.slice(0, out.indexOf('tpanel__signin'))
-    const names = ['Replay', 'Save sign-in', 'Open Sign-in tests', 'Close Try a sign-in']
-    expect(labels(header).filter((l) => names.includes(l))).toEqual(names)
-    expect(header).toContain('class="bb__inspbar is-test"')
-    expect(header.indexOf('tpanel__rule')).toBeGreaterThan(header.indexOf('aria-label="Open Sign-in tests"'))
-    expect(header.indexOf('tpanel__rule')).toBeLessThan(header.indexOf('aria-label="Close Try a sign-in"'))
-    /* Nothing orange: Save policy is the board's one brand button. */
-    expect(out).not.toContain('bx-btn--brand')
-  })
-
-  it('holds the sentence, chromeless, with no verdict or buttons of its own', () => {
-    expect(out).toContain('role="group" aria-label="Sign-in" class="tsent is-panel"')
-    for (const id of ['bb-try-person', 'bb-try-app', 'bb-try-address', 'bb-try-device']) expect(out).toContain(`id="${id}"`)
-    expect(out).not.toContain('tsent__end')
-    expect(out).not.toContain('tsent__why')
-  })
-
-  it('says the verdict under the sentence: the version’s name over a larger badge, then why', () => {
-    const block = out.slice(out.indexOf('tpanel__verdict'), out.indexOf('role="tablist"'))
-    expect(block).toContain('class="tsent-verdict is-panel"')
-    expect(block).toContain('<span class="tsent-verdict__cap">Live</span>')
-    expect(block).toMatch(/bx-badge--positive bx-decision-badge tsent-verdict__big/)
-    expect(block).toContain('<p class="tpanel__why" title="Rule 1 · In the office on a compliant device">')
-    expect(out.indexOf('tpanel__verdict')).toBeGreaterThan(out.indexOf('tsent is-panel'))
-  })
-
-  it('draws two versions as two mini columns with a quiet arrow, named as one', () => {
-    const two = draw({ columns: [col('live', 'Today', 'decided', '1fa'), col('edits', 'Your edits', 'decided', 'deny')] })
-    expect(two).toContain('class="tsent-verdict is-panel is-two" role="img" aria-label="Today Allow on 1 factor, Your edits Deny"')
-    expect(two).toContain('<span class="tsent-verdict__cap">Today</span>')
-    expect(two).toContain('<span class="tsent-verdict__cap">Your edits</span>')
-    expect(two.match(/tsent-verdict__big/g)).toHaveLength(2)
-    expect(two).toContain('tsent-verdict__arrow')
-  })
-
-  it('says Depends and Can’t tell as grey words, never a badge', () => {
-    const depends = draw({ columns: [col('edits', 'Your edits', 'depends')] })
-    expect(depends).toContain('<span class="tsent-verdict__word">Depends</span>')
-    expect(depends.slice(depends.indexOf('tpanel__verdict'), depends.indexOf('role="tablist"'))).not.toContain('bx-decision-badge')
-    const cant = draw({ columns: [col('edits', 'Your edits', 'incomplete')], why: 'Choose a person' })
-    expect(cant).toContain('bx-canttell')
-  })
-
-  it('has line tabs without counts, over one tab panel', () => {
-    expect(out).toContain('bx-tabs--line tpanel__tabs')
-    expect(lineTabs(out)).toEqual(['Saved sign-ins', 'People', 'Past sign-ins'])
-    for (const label of lineTabs(out)) expect(label).not.toMatch(/\d/)
-    expect(selected(out)).toBe('Saved sign-ins')
-    expect(count(out, 'role="tabpanel"')).toBe(1)
-    expect(out).toContain('role="tabpanel" aria-label="Saved sign-ins" class="tpanel__body"')
-  })
-
-  it('offers the Break-in test only where it runs, and falls back to Saved sign-ins', () => {
-    const bi = draw({ tab: 'break-in', breakIn: true })
-    expect(lineTabs(bi)).toEqual(['Saved sign-ins', 'People', 'Past sign-ins', 'Break-in test'])
-    expect(selected(bi)).toBe('Break-in test')
-    expect(text(bi)).toContain('The Break-in test')
-    expect(selected(draw({ tab: 'break-in' }))).toBe('Saved sign-ins')
-  })
-
-  it('is the sign-in alone without Policy testing', () => {
-    const lite = draw({ views: false })
-    expect(lite).not.toContain('role="tablist"')
-    expect(lite).not.toContain('role="tabpanel"')
-    expect(lite).toContain('tsent is-panel')
-  })
-})
 
 describe('Saved sign-ins, at the panel’s width', () => {
   const out = draw()
@@ -312,7 +193,7 @@ describe('Past sign-ins, at the panel’s width', () => {
 describe('the panel’s stylesheet and words', () => {
   const rules = panelCss.replace(/\/\*[\s\S]*?\*\//g, '')
 
-  it('gives nothing a transform or a transition: motion owns the rows, the tab body and the segments', () => {
+  it('gives nothing a transform or a transition: motion owns the rows and the segments', () => {
     expect(rules).not.toMatch(/\b(transform|transition|translate|scale)\s*:/)
   })
 
@@ -325,12 +206,12 @@ describe('the panel’s stylesheet and words', () => {
     const animated = [...rules.matchAll(/([^{}]+)\{[^}]*\banimation\s*:\s*(?!none\b)\w/g)].map((m) => m[1].trim())
     expect(animated).toEqual(['.bb__insp.is-swap', '.tpanel-row__flash'])
     const reduced = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\}\s*$/.exec(rules)?.[1] ?? ''
-    expect(reduced).toMatch(/\.bb__insp\.is-swap,\s*\.bb__insp\.tpanel \{ animation: none; \}/)
+    expect(reduced).toMatch(/\.bb__insp\.is-swap \{ animation: none; \}/)
     expect(reduced).toMatch(/\.tpanel-row__flash\s*\{[^}]*animation:\s*none/)
   })
 
   it('says none of the words the testing surfaces may not, and draws no Sparkles or Wand', () => {
-    for (const src of [panelSrc, savedSrc, peopleSrc, pastSrc, pureSrc]) {
+    for (const src of [savedSrc, peopleSrc, pastSrc, pureSrc]) {
       const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
       /* What a person reads: string literals, template text and JSX text. */
       const copy = [...code.matchAll(/'([^'\\\n]*)'|"([^"\\\n]*)"|`([^`]*)`|>([^<>{}]+)</g)].map((m) => m[1] ?? m[2] ?? m[3] ?? m[4]).join('\n')

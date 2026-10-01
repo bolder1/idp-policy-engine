@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "oxlint",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "preview": "vite preview",
     "logos": "node scripts/fetch-logos.mjs",
     "demo:record": "node scripts/record-demo.mjs"

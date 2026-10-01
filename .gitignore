@@ -23,3 +23,50 @@ dist-ssr
 *.sln
 *.sw?
 .demo-recording/
+
+# On disk only, never committed: the final MP4s and anything too big for git (local-archive/README.md)
+local-archive/
+# The walkthrough pages' videos (docs/artifacts/README.md says where they come from)
+docs/artifacts/*/media/
+
+# The film pipeline's installs and renders (video/.gitignore says the same inside video/)
+video/node_modules
+video/.work
+video/out
+
+# Playwright output
+test-results/
+playwright-report/
+
+# What the rigs write next to themselves: screenshots, takes, Chrome profiles, renders
+tools/rigs/**/out/
+tools/rigs/**/profile*/
+tools/rigs/**/shots/
+tools/rigs/**/videos/
+tools/rigs/**/rec-*/
+tools/rigs/**/fr-*/
+tools/rigs/**/work/
+tools/rigs/**/frames/
+tools/rigs/**/frames-*/
+tools/rigs/**/take/
+tools/rigs/**/take-*/
+tools/rigs/**/voice/
+tools/rigs/**/fragments/
+tools/rigs/**/review/
+tools/rigs/**/*.png
+tools/rigs/**/*.jpg
+tools/rigs/**/*.mp4
+tools/rigs/**/*.mkv
+tools/rigs/**/*.webm
+tools/rigs/**/*.wav
+tools/rigs/**/*.pid
+
+# Local only, never in git (owner, 1 Oct 2026): both GitHub remotes are public,
+# and these hold tenant identifiers and internal material — the memory notes,
+# the research (the manager's scenario sheet, audits, the team deck), the
+# published artifact pages, and the walkthrough rigs with their org ids. They
+# live on this disk in the main checkout; docs/HANDOFF.md says what is where.
+docs/memory/
+docs/research/
+docs/artifacts/
+tools/rigs/walkthroughs/

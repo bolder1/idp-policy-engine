@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Policy Engine — compositor</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&family=Kalam:wght@400;700&display=block"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="compose.css" />
+    <link rel="stylesheet" href="explain.css" />
+    <link rel="stylesheet" href="slides.css" />
+    <link rel="stylesheet" href="slides-v2.css" />
+    <link rel="stylesheet" href="slides-v4.css" />
+    <link rel="stylesheet" href="slides-bento.css" />
+    <link rel="stylesheet" href="slides-v7.css" />
+    <script>
+      // the theme is fixed before first paint, so nothing renders light and re-paints dark
+      const th = new URLSearchParams(location.search).get('theme')
+      if (th) document.documentElement.dataset.theme = th
+    </script>
+  </head>
+  <body>
+    <div id="film">
+      <div id="bg"></div>
+      <canvas id="stage" width="1920" height="1080"></canvas>
+      <div id="ov"></div>
+      <div id="slides"></div>
+      <!-- the mascot and its cloud were cut from the film; the mounts stay for the engine -->
+      <div id="mascot" hidden></div>
+      <div id="cloud" class="cloud" hidden>
+        <div class="cloud__body"><span class="cloud__t"></span></div>
+        <i class="cloud__b1"></i><i class="cloud__b2"></i>
+      </div>
+      <div id="kbd" hidden></div>
+      <div id="hud">
+        <div id="hud-rail" class="hud__rail"><div class="hud__fill"></div><div class="hud__ticks"></div></div>
+      </div>
+      <div id="cap" class="cap"><span class="cap__t"></span></div>
+    </div>
+    <script src="anno.js"></script>
+    <script src="explain.js"></script>
+    <script src="engine.js"></script>
+    <script src="slides.js"></script>
+    <script src="slides-v2.js"></script>
+    <script src="slides-v4.js"></script>
+    <script src="slides-bento.js"></script>
+    <script src="slides-v7.js"></script>
+  </body>
+</html>

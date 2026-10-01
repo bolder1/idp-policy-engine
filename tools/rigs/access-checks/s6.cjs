@@ -1,0 +1,30 @@
+// s6: after Fix in policy (pristine rule), what does saving / the policy-as-text say?
+const L = require('./lib.cjs')
+const O = L.OUT + 's6-'
+;(async () => {
+  const { browser, page, errors } = await L.open()
+  await L.toChecks(page)
+  await L.fillAndRun(page, 'Arun', 'AWS Console')
+  await page.locator('button.tj-hero__strip').first().click()
+  await page.waitForTimeout(1100)
+  await page.locator('.sit-attpanel').getByRole('button', { name: /Fix in policy/ }).first().click()
+  await page.waitForTimeout(2200)
+  // close the inspector so the card stands alone
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(500)
+  const card = page.locator('.bb__card').first()
+  await card.screenshot({ path: O + '01-card.png' })
+  console.log('card text:', (await card.innerText()).replace(/\n/g, ' / '))
+  // look for any text mentioning not chosen anywhere
+  console.log('not-chosen hits', await page.getByText(/not chosen yet/i).count())
+  await page.getByRole('button', { name: 'Save policy', exact: true }).click()
+  await page.waitForTimeout(1200)
+  await page.screenshot({ path: O + '02-save.png' })
+  const dlg = page.locator('[role="dialog"]').first()
+  if (await dlg.count()) console.log('dialog:', (await dlg.innerText()).replace(/\n/g, ' / ').slice(0, 900))
+  console.log('not-chosen hits after save click', await page.getByText(/not chosen yet/i).count())
+  const toasts = await page.locator('.bshell__toasttext').allTextContents()
+  console.log('toasts', JSON.stringify(toasts))
+  console.log(errors.length ? 'ERRORS ' + errors.join(' | ') : 'no errors')
+  await browser.close()
+})().catch((e) => { console.error(e); process.exit(1) })

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Policy Engine — compositor</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=block"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="compose.css" />
+    <link rel="stylesheet" href="slides.css" />
+  </head>
+  <body>
+    <div id="film">
+      <div id="bg"></div>
+      <canvas id="stage" width="1920" height="1080"></canvas>
+      <div id="ov"></div>
+      <div id="slides"></div>
+      <div id="hud">
+        <div id="hud-chip" class="hud__chip">
+          <img class="hud__logo" src="/app/xecurify-logo.png" alt="" />
+          <span class="hud__sep"></span>
+          <span class="hud__n"></span>
+          <span class="hud__t"></span>
+        </div>
+        <div id="hud-rail" class="hud__rail"><div class="hud__fill"></div><div class="hud__ticks"></div></div>
+      </div>
+      <div id="cap" class="cap"><span class="cap__t"></span></div>
+    </div>
+    <script src="engine.js"></script>
+    <script src="slides.js"></script>
+  </body>
+</html>

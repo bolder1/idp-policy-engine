@@ -1,0 +1,367 @@
+/* The compositor's chrome. Colours are the console's own tokens
+   (src/brand/console-theme.css): ink and grey carry structure, the feedback
+   ramps appear only where the colour IS the meaning, and the brand orange is
+   kept to the one accent a frame can afford. */
+:root {
+  --ink: #212529;
+  --ink-2: #495057;
+  --ink-3: #646e79;
+  --line: #e4e8ec;
+  --line-2: #d3dae1;
+  --sunken: #f8f9fa;
+  --inset: #eef1f4;
+  --shell: #1e2c38;
+  --brand: #eb5424;
+  --pos-bg: #e8f7ee;
+  --pos-bd: #b6e3c6;
+  --pos-fg: #14663a;
+  --pos-dot: #128f43;
+  --neg-bg: #fdf0f2;
+  --neg-bd: #f5c6ce;
+  --neg-fg: #a5142b;
+  --neg-dot: #d01243;
+  --note-bg: #fdf6e0;
+  --note-bd: #f0dfa4;
+  --note-fg: #7d5800;
+  --note-dot: #b07a00;
+  --info-bg: #e9f2fd;
+  --info-bd: #b9d6f5;
+  --info-fg: #155e91;
+  --info-dot: #1189d4;
+  --slate: #4a5560;
+  --font: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: #f3f5f8;
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+#film {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+}
+
+/* --- ground ---------------------------------------------------------------- */
+#bg {
+  position: absolute;
+  inset: 0;
+  background-color: #f2f4f7;
+  background-image: radial-gradient(circle at 1px 1px, rgba(33, 37, 41, 0.085) 1.2px, transparent 1.6px),
+    radial-gradient(1200px 800px at 12% 8%, rgba(74, 85, 96, 0.10), transparent 60%),
+    radial-gradient(900px 700px at 92% 96%, rgba(235, 84, 36, 0.06), transparent 62%);
+  background-size: 26px 26px, 100% 100%, 100% 100%;
+}
+#stage {
+  position: absolute;
+  inset: 0;
+}
+#ov {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#slides {
+  position: absolute;
+  inset: 0;
+}
+
+/* --- cursor & click cues ----------------------------------------------------- */
+.ov-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.28));
+  z-index: 30;
+}
+.ov-cursor svg {
+  display: block;
+}
+.ov-hint {
+  position: absolute;
+  border-radius: 10px;
+  border: 2px solid rgba(235, 84, 36, 0.95);
+  box-shadow: 0 0 0 4px rgba(235, 84, 36, 0.16), 0 0 24px rgba(235, 84, 36, 0.25);
+  z-index: 12;
+}
+.ov-hint-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2.5px solid rgba(235, 84, 36, 0.9);
+  z-index: 13;
+}
+.ov-ripple {
+  position: absolute;
+  border-radius: 50%;
+  border: 3px solid rgba(235, 84, 36, 0.9);
+  background: rgba(235, 84, 36, 0.12);
+  z-index: 14;
+}
+/* --- spotlight -------------------------------------------------------------- */
+#ov-spot {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+}
+.ov-tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px 12px 16px;
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--ink);
+  font: 600 24px/1.1 var(--font);
+  letter-spacing: -0.015em;
+  box-shadow: 0 14px 40px rgba(10, 14, 20, 0.28);
+  white-space: nowrap;
+  z-index: 9;
+}
+.ov-tag__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 0 5px rgba(235, 84, 36, 0.16);
+}
+
+/* --- callouts --------------------------------------------------------------- */
+.ov-call {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 16;
+}
+.ov-call__t {
+  position: absolute;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--ink);
+  font: 600 21px/1.15 var(--font);
+  box-shadow: 0 10px 28px rgba(10, 14, 20, 0.22);
+  white-space: nowrap;
+  border: 1px solid var(--line);
+}
+.ov-call__line {
+  position: absolute;
+  left: -60px;
+  top: -60px;
+  overflow: visible;
+}
+.ov-call__line path {
+  stroke: #15191e;
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: round;
+}
+.ov-call[data-side='top'] .ov-call__t {
+  transform: translate(-50%, -100%);
+}
+.ov-call[data-side='bottom'] .ov-call__t {
+  transform: translate(-50%, 0);
+}
+.ov-call[data-side='left'] .ov-call__t {
+  transform: translate(-100%, -50%);
+}
+.ov-call[data-side='right'] .ov-call__t {
+  transform: translate(0, -50%);
+}
+
+/* --- keycaps ---------------------------------------------------------------- */
+.ov-keys {
+  position: absolute;
+  left: 50%;
+  bottom: 170px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 22;
+}
+.ov-keys__caps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: rgba(21, 25, 30, 0.9);
+  box-shadow: 0 16px 40px rgba(10, 14, 20, 0.3);
+}
+.ov-keys kbd {
+  min-width: 56px;
+  height: 56px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: linear-gradient(#ffffff, #eef1f4);
+  color: var(--ink);
+  font: 600 26px/1 var(--font);
+  box-shadow: 0 4px 0 #adb5bd, 0 6px 14px rgba(0, 0, 0, 0.25);
+  transform: translateY(0);
+}
+.ov-keys kbd.is-down {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #adb5bd, 0 3px 8px rgba(0, 0, 0, 0.25);
+}
+.ov-keys__plus {
+  color: #adb5bd;
+  font: 500 24px/1 var(--font);
+}
+.ov-keys__label {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+  font: 600 20px/1 var(--font);
+  box-shadow: 0 6px 18px rgba(10, 14, 20, 0.18);
+}
+
+/* --- step banner ------------------------------------------------------------ */
+.ov-lower {
+  position: absolute;
+  left: 64px;
+  top: 110px;
+  max-width: 560px;
+  padding: 22px 26px 22px 30px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 20px 60px rgba(10, 14, 20, 0.22);
+  border: 1px solid var(--line);
+  z-index: 18;
+}
+.ov-lower::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 22px;
+  bottom: 22px;
+  width: 5px;
+  border-radius: 0 4px 4px 0;
+  background: var(--brand);
+}
+.ov-lower__k {
+  font: 600 18px/1 var(--font);
+  color: var(--ink-3);
+  letter-spacing: 0.01em;
+}
+.ov-lower__t {
+  margin-top: 10px;
+  font: 700 40px/1.05 var(--font);
+  letter-spacing: -0.025em;
+}
+.ov-lower__s {
+  margin-top: 10px;
+  font: 400 22px/1.35 var(--font);
+  color: var(--ink-2);
+}
+
+/* --- HUD ---------------------------------------------------------------------- */
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+}
+.hud__chip {
+  position: absolute;
+  left: 34px;
+  top: 34px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px 9px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(10, 14, 20, 0.12);
+  font: 500 19px/1 var(--font);
+  color: var(--ink-2);
+  opacity: 0;
+}
+.hud__logo {
+  height: 22px;
+  width: auto;
+}
+.hud__sep {
+  width: 1px;
+  height: 20px;
+  background: var(--line-2);
+}
+.hud__n {
+  font: 600 17px/1 var(--mono);
+  color: var(--ink-3);
+}
+.hud__t {
+  color: var(--ink);
+  font-weight: 600;
+}
+.hud__rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: rgba(33, 37, 41, 0.08);
+}
+.hud__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #4a5560, #212529);
+}
+.hud__ticks i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #ffffff;
+}
+
+/* --- subtitles ---------------------------------------------------------------- */
+.cap {
+  position: absolute;
+  left: 50%;
+  bottom: 52px;
+  max-width: 1480px;
+  padding: 16px 30px 17px;
+  border-radius: 18px;
+  background: rgba(17, 21, 26, 0.86);
+  box-shadow: 0 16px 50px rgba(10, 14, 20, 0.3);
+  color: #ffffff;
+  text-align: center;
+  font: 500 33px/1.32 var(--font);
+  letter-spacing: -0.01em;
+  opacity: 0;
+  z-index: 50;
+  text-wrap: balance;
+}
+/* On a slide the artwork owns the right half, so the subtitle sits under the
+   title column instead of across the drawing. */
+.cap.cap--left {
+  left: 150px;
+  bottom: 64px;
+  max-width: 740px;
+  text-align: left;
+  font-size: 30px;
+  padding: 16px 26px 17px;
+}

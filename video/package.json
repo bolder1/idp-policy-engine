@@ -1,0 +1,10 @@
+{
+  "name": "idp-policy-demo-video",
+  "private": true,
+  "type": "module",
+  "description": "Renders the Policy Engine product demo video by driving the real app frame by frame",
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "playwright": "^1.63.0"
+  }
+}

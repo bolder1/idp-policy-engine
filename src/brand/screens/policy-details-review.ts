@@ -13,11 +13,16 @@ export interface DetailsDraft {
   appIds: string[]
 }
 
-/* A Review changes row. The name leads the review on its own (no group); each
-   application added or removed sits under Applications, named by `item`, with
-   "Assigned" as its value — the app's name again would read "GitHub  GitHub".
-   The status and rules rows are consequences of the edit (`effect`), shown
-   last. */
+/* A Review changes row. The name leads the review on its own (no group, so
+   under Basic details — GENERAL_GROUP); each application added or removed sits
+   under Applications, named by `item`, with "Assigned" as its value — the
+   app's name again would read "GitHub  GitHub". The status and rules rows are
+   consequences of the edit (`effect`), shown last.
+
+   The name stays in this review. On the library pages a rename saves itself
+   from the name field's ✓ and leaves the review (1 Oct 2026, rename-now.ts),
+   but this page has no ✓: the name is a field of the form, and the footer's
+   Save is the only thing that stores it, so the review is where it is read. */
 export type DetailsRow = ReviewLine
 
 export interface DetailsChanges {

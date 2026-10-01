@@ -63,8 +63,19 @@ export interface ReviewGroup<R> {
   effect: boolean
 }
 
-/** The heading for rows that name no section. */
-export const GENERAL_GROUP = 'General'
+/* The heading for rows that name no section — in every review, a name.
+
+   It was "General". The owner, 1 Oct 2026: "Call it Basic details", which is
+   what the name is on the pages it belongs to. On a device profile the setup
+   rows already file under a section of exactly that title (fingerprint.ts), so
+   a name row joins that same section rather than opening a second one of the
+   same name: `groupReview` files by title.
+
+   Fewer reviews hold one now. A rename saves itself from the name field's ✓
+   on a stored item (rename-now.ts), so the name shows here only for an item
+   not stored yet — a new zone or device profile — and on Policy details,
+   whose name is a field of the form the footer saves. */
+export const GENERAL_GROUP = 'Basic details'
 /** The heading for consequences that name no section of their own. */
 export const EFFECT_GROUP = 'Other settings'
 
@@ -148,8 +159,9 @@ const tally = (rows: { count?: number }[]) => rows.reduce((n, r) => n + (r.count
    zone's single "10.0.0.2, 10.0.0.3 and 12 more" row counts fifteen changes
    and takes one line.
 
-   The one left open is the biggest, not the first. The first is General — the
-   Name row — on every rename and every create, so "open the first" opened a
+   The one left open is the biggest, not the first. The first is Basic details
+   (GENERAL_GROUP) — the Name row — on every create, and was on every rename
+   until a rename saved itself (1 Oct 2026), so "open the first" opened a
    one-row section and shut everything worth reading.
 
    A section holding something that fails is always open: what stops the save

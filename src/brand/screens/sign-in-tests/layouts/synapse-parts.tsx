@@ -3,16 +3,13 @@ import type { CSSProperties, ReactNode } from 'react'
 import { Check, CircleHelp, X, type LucideIcon } from 'lucide-react'
 
 import type { LineStatus } from '../../testing/evidence'
-import type { CheckRow } from '../engine-run'
-import type { Via } from '../conflicts'
 import type { Box } from './synapse-geometry'
 import type { Tone } from './synapse-model'
+import { EASE } from './synapse-parts-utils'
 
 /* The network's small pieces (SynapseLayout.tsx): a mark, the spinner, a
    neuron's shell, a synapse and the light that travels it, a firing ripple.
    Nothing motion moves carries a CSS transform or transition of its own. */
-
-export const EASE = [0.2, 0, 0, 1] as const
 
 const MARK: Record<LineStatus, { Icon: LucideIcon; label: string }> = {
   pass: { Icon: Check, label: 'Passed' },
@@ -40,17 +37,6 @@ export function Busy({ label = 'Working' }: { label?: string }) {
     </span>
   )
 }
-
-/** A check's fact as the sign-in showed it; a Who that let the person in says how. */
-export function factOf(c: CheckRow, via?: Via): string {
-  if (c.missing || c.status === 'unknown') return c.value && c.value !== 'Not stated' && !c.missing ? c.value : 'Not stated'
-  if (c.category === 'who' && c.status === 'pass' && via?.matches && via.say) return `${c.value} · ${via.say}`
-  return c.value
-}
-const lowerFirst = (t: string): string => (/^(Not|Below|Above|Between|Before|After|Any) /.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t)
-export const needOf = (c: CheckRow): string => (!c.requirement ? '' : /^Not in /.test(c.requirement) ? `needs outside ${c.requirement.slice(7)}` : `needs ${lowerFirst(c.requirement)}`)
-
-export const firstName = (name: string): string => name.trim().split(/\s+/)[0] || name
 
 // --- A neuron ----------------------------------------------------------------------------------
 

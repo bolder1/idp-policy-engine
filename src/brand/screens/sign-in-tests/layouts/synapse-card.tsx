@@ -10,19 +10,19 @@ import type { EngineRun } from '../engine-run'
 import { expectMark, heroFinding } from '../journey'
 import type { Box } from './synapse-geometry'
 import { decisionTone, type Tone } from './synapse-model'
-import { EASE } from './synapse-parts'
+import { EASE } from './synapse-parts-utils'
 
 /* The outcome card (SynapseLayout.tsx): the decision neuron, bloomed — the
    verdict, what they are asked for, Decided by (opens the rule), the one
    finding, and What they see on demand. It opens as a circle growing out of
    the neuron that fired (a clip-path: no transform). */
 
-export function factorsOf(screens: readonly SignInScreens[], d: AccessDecision | null): string[] {
+function factorsOf(screens: readonly SignInScreens[], d: AccessDecision | null): string[] {
   if (!d) return []
   const sc = screens.find((x) => x.decision === d)
   return (sc?.steps ?? []).filter((st) => st.kind !== 'deny').map(stepLabel)
 }
-export function denyMessageOf(screens: readonly SignInScreens[]): string {
+function denyMessageOf(screens: readonly SignInScreens[]): string {
   const sc = screens.find((x) => x.decision === 'deny')
   const st = sc?.steps.find((x) => x.kind === 'deny')
   return st && st.kind === 'deny' ? st.message : ''

@@ -5,11 +5,12 @@ import { Face } from '../../../faces'
 import { AppLogo } from '../../../logos/AppLogo'
 import { useBrand } from '../../../store'
 import type { RowsRead } from '../../testing/rows-read'
-import { sentenceTokens, tokenValue, type SentenceContext, type TokenId } from '../../testing/sign-in-sentence'
+import { tokenValue, type SentenceContext, type TokenId } from '../../testing/sign-in-sentence'
 import type { SignInForm } from '../../testing/sign-in-form'
 import { ValueMark } from '../SignInCard'
 import { groupNamesOf } from '../sign-in-card'
 import { G } from './stream-geometry'
+import { chipGroups, factTokens, sourceCardH } from './stream-source-utils'
 import { DEVICE_CHIPS, FROM_CHIPS, RISK_CHIPS, ownOf, type Flips } from './stream-whatif'
 
 /* -----------------------------------------------------------------------------
@@ -21,24 +22,6 @@ import { DEVICE_CHIPS, FROM_CHIPS, RISK_CHIPS, ownOf, type Flips } from './strea
    -------------------------------------------------------------------------- */
 
 const SHORT: Partial<Record<TokenId, string>> = { from: 'From', device: 'Device', when: 'When', risk: 'Risk' }
-
-export function factTokens(rows: RowsRead): TokenId[] {
-  return sentenceTokens(rows).filter((t) => t !== 'person' && t !== 'app')
-}
-
-/** The source's card height, for the geometry: its rows are fixed. */
-export const sourceCardH = (facts: number): number => 100 + facts * 22
-
-/** The card and the chips under it, as the geometry reserves them. */
-export const sourceH = (facts: number, groups: readonly ('from' | 'device' | 'risk')[]): number =>
-  sourceCardH(facts) + 46 + groups.reduce((n, g) => n + (g === 'device' ? 108 : g === 'risk' ? 46 : 76), 0)
-
-export function chipGroups(rows: RowsRead): ('from' | 'device' | 'risk')[] {
-  const out: ('from' | 'device' | 'risk')[] = ['from']
-  if (rows.rows.has('device')) out.push('device')
-  if (rows.rows.has('risk')) out.push('risk')
-  return out
-}
 
 export interface SourceProps {
   form: SignInForm

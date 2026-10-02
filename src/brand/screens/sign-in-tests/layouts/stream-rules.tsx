@@ -9,7 +9,8 @@ import { traceResult } from '../journey'
 import { Spinner } from '../PolicyStack'
 import { G, type Slot } from './stream-geometry'
 import type { Tone } from './stream-model'
-import { FactNeed, Gate, Mark, NoteLines, Num, Peek, Sensor, lowerFirst, type GateState, type SensorState } from './stream-parts'
+import { FactNeed, Gate, Mark, NoteLines, Num, Peek, Sensor, type GateState, type SensorState } from './stream-parts'
+import { lowerFirst } from './stream-parts-utils'
 
 /* -----------------------------------------------------------------------------
    The RULE gates inside the open channel (StreamLayout.tsx), in order down

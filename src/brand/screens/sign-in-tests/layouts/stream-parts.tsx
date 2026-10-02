@@ -1,10 +1,12 @@
 import { motion } from 'motion/react'
-import { createContext, useContext, type CSSProperties, type ReactNode } from 'react'
+import { useContext, type CSSProperties, type ReactNode } from 'react'
 import { AppWindow, Check, CircleHelp, Clock, Gauge, Globe, Laptop, Lock, MapPin, Users, X, type LucideIcon } from 'lucide-react'
 
 import type { LineStatus } from '../../testing/evidence'
 import type { PillCategory } from '../../testing/trace-pills'
 import { Spinner } from '../PolicyStack'
+import { EASE_OUT, lowerFirst } from './stream-parts-utils'
+import { PeekCtx } from './stream-peek-ctx'
 
 /* -----------------------------------------------------------------------------
    The stream's small pieces (StreamLayout.tsx): a channel's number, a mark,
@@ -12,8 +14,6 @@ import { Spinner } from '../PolicyStack'
    one note open at a time, beside what is hovered, focused or pressed (a
    press pins it; Escape or a press elsewhere lets it go).
    -------------------------------------------------------------------------- */
-
-export const EASE_OUT = [0.2, 0, 0, 1] as const
 
 export function Num({ n }: { n: number | null }) {
   return (
@@ -77,15 +77,6 @@ export function Sensor({ category, word, state }: { category: PillCategory; word
 }
 
 // --- The peek -------------------------------------------------------------------------
-
-export interface PeekState {
-  open: { id: string; pinned: boolean } | null
-  show: (id: string) => void
-  hide: (id: string) => void
-  toggle: (id: string, from: HTMLElement) => void
-}
-
-export const PeekCtx = createContext<PeekState>({ open: null, show: () => {}, hide: () => {}, toggle: () => {} })
 
 const noteId = (id: string) => `rl-stream-note-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 
@@ -164,9 +155,6 @@ export function NoteLines({ lines, fix }: { lines: readonly string[]; fix?: stri
     </>
   )
 }
-
-/** The rule's requirement after "needs": "below 40", a name keeps its capital. */
-export const lowerFirst = (t: string): string => (/^(Not|Below|Above|Between|Before|After) /.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t)
 
 /** One check read across: what the sign-in showed, then what the rule needs — never run together. */
 export function FactNeed({ word, fact, via, need, status }: { word: string; fact: string; via?: string; need: string; status?: LineStatus }) {

@@ -13,7 +13,8 @@ import { Spinner } from '../PolicyStack'
 import type { RunLayoutProps } from './types'
 import { G, type PoolSlot } from './stream-geometry'
 import type { Tone } from './stream-model'
-import { EASE_OUT, FactNeed, NoteLines, Peek } from './stream-parts'
+import { FactNeed, NoteLines, Peek } from './stream-parts'
+import { EASE_OUT } from './stream-parts-utils'
 
 /* -----------------------------------------------------------------------------
    The POOLS (StreamLayout.tsx): the three outcomes a sign-in can get. The

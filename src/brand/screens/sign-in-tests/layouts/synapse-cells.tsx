@@ -8,7 +8,8 @@ import type { CheckRow, EnginePolicy, EngineRule } from '../engine-run'
 import { traceResult } from '../journey'
 import type { Box } from './synapse-geometry'
 import type { OutId, PolKind, Tone } from './synapse-model'
-import { Busy, Mark, Neuron, factOf, needOf } from './synapse-parts'
+import { Busy, Mark, Neuron } from './synapse-parts'
+import { factOf, needOf } from './synapse-parts-utils'
 
 /* The neurons of each layer (SynapseLayout.tsx): what each one says, in few
    words, and the press it answers. Their tones come from synapse-model.ts. */
@@ -112,7 +113,7 @@ export function CheckCell({ c, r, k, ...b }: CellBase & { c: CheckRow; r: Engine
 }
 
 /** A rule's few words, at its standing: what failed it, or where it stands. */
-export function ruleWords(r: EngineRule, s: number): string {
+function ruleWords(r: EngineRule, s: number): string {
   const res = traceResult(r, s, true)
   const failing = r.failing !== null ? r.checks[r.failing] : r.checks.find((c) => c.status === 'fail')
   const unknown = r.checks.find((c) => c.status === 'unknown')
@@ -159,7 +160,7 @@ export function RuleCell({ r, s, ...b }: CellBase & { r: EngineRule; s: number }
   )
 }
 
-export const OUT_WORDS: Record<OutId, string> = { ...DECISION_WORDS, depends: 'Depends', none: 'No decision' }
+const OUT_WORDS: Record<OutId, string> = { ...DECISION_WORDS, depends: 'Depends', none: 'No decision' }
 
 export function OutputCell({ id, chosen, ...b }: CellBase & { id: OutId; chosen: boolean }) {
   return (

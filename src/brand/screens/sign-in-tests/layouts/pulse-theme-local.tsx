@@ -1,13 +1,13 @@
 import { Moon, Sun } from 'lucide-react'
 
 import { Tip } from '../../../kit'
-import { useStageTheme } from './stream-theme-state'
+import { useLocalTheme } from './pulse-theme-state'
 
-/* The stream's stage toggle; the stage itself (`idp.check-stage`) is read and written in stream-theme-state.ts. */
+/* Pulse's own stage button (pulse-theme.tsx), used while the shared
+   stage-theme module is away. */
 
-/** The dock's light / dark button: pressed while the stage is dark. */
-export function StageThemeToggle() {
-  const [theme, set] = useStageTheme()
+export function LocalToggle() {
+  const [theme, set] = useLocalTheme()
   const dark = theme === 'dark'
   return (
     <Tip text={dark ? 'Light stage' : 'Dark stage'} placement="top">
